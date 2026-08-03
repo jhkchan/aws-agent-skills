@@ -1,0 +1,58 @@
+# CI eval workflow — assertion-only on every PR.
+# Gate-2 decision: Local-eval workflow (maintainer runs the LLM-judge locally
+# via the maintainer SSO, commits scorecard artifacts; CI runs ONLY the assertion
+# layer — no AWS credentials configured).
+#
+# Satisfies:
+#   S-006 — assertion-layer evals on every PR
+#   S-E04 — warns on skills missing eval/
+name: Eval
+
+on:
+  pull_request:
+    paths:
+      - 'skills/**'
+      - 'eval/**'
+      - '.github/workflows/eval.yml'
+  workflow_dispatch:
+
+# Cancel stale runs on the same PR to keep solo-maintainer CI lean.
+concurrency:
+  group: eval-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  assertion:
+    name: Assertion-layer eval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runner dependencies
+        run: pip install pyyaml
+
+      - name: Run assertion-only eval (no model invocation)
+        run: python eval/run_eval.py --assert-only
+
+  eval-coverage:
+    name: Eval coverage check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Warn on skills missing eval/ directory
+        run: |
+          # S-E04: every shipped skill must carry a co-located eval/ directory.
+          # Emits a GitHub Actions warning (non-blocking) for each skill
+          # that is missing eval/.
+          for skill_dir in skills/*/; do
+            [ -d "$skill_dir" ] || continue
+            skill_name=$(basename "$skill_dir")
+            if [ ! -d "${skill_dir}eval" ]; then
+              echo "::warning file=${skill_dir}SKILL.md::Skill ${skill_name} has no eval/ directory — eval-backed contract requires co-located test cases"
+            fi
+          done
