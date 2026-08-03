@@ -1,0 +1,5 @@
+# CODEOWNERS for jhkchan/aws-agent-skills
+# Solo-maintainer repo. All changes require review from the maintainer.
+# De-branded: personal attribution only, no employer/company branding.
+
+* @jhkchan
