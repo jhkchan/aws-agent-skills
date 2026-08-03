@@ -43,7 +43,7 @@ the skill is returned for improvement rather than shipped as eval-backed.
 ## License
 
 By contributing, you agree that your contributions are licensed under the
-[Apache License 2.0](./LICENSE).
+[Apache-2.0](./LICENSE) license.
 
 ## Author
 
