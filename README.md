@@ -1,9 +1,16 @@
 # aws-agent-skills
 
+> Repository: **[jhkchan/aws-agent-skills](https://github.com/jhkchan/aws-agent-skills)**
+> · License: **Apache-2.0** · Maintainer: **Jacky Chan, AWS Community Builder**
+> (solo, de-branded — no employer or product branding).
+
 Eval-backed AWS CloudOps agent skills. Every shipped skill carries a
 co-located eval specification (`skills/<name>/eval/test-cases.yaml`) that
 produces a per-dimension, 120-point scorecard when run through the shared
-Python harness — measured, not asserted.
+Python harness — measured, not asserted. Each committed scorecard renders
+into the README table below with the per-skill columns mandated by S-007:
+**skill**, **model**, **total** score, **grade**, **verdict** (assertion
+correctness), **latency**, and **tokens**.
 
 ## Why eval-backed?
 
