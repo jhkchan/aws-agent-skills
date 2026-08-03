@@ -1,0 +1,138 @@
+# Eval test cases for iam-least-privilege-advisor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: iam-least-privilege-advisor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: admin-wildcard
+    description: Admin role with wildcard action and resource — maximum blast radius
+    input: |
+      Policy name: admin-wildcard
+      Policy document:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "*"
+            Resource: "*"
+    expected_verdict: OVERPERMISSIVE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE"
+        - "admin-wildcard"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: LEAST_PRIVILEGE"
+
+  - id: s3-readonly-scoped
+    description: Read-only S3 role scoped to a single bucket prefix — least privilege
+    input: |
+      Policy name: s3-readonly-scoped
+      Policy document:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - "arn:aws:s3:::app-data-prod"
+              - "arn:aws:s3:::app-data-prod/*"
+    expected_verdict: LEAST_PRIVILEGE
+    assertions:
+      must_contain:
+        - "LEAST_PRIVILEGE"
+        - "s3-readonly-scoped"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OVERPERMISSIVE"
+
+  - id: s3-poweruser-wildcard-resource
+    description: S3 power-user with service wildcard action on all resources
+    input: |
+      Policy name: s3-poweruser-wildcard-resource
+      Policy document:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "s3:*"
+            Resource: "*"
+    expected_verdict: OVERPERMISSIVE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE"
+        - "s3-poweruser-wildcard-resource"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: LEAST_PRIVILEGE"
+
+  - id: s3-get-wildcard-scoped-resource
+    description: S3 read-only wildcard actions scoped to a concrete bucket ARN — ambiguous
+    input: |
+      Policy name: s3-get-wildcard-scoped-resource
+      Policy document:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"
+            Resource:
+              - "arn:aws:s3:::app-data-prod"
+              - "arn:aws:s3:::app-data-prod/*"
+    expected_verdict: AMBIGUOUS
+    assertions:
+      must_contain:
+        - "AMBIGUOUS"
+        - "s3-get-wildcard-scoped-resource"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: LEAST_PRIVILEGE"
+        - "VERDICT: OVERPERMISSIVE"
+
+  - id: sts-assume-role-scoped
+    description: STS AssumeRole scoped to a specific role ARN — least privilege
+    input: |
+      Policy name: sts-assume-role-scoped
+      Policy document:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "sts:AssumeRole"
+            Resource: "arn:aws:iam::123456789012:role/cross-audit-role"
+    expected_verdict: LEAST_PRIVILEGE
+    assertions:
+      must_contain:
+        - "LEAST_PRIVILEGE"
+        - "sts-assume-role-scoped"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OVERPERMISSIVE"
