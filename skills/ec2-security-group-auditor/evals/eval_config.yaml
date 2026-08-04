@@ -1,0 +1,38 @@
+# Eval configuration for ec2-security-group-auditor
+# Maps each eval case to its prompt and baseline files.
+# The canonical eval surface for the full structured-eval pattern.
+#
+# Relationship to eval/test-cases.yaml:
+#   eval/test-cases.yaml is the compatibility shim discovered by
+#   eval/run_eval.py (glob: skills/*/eval/*.yaml). It contains the same
+#   5 test cases with inline inputs and assertions.
+#   This evals/ directory is the structured canonical surface with
+#   separated prompt/baseline files for with-skill-vs-baseline comparison.
+#   Both surfaces are kept in sync. CI uses eval/test-cases.yaml via
+#   run_eval.py --assertion-only; the evals/ directory is the
+#   contributor-facing contract.
+
+skill_name: ec2-security-group-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: web-tier-https
+    prompt_file: prompts/web-tier-https.md
+    baseline_file: baselines/web-tier-https.md
+  - id: bastion-ssh-open
+    prompt_file: prompts/bastion-ssh-open.md
+    baseline_file: baselines/bastion-ssh-open.md
+  - id: db-private-cidr
+    prompt_file: prompts/db-private-cidr.md
+    baseline_file: baselines/db-private-cidr.md
+  - id: db-mysql-open
+    prompt_file: prompts/db-mysql-open.md
+    baseline_file: baselines/db-mysql-open.md
+  - id: all-ports-open
+    prompt_file: prompts/all-ports-open.md
+    baseline_file: baselines/all-ports-open.md

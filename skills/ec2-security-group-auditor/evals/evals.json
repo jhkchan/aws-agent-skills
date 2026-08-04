@@ -1,0 +1,127 @@
+{
+  "skill": "ec2-security-group-auditor",
+  "schema_version": "1.0",
+  "description": "Structured eval definitions for the EC2 Security-Group Auditor skill. Each eval case specifies the prompt, expected verdict, and assertion checks. The prompt_file and baseline_file fields point to files under prompts/ and baselines/ respectively.",
+  "evals": [
+    {
+      "id": "web-tier-https",
+      "name": "Web-tier HTTPS public + SSH restricted to private CIDR",
+      "difficulty": "medium",
+      "prompt_file": "prompts/web-tier-https.md",
+      "baseline_file": "baselines/web-tier-https.md",
+      "expected_verdict": "PUBLIC_NONCRITICAL",
+      "assertions": {
+        "must_contain": [
+          "PUBLIC_NONCRITICAL",
+          "web-tier-https",
+          "VERDICT",
+          "REASON",
+          "REMEDIATION"
+        ],
+        "must_not_contain": [
+          "Error:",
+          "I cannot",
+          "I'm unable",
+          "VERDICT: OPEN",
+          "VERDICT: RESTRICTED"
+        ]
+      }
+    },
+    {
+      "id": "bastion-ssh-open",
+      "name": "Bastion SG with SSH open to the entire internet — critical exposure",
+      "difficulty": "easy",
+      "prompt_file": "prompts/bastion-ssh-open.md",
+      "baseline_file": "baselines/bastion-ssh-open.md",
+      "expected_verdict": "OPEN",
+      "assertions": {
+        "must_contain": [
+          "OPEN",
+          "bastion-ssh-open",
+          "VERDICT",
+          "REASON",
+          "REMEDIATION"
+        ],
+        "must_not_contain": [
+          "Error:",
+          "I cannot",
+          "I'm unable",
+          "VERDICT: RESTRICTED",
+          "VERDICT: PUBLIC_NONCRITICAL"
+        ]
+      }
+    },
+    {
+      "id": "db-private-cidr",
+      "name": "Database SG with MySQL port restricted to private network CIDR",
+      "difficulty": "medium",
+      "prompt_file": "prompts/db-private-cidr.md",
+      "baseline_file": "baselines/db-private-cidr.md",
+      "expected_verdict": "RESTRICTED",
+      "assertions": {
+        "must_contain": [
+          "RESTRICTED",
+          "db-private-cidr",
+          "VERDICT",
+          "REASON",
+          "REMEDIATION"
+        ],
+        "must_not_contain": [
+          "Error:",
+          "I cannot",
+          "I'm unable",
+          "VERDICT: OPEN",
+          "VERDICT: PUBLIC_NONCRITICAL"
+        ]
+      }
+    },
+    {
+      "id": "db-mysql-open",
+      "name": "Database SG with MySQL port open to the entire internet — critical exposure",
+      "difficulty": "easy",
+      "prompt_file": "prompts/db-mysql-open.md",
+      "baseline_file": "baselines/db-mysql-open.md",
+      "expected_verdict": "OPEN",
+      "assertions": {
+        "must_contain": [
+          "OPEN",
+          "db-mysql-open",
+          "VERDICT",
+          "REASON",
+          "REMEDIATION"
+        ],
+        "must_not_contain": [
+          "Error:",
+          "I cannot",
+          "I'm unable",
+          "VERDICT: RESTRICTED",
+          "VERDICT: PUBLIC_NONCRITICAL"
+        ]
+      }
+    },
+    {
+      "id": "all-ports-open",
+      "name": "SG with all TCP ports open to the entire internet — maximum exposure",
+      "difficulty": "hard",
+      "prompt_file": "prompts/all-ports-open.md",
+      "baseline_file": "baselines/all-ports-open.md",
+      "expected_verdict": "OPEN",
+      "assertions": {
+        "must_contain": [
+          "OPEN",
+          "all-ports-open",
+          "VERDICT",
+          "REASON",
+          "REMEDIATION"
+        ],
+        "must_not_contain": [
+          "Error:",
+          "I cannot",
+          "I'm unable",
+          "VERDICT: RESTRICTED",
+          "VERDICT: PUBLIC_NONCRITICAL"
+        ]
+      }
+    }
+  ]
+}

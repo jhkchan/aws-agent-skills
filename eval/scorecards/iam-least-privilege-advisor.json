@@ -1,69 +1,12 @@
 {
   "skill": "iam-least-privilege-advisor",
   "model_id": "amazon.nova-pro-v1:0",
-  "dimensions": [
-    {
-      "id": "D1",
-      "name": "Knowledge Delta",
-      "score": 17,
-      "max": 20,
-      "justification": "The skill supplies a detailed, step\u2011by\u2011step classification algorithm, a concrete list of privilege\u2011escalation services, and nuanced condition\u2011bypass checks that go beyond a generic model. However it omits handling of resource\u2011based policies in the verdict logic, ignores some condition operators (e.g., StringNotEquals, Bool), and does not address policy variables beyond version validation, limiting the expert delta."
-    },
-    {
-      "id": "D2",
-      "name": "Mindset + Appropriate Procedures",
-      "score": 13,
-      "max": 15,
-      "justification": "Procedures are AWS\u2011specific and well\u2011structured (validation, deny handling, wildcard checks, escalation checks, condition analysis, aggregation). The remediation workflow references CloudTrail and Athena, but it lacks explicit steps for using IAM Access Analyzer or the policy simulator in the remediation loop, and the ordering of some steps could be clearer."
-    },
-    {
-      "id": "D3",
-      "name": "Anti-Pattern Quality",
-      "score": 14,
-      "max": 15,
-      "justification": "A comprehensive NEVER list is provided with concrete reasons (e.g., never treat Action:\"*\" Resource:\"*\" as safe, never trust iam:PassRole on \"*\", never ignore ForAllValues bypasses). Missing are warnings about NotResource in resource\u2011based policies and about over\u2011reliance on managed policies beyond the ones listed, which would strengthen the anti\u2011pattern coverage."
-    },
-    {
-      "id": "D4",
-      "name": "Specification Compliance",
-      "score": 15,
-      "max": 15,
-      "justification": "Frontmatter is complete, description clearly states purpose, activation triggers, and keywords. Output format is precisely defined, enabling reliable invocation."
-    },
-    {
-      "id": "D5",
-      "name": "Progressive Disclosure",
-      "score": 13,
-      "max": 15,
-      "justification": "The skill presents a quick reference and then a full process early, which is useful but still front\u2011loads many details before the anti\u2011pattern and remediation sections, creating some cognitive overload. A more staged reveal (e.g., high\u2011level checklist first) would improve layering."
-    },
-    {
-      "id": "D6",
-      "name": "Freedom Calibration",
-      "score": 15,
-      "max": 15,
-      "justification": "The skill only performs analysis and advice; no destructive actions are permitted. Constraints match the fragility of the task, providing safe freedom."
-    },
-    {
-      "id": "D7",
-      "name": "Pattern Recognition",
-      "score": 10,
-      "max": 10,
-      "justification": "The document follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Process \u2192 Effective\u2011permissions context \u2192 Output format \u2192 Anti\u2011patterns \u2192 Remediation \u2192 References), aiding comprehension."
-    },
-    {
-      "id": "D8",
-      "name": "Practical Usability",
-      "score": 14,
-      "max": 15,
-      "justification": "The algorithm is actionable, includes error handling, and the model output examples demonstrate correct classification. The only shortfall is the lack of explicit guidance for cross\u2011account resource\u2011based policies in the aggregation step, which could lead to ambiguous verdicts in some scenarios."
-    }
-  ],
-  "total_score": 111,
+  "dimensions": [],
+  "total_score": 0,
   "max_score": 120,
-  "grade": "A",
-  "token_count": 8973,
-  "latency_ms": 9222,
+  "grade": "F",
+  "token_count": 0,
+  "latency_ms": 0,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

@@ -1,0 +1,44 @@
+{
+  "name": "@jhkchan/aws-agent-skills",
+  "version": "0.1.0",
+  "description": "Eval-backed AWS CloudOps agent skills — detective auditors with deterministic verdicts, pipeline orchestration, and co-located evals",
+  "license": "Apache-2.0",
+  "author": "Jacky Chan",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jhkchan/aws-agent-skills.git"
+  },
+  "type": "module",
+  "bin": {
+    "aws-skills": "cli/bin/cli.js"
+  },
+  "files": [
+    "cli/bin",
+    "skills",
+    "commands",
+    "schema",
+    "_aws_shared"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "ai-agent",
+    "aws",
+    "cloudops",
+    "skills",
+    "auditor",
+    "security",
+    "compliance",
+    "claude",
+    "cursor",
+    "windsurf",
+    "codex",
+    "gemini",
+    "eval-backed",
+    "detective-audit",
+    "iam",
+    "s3",
+    "ec2"
+  ]
+}

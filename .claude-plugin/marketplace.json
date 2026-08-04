@@ -1,0 +1,24 @@
+{
+  "name": "aws-agent-skills",
+  "owner": {
+    "name": "Jacky Chan",
+    "email": ""
+  },
+  "metadata": {
+    "description": "Eval-backed AWS CloudOps agent skills — detective auditors with deterministic verdicts, pipeline orchestration, and co-located evals",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "aws-cloudops-skills",
+      "description": "AWS CloudOps audit skills for S3, IAM, EC2, and pipeline orchestration across the Assess-Audit-Prioritize-Remediate lifecycle",
+      "source": "./",
+      "skills": [
+        "./skills/s3-public-access-auditor",
+        "./skills/iam-least-privilege-advisor",
+        "./skills/ec2-security-group-auditor",
+        "./skills/aws-orchestrator"
+      ]
+    }
+  ]
+}

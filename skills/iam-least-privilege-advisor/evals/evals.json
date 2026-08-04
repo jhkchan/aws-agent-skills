@@ -1,0 +1,109 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "iam-least-privilege-advisor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the IAM Least-Privilege Advisor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval pattern eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "admin-wildcard",
+      "name": "Admin wildcard — maximum blast radius",
+      "difficulty": "easy",
+      "prompt_file": "prompts/admin-wildcard.md",
+      "baseline_file": "baselines/admin-wildcard.md",
+      "expected_verdict": "OVERPERMISSIVE",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OVERPERMISSIVE", "admin-wildcard", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: LEAST_PRIVILEGE"]
+        }
+      ]
+    },
+    {
+      "id": "s3-readonly-scoped",
+      "name": "Read-only S3 role scoped to a single bucket prefix — least privilege",
+      "difficulty": "easy",
+      "prompt_file": "prompts/s3-readonly-scoped.md",
+      "baseline_file": "baselines/s3-readonly-scoped.md",
+      "expected_verdict": "LEAST_PRIVILEGE",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["LEAST_PRIVILEGE", "s3-readonly-scoped", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OVERPERMISSIVE"]
+        }
+      ]
+    },
+    {
+      "id": "s3-poweruser-wildcard-resource",
+      "name": "S3 power-user with service wildcard action on all resources",
+      "difficulty": "medium",
+      "prompt_file": "prompts/s3-poweruser-wildcard-resource.md",
+      "baseline_file": "baselines/s3-poweruser-wildcard-resource.md",
+      "expected_verdict": "OVERPERMISSIVE",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OVERPERMISSIVE", "s3-poweruser-wildcard-resource", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: LEAST_PRIVILEGE"]
+        }
+      ]
+    },
+    {
+      "id": "s3-get-wildcard-scoped-resource",
+      "name": "S3 read-only wildcard actions scoped to a concrete bucket ARN — ambiguous",
+      "difficulty": "hard",
+      "prompt_file": "prompts/s3-get-wildcard-scoped-resource.md",
+      "baseline_file": "baselines/s3-get-wildcard-scoped-resource.md",
+      "expected_verdict": "AMBIGUOUS",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AMBIGUOUS", "s3-get-wildcard-scoped-resource", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: LEAST_PRIVILEGE", "VERDICT: OVERPERMISSIVE"]
+        }
+      ]
+    },
+    {
+      "id": "sts-assume-role-scoped",
+      "name": "STS AssumeRole scoped to a specific role ARN — least privilege",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sts-assume-role-scoped.md",
+      "baseline_file": "baselines/sts-assume-role-scoped.md",
+      "expected_verdict": "LEAST_PRIVILEGE",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["LEAST_PRIVILEGE", "sts-assume-role-scoped", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OVERPERMISSIVE"]
+        }
+      ]
+    }
+  ]
+}

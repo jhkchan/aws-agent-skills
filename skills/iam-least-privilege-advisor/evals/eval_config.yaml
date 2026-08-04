@@ -1,0 +1,48 @@
+# Eval configuration for iam-least-privilege-advisor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval pattern eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: iam-least-privilege-advisor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: admin-wildcard
+    difficulty: easy
+    prompt_file: prompts/admin-wildcard.md
+    baseline_file: baselines/admin-wildcard.md
+    expected_verdict: OVERPERMISSIVE
+    expected_risk: CRITICAL
+  - id: s3-readonly-scoped
+    difficulty: easy
+    prompt_file: prompts/s3-readonly-scoped.md
+    baseline_file: baselines/s3-readonly-scoped.md
+    expected_verdict: LEAST_PRIVILEGE
+    expected_risk: LOW
+  - id: s3-poweruser-wildcard-resource
+    difficulty: medium
+    prompt_file: prompts/s3-poweruser-wildcard-resource.md
+    baseline_file: baselines/s3-poweruser-wildcard-resource.md
+    expected_verdict: OVERPERMISSIVE
+    expected_risk: HIGH
+  - id: s3-get-wildcard-scoped-resource
+    difficulty: hard
+    prompt_file: prompts/s3-get-wildcard-scoped-resource.md
+    baseline_file: baselines/s3-get-wildcard-scoped-resource.md
+    expected_verdict: AMBIGUOUS
+    expected_risk: MODERATE
+  - id: sts-assume-role-scoped
+    difficulty: medium
+    prompt_file: prompts/sts-assume-role-scoped.md
+    baseline_file: baselines/sts-assume-role-scoped.md
+    expected_verdict: LEAST_PRIVILEGE
+    expected_risk: LOW

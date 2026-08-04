@@ -1,0 +1,21 @@
+{
+  "$schema": "https://skills.sh/schema/skills.sh.json",
+  "groupings": [
+    {
+      "title": "AWS CloudOps Auditors",
+      "description": "Eval-backed detective-audit skills that read AWS configuration state and emit deterministic verdicts (SAFE/PUBLIC/AMBIGUOUS, PASS/FAIL, etc.) with specific remediation guidance",
+      "skills": [
+        "s3-public-access-auditor",
+        "iam-least-privilege-advisor",
+        "ec2-security-group-auditor"
+      ]
+    },
+    {
+      "title": "Pipeline Orchestration",
+      "description": "The CloudOps pipeline entry point — routes user prompts across the Assess, Audit, Prioritize, and Remediate phases to the right specialist skill(s)",
+      "skills": [
+        "aws-orchestrator"
+      ]
+    }
+  ]
+}
