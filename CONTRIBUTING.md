@@ -47,5 +47,4 @@ By contributing, you agree that your contributions are licensed under the
 
 ## Author
 
-Jacky Chan — AWS Community Builder. This repo is de-branded: it carries no
-employer, company, or product branding. Personal attribution only.
+Jacky Chan — AWS Community Builder (ML & GenAI).

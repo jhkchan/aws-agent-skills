@@ -1,15 +1,12 @@
-"""OSS governance tests for T-9 ship gate.
+"""OSS governance tests.
 
-Asserts the three ship artifacts (LICENSE, CONTRIBUTING.md, README.md) satisfy
-the spec's eval-backed contract, de-brand, and repo-posture requirements.
+Asserts the ship artifacts (LICENSE, CONTRIBUTING.md, README.md) satisfy the
+eval-backed contract and repo-posture requirements.
 
 Derived from:
   - S-001 (LICENSE Apache-2.0, CONTRIBUTING.md exist with correct structure)
   - S-007 (README publishes eval scorecard table)
-  - Spec glossary "De-brand" (zero employer/company/product branding;
-    author attributes as "Jacky Chan, AWS Community Builder")
-  - Spec line 20 repo posture (jhkchan/aws-agent-skills, Apache-2.0,
-    de-branded, solo-maintainer)
+  - Repo posture (jhkchan/aws-agent-skills, Apache-2.0, solo maintainer)
 """
 
 from __future__ import annotations
@@ -23,12 +20,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 LICENSE = REPO_ROOT / "LICENSE"
 CONTRIBUTING = REPO_ROOT / "CONTRIBUTING.md"
 README = REPO_ROOT / "README.md"
-
-# De-brand blocklist — these tokens MUST NOT appear in shipped content.
-# De-brand guardrail: the project carries no employer/company branding.
-# Author attributes personally; these tokens must never appear in shipped
-# skill or doc content.
-FORBIDDEN_BRAND_TOKENS = ("the internal reference repo", "the other internal reference repo")
 
 
 def _read(path: Path) -> str:
@@ -52,13 +43,9 @@ class TestLicense:
         assert "Version 2.0" in text
         assert "SPDX-License-Identifier: Apache-2.0" in text
 
-    def test_copyright_personal_not_company(self) -> None:
+    def test_personal_attribution(self) -> None:
         text = _read(LICENSE)
         assert "Jacky Chan" in text
-        for token in FORBIDDEN_BRAND_TOKENS:
-            assert token.lower() not in text.lower(), (
-                f"de-brand violation: LICENSE mentions '{token}'"
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -88,13 +75,6 @@ class TestContributing:
     def test_documents_license(self) -> None:
         text = _read(CONTRIBUTING).lower()
         assert "apache-2.0" in text or "apache 2.0" in text
-
-    def test_debrand(self) -> None:
-        text = _read(CONTRIBUTING).lower()
-        for token in FORBIDDEN_BRAND_TOKENS:
-            assert token.lower() not in text, (
-                f"de-brand violation: CONTRIBUTING mentions '{token}'"
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -127,14 +107,6 @@ class TestReadme:
         assert "apache-2.0" in lowered or "apache 2.0" in lowered
 
     def test_attribution(self) -> None:
-        """De-brand glossary: author = 'Jacky Chan, AWS Community Builder'."""
         text = _read(README)
         assert "Jacky Chan" in text
         assert "AWS Community Builder" in text
-
-    def test_debrand_no_company(self) -> None:
-        text = _read(README).lower()
-        for token in FORBIDDEN_BRAND_TOKENS:
-            assert token.lower() not in text, (
-                f"de-brand violation: README mentions '{token}'"
-            )
