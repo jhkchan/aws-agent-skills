@@ -25,7 +25,9 @@ CONTRIBUTING = REPO_ROOT / "CONTRIBUTING.md"
 README = REPO_ROOT / "README.md"
 
 # De-brand blocklist — these tokens MUST NOT appear in shipped content.
-# (The internal reference repo / The other internal reference repo are Jacky's employers; de-brand per spec glossary.)
+# De-brand guardrail: the project carries no employer/company branding.
+# Author attributes personally; these tokens must never appear in shipped
+# skill or doc content.
 FORBIDDEN_BRAND_TOKENS = ("the internal reference repo", "the other internal reference repo")
 
 

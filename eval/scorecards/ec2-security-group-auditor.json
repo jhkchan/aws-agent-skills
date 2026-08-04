@@ -1,0 +1,70 @@
+{
+  "skill": "ec2-security-group-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete decision\u2011tree logic, high\u2011risk port registry, CIDR /7 public classification, prefix\u2011list inspection steps, CVSS\u2011style severity mapping and compliance control cross\u2011reference \u2013 details a senior CloudOps engineer would learn. Missing coverage of IPv6 protocol\u2011specific nuances (e.g., ICMPv6 type handling) prevents a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific mindset (stateful SG, worst\u2011rule aggregation) and concrete pre\u2011flight CLI safety steps. Lacks an explicit procedure for deduplicating or reconciling overlapping CIDR rules, so not fully comprehensive."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete reasons (SSH public, all\u2011ports, prefix\u2011list, CIDR /7, ephemerals, etc.). Does not include a NEVER rule for exposing HTTP (port 80) without an ALB, a minor omission."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states when to invoke, and activation keywords are exhaustive. No explicit \"when NOT to invoke\" clause, leading to a small deduction."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (summary, mindset, process, tables, anti\u2011patterns, references). Some deep reference tables appear early, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive remediation is tightly constrained with backup, additive\u2011change guidance, rollback verification, and safety checks; creative analysis is left free. Calibration is spot\u2011on."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows the established CloudOps auditor pattern with clear sections (frontmatter, mindset, process, anti\u2011patterns, references, output format, safety checks, remediation)."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working pseudocode, CLI commands, output format, and worked examples; an agent can execute end\u2011to\u2011end. Missing explicit handling for protocol -1 combined with prefix\u2011list sources and IPv6 ICMP specifics, so not flawless."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 9929,
+  "latency_ms": 24865,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

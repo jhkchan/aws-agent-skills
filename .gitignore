@@ -1,0 +1,13 @@
+# Python caches
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Feature-workflow internal artifacts (design docs, not shipped content)
+features/
+.omc/
+
+# macOS
+.DS_Store

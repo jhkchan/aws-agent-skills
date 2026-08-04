@@ -36,7 +36,7 @@ jobs:
         run: pip install pyyaml
 
       - name: Run assertion-only eval (no model invocation)
-        run: python eval/run_eval.py --assert-only
+        run: python eval/run_eval.py --assertion-only
 
   eval-coverage:
     name: Eval coverage check

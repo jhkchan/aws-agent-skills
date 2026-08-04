@@ -26,6 +26,9 @@ incomplete, and CI runs the assertion layer on every PR.
 <!-- BEGIN EVAL SCORECARD TABLE -->
 | Skill | Model | Score | Grade | Verdicts | Latency | Tokens |
 |---|---|---|---|---|---|---|
+| ec2-security-group-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 24.9s | 9929 |
+| iam-least-privilege-advisor | amazon.nova-pro-v1:0 | 111/120 | A | 5/5 | 9.2s | 8973 |
+| s3-public-access-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 4.8s | 7587 |
 <!-- END EVAL SCORECARD TABLE -->
 
 > Scorecard rows appear once eval runs commit JSON artifacts to
@@ -47,7 +50,7 @@ skills/*/eval/*.yaml  ->  eval/run_eval.py
 - **CI:** assertion-only on every PR (no AWS credentials). The maintainer
   runs the LLM-judge locally and commits scorecard artifacts.
 - **Eval-backed floor:** a skill is listed as eval-backed only if it scores
-  >=70/120 (Grade B).
+  >=108/120 (Grade A). Every shipped skill above meets this floor.
 
 ## Quickstart
 
@@ -64,6 +67,28 @@ python3 eval/run_eval.py
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the directory structure and how
 to add a skill.
+
+## Coverage Roadmap
+
+This repo's wedge is **eval-rigor, not breadth** — three eval-backed skills
+beat 200 unevaluated ones (that is the "measured, not vibes" thesis). The path
+from these seeds to broad AWS coverage is staged:
+
+1. **Now (Phase 2):** 3 deep seeds across 3 service families (S3 / IAM / EC2),
+   each clearing the Grade-A eval-backed floor via the 8-dimension judge. Proves
+   the harness + floor + CI + governance end-to-end.
+2. **Category depth:** saturate one family (e.g. *security*: +KMS, GuardDuty,
+   Config, Security Hub) to prove the pattern repeats and the contributor docs work.
+3. **Breadth across families:** expand to networking, storage, compute, databases
+   — prioritized by CloudOps demand.
+4. **Contributor-driven growth:** the awslabs amplification path
+   (`awslabs/agent-plugins` accepts external PRs) and a future dedicated org
+   unlock external contributors.
+5. **Steady state:** broad AWS coverage maintained by a community, not one person.
+
+A solo maintainer realistically holds ~10–30 eval-backed skills; beyond that,
+breadth requires the contributor model. "Cover all ~200 AWS services" is a
+community-scale goal — the seed set plus this roadmap are the on-ramp.
 
 ## License
 

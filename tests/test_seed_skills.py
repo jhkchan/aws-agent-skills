@@ -18,7 +18,11 @@ from eval.skill_validator import discover_skills, validate_skill_dir
 
 SKILLS_DIR = pathlib.Path(__file__).resolve().parent.parent / "skills"
 
-SEED_SKILLS = ["iam-least-privilege-advisor", "ec2-security-group-auditor"]
+SEED_SKILLS = [
+    "iam-least-privilege-advisor",
+    "ec2-security-group-auditor",
+    "s3-public-access-auditor",
+]
 
 
 # -- S-002: skill directory structure ----------------------------------------
@@ -84,6 +88,14 @@ def test_ec2_eval_has_verdict_diversity() -> None:
     data = yaml.safe_load(eval_yaml.read_text())
     verdicts = {tc["expected_verdict"] for tc in data["test_cases"]}
     assert verdicts == {"OPEN", "PUBLIC_NONCRITICAL", "RESTRICTED"}
+
+
+def test_s3_eval_has_verdict_diversity() -> None:
+    """S3 eval covers SAFE, PUBLIC, and AMBIGUOUS verdicts (S-003/S-004)."""
+    eval_yaml = SKILLS_DIR / "s3-public-access-auditor" / "eval" / "test-cases.yaml"
+    data = yaml.safe_load(eval_yaml.read_text())
+    verdicts = {tc["expected_verdict"] for tc in data["test_cases"]}
+    assert verdicts == {"SAFE", "PUBLIC", "AMBIGUOUS"}
 
 
 # -- S-E04: skill without eval/ is flagged -----------------------------------

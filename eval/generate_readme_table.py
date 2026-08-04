@@ -62,8 +62,8 @@ def _format_score(card: dict) -> str:
 
 
 def _format_verdicts(card: dict) -> str:
-    correct = card.get("verdicts_correct", 0)
-    total = card.get("verdicts_total", 0)
+    correct = card.get("assertions_passed_count", 0)
+    total = correct + card.get("assertions_failed_count", 0)
     return f"{correct}/{total}"
 
 
