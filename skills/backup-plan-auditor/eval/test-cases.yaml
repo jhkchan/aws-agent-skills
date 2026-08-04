@@ -1,0 +1,272 @@
+# Eval test cases for backup-plan-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: backup-plan-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: coverage-gap-empty-selection
+    description: >-
+      Backup plan with a valid daily schedule, compliance-mode vault lock,
+      and CMK encryption — but the resource selection is empty (Resources: []
+      and no tags/conditions). The plan backs up nothing.
+    input: |
+      Plan name: daily-ec2-backup
+      Plan ARN: arn:aws:backup:us-east-1:111111111111:backup-plan:abc-123
+
+      Backup vault: secure-vault
+      Vault lock: COMPLIANCE (MinRetentionDays: 30)
+      Vault encryption key: arn:aws:kms:us-east-1:111111111111:key/cmk-vault (customer-managed CMK)
+
+      Backup plan rules:
+        Rule 1 (daily-rule):
+          ScheduleExpression: cron(0 5 * * ? *)  — daily at 05:00 UTC
+          TargetBackupVault: secure-vault
+          Lifecycle: DeleteAfterDays: 30
+
+      Backup selections:
+        Selection 1 (ec2-prod):
+          IamRoleArn: arn:aws:iam::111111111111:role/service-role/AWSBackupDefaultServiceRole
+          Resources: []  (empty — no resources assigned)
+          ListOfTags: (none)
+          Conditions: (none)
+
+      Emit the standard VERDICT block (PLAN, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: COVERAGE_GAP
+    assertions:
+      must_contain:
+        - "COVERAGE_GAP"
+        - "daily-ec2-backup"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: VAULT_RISK"
+
+  - id: vault-risk-no-lock-aws-managed-key
+    description: >-
+      Backup plan with a valid daily schedule and real resource coverage, but
+      the vault has no lock and uses the AWS-managed key (aws/backup). Backups
+      are vulnerable to ransomware deletion and lack CMK control.
+    input: |
+      Plan name: prod-database-backup
+      Plan ARN: arn:aws:backup:us-east-1:111111111111:backup-plan:def-456
+
+      Backup vault: prod-backup-vault
+      Vault lock: NONE
+      Vault encryption key: aws/backup (AWS-managed key — shared across all accounts in the region)
+
+      Backup plan rules:
+        Rule 1 (daily-db):
+          ScheduleExpression: cron(0 2 * * ? *)  — daily at 02:00 UTC
+          TargetBackupVault: prod-backup-vault
+          Lifecycle: DeleteAfterDays: 30
+
+      Backup selections:
+        Selection 1 (rds-prod):
+          IamRoleArn: arn:aws:iam::111111111111:role/service-role/AWSBackupDefaultServiceRole
+          Resources:
+            - arn:aws:rds:us-east-1:111111111111:db:prod-database-1
+          Conditions: (none)
+
+      Emit the standard VERDICT block (PLAN, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: VAULT_RISK
+    assertions:
+      must_contain:
+        - "VAULT_RISK"
+        - "prod-database-backup"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: COVERAGE_GAP"
+
+  - id: noncompliant-weekly-short-retention
+    description: >-
+      Backup plan with a compliance-mode vault lock and CMK, real resource
+      coverage — but the schedule is weekly (Monday only) and retention is
+      only 7 days. Fails the daily-frequency and 30-day-retention baseline.
+    input: |
+      Plan name: weekly-archive-plan
+      Plan ARN: arn:aws:backup:us-east-1:111111111111:backup-plan:ghi-789
+
+      Backup vault: locked-vault
+      Vault lock: COMPLIANCE (MinRetentionDays: 7)
+      Vault encryption key: arn:aws:kms:us-east-1:111111111111:key/cmk-arch (customer-managed CMK)
+
+      Backup plan rules:
+        Rule 1 (weekly-rule):
+          ScheduleExpression: cron(0 5 ? * 1 *)  — every Monday at 05:00 UTC (weekly)
+          TargetBackupVault: locked-vault
+          Lifecycle: DeleteAfterDays: 7
+
+      Backup selections:
+        Selection 1 (ec2-archive):
+          IamRoleArn: arn:aws:iam::111111111111:role/service-role/AWSBackupDefaultServiceRole
+          Resources:
+            - arn:aws:ec2:us-east-1:111111111111:instance/i-abc12345
+          Conditions: (none)
+
+      Emit the standard VERDICT block (PLAN, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NONCOMPLIANT
+    assertions:
+      must_contain:
+        - "NONCOMPLIANT"
+        - "weekly-archive-plan"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-impossible-lifecycle
+    description: >-
+      Backup plan where the rule has MoveToColdStorageAfterDays of 90 and
+      DeleteAfterDays of 30 — the cold-storage transition can never execute
+      because the recovery point is deleted first.
+    input: |
+      Plan name: cold-storage-backup
+      Plan ARN: arn:aws:backup:us-east-1:111111111111:backup-plan:jkl-012
+
+      Backup vault: compliant-vault
+      Vault lock: COMPLIANCE (MinRetentionDays: 30)
+      Vault encryption key: arn:aws:kms:us-east-1:111111111111:key/cmk-efs (customer-managed CMK)
+
+      Backup plan rules:
+        Rule 1 (efs-cold-tier):
+          ScheduleExpression: cron(0 3 * * ? *)  — daily at 03:00 UTC
+          TargetBackupVault: compliant-vault
+          Lifecycle:
+            MoveToColdStorageAfterDays: 90
+            DeleteAfterDays: 30
+
+      Backup selections:
+        Selection 1 (efs-prod):
+          IamRoleArn: arn:aws:iam::111111111111:role/service-role/AWSBackupDefaultServiceRole
+          Resources:
+            - arn:aws:elasticfilesystem:us-east-1:111111111111:file-system/fs-abc12345
+          Conditions: (none)
+
+      Emit the standard VERDICT block (PLAN, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "cold-storage-backup"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: COVERAGE_GAP"
+
+  - id: ok-well-configured
+    description: >-
+      Production backup plan with daily schedule, 90-day retention, cold
+      storage at 30 days, compliance-mode vault lock (Min 90 / Max 365),
+      customer-managed key, cross-region copy to a DR vault, and three
+      resource selections. All audit dimensions pass.
+    input: |
+      Plan name: prod-compliant-backup
+      Plan ARN: arn:aws:backup:us-east-1:111111111111:backup-plan:mno-345
+
+      Backup vault: prod-locked-vault
+      Vault lock: COMPLIANCE (MinRetentionDays: 90, MaxRetentionDays: 365)
+      Vault encryption key: arn:aws:kms:us-east-1:111111111111:key/cmk-secure (customer-managed CMK)
+
+      Backup plan rules:
+        Rule 1 (daily-production):
+          ScheduleExpression: cron(0 2 * * ? *)  — daily at 02:00 UTC
+          TargetBackupVault: prod-locked-vault
+          Lifecycle:
+            MoveToColdStorageAfterDays: 30
+            DeleteAfterDays: 90
+          CopyActions:
+            - DestinationBackupVaultArn: arn:aws:backup:us-west-2:111111111111:backup-vault:dr-locked-vault
+              Lifecycle:
+                DeleteAfterDays: 90
+
+      Backup selections:
+        Selection 1 (prod-resources):
+          IamRoleArn: arn:aws:iam::111111111111:role/service-role/AWSBackupDefaultServiceRole
+          Resources:
+            - arn:aws:ec2:us-east-1:111111111111:instance/i-prod001
+            - arn:aws:rds:us-east-1:111111111111:db:prod-db-001
+            - arn:aws:dynamodb:us-east-1:111111111111:table/prod-orders
+          Conditions: (none)
+
+      Emit the standard VERDICT block (PLAN, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "prod-compliant-backup"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: COVERAGE_GAP"
+        - "VERDICT: VAULT_RISK"
+
+  - id: vault-risk-governance-mode
+    description: >-
+      Backup plan with a vault lock in governance mode (ChangeableForDays: 30)
+      — root can still remove the lock. Backups are vulnerable to a
+      compromised root account despite the lock appearing to be in place.
+    input: |
+      Plan name: staging-backup-plan
+      Plan ARN: arn:aws:backup:us-east-1:111111111111:backup-plan:pqr-678
+
+      Backup vault: staging-vault
+      Vault lock: GOVERNANCE (MinRetentionDays: 30, ChangeableForDays: 30 — lock becomes permanent in 30 days)
+      Vault encryption key: arn:aws:kms:us-east-1:111111111111:key/cmk-staging (customer-managed CMK)
+
+      Backup plan rules:
+        Rule 1 (staging-daily):
+          ScheduleExpression: cron(0 4 * * ? *)  — daily at 04:00 UTC
+          TargetBackupVault: staging-vault
+          Lifecycle: DeleteAfterDays: 30
+
+      Backup selections:
+        Selection 1 (staging-ec2):
+          IamRoleArn: arn:aws:iam::111111111111:role/service-role/AWSBackupDefaultServiceRole
+          Resources:
+            - arn:aws:ec2:us-east-1:111111111111:instance/i-staging001
+          Conditions: (none)
+
+      Emit the standard VERDICT block (PLAN, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: VAULT_RISK
+    assertions:
+      must_contain:
+        - "VAULT_RISK"
+        - "staging-backup-plan"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NONCOMPLIANT"

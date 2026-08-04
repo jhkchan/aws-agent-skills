@@ -1,0 +1,70 @@
+{
+  "skill": "compute-optimizer-findings-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides concrete, expert\u2011level thresholds and decision rules not commonly known (e.g., performanceRisk \u22654 = low confidence, 30\u2011day stale rule, minimum 3 EC2 metrics for high confidence, savings\u2011based risk tiers). Adds genuine delta beyond a baseline model, but some thresholds (e.g., exact metric count) could be more justified, so not full 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: enrollment status check, pagination with next\u2011token, CloudTrail verification, CLI remediation steps, snapshot before right\u2011size, ASG launch\u2011template update, confirmation gate. Only minor deduction for occasional generic phrasing like \"check security\" absent."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete reasons (e.g., never classify Overprovisioned as UNDERUTILIZED without memory metric, never act on performanceRisk \u22654, never ignore lastRefreshTimestamp). All warnings are specific and explain why. One point deducted for lack of explicit ordering of anti\u2011patterns by severity."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. However, the schema is informal prose rather than a strict JSON schema, and the \"entry_point\" flag is false, which could hinder automated discovery. Hence not a perfect 15."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Layers information: quick reference table, ordered steps, deep reference section, and separate anti\u2011pattern block. Some users may find the risk\u2011level tables embedded in step 4a\u2011c a bit dense, but overall the hierarchy is respected."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated (confirmation prompt, snapshot, ASG refresh steps). Classification is fully deterministic. Only a slight deduction because the confirmation gate is described but not enforced in the example outputs."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Examples \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation. Structure is clear and reusable."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Model output examples correctly apply the decision tree, produce the required output format, and handle error cases. Missing explicit handling of pagination in the aggregated account verdict, but that does not prevent successful per\u2011resource execution."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 35720,
+  "latency_ms": 17806,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

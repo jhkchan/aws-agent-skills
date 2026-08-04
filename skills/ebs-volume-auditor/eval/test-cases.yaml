@@ -1,0 +1,240 @@
+# Eval test cases for ebs-volume-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ebs-volume-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-snapshot-block-exposure
+    description: >-
+      EBS snapshot owned by the caller with CreateVolumePermissions Group:all —
+      any AWS account can launch a volume from the snapshot and read every
+      block. Data-breach-likely exposure.
+    input: |
+      Resource type: snapshot
+      Resource id: snap-0aaa111profile-public-exposure
+      Snapshot configuration (aws ec2 describe-snapshots --snapshot-ids ...):
+        SnapshotId: snap-0aaa111profile-public-exposure
+        OwnerId: "111111111111"
+        VolumeId: vol-0abcdef
+        State: completed
+        StartTime: 2026-06-15T10:30:00Z
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc-customer-managed
+      CreateVolumePermissions (aws ec2 describe-snapshot-attribute ...):
+        [
+          {"Group": "all", "UserId": ""}
+        ]
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_SNAPSHOT
+    assertions:
+      must_contain:
+        - "PUBLIC_SNAPSHOT"
+        - "public-exposure"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "CRITICAL"
+        - "reset-snapshot-attribute"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNENCRYPTED"
+
+  - id: unencrypted-volume-compliance-violation
+    description: >-
+      EBS volume with Encrypted: false — unencrypted at rest, compliance
+      violation under PCI-DSS/HIPAA/SOC2. Encryption is immutable; remediation
+      is snapshot-copy + re-create.
+    input: |
+      Resource type: volume
+      Resource id: vol-0bbb222unencrypted-volume
+      Volume configuration (aws ec2 describe-volumes --volume-ids ...):
+        VolumeId: vol-0bbb222unencrypted-volume
+        State: in-use
+        Size: 100
+        VolumeType: gp2
+        Encrypted: false
+        Attachments:
+          - InstanceId: i-0123456789abcdef0
+            State: attached
+            DeleteOnTermination: false
+            AttachTime: 2026-05-01T08:00:00Z
+      Region encryption-by-default: true
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: UNENCRYPTED
+    assertions:
+      must_contain:
+        - "UNENCRYPTED"
+        - "unencrypted-volume"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "HIGH"
+        - "copy-snapshot"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_SNAPSHOT"
+
+  - id: unattached-volume-cost-waste
+    description: >-
+      EBS volume in available state for over 90 days with no attachments —
+      accruing full GB-month cost with no workload benefit. Snapshot-then-delete
+      is the recommended remediation.
+    input: |
+      Resource type: volume
+      Resource id: vol-0ccc333unattached-volume
+      Volume configuration (aws ec2 describe-volumes --volume-ids ...):
+        VolumeId: vol-0ccc333unattached-volume
+        State: available
+        Size: 500
+        VolumeType: gp3
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc-customer-managed
+        CreateTime: 2026-03-01T08:00:00Z
+        Attachments: []
+      Resource tags:
+        - Key: lastAttached, Value: 2026-03-15
+      Today: 2026-08-02
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: UNATTACHED
+    assertions:
+      must_contain:
+        - "UNATTACHED"
+        - "unattached-volume"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "MEDIUM"
+        - "delete-volume"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: LEGACY_TYPE"
+
+  - id: stale-snapshot-no-consumer
+    description: >-
+      EBS snapshot older than 90 days, not referenced by any AMI, no FSR enabled,
+      standard tier, no retention tag — pure storage-cost line. Delete after
+      CloudTrail verification.
+    input: |
+      Resource type: snapshot
+      Resource id: snap-0ddd444stale-snapshot
+      Snapshot configuration (aws ec2 describe-snapshots --snapshot-ids ...):
+        SnapshotId: snap-0ddd444stale-snapshot
+        OwnerId: "111111111111"
+        VolumeId: vol-0oldvolume-deleted
+        State: completed
+        StartTime: 2026-02-10T12:00:00Z
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc-customer-managed
+      AMI references (describe-images --filters BlockDeviceMapping.SnapshotId=...): []
+      Fast Snapshot Restore (describe-fast-snapshot-restores): []
+      Tier status (describe-snapshot-tier-status): STANDARD
+      Resource tags: []
+      Today: 2026-08-02
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: STALE_SNAPSHOT
+    assertions:
+      must_contain:
+        - "STALE_SNAPSHOT"
+        - "stale-snapshot"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "MEDIUM"
+        - "delete-snapshot"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNENCRYPTED"
+
+  - id: legacy-type-gp2-volume
+    description: >-
+      Encrypted gp2 volume attached and in-use — no security issue but legacy
+      volume type with online gp3 upgrade path (~20% cost reduction, tunable
+      IOPS/throughput).
+    input: |
+      Resource type: volume
+      Resource id: vol-0eee555legacy-gp2-volume
+      Volume configuration (aws ec2 describe-volumes --volume-ids ...):
+        VolumeId: vol-0eee555legacy-gp2-volume
+        State: in-use
+        Size: 200
+        VolumeType: gp2
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc-customer-managed
+        Iops: 600
+        Attachments:
+          - InstanceId: i-0123456789abcdef0
+            State: attached
+            DeleteOnTermination: false
+            AttachTime: 2026-04-15T08:00:00Z
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: LEGACY_TYPE
+    assertions:
+      must_contain:
+        - "LEGACY_TYPE"
+        - "legacy-gp2-volume"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "LOW"
+        - "modify-volume"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNENCRYPTED"
+
+  - id: encrypted-gp3-attached-ok
+    description: >-
+      Clean EBS volume: encrypted, gp3, attached, no legacy-type, no
+      unattached cost waste, no public exposure on its snapshot lineage.
+      All dimensions clean — OK verdict.
+    input: |
+      Resource type: volume
+      Resource id: vol-0fff666encrypted-gp3-ok
+      Volume configuration (aws ec2 describe-volumes --volume-ids ...):
+        VolumeId: vol-0fff666encrypted-gp3-ok
+        State: in-use
+        Size: 100
+        VolumeType: gp3
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc-customer-managed
+        Iops: 3000
+        Throughput: 125
+        Attachments:
+          - InstanceId: i-0123456789abcdef0
+            State: attached
+            DeleteOnTermination: false
+            AttachTime: 2026-07-01T08:00:00Z
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "encrypted-gp3-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL"
+        - "VERDICT: UNENCRYPTED"
+        - "VERDICT: LEGACY_TYPE"

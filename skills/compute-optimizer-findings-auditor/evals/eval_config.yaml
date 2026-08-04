@@ -1,0 +1,53 @@
+# Eval configuration for compute-optimizer-findings-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: compute-optimizer-findings-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: ec2-overprovisioned-high-confidence
+    difficulty: medium
+    prompt_file: prompts/ec2-overprovisioned-high-confidence.md
+    baseline_file: baselines/ec2-overprovisioned-high-confidence.md
+    expected_verdict: UNDERUTILIZED
+    expected_risk: HIGH
+  - id: ec2-underprovisioned-cpu-memory
+    difficulty: medium
+    prompt_file: prompts/ec2-underprovisioned-cpu-memory.md
+    baseline_file: baselines/ec2-underprovisioned-cpu-memory.md
+    expected_verdict: NOT_OPTIMIZED
+    expected_risk: HIGH
+  - id: ebs-volume-optimized
+    difficulty: easy
+    prompt_file: prompts/ebs-volume-optimized.md
+    baseline_file: baselines/ebs-volume-optimized.md
+    expected_verdict: OK
+    expected_risk: LOW
+  - id: lambda-overprovisioned-memory
+    difficulty: medium
+    prompt_file: prompts/lambda-overprovisioned-memory.md
+    baseline_file: baselines/lambda-overprovisioned-memory.md
+    expected_verdict: UNDERUTILIZED
+    expected_risk: MEDIUM
+  - id: ec2-overprovisioned-low-confidence-inferred-memory
+    difficulty: hard
+    prompt_file: prompts/ec2-overprovisioned-low-confidence-inferred-memory.md
+    baseline_file: baselines/ec2-overprovisioned-low-confidence-inferred-memory.md
+    expected_verdict: NOT_OPTIMIZED
+    expected_risk: MEDIUM
+  - id: ec2-optimized-clean
+    difficulty: easy
+    prompt_file: prompts/ec2-optimized-clean.md
+    baseline_file: baselines/ec2-optimized-clean.md
+    expected_verdict: OK
+    expected_risk: LOW

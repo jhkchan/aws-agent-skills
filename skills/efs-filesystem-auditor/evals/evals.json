@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "efs-filesystem-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EFS Filesystem Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "unencrypted-fs",
+      "name": "Unencrypted EFS filesystem — plaintext at rest, encryption immutable",
+      "difficulty": "easy",
+      "prompt_file": "prompts/unencrypted-fs.md",
+      "baseline_file": "baselines/unencrypted-fs.md",
+      "expected_verdict": "UNENCRYPTED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["UNENCRYPTED", "unencrypted-fs", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_POLICY", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "public-policy-wildcard",
+      "name": "Public filesystem policy — Principal star with ClientRootAccess, no condition",
+      "difficulty": "medium",
+      "prompt_file": "prompts/public-policy-wildcard.md",
+      "baseline_file": "baselines/public-policy-wildcard.md",
+      "expected_verdict": "PUBLIC_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PUBLIC_POLICY", "public-policy-wildcard", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-no-lifecycle",
+      "name": "Encrypted and clean policy but no lifecycle policy — unbounded storage cost",
+      "difficulty": "medium",
+      "prompt_file": "prompts/config-gap-no-lifecycle.md",
+      "baseline_file": "baselines/config-gap-no-lifecycle.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-no-lifecycle", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_POLICY"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-no-tls",
+      "name": "Encrypted with lifecycle and access points but no TLS enforcement — plaintext NFS",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-no-tls.md",
+      "baseline_file": "baselines/config-gap-no-tls.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-no-tls", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_POLICY"]
+        }
+      ]
+    },
+    {
+      "id": "fully-hardened",
+      "name": "Fully hardened EFS — encrypted, scoped policy, TLS, lifecycle, access points",
+      "difficulty": "easy",
+      "prompt_file": "prompts/fully-hardened.md",
+      "baseline_file": "baselines/fully-hardened.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "fully-hardened", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: UNENCRYPTED", "VERDICT: PUBLIC_POLICY", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "public-scoped-by-access-point",
+      "name": "Principal star scoped by AccessPointArn condition — strong downgrade to OK",
+      "difficulty": "hard",
+      "prompt_file": "prompts/public-scoped-by-access-point.md",
+      "baseline_file": "baselines/public-scoped-by-access-point.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "public-scoped-by-access-point", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: UNENCRYPTED", "VERDICT: PUBLIC_POLICY", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

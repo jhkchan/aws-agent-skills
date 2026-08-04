@@ -1,0 +1,70 @@
+{
+  "skill": "eks-cluster-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds multiple non\u2011obvious EKS specifics (empty publicAccessCidrs treated as open, N\u20113 version drift threshold, 40 CIDR limit, priority of log types, port\u201110250 exposure risk, access\u2011entry vs ConfigMap nuances, Fargate profile considerations) that a generic model would not enumerate."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific audit mindset with a priority matrix, step\u2011by\u2011step classification, concrete CLI commands, and pre\u2011flight safety gates; only minor generic phrasing remains."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete reasoning (e.g., empty CIDR list, partial logging, wildcard usernames, cross\u2011account role trust). One point off because some anti\u2011patterns could be grouped more succinctly, but overall strong."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter includes all required metadata, clear description, activation triggers, and an invocation schema; lacks an explicit JSON schema definition but otherwise meets spec."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Content is layered (mindset, quick reference, pre\u2011flight, detailed steps, output format, anti\u2011patterns, remediation), yet the opening sections are dense, imposing some cognitive load."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are protected by mandatory confirmation, backup instructions, and cost warnings, matching the fragility of the operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Process \u2192 Output \u2192 Anti\u2011patterns \u2192 Remediation) that aligns with established skill patterns."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a decision tree, error handling, concrete example outputs, and actionable CLI remediation; missing explicit integration of latest\u2011version lookup into the flow, but overall an agent could execute the audit successfully."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 34838,
+  "latency_ms": 11708,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

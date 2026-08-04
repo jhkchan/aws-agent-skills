@@ -1,0 +1,70 @@
+{
+  "skill": "ecr-repository-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many expert\u2011level specifics (strong vs weak conditions, lifecycle rule priority nuances, replication policy propagation, encryption type limits, scan\u2011on\u2011push vs enhanced scanning, policy size limits). However, it omits a few niche edge\u2011cases such as how overlapping Allow statements with differing conditions are resolved, leaving a small knowledge gap."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers a clear AWS\u2011specific step\u2011by\u2011step audit flow, pagination handling, pre\u2011flight safety checks, and remediation ordering. The only shortfall is the lack of an explicit algorithm for aggregating findings across a multi\u2011repo sweep (e.g., how to merge per\u2011repo verdicts into a summary)."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (wildcard principals, empty policies, NotAction, SourceIp 0.0.0.0/0, GetAuthorizationToken misuse, etc.). One minor omission: it does not explicitly warn against using malformed lifecyclePolicyText, which could cause silent failures."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Front\u2011matter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata, activation triggers, invocation schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides reliable keywords for activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill is layered (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Anti\u2011Patterns \u2192 Remediation \u2192 Deep reference), but the initial sections are dense, forcing the agent to read a large amount before reaching the concise top\u2011level instructions. Critical safety gates are buried in later sections, causing potential cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions (policy changes, tag\u2011mutability updates, lifecycle policy application) are gated by explicit confirmation prompts, rollback backups, and warnings about irreversibility. Creative tasks have ample freedom, while fragile operations are tightly constrained."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Anti\u2011Patterns \u2192 Remediation \u2192 Deep reference) that aligns with the standard CloudOps skill template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a concrete output format, working CLI snippets, decision tree, and error handling for malformed policies. Lacks explicit handling for malformed lifecyclePolicyText and does not show a fallback when CLI commands fail, which could leave an agent without a clear recovery path."
+    }
+  ],
+  "total_score": 113,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 46409,
+  "latency_ms": 12401,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

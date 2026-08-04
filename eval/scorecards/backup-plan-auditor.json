@@ -1,0 +1,70 @@
+{
+  "skill": "backup-plan-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many deep, non\u2011obvious AWS Backup specifics (cold\u2011storage vs deletion timing, governance vs compliance lock nuances, AWS\u2011managed key sharing, cross\u2011region copy lock independence, WindowsVSS requirement, cron syntax details, PITR vs snapshots, tag\u2011selection eventual consistency, legal hold overrides, update\u2011behavior clearing fields, cross\u2011account KMS grants). A capable model would not automatically know all these."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines a clear AWS\u2011specific mindset and ordered classification steps, includes concrete CLI pagination and confirmation\u2011gate procedures, and maps remediation to exact AWS commands. Only minor generic phrasing (e.g., \"validate input structure\") prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasoning for each pitfall (empty selections, governance lock, impossible lifecycle, AWS\u2011managed key, sub\u2011daily schedule, cross\u2011region copy lock assumptions, vault\u2011lock enablement without retention check, tag\u2011selection coverage, etc.)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete front\u2011matter, clear description, explicit when\u2011to\u2011use, activation triggers, invocation schema, and verdict shape. An agent can reliably know when to invoke the skill."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Top\u2011level quick reference table, then deeper sections (mindset, pre\u2011flight, step\u2011by\u2011step, edge cases, anti\u2011patterns, safety, remediation). Some critical rules (e.g., cold\u2011storage rule) are buried in Step\u202f0, causing slight cognitive load."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions (plan updates, vault lock) are gated by mandatory confirmation and safety checks; classification is free\u2011form. Calibration matches task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable structure (mindset \u2192 quick reference \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 examples \u2192 anti\u2011patterns \u2192 safety \u2192 remediation)."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides decision tree, deterministic output format, concrete CLI remediation, pagination guidance, and works correctly in the model output examples. Slight omission of detailed schedule\u2011parsing edge cases prevents a perfect score."
+    }
+  ],
+  "total_score": 115,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 30595,
+  "latency_ms": 8498,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

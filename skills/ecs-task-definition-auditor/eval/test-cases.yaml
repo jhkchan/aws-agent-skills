@@ -1,0 +1,359 @@
+# Eval test cases for ecs-task-definition-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ecs-task-definition-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: privileged-ec2-sidecar
+    description: >-
+      EC2 launch-type task definition with a container that has privileged: true.
+      The container bypasses all Docker security isolation — full host kernel
+      access on the EC2 instance.
+    input: |
+      Audit the following ECS task definition for security exposure. Emit the
+      standard VERDICT block (TASK, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Task definition family: privileged-ec2-sidecar
+      networkMode: bridge
+      requiresCompatibilities: ["EC2"]
+
+      containerDefinitions:
+        [
+          {
+            "name": "sidecar",
+            "image": "public.ecr.aws/nginx/nginx:latest",
+            "privileged": true,
+            "cpu": 256,
+            "memory": 512,
+            "user": "1000",
+            "essential": true,
+            "portMappings": [
+              {"containerPort": 80, "hostPort": 8080}
+            ],
+            "logConfiguration": {
+              "logDriver": "awslogs",
+              "options": {
+                "awslogs-group": "/ecs/privileged-ec2-sidecar",
+                "awslogs-region": "us-east-1",
+                "awslogs-stream-prefix": "ecs"
+              }
+            }
+          }
+        ]
+    expected_verdict: PRIVILEGED
+    assertions:
+      must_contain:
+        - "PRIVILEGED"
+        - "privileged-ec2-sidecar"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "privileged"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: SECRET_LEAK"
+        - "VERDICT: INSECURE"
+
+  - id: password-in-env-var
+    description: >-
+      Fargate task definition that stores DATABASE_PASSWORD in the plaintext
+      environment array instead of the secrets array (Secrets Manager). The
+      credential is permanently committed in the task definition JSON.
+    input: |
+      Audit the following ECS task definition for security exposure. Emit the
+      standard VERDICT block (TASK, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Task definition family: password-in-env-var
+      networkMode: awsvpc
+      requiresCompatibilities: ["FARGATE"]
+      executionRoleArn: arn:aws:iam::111111111111:role/ecs-task-execution
+      cpu: "512"
+      memory: "1GB"
+
+      containerDefinitions:
+        [
+          {
+            "name": "api-server",
+            "image": "111111111111.dkr.ecr.us-east-1.amazonaws.com/api-server:v2",
+            "cpu": 512,
+            "memory": 1024,
+            "user": "1000",
+            "essential": true,
+            "environment": [
+              {"name": "NODE_ENV", "value": "production"},
+              {"name": "DATABASE_PASSWORD", "value": "s3cretP@ssw0rd!2024"},
+              {"name": "LOG_LEVEL", "value": "info"}
+            ],
+            "portMappings": [
+              {"containerPort": 3000}
+            ],
+            "logConfiguration": {
+              "logDriver": "awslogs",
+              "options": {
+                "awslogs-group": "/ecs/password-in-env-var",
+                "awslogs-region": "us-east-1",
+                "awslogs-stream-prefix": "ecs"
+              }
+            }
+          }
+        ]
+    expected_verdict: SECRET_LEAK
+    assertions:
+      must_contain:
+        - "SECRET_LEAK"
+        - "password-in-env-var"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DATABASE_PASSWORD"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PRIVILEGED"
+        - "VERDICT: INSECURE"
+
+  - id: host-network-root-user
+    description: >-
+      EC2 task definition with networkMode host (no network namespace isolation)
+      and user root (UID 0). Both dimensions are insecure; no privileged flag and
+      no secrets in env.
+    input: |
+      Audit the following ECS task definition for security exposure. Emit the
+      standard VERDICT block (TASK, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Task definition family: host-network-root-user
+      networkMode: host
+      requiresCompatibilities: ["EC2"]
+
+      containerDefinitions:
+        [
+          {
+            "name": "worker",
+            "image": "111111111111.dkr.ecr.us-east-1.amazonaws.com/worker:v1",
+            "cpu": 256,
+            "memory": 512,
+            "user": "root",
+            "essential": true,
+            "environment": [
+              {"name": "WORKER_CONCURRENCY", "value": "4"},
+              {"name": "QUEUE_NAME", "value": "jobs"}
+            ],
+            "logConfiguration": {
+              "logDriver": "awslogs",
+              "options": {
+                "awslogs-group": "/ecs/host-network-root-user",
+                "awslogs-region": "us-east-1",
+                "awslogs-stream-prefix": "ecs"
+              }
+            }
+          }
+        ]
+    expected_verdict: INSECURE
+    assertions:
+      must_contain:
+        - "INSECURE"
+        - "host-network-root-user"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "host"
+        - "root"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PRIVILEGED"
+        - "VERDICT: SECRET_LEAK"
+
+  - id: missing-resource-limits
+    description: >-
+      Task definition with no task-level or container-level CPU/memory limits and
+      no log configuration. All other dimensions pass (non-root, not privileged,
+      awsvpc, no secrets in env).
+    input: |
+      Audit the following ECS task definition for security exposure. Emit the
+      standard VERDICT block (TASK, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Task definition family: missing-resource-limits
+      networkMode: awsvpc
+
+      containerDefinitions:
+        [
+          {
+            "name": "batch-job",
+            "image": "111111111111.dkr.ecr.us-east-1.amazonaws.com/batch-job:latest",
+            "user": "1000",
+            "essential": true,
+            "environment": [
+              {"name": "BATCH_SIZE", "value": "100"},
+              {"name": "OUTPUT_BUCKET", "value": "my-batch-results"}
+            ]
+          }
+        ]
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "missing-resource-limits"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PRIVILEGED"
+        - "VERDICT: SECRET_LEAK"
+        - "VERDICT: INSECURE"
+
+  - id: hardened-fargate-task
+    description: >-
+      Hardened Fargate task definition — awsvpc, non-root user, resource limits,
+      secrets via Secrets Manager, readonlyRootFilesystem, no privileged flag,
+      log configuration present. All dimensions pass.
+    input: |
+      Audit the following ECS task definition for security exposure. Emit the
+      standard VERDICT block (TASK, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Task definition family: hardened-fargate-task
+      networkMode: awsvpc
+      requiresCompatibilities: ["FARGATE"]
+      executionRoleArn: arn:aws:iam::111111111111:role/ecs-task-execution
+      taskRoleArn: arn:aws:iam::111111111111:role/app-task-role
+      cpu: "512"
+      memory: "1GB"
+
+      containerDefinitions:
+        [
+          {
+            "name": "web-app",
+            "image": "111111111111.dkr.ecr.us-east-1.amazonaws.com/web-app:v3",
+            "cpu": 512,
+            "memory": 1024,
+            "memoryReservation": 768,
+            "user": "1000:1000",
+            "privileged": false,
+            "readonlyRootFilesystem": true,
+            "essential": true,
+            "initProcessEnabled": true,
+            "environment": [
+              {"name": "NODE_ENV", "value": "production"},
+              {"name": "LOG_LEVEL", "value": "info"},
+              {"name": "MAX_CONNECTIONS", "value": "100"}
+            ],
+            "secrets": [
+              {
+                "name": "DATABASE_PASSWORD",
+                "valueFrom": "arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/db-password-AbCdEf"
+              },
+              {
+                "name": "JWT_SIGNING_KEY",
+                "valueFrom": "arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/jwt-key-XyZwVu"
+              }
+            ],
+            "portMappings": [
+              {"containerPort": 3000}
+            ],
+            "linuxParameters": {
+              "capabilities": {
+                "drop": ["ALL"]
+              }
+            },
+            "dockerSecurityOptions": ["no-new-privileges:true"],
+            "logConfiguration": {
+              "logDriver": "awslogs",
+              "options": {
+                "awslogs-group": "/ecs/hardened-fargate-task",
+                "awslogs-region": "us-east-1",
+                "awslogs-stream-prefix": "ecs"
+              }
+            },
+            "healthCheck": {
+              "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+              "interval": 30,
+              "timeout": 5,
+              "retries": 3,
+              "startPeriod": 60
+            }
+          }
+        ]
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "hardened-fargate-task"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PRIVILEGED"
+        - "VERDICT: SECRET_LEAK"
+        - "VERDICT: INSECURE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: aggregate-worst-finding
+    description: >-
+      EC2 task definition with multiple findings: privileged: true (PRIVILEGED),
+      API_KEY in plaintext environment (SECRET_LEAK), networkMode host and user
+      root (INSECURE), and no resource limits (CONFIG_GAP). Worst verdict
+      wins — PRIVILEGED.
+    input: |
+      Audit the following ECS task definition for security exposure. Emit the
+      standard VERDICT block (TASK, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Task definition family: aggregate-worst-finding
+      networkMode: host
+      requiresCompatibilities: ["EC2"]
+
+      containerDefinitions:
+        [
+          {
+            "name": "legacy-service",
+            "image": "111111111111.dkr.ecr.us-east-1.amazonaws.com/legacy-service:latest",
+            "privileged": true,
+            "user": "root",
+            "essential": true,
+            "environment": [
+              {"name": "ENV_NAME", "value": "prod"},
+              {"name": "API_KEY", "value": "sk-live-abc123secret456"},
+              {"name": "ENDPOINT_URL", "value": "https://api.example.com"}
+            ],
+            "readonlyRootFilesystem": false,
+            "linuxParameters": {
+              "capabilities": {
+                "add": ["SYS_ADMIN"]
+              }
+            }
+          }
+        ]
+    expected_verdict: PRIVILEGED
+    assertions:
+      must_contain:
+        - "PRIVILEGED"
+        - "aggregate-worst-finding"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "privileged"
+        - "API_KEY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INSECURE"
+        - "VERDICT: CONFIG_GAP"

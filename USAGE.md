@@ -26,6 +26,16 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-cognito-user-pool` | 2 Audit | Audit Cognito user pools for MFA, password policy, auth-flow safety, OAuth exposure, ASF mode — emits INSECURE/WEAK/ADEQUATE/OK per pool (routes to `cognito-idp-user-pool-auditor`) |
 | `/aws:audit-acm-certificate-expiry` | 2 Audit | Audit ACM certificates for expiry, renewal status, and key-algorithm compliance — emits VERDICT per certificate (routes to `acm-certificate-expiry-auditor`) |
 | `/aws:audit-securityhub-control-compliance` | 2 Audit | Audit Security Hub control findings — classifies lifecycle states (suppressed, resolved, archived, NOT_AVAILABLE) into FAILED/WARNING/PASSED/NOT_APPLICABLE + maps to fix action (routes to `securityhub-control-compliance-auditor`) |
+| `/aws:audit-ecs-task-definition` | 2 Audit | Audit ECS task definitions for privileged containers, plaintext secrets in env vars, host network mode, root-user execution, missing resource limits — emits PRIVILEGED/SECRET_LEAK/INSECURE/CONFIG_GAP/OK per task (routes to `ecs-task-definition-auditor`) |
+| `/aws:audit-backup-plan` | 2 Audit | Audit AWS Backup plans for coverage gaps, vault risks (no lock, governance-mode lock, AWS-managed key), impossible lifecycle configs, and compliance violations — emits COVERAGE_GAP/VAULT_RISK/NONCOMPLIANT/CONFIG_GAP/OK per plan (routes to `backup-plan-auditor`) |
+| `/aws:audit-eks-cluster` | 2 Audit | Audit EKS clusters for public API endpoint, disabled control-plane logging, IAM auth mapRoles, security group exposure, and outdated version (routes to `eks-cluster-auditor`) |
+| `/aws:audit-compute-optimizer-findings` | 2 Audit | Audit Compute Optimizer findings for EC2/EBS/Lambda/ASG — confidence-gated UNDERUTILIZED/NOT_OPTIMIZED/OK with per-finding risk + CLI remediation (routes to `compute-optimizer-findings-auditor`) |
+| `/aws:audit-lambda-runtime-deprecation` | 2 Audit | Audit Lambda functions for deprecated/EOL runtimes, over-permissioned execution roles, public function URL exposure, and observability config gaps — emits VERDICT per function (routes to `lambda-runtime-deprecation-auditor`) |
+| `/aws:audit-autoscaling-group` | 2 Audit | Audit Auto Scaling Groups for launch-template health, ELB health-check integrity, mixed-instances Spot diversification, capacity bounds, and unhealthy-termination behavior — emits MISCONFIGURED/CONFIG_GAP/OK per ASG (routes to `autoscaling-group-auditor`) |
+| `/aws:audit-ecr-repository` | 2 Audit | Audit ECR private repositories for public access, scan-on-push gaps, lifecycle-policy absence, tag-immutability gaps, unscanned images — emits PUBLIC/NO_SCAN/NO_LIFECYCLE/CONFIG_GAP/OK per repo (routes to `ecr-repository-auditor`) |
+| `/aws:audit-efs-filesystem` | 2 Audit | Audit EFS filesystems for encryption-at-rest, public filesystem policy, TLS enforcement, lifecycle management, and access point governance — emits UNENCRYPTED/PUBLIC_POLICY/CONFIG_GAP/OK per filesystem (routes to `efs-filesystem-auditor`) |
+| `/aws:audit-dlm-lifecycle-policy` | 2 Audit | Audit DLM EBS snapshot lifecycle policies for disabled state, empty tag/resource targets, invalid schedules, weak retention, missing cross-region copy (DR gap), CopyTags metadata loss, and per-volume snapshot quota risk — emits NO_POLICY/MISCONFIGURED/CONFIG_GAP/OK per policy (routes to `dlm-lifecycle-policy-auditor`) |
+| `/aws:audit-ebs-volume` | 2 Audit | Audit EBS volumes and snapshots for unencrypted state, unattached cost waste, legacy gp2/io1/standard volume types (gp3/io2 upgrade), stale snapshots (with FSR cost-dominance check), and public-snapshot block-data exposure — emits UNENCRYPTED/UNATTACHED/LEGACY_TYPE/STALE_SNAPSHOT/PUBLIC_SNAPSHOT/OK per resource (routes to `ebs-volume-auditor`) |
 
 Every command has a natural-language equivalent — the orchestrator routes
 identically.
@@ -793,6 +803,218 @@ and prioritized remediation.
 
 ---
 
+### 14. ecs-task-definition-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-ecs-task-definition`
+
+**What it does:** Audits ECS task definitions for privileged containers,
+plaintext secrets in environment variables (instead of Secrets Manager / SSM),
+host network mode, root-user execution, and missing resource limits (CPU,
+memory, logging). Emits a deterministic verdict
+(PRIVILEGED | SECRET_LEAK | INSECURE | CONFIG_GAP | OK) per task definition
+with enumerated findings and specific remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this ECS task definition"
+- "is my ECS container privileged?"
+- "check ECS task for secrets in env vars"
+- "ECS host network mode"
+- "is my container running as root?"
+- "ECS resource limits missing"
+- "harden my Fargate task"
+- reviewing a task definition before production deployment
+
+**Example prompt:**
+
+```
+You: "This ECS task has privileged: true, DATABASE_PASSWORD in environment,
+     and networkMode host. Audit it before we migrate to Fargate."
+```
+
+**Expected behavior:**
+
+1. Classifies the privileged flag (PRIVILEGED on EC2 — full host kernel
+   access), the plaintext secret (SECRET_LEAK), and the insecure network
+   mode + root user (INSECURE).
+2. Emits VERDICT: PRIVILEGED (worst finding wins — Step 1).
+3. Identifies the secret leak and insecure configuration as additional
+   findings.
+4. Provides register-new-revision remediation: set privileged: false,
+   move secret to secrets array (rotate the credential), change to
+   awsvpc network mode, set non-root user, add resource limits.
+
+**End-to-end scenario:** see
+[`skills/ecs-task-definition-auditor/examples/end-to-end.md`](skills/ecs-task-definition-auditor/examples/end-to-end.md)
+for a multi-finding legacy EC2 task definition walkthrough (privileged +
+secret leak + host network + root user + no limits + dangerous
+capabilities) covering severity aggregation and the register-new-revision
+remediation workflow.
+
+---
+
+### 15. eks-cluster-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-eks-cluster`
+
+**What it does:** Audits AWS EKS cluster configurations for public API
+endpoint exposure, disabled control-plane logging, IAM auth mapRoles
+misconfiguration (system:masters to broad principals, node IAM role
+privilege escalation, wildcard username), security group ingress exposure
+on critical ports (kubelet 10250, API 443, SSH 22), and outdated Kubernetes
+version drift. Emits a deterministic categorical verdict
+(PUBLIC_ENDPOINT | LOGGING_DISABLED | CONFIG_GAP | OUTDATED | OK) per
+cluster with enumerated findings and specific remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this EKS cluster"
+- "is my EKS API server public"
+- "check control-plane logging"
+- "audit aws-auth ConfigMap"
+- "system:masters mapping"
+- "check EKS security groups"
+- "is my Kubernetes version outdated"
+- "harden EKS cluster"
+- reviewing an EKS cluster before production deployment or compliance audit
+
+**Example prompt:**
+
+```
+You: "Audit this EKS cluster before our compliance review. The API
+     endpoint is public with publicAccessCidrs empty, logging is off,
+     and the node IAM role is in system:masters. What's the risk?"
+```
+
+**Expected behavior:**
+
+1. Applies the priority-ordered classification (endpoint -> logging ->
+   config -> version).
+2. Emits VERDICT: PUBLIC_ENDPOINT (Step 1 — empty publicAccessCidrs
+   defaults to 0.0.0.0/0).
+3. Lists all other findings (LOGGING_DISABLED, CONFIG_GAP for node-role
+   escalation, OUTDATED if applicable) in the FINDINGS section.
+4. Provides specific remediation with CLI commands for each finding.
+
+**End-to-end scenario:** see
+[`skills/eks-cluster-auditor/examples/end-to-end.md`](skills/eks-cluster-auditor/examples/end-to-end.md)
+for a multi-finding cluster walkthrough (public endpoint, disabled logging,
+node-role privesc, open kubelet port, outdated version) covering
+priority-ordered classification, the empty-CIDR trap, and the
+multi-finding remediation workflow.
+
+---
+
+### 16. lambda-runtime-deprecation-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-lambda-runtime-deprecation`
+
+**What it does:** Audits AWS Lambda functions for deprecated/EOL runtimes
+(python3.9, nodejs16.x, etc.), over-permissioned execution roles (admin
+wildcards, privilege-escalation actions), public function URL exposure
+(AuthType NONE), and observability config gaps (missing X-Ray tracing,
+missing DLQ, reserved concurrency 0). Emits a deterministic verdict
+(DEPRECATED_RUNTIME | PUBLIC_EXPOSURE | OVERPERMISSIVE | CONFIG_GAP | OK)
+per function with enumerated findings and CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this Lambda function"
+- "is my Lambda runtime deprecated?"
+- "Lambda runtime EOL"
+- "check Lambda execution role"
+- "Lambda admin role"
+- "is my function URL public?"
+- "Lambda AuthType NONE"
+- "missing X-Ray tracing Lambda"
+- "Lambda dead letter queue"
+- "hardening Lambda function"
+- reviewing a Lambda function before production deployment
+
+**Example prompt:**
+
+```
+You: "This Lambda function runs python3.9 with a scoped S3 role, active
+     tracing, and no function URL. Is it production-ready?"
+```
+
+**Expected behavior:**
+
+1. Compares Runtime (python3.9) against the supported-runtime set.
+2. Emits VERDICT: DEPRECATED_RUNTIME (Step 1 — python3.9 is deprecated,
+   Phase 1 create/update block in effect; function is a ticking time bomb).
+3. Confirms the execution role, tracing, and URL are all OK — the runtime
+   is the sole finding.
+4. Provides specific remediation: update to python3.12, test code
+   compatibility, publish a new version.
+
+**End-to-end scenario:** see
+[`skills/lambda-runtime-deprecation-auditor/examples/end-to-end.md`](skills/lambda-runtime-deprecation-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (nodejs16.x blocked Phase 2 + public
+function URL) covering worst-finding aggregation, runtime lifecycle phases,
+and the stale-LastModified risk amplifier.
+
+---
+
+### 17. compute-optimizer-findings-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-compute-optimizer-findings`
+
+**What it does:** Audits AWS Compute Optimizer findings for EC2, EBS, Lambda,
+and Auto Scaling Group resources — classifies overprovisioned (underutilized)
+cost waste, underprovisioned (performance-risk) findings, and low-confidence
+recommendations (inferred memory without CWAgent, high performanceRisk, stale
+findings, zero-invocation Lambda) into a deterministic verdict with per-finding
+risk and CLI remediation. Emits UNDERUTILIZED | NOT_OPTIMIZED | OK per resource.
+
+**When to invoke (trigger phrases):**
+
+- "audit compute optimizer findings"
+- "check EC2 right-sizing recommendations"
+- "is this compute optimizer finding reliable"
+- "overprovisioned instances"
+- "Lambda memory recommendations"
+- "EBS volume recommendations"
+- "performanceRisk too high"
+- "compute optimizer low confidence"
+- "right-size EC2 instances"
+- reviewing cost-optimization posture before a batch right-size
+
+**Example prompt:**
+
+```
+You: "This EC2 instance has a Compute Optimizer finding of Overprovisioned
+     with CPU at 8% and Memory at 15% (CWAgent installed). performanceRisk 1,
+     savings $150/month. Should I right-size?"
+```
+
+**Expected behavior:**
+
+1. Applies the confidence gate first — checks whether Memory metrics are
+   measured (CWAgent present) vs inferred, evaluates performanceRisk, checks
+   data sufficiency and staleness.
+2. Emits VERDICT: UNDERUTILIZED (Overprovisioned + HIGH confidence + savings
+   > $100/month = actionable cost waste).
+3. Quantifies waste ($150/month) and risk-tier it HIGH.
+4. Provides CLI remediation: create AMI, stop, modify-instance-attribute,
+   start, monitor 7 days.
+
+**End-to-end scenario:** see
+[`skills/compute-optimizer-findings-auditor/examples/end-to-end.md`](skills/compute-optimizer-findings-auditor/examples/end-to-end.md)
+for a two-instance walkthrough (high-confidence UNDERUTILIZED vs low-confidence
+NOT_OPTIMIZED with inferred memory) covering confidence gating,
+performanceRisk interpretation, and per-resource CLI remediation.
+
+---
+
 ## Pipeline Walkthrough (end-to-end)
 
 ```
@@ -830,6 +1052,324 @@ Orchestrator:
   - EC2: restrict SSH/RDP to known CIDR or use Session Manager
   - IAM: scope down PassRole to specific role ARNs
 ```
+
+---
+
+### 17. autoscaling-group-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-autoscaling-group`
+
+**What it does:** Audits AWS Auto Scaling Groups for launch-template health
+(legacy launch configuration, IMDSv2 enforcement), ELB health-check integrity
+(missing target group, grace-period timing), mixed-instances policy (single
+Spot instance type, allocation strategy), capacity bounds (desired vs
+min/max), and unhealthy-termination behavior (EC2-only checks behind an ELB,
+capacity rebalance). Emits a deterministic verdict
+(MISCONFIGURED | CONFIG_GAP | OK) per ASG with enumerated findings and
+specific remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this auto scaling group"
+- "is my ASG misconfigured?"
+- "why are my instances cycling?"
+- "check ASG health check wiring"
+- "launch template vs launch configuration"
+- "spot single instance type"
+- "ASG infinite replacement loop"
+- "is my Spot diversification sufficient?"
+
+**Example prompt:**
+
+```
+You: "This ASG has HealthCheckType ELB but no target group attached.
+     Instances keep cycling. What's wrong?"
+```
+
+**Expected behavior:**
+
+1. Classifies the ELB health check as MISCONFIGURED (Step 3) — no target
+   group means every instance is Unhealthy from launch, creating an infinite
+   replacement loop.
+2. Evaluates all other dimensions (launch template IMDSv2, capacity bounds,
+   MIP diversification, AZ diversity, scale-out headroom).
+3. Emits VERDICT: MISCONFIGURED with per-finding breakdown.
+4. Provides specific remediation: attach the target group or switch to EC2
+   health checks, with exact CLI commands.
+
+**End-to-end scenario:** see
+[`skills/autoscaling-group-auditor/examples/end-to-end.md`](skills/autoscaling-group-auditor/examples/end-to-end.md)
+for a production ASG walkthrough (ELB health check with no target group)
+covering the infinite-replacement-loop concept, ordered classification, and
+per-finding CLI remediation.
+
+---
+
+---
+
+### 18. ecr-repository-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-ecr-repository` — or route via `/aws:pipeline`.
+
+**What it does:** Audits ECR private repositories for public-access exposure
+via `repositoryPolicy` (`Principal: "*"` with pull/push actions and no strong
+condition), image-scan configuration gaps (`scanOnPush: false` with unscanned
+images), lifecycle-policy absence (no `lifecyclePolicyText`), tag-immutability
+gaps (`MUTABLE` tags — supply-chain overwrite risk), and cross-account access.
+Classifies each repository as PUBLIC, NO_SCAN, NO_LIFECYCLE, CONFIG_GAP, or OK
+with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this ECR repository"
+- "is my ECR repo public?"
+- "check ECR repository policy"
+- "is scan-on-push enabled?"
+- "does this repo have a lifecycle policy?"
+- "are there unscanned images?"
+- "is tag immutability set?"
+- "ECR cross-account access"
+
+**Example session:**
+
+You: "This ECR repo grants ecr:BatchGetImage to Principal '*' with no
+condition. scanOnPush is false."
+
+Skill:
+1. Classifies the repositoryPolicy statement: WILDCARD_PRINCIPAL + PULL
+   actions + no condition → PUBLIC (any AWS account holder can pull every
+   image layer, exposing source code and embedded secrets).
+2. Checks scanOnPush: false + images with imageScanStatus: null → NO_SCAN.
+3. Emits VERDICT: PUBLIC (worst finding wins).
+4. Remediation: remove the wildcard principal, enable scanOnPush, manually
+   scan existing images, assume breach and audit CloudTrail for pull events.
+
+**End-to-end example:** see
+[`skills/ecr-repository-auditor/examples/end-to-end.md`](skills/ecr-repository-auditor/examples/end-to-end.md)
+for a four-finding audit walkthrough (PUBLIC pull grant, NO_SCAN with
+unscanned images, NO_LIFECYCLE, CONFIG_GAP mutable tags) covering severity
+aggregation, image-layer exposure reasoning, and assume-breach remediation.
+
+---
+
+### 19. efs-filesystem-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-efs-filesystem`
+
+**What it does:** Audits EFS filesystems for encryption-at-rest, filesystem
+policy public principal exposure, encryption-in-transit enforcement
+(`aws:SecureTransport`), lifecycle management policies, and access point
+governance. Emits a deterministic verdict (UNENCRYPTED | PUBLIC_POLICY |
+CONFIG_GAP | OK) per filesystem with enumerated findings and specific
+remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this EFS filesystem"
+- "is my EFS filesystem public"
+- "check EFS encryption"
+- "EFS filesystem policy too permissive"
+- "review EFS lifecycle policy"
+- "EFS access points configured"
+- "harden EFS filesystem"
+- reviewing an EFS filesystem before production deployment
+
+**Example prompt:**
+
+```
+You: "This EFS filesystem has Principal * with ClientRootAccess in the
+     policy, no lifecycle policy, and no TLS enforcement. What's the risk?"
+```
+
+**Expected behavior:**
+
+1. Classifies the filesystem as PUBLIC_POLICY (Principal "*" with Client*
+   actions and no restrictive condition — Rule 2a).
+2. Notes ClientRootAccess as total filesystem compromise (no root squashing).
+3. Identifies lifecycle and TLS gaps as additional CONFIG_GAP findings.
+4. Provides assume-breach remediation: restrict principals, add conditions,
+   enforce TLS, add lifecycle policy, create access points.
+
+**End-to-end scenario:** see
+[`skills/efs-filesystem-auditor/examples/end-to-end.md`](skills/efs-filesystem-auditor/examples/end-to-end.md)
+for a production ML-dataset filesystem walkthrough (public root access +
+missing lifecycle + missing TLS) covering severity aggregation, the
+ClientRootAccess danger concept, and the assume-breach remediation workflow.
+
+---
+
+### 20. backup-plan-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-backup-plan`
+
+**What it does:** Audits AWS Backup plans for coverage gaps (empty or missing
+resource selections), vault risks (missing vault lock, governance-mode lock
+bypassable by root, AWS-managed encryption key), impossible lifecycle
+configurations (cold storage transition at or after deletion, retention below
+vault-lock floor), and compliance violations (backup frequency below daily,
+retention below 30 days). Emits a deterministic verdict
+(COVERAGE_GAP | VAULT_RISK | NONCOMPLIANT | CONFIG_GAP | OK) per plan with
+enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this backup plan"
+- "check backup coverage"
+- "is my backup vault locked?"
+- "backup lifecycle invalid"
+- "cold storage transition"
+- "vault lock governance vs compliance"
+- "backup retention too short"
+- "ransomware protection backup"
+- reviewing a backup plan before production deployment
+
+**Example prompt:**
+
+```
+You: "This backup plan has MoveToColdStorageAfterDays: 90 and
+     DeleteAfterDays: 30. Is the lifecycle valid?"
+```
+
+**Expected behavior:**
+
+1. Classifies the lifecycle as impossible — cold storage transition (90) is
+   at or after deletion (30), so the cold tier is never used (Step 1a).
+2. Emits VERDICT: CONFIG_GAP — the first matching step in the ordered
+   classification.
+3. Reports vault, coverage, and schedule dimensions as OK (they pass their
+   respective steps but CONFIG_GAP takes priority).
+4. Provides lifecycle-fix remediation: set cold=30, delete=90, with CLI.
+
+**End-to-end scenario:** see
+[`skills/backup-plan-auditor/examples/end-to-end.md`](skills/backup-plan-auditor/examples/end-to-end.md)
+for a production EFS backup walkthrough covering the impossible-lifecycle
+concept, ordered classification priority, and cross-region copy assessment.
+
+---
+
+### 21. dlm-lifecycle-policy-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-dlm-lifecycle-policy`
+
+**What it does:** Audits AWS Data Lifecycle Manager (DLM) EBS snapshot
+lifecycle policies for coverage gaps and silent-failure modes. Checks for
+disabled policies (State: DISABLED creates zero snapshots), empty tag/resource
+targets (TargetTags: [] matches no volumes), invalid schedules (5-field cron
+is rejected; DLM requires 6-field with year), missing/weak retention
+(Count:1 = no recovery history; missing RetainRule = unbounded quota cliff),
+absent cross-region copy (single-region backup = no DR), CopyTags metadata
+loss, and per-volume snapshot quota risk (Count >= 1000). Emits a
+deterministic verdict (NO_POLICY | MISCONFIGURED | CONFIG_GAP | OK) per policy
+or workload with enumerated findings and CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this DLM lifecycle policy"
+- "why did my EBS snapshots stop?"
+- "is my DLM policy enabled?"
+- "check DLM retention and DR"
+- "is DLM actually working?"
+- "EBS backup coverage"
+- "DLM silent failure"
+- reviewing a DLM policy before production deployment
+
+**Example prompt:**
+
+```
+You: "This DLM policy is ENABLED with a daily schedule and 14-snapshot
+     retention, but there's no cross-region copy. What's the gap?"
+```
+
+**Expected behavior:**
+
+1. Classifies the policy State (ENABLED), target coverage (valid TargetTags),
+   schedule validity (valid Interval), and retention strength (14 snapshots
+   = sensible).
+2. Identifies the missing CrossRegionCopyTargets as a DR gap (Step 7).
+3. Emits VERDICT: CONFIG_GAP — single-region backup provides no disaster
+   recovery posture.
+4. Provides remediation: add a CrossRegionCopyTarget with an explicit KMS
+   CMK in the DR region (do NOT rely on the destination region's default
+   encryption), then verify DR snapshots via `describe-snapshots`.
+
+**End-to-end scenario:** see
+[`skills/dlm-lifecycle-policy-auditor/examples/end-to-end.md`](skills/dlm-lifecycle-policy-auditor/examples/end-to-end.md)
+for a six-scenario walkthrough covering NO_POLICY (account with zero
+policies), MISCONFIGURED (disabled policy + empty TargetTags), CONFIG_GAP
+(no DR + weak retention with CopyTags false), and OK (clean production
+policy with 6-field cron, 30-day retention, and cross-region copy).
+
+---
+
+### 22. ebs-volume-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-ebs-volume`
+
+**What it does:** Audits EBS volumes and snapshots for unencrypted state
+(compliance violation under PCI/HIPAA/SOC2), unattached cost-waste volumes,
+legacy volume types (gp2/io1/standard with online upgrade paths), stale
+snapshots accumulating storage cost (with Fast Snapshot Restore cost-
+dominance check), and public snapshots exposing block-level data to every
+AWS account. Emits a deterministic verdict
+(UNENCRYPTED | UNATTACHED | LEGACY_TYPE | STALE_SNAPSHOT | PUBLIC_SNAPSHOT | OK)
+per resource with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this EBS volume"
+- "is my EBS volume encrypted"
+- "unattached EBS volumes"
+- "gp2 to gp3 upgrade"
+- "io1 to io2 upgrade"
+- "stale EBS snapshots"
+- "public snapshot exposure"
+- "CreateVolumePermission public"
+- "EBS cost optimization"
+- "EBS compliance violation"
+- reviewing an EBS volume or snapshot before production deployment or a
+  compliance audit
+
+**Example prompt:**
+
+```
+You: "This EBS volume is unencrypted, gp2, and attached with
+     DeleteOnTermination: true. It hosts our checkout config. PCI audit
+     next week — what's the verdict and remediation?"
+```
+
+**Expected behavior:**
+
+1. Classifies the volume as UNENCRYPTED (HIGH) — Step 1, the worst
+   non-CRITICAL verdict. Cites PCI-DSS Requirement 3.4 explicitly.
+2. Notes the DeleteOnTermination: true as a CONFIG_GAP finding inside the
+   verdict (does not change the verdict; not in the enum).
+3. Identifies gp2 as LEGACY_TYPE (LOW) and the region's missing
+   encryption-by-default as an account-level CONFIG_GAP.
+4. Provides the correct 7-step encryption-migration flow (snapshot →
+   copy-snapshot --encrypted → create-volume → attach → fix
+   DeleteOnTermination → detach → delete). Does NOT recommend
+   "enable encryption" — EBS encryption is immutable per resource.
+5. Surfaces `enable-ebs-encryption-by-default` as the higher-leverage
+   account-level remediation (do this FIRST to stop future bleeding).
+
+**End-to-end scenario:** see
+[`skills/ebs-volume-auditor/examples/end-to-end.md`](skills/ebs-volume-auditor/examples/end-to-end.md)
+for a PCI-DSS audit walkthrough (unencrypted gp2 data volume with
+DeleteOnTermination: true) covering severity aggregation, the
+encryption-immutability remediation flow, account-level root-cause
+escalation, and the assume-breach snapshot-lineage workflow.
 
 ---
 

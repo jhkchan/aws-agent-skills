@@ -1,0 +1,333 @@
+# Eval test cases for lambda-runtime-deprecation-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: lambda-runtime-deprecation-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: deprecated-python39-clean-config
+    description: >-
+      Lambda function on python3.9 (deprecated runtime) with an otherwise
+      clean configuration — scoped role, no public URL, active tracing.
+      The runtime is the sole finding; it is a ticking time bomb.
+    input: |
+      Function name: deprecated-python39-clean-config
+      Function configuration:
+        Runtime: python3.9
+        Handler: index.handler
+        CodeSize: 1024
+        PackageType: Zip
+        Architectures: [x86_64]
+        LastModified: 2024-03-15T10:30:00.000+0000
+        TracingConfig:
+          Mode: Active
+        Timeout: 30
+        MemorySize: 512
+      Execution role: arn:aws:iam::111111111111:role/lambda-s3-reader
+      Execution role policies (attached managed + inline):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject"],
+              "Resource": "arn:aws:s3:::app-data-prod/*"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+              "Resource": "arn:aws:logs:us-east-1:111111111111:log-group:/aws/lambda/deprecated-python39-clean-config:*"
+            }
+          ]
+        }
+      Function URL config: (none — not configured)
+      Emit the standard VERDICT block (FUNCTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: DEPRECATED_RUNTIME
+    assertions:
+      must_contain:
+        - "DEPRECATED_RUNTIME"
+        - "deprecated-python39-clean-config"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "python3.9"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: OVERPERMISSIVE"
+
+  - id: admin-wildcard-role-nodejs20
+    description: >-
+      Lambda function on nodejs20.x (current runtime) with an execution role
+      granting Action "*" Resource "*" — AdministratorAccess-equivalent.
+      No public function URL. Active tracing. The role is the sole finding.
+    input: |
+      Function name: admin-wildcard-role-nodejs20
+      Function configuration:
+        Runtime: nodejs20.x
+        Handler: index.handler
+        CodeSize: 2048
+        PackageType: Zip
+        Architectures: [x86_64]
+        LastModified: 2025-06-20T14:00:00.000+0000
+        TracingConfig:
+          Mode: Active
+        Timeout: 15
+        MemorySize: 256
+      Execution role: arn:aws:iam::111111111111:role/lambda-admin-role
+      Execution role policies (attached managed + inline):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "*",
+              "Resource": "*"
+            }
+          ]
+        }
+      Function URL config: (none — not configured)
+      Emit the standard VERDICT block (FUNCTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE"
+        - "admin-wildcard-role-nodejs20"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DEPRECATED_RUNTIME"
+
+  - id: public-function-url-python312
+    description: >-
+      Lambda function on python3.12 (current runtime) with a scoped execution
+      role but a Function URL configured with AuthType NONE — publicly
+      invocable by anyone on the internet. Active tracing. The public URL is
+      the sole finding.
+    input: |
+      Function name: public-function-url-python312
+      Function configuration:
+        Runtime: python3.12
+        Handler: app.lambda_handler
+        CodeSize: 4096
+        PackageType: Zip
+        Architectures: [x86_64]
+        LastModified: 2025-11-01T09:15:00.000+0000
+        TracingConfig:
+          Mode: Active
+        Timeout: 60
+        MemorySize: 512
+      Execution role: arn:aws:iam::111111111111:role/lambda-api-role
+      Execution role policies (attached managed + inline):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["dynamodb:Query", "dynamodb:GetItem"],
+              "Resource": "arn:aws:dynamodb:us-east-1:111111111111:table/app-table"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+              "Resource": "arn:aws:logs:us-east-1:111111111111:log-group:/aws/lambda/public-function-url-python312:*"
+            }
+          ]
+        }
+      Function URL config:
+        FunctionUrl: https://abc123def456.lambda-url.us-east-1.on.aws
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["GET", "POST"]
+          AllowHeaders: ["content-type"]
+      Emit the standard VERDICT block (FUNCTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_EXPOSURE
+    assertions:
+      must_contain:
+        - "PUBLIC_EXPOSURE"
+        - "public-function-url-python312"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "NONE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: missing-tracing-nodejs20
+    description: >-
+      Lambda function on nodejs20.x (current runtime) with a scoped execution
+      role, no public function URL, but TracingConfig Mode PassThrough — no
+      active tracing. The missing tracing is the sole finding.
+    input: |
+      Function name: missing-tracing-nodejs20
+      Function configuration:
+        Runtime: nodejs20.x
+        Handler: index.handler
+        CodeSize: 1536
+        PackageType: Zip
+        Architectures: [arm64]
+        LastModified: 2025-09-10T12:00:00.000+0000
+        TracingConfig:
+          Mode: PassThrough
+        Timeout: 30
+        MemorySize: 512
+      Execution role: arn:aws:iam::111111111111:role/lambda-processor-role
+      Execution role policies (attached managed + inline):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
+              "Resource": "arn:aws:sqs:us-east-1:111111111111:task-queue"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+              "Resource": "arn:aws:logs:us-east-1:111111111111:log-group:/aws/lambda/missing-tracing-nodejs20:*"
+            }
+          ]
+        }
+      Function URL config: (none — not configured)
+      Emit the standard VERDICT block (FUNCTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "missing-tracing-nodejs20"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DEPRECATED_RUNTIME"
+
+  - id: clean-function-python312-ok
+    description: >-
+      Lambda function on python3.12 (current runtime) with a scoped execution
+      role, no public function URL, active X-Ray tracing, and a DLQ
+      configured. Clean posture across all dimensions.
+    input: |
+      Function name: clean-function-python312-ok
+      Function configuration:
+        Runtime: python3.12
+        Handler: app.handler
+        CodeSize: 3072
+        PackageType: Zip
+        Architectures: [arm64]
+        LastModified: 2025-12-01T08:00:00.000+0000
+        TracingConfig:
+          Mode: Active
+        Timeout: 60
+        MemorySize: 512
+        DeadLetterConfig:
+          TargetArn: arn:aws:sqs:us-east-1:111111111111:lambda-dlq
+      Execution role: arn:aws:iam::111111111111:role/lambda-clean-role
+      Execution role policies (attached managed + inline):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:PutObject"],
+              "Resource": "arn:aws:s3:::app-data-prod/*"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+              "Resource": "arn:aws:logs:us-east-1:111111111111:log-group:/aws/lambda/clean-function-python312-ok:*"
+            }
+          ]
+        }
+      Function URL config: (none — not configured)
+      Emit the standard VERDICT block (FUNCTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "clean-function-python312-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: DEPRECATED_RUNTIME"
+        - "VERDICT: OVERPERMISSIVE"
+
+  - id: nodejs16-public-and-deprecated
+    description: >-
+      Lambda function on nodejs16.x (deprecated AND blocked runtime) with a
+      scoped role and a public function URL (AuthType NONE). Multiple findings
+      present; the worst finding (deprecated runtime) determines the verdict.
+    input: |
+      Function name: nodejs16-public-and-deprecated
+      Function configuration:
+        Runtime: nodejs16.x
+        Handler: index.handler
+        CodeSize: 2048
+        PackageType: Zip
+        Architectures: [x86_64]
+        LastModified: 2023-08-10T10:00:00.000+0000
+        TracingConfig:
+          Mode: Active
+        Timeout: 15
+        MemorySize: 256
+      Execution role: arn:aws:iam::111111111111:role/lambda-legacy-role
+      Execution role policies (attached managed + inline):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["dynamodb:GetItem"],
+              "Resource": "arn:aws:dynamodb:us-east-1:111111111111:table/legacy-table"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+              "Resource": "arn:aws:logs:us-east-1:111111111111:log-group:/aws/lambda/nodejs16-public-and-deprecated:*"
+            }
+          ]
+        }
+      Function URL config:
+        FunctionUrl: https://xyz789abc012.lambda-url.us-east-1.on.aws
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["GET"]
+      Emit the standard VERDICT block (FUNCTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: DEPRECATED_RUNTIME
+    assertions:
+      must_contain:
+        - "DEPRECATED_RUNTIME"
+        - "nodejs16-public-and-deprecated"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "nodejs16.x"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: OVERPERMISSIVE"

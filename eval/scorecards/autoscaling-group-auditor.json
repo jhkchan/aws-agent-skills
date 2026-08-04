@@ -1,0 +1,70 @@
+{
+  "skill": "autoscaling-group-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds many concrete expert details not usually known by a generic model: exact grace\u2011period thresholds, $Latest launch\u2011template version pitfalls, deprecation date of launch configurations, Spot allocation math, weighted\u2011capacity impact, MaxInstanceLifetime behavior, Spot two\u2011minute warning vs rebalance recommendation, and precise CLI remediation steps. This constitutes genuine delta knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, ordered 9\u2011step audit procedure, pre\u2011flight metadata gating, mandatory confirmation before any state\u2011changing CLI, and explicit backup commands. Minor deduction because a few steps (e.g., \"check security\") remain generic rather than fully AWS\u2011tailored."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete reasons (e.g., ELB health check without target group = infinite loop, launch\u2011configuration dead\u2011end, single Spot type = total outage). One point deducted for omitting a specific warning about disabling health checks without an alternative monitoring mechanism."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Full frontmatter, clear description, exhaustive activation triggers, and a precise invocation schema. Slight deduction because the \"when_to_use\" paragraph, while comprehensive, could be tighter to avoid ambiguous trigger overlap."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered: quick reference table, step\u2011by\u2011step process, deep reference, anti\u2011patterns, safety checks, and remediation. One point off because the initial Mindset section packs a large amount of expert detail that could overload a first\u2011pass reader."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated with CONFIRM prompts, backup snapshots, and pre\u2011flight safety checks. Deducted one point for not explicitly limiting parameter ranges in the CLI examples (e.g., no max\u2011size guard for update\u2011auto\u2011scaling\u2011group)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick reference \u2192 Detailed steps \u2192 Output format \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation \u2192 Deep reference. Fully coherent, only a minor deviation in ordering of safety checks versus remediation."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a deterministic verdict algorithm, concrete output format, and working CLI remediation examples. Two points deducted because edge\u2011case handling is limited: malformed HealthCheckType strings beyond the documented \"ELB,EC2\" case are not covered, and the error branch only handles missing required fields, not contradictory configurations (e.g., both LaunchTemplate and LaunchConfiguration set)."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 39803,
+  "latency_ms": 18928,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "dlm-lifecycle-policy-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 19,
+      "max": 20,
+      "justification": "The skill provides deep, AWS\u2011specific knowledge not found in a generic model: 6\u2011field Cron requirement, per\u2011volume 1,000 snapshot quota behavior, silent\u2011failure modes (service\u2011role deletion, KMS decrypt loss, tag drift), default CopyTags behavior, cross\u2011region copy encryption nuances, FastRestore cost implications, IAM policy version drift, and the complete lack of CloudWatch metrics. The only minor gap is the absence of explicit pagination guidance for CLI list commands, which a senior engineer would expect."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers a concrete AWS\u2011specific audit workflow: pre\u2011flight CLI data collection, step\u2011wise classification, verification of snapshots, service\u2011role checks, and remediation ordering. One deduction because the suggestion to \"check CloudTrail is logging\" is a generic security step rather than a DLM\u2011unique procedure."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Extensive NEVER list with precise reasoning (e.g., never treat ENABLED as OK, never accept empty TargetTags, never rely on 5\u2011field Cron, never assume ShareRules provide DR). Only minor omission: no explicit warning about stale IAM inline policies beyond version drift, but overall strong."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, metadata, activation_triggers, invocation_schema). Description clearly states WHAT the skill does, WHEN to invoke, and provides KEYWORDS for activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Layers information well: quick reference table, then pre\u2011flight, then detailed stepwise process, then deep reference. Deducted because the deep reference section is large and placed after the core workflow, which can overload the reader before they have completed the primary audit steps."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive actions require explicit CONFIRM gate and policy backup; classification is deterministic; creative tasks (e.g., remediation suggestions) are bounded by concrete CLI commands."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation \u2192 Deep reference). One point deducted because the pattern lacks an explicit \u201cPhilosophy\u201d label, making the structure slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a complete decision tree, working CLI examples, remediation steps, and handling of multi\u2011schedule policies. Deducted for not detailing how to handle partial failures when only some schedules are misconfigured and for a limited error\u2011handling strategy for malformed JSON beyond a generic note."
+    }
+  ],
+  "total_score": 112,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 41975,
+  "latency_ms": 6227,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

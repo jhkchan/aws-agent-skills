@@ -1,0 +1,433 @@
+# Eval test cases for eks-cluster-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: eks-cluster-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-endpoint-open
+    description: >-
+      EKS cluster with endpointPublicAccess true and publicAccessCidrs
+      0.0.0.0/0 — API server is internet-reachable. Also has logging
+      disabled and an open security group, but PUBLIC_ENDPOINT is the
+      highest-priority verdict.
+    input: |
+      Audit the following EKS cluster configuration for security exposure.
+      Latest available EKS version: 1.32. Emit the standard VERDICT block
+      (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: public-endpoint-open
+      Cluster config (describe-cluster output):
+      {
+        "cluster": {
+          "name": "public-endpoint-open",
+          "version": "1.28",
+          "status": "ACTIVE",
+          "resourcesVpcConfig": {
+            "endpointPublicAccess": true,
+            "endpointPrivateAccess": false,
+            "publicAccessCidrs": ["0.0.0.0/0"]
+          },
+          "logging": {
+            "clusterLogging": [
+              {"types": ["api","audit","authenticator","controllerManager","scheduler"], "enabled": false}
+            ]
+          }
+        }
+      }
+
+      aws-auth ConfigMap mapRoles:
+      [
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-node-role",
+          "username": "system:node:{{EC2PrivateDNSName}}",
+          "groups": ["system:bootstrappers", "system:nodes"]
+        },
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-admin-role",
+          "username": "admin",
+          "groups": ["system:masters"]
+        }
+      ]
+
+      Node security groups:
+      [
+        {
+          "groupId": "sg-node-001",
+          "groupName": "eks-node-sg",
+          "ipPermissions": [
+            {"fromPort": 10250, "toPort": 10250, "ipProtocol": "tcp", "ipRanges": [{"cidrIp": "0.0.0.0/0"}]}
+          ]
+        }
+      ]
+    expected_verdict: PUBLIC_ENDPOINT
+    assertions:
+      must_contain:
+        - "PUBLIC_ENDPOINT"
+        - "public-endpoint-open"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "0.0.0.0/0"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: LOGGING_DISABLED"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: logging-all-disabled
+    description: >-
+      EKS cluster with private endpoint only, all control-plane log types
+      disabled. Everything else is clean. LOGGING_DISABLED is the verdict.
+    input: |
+      Audit the following EKS cluster configuration for security exposure.
+      Latest available EKS version: 1.32. Emit the standard VERDICT block
+      (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: logging-all-disabled
+      Cluster config (describe-cluster output):
+      {
+        "cluster": {
+          "name": "logging-all-disabled",
+          "version": "1.31",
+          "status": "ACTIVE",
+          "resourcesVpcConfig": {
+            "endpointPublicAccess": false,
+            "endpointPrivateAccess": true,
+            "publicAccessCidrs": []
+          },
+          "logging": {
+            "clusterLogging": [
+              {"types": ["api","audit","authenticator","controllerManager","scheduler"], "enabled": false}
+            ]
+          }
+        }
+      }
+
+      aws-auth ConfigMap mapRoles:
+      [
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-admin-role",
+          "username": "admin",
+          "groups": ["system:masters"]
+        },
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-node-role",
+          "username": "system:node:{{EC2PrivateDNSName}}",
+          "groups": ["system:bootstrappers", "system:nodes"]
+        }
+      ]
+
+      Node security groups:
+      [
+        {
+          "groupId": "sg-node-002",
+          "groupName": "eks-node-sg",
+          "ipPermissions": [
+            {"fromPort": 10250, "toPort": 10250, "ipProtocol": "tcp", "ipRanges": [{"cidrIp": "10.0.0.0/16"}]}
+          ]
+        }
+      ]
+    expected_verdict: LOGGING_DISABLED
+    assertions:
+      must_contain:
+        - "LOGGING_DISABLED"
+        - "logging-all-disabled"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ENDPOINT"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: system-masters-node-role
+    description: >-
+      EKS cluster with private endpoint and logging enabled, but the
+      aws-auth ConfigMap maps the EKS node IAM role to system:masters with
+      a wildcard username — privilege escalation path from any pod to
+      cluster-admin.
+    input: |
+      Audit the following EKS cluster configuration for security exposure.
+      Latest available EKS version: 1.32. Emit the standard VERDICT block
+      (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: system-masters-node-role
+      Cluster config (describe-cluster output):
+      {
+        "cluster": {
+          "name": "system-masters-node-role",
+          "version": "1.30",
+          "status": "ACTIVE",
+          "resourcesVpcConfig": {
+            "endpointPublicAccess": false,
+            "endpointPrivateAccess": true,
+            "publicAccessCidrs": []
+          },
+          "logging": {
+            "clusterLogging": [
+              {"types": ["api","audit","authenticator","controllerManager","scheduler"], "enabled": true}
+            ]
+          }
+        }
+      }
+
+      aws-auth ConfigMap mapRoles:
+      [
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-node-role",
+          "username": "*",
+          "groups": ["system:masters"]
+        }
+      ]
+
+      Node security groups:
+      [
+        {
+          "groupId": "sg-node-003",
+          "groupName": "eks-node-sg",
+          "ipPermissions": [
+            {"fromPort": 10250, "toPort": 10250, "ipProtocol": "tcp", "ipRanges": [{"cidrIp": "10.0.0.0/16"}]}
+          ]
+        }
+      ]
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "system-masters-node-role"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "system:masters"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ENDPOINT"
+        - "VERDICT: LOGGING_DISABLED"
+
+  - id: open-security-group
+    description: >-
+      EKS cluster with private endpoint, logging enabled, and clean
+      aws-auth ConfigMap, but the node security group allows inbound
+      0.0.0.0/0 on the kubelet port 10250 — direct kubelet API access
+      from the internet.
+    input: |
+      Audit the following EKS cluster configuration for security exposure.
+      Latest available EKS version: 1.32. Emit the standard VERDICT block
+      (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: open-security-group
+      Cluster config (describe-cluster output):
+      {
+        "cluster": {
+          "name": "open-security-group",
+          "version": "1.31",
+          "status": "ACTIVE",
+          "resourcesVpcConfig": {
+            "endpointPublicAccess": false,
+            "endpointPrivateAccess": true,
+            "publicAccessCidrs": []
+          },
+          "logging": {
+            "clusterLogging": [
+              {"types": ["api","audit","authenticator","controllerManager","scheduler"], "enabled": true}
+            ]
+          }
+        }
+      }
+
+      aws-auth ConfigMap mapRoles:
+      [
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-admin-role",
+          "username": "admin",
+          "groups": ["system:masters"]
+        },
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-node-role",
+          "username": "system:node:{{EC2PrivateDNSName}}",
+          "groups": ["system:bootstrappers", "system:nodes"]
+        }
+      ]
+
+      Node security groups:
+      [
+        {
+          "groupId": "sg-node-004",
+          "groupName": "eks-node-sg",
+          "ipPermissions": [
+            {"fromPort": 10250, "toPort": 10250, "ipProtocol": "tcp", "ipRanges": [{"cidrIp": "0.0.0.0/0"}]}
+          ]
+        }
+      ]
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "open-security-group"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "10250"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ENDPOINT"
+        - "VERDICT: LOGGING_DISABLED"
+
+  - id: outdated-version
+    description: >-
+      EKS cluster with private endpoint, logging enabled, clean aws-auth
+      ConfigMap, and restricted security groups, but running Kubernetes
+      1.28 when the latest available is 1.32 (N-4 — past end-of-standard-
+      support).
+    input: |
+      Audit the following EKS cluster configuration for security exposure.
+      Latest available EKS version: 1.32. Emit the standard VERDICT block
+      (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: outdated-version
+      Cluster config (describe-cluster output):
+      {
+        "cluster": {
+          "name": "outdated-version",
+          "version": "1.28",
+          "status": "ACTIVE",
+          "resourcesVpcConfig": {
+            "endpointPublicAccess": false,
+            "endpointPrivateAccess": true,
+            "publicAccessCidrs": []
+          },
+          "logging": {
+            "clusterLogging": [
+              {"types": ["api","audit","authenticator","controllerManager","scheduler"], "enabled": true}
+            ]
+          }
+        }
+      }
+
+      aws-auth ConfigMap mapRoles:
+      [
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-admin-role",
+          "username": "admin",
+          "groups": ["system:masters"]
+        },
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-node-role",
+          "username": "system:node:{{EC2PrivateDNSName}}",
+          "groups": ["system:bootstrappers", "system:nodes"]
+        }
+      ]
+
+      Node security groups:
+      [
+        {
+          "groupId": "sg-node-005",
+          "groupName": "eks-node-sg",
+          "ipPermissions": [
+            {"fromPort": 10250, "toPort": 10250, "ipProtocol": "tcp", "ipRanges": [{"cidrIp": "10.0.0.0/16"}]}
+          ]
+        }
+      ]
+    expected_verdict: OUTDATED
+    assertions:
+      must_contain:
+        - "OUTDATED"
+        - "outdated-version"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "1.28"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ENDPOINT"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: clean-hardened-cluster
+    description: >-
+      Fully hardened EKS cluster: private endpoint only, all control-plane
+      logs enabled, scoped IAM auth (admin role to system:masters, node
+      role to system:nodes), restricted security groups, current version
+      (1.31, N-1 from latest 1.32). Expected verdict: OK.
+    input: |
+      Audit the following EKS cluster configuration for security exposure.
+      Latest available EKS version: 1.32. Emit the standard VERDICT block
+      (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: clean-hardened-cluster
+      Cluster config (describe-cluster output):
+      {
+        "cluster": {
+          "name": "clean-hardened-cluster",
+          "version": "1.31",
+          "status": "ACTIVE",
+          "resourcesVpcConfig": {
+            "endpointPublicAccess": false,
+            "endpointPrivateAccess": true,
+            "publicAccessCidrs": []
+          },
+          "logging": {
+            "clusterLogging": [
+              {"types": ["api","audit","authenticator","controllerManager","scheduler"], "enabled": true}
+            ]
+          }
+        }
+      }
+
+      aws-auth ConfigMap mapRoles:
+      [
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-admin-role",
+          "username": "admin",
+          "groups": ["system:masters"]
+        },
+        {
+          "rolearn": "arn:aws:iam::111111111111:role/eks-node-role",
+          "username": "system:node:{{EC2PrivateDNSName}}",
+          "groups": ["system:bootstrappers", "system:nodes"]
+        }
+      ]
+
+      Node security groups:
+      [
+        {
+          "groupId": "sg-node-006",
+          "groupName": "eks-node-sg",
+          "ipPermissions": [
+            {"fromPort": 10250, "toPort": 10250, "ipProtocol": "tcp", "ipRanges": [{"cidrIp": "10.0.0.0/16"}]}
+          ]
+        }
+      ]
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "clean-hardened-cluster"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PUBLIC_ENDPOINT"
+        - "VERDICT: LOGGING_DISABLED"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: OUTDATED"

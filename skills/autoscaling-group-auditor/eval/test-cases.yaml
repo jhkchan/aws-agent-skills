@@ -1,0 +1,296 @@
+# Eval test cases for autoscaling-group-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: autoscaling-group-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: elb-healthcheck-no-targetgroup
+    description: >-
+      ASG with HealthCheckType ELB but no target group or load balancer
+      attached — instances will be Unhealthy from launch, creating an infinite
+      replacement loop.
+    input: |
+      ASG name: prod-web-asg
+      LaunchTemplate:
+        LaunchTemplateId: lt-0abc123def456
+        Version: "3"
+        MetadataOptions:
+          HttpTokens: required
+      LaunchConfigurationName: null
+      MinSize: 2
+      MaxSize: 6
+      DesiredCapacity: 4
+      AvailabilityZones: [us-east-1a, us-east-1b, us-east-1c]
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      TargetGroupARNs: []
+      LoadBalancerNames: []
+      MixedInstancesPolicy: null
+      CapacityRebalance:
+        Enabled: false
+      TerminationPolicies: [Default]
+      SuspendedProcesses: []
+      Emit the standard VERDICT block (ASG, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: MISCONFIGURED
+    assertions:
+      must_contain:
+        - "MISCONFIGURED"
+        - "prod-web-asg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "ELB"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: legacy-launch-config-desired-over-max
+    description: >-
+      ASG using a deprecated launch configuration with DesiredCapacity exceeding
+      MaxSize — double misconfiguration (legacy LC + impossible capacity bounds).
+    input: |
+      ASG name: legacy-batch-asg
+      LaunchTemplate: null
+      LaunchConfigurationName: legacy-batch-lc-2023
+      MinSize: 2
+      MaxSize: 4
+      DesiredCapacity: 6
+      AvailabilityZones: [us-east-1a, us-east-1b]
+      HealthCheckType: EC2
+      HealthCheckGracePeriod: 300
+      TargetGroupARNs: []
+      LoadBalancerNames: []
+      MixedInstancesPolicy: null
+      CapacityRebalance:
+        Enabled: false
+      TerminationPolicies: [Default]
+      SuspendedProcesses: []
+      Emit the standard VERDICT block (ASG, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: MISCONFIGURED
+    assertions:
+      must_contain:
+        - "MISCONFIGURED"
+        - "legacy-batch-asg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: spot-single-instance-type
+    description: >-
+      ASG with a MixedInstancesPolicy using a single Spot instance type and 0%
+      On-Demand — one Spot interruption affects 100% of capacity. No Capacity
+      Rebalance enabled.
+    input: |
+      ASG name: prod-spot-worker-asg
+      LaunchTemplate:
+        LaunchTemplateId: lt-0xyz789ghi012
+        Version: "2"
+        MetadataOptions:
+          HttpTokens: required
+      LaunchConfigurationName: null
+      MinSize: 2
+      MaxSize: 10
+      DesiredCapacity: 4
+      AvailabilityZones: [us-east-1a, us-east-1b, us-east-1c]
+      HealthCheckType: EC2
+      HealthCheckGracePeriod: 300
+      TargetGroupARNs: []
+      LoadBalancerNames: []
+      MixedInstancesPolicy:
+        LaunchTemplate:
+          LaunchTemplateSpecification:
+            LaunchTemplateId: lt-0xyz789ghi012
+            Version: "2"
+          Overrides:
+            - InstanceType: c5.large
+        InstancesDistribution:
+          OnDemandAllocationStrategy: prioritized
+          OnDemandBaseCapacity: 0
+          OnDemandPercentageAboveBaseCapacity: 0
+          SpotAllocationStrategy: capacity-optimized
+      CapacityRebalance:
+        Enabled: false
+      TerminationPolicies: [Default]
+      SuspendedProcesses: []
+      Emit the standard VERDICT block (ASG, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: MISCONFIGURED
+    assertions:
+      must_contain:
+        - "MISCONFIGURED"
+        - "prod-spot-worker-asg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: imdsv2-gap-short-grace
+    description: >-
+      ASG with a launch template that does not require IMDSv2 and a 30-second
+      ELB health check grace period — two configuration gaps that create
+      security and operational risk.
+    input: |
+      ASG name: staging-api-asg
+      LaunchTemplate:
+        LaunchTemplateId: lt-0def456abc789
+        Version: "1"
+        MetadataOptions:
+          HttpTokens: optional
+      LaunchConfigurationName: null
+      MinSize: 2
+      MaxSize: 10
+      DesiredCapacity: 4
+      AvailabilityZones: [us-east-1a, us-east-1b]
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 30
+      TargetGroupARNs: [arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/api-tg/abc123]
+      LoadBalancerNames: []
+      MixedInstancesPolicy:
+        LaunchTemplate:
+          LaunchTemplateSpecification:
+            LaunchTemplateId: lt-0def456abc789
+            Version: "1"
+          Overrides:
+            - InstanceType: c5.large
+            - InstanceType: c5a.large
+            - InstanceType: m5.large
+        InstancesDistribution:
+          OnDemandAllocationStrategy: prioritized
+          OnDemandBaseCapacity: 2
+          OnDemandPercentageAboveBaseCapacity: 70
+          SpotAllocationStrategy: capacity-optimized
+      CapacityRebalance:
+        Enabled: true
+      TerminationPolicies: [Default]
+      SuspendedProcesses: []
+      Emit the standard VERDICT block (ASG, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "staging-api-asg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: MISCONFIGURED"
+
+  - id: ec2-check-elb-attached
+    description: >-
+      ASG with a target group attached but using EC2-only health checks —
+      application-level failures are undetected. Also has MaxSize equal to
+      DesiredCapacity (no scale-out headroom) and a single AZ.
+    input: |
+      ASG name: prod-backend-asg
+      LaunchTemplate:
+        LaunchTemplateId: lt-0aaa111bbb222
+        Version: "4"
+        MetadataOptions:
+          HttpTokens: required
+      LaunchConfigurationName: null
+      MinSize: 2
+      MaxSize: 4
+      DesiredCapacity: 4
+      AvailabilityZones: [us-east-1a]
+      HealthCheckType: EC2
+      HealthCheckGracePeriod: 300
+      TargetGroupARNs: [arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/backend-tg/def456]
+      LoadBalancerNames: []
+      MixedInstancesPolicy: null
+      CapacityRebalance:
+        Enabled: false
+      TerminationPolicies: [Default]
+      SuspendedProcesses: []
+      Emit the standard VERDICT block (ASG, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "prod-backend-asg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: MISCONFIGURED"
+
+  - id: well-configured-production-asg
+    description: >-
+      Well-configured production ASG: launch template with IMDSv2 required,
+      mixed-instances policy with 4 instance types across 3 AZs, ELB health
+      check with target group attached, 300s grace period, CapacityRebalance
+      enabled, proper capacity bounds.
+    input: |
+      ASG name: prod-frontend-asg
+      LaunchTemplate:
+        LaunchTemplateId: lt-0prod123template
+        Version: "5"
+        MetadataOptions:
+          HttpTokens: required
+      LaunchConfigurationName: null
+      MinSize: 2
+      MaxSize: 10
+      DesiredCapacity: 4
+      AvailabilityZones: [us-east-1a, us-east-1b, us-east-1c]
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      TargetGroupARNs: [arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/frontend-tg/ghi789]
+      LoadBalancerNames: []
+      MixedInstancesPolicy:
+        LaunchTemplate:
+          LaunchTemplateSpecification:
+            LaunchTemplateId: lt-0prod123template
+            Version: "5"
+          Overrides:
+            - InstanceType: c5.large
+            - InstanceType: c5a.large
+            - InstanceType: m5.large
+            - InstanceType: m5a.large
+        InstancesDistribution:
+          OnDemandAllocationStrategy: prioritized
+          OnDemandBaseCapacity: 2
+          OnDemandPercentageAboveBaseCapacity: 50
+          SpotAllocationStrategy: capacity-optimized
+      CapacityRebalance:
+        Enabled: true
+      TerminationPolicies: [Default]
+      SuspendedProcesses: []
+      Emit the standard VERDICT block (ASG, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "prod-frontend-asg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MISCONFIGURED"
+        - "VERDICT: CONFIG_GAP"

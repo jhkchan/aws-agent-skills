@@ -1,0 +1,70 @@
+{
+  "skill": "efs-filesystem-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides expert\u2011level nuances not commonly known to a baseline model: encryption\u2011at\u2011rest is immutable, missing filesystem policy is not a gap, AccessPointArn is the strongest condition, detailed condition strength hierarchy, lifecycle policy cost impact, policy size limit, and cross\u2011account network considerations. These constitute genuine delta knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedural flow: pre\u2011flight CLI calls, ordered decision\u2011tree steps, explicit confirmation gate before any state\u2011changing API, backup of policies, and remediation sequences. Only minor generic advice (\"confirm filesystem exists\") prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never treat missing policy as a gap, never enable encryption on an existing unencrypted filesystem, never rely on SourceIp 0.0.0.0/0). Lacks a few edge\u2011case warnings such as never ignore Deny statements that block TLS via aws:SecureTransport:false."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Front\u2011matter includes name, description, version, author, license, compatibility, keywords, tags, and rich metadata (when_to_use, activation_triggers, invocation_schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides reliable activation triggers."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered structure: quick reference table, step\u2011by\u2011step process, deep reference at the end. Critical rules are not buried, but the extensive deep reference may overload a first\u2011time reader."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions (PutFileSystemPolicy, PutLifecycleConfiguration, CreateAccessPoint, DeleteFileSystem) are gated by an explicit CONFIRM prompt and backup steps. Non\u2011destructive audit steps are left free, matching task fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation \u2192 Deep reference). Minor inconsistency: the \"Deep reference\" section is not explicitly labeled as a separate pattern component."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, deterministic output format, decision tree, and worked examples. Lacks guidance for pagination of large access\u2011point lists and for handling multiple overlapping Allow/Deny statements, which could cause execution gaps."
+    }
+  ],
+  "total_score": 110,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 38429,
+  "latency_ms": 11576,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

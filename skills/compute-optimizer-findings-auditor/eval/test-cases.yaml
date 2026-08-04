@@ -1,0 +1,226 @@
+# Eval test cases for compute-optimizer-findings-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: compute-optimizer-findings-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ec2-overprovisioned-high-confidence
+    description: >-
+      EC2 instance with Overprovisioned finding, all metrics measured by
+      CloudWatch Agent (CPU, Memory, Network), performanceRisk 1, savings
+      $150/month — actionable cost waste.
+    input: |
+      Audit the following Compute Optimizer finding. Emit the standard
+      VERDICT block (RESOURCE, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+
+      Resource type: EC2 instance
+      Instance ARN: arn:aws:ec2:us-east-1:111111111111:instance/i-ec2-overprovisioned-high-confidence
+      Current instance type: m5.2xlarge
+      Finding: Overprovisioned
+      Finding reasons: ["CPUOverprovisioned", "MemoryOverprovisioned"]
+      Utilization metrics:
+        - name: CPU, statistic: Maximum, value: 8.0, source: CloudWatch
+        - name: Memory, statistic: Maximum, value: 15.0, source: CloudWatchAgent
+        - name: NetworkIn, statistic: Average, value: 0.05, source: CloudWatch
+      Recommendation options:
+        - rank: 1, instanceType: t3.large, performanceRisk: 1, savingsOpportunity: { savingsPercentage: 75.0, estimatedMonthlySavings: 150.0 }
+        - rank: 2, instanceType: t3.medium, performanceRisk: 2, savingsOpportunity: { savingsPercentage: 82.0, estimatedMonthlySavings: 165.0 }
+      Last refresh timestamp: 2026-07-28
+    expected_verdict: UNDERUTILIZED
+    assertions:
+      must_contain:
+        - "UNDERUTILIZED"
+        - "ec2-overprovisioned-high-confidence"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Overprovisioned"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NOT_OPTIMIZED"
+
+  - id: ec2-underprovisioned-cpu-memory
+    description: >-
+      EC2 instance with Underprovisioned finding — CPU 97% and Memory 92%,
+      performance degradation risk. Needs more capacity, not less.
+    input: |
+      Audit the following Compute Optimizer finding. Emit the standard
+      VERDICT block (RESOURCE, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+
+      Resource type: EC2 instance
+      Instance ARN: arn:aws:ec2:us-east-1:111111111111:instance/i-ec2-underprovisioned-cpu-memory
+      Current instance type: t3.small
+      Finding: Underprovisioned
+      Finding reasons: ["CPUUnderprovisioned", "MemoryUnderprovisioned"]
+      Utilization metrics:
+        - name: CPU, statistic: Maximum, value: 97.0, source: CloudWatch
+        - name: Memory, statistic: Maximum, value: 92.0, source: CloudWatchAgent
+        - name: NetworkIn, statistic: Average, value: 1.2, source: CloudWatch
+      Recommendation options:
+        - rank: 1, instanceType: t3.large, performanceRisk: 1, savingsOpportunity: { savingsPercentage: 0.0, estimatedMonthlySavings: -45.0 }
+      Last refresh timestamp: 2026-07-30
+    expected_verdict: NOT_OPTIMIZED
+    assertions:
+      must_contain:
+        - "NOT_OPTIMIZED"
+        - "ec2-underprovisioned-cpu-memory"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Underprovisioned"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNDERUTILIZED"
+
+  - id: ebs-volume-optimized
+    description: >-
+      EBS gp3 volume with Optimized finding — IOPS and throughput within
+      expected range, no action needed.
+    input: |
+      Audit the following Compute Optimizer finding. Emit the standard
+      VERDICT block (RESOURCE, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+
+      Resource type: EBS volume
+      Volume ARN: arn:aws:ec2:us-east-1:111111111111:volume/vol-ebs-volume-optimized
+      Current configuration: { volumeType: gp3, volumeSizeGB: 100, baselineIOPS: 3000, baselineThroughputMBps: 125 }
+      Finding: Optimized
+      Finding reasons: []
+      Utilization metrics:
+        - name: VolumeReadOpsPerSecond, statistic: Average, value: 1500.0
+        - name: VolumeWriteOpsPerSecond, statistic: Average, value: 800.0
+        - name: VolumeReadBytesPerSecond, statistic: Average, value: 25.0
+        - name: VolumeWriteBytesPerSecond, statistic: Average, value: 15.0
+      Recommendation options: []
+      Last refresh timestamp: 2026-07-29
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ebs-volume-optimized"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Optimized"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NOT_OPTIMIZED"
+        - "VERDICT: UNDERUTILIZED"
+
+  - id: lambda-overprovisioned-memory
+    description: >-
+      Lambda function with Overprovisioned finding — 2560 MB allocated but
+      average usage 400 MB, invocations present, savings $80/month.
+    input: |
+      Audit the following Compute Optimizer finding. Emit the standard
+      VERDICT block (RESOURCE, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+
+      Resource type: Lambda function
+      Function ARN: arn:aws:lambda:us-east-1:111111111111:function:lambda-overprovisioned-memory
+      Current memory size: 2560 MB
+      Finding: Overprovisioned
+      Finding reasons: ["MemoryOverprovisioned"]
+      Utilization metrics:
+        - name: Memory, statistic: Average, value: 400.0, unit: MB
+        - name: Invocations, statistic: Sum, value: 50000.0, unit: Count
+        - name: Duration, statistic: Average, value: 250.0, unit: Milliseconds
+      Recommendation options:
+        - rank: 1, memorySize: 1280, performanceRisk: 1, savingsOpportunity: { estimatedMonthlySavings: 80.0 }
+      Last refresh timestamp: 2026-07-27
+    expected_verdict: UNDERUTILIZED
+    assertions:
+      must_contain:
+        - "UNDERUTILIZED"
+        - "lambda-overprovisioned-memory"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Overprovisioned"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NOT_OPTIMIZED"
+
+  - id: ec2-overprovisioned-low-confidence-inferred-memory
+    description: >-
+      EC2 instance with Overprovisioned finding BUT memory metric is absent
+      (CWAgent not installed — memory inferred), performanceRisk 4 on
+      recommendation. Low confidence — do NOT act without better data.
+    input: |
+      Audit the following Compute Optimizer finding. Emit the standard
+      VERDICT block (RESOURCE, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+
+      Resource type: EC2 instance
+      Instance ARN: arn:aws:ec2:us-east-1:111111111111:instance/i-ec2-overprovisioned-low-confidence
+      Current instance type: m5.xlarge
+      Finding: Overprovisioned
+      Finding reasons: ["CPUOverprovisioned"]
+      Utilization metrics:
+        - name: CPU, statistic: Maximum, value: 12.0, source: CloudWatch
+        (Memory metric ABSENT — CloudWatch Agent not installed; memory usage inferred from instance type specifications)
+      Recommendation options:
+        - rank: 1, instanceType: t3.medium, performanceRisk: 4, savingsOpportunity: { savingsPercentage: 70.0, estimatedMonthlySavings: 95.0 }
+      Last refresh timestamp: 2026-07-26
+    expected_verdict: NOT_OPTIMIZED
+    assertions:
+      must_contain:
+        - "NOT_OPTIMIZED"
+        - "ec2-overprovisioned-low-confidence"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNDERUTILIZED"
+
+  - id: ec2-optimized-clean
+    description: >-
+      EC2 instance with Optimized finding — CPU 60%, Memory 55% (both
+      measured by CWAgent), all metrics present, recent refresh. Clean
+      posture, no action needed.
+    input: |
+      Audit the following Compute Optimizer finding. Emit the standard
+      VERDICT block (RESOURCE, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+
+      Resource type: EC2 instance
+      Instance ARN: arn:aws:ec2:us-east-1:111111111111:instance/i-ec2-optimized-clean
+      Current instance type: c5.xlarge
+      Finding: Optimized
+      Finding reasons: []
+      Utilization metrics:
+        - name: CPU, statistic: Maximum, value: 60.0, source: CloudWatch
+        - name: Memory, statistic: Maximum, value: 55.0, source: CloudWatchAgent
+        - name: NetworkIn, statistic: Average, value: 0.8, source: CloudWatch
+      Recommendation options: []
+      Last refresh timestamp: 2026-07-31
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ec2-optimized-clean"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Optimized"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NOT_OPTIMIZED"
+        - "VERDICT: UNDERUTILIZED"

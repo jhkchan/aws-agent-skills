@@ -1,0 +1,309 @@
+# Eval test cases for efs-filesystem-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: efs-filesystem-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: unencrypted-fs
+    description: >-
+      EFS filesystem with Encrypted: false — plaintext at rest, encryption
+      immutable. All other dimensions are clean, but UNENCRYPTED is the
+      worst verdict.
+    input: |
+      Filesystem id: fs-0abc123456789 (unencrypted-fs)
+      Filesystem ARN: arn:aws:elasticfilesystem:us-east-1:111111111111:file-system/fs-0abc123456789
+      Filesystem metadata:
+        Encrypted: false
+        PerformanceMode: generalPurpose
+        ThroughputMode: bursting
+        LifecyclePolicies:
+          - TransitionToIA: AFTER_30_DAYS
+        Access points: 1 (fsap-aaa — root directory /prod/app)
+      Filesystem policy: none (IAM-governed)
+      Emit the standard VERDICT block (FILESYSTEM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: UNENCRYPTED
+    assertions:
+      must_contain:
+        - "UNENCRYPTED"
+        - "unencrypted-fs"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_POLICY"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: public-policy-wildcard
+    description: >-
+      Encrypted EFS filesystem with a filesystem policy granting ClientMount,
+      ClientWrite, and ClientRootAccess to Principal "*" with no restrictive
+      condition — any network-reachable client can mount with root privileges.
+    input: |
+      Filesystem id: fs-1def789012345 (public-policy-wildcard)
+      Filesystem ARN: arn:aws:elasticfilesystem:us-east-1:111111111111:file-system/fs-1def789012345
+      Filesystem metadata:
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc-def-123
+        PerformanceMode: generalPurpose
+        LifecyclePolicies:
+          - TransitionToIA: AFTER_30_DAYS
+        Access points: 0
+      Filesystem policy:
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "OpenMount",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+              "elasticfilesystem:ClientMount",
+              "elasticfilesystem:ClientWrite",
+              "elasticfilesystem:ClientRootAccess"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+      ```
+      Emit the standard VERDICT block (FILESYSTEM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_POLICY
+    assertions:
+      must_contain:
+        - "PUBLIC_POLICY"
+        - "public-policy-wildcard"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-no-lifecycle
+    description: >-
+      Encrypted EFS filesystem with a properly scoped same-account filesystem
+      policy (TLS enforced, named actions) and access points present, but no
+      lifecycle policy — unbounded storage cost growth.
+    input: |
+      Filesystem id: fs-2abc34567890 (config-gap-no-lifecycle)
+      Filesystem ARN: arn:aws:elasticfilesystem:us-east-1:111111111111:file-system/fs-2abc34567890
+      Filesystem metadata:
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/def-456-789
+        PerformanceMode: generalPurpose
+        LifecyclePolicies: (none)
+        Access points: 1 (fsap-bbb — root directory /data/share)
+      Filesystem policy:
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AppAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-efs-role"},
+            "Action": [
+              "elasticfilesystem:ClientMount",
+              "elasticfilesystem:ClientWrite"
+            ],
+            "Resource": "*",
+            "Condition": {
+              "Bool": {"aws:SecureTransport": "true"}
+            }
+          }
+        ]
+      }
+      ```
+      Emit the standard VERDICT block (FILESYSTEM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-no-lifecycle"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_POLICY"
+
+  - id: config-gap-no-tls
+    description: >-
+      Encrypted EFS filesystem with lifecycle policy, access points, and a
+      same-account filesystem policy, but the policy grants Client* actions
+      without aws:SecureTransport condition — clients can mount without TLS.
+    input: |
+      Filesystem id: fs-3def45678901 (config-gap-no-tls)
+      Filesystem ARN: arn:aws:elasticfilesystem:us-east-1:111111111111:file-system/fs-3def45678901
+      Filesystem metadata:
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/ghi-012-345
+        PerformanceMode: generalPurpose
+        LifecyclePolicies:
+          - TransitionToIA: AFTER_30_DAYS
+        Access points: 1 (fsap-ccc — root directory /logs/archive)
+      Filesystem policy:
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AppAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-efs-role"},
+            "Action": [
+              "elasticfilesystem:ClientMount",
+              "elasticfilesystem:ClientWrite"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+      ```
+      Emit the standard VERDICT block (FILESYSTEM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-no-tls"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_POLICY"
+
+  - id: fully-hardened
+    description: >-
+      Encrypted EFS filesystem with same-account filesystem policy (TLS
+      enforced), lifecycle policy, and multiple access points — all
+      dimensions pass.
+    input: |
+      Filesystem id: fs-4abc56789012 (fully-hardened)
+      Filesystem ARN: arn:aws:elasticfilesystem:us-east-1:111111111111:file-system/fs-4abc56789012
+      Filesystem metadata:
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/jkl-345-678
+        PerformanceMode: generalPurpose
+        LifecyclePolicies:
+          - TransitionToIA: AFTER_30_DAYS
+        Access points: 2 (fsap-ddd — root directory /prod/app, fsap-eee — root directory /prod/shared)
+      Filesystem policy:
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AppAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-efs-role"},
+            "Action": [
+              "elasticfilesystem:ClientMount",
+              "elasticfilesystem:ClientWrite"
+            ],
+            "Resource": "*",
+            "Condition": {
+              "Bool": {"aws:SecureTransport": "true"}
+            }
+          }
+        ]
+      }
+      ```
+      Emit the standard VERDICT block (FILESYSTEM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "fully-hardened"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: UNENCRYPTED"
+        - "VERDICT: PUBLIC_POLICY"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: public-scoped-by-access-point
+    description: >-
+      Encrypted EFS filesystem with Principal "*" BUT scoped by
+      elasticfilesystem:AccessPointArn condition (forces access through a
+      named access point with fixed POSIX identity). Also has TLS enforced,
+      lifecycle policy, and access points. The strong condition downgrades
+      from PUBLIC_POLICY to OK.
+    input: |
+      Filesystem id: fs-5def67890123 (public-scoped-by-access-point)
+      Filesystem ARN: arn:aws:elasticfilesystem:us-east-1:111111111111:file-system/fs-5def67890123
+      Filesystem metadata:
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/mno-678-901
+        PerformanceMode: generalPurpose
+        LifecyclePolicies:
+          - TransitionToIA: AFTER_14_DAYS
+        Access points: 1 (fsap-fff — root directory /shared/multi-tenant, PosixUser Uid=1000 Gid=1000)
+      Filesystem policy:
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AccessPointOnly",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+              "elasticfilesystem:ClientMount",
+              "elasticfilesystem:ClientWrite"
+            ],
+            "Resource": "*",
+            "Condition": {
+              "StringEquals": {
+                "elasticfilesystem:AccessPointArn": "arn:aws:elasticfilesystem:us-east-1:111111111111:access-point/fsap-fff"
+              },
+              "Bool": {"aws:SecureTransport": "true"}
+            }
+          }
+        ]
+      }
+      ```
+      Emit the standard VERDICT block (FILESYSTEM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "public-scoped-by-access-point"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: UNENCRYPTED"
+        - "VERDICT: PUBLIC_POLICY"
+        - "VERDICT: CONFIG_GAP"

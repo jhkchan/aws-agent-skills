@@ -1,0 +1,257 @@
+# Eval test cases for dlm-lifecycle-policy-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Verdict shape: NO_POLICY | MISCONFIGURED | CONFIG_GAP | OK
+# The 6 cases below exercise each verdict and the ordered classification steps
+# (Step 1 existence -> Step 10 OK). Case ids are embedded in the policy id /
+# workload scope so they appear in the model's VERDICT-block output.
+skill: dlm-lifecycle-policy-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-policy-at-all
+    description: >-
+      Account hosts 50 production EBS volumes tagged Environment:production but
+      has zero DLM lifecycle policies. No automated EBS backup exists.
+    input: |
+      Workload ID: no-policy-at-all
+      Account context:
+        Region: us-east-1
+        EBS volumes tagged "Environment:production": 50 volumes
+        aws dlm get-lifecycle-policies response: []
+
+      Audit the DLM EBS snapshot lifecycle coverage for workload
+      "no-policy-at-all". Emit the standard VERDICT block (POLICY, VERDICT,
+      REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_POLICY
+    assertions:
+      must_contain:
+        - "NO_POLICY"
+        - "no-policy-at-all"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MISCONFIGURED"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: OK"
+
+  - id: disabled-policy
+    description: >-
+      DLM lifecycle policy is well-formed (valid TargetTags, schedule, retention)
+      but State is DISABLED. The policy creates zero snapshots.
+    input: |
+      Policy id: policy-disabled-policy
+      DLM lifecycle policy (from get-lifecycle-policy):
+        Description: production-ebs-daily
+        State: DISABLED
+        PolicyType: EBS_SNAPSHOT_POLICY
+        DateCreated: 2025-06-01T10:00:00Z
+        PolicyDetails:
+          ResourceTypes: ["VOLUME"]
+          TargetTags: [{"Key": "Environment", "Values": ["production"]}]
+          Schedules:
+            - Name: daily-6am
+              CreateRule:
+                Interval: 24
+                IntervalUnit: HOURS
+                Times: ["06:00"]
+              RetainRule:
+                Count: 14
+              CopyTags: true
+              CrossRegionCopyTargets: []
+      Audit this DLM lifecycle policy. Emit the standard VERDICT block (POLICY,
+      VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: MISCONFIGURED
+    assertions:
+      must_contain:
+        - "MISCONFIGURED"
+        - "disabled-policy"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_POLICY"
+        - "VERDICT: OK"
+
+  - id: empty-target-tags
+    description: >-
+      DLM lifecycle policy is ENABLED but PolicyDetails.TargetTags is an empty
+      array — no volumes match, so the policy snapshots nothing.
+    input: |
+      Policy id: policy-empty-target-tags
+      DLM lifecycle policy (from get-lifecycle-policy):
+        Description: stale-dev-backup
+        State: ENABLED
+        PolicyType: EBS_SNAPSHOT_POLICY
+        DateCreated: 2025-03-15T08:00:00Z
+        PolicyDetails:
+          ResourceTypes: ["VOLUME"]
+          TargetTags: []
+          Schedules:
+            - Name: daily-2am
+              CreateRule:
+                Interval: 24
+                IntervalUnit: HOURS
+                Times: ["02:00"]
+              RetainRule:
+                Count: 7
+              CopyTags: true
+      Audit this DLM lifecycle policy. Emit the standard VERDICT block (POLICY,
+      VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: MISCONFIGURED
+    assertions:
+      must_contain:
+        - "MISCONFIGURED"
+        - "empty-target-tags"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_POLICY"
+        - "VERDICT: OK"
+
+  - id: no-cross-region-copy-gap
+    description: >-
+      DLM lifecycle policy is ENABLED with valid schedule, sensible 14-day
+      retention, CopyTags true, but no CrossRegionCopyTargets on any schedule.
+      Single-region backup = no DR posture.
+    input: |
+      Policy id: policy-no-cross-region-copy-gap
+      DLM lifecycle policy (from get-lifecycle-policy):
+        Description: prod-volumes-daily
+        State: ENABLED
+        PolicyType: EBS_SNAPSHOT_POLICY
+        DateCreated: 2025-01-20T12:00:00Z
+        PolicyDetails:
+          ResourceTypes: ["VOLUME"]
+          TargetTags: [{"Key": "Environment", "Values": ["production"]}]
+          Schedules:
+            - Name: daily-6am
+              CreateRule:
+                Interval: 24
+                IntervalUnit: HOURS
+                Times: ["06:00"]
+              RetainRule:
+                Count: 14
+              CopyTags: true
+              CrossRegionCopyTargets: []
+      Audit this DLM lifecycle policy. Emit the standard VERDICT block (POLICY,
+      VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "no-cross-region-copy-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_POLICY"
+        - "VERDICT: MISCONFIGURED"
+        - "VERDICT: OK"
+
+  - id: short-retention-no-copy-tags-gap
+    description: >-
+      DLM lifecycle policy is ENABLED with a valid daily schedule, but
+      RetainRule.Count is 1 (no recovery history) and CopyTags is false
+      (source volume tags dropped from snapshots). No cross-region copy either.
+    input: |
+      Policy id: policy-short-retention-no-copy-tags-gap
+      DLM lifecycle policy (from get-lifecycle-policy):
+        Description: minimal-backup
+        State: ENABLED
+        PolicyType: EBS_SNAPSHOT_POLICY
+        DateCreated: 2025-04-10T09:00:00Z
+        PolicyDetails:
+          ResourceTypes: ["VOLUME"]
+          TargetTags: [{"Key": "App", "Values": ["billing"]}]
+          Schedules:
+            - Name: daily-3am
+              CreateRule:
+                Interval: 24
+                IntervalUnit: HOURS
+                Times: ["03:00"]
+              RetainRule:
+                Count: 1
+              CopyTags: false
+              CrossRegionCopyTargets: []
+      Audit this DLM lifecycle policy. Emit the standard VERDICT block (POLICY,
+      VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "short-retention-no-copy-tags-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_POLICY"
+        - "VERDICT: MISCONFIGURED"
+        - "VERDICT: OK"
+
+  - id: clean-production-policy
+    description: >-
+      DLM lifecycle policy is ENABLED with a valid 6-field CronExpression, 30-day
+      retention, CopyTags true, and cross-region copy to us-west-2 with an
+      explicit KMS CMK. Well-configured production backup posture.
+    input: |
+      Policy id: policy-clean-production-policy
+      DLM lifecycle policy (from get-lifecycle-policy):
+        Description: production-ebs-full-backup
+        State: ENABLED
+        PolicyType: EBS_SNAPSHOT_POLICY
+        DateCreated: 2024-11-05T14:00:00Z
+        PolicyDetails:
+          ResourceTypes: ["VOLUME"]
+          TargetTags: [{"Key": "Environment", "Values": ["production"]}]
+          Schedules:
+            - Name: daily-6am-with-dr
+              CreateRule:
+                CronExpression: "0 6 * * ? *"
+                Times: ["06:00"]
+              RetainRule:
+                Count: 30
+              CopyTags: true
+              CrossRegionCopyTargets:
+                - TargetRegion: us-west-2
+                  EncryptionConfiguration:
+                    Encrypted: true
+                    CmkArn: arn:aws:kms:us-west-2:111111111111:key/dr-cmk-abc123
+      Audit this DLM lifecycle policy. Emit the standard VERDICT block (POLICY,
+      VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "clean-production-policy"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_POLICY"
+        - "VERDICT: MISCONFIGURED"
+        - "VERDICT: CONFIG_GAP"

@@ -1,0 +1,48 @@
+# Eval configuration for backup-plan-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: backup-plan-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: coverage-gap-empty-selection
+    difficulty: medium
+    prompt_file: prompts/coverage-gap-empty-selection.md
+    baseline_file: baselines/coverage-gap-empty-selection.md
+    expected_verdict: COVERAGE_GAP
+  - id: vault-risk-no-lock-aws-managed-key
+    difficulty: medium
+    prompt_file: prompts/vault-risk-no-lock-aws-managed-key.md
+    baseline_file: baselines/vault-risk-no-lock-aws-managed-key.md
+    expected_verdict: VAULT_RISK
+  - id: noncompliant-weekly-short-retention
+    difficulty: hard
+    prompt_file: prompts/noncompliant-weekly-short-retention.md
+    baseline_file: baselines/noncompliant-weekly-short-retention.md
+    expected_verdict: NONCOMPLIANT
+  - id: config-gap-impossible-lifecycle
+    difficulty: hard
+    prompt_file: prompts/config-gap-impossible-lifecycle.md
+    baseline_file: baselines/config-gap-impossible-lifecycle.md
+    expected_verdict: CONFIG_GAP
+  - id: ok-well-configured
+    difficulty: easy
+    prompt_file: prompts/ok-well-configured.md
+    baseline_file: baselines/ok-well-configured.md
+    expected_verdict: OK
+  - id: vault-risk-governance-mode
+    difficulty: hard
+    prompt_file: prompts/vault-risk-governance-mode.md
+    baseline_file: baselines/vault-risk-governance-mode.md
+    expected_verdict: VAULT_RISK

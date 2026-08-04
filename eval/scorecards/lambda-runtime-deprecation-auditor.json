@@ -1,0 +1,70 @@
+{
+  "skill": "lambda-runtime-deprecation-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Adds concrete expert knowledge not in a generic model: up\u2011to\u2011date runtime deprecation tables (including phase\u202f1/2 dates), DUCS urgency scoring, breakage\u2011matrix per migration path, role\u2011tier classification, exact async\u2011trigger detection algorithm, pagination handling, and detailed container\u2011image CVE audit steps. Deducted 2 points because a few very recent runtimes (e.g., python3.14) are not listed, leaving a tiny knowledge gap."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific mindset: worst\u2011finding aggregation, exact order of checks (runtime \u2192 URL \u2192 role \u2192 observability), pagination of list\u2011functions, separate API calls for URL and policy, and mandatory confirmation before any state\u2011changing CLI. Only 1 point deducted for a generic phrase \u201ccheck security\u201d that could be more AWS\u2011specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a thorough NEVER list with concrete reasoning (e.g., never flag PackageType:Image for missing runtime, never treat provided.al2023 as deprecated, never recommend AdministratorAccess as remediation). One point deducted because it does not explicitly warn about over\u2011permissive resource\u2011based policies that use a weak Condition key (e.g., broad VPC\u2011scoped wildcard without further restriction)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete frontmatter, clear description of WHAT it does, WHEN to invoke, exhaustive keyword list, activation_triggers, and a precise invocation_schema. No missing or vague elements."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Starts with a concise Quick\u2011Start and then layers deeper sections (Mindset, Process, Anti\u2011Patterns, Deep Reference). However, the document is long and many details appear early, which can cause cognitive overload before a user knows they need that depth. Deducted 2 points for front\u2011loading excess detail."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates tightly for fragile operations: mandatory CONFIRM gate before any update\u2011function\u2011configuration, explicit safety steps before runtime changes, role scoping, and DLQ updates. One point deducted because creative tasks like custom\u2011runtime CVE scanning are only mentioned abstractly, not tightly constrained."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Quick\u2011Start \u2192 Mindset \u2192 Process \u2192 Anti\u2011Patterns \u2192 Remediation). The ordering of sections is slightly ad\u2011hoc (e.g., Deep Reference appears after Remediation), preventing a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a usable decision tree, exact CLI remediation commands, error handling, and detailed async\u2011trigger detection steps. Two points deducted because some edge cases (e.g., functions with multiple async triggers across services, inclusion of the DUCS score in output) are not fully exemplified, and the sample outputs omit the DUCS field."
+    }
+  ],
+  "total_score": 110,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 44874,
+  "latency_ms": 12568,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

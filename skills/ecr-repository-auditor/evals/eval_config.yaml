@@ -1,0 +1,48 @@
+# Eval configuration for ecr-repository-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ecr-repository-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: public-pull-wildcard-no-condition
+    difficulty: easy
+    prompt_file: prompts/public-pull-wildcard-no-condition.md
+    baseline_file: baselines/public-pull-wildcard-no-condition.md
+    expected_verdict: PUBLIC
+  - id: scan-off-unscanned-images
+    difficulty: medium
+    prompt_file: prompts/scan-off-unscanned-images.md
+    baseline_file: baselines/scan-off-unscanned-images.md
+    expected_verdict: NO_SCAN
+  - id: no-lifecycle-policy
+    difficulty: medium
+    prompt_file: prompts/no-lifecycle-policy.md
+    baseline_file: baselines/no-lifecycle-policy.md
+    expected_verdict: NO_LIFECYCLE
+  - id: tag-mutable-config-gap
+    difficulty: easy
+    prompt_file: prompts/tag-mutable-config-gap.md
+    baseline_file: baselines/tag-mutable-config-gap.md
+    expected_verdict: CONFIG_GAP
+  - id: clean-ok
+    difficulty: easy
+    prompt_file: prompts/clean-ok.md
+    baseline_file: baselines/clean-ok.md
+    expected_verdict: OK
+  - id: public-pull-sourcevpce-scoped-config-gap
+    difficulty: hard
+    prompt_file: prompts/public-pull-sourcevpce-scoped-config-gap.md
+    baseline_file: baselines/public-pull-sourcevpce-scoped-config-gap.md
+    expected_verdict: CONFIG_GAP
