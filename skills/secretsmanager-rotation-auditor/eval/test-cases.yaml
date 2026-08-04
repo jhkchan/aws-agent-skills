@@ -1,0 +1,266 @@
+# Eval test cases for secretsmanager-rotation-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: secretsmanager-rotation-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: unrotated-rds-secret
+    description: RDS PostgreSQL credential secret with no rotation enabled — static DB password
+    input: |
+      Audit the following Secrets Manager secret for rotation health and credential hygiene.
+
+      Secret name: prod-rds-postgres-credentials
+      Secret type: AWS::RDS::DBInstance
+      Description: Primary PostgreSQL credentials for the production orders database
+      RotationEnabled: false
+      RotationLambdaARN: (none)
+      RotationRules:
+        AutomaticallyAfterDays: (none)
+      LastRotatedDate: (never — secret was created 180 days ago)
+      LastChangedDate: 2026-02-05T00:00:00Z
+      DeletedDate: (none)
+      KmsKeyId: default (aws/secretsmanager)
+      VersionIdsToStages:
+        v1: ["AWSCURRENT"]
+    expected_verdict: UNROTATED
+    assertions:
+      must_contain:
+        - "UNROTATED"
+        - "prod-rds-postgres-credentials"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: STALE"
+        - "VERDICT: ROTATION_BROKEN"
+
+  - id: ok-healthy-rotation
+    description: RDS MySQL secret with healthy rotation — Lambda active, last rotation 7 days ago, interval 30 days
+    input: |
+      Audit the following Secrets Manager secret for rotation health and credential hygiene.
+      Current date: 2026-08-04
+
+      Secret name: staging-rds-mysql-credentials
+      Secret type: AWS::RDS::DBInstance
+      Description: MySQL credentials for staging environment
+      RotationEnabled: true
+      RotationLambdaARN: arn:aws:lambda:us-east-1:123456789012:function:SecretsManagerRotation-MySQL
+      RotationRules:
+        AutomaticallyAfterDays: 30
+      LastRotatedDate: 2026-07-28T03:15:00Z
+      LastChangedDate: 2026-07-28T03:15:00Z
+      DeletedDate: (none)
+      KmsKeyId: default (aws/secretsmanager)
+      VersionIdsToStages:
+        v4: ["AWSCURRENT"]
+        v3: ["AWSPREVIOUS"]
+      Lambda:
+        State: Active
+        Role: arn:aws:iam::123456789012:role/service-role/SecretsManagerRotation-MySQL
+        RolePolicies: [SecretsManagerRotation, AWSLambdaVPCAccessExecutionRole]
+        Timeout: 30
+        VpcConfig:
+          SubnetIds: [subnet-aaa111, subnet-bbb222]
+          SecurityGroupIds: [sg-rdslambda]
+        LastInvocation:
+          Status: SUCCESS
+          Timestamp: 2026-07-28T03:15:00Z
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "staging-rds-mysql-credentials"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: UNROTATED"
+        - "VERDICT: STALE"
+        - "VERDICT: ROTATION_BROKEN"
+
+  - id: broken-lambda-deleted
+    description: Redshift secret with rotation enabled but Lambda function deleted — every rotation silently fails
+    input: |
+      Audit the following Secrets Manager secret for rotation health and credential hygiene.
+      Current date: 2026-08-04
+
+      Secret name: analytics-redshift-credentials
+      Secret type: AWS::Redshift::Cluster
+      Description: Redshift credentials for analytics cluster
+      RotationEnabled: true
+      RotationLambdaARN: arn:aws:lambda:us-east-1:123456789012:function:RedshiftRotationLambda
+      RotationRules:
+        AutomaticallyAfterDays: 60
+      LastRotatedDate: 2025-12-15T08:00:00Z
+      LastChangedDate: 2025-12-15T08:00:00Z
+      DeletedDate: (none)
+      KmsKeyId: default (aws/secretsmanager)
+      VersionIdsToStages:
+        v2: ["AWSCURRENT"]
+        v1: ["AWSPREVIOUS"]
+      Lambda:
+        State: Deleted (ResourceNotFoundException — function was deleted on 2026-03-01)
+        Role: (n/a — function does not exist)
+        LastInvocation:
+          Status: ERROR
+          ErrorCode: ResourceNotFoundException
+          ErrorMessage: Function not found: arn:aws:lambda:us-east-1:123456789012:function:RedshiftRotationLambda
+    expected_verdict: ROTATION_BROKEN
+    assertions:
+      must_contain:
+        - "ROTATION_BROKEN"
+        - "analytics-redshift-credentials"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: STALE"
+        - "VERDICT: UNROTATED"
+
+  - id: stale-overdue-rotation
+    description: DocDB secret with rotation enabled and Lambda healthy but last rotation 95 days ago (interval 30) — overdue
+    input: |
+      Audit the following Secrets Manager secret for rotation health and credential hygiene.
+      Current date: 2026-08-04
+
+      Secret name: documentdb-cluster-credentials
+      Secret type: AWS::DocDB::DBCluster
+      Description: DocumentDB credentials for content metadata cluster
+      RotationEnabled: true
+      RotationLambdaARN: arn:aws:lambda:us-east-1:123456789012:function:DocDBRotationLambda
+      RotationRules:
+        AutomaticallyAfterDays: 30
+      LastRotatedDate: 2026-05-01T02:00:00Z
+      Days since last rotation: 95
+      LastChangedDate: 2026-05-01T02:00:00Z
+      DeletedDate: (none)
+      KmsKeyId: default (aws/secretsmanager)
+      VersionIdsToStages:
+        v5: ["AWSCURRENT"]
+        v4: ["AWSPREVIOUS"]
+      Lambda:
+        State: Active
+        Role: arn:aws:iam::123456789012:role/service-role/DocDBRotationLambda
+        RolePolicies: [SecretsManagerRotation, AWSLambdaVPCAccessExecutionRole]
+        Timeout: 30
+        VpcConfig:
+          SubnetIds: [subnet-ccc333, subnet-ddd444]
+          SecurityGroupIds: [sg-docdb-lambda]
+        LastInvocation:
+          Status: SUCCESS
+          Timestamp: 2026-05-01T02:00:00Z
+    expected_verdict: STALE
+    assertions:
+      must_contain:
+        - "STALE"
+        - "documentdb-cluster-credentials"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNROTATED"
+        - "VERDICT: ROTATION_BROKEN"
+
+  - id: broken-never-rotated
+    description: Oracle RDS secret with rotation enabled 90 days ago but LastRotatedDate null and Lambda erroring — target DB instance deleted
+    input: |
+      Audit the following Secrets Manager secret for rotation health and credential hygiene.
+      Current date: 2026-08-04
+
+      Secret name: legacy-oracle-credentials
+      Secret type: AWS::RDS::DBInstance
+      Description: Oracle credentials for legacy reporting database
+      RotationEnabled: true
+      RotationLambdaARN: arn:aws:lambda:us-east-1:123456789012:function:OracleRotationLambda
+      RotationRules:
+        AutomaticallyAfterDays: 30
+      LastRotatedDate: (null — never rotated)
+      LastChangedDate: 2026-05-05T00:00:00Z
+      CreatedDate: 2026-05-05T00:00:00Z
+      DeletedDate: (none)
+      KmsKeyId: default (aws/secretsmanager)
+      VersionIdsToStages:
+        v1: ["AWSCURRENT"]
+      Lambda:
+        State: Active
+        Role: arn:aws:iam::123456789012:role/service-role/OracleRotationLambda
+        RolePolicies: [SecretsManagerRotation, AWSLambdaVPCAccessExecutionRole]
+        Timeout: 60
+        VpcConfig:
+          SubnetIds: [subnet-eee555, subnet-fff666]
+          SecurityGroupIds: [sg-oracle-lambda]
+        LastInvocation:
+          Status: ERROR
+          ErrorCode: ResourceNotFoundException
+          ErrorMessage: DBInstance not found: oracle-legacy-prod (the RDS instance was deleted on 2026-06-15)
+    expected_verdict: ROTATION_BROKEN
+    assertions:
+      must_contain:
+        - "ROTATION_BROKEN"
+        - "legacy-oracle-credentials"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: STALE"
+        - "VERDICT: UNROTATED"
+
+  - id: recovery-window-flagged
+    description: API token secret in recovery window (DeletedDate set) with no rotation enabled — UNROTATED plus DELETION_FLAG
+    input: |
+      Audit the following Secrets Manager secret for rotation health and credential hygiene.
+      Current date: 2026-08-04
+
+      Secret name: payment-gateway-api-token
+      Secret type: Other
+      Description: Stripe API key for payment processing
+      RotationEnabled: false
+      RotationLambdaARN: (none)
+      RotationRules:
+        AutomaticallyAfterDays: (none)
+      LastRotatedDate: (never)
+      LastChangedDate: 2026-01-10T00:00:00Z
+      DeletedDate: 2026-08-12T00:00:00Z
+      RecoveryWindowInDays: 30
+      KmsKeyId: default (aws/secretsmanager)
+      VersionIdsToStages:
+        v1: ["AWSCURRENT"]
+    expected_verdict: UNROTATED
+    assertions:
+      must_contain:
+        - "UNROTATED"
+        - "payment-gateway-api-token"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DELETION_FLAG"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: STALE"
+        - "VERDICT: ROTATION_BROKEN"

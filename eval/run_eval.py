@@ -541,36 +541,70 @@ def run_eval_for_skill(spec_path: Path, assertion_only: bool = False) -> dict | 
     # Combine actual model outputs for the judge (not raw test-case inputs).
     full_output = "\n---\n".join(model_outputs)
     judge_text = render_judge_prompt(skill_definition, full_output)
-    try:
-        start = time.monotonic()
-        judge_response = invoke_bedrock(
-            judge_model_id, judge_text, profile, region, temperature
+    # Multi-run median (judge_runs=3): the judge has ~±5 run-to-run variance
+    # even at temperature 0. Running it 3x and taking the per-dimension median
+    # yields a stable, reproducible scorecard — the "measured, not vibes" contract.
+    judge_runs = 3
+    dim_runs: list[list[dict]] = []
+    judge_tokens = 0
+    run_latencies: list[int] = []
+    for _ in range(judge_runs):
+        try:
+            _start = time.monotonic()
+            judge_response = invoke_bedrock(
+                judge_model_id, judge_text, profile, region, temperature
+            )
+            run_latencies.append(int((time.monotonic() - _start) * 1000))
+        except SSOSessionExpiredError:
+            print(
+                f"\nERROR: AWS SSO session expired for profile '{profile}'.\n"
+                f"Run: aws sso login --profile {profile}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        except subprocess.CalledProcessError as exc:
+            print(
+                f"  ERROR: judge invocation failed for {skill_name}: "
+                f"{exc.stderr[:200]}",
+                file=sys.stderr,
+            )
+            continue  # use whatever other runs succeeded
+        # Robust text extraction: reasoning-capable models (e.g. gpt-oss-120b)
+        # may return a reasoning block in content[0]; concatenate all text blocks.
+        _content = judge_response.get("output", {}).get("message", {}).get("content", [])
+        judge_output = "\n".join(
+            b.get("text", "") for b in _content if isinstance(b, dict) and b.get("text")
         )
-        judge_latency = int((time.monotonic() - start) * 1000)
-    except SSOSessionExpiredError:
-        print(
-            f"\nERROR: AWS SSO session expired for profile '{profile}'.\n"
-            f"Run: aws sso login --profile {profile}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    except subprocess.CalledProcessError as exc:
-        print(
-            f"  ERROR: judge invocation failed for {skill_name}: "
-            f"{exc.stderr[:200]}",
-            file=sys.stderr,
-        )
-        return None
+        judge_tokens += judge_response.get("usage", {}).get("totalTokens", 0)
+        dim_runs.append(parse_judge_output(judge_output))
 
-    # Robust text extraction: reasoning-capable models (e.g. gpt-oss-120b) may
-    # return a reasoning/tool block in content[0] with the actual text in a
-    # later block. Concatenate all text blocks instead of assuming content[0].
-    _content = judge_response.get("output", {}).get("message", {}).get("content", [])
-    judge_output = "\n".join(
-        b.get("text", "") for b in _content if isinstance(b, dict) and b.get("text")
-    )
-    judge_tokens = judge_response.get("usage", {}).get("totalTokens", 0)
-    dimensions = parse_judge_output(judge_output)
+    if not dim_runs:
+        return None  # every judge run failed
+
+    # Per-dimension median across runs (odd N: the middle of the sorted scores).
+    by_id: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for run in dim_runs:
+        for d in run:
+            did = d.get("id", "")
+            if did not in by_id:
+                by_id[did] = []
+                order.append(did)
+            by_id[did].append(d)
+    dimensions: list[dict] = []
+    for did in order:
+        runs_d = by_id[did]
+        scores = sorted(d.get("score", 0) for d in runs_d)
+        med = scores[len(scores) // 2]  # median (odd N)
+        best = min(runs_d, key=lambda d: abs(d.get("score", 0) - med))
+        dimensions.append({
+            "id": did,
+            "name": best.get("name", did),
+            "score": int(med),
+            "max": best.get("max", 15),
+            "justification": best.get("justification", ""),
+        })
+    judge_latency = sorted(run_latencies)[len(run_latencies) // 2] if run_latencies else 0
     return build_scorecard(
         skill_name=skill_name,
         model_id=model_id,

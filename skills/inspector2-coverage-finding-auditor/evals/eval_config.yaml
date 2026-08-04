@@ -1,0 +1,54 @@
+# Eval configuration for inspector2-coverage-finding-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: inspector2-coverage-finding-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: inspector2-disabled-prod-ec2
+    difficulty: medium
+    prompt_file: prompts/inspector2-disabled-prod-ec2.md
+    baseline_file: baselines/inspector2-disabled-prod-ec2.md
+    expected_verdict: CRITICAL
+    expected_risk: CRITICAL
+  - id: ec2-critical-cve-internet-reachable
+    difficulty: hard
+    prompt_file: prompts/ec2-critical-cve-internet-reachable.md
+    baseline_file: baselines/ec2-critical-cve-internet-reachable.md
+    expected_verdict: CRITICAL
+    expected_risk: CRITICAL
+  - id: ec2-high-cve-isolated
+    difficulty: medium
+    prompt_file: prompts/ec2-high-cve-isolated.md
+    baseline_file: baselines/ec2-high-cve-isolated.md
+    expected_verdict: HIGH
+    expected_risk: HIGH
+  - id: ecr-prod-stale-scan
+    difficulty: hard
+    prompt_file: prompts/ecr-prod-stale-scan.md
+    baseline_file: baselines/ecr-prod-stale-scan.md
+    expected_verdict: MEDIUM
+    expected_risk: MEDIUM
+  - id: ec2-low-cve-only
+    difficulty: easy
+    prompt_file: prompts/ec2-low-cve-only.md
+    baseline_file: baselines/ec2-low-cve-only.md
+    expected_verdict: LOW
+    expected_risk: LOW
+  - id: ecr-scanonpush-clean
+    difficulty: easy
+    prompt_file: prompts/ecr-scanonpush-clean.md
+    baseline_file: baselines/ecr-scanonpush-clean.md
+    expected_verdict: COVERED
+    expected_risk: LOW

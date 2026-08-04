@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "acm-certificate-expiry-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ACM Certificate Expiry Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "expired-amazon-issued",
+      "name": "AMAZON_ISSUED cert with NotAfter in the past — terminal expiry / live TLS outage",
+      "difficulty": "easy",
+      "prompt_file": "prompts/expired-amazon-issued.md",
+      "baseline_file": "baselines/expired-amazon-issued.md",
+      "expected_verdict": "EXPIRED",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["EXPIRED", "expired-amazon-issued", "VERDICT", "RISK", "REASON", "REMEDIATION", "CRITICAL"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: EXPIRING_SOON", "VERDICT: RENEWAL_FAILED"]
+        }
+      ]
+    },
+    {
+      "id": "renewal-failed-caa-error",
+      "name": "AMAZON_ISSUED cert with FAILED_AUTORENEWAL + CAA_ERROR at 20 days to expiry — CRITICAL renewal failure",
+      "difficulty": "hard",
+      "prompt_file": "prompts/renewal-failed-caa-error.md",
+      "baseline_file": "baselines/renewal-failed-caa-error.md",
+      "expected_verdict": "RENEWAL_FAILED",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["RENEWAL_FAILED", "renewal-failed-caa-error", "VERDICT", "RISK", "REASON", "REMEDIATION", "CAA_ERROR", "CRITICAL"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: EXPIRING_SOON", "VERDICT: EXPIRED"]
+        }
+      ]
+    },
+    {
+      "id": "expiring-soon-amazon-15-days",
+      "name": "AMAZON_ISSUED cert 15 days from NotAfter with renewal pending — EXPIRING_SOON + AMAZON_ISSUED => HIGH",
+      "difficulty": "medium",
+      "prompt_file": "prompts/expiring-soon-amazon-15-days.md",
+      "baseline_file": "baselines/expiring-soon-amazon-15-days.md",
+      "expected_verdict": "EXPIRING_SOON",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["EXPIRING_SOON", "expiring-soon-amazon-15-days", "VERDICT", "RISK", "REASON", "REMEDIATION", "HIGH", "AMAZON_ISSUED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: EXPIRED", "VERDICT: RENEWAL_FAILED"]
+        }
+      ]
+    },
+    {
+      "id": "imported-expiring-soon-45-days",
+      "name": "IMPORTED cert 45 days from NotAfter — EXPIRING_SOON, MODERATE (no auto-renewal, 30 < d <= 60)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/imported-expiring-soon-45-days.md",
+      "baseline_file": "baselines/imported-expiring-soon-45-days.md",
+      "expected_verdict": "EXPIRING_SOON",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["EXPIRING_SOON", "imported-expiring-soon-45-days", "VERDICT", "RISK", "REASON", "REMEDIATION", "MODERATE", "IMPORTED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: EXPIRED", "VERDICT: RENEWAL_FAILED"]
+        }
+      ]
+    },
+    {
+      "id": "healthy-amazon-90-days",
+      "name": "AMAZON_ISSUED cert 90 days out, eligible, RSA_2048 — healthy posture, OK / LOW",
+      "difficulty": "easy",
+      "prompt_file": "prompts/healthy-amazon-90-days.md",
+      "baseline_file": "baselines/healthy-amazon-90-days.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "healthy-amazon-90-days", "VERDICT", "RISK", "REASON", "REMEDIATION", "LOW"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: EXPIRED", "VERDICT: EXPIRING_SOON", "VERDICT: RENEWAL_FAILED"]
+        }
+      ]
+    },
+    {
+      "id": "error-pending-validation",
+      "name": "Cert in PENDING_VALIDATION state with NotAfter null — ERROR / N/A (cannot classify expiry)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/error-pending-validation.md",
+      "baseline_file": "baselines/error-pending-validation.md",
+      "expected_verdict": "ERROR",
+      "expected_risk": "N/A",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ERROR", "error-pending-validation", "VERDICT", "RISK", "REASON", "REMEDIATION", "PENDING_VALIDATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: EXPIRED", "VERDICT: EXPIRING_SOON", "VERDICT: RENEWAL_FAILED"]
+        }
+      ]
+    }
+  ]
+}

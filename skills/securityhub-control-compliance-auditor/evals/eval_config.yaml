@@ -1,0 +1,54 @@
+# Eval configuration for securityhub-control-compliance-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: securityhub-control-compliance-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: s3-bpa-failed
+    difficulty: easy
+    prompt_file: prompts/s3-bpa-failed.md
+    baseline_file: baselines/s3-bpa-failed.md
+    expected_verdict: FAILED
+    expected_risk: HIGH
+  - id: iam-password-policy-passed
+    difficulty: easy
+    prompt_file: prompts/iam-password-policy-passed.md
+    baseline_file: baselines/iam-password-policy-passed.md
+    expected_verdict: PASSED
+    expected_risk: "—"
+  - id: not-available-no-resources
+    difficulty: hard
+    prompt_file: prompts/not-available-no-resources.md
+    baseline_file: baselines/not-available-no-resources.md
+    expected_verdict: NOT_APPLICABLE
+    expected_risk: "—"
+  - id: not-available-service-disabled
+    difficulty: hard
+    prompt_file: prompts/not-available-service-disabled.md
+    baseline_file: baselines/not-available-service-disabled.md
+    expected_verdict: WARNING
+    expected_risk: MEDIUM
+  - id: suppressed-failed
+    difficulty: hard
+    prompt_file: prompts/suppressed-failed.md
+    baseline_file: baselines/suppressed-failed.md
+    expected_verdict: WARNING
+    expected_risk: HIGH
+  - id: archived-finding
+    difficulty: medium
+    prompt_file: prompts/archived-finding.md
+    baseline_file: baselines/archived-finding.md
+    expected_verdict: NOT_APPLICABLE
+    expected_risk: "—"

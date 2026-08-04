@@ -1,0 +1,70 @@
+{
+  "skill": "sts-cross-account-role-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides extensive expert knowledge not commonly known: exhaustive confused\u2011deputy service list, detailed condition\u2011strength matrix, root\u2011ARN expansion nuance, ForAllValues trap, and precise decision tree. Minor gap: does not mention IAM policy variables (e.g., ${aws:username}) as a weak pattern."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a concrete AWS\u2011specific procedure: ordered classification steps, pre\u2011flight safety checks, exact CLI commands for backup and CloudTrail lookup, and remediation ordering (add guard before removal). The only deduction is a small reliance on generic phrasing like \u201ccheck condition strength\u201d without naming the exact matrix lookup."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., NotPrincipal, wildcard principal, weak condition keys, ForAllValues trap, ExternalId StringLike). One point deducted because the list could also flag \u201cNever use IAM policy variables in trust policies\u201d which is a known pitfall."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete (name, description, version, keywords, triggers, when_to_use). Output format is precisely defined. The only shortfall is the lack of an explicit \u201cactivation regex\u201d field; triggers are described in prose, which could be ambiguous for an automated parser."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered well: high\u2011level mindset \u2192 quick reference \u2192 step\u2011by\u2011step decision tree \u2192 matrices \u2192 edge\u2011case walkthroughs \u2192 remediation. The extensive service\u2011principal list appears early, adding some cognitive load, but overall the layering respects progressive disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "The skill is read\u2011only audit\u2011only, so it imposes tight constraints on any destructive action. Remediation guidance is deliberately conservative (add guard before removal) and includes safety checks (backup, service\u2011linked role detection). Calibration matches task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows the canonical CloudOps auditor pattern (frontmatter \u2192 mindset \u2192 quick reference \u2192 detailed process \u2192 matrices \u2192 edge cases \u2192 output \u2192 anti\u2011patterns \u2192 safety checks \u2192 remediation \u2192 references). Structure is immediately recognizable."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 15,
+      "max": 15,
+      "justification": "Provides a complete, executable workflow: validation of JSON, extraction of owning account, stepwise classification, worst\u2011case aggregation, error handling, and concrete remediation commands. Model output examples match the prescribed format, showing the skill can be used cold with correct results."
+    }
+  ],
+  "total_score": 114,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 47639,
+  "latency_ms": 9301,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

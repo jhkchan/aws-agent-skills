@@ -4,7 +4,7 @@
 # eval/test-cases.yaml is preserved as a compatibility shim for eval/run_eval.py
 # (which discovers skills/*/eval/*.yaml).
 #
-# The internal reference repo pattern: eval_config.yaml provides the with-skill-vs-baseline comparison
+# structured-eval pattern: eval_config.yaml provides the with-skill-vs-baseline comparison
 # surface. Each eval has a prompt_file (the input the model receives) and a
 # baseline_file (what a no-skill model produces — demonstrating skill value).
 

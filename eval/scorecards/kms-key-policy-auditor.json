@@ -1,0 +1,70 @@
+{
+  "skill": "kms-key-policy-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many expert\u2011level specifics not commonly known: exact deletion\u2011window thresholds (\u22647\u202fdays\u202f=\u202fCRITICAL, 8\u201130\u202f=\u202fHIGH), condition\u2011strength taxonomy, grant\u2011chaining limits, multi\u2011region replica independence, rotation timing nuances, policy\u2011size limit, and mandatory confirmation gates. These details go beyond a generic model\u2019s baseline knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific evaluation pipeline (pre\u2011flight metadata gate, ordered steps, pagination handling, IAM\u2011policy\u2011simulator verification, additive\u2011then\u2011destructive remediation ordering). Only minor omission: no explicit step for running the IAM policy simulator command."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a comprehensive NEVER list with concrete reasoning (e.g., never treat wildcard Decrypt as non\u2011critical, never flag the root\u2011of\u2011trust statement, never rely on SourceIp 0.0.0.0/0, never ignore CreateGrant, never assume key\u2011policy alone is sufficient). One small omission is a explicit NEVER for trusting IAM policies without checking the root\u2011of\u2011trust statement, but overall very strong."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes name, description, version, author, license, compatibility, keywords, tags, metadata, activation_triggers, and a clear invocation_schema. Description explains WHAT it does, WHEN to invoke, and provides KEYWORDS for activation. No missing required fields."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Layers information well (high\u2011level Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Step\u2011by\u2011step process \u2192 Edge\u2011cases \u2192 Deep reference). However, the Quick reference table and deep reference are dense, causing some cognitive load before the core steps."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive operations are tightly constrained with mandatory confirmation, policy backup, and safety checks. Classification (audit) is deterministic, while remediation steps allow controlled freedom. Calibration matches task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent pattern: Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation \u2192 Deep reference. The structure is recognizable and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a concrete output format, decision matrix, CLI command snippets for every remediation step, handling of malformed policies, pagination guidance, and grant enumeration. Lacks a ready\u2011to\u2011run script/template, but an agent could implement the audit and remediation directly from the skill."
+    }
+  ],
+  "total_score": 113,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 49516,
+  "latency_ms": 17193,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

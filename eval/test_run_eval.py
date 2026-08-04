@@ -553,8 +553,8 @@ def test_run_eval_for_skill_mocked_pipeline(mock_invoke):
     assert sc["max_score"] == 120
     assert len(sc["dimensions"]) == 8
     assert sc["total_score"] == 96
-    assert sc["token_count"] == 200
-    assert mock_invoke.call_count >= 6  # 5 test cases + 1 judge
+    assert sc["token_count"] == 600  # 3 judge runs (median-of-3) x 200 tokens
+    assert mock_invoke.call_count >= 8  # 5 test cases + 3 judge runs (median-of-3)
 
 
 def test_run_eval_for_skill_assertion_only():

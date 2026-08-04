@@ -1,0 +1,276 @@
+# Eval test cases for inspector2-coverage-finding-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: inspector2-coverage-finding-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: inspector2-disabled-prod-ec2
+    description: >-
+      Inspector2 EC2 scanning disabled in region, production EC2 instances
+      exist — blanket coverage gap on critical assets.
+    input: |
+      Audit the Inspector2 coverage and finding posture for this account.
+      Audit ID: inspector2-disabled-prod-ec2
+
+      Account: 123456789012
+      Region: us-east-1
+
+      Inspector2 account status (batch-get-account-status):
+        EC2:  DISABLED
+        ECR:  ENABLED
+        LAMBDA: ENABLED
+
+      Resource inventory:
+        - i-prod-web-01 (EC2, t3.large, env=prod, critical=true)
+        - i-prod-app-02 (EC2, t3.medium, env=prod)
+        - ecr-prod-api (ECR, scanOnPush=true)
+
+      Coverage data (list-coverage):
+        - ecr-prod-api: lastScannedAt=2026-08-01, status=ACTIVE, 0 open findings
+
+      Findings (list-findings, status=OPEN):
+        (none — EC2 scanning disabled, no EC2 findings can exist)
+    expected_verdict: CRITICAL
+    assertions:
+      must_contain:
+        - "CRITICAL"
+        - "inspector2-disabled-prod-ec2"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: COVERED"
+        - "VERDICT: LOW"
+
+  - id: ec2-critical-cve-internet-reachable
+    description: >-
+      EC2 with ACTIVE coverage, OPEN CRITICAL CVE (log4j RCE), confirmed
+      internet-reachable via NETWORK_REACHABILITY finding — confirmed
+      exploitable attack path.
+    input: |
+      Audit the Inspector2 coverage and finding posture for this resource.
+      Audit ID: ec2-critical-cve-internet-reachable
+
+      Resource: i-prod-web-01 (EC2, env=prod)
+      Region: us-east-1
+
+      Inspector2 account status:
+        EC2: ENABLED
+
+      Coverage:
+        - i-prod-web-01: lastScannedAt=2026-08-02, status=ACTIVE, SSM PingStatus=Online
+
+      Findings (status=OPEN):
+        - findingId: arn:aws:inspector2:us-east-1:123456789012:finding/abc-123
+          type: PACKAGE_VULNERABILITY
+          severity: CRITICAL
+          cve: CVE-2021-44228
+          affectedPackage: log4j-core
+          affectedVersion: 2.14.1
+          cvssScore: 10.0
+          description: Apache Log4j2 JNDI features do not protect against attacker-controlled LDAP and other JNDI related endpoints.
+        - findingId: arn:aws:inspector2:us-east-1:123456789012:finding/net-456
+          type: NETWORK_REACHABILITY
+          severity: INFORMATIONAL
+          protocol: TCP
+          portRange: "443"
+          reachability: ReachableFromInternet
+          description: Port 443 reachable from internet.
+
+      Note: CVE-2021-44228 (Log4Shell) is listed in the CISA KEV catalog.
+    expected_verdict: CRITICAL
+    assertions:
+      must_contain:
+        - "CRITICAL"
+        - "ec2-critical-cve-internet-reachable"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: COVERED"
+        - "VERDICT: MEDIUM"
+
+  - id: ec2-high-cve-isolated
+    description: >-
+      EC2 with ACTIVE coverage, OPEN HIGH CVE but NOT internet-reachable —
+      no reachability finding on the vulnerable port. High severity without
+      confirmed exploitable path.
+    input: |
+      Audit the Inspector2 coverage and finding posture for this resource.
+      Audit ID: ec2-high-cve-isolated
+
+      Resource: i-prod-app-02 (EC2, env=prod)
+      Region: us-east-1
+
+      Inspector2 account status:
+        EC2: ENABLED
+
+      Coverage:
+        - i-prod-app-02: lastScannedAt=2026-08-01, status=ACTIVE, SSM PingStatus=Online
+
+      Findings (status=OPEN):
+        - findingId: arn:aws:inspector2:us-east-1:123456789012:finding/def-789
+          type: PACKAGE_VULNERABILITY
+          severity: HIGH
+          cve: CVE-2024-5678
+          affectedPackage: openssl
+          affectedVersion: 1.1.1k
+          cvssScore: 7.5
+          description: OpenSSL buffer overrun in X.509 certificate parsing.
+
+      Network reachability findings: none (no NETWORK_REACHABILITY findings for this resource).
+      KEV catalog: CVE-2024-5678 is NOT in the CISA KEV catalog.
+    expected_verdict: HIGH
+    assertions:
+      must_contain:
+        - "HIGH"
+        - "ec2-high-cve-isolated"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: COVERED"
+        - "VERDICT: CRITICAL"
+
+  - id: ecr-prod-stale-scan
+    description: >-
+      ECR production repo scanned 45 days ago (stale coverage), no recent
+      re-scan — new CVEs published since the last scan are undetected.
+      Coverage degradation on a production resource.
+    input: |
+      Audit the Inspector2 coverage and finding posture for this resource.
+      Audit ID: ecr-prod-stale-scan
+
+      Resource: ecr-prod-payments (ECR, env=prod, compliance=pci)
+      Region: us-east-1
+
+      Inspector2 account status:
+        ECR: ENABLED
+
+      Coverage:
+        - ecr-prod-payments: lastScannedAt=2026-06-15, status=SUCCESSFUL, scanOnPush=true
+          (last image push was 45 days ago; ECR scans only at push time)
+
+      Findings (status=OPEN):
+        - findingId: arn:aws:inspector2:us-east-1:123456789012:finding/ghi-012
+          type: PACKAGE_VULNERABILITY
+          severity: MEDIUM
+          cve: CVE-2024-3456
+          affectedPackage: node
+          affectedVersion: 18.19.0
+          cvssScore: 5.3
+          description: Node.js HTTP request smuggling vulnerability.
+
+      Network reachability: N/A (ECR image, not a running instance).
+      KEV catalog: CVE-2024-3456 is NOT in the CISA KEV catalog.
+    expected_verdict: MEDIUM
+    assertions:
+      must_contain:
+        - "MEDIUM"
+        - "ecr-prod-stale-scan"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: COVERED"
+        - "VERDICT: CRITICAL"
+
+  - id: ec2-low-cve-only
+    description: >-
+      EC2 with ACTIVE coverage, single OPEN LOW-severity CVE, no
+      reachability finding, not in KEV. Minimal risk — backlog item.
+    input: |
+      Audit the Inspector2 coverage and finding posture for this resource.
+      Audit ID: ec2-low-cve-only
+
+      Resource: i-dev-sandbox-03 (EC2, env=dev)
+      Region: us-east-1
+
+      Inspector2 account status:
+        EC2: ENABLED
+
+      Coverage:
+        - i-dev-sandbox-03: lastScannedAt=2026-08-03, status=ACTIVE, SSM PingStatus=Online
+
+      Findings (status=OPEN):
+        - findingId: arn:aws:inspector2:us-east-1:123456789012:finding/jkl-345
+          type: PACKAGE_VULNERABILITY
+          severity: LOW
+          cve: CVE-2024-9999
+          affectedPackage: curl
+          affectedVersion: 7.81.0
+          cvssScore: 2.7
+          description: cURL information disclosure in verbose output mode.
+
+      Network reachability: none.
+      KEV catalog: CVE-2024-9999 is NOT in the CISA KEV catalog.
+    expected_verdict: LOW
+    assertions:
+      must_contain:
+        - "LOW"
+        - "ec2-low-cve-only"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: COVERED"
+        - "VERDICT: HIGH"
+
+  - id: ecr-scanonpush-clean
+    description: >-
+      ECR repo with scanOnPush=true, recently scanned, zero open findings
+      — fully covered, no actionable findings. The COVERED verdict.
+    input: |
+      Audit the Inspector2 coverage and finding posture for this resource.
+      Audit ID: ecr-scanonpush-clean
+
+      Resource: eci-prod-frontend (ECR, env=prod)
+      Region: us-east-1
+
+      Inspector2 account status:
+        ECR: ENABLED
+
+      Coverage:
+        - eci-prod-frontend: lastScannedAt=2026-08-04, status=SUCCESSFUL, scanOnPush=true
+          (last push was 2 hours ago)
+
+      Findings (status=OPEN):
+        (none)
+
+      Findings (status=SUPPRESSED):
+        - 1 SUPPRESSED (package removed in latest image rebuild)
+
+      Network reachability: N/A.
+    expected_verdict: COVERED
+    assertions:
+      must_contain:
+        - "COVERED"
+        - "ecr-scanonpush-clean"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL"
+        - "VERDICT: HIGH"

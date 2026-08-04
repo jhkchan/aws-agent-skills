@@ -1,0 +1,338 @@
+# Eval test cases for cognito-idp-user-pool-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cognito-idp-user-pool-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: insecure-no-mfa-weak-password
+    description: Pool with MFA off, weak password policy, public client with no secret and user enumeration enabled
+    input: |
+      Audit this Cognito user pool configuration for security posture.
+      Emit the standard VERDICT block (USER POOL, VERDICT, REASON, RISK, REMEDIATION).
+
+      User Pool: insecure-demo-pool
+      MfaConfiguration: OFF
+      EnabledMfas: []
+      PasswordPolicy:
+        MinimumLength: 6
+        RequireUppercase: false
+        RequireLowercase: false
+        RequireNumbers: false
+        RequireSymbols: false
+        TemporaryPasswordValidityDays: 7
+      UserPoolAddOns:
+        AdvancedSecurityMode: OFF
+      DeletionProtection: INACTIVE
+
+      App Client: web-client
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+      PreventUserExistenceErrors: LEGACY
+      EnableTokenRevocation: false
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        RefreshToken: days
+      AllowedOAuthFlows: []
+    expected_verdict: INSECURE
+    assertions:
+      must_contain:
+        - "INSECURE"
+        - "insecure-demo-pool"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: WEAK"
+        - "VERDICT: ADEQUATE"
+        - "VERDICT: OK"
+
+  - id: insecure-implicit-oauth
+    description: Hardened pool except OAuth implicit flow is enabled — token leakage via URL fragment
+    input: |
+      Audit this Cognito user pool configuration for security posture.
+      Emit the standard VERDICT block (USER POOL, VERDICT, REASON, RISK, REMEDIATION).
+
+      User Pool: spa-app-pool
+      MfaConfiguration: ON
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      PasswordPolicy:
+        MinimumLength: 12
+        RequireUppercase: true
+        RequireLowercase: true
+        RequireNumbers: true
+        RequireSymbols: true
+        TemporaryPasswordValidityDays: 7
+      UserPoolAddOns:
+        AdvancedSecurityMode: ENFORCED
+      DeletionProtection: ACTIVE
+
+      App Client: spa-client
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        RefreshToken: days
+      AllowedOAuthFlows:
+        - implicit
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs:
+        - https://app.example.com/callback
+    expected_verdict: INSECURE
+    assertions:
+      must_contain:
+        - "INSECURE"
+        - "spa-app-pool"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: WEAK"
+        - "VERDICT: ADEQUATE"
+        - "VERDICT: OK"
+
+  - id: weak-optional-mfa
+    description: Pool with optional MFA, adequate password policy, SRP auth, ASF audit mode, long refresh token
+    input: |
+      Audit this Cognito user pool configuration for security posture.
+      Emit the standard VERDICT block (USER POOL, VERDICT, REASON, RISK, REMEDIATION).
+
+      User Pool: consumer-app-pool
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+        - SMS
+      PasswordPolicy:
+        MinimumLength: 8
+        RequireUppercase: true
+        RequireLowercase: true
+        RequireNumbers: true
+        RequireSymbols: false
+        TemporaryPasswordValidityDays: 7
+      UserPoolAddOns:
+        AdvancedSecurityMode: AUDIT
+      DeletionProtection: INACTIVE
+
+      App Client: mobile-client
+      GenerateSecret: true
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      RefreshTokenValidity: 90
+      TokenValidityUnits:
+        RefreshToken: days
+      AllowedOAuthFlows:
+        - code
+      CallbackURLs:
+        - https://mobile.example.com/callback
+    expected_verdict: WEAK
+    assertions:
+      must_contain:
+        - "WEAK"
+        - "consumer-app-pool"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSECURE"
+        - "VERDICT: ADEQUATE"
+        - "VERDICT: OK"
+
+  - id: weak-admin-auth-flow
+    description: Pool with MFA OPTIONAL, strong password, but insecure OAuth redirect URLs (HTTP + wildcard subdomain) and ASF OFF
+    input: |
+      Audit this Cognito user pool configuration for security posture.
+      Emit the standard VERDICT block (USER POOL, VERDICT, REASON, RISK, REMEDIATION).
+
+      User Pool: enterprise-b2b-pool
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      PasswordPolicy:
+        MinimumLength: 12
+        RequireUppercase: true
+        RequireLowercase: true
+        RequireNumbers: true
+        RequireSymbols: true
+        TemporaryPasswordValidityDays: 7
+      UserPoolAddOns:
+        AdvancedSecurityMode: OFF
+      DeletionProtection: ACTIVE
+
+      App Client: web-portal-client
+      GenerateSecret: true
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        RefreshToken: days
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs:
+        - http://app.enterprise.example.com/callback
+        - https://*.enterprise.example.com/callback
+      LogoutURLs:
+        - http://app.enterprise.example.com/logout
+    expected_verdict: WEAK
+    assertions:
+      must_contain:
+        - "WEAK"
+        - "enterprise-b2b-pool"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSECURE"
+        - "VERDICT: ADEQUATE"
+        - "VERDICT: OK"
+
+  - id: adequate-enforced-mfa-minor-gaps
+    description: Pool with MFA ON, strong password, SRP auth, but ASF in AUDIT mode and SMS-only MFA
+    input: |
+      Audit this Cognito user pool configuration for security posture.
+      Emit the standard VERDICT block (USER POOL, VERDICT, REASON, RISK, REMEDIATION).
+
+      User Pool: saas-platform-pool
+      MfaConfiguration: ON
+      EnabledMfas:
+        - SMS
+      PasswordPolicy:
+        MinimumLength: 10
+        RequireUppercase: true
+        RequireLowercase: true
+        RequireNumbers: true
+        RequireSymbols: true
+        TemporaryPasswordValidityDays: 7
+      UserPoolAddOns:
+        AdvancedSecurityMode: AUDIT
+      DeletionProtection: ACTIVE
+
+      App Client: web-app-client
+      GenerateSecret: true
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        RefreshToken: days
+      AllowedOAuthFlows:
+        - code
+      CallbackURLs:
+        - https://app.saas-platform.com/callback
+    expected_verdict: ADEQUATE
+    assertions:
+      must_contain:
+        - "ADEQUATE"
+        - "saas-platform-pool"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSECURE"
+        - "VERDICT: WEAK"
+        - "VERDICT: OK"
+
+  - id: ok-hardened-pool
+    description: Fully hardened pool — MFA ON with TOTP, strong password, ASF ENFORCED, SRP-only, code flow, all controls met
+    input: |
+      Audit this Cognito user pool configuration for security posture.
+      Emit the standard VERDICT block (USER POOL, VERDICT, REASON, RISK, REMEDIATION).
+
+      User Pool: hardened-prod-pool
+      MfaConfiguration: ON
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      PasswordPolicy:
+        MinimumLength: 14
+        RequireUppercase: true
+        RequireLowercase: true
+        RequireNumbers: true
+        RequireSymbols: true
+        TemporaryPasswordValidityDays: 3
+      UserPoolAddOns:
+        AdvancedSecurityMode: ENFORCED
+      DeletionProtection: ACTIVE
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+          - Name: verified_phone_number
+            Priority: 2
+
+      App Client: prod-web-client
+      GenerateSecret: true
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      RefreshTokenValidity: 7
+      TokenValidityUnits:
+        RefreshToken: days
+        AccessToken: hours
+        IdToken: hours
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs:
+        - https://app.example.com/callback
+      LogoutURLs:
+        - https://app.example.com/logout
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "hardened-prod-pool"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSECURE"
+        - "VERDICT: WEAK"
+        - "VERDICT: ADEQUATE"

@@ -1,0 +1,238 @@
+# Eval test cases for sts-cross-account-role-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: sts-cross-account-role-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: wildcard-principal-open
+    description: Trust policy with Principal "*" and no condition — open to any AWS credential holder
+    input: |
+      Role name: wildcard-principal-open
+      Role ARN: arn:aws:iam::123456789012:role/wildcard-principal-open
+      Trust policy (AssumeRolePolicyDocument):
+
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      }
+      ```
+    expected_verdict: WILDCARD_TRUST
+    assertions:
+      must_contain:
+        - "WILDCARD_TRUST"
+        - "wildcard-principal-open"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONDITIONAL"
+
+  - id: cross-account-root-no-externalid
+    description: Trust policy granting to a cross-account root ARN without ExternalId — unguarded cross-account trust
+    input: |
+      Role name: cross-account-root-no-externalid
+      Role ARN: arn:aws:iam::123456789012:role/cross-account-root-no-externalid
+      Trust policy (AssumeRolePolicyDocument):
+
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": "arn:aws:iam::999999999999:root"
+            },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      }
+      ```
+    expected_verdict: EXTERNAL_TRUST
+    assertions:
+      must_contain:
+        - "EXTERNAL_TRUST"
+        - "cross-account-root-no-externalid"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: WILDCARD_TRUST"
+
+  - id: cross-account-with-externalid
+    description: Cross-account root ARN with sts:ExternalId in StringEquals — guarded cross-account trust
+    input: |
+      Role name: cross-account-with-externalid
+      Role ARN: arn:aws:iam::123456789012:role/cross-account-with-externalid
+      Trust policy (AssumeRolePolicyDocument):
+
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": "arn:aws:iam::999999999999:root"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+              "StringEquals": {
+                "sts:ExternalId": "a1b2c3d4e5f6g7h8i9j0kLmNoPqRsTuV"
+              }
+            }
+          }
+        ]
+      }
+      ```
+    expected_verdict: CONDITIONAL
+    assertions:
+      must_contain:
+        - "CONDITIONAL"
+        - "cross-account-with-externalid"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: WILDCARD_TRUST"
+        - "VERDICT: EXTERNAL_TRUST"
+
+  - id: confused-deputy-no-source
+    description: Service principal (lambda.amazonaws.com) without aws:SourceArn or aws:SourceAccount — confused-deputy vulnerable
+    input: |
+      Role name: confused-deputy-no-source
+      Role ARN: arn:aws:iam::123456789012:role/confused-deputy-no-source
+      Trust policy (AssumeRolePolicyDocument):
+
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "lambda.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      }
+      ```
+    expected_verdict: EXTERNAL_TRUST
+    assertions:
+      must_contain:
+        - "EXTERNAL_TRUST"
+        - "confused-deputy-no-source"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: WILDCARD_TRUST"
+
+  - id: confused-deputy-with-source-arn
+    description: Service principal with aws:SourceArn condition — confused-deputy guarded
+    input: |
+      Role name: confused-deputy-with-source-arn
+      Role ARN: arn:aws:iam::123456789012:role/confused-deputy-with-source-arn
+      Trust policy (AssumeRolePolicyDocument):
+
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "lambda.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+              "ArnLike": {
+                "aws:SourceArn": "arn:aws:lambda:us-east-1:123456789012:function:*"
+              },
+              "StringEquals": {
+                "aws:SourceAccount": "123456789012"
+              }
+            }
+          }
+        ]
+      }
+      ```
+    expected_verdict: CONDITIONAL
+    assertions:
+      must_contain:
+        - "CONDITIONAL"
+        - "confused-deputy-with-source-arn"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: WILDCARD_TRUST"
+        - "VERDICT: EXTERNAL_TRUST"
+
+  - id: same-account-scoped-ok
+    description: Same-account role ARN as principal — properly scoped internal trust
+    input: |
+      Role name: same-account-scoped-ok
+      Role ARN: arn:aws:iam::123456789012:role/same-account-scoped-ok
+      Trust policy (AssumeRolePolicyDocument):
+
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "AWS": "arn:aws:iam::123456789012:role/app-ci-runner"
+            },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      }
+      ```
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "same-account-scoped-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: WILDCARD_TRUST"
+        - "VERDICT: EXTERNAL_TRUST"

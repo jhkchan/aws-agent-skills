@@ -7,7 +7,7 @@ description: >-
   bypasses — then provides least-privilege remediation. Use when reviewing
   IAM policies, checking for wildcard or escalation permissions, auditing
   role or user privileges, or tightening access control scope.
-version: 0.2.0
+version: 0.3.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: >-
@@ -47,6 +47,15 @@ metadata:
 ---
 
 # IAM Least-Privilege Advisor
+
+## Activation
+
+Activate this skill when the user provides an IAM policy document (JSON),
+references a role/user/group policy for review, or asks whether a policy is
+safe, least-privilege, or over-permissive. Trigger phrases: "review this
+policy", "is this least privilege?", "check my IAM policy", "tighten these
+permissions", "audit this role", "scan for wildcard permissions", "is this
+policy secure?".
 
 ## Mindset
 
@@ -90,7 +99,7 @@ several condition operators are unsupported. The correct version is
 `"2012-10-17"`. A policy with the wrong version may behave differently
 than its text suggests, making classification unreliable.
 
-### Step 1: Separate Deny from Allow
+### Step 1: Separate Deny from Allow (with overlap resolution)
 
 If a statement has `Effect: Deny`, it **narrows** effective permissions — it
 never grants access. Deny statements are security controls. **Exclude Deny
@@ -104,8 +113,20 @@ all actions/resources except those listed, which may break workloads
 silently. Review whether the deny is intentionally broad.
 ```
 
-This is an operational risk (false denials), not an over-permissive grant,
-so it does not change the verdict.
+**Allow/Deny overlap resolution:** when the same action+resource pair appears
+in both an Allow and a Deny statement within the same policy, the Deny
+**always** wins regardless of statement order or Sid. This is the IAM
+evaluation rule: explicit Deny takes absolute precedence. For classification,
+do NOT let the presence of a Deny "cancel" an over-permissive Allow for a
+*different* action+resource — only the exact overlapping pair is denied. A
+policy that Allows `s3:*` on `*` and Denies `s3:DeleteBucket` on a specific
+bucket is still OVERPERMISSIVE for every other S3 action and resource.
+
+**Cross-policy overlap:** if a permissions boundary or SCP denies the action,
+the effective permission is denied even though the identity-based policy
+allows it. However, classify the identity-based policy on its own text — a
+boundary can be removed, so the identity policy's blast radius is the
+classification truth. Note the boundary presence in REMEDIATION.
 
 ### Step 2: Admin wildcard — maximum blast radius
 
@@ -114,7 +135,7 @@ the policy is **OVERPERMISSIVE** with **CRITICAL** risk. This grants every
 action on every resource in the account — equivalent to
 `AdministratorAccess`.
 
-### Step 3: Service-level or read-level wildcards on all resources
+### Step 3: Service-level wildcards on all resources
 
 If a statement has `Effect: Allow` with any wildcard action (e.g., `s3:*`,
 `ec2:*`, `s3:Get*`, `iam:List*`) AND `Resource: "*"`, the policy is
@@ -126,7 +147,7 @@ only the privilege-escalation-service wildcards (Step 5) escalate to **CRITICAL*
 - `OVERPERMISSIVE` + admin wildcard (`Action: "*"` `Resource: "*"`) → **CRITICAL**
 - `OVERPERMISSIVE` + privilege-escalation-service wildcard (Step 5 list) → **CRITICAL**
 - `OVERPERMISSIVE` + any other service wildcard on `Resource: "*"` → **HIGH**
-- `AMBIGUOUS` → **MODERATE** (access is conditionally restricted — real but bounded exposure; not HIGH because no unconditional grant, not LOW because a condition change could expose it)
+- `AMBIGUOUS` → **MODERATE** (access is conditionally restricted — bounded exposure)
 - `LEAST_PRIVILEGE` → **LOW**
 
 **Severity escalation:** If the wildcard action is on a **privilege-escalation
@@ -175,6 +196,11 @@ gain permissions beyond their own policy:
   managed policy or inject an inline policy into any role.
 - `iam:UpdateAssumeRolePolicy` on `"*"` — can modify the trust policy of any
   role, allowing arbitrary principals to assume it.
+- `iam:CreateServiceLinkedRole` on `"*"` — frequently overlooked. Creates a
+  service-linked role that grants the linked service permissions to act on
+  the caller's behalf (e.g., `AWSServiceRoleForEC2Spot` grants Spot Fleet
+  access). The principal effectively delegates escalated permissions to the
+  service, bypassing their own policy limits.
 
 ### Step 6: Wildcard actions scoped to specific resources
 
@@ -188,34 +214,28 @@ action is automatically granted.
 ### Step 7: Evaluate Condition keys for bypass paths
 
 If an Allow statement includes a `Condition` block, check whether the
-condition actually restricts access or creates a bypass:
+condition actually restricts access or creates a bypass. See the
+**Condition-key bypass catalog** in the Expert edge cases section for the
+full list with exploitation mechanics. Quick checklist:
 
 - `aws:SourceIp` containing `0.0.0.0/0` — equivalent to no IP restriction.
-  Treat the statement as if the condition is absent.
-- `ForAllValues:StringEquals` — grants access when the request contains
-  **zero** matching values. If the tested key is absent from the request,
-  the condition evaluates true — a known bypass. Use `ForAnyValue` or add
-  an explicit `StringLike` guard.
-- `Null` operator with `"false"` — `"Null": {"aws:MultiFactorAuthPresent":
-  "false"}` means "the key must be ABSENT", which is true when MFA is never
-  checked. To require MFA, use `"true"` (key must be present) plus a
-  `Bool` check.
-- `StringEquals` on `aws:sourceVpce` or `aws:sourceVpc` — these are
-  legitimate network-scoping conditions. A statement with these is genuinely
-  restricted, not a bypass.
+- `ForAllValues:StringEquals` — evaluates true when request has zero
+  matching values (absent-key bypass).
+- `Null` operator with `"false"` — means "key must be ABSENT".
+- `StringLike` without `*` anchors — exact match, but with unanchored
+  wildcards like `${aws:username}`, user-controlled values may match
+  unintended resources.
 
-Statements with bypass-prone conditions should be classified as
-**AMBIGUOUS** at best (the condition looks like access control but fails
-under edge cases).
+Statements with bypass-prone conditions classify as **AMBIGUOUS** at best.
 
 ### Step 8: Check resource ARN scope
 
 If the resource ARN uses a partition wildcard (`arn:aws-*:`), it spans all
 partitions — commercial, AWS GovCloud (US), and AWS China. If it uses a
 broad pattern like `arn:aws:s3:::*`, it includes every S3 bucket globally,
-not just the caller's account. These should be classified as
-**OVERPERMISSIVE** even when the action is explicitly named — the resource
-scope is effectively unconstrained.
+not just the caller's account. These classify as **OVERPERMISSIVE** even
+when the action is explicitly named — the resource scope is effectively
+unconstrained.
 
 ### Step 9: Specific named actions on specific resources (LEAST_PRIVILEGE)
 
@@ -237,45 +257,30 @@ explicitly named actions:
 These are safe as long as the action is explicitly named, not a service
 wildcard like `ec2:*`.
 
-### Step 10: Aggregation
+### Step 10: IAM policy size check
+
+After classification, verify the policy's serialized JSON size against IAM
+limits:
+
+- **Managed policy:** 6,144 characters max
+- **Inline policy:** 10,240 characters max
+- **Managed policy versions:** 10 versions max (oldest auto-deleted)
+
+If the policy exceeds the limit, append a **SIZE_WARNING** to the
+REMEDIATION field regardless of verdict:
+
+```text
+SIZE_WARNING: Policy is <N> characters, exceeding the <managed|inline> limit
+of <limit>. Split into multiple statements scoped by service or resource
+group. Use AWS IAM Access Analyzer policy generation to produce a compressed
+form. If derived from CloudTrail, partition by service prefix.
+```
+
+### Step 11: Aggregation
 
 When a policy contains multiple statements, the policy-level verdict is the
 **worst** verdict across all Allow statements, where OVERPERMISSIVE is worse
 than AMBIGUOUS and AMBIGUOUS is worse than LEAST_PRIVILEGE.
-
-### Effective permissions context (expert note)
-
-The classification above evaluates a single policy document in isolation.
-In production, AWS computes **effective permissions** by intersecting
-multiple policy layers in this evaluation order:
-
-1. **Explicit Deny** in ANY policy (identity, resource-based, SCP, permissions
-   boundary, session policy) → request is DENIED. Deny wins everywhere.
-2. **Permissions boundary** (if attached to the role) → if the boundary does
-   not allow the action, request is DENIED. A boundary caps the maximum
-   effective permissions regardless of what the identity-based policy grants.
-3. **Service Control Policy (SCP)** (if the account is in an Organization) →
-   SCPs set the maximum permissions for the account. An Allow in an SCP does
-   nothing; only a Deny restricts.
-4. **Session policy** (if the role was assumed with a session policy) → the
-   effective permissions are the INTERSECTION of the role's policy and the
-   session policy.
-5. **Identity-based policy** Allow → grants access if no above layer denied.
-6. **Resource-based policy** (S3 bucket policy, KMS key policy, SQS policy,
-   Lambda function policy):
-   - **Same-account access**: EITHER the identity-based OR the resource-based
-     policy can grant access (union). A principal with no identity-based
-     policy can still access a resource if the resource-based policy allows
-     it.
-   - **Cross-account access**: BOTH the identity-based AND the resource-based
-     policy must allow access (intersection).
-
-**Classification implication:** when a resource-based policy (e.g., S3 bucket
-policy) grants `Principal: "*"` for same-account access, the blast radius is
-wider than the identity-based policy alone suggests — any principal in the
-account can access the resource without needing their own Allow. Flag this
-pattern as **AMBIGUOUS** even if the actions are specific, because the
-principal grant is unconstrained within the account.
 
 ## Output format (per policy)
 
@@ -298,6 +303,197 @@ REASON: Statement 1 (s3:GetObject on arn:aws:s3:::app-data-prod/*) is LEAST_PRIV
 RISK: CRITICAL
 REMEDIATION: Restrict iam:PassRole in Statement 2 to the specific role ARN the workload needs (e.g., arn:aws:iam::123456789012:role/app-execution-role).
 ```
+
+## Expert edge cases
+
+These patterns represent genuine, non-obvious IAM attack surface that a
+senior security engineer would catch but a generalist would miss.
+
+### S3 dual-ARN requirement
+
+S3 bucket actions and object actions use **different ARN shapes**, and a
+correct policy must grant both:
+
+- **Bucket-level actions** (e.g., `s3:ListBucket`, `s3:DeleteBucket`,
+  `s3:GetBucketLocation`) require `arn:aws:s3:::bucket-name` (no trailing `/*`).
+- **Object-level actions** (e.g., `s3:GetObject`, `s3:PutObject`,
+  `s3:DeleteObject`) require `arn:aws:s3:::bucket-name/*` (with trailing `/*`).
+
+A policy granting `s3:GetObject` on `arn:aws:s3:::bucket-name` (without `/*`)
+silently fails — the action never matches. Conversely, granting `s3:*` on
+both ARNs to "fix" the mismatch grants destructive bucket-level actions.
+Classify such mismatches as **AMBIGUOUS** (the policy does not work as
+written, but broadening it introduces over-permission).
+
+### Scoping PassRole with `iam:PassedToService`
+
+The safest way to scope `iam:PassRole` is not just to a specific role ARN
+but also via the `iam:PassedToService` condition key, which restricts
+*which AWS service* may receive the role:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "iam:PassRole",
+  "Resource": "arn:aws:iam::123456789012:role/app-execution-role",
+  "Condition": {
+    "StringEquals": { "iam:PassedToService": "lambda.amazonaws.com" }
+  }
+}
+```
+
+This prevents the role from being passed to EC2, CloudFormation, or any
+other service that accepts role ARNs. Without this condition, a principal
+with `iam:PassRole` on a specific role can still pass it to any service,
+potentially escalating via a service with broader network access (e.g.,
+EC2 with a public IP).
+
+### Cross-account data exfiltration via `aws:ResourceAccount`
+
+A policy that grants `s3:GetObject` on `arn:aws:s3:::*/*` allows reading
+objects from **any AWS account's buckets**, not just the caller's account,
+if the bucket owner cross-accounts the principal. The defense is the
+`aws:ResourceAccount` condition:
+
+```json
+"Condition": { "StringEquals": { "aws:ResourceAccount": "123456789012" } }
+```
+
+Without this condition, any resource wildcard spanning `*` is a
+cross-account exfiltration vector. Flag broad S3/KMS/SQS resource patterns
+without `aws:ResourceAccount` as **AMBIGUOUS** at minimum.
+
+### Tag-mutation bypass of `aws:ResourceTag` conditions
+
+ABAC policies conditioned on `aws:ResourceTag/Environment: prod` are
+**bypassable** if the principal also has `tag:TagResources` (or a broad
+permission like `ec2:*` that includes tagging). The principal can tag any
+resource with `Environment=prod` and then access it. When evaluating
+tag-based conditions, check whether the same policy (or other policies
+attached to the principal) grants tagging permissions on the same resource
+type. If so, downgrade the classification — the tag condition provides no
+real boundary.
+
+### `kms:Decrypt` on `Resource: "*"`
+
+Even without `kms:*`, a grant of `kms:Decrypt` on `"*"` is a silent data
+exfiltration vector. If any AWS service uses a customer-managed KMS key for
+encryption (S3 server-side encryption, EBS volumes, RDS snapshots, Secrets
+Manager), a principal with `kms:Decrypt` on `"*"` can decrypt that data
+*if they can first access the ciphertext*. Classify `kms:Decrypt` on `"*"`
+as **OVERPERMISSIVE** with **HIGH** risk — it is a data-access multiplier
+that silently extends the blast radius of every encrypted resource.
+
+### Condition-key bypass catalog
+
+| Pattern | Exploitation mechanic | Correct defense |
+| --- | --- | --- |
+| `aws:SourceIp: 0.0.0.0/0` | CIDR covers entire internet; no restriction | Use real egress CIDR or remove condition |
+| `ForAllValues:StringEquals` | True when request has zero matching values — absent key bypasses | Use `ForAnyValue` or add explicit Deny on `Null` |
+| `Null: { key: "false" }` | Means "key must be absent" — true when MFA never checked | Use `"true"` (require presence) + `Bool` check |
+| `StringLike` without anchors | `${aws:username}` in a resource ARN with `StringLike` can match unintended paths if username contains special chars | Use `StringEquals` for exact, or anchor with explicit `*` placement |
+| `aws:PrincipalArn` in trust policy | A trust policy granting `sts:AssumeRole` to `aws:PrincipalArn` matching a broad pattern can be exploited by any matching principal | Restrict to exact ARN, never pattern-match on principal |
+| `aws:RequestTag` without `ForAllValues` | Only checks tags present in request; does not enforce required tags exist | Pair with `Null` check or `ForAllValues:StringEquals` |
+| Missing `aws:SecureTransport` | Allows HTTP alongside HTTPS for API calls supporting both | Add `Bool: { aws:SecureTransport: "true" }` |
+| `aws:MultiFactorAuthPresent` via `Bool` alone | `Bool` check fails silently if key absent (e.g., programmatic call never sets MFA key) | Combine `Null: false` (require key present) with `Bool: true` (require MFA value) |
+
+### MFA condition interaction
+
+The correct MFA enforcement pattern requires **two** conditions working
+together — a common error is using only one:
+
+1. `Null: { "aws:MultiFactorAuthPresent": "false" }` — ensures the key EXISTS
+   in the request (programmatic calls via CLI/SDK without MFA do NOT include
+   this key at all, so a `Bool` check alone silently passes).
+2. `Bool: { "aws:MultiFactorAuthPresent": "true" }` — ensures the value is
+   true (MFA was actually used).
+
+Using only `Bool` is the most common MFA bypass: the condition evaluates to
+false (key absent → not true → condition fails → access denied) in many
+cases, BUT certain long-lived credentials (e.g., role assumption chains) may
+forward the key unexpectedly, and the absence semantics are
+account-dependent. Always use both conditions together.
+
+### Service-specific PassRole variants
+
+`iam:PassRole` is not the only action that passes roles to services.
+Several services have their own "pass-role" semantics that do NOT require
+`iam:PassRole` but achieve a similar effect:
+
+- `states:CreateStateMachine` / `states:UpdateStateMachine` — passes an
+  execution role to Step Functions.
+- `glue:CreateJob` / `glue:CreateCrawler` — passes a role to Glue.
+- `lex:CreateBot` / `lex:UpdateBot` — passes a role to Lex.
+- `opsworks:CreateStack` — passes a role to OpsWorks.
+
+If the policy grants `iam:PassRole` on `"*"`, check whether these service
+actions are also allowed — they compound the escalation surface because
+each service executes under the passed role's identity.
+
+### Cross-account trust policy abuse
+
+A role trust policy (`Resource`-based policy on the IAM role itself) that
+uses `aws:PrincipalArn` or `aws:PrincipalAccount` with a wildcard pattern
+(e.g., `arn:aws:iam::*:role/*`) allows **any AWS account** to attempt
+assumption. The `sts:ExternalId` condition is the standard defense for
+cross-account trust:
+
+```json
+"Condition": { "StringEquals": { "sts:ExternalId": "<unique-hardcoded-id>" } }
+```
+
+Without `sts:ExternalId`, a confused-deputy attack is possible: any
+principal matching the trust pattern can assume the role. Flag trust
+policies with broad principal patterns and no `sts:ExternalId` as
+**OVERPERMISSIVE**.
+
+## Effective permissions context
+
+The classification logic above evaluates a single identity-based policy
+document in isolation. In production, AWS computes **effective permissions**
+by intersecting multiple policy layers in this evaluation order:
+
+1. **Explicit Deny** in ANY policy (identity, resource-based, SCP, permissions
+   boundary, session policy) → request is DENIED. Deny wins everywhere.
+2. **Permissions boundary** (if attached to the role) → if the boundary does
+   not allow the action, request is DENIED. A boundary caps the maximum
+   effective permissions regardless of what the identity-based policy grants.
+3. **Service Control Policy (SCP)** (if the account is in an Organization) →
+   SCPs set the maximum permissions for the account. An Allow in an SCP does
+   nothing; only a Deny restricts.
+4. **Session policy** (if the role was assumed with a session policy) → the
+   effective permissions are the INTERSECTION of the role's policy and the
+   session policy.
+5. **Identity-based policy** Allow → grants access if no above layer denied.
+6. **Resource-based policy** (S3 bucket policy, KMS key policy, SQS policy,
+   Lambda function policy):
+   - **Same-account access**: EITHER the identity-based OR the resource-based
+     policy can grant access (union). A principal with no identity-based
+     policy can still access a resource if the resource-based policy allows
+     it.
+   - **Cross-account access**: BOTH the identity-based AND the resource-based
+     policy must allow access (intersection).
+
+**Cross-account resource-based policy decision branch:**
+When evaluating a resource-based policy (e.g., S3 bucket policy):
+
+1. If `Principal: "*"` with no condition → **OVERPERMISSIVE** (any AWS
+   account principal can access, limited only by the caller's identity-based
+   policy, which the resource owner does not control).
+2. If `Principal: "*"` with `aws:SourceAccount` or `aws:SourceArn`
+   condition → **AMBIGUOUS** (scoped to a specific account/ARN, but the
+   resource owner depends on the caller's account configuration).
+3. If `Principal` is a specific ARN → evaluate the action/resource scope as
+   normal for LEAST_PRIVILEGE / OVERPERMISSIVE.
+4. For **same-account** resource-based policies with `Principal: "*"`:
+   **AMBIGUOUS** — the blast radius is wider than the identity-based policy
+   alone suggests (any principal in the account can access without their
+   own Allow).
+
+**Classification implication:** Always classify the identity-based policy on
+its own text. Note the presence of resource-based policies and boundaries in
+the REMEDIATION field — they affect effective permissions but do not change
+the classification of the policy document under review.
 
 ## Anti-Patterns — NEVER
 
@@ -337,6 +533,20 @@ REMEDIATION: Restrict iam:PassRole in Statement 2 to the specific role ARN the w
 - NEVER accept `aws:SourceIp` with `0.0.0.0/0` as a real condition — it is
   the CIDR for the entire internet and provides zero restriction.
 
+- NEVER trust `aws:ResourceTag` conditions as a hard boundary when the
+  principal has `tag:TagResources` or a broad service wildcard that includes
+  tagging (e.g., `ec2:*`). The principal can self-tag resources to satisfy
+  the condition and bypass the ABAC boundary.
+
+- NEVER use `aws:PrincipalArn` with a wildcard pattern in a role trust
+  policy. This allows any principal matching the pattern (potentially
+  any account) to assume the role. Always use exact ARNs.
+
+- NEVER assume a `StringLike` condition without explicit `*` anchors is
+  safe against injection. If the matched value is user-controlled (e.g.,
+  `${aws:username}` expanded into a resource ARN), a username containing
+  path separators or wildcards can cause unintended matches.
+
 - NEVER assume a scoped policy fits within IAM limits without checking.
   Inline policies are capped at 10,240 characters; managed policies at
   6,144 characters; a maximum of 10 versions per managed policy. A policy
@@ -349,6 +559,14 @@ REMEDIATION: Restrict iam:PassRole in Statement 2 to the specific role ARN the w
   a chained API flow (e.g., `lambda:InvokeFunction` calling `s3:GetObject`
   under the function's role). Always cross-reference simulator results
   with actual CloudTrail activity.
+
+- NEVER treat `kms:Decrypt` on `Resource: "*"` as a minor issue. It is a
+  silent data-exfiltration multiplier — any encrypted resource in the
+  account becomes readable if the ciphertext is accessible.
+
+- NEVER overlook `iam:CreateServiceLinkedRole` as a privilege-escalation
+  vector. It delegates permissions to the linked service, which may exceed
+  the principal's own policy limits.
 
 ## Remediation guidance
 
@@ -391,18 +609,25 @@ API usage:
 - Replace `Resource: "*"` with the specific ARN(s) the workload accesses.
 - For privilege-escalation actions (`iam:PassRole`, `sts:AssumeRole`):
   restrict to the minimum role ARN the workload needs — never leave on
-  `"*"`.
+  `"*"`. Add `iam:PassedToService` to constrain which service can receive
+  the role.
 - For `NotAction` / `NotResource`: convert to explicit `Action` and
   `Resource` allow-lists.
 - For partition wildcards (`arn:aws-*:`): pin to `arn:aws:` for the
   partition the workload operates in.
+- For `kms:Decrypt` on `"*"`: scope to specific key ARNs and add
+  `aws:ResourceAccount` to prevent cross-account decryption.
 
 ### For AMBIGUOUS policies
 
 - Expand wildcard patterns to explicit named actions (e.g., replace
   `s3:Get*` with the specific `s3:GetObject`, `s3:GetObjectVersion`).
-- Review Condition keys for bypass paths (Step 7).
+- Review Condition keys for bypass paths (Step 7, Condition-key bypass
+  catalog).
 - Validate that the resource ARN scope matches the workload boundary.
+- For tag-based conditions: verify the principal does NOT have tagging
+  permissions on the same resources, or add an explicit Deny on
+  `tag:TagResources`.
 
 ### For LEAST_PRIVILEGE policies
 
@@ -410,6 +635,14 @@ API usage:
 - Confirm the policy is attached only to the intended principal.
 - Verify a permissions boundary is set on the role if the account has a
   broad SCP — the boundary caps the maximum effective permissions.
+
+### For policies exceeding IAM size limits
+
+- Split by service prefix (e.g., all `s3:*` actions in one statement, all
+  `ec2:*` in another).
+- Use customer-managed policies instead of inline (larger size limit).
+- Factor common action+resource pairs into a reusable managed policy.
+- If the policy is CloudTrail-derived, partition by event source.
 
 ## References
 

@@ -1,0 +1,70 @@
+{
+  "skill": "wafv2-web-acl-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill adds many expert\u2011level details (COUNT\u2011mode paralysis, label propagation nuances, forwarded\u2011IP spoofing, JSON oversize handling, operational edge cases) that a baseline model would not know, but it still restates basic WAF concepts (default action, rule priority) so it does not achieve a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific procedural flow (steps 0\u201111) with exact ordering, priority handling, OverrideAction checks, and coverage matrix. Minor deduction for not explicitly prescribing a checklist for verifying resource associations before remediation (only a note is given)."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning for each anti\u2011pattern. It omits an explicit warning about stale IPSet contents (only hinted in edge cases), so one point is deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete frontmatter, clear description, trigger keywords, versioning, licensing, and a precise activation \"when_to_use\" section. An agent can reliably know when to invoke the skill."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (mindset, quick reference, stepwise process, matrices, NEVER, edge cases, remediation), but the overall length and placement of some critical items (e.g., gap\u2011ID definitions) cause slight cognitive overload, losing two points."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Audit\u2011only operations are tightly constrained; destructive changes are guarded by pre\u2011flight safety checks. Creative tasks (e.g., remediation suggestions) are given appropriate freedom, while classification is deterministic."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows the canonical CloudOps auditor pattern (frontmatter, mindset, quick reference, classification logic, matrices, output format, NEVER, safety checks, remediation, references). Structure is clear and recognizable."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a complete decision tree, output template, and example classifications that an agent can execute. Minor gaps: no explicit handling of duplicate rule priorities, no guidance for malformed but parseable JSON edge cases, and no built\u2011in validation of IPSet CIDR breadth."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 43695,
+  "latency_ms": 12091,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

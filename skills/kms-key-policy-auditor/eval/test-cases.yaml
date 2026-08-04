@@ -1,0 +1,313 @@
+# Eval test cases for kms-key-policy-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: kms-key-policy-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cross-account-decrypt-no-condition
+    description: >-
+      Customer-managed symmetric KMS key granting kms:Decrypt to a cross-account
+      principal with no restrictive condition — full data exposure.
+    input: |
+      Key id: arn:aws:kms:us-east-1:111111111111:key/cross-account-decrypt-no-condition
+      Key metadata:
+        KeyManager: CUSTOMER
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+        MultiRegion: false
+        KeyState: Enabled
+        EnableKeyRotation: true
+      Key policy (default):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "ExternalDecrypt",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::222222222222:role/external-analyzer"},
+              "Action": "kms:Decrypt",
+              "Resource": "*"
+            }
+          ]
+        }
+      Emit the standard VERDICT block (KEY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CRITICAL
+    assertions:
+      must_contain:
+        - "CRITICAL"
+        - "cross-account-decrypt-no-condition"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "222222222222"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: HIGH"
+
+  - id: wildcard-kms-all-no-condition
+    description: >-
+      KMS key policy granting kms:* to Principal "*" with no condition — any AWS
+      account holder has full key control and data access.
+    input: |
+      Key id: arn:aws:kms:us-east-1:111111111111:key/wildcard-kms-all-no-condition
+      Key metadata:
+        KeyManager: CUSTOMER
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+        MultiRegion: false
+        KeyState: Enabled
+        EnableKeyRotation: false
+      Key policy (default):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "OpenAccess",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "kms:*",
+              "Resource": "*"
+            }
+          ]
+        }
+      Emit the standard VERDICT block (KEY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CRITICAL
+    assertions:
+      must_contain:
+        - "CRITICAL"
+        - "wildcard-kms-all-no-condition"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: HIGH"
+
+  - id: same-account-via-service-ok
+    description: >-
+      Customer-managed symmetric key with same-account principals, named actions,
+      kms:ViaService condition, rotation enabled, not pending deletion — clean posture.
+    input: |
+      Key id: arn:aws:kms:us-east-1:111111111111:key/same-account-via-service-ok
+      Key metadata:
+        KeyManager: CUSTOMER
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+        MultiRegion: false
+        KeyState: Enabled
+        EnableKeyRotation: true
+      Key policy (default):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "S3ViaService",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-s3-role"},
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey"
+              ],
+              "Resource": "*",
+              "Condition": {
+                "StringEquals": {
+                  "kms:ViaService": "s3.us-east-1.amazonaws.com"
+                }
+              }
+            }
+          ]
+        }
+      Emit the standard VERDICT block (KEY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "same-account-via-service-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL"
+        - "VERDICT: HIGH"
+
+  - id: cross-account-decrypt-source-account-medium
+    description: >-
+      Cross-account kms:Decrypt grant restricted by aws:SourceAccount — currently
+      scoped but fragile (a policy edit could widen exposure).
+    input: |
+      Key id: arn:aws:kms:us-east-1:111111111111:key/cross-account-decrypt-source-account-medium
+      Key metadata:
+        KeyManager: CUSTOMER
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+        MultiRegion: false
+        KeyState: Enabled
+        EnableKeyRotation: true
+      Key policy (default):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "CrossAccountScoped",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::222222222222:role/log-shipper"},
+              "Action": "kms:Decrypt",
+              "Resource": "*",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": "222222222222"
+                }
+              }
+            }
+          ]
+        }
+      Emit the standard VERDICT block (KEY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: MEDIUM
+    assertions:
+      must_contain:
+        - "MEDIUM"
+        - "cross-account-decrypt-source-account-medium"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL"
+        - "VERDICT: OK"
+
+  - id: rotation-disabled-same-account-high
+    description: >-
+      Customer-managed symmetric key with same-account-only named actions and no
+      wildcard principals, but EnableKeyRotation is false — stale key material.
+    input: |
+      Key id: arn:aws:kms:us-east-1:111111111111:key/rotation-disabled-same-account-high
+      Key metadata:
+        KeyManager: CUSTOMER
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+        MultiRegion: false
+        KeyState: Enabled
+        EnableKeyRotation: false
+      Key policy (default):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "AppEncrypt",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-encryption-role"},
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+      Emit the standard VERDICT block (KEY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: HIGH
+    assertions:
+      must_contain:
+        - "HIGH"
+        - "rotation-disabled-same-account-high"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL"
+        - "VERDICT: OK"
+
+  - id: pending-deletion-7-days
+    description: >-
+      Key in PendingDeletion state with PendingWindowInDays of 7 — imminent
+      irrecoverable data loss, encrypt/decrypt already failing.
+    input: |
+      Key id: arn:aws:kms:us-east-1:111111111111:key/pending-deletion-7-days
+      Key metadata:
+        KeyManager: CUSTOMER
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+        MultiRegion: false
+        KeyState: PendingDeletion
+        PendingWindowInDays: 7
+        EnableKeyRotation: true
+      Key policy (default):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "kms:*",
+              "Resource": "*"
+            }
+          ]
+        }
+      Emit the standard VERDICT block (KEY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CRITICAL
+    assertions:
+      must_contain:
+        - "CRITICAL"
+        - "pending-deletion-7-days"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "PendingDeletion"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: HIGH"

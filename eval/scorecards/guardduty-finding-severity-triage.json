@@ -1,0 +1,70 @@
+{
+  "skill": "guardduty-finding-severity-triage",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides concrete, expert\u2011level thresholds (e.g., count\u202f\u2265\u202f100 for brute\u2011force, \u2265\u202f20 for port\u2011probe, \u2265\u202f15 for DNS) and detailed false\u2011positive patterns (FP\u20111 through FP\u20116) that a typical model would not know without domain experience. This is genuine delta, though some of the taxonomy restates public GuardDuty docs, preventing a perfect 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, ordered decision\u2011tree (validation \u2192 FP overrides \u2192 critical \u2192 high \u2192 \u2026) and concrete CLI commands for remediation and pre\u2011flight checks. The procedure is largely specific, but the count\u2011escalation overlay mixes generic \u201cescalate one band\u201d language with a few generic steps, losing a point for not being fully AWS\u2011unique."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains an extensive NEVER list with concrete rationales (e.g., never auto\u2011archive Impact findings, never downgrade based on confidence). Only minor gap: no explicit warning about over\u2011reliance on GuardDuty confidence for ML\u2011based findings beyond the listed cases."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter is complete, description clearly states WHAT, WHEN, and includes keywords. The only minor gap is the lack of an explicit activation trigger field (e.g., a boolean \"enabled\" flag), but overall the spec is reliable for agent invocation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Starts with a concise 30\u2011second decision tree, then layers deeper sections (mindset, detailed steps, overlays, references). Critical safety rules are presented early. Slightly heavy on initial exposition but still respects layered disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (isolation, revocation) are guarded by pre\u2011flight checks and NEVER rules; classification tasks are given generous freedom. The only shortfall is the lack of explicit constraint on count\u2011based escalation for unknown finding types beyond the stated cap, which is implied but not enforced programmatically."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows the CloudOps auditor pattern (frontmatter \u2192 quick triage \u2192 mindset \u2192 process \u2192 tables \u2192 anti\u2011patterns \u2192 remediation). Structure is coherent and recognizable."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Model output examples match the prescribed format and correctly apply the decision tree. However, edge\u2011case handling (e.g., missing `service.count`, malformed JSON beyond listed cases, or ambiguous resource\u2011criticality when tags are absent) is described but not exemplified, leaving some ambiguity for an agent."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 55940,
+  "latency_ms": 12318,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

@@ -1,0 +1,435 @@
+# Eval test cases for wafv2-web-acl-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: wafv2-web-acl-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: misconfigured-zero-rule-allow
+    description: Web ACL with DefaultAction Allow and zero rules — open door, WAF is a no-op
+    input: |
+      Web ACL name: open-door-acl
+      Web ACL config (describe-web-acl output):
+
+      ```json
+      {
+        "Name": "open-door-acl",
+        "Scope": "REGIONAL",
+        "DefaultAction": { "Allow": {} },
+        "Rules": [],
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": false,
+          "MetricName": "open-door-acl",
+          "SampledRequestsEnabled": false
+        }
+      }
+      ```
+    expected_verdict: MISCONFIGURED
+    assertions:
+      must_contain:
+        - "MISCONFIGURED"
+        - "open-door-acl"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: ADEQUATE"
+
+  - id: misconfigured-count-mode
+    description: Web ACL with CommonRuleSet and SQLiRuleSet but all managed groups in COUNT mode — protection disabled
+    input: |
+      Web ACL name: count-mode-acl
+      Web ACL config (describe-web-acl output):
+
+      ```json
+      {
+        "Name": "count-mode-acl",
+        "Scope": "REGIONAL",
+        "DefaultAction": { "Allow": {} },
+        "Rules": [
+          {
+            "Name": "AWS-AWSManagedRulesCommonRuleSet",
+            "Priority": 0,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesCommonRuleSet"
+              }
+            },
+            "OverrideAction": { "Count": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "CommonRuleSet",
+              "SampledRequestsEnabled": true
+            }
+          },
+          {
+            "Name": "AWS-AWSManagedRulesSQLiRuleSet",
+            "Priority": 1,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesSQLiRuleSet"
+              }
+            },
+            "OverrideAction": { "Count": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "SQLiRuleSet",
+              "SampledRequestsEnabled": true
+            }
+          }
+        ],
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "count-mode-acl",
+          "SampledRequestsEnabled": true
+        }
+      }
+      ```
+    expected_verdict: MISCONFIGURED
+    assertions:
+      must_contain:
+        - "MISCONFIGURED"
+        - "count-mode-acl"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OK"
+        - "VERDICT: ADEQUATE"
+
+  - id: weak-minimal-no-logging
+    description: Default Allow with CommonRuleSet in BLOCK but no rate-based rule, no logging, no metrics, no sampled requests — multiple significant gaps
+    input: |
+      Web ACL name: minimal-acl
+      Web ACL config (describe-web-acl output):
+
+      ```json
+      {
+        "Name": "minimal-acl",
+        "Scope": "REGIONAL",
+        "DefaultAction": { "Allow": {} },
+        "Rules": [
+          {
+            "Name": "AWS-AWSManagedRulesCommonRuleSet",
+            "Priority": 10,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesCommonRuleSet"
+              }
+            },
+            "OverrideAction": { "None": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": false,
+              "MetricName": "CommonRuleSet",
+              "SampledRequestsEnabled": false
+            }
+          }
+        ],
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": false,
+          "MetricName": "minimal-acl",
+          "SampledRequestsEnabled": false
+        }
+      }
+      ```
+    expected_verdict: WEAK
+    assertions:
+      must_contain:
+        - "WEAK"
+        - "minimal-acl"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OK"
+        - "VERDICT: MISCONFIGURED"
+
+  - id: adequate-good-baseline
+    description: Default Allow with CommonRuleSet and KnownBadInputs in BLOCK, rate-based rule, logging, visibility — one minor gap
+    input: |
+      Web ACL name: baseline-protected-acl
+      Web ACL config (describe-web-acl output):
+
+      ```json
+      {
+        "Name": "baseline-protected-acl",
+        "Scope": "REGIONAL",
+        "DefaultAction": { "Allow": {} },
+        "Rules": [
+          {
+            "Name": "AWS-AWSManagedRulesCommonRuleSet",
+            "Priority": 10,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesCommonRuleSet"
+              }
+            },
+            "OverrideAction": { "None": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "CommonRuleSet",
+              "SampledRequestsEnabled": true
+            }
+          },
+          {
+            "Name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+            "Priority": 20,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesKnownBadInputsRuleSet"
+              }
+            },
+            "OverrideAction": { "None": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "KnownBadInputs",
+              "SampledRequestsEnabled": true
+            }
+          },
+          {
+            "Name": "rate-limit-rule",
+            "Priority": 30,
+            "Action": { "Block": {} },
+            "Statement": {
+              "RateBasedStatement": {
+                "Limit": 2000,
+                "AggregateKeyType": "IP",
+                "EvaluationWindowSec": 300
+              }
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "rate-limit-rule",
+              "SampledRequestsEnabled": true
+            }
+          }
+        ],
+        "LoggingConfiguration": {
+          "LogDestinationConfigs": ["arn:aws:logs:us-east-1:123456789012:log-group:waf-logs"]
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "baseline-protected-acl",
+          "SampledRequestsEnabled": true
+        }
+      }
+      ```
+    expected_verdict: ADEQUATE
+    assertions:
+      must_contain:
+        - "ADEQUATE"
+        - "baseline-protected-acl"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MISCONFIGURED"
+        - "VERDICT: WEAK"
+
+  - id: weak-shadow-bypass-rule
+    description: Default Block with good managed rules but a custom Allow rule at priority 0 matching URIPath STARTS_WITH /api/ — shadow bypass
+    input: |
+      Web ACL name: shadow-bypass-acl
+      Web ACL config (describe-web-acl output):
+
+      ```json
+      {
+        "Name": "shadow-bypass-acl",
+        "Scope": "REGIONAL",
+        "DefaultAction": { "Block": {} },
+        "Rules": [
+          {
+            "Name": "api-allow-rule",
+            "Priority": 0,
+            "Action": { "Allow": {} },
+            "Statement": {
+              "ByteMatchStatement": {
+                "SearchString": "/api/",
+                "FieldToMatch": { "UriPath": {} },
+                "TextTransformations": [{ "Priority": 0, "Type": "NONE" }],
+                "PositionalConstraint": "STARTS_WITH"
+              }
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "api-allow-rule",
+              "SampledRequestsEnabled": true
+            }
+          },
+          {
+            "Name": "AWS-AWSManagedRulesCommonRuleSet",
+            "Priority": 10,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesCommonRuleSet"
+              }
+            },
+            "OverrideAction": { "None": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "CommonRuleSet",
+              "SampledRequestsEnabled": true
+            }
+          },
+          {
+            "Name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+            "Priority": 20,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesKnownBadInputsRuleSet"
+              }
+            },
+            "OverrideAction": { "None": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "KnownBadInputs",
+              "SampledRequestsEnabled": true
+            }
+          }
+        ],
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "shadow-bypass-acl",
+          "SampledRequestsEnabled": true
+        }
+      }
+      ```
+    expected_verdict: MISCONFIGURED
+    assertions:
+      must_contain:
+        - "MISCONFIGURED"
+        - "shadow-bypass-acl"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OK"
+        - "VERDICT: ADEQUATE"
+
+  - id: ok-comprehensive
+    description: Default Allow with comprehensive managed rules in BLOCK, forwarded-IP rate rule, logging, full visibility — clean posture
+    input: |
+      Web ACL name: production-hardened-acl
+      Web ACL config (describe-web-acl output):
+
+      ```json
+      {
+        "Name": "production-hardened-acl",
+        "Scope": "CLOUDFRONT",
+        "DefaultAction": { "Allow": {} },
+        "Rules": [
+          {
+            "Name": "AWS-AWSManagedRulesCommonRuleSet",
+            "Priority": 10,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesCommonRuleSet"
+              }
+            },
+            "OverrideAction": { "None": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "CommonRuleSet",
+              "SampledRequestsEnabled": true
+            }
+          },
+          {
+            "Name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+            "Priority": 20,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesKnownBadInputsRuleSet"
+              }
+            },
+            "OverrideAction": { "None": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "KnownBadInputs",
+              "SampledRequestsEnabled": true
+            }
+          },
+          {
+            "Name": "AWS-AWSManagedRulesAmazonIpReputationList",
+            "Priority": 30,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "VendorName": "AWS",
+                "Name": "AWSManagedRulesAmazonIpReputationList"
+              }
+            },
+            "OverrideAction": { "None": {} },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "IPReputationList",
+              "SampledRequestsEnabled": true
+            }
+          },
+          {
+            "Name": "rate-limit-forwarded-ip",
+            "Priority": 40,
+            "Action": { "Block": {} },
+            "Statement": {
+              "RateBasedStatement": {
+                "Limit": 2000,
+                "AggregateKeyType": "FORWARDED_IP",
+                "EvaluationWindowSec": 300,
+                "ForwardedIPConfig": {
+                  "HeaderName": "X-Forwarded-For",
+                  "FallbackBehavior": "MATCH"
+                }
+              }
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "rate-limit-forwarded-ip",
+              "SampledRequestsEnabled": true
+            }
+          }
+        ],
+        "LoggingConfiguration": {
+          "LogDestinationConfigs": ["arn:aws:firehose:us-east-1:123456789012:deliverystream/waf-logs"]
+        },
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "production-hardened-acl",
+          "SampledRequestsEnabled": true
+        }
+      }
+      ```
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "production-hardened-acl"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MISCONFIGURED"
+        - "VERDICT: WEAK"

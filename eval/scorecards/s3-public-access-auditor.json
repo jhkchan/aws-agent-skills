@@ -1,12 +1,69 @@
 {
   "skill": "s3-public-access-auditor",
   "model_id": "amazon.nova-pro-v1:0",
-  "dimensions": [],
-  "total_score": 0,
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides expert\u2011level specifics not commonly known: exact precedence of BPA \u2192 Object Ownership \u2192 bucket policy \u2192 ACL \u2192 Access Point, the account\u2011vs\u2011bucket BPA truth table, condition\u2011strength matrix, and detailed remediation steps. Adds concrete decision thresholds beyond a generic model's baseline."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: CLI commands for bulk enumeration, pre\u2011flight safety checks, step\u2011by\u2011step audit flow, and precise ordering of access\u2011control planes. No generic \"check security\" fluff."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete pitfalls (e.g., never classify PUBLIC when BPA enabled, never trust weak conditions, never ignore AuthenticatedUsers). Lacks a few niche anti\u2011patterns (e.g., cross\u2011account replication leakage) but overall strong."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete frontmatter, clear description, precise activation keywords, and an unambiguous output contract with required labels. All required metadata present."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (high\u2011level overview \u2192 detailed tables \u2192 deep references). However the initial sections are dense, causing some cognitive overload before reaching the core decision tree."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive actions (policy deletion, BPA changes) are guarded by pre\u2011flight checks and backup steps, while enumeration is left flexible. One point deducted for lacking guidance on limiting concurrency or cost when auditing thousands of buckets."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows the canonical CloudOps auditor pattern with a clear taxonomy, making the structure instantly recognizable."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Agent can follow the decision tree and produce the required output format; examples show correct usage. Missing explicit pseudo\u2011code for multi\u2011statement evaluation and limited guidance on handling malformed JSON edge cases reduces usability."
+    }
+  ],
+  "total_score": 109,
   "max_score": 120,
-  "grade": "F",
-  "token_count": 0,
-  "latency_ms": 0,
+  "grade": "A",
+  "token_count": 40044,
+  "latency_ms": 14729,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

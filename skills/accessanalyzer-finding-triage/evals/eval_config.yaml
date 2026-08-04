@@ -1,0 +1,54 @@
+# Eval configuration for accessanalyzer-finding-triage.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: accessanalyzer-finding-triage
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: kms-external-public
+    difficulty: easy
+    prompt_file: prompts/kms-external-public.md
+    baseline_file: baselines/kms-external-public.md
+    expected_verdict: EXTERNAL_ACCESS
+    expected_risk: CRITICAL
+  - id: s3-source-arn-bounded
+    difficulty: hard
+    prompt_file: prompts/s3-source-arn-bounded.md
+    baseline_file: baselines/s3-source-arn-bounded.md
+    expected_verdict: SAFE
+    expected_risk: LOW
+  - id: unused-role-legacy-etl
+    difficulty: easy
+    prompt_file: prompts/unused-role-legacy-etl.md
+    baseline_file: baselines/unused-role-legacy-etl.md
+    expected_verdict: UNUSED_ACCESS
+    expected_risk: MODERATE
+  - id: unused-access-key-ci-deployer
+    difficulty: medium
+    prompt_file: prompts/unused-access-key-ci-deployer.md
+    baseline_file: baselines/unused-access-key-ci-deployer.md
+    expected_verdict: UNUSED_ACCESS
+    expected_risk: HIGH
+  - id: sqs-external-write-public
+    difficulty: medium
+    prompt_file: prompts/sqs-external-write-public.md
+    baseline_file: baselines/sqs-external-write-public.md
+    expected_verdict: EXTERNAL_ACCESS
+    expected_risk: HIGH
+  - id: iam-role-trust-lambda-execution
+    difficulty: hard
+    prompt_file: prompts/iam-role-trust-lambda-execution.md
+    baseline_file: baselines/iam-role-trust-lambda-execution.md
+    expected_verdict: EXPECTED
+    expected_risk: LOW

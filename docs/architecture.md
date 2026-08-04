@@ -1,7 +1,7 @@
 # Architecture — AWS CloudOps Agent Skills
 
 This document describes the repo's layered architecture, derived from the
-softaworks skill-suite pattern and adapted for AWS CloudOps auditing.
+structured-eval/softaworks skill-suite pattern and adapted for AWS CloudOps auditing.
 
 ---
 
@@ -52,8 +52,8 @@ This repo's architecture is derived from studying these source repos:
 
 | Source repo | What we adopted | What we adapted |
 |---|---|---|
-| `the internal reference repo/sales-agent-skills` | Top-level layout (commands/, cli/, schema/, skills.sh.json, .claude-plugin/, USAGE.md), orchestrator-with-references pattern, evals/ structure, slash-command frontmatter (description + nl_triggers + routes_to) | Domain (sales -> AWS CloudOps); pipeline stages (RAIN 6-stage -> CloudOps 4-phase); verdict shape (advisory -> deterministic) |
-| `the internal reference repo/programming-agent-skills` | `_programming_shared/` cross-cutting reference pattern -> `_aws_shared/` | Content (Pragmatic Programmer concepts -> AWS service taxonomy, IAM patterns, CLI reference) |
+| `structured-eval/sales-agent-skills` | Top-level layout (commands/, cli/, schema/, skills.sh.json, .claude-plugin/, USAGE.md), orchestrator-with-references pattern, evals/ structure, slash-command frontmatter (description + nl_triggers + routes_to) | Domain (sales -> AWS CloudOps); pipeline stages (RAIN 6-stage -> CloudOps 4-phase); verdict shape (advisory -> deterministic) |
+| `structured-eval/programming-agent-skills` | `_programming_shared/` cross-cutting reference pattern -> `_aws_shared/` | Content (Pragmatic Programmer concepts -> AWS service taxonomy, IAM patterns, CLI reference) |
 | `softaworks/agent-toolkit` | agents/ routing concept, commands/ as slash-command entry points | agents/ directory folded into skills/aws-orchestrator/ (single orchestrator vs multiple agents) |
 
 ---
@@ -64,7 +64,7 @@ This repo's architecture is derived from studying these source repos:
 
 Each skill ships `eval/test-cases.yaml` inside its own directory
 (`skills/<name>/eval/test-cases.yaml`). This follows the repo's original
-Phase 2 contract and differs from the reference repo's `evals/` directory
+Phase 2 contract and differs from structured-eval's `evals/` directory
 (`evals/evals.json` + `evals/eval_config.yaml`). The AWS repo preserves the
 existing eval convention for backwards compatibility — the eval runner globs
 `skills/*/eval/*.yaml`. Phase 3 adds the `evals/` structured layer as a
@@ -80,7 +80,7 @@ frontmatter-based routing as specialist skills.
 
 ### 3. Functional CLI (not a stub)
 
-the reference repo's `cli/bin/cli.js` is a stub (`console.log("full CLI coming")`). We
+structured-eval's `cli/bin/cli.js` is a stub (`console.log("full CLI coming")`). We
 make it functional: it discovers skills, routes prompts by keyword matching,
 validates against the schema, and reports status. This enables
 `node cli/bin/cli.js route "check my S3"` to return the matched skill(s)
@@ -88,7 +88,7 @@ without an LLM — useful for CI, scripting, and debugging.
 
 ### 4. _aws_shared/ at repo root (not under skills/)
 
-the internal reference repo places `_programming_shared/` at the repo root (not inside `skills/`).
+structured-eval places `_programming_shared/` at the repo root (not inside `skills/`).
 We follow the same convention: `_aws_shared/` is a peer of `skills/`, not a
 child. This avoids the skill-directory validation contract (which requires
 every `skills/*` directory to have `SKILL.md`) while making shared references
@@ -97,7 +97,7 @@ importable by any skill via relative path.
 ### 5. JSON Schema for frontmatter validation
 
 `schema/SKILL.schema.json` (draft-07) validates the SKILL.md YAML frontmatter.
-This is adopted directly from the reference repo's `schema/SKILL.schema.json` pattern.
+This is adopted directly from structured-eval's `schema/SKILL.schema.json` pattern.
 The schema enforces: name pattern (lowercase-hyphens), description length
 (10-1024 chars for agent activation triggers), version, keywords, tags,
 dependencies, and metadata (CloudOps-specific extensions: family, phase,

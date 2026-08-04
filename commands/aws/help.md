@@ -20,6 +20,7 @@ routes_to: (no skill — meta command)
 | `/aws:audit-s3-public-access` | 2 Audit | Audit S3 bucket configs for public exposure | "is this bucket public?" |
 | `/aws:help` | — | This list | "help" |
 | `/aws:audit-ec2-security-groups` | 2 Audit | Audit EC2 SGs for exposed ports + CIS/PCI-DSS violations | "is this security group open?" |
+| `/aws:audit-inspector2-coverage-findings` | 2 Audit | Audit Inspector2 coverage gaps + finding severity (CRITICAL/HIGH/MEDIUM/LOW/COVERED) | "are my instances scanned?" |
 
 ## Specialist Skills
 
@@ -28,6 +29,7 @@ routes_to: (no skill — meta command)
 | `s3-public-access-auditor` | S3 | PUBLIC / SAFE / AMBIGUOUS | 2 Audit |
 | `iam-least-privilege-advisor` | IAM | OVERPERMISSIVE / LEAST_PRIVILEGE / AMBIGUOUS | 2 Audit |
 | `ec2-security-group-auditor` | EC2 (Security Groups) | OPEN / PUBLIC_NONCRITICAL / RESTRICTED | 2 Audit |
+| `inspector2-coverage-finding-auditor` | Inspector2 (Vuln Mgmt) | CRITICAL / HIGH / MEDIUM / LOW / COVERED | 2 Audit |
 
 ## Pipeline Phases
 

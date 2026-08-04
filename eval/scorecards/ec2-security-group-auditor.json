@@ -1,12 +1,69 @@
 {
   "skill": "ec2-security-group-auditor",
   "model_id": "amazon.nova-pro-v1:0",
-  "dimensions": [],
-  "total_score": 0,
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many AWS\u2011specific nuances (union semantics, stateful SG behavior, prefix\u2011list versioning, split\u2011horizon CIDR evasion, RAM\u2011shared VPC handling, detailed compliance mapping, and concrete CLI commands) that go beyond a generic model's baseline knowledge. Some content restates known facts, preventing a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers an AWS\u2011specific procedural flow: iterate all four source arrays, inspect prefix\u2011list entries, perform pre\u2011flight backups, prefer additive changes, and use Reachability Analyzer. Lacks a single numbered checklist, so deduct one point."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete reasoning (e.g., never treat 0\u20110/0 as non\u2011critical, never add ephemeral inbound rules, never trust unmanaged prefix lists). One minor omission: no explicit warning about stale security\u2011group references after VPC peering changes."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete frontmatter, clear description, explicit 'when to invoke' clause, comprehensive keyword list, and activation terms. Agent can reliably decide when to call the skill."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: quick verdict logic first, then deeper Mindset, Process, Reference, and Tool sections. However, the initial sections are dense, which could overload the agent before it reaches the detailed layers, so two points are deducted."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive changes require backups and additive steps, while classification is unrestricted. Slightly less tight on destructive prefix\u2011list modifications (no explicit lock on version), leading to a one\u2011point loss."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows the documented CloudOps Auditor pattern (Mindset \u2192 Process \u2192 Reference \u2192 Tool) with explicit section tags, making the structure instantly recognizable."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides runnable pseudocode, output format, pre\u2011flight safety checks, and remediation guidance. Model output examples are correct. Deduct one point because the skill does not give a concrete algorithm for detecting split\u2011horizon CIDR unions, leaving that to the implementer."
+    }
+  ],
+  "total_score": 111,
   "max_score": 120,
-  "grade": "F",
-  "token_count": 0,
-  "latency_ms": 0,
+  "grade": "A",
+  "token_count": 38372,
+  "latency_ms": 11530,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

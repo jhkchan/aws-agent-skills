@@ -2,7 +2,7 @@
 #
 # Maps each eval case to its external prompt and baseline files so the same
 # case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
-# for delta comparison. This is the canonical structured-eval pattern eval surface.
+# for delta comparison. This is the canonical structured-eval eval surface.
 #
 # The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
 # discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does

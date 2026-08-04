@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "guardduty-finding-severity-triage",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the GuardDuty Finding Severity Triage skill. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "crypto-mining-critical",
+      "name": "Impact:EC2/CryptocurrencyClient — active compromise, escalate to CRITICAL",
+      "difficulty": "medium",
+      "prompt_file": "prompts/crypto-mining-critical.md",
+      "baseline_file": "baselines/crypto-mining-critical.md",
+      "expected_verdict": "CRITICAL",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CRITICAL", "crypto-mining-critical", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: LOW", "LIKELY_FALSE_POSITIVE"]
+        }
+      ]
+    },
+    {
+      "id": "port-sweep-from-scanner",
+      "name": "Recon:EC2/PortSweepUnusual from authorized Nessus scanner — likely false positive",
+      "difficulty": "hard",
+      "prompt_file": "prompts/port-sweep-from-scanner.md",
+      "baseline_file": "baselines/port-sweep-from-scanner.md",
+      "expected_verdict": "LIKELY_FALSE_POSITIVE",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["LIKELY_FALSE_POSITIVE", "port-sweep-from-scanner", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: CRITICAL", "VERDICT: HIGH"]
+        }
+      ]
+    },
+    {
+      "id": "ssh-brute-force-high",
+      "name": "UnauthorizedAccess:EC2/SSHBruteForce — escalate from MEDIUM to HIGH",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ssh-brute-force-high.md",
+      "baseline_file": "baselines/ssh-brute-force-high.md",
+      "expected_verdict": "HIGH",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["HIGH", "ssh-brute-force-high", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: LOW", "LIKELY_FALSE_POSITIVE"]
+        }
+      ]
+    },
+    {
+      "id": "port-probe-low",
+      "name": "Recon:EC2/PortProbeUnprotectedPort — basic reconnaissance, LOW severity",
+      "difficulty": "easy",
+      "prompt_file": "prompts/port-probe-low.md",
+      "baseline_file": "baselines/port-probe-low.md",
+      "expected_verdict": "LOW",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["LOW", "port-probe-low", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: CRITICAL", "VERDICT: HIGH"]
+        }
+      ]
+    },
+    {
+      "id": "tor-on-public-alb",
+      "name": "UnauthorizedAccess:EC2/TorIPCaller on public-facing ALB — likely false positive",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tor-on-public-alb.md",
+      "baseline_file": "baselines/tor-on-public-alb.md",
+      "expected_verdict": "LIKELY_FALSE_POSITIVE",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["LIKELY_FALSE_POSITIVE", "tor-on-public-alb", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: CRITICAL", "VERDICT: HIGH"]
+        }
+      ]
+    },
+    {
+      "id": "console-login-anomalous",
+      "name": "UnauthorizedAccess:IAMUser/ConsoleLoginFromAnomalousLocation — behavioral anomaly, MEDIUM",
+      "difficulty": "easy",
+      "prompt_file": "prompts/console-login-anomalous.md",
+      "baseline_file": "baselines/console-login-anomalous.md",
+      "expected_verdict": "MEDIUM",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MEDIUM", "console-login-anomalous", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: CRITICAL", "VERDICT: LOW"]
+        }
+      ]
+    }
+  ]
+}

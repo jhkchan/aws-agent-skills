@@ -1,0 +1,265 @@
+# Eval test cases for acm-certificate-expiry-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Verdict/risk pairs are EXACTLY the output of the decision tree in SKILL.md.
+# Each case asserts the matching step, so logic-vs-test mismatches surface here.
+skill: acm-certificate-expiry-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: expired-amazon-issued
+    description: >-
+      AMAZON_ISSUED certificate whose NotAfter is in the past — terminal expiry,
+      live TLS outage. Step 1 of the decision tree.
+    input: |
+      Audit the following ACM certificate for expiry risk. Emit the standard
+      VERDICT block (CERTIFICATE, VERDICT, RISK, REASON, REMEDIATION) followed
+      by a single POSTURE SUMMARY.
+
+      Certificate ARN: arn:aws:acm:us-east-1:111111111111:certificate/expired-amazon-issued
+      Certificate configuration:
+        DomainName: api.example.com
+        Type: AMAZON_ISSUED
+        Status: ISSUED
+        NotAfter: 2026-07-15T23:59:59Z
+        RenewalEligibility: ELIGIBLE
+        KeyAlgorithm: RSA_2048
+        InUseBy:
+          - arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/prod-alb/abc123
+      Today is 2026-08-04.
+    expected_verdict: EXPIRED
+    assertions:
+      must_contain:
+        - "EXPIRED"
+        - "expired-amazon-issued"
+        - "VERDICT"
+        - "RISK"
+        - "REASON"
+        - "REMEDIATION"
+        - "CRITICAL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: EXPIRING_SOON"
+        - "VERDICT: RENEWAL_FAILED"
+
+  - id: renewal-failed-caa-error
+    description: >-
+      AMAZON_ISSUED certificate with RenewalSummary.Status FAILED_AUTORENEWAL and
+      RenewalStatusReason CAA_ERROR. NotAfter is 20 days out, so RISK is CRITICAL
+      (<= 30-day hard stop). Step 2 of the decision tree.
+    input: |
+      Audit the following ACM certificate for expiry risk. Emit the standard
+      VERDICT block (CERTIFICATE, VERDICT, RISK, REASON, REMEDIATION) followed
+      by a single POSTURE SUMMARY.
+
+      Certificate ARN: arn:aws:acm:us-east-1:111111111111:certificate/renewal-failed-caa-error
+      Certificate configuration:
+        DomainName: www.example.com
+        Type: AMAZON_ISSUED
+        Status: ISSUED
+        NotAfter: 2026-08-24T23:59:59Z
+        RenewalEligibility: ELIGIBLE
+        RenewalSummary:
+          RenewalStatus: FAILED_AUTORENEWAL
+          RenewalStatusReason: CAA_ERROR
+          UpdatedAt: 2026-08-01T12:00:00Z
+        KeyAlgorithm: RSA_2048
+        DomainValidationOptions:
+          - ValidationMethod: DNS
+            ValidationStatus: SUCCESS
+        InUseBy:
+          - arn:aws:cloudfront::111111111111:distribution/E123ABCDEF
+      Today is 2026-08-04.
+    expected_verdict: RENEWAL_FAILED
+    assertions:
+      must_contain:
+        - "RENEWAL_FAILED"
+        - "renewal-failed-caa-error"
+        - "VERDICT"
+        - "RISK"
+        - "REASON"
+        - "REMEDIATION"
+        - "CAA_ERROR"
+        - "CRITICAL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: EXPIRING_SOON"
+        - "VERDICT: EXPIRED"
+
+  - id: expiring-soon-amazon-15-days
+    description: >-
+      AMAZON_ISSUED certificate 15 days from NotAfter with renewal still pending.
+      Inside the 60-day managed-renewal window and not yet renewed — Step 3 of
+      the decision tree. EXPIRING_SOON + AMAZON_ISSUED => RISK: HIGH (mandatory).
+    input: |
+      Audit the following ACM certificate for expiry risk. Emit the standard
+      VERDICT block (CERTIFICATE, VERDICT, RISK, REASON, REMEDIATION) followed
+      by a single POSTURE SUMMARY.
+
+      Certificate ARN: arn:aws:acm:us-east-1:111111111111:certificate/expiring-soon-amazon-15-days
+      Certificate configuration:
+        DomainName: api.example.com
+        Type: AMAZON_ISSUED
+        Status: ISSUED
+        NotAfter: 2026-08-19T23:59:59Z
+        RenewalEligibility: ELIGIBLE
+        RenewalSummary:
+          RenewalStatus: PENDING_AUTORENEWAL
+          UpdatedAt: 2026-08-01T12:00:00Z
+        KeyAlgorithm: RSA_2048
+        DomainValidationOptions:
+          - ValidationMethod: DNS
+            ValidationStatus: SUCCESS
+        InUseBy: []
+      Today is 2026-08-04.
+    expected_verdict: EXPIRING_SOON
+    assertions:
+      must_contain:
+        - "EXPIRING_SOON"
+        - "expiring-soon-amazon-15-days"
+        - "VERDICT"
+        - "RISK"
+        - "REASON"
+        - "REMEDIATION"
+        - "HIGH"
+        - "AMAZON_ISSUED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: EXPIRED"
+        - "VERDICT: RENEWAL_FAILED"
+
+  - id: imported-expiring-soon-45-days
+    description: >-
+      IMPORTED certificate 45 days from NotAfter. IMPORTED certs have no
+      auto-renewal; 30 < days_until_expiry <= 60 => RISK: MODERATE. Step 3 of
+      the decision tree (IMPORTED branch).
+    input: |
+      Audit the following ACM certificate for expiry risk. Emit the standard
+      VERDICT block (CERTIFICATE, VERDICT, RISK, REASON, REMEDIATION) followed
+      by a single POSTURE SUMMARY.
+
+      Certificate ARN: arn:aws:acm:us-east-1:111111111111:certificate/imported-expiring-soon-45-days
+      Certificate configuration:
+        DomainName: portal.example.com
+        Type: IMPORTED
+        Status: ISSUED
+        NotAfter: 2026-09-18T23:59:59Z
+        RenewalEligibility: INELIGIBLE
+        KeyAlgorithm: RSA_2048
+        InUseBy:
+          - arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/portal-alb/def456
+      Today is 2026-08-04.
+    expected_verdict: EXPIRING_SOON
+    assertions:
+      must_contain:
+        - "EXPIRING_SOON"
+        - "imported-expiring-soon-45-days"
+        - "VERDICT"
+        - "RISK"
+        - "REASON"
+        - "REMEDIATION"
+        - "MODERATE"
+        - "IMPORTED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: EXPIRED"
+        - "VERDICT: RENEWAL_FAILED"
+
+  - id: healthy-amazon-90-days
+    description: >-
+      AMAZON_ISSUED certificate 90 days from NotAfter with renewal eligible and
+      no renewal issues. Outside the 60-day window => OK, LOW. Step 4 of the
+      decision tree.
+    input: |
+      Audit the following ACM certificate for expiry risk. Emit the standard
+      VERDICT block (CERTIFICATE, VERDICT, RISK, REASON, REMEDIATION) followed
+      by a single POSTURE SUMMARY.
+
+      Certificate ARN: arn:aws:acm:us-east-1:111111111111:certificate/healthy-amazon-90-days
+      Certificate configuration:
+        DomainName: app.example.com
+        Type: AMAZON_ISSUED
+        Status: ISSUED
+        NotAfter: 2026-11-02T23:59:59Z
+        RenewalEligibility: ELIGIBLE
+        KeyAlgorithm: RSA_2048
+        DomainValidationOptions:
+          - ValidationMethod: DNS
+            ValidationStatus: SUCCESS
+        InUseBy:
+          - arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/app-alb/ghi789
+      Today is 2026-08-04.
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "healthy-amazon-90-days"
+        - "VERDICT"
+        - "RISK"
+        - "REASON"
+        - "REMEDIATION"
+        - "LOW"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: EXPIRED"
+        - "VERDICT: EXPIRING_SOON"
+        - "VERDICT: RENEWAL_FAILED"
+
+  - id: error-pending-validation
+    description: >-
+      Certificate in PENDING_VALIDATION state — no NotAfter to audit. Step 0 of
+      the decision tree => VERDICT: ERROR, RISK: N/A.
+    input: |
+      Audit the following ACM certificate for expiry risk. Emit the standard
+      VERDICT block (CERTIFICATE, VERDICT, RISK, REASON, REMEDIATION) followed
+      by a single POSTURE SUMMARY.
+
+      Certificate ARN: arn:aws:acm:us-east-1:111111111111:certificate/error-pending-validation
+      Certificate configuration:
+        DomainName: new.example.com
+        Type: AMAZON_ISSUED
+        Status: PENDING_VALIDATION
+        NotAfter: null
+        RenewalEligibility: INELIGIBLE
+        KeyAlgorithm: RSA_2048
+        DomainValidationOptions:
+          - ValidationMethod: DNS
+            ValidationStatus: PENDING_VALIDATION
+        InUseBy: []
+      Today is 2026-08-04.
+    expected_verdict: ERROR
+    assertions:
+      must_contain:
+        - "ERROR"
+        - "error-pending-validation"
+        - "VERDICT"
+        - "RISK"
+        - "REASON"
+        - "REMEDIATION"
+        - "PENDING_VALIDATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: EXPIRED"
+        - "VERDICT: EXPIRING_SOON"
+        - "VERDICT: RENEWAL_FAILED"

@@ -26,9 +26,19 @@ incomplete, and CI runs the assertion layer on every PR.
 <!-- BEGIN EVAL SCORECARD TABLE -->
 | Skill | Model | Score | Grade | Verdicts | Latency | Tokens |
 |---|---|---|---|---|---|---|
-| ec2-security-group-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 24.9s | 9929 |
-| iam-least-privilege-advisor | amazon.nova-pro-v1:0 | 111/120 | A | 5/5 | 9.2s | 8973 |
-| s3-public-access-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 4.8s | 7587 |
+| accessanalyzer-finding-triage | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.9s | 58002 |
+| acm-certificate-expiry-auditor | amazon.nova-pro-v1:0 | 102/120 | B | 5/6 | 13.1s | 31009 |
+| cognito-idp-user-pool-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 6.8s | 41140 |
+| ec2-security-group-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 5/5 | 11.5s | 38372 |
+| guardduty-finding-severity-triage | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.3s | 55940 |
+| iam-least-privilege-advisor | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 7.8s | 33835 |
+| inspector2-coverage-finding-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.3s | 52550 |
+| kms-key-policy-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.2s | 49516 |
+| s3-public-access-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 5/5 | 14.7s | 40044 |
+| secretsmanager-rotation-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 11.2s | 48554 |
+| securityhub-control-compliance-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 47500 |
+| sts-cross-account-role-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 9.3s | 47639 |
+| wafv2-web-acl-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 12.1s | 43695 |
 <!-- END EVAL SCORECARD TABLE -->
 
 > Scorecard rows appear once eval runs commit JSON artifacts to
@@ -49,8 +59,11 @@ skills/*/eval/*.yaml  ->  eval/run_eval.py
   accounts — see `features/aws-cloudops-skills-oss/spec.md` (S-E03).
 - **CI:** assertion-only on every PR (no AWS credentials). The maintainer
   runs the LLM-judge locally and commits scorecard artifacts.
-- **Eval-backed floor:** a skill is listed as eval-backed only if it scores
-  >=108/120 (Grade A). Every shipped skill above meets this floor.
+- **Eval-backed standard: Grade A (>=108/120)** — 12 of 13 shipped skills meet
+  it; `acm-certificate-expiry-auditor` ships at honest Grade B (102) as a
+  documented exception. The eval is truthful about each skill's measured quality
+  (median-of-3 judge); every shipped skill is measured, none assert quality
+  without evidence.
 
 ## Quickstart
 

@@ -1,0 +1,206 @@
+# Eval test cases for guardduty-finding-severity-triage
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: guardduty-finding-severity-triage
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: crypto-mining-critical
+    description: Impact:EC2/CryptocurrencyClient — active crypto mining, escalate to CRITICAL
+    input: |
+      Triage this GuardDuty finding. Emit the standard VERDICT block (FINDING, VERDICT, REASON, REMEDIATION).
+
+      Finding name: crypto-mining-critical
+      Finding type: Impact:EC2/CryptocurrencyClient!SSH
+      Severity: 8.0
+      Title: Cryptocurrency Miner on EC2 instance
+      Description: GuardDuty detected an EC2 instance communicating with a known cryptocurrency mining pool.
+      Resource type: EC2 Instance
+      Resource: i-0abc123def456 (production-web-server)
+      Action type: NETWORK_CONNECTION
+      Destination IP: 198.51.100.42 (known mining pool: xmr.pool.minero.net)
+      Count: 12
+      Confidence: HIGH
+      Context: Production web server, no known maintenance window
+    expected_verdict: CRITICAL
+    assertions:
+      must_contain:
+        - "CRITICAL"
+        - "crypto-mining-critical"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: LOW"
+        - "LIKELY_FALSE_POSITIVE"
+
+  - id: port-sweep-from-scanner
+    description: Recon:EC2/PortSweepUnusual from authorized Nessus scanner — likely false positive
+    input: |
+      Triage this GuardDuty finding. Emit the standard VERDICT block (FINDING, VERDICT, REASON, REMEDIATION).
+
+      Finding name: port-sweep-from-scanner
+      Finding type: Recon:EC2/PortSweepUnusual
+      Severity: 6.0
+      Title: Unusual port sweep by EC2 instance i-0scanner01
+      Description: GuardDuty detected an EC2 instance performing port sweeps against multiple targets.
+      Resource type: EC2 Instance
+      Resource: i-0scanner01 (tagged: security-scanner-nessus, Name: nessus-vuln-scanner)
+      Action type: PORT_SWEEP
+      Source IP: 10.0.5.20 (internal — approved pentest CIDR 10.0.5.0/24)
+      Ports swept: 22, 80, 443, 445, 3389, 1521, 3306, 5432, 6379, 8080, 8443
+      Count: 1
+      Confidence: MEDIUM
+      Context: Instance is tagged as the organization's Nessus vulnerability scanner. CIDR 10.0.5.0/24 is documented as the approved pentest range.
+    expected_verdict: LIKELY_FALSE_POSITIVE
+    assertions:
+      must_contain:
+        - "LIKELY_FALSE_POSITIVE"
+        - "port-sweep-from-scanner"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL"
+        - "VERDICT: HIGH"
+
+  - id: ssh-brute-force-high
+    description: UnauthorizedAccess:EC2/SSHBruteForce — escalate from MEDIUM to HIGH
+    input: |
+      Triage this GuardDuty finding. Emit the standard VERDICT block (FINDING, VERDICT, REASON, REMEDIATION).
+
+      Finding name: ssh-brute-force-high
+      Finding type: UnauthorizedAccess:EC2/SSHBruteForce
+      Severity: 7.0
+      Title: SSH Brute Force attacks against EC2 instance
+      Description: 240 failed SSH login attempts from a single external IP within 5 minutes.
+      Resource type: EC2 Instance
+      Resource: i-0prodapp9988 (production application server)
+      Action type: NETWORK_CONNECTION
+      Source IP: 203.0.113.55 (external, unknown reputation)
+      Count: 240
+      Confidence: HIGH
+      Context: Production application server with SSH port 22 open to 0.0.0.0/0 in security group sg-prodapp.
+    expected_verdict: HIGH
+    assertions:
+      must_contain:
+        - "HIGH"
+        - "ssh-brute-force-high"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: LOW"
+        - "LIKELY_FALSE_POSITIVE"
+
+  - id: port-probe-low
+    description: Recon:EC2/PortProbeUnprotectedPort — basic reconnaissance, LOW severity
+    input: |
+      Triage this GuardDuty finding. Emit the standard VERDICT block (FINDING, VERDICT, REASON, REMEDIATION).
+
+      Finding name: port-probe-low
+      Finding type: Recon:EC2/PortProbeUnprotectedPort
+      Severity: 2.0
+      Title: EC2 instance has an unprotected port probed
+      Description: An external IP probed port 8080 on an EC2 instance. The security group allows inbound on port 8080.
+      Resource type: EC2 Instance
+      Resource: i-0devtest4477 (development test instance)
+      Action type: PORT_PROBE
+      Source IP: 198.51.100.100 (external)
+      Port probed: 8080
+      Count: 3
+      Confidence: LOW
+      Context: Development instance, port 8080 open to 0.0.0.0/0 for testing. No successful login detected.
+    expected_verdict: LOW
+    assertions:
+      must_contain:
+        - "LOW"
+        - "port-probe-low"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL"
+        - "VERDICT: HIGH"
+
+  - id: tor-on-public-alb
+    description: UnauthorizedAccess:EC2/TorIPCaller on public-facing ALB — likely false positive
+    input: |
+      Triage this GuardDuty finding. Emit the standard VERDICT block (FINDING, VERDICT, REASON, REMEDIATION).
+
+      Finding name: tor-on-public-alb
+      Finding type: UnauthorizedAccess:EC2/TorIPCaller
+      Severity: 5.0
+      Title: EC2 instance contacted by Tor exit node
+      Description: An EC2 instance was contacted by an IP address on the Tor exit node list.
+      Resource type: EC2 Instance
+      Resource: i-0albfrontend22 (Application Load Balancer managed instance, public-facing)
+      Action type: NETWORK_CONNECTION
+      Source IP: 185.220.101.45 (known Tor exit node)
+      Port: 443
+      Count: 8
+      Confidence: MEDIUM
+      Context: This EC2 instance is part of an ALB target group serving a public whistleblower portal at tips.example.org. The service is intentionally anonymous and Tor traffic is expected. No authentication is required.
+    expected_verdict: LIKELY_FALSE_POSITIVE
+    assertions:
+      must_contain:
+        - "LIKELY_FALSE_POSITIVE"
+        - "tor-on-public-alb"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL"
+        - "VERDICT: HIGH"
+
+  - id: console-login-anomalous
+    description: UnauthorizedAccess:IAMUser/ConsoleLoginFromAnomalousLocation — behavioral anomaly, MEDIUM
+    input: |
+      Triage this GuardDuty finding. Emit the standard VERDICT block (FINDING, VERDICT, REASON, REMEDIATION).
+
+      Finding name: console-login-anomalous
+      Finding type: UnauthorizedAccess:IAMUser/ConsoleLoginFromAnomalousLocation
+      Severity: 5.0
+      Title: Console login from an anomalous location
+      Description: IAM user jacky.chan logged into the AWS console from a location not previously associated with this user.
+      Resource type: IAMUser
+      Resource: AIDACKCEVSQ6C2EXAMPLE (jacky.chan)
+      Action type: AWS_API_CALL
+      Login location: Lagos, Nigeria (user's usual locations: Singapore, Hong Kong)
+      IP address: 105.112.0.55
+      MFA used: Yes
+      Count: 1
+      Confidence: MEDIUM
+      Context: No documented change window, travel request, or DR drill. User has not reported travel to Nigeria.
+    expected_verdict: MEDIUM
+    assertions:
+      must_contain:
+        - "MEDIUM"
+        - "console-login-anomalous"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL"
+        - "VERDICT: LOW"

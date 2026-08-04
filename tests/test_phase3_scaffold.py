@@ -64,7 +64,7 @@ def test_schema_validation(skill_name: str) -> None:
 
 @pytest.mark.parametrize("skill_name", SEED_SKILLS)
 def test_seed_frontmatter_has_metadata_fields(skill_name: str) -> None:
-    """Seed skills must have the full structured-eval pattern metadata fields."""
+    """Seed skills must have the full structured-eval metadata fields."""
     skill_md = SKILLS_DIR / skill_name / "SKILL.md"
     fm = _parse_frontmatter(skill_md)
     metadata = fm.get("metadata", {})

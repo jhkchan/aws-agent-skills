@@ -1,0 +1,70 @@
+{
+  "skill": "inspector2-coverage-finding-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many specific thresholds (7\u2011day EC2 freshness, 30\u2011day ECR freshness, 30\u201190 day staleness windows) and nuanced AWS\u2011specific behaviors (SSM\u2011agent requirement, enhanced ECR scanning, KEV escalation). However, a large portion restates publicly documented Inspector2 concepts without adding novel decision\u2011making heuristics, so it does not earn the full 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Offers a clear step\u2011by\u2011step AWS\u2011specific procedure (batch\u2011get\u2011account\u2011status, per\u2011resource coverage checks, reachability cross\u2011reference). Missing a concrete ordering for multi\u2011region audits (e.g., iterate regions before resource loops) and does not explicitly prescribe handling of pagination in ListFindings, which are important procedural details."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with specific reasons (e.g., never classify COVERED without active coverage, never ignore lastScannedAt). Lacks an explicit warning about stale NETWORK_REACHABILITY findings when security\u2011group changes occur after the scan; the brief mention is insufficiently reasoned, leaving a gap in anti\u2011pattern coverage."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, dependencies, metadata, when_to_use). Description clearly states WHAT the skill does, WHEN to invoke, and provides comprehensive keywords for reliable triggering."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Uses a layered structure: quick reference, mindset, philosophy, high\u2011level flow, then detailed steps and examples. The initial three\u2011rule quick reference is a slight front\u2011load of critical logic, but overall cognitive load is well managed."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibration matches task fragility: classification is non\u2011destructive and includes strict NEVER rules for automated remediation. However, the skill relies on downstream consumers to enforce guardrails rather than embedding hard constraints (e.g., schema validation) within the skill itself."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows the canonical CloudOps auditor pattern (frontmatter \u2192 quick reference \u2192 mindset \u2192 philosophy \u2192 decision flow \u2192 detailed process \u2192 output format \u2192 anti\u2011patterns \u2192 safety checks \u2192 remediation). Structure is coherent and recognizable."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a complete decision tree, output template, and worked examples, enabling an agent to execute the audit. Missing explicit input schema (field names, required JSON structure) and a concrete example of handling paginated ListFindings data, which could cause runtime errors or incomplete analysis."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 52550,
+  "latency_ms": 17271,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

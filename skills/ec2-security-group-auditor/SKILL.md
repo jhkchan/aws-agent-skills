@@ -1,15 +1,15 @@
 ---
 name: ec2-security-group-auditor
 description: >-
-  Audits EC2 security group inbound rules to identify publicly exposed ports
-  and provides remediation guidance mapped to CIS AWS Foundations Benchmark,
-  PCI-DSS, and NIST SP 800-53. Invoke when: (a) reviewing an SG before
-  production deployment, (b) performing a periodic compliance audit against
-  CIS/PCI-DSS controls, (c) responding to a security incident involving
-  suspected network exposure, (d) onboarding a new VPC or account for
-  security baseline validation. Recognizes port ranges, non-TCP protocols,
-  managed prefix lists, IPv6 sources, and mixed rule sets. Keywords: security
-  group, SG, ec2, inbound rule, port exposure, 0.0.0.0/0, CIDR audit, attack
+  Classifies each EC2 security group's inbound exposure as OPEN,
+  PUBLIC_NONCRITICAL, or RESTRICTED (worst-case per-rule aggregation) and
+  emits remediation mapped to CIS AWS Foundations / PCI-DSS / NIST SP 800-53.
+  Invoke when: (a) pre-production SG review, (b) periodic CIS/PCI-DSS
+  compliance audit, (c) incident response involving suspected network
+  exposure, or (d) VPC/account security-baseline validation. Recognizes
+  port ranges, non-TCP protocols, managed prefix lists, IPv6 sources,
+  split-horizon CIDR pairs, and overlapping rules. Keywords: security group,
+  SG, ec2, inbound rule, port exposure, 0.0.0.0/0, CIDR audit, attack
   surface, compliance check, VPC security.
 version: 0.4.0
 license: Apache-2.0
@@ -87,6 +87,19 @@ to identify publicly exposed ports, classify each security group's exposure
 level with a CVSS-style risk score, and provide specific remediation guidance
 mapped to compliance controls.
 
+## Quick verdict logic (at-a-glance)
+
+For EACH inbound rule: classify **SOURCE** (PUBLIC / RESTRICTED /
+CONDITIONAL), then **PORT** (CRITICAL / NON_CRITICAL). Combine:
+PUBLIC + CRITICAL → **OPEN**; PUBLIC + NON_CRITICAL →
+**PUBLIC_NONCRITICAL**; RESTRICTED source → **RESTRICTED**. SG verdict =
+WORST per-rule verdict (`OPEN > PUBLIC_NONCRITICAL > RESTRICTED`).
+Sources arrive in FOUR distinct API arrays — `IpRanges`, `Ipv6Ranges`,
+`UserIdGroupPairs`, `PrefixListIds` — iterate all four or you will miss
+IPv6 exposure, SG-ref cycles, and prefix-list drift. Full procedure,
+port-range intersection rules, and edge cases in §"Classification logic";
+deep AWS dataplane behavior in §"AWS dataplane expert details".
+
 ## Activation keywords
 
 security group, SG, ec2, inbound rule, port exposure, open SSH, open RDP,
@@ -108,6 +121,128 @@ every other rule is locked down. The procedure below evaluates each rule
 independently first, then aggregates to the worst case. This is the
 inverse of firewall "default deny" reasoning: a restrictive rule does NOT
 narrow an already-open rule on the same SG.
+
+## AWS dataplane expert details (Mindset — non-obvious AWS behavior)
+
+These AWS-specific behaviors are NOT in the port registry but routinely
+trip up audits. Internalize them before emitting any verdict.
+
+### Rule evaluation is UNION, not first-match
+
+AWS security groups do NOT use first-match priority. Every inbound allow
+rule is independently evaluated against the packet; the **union** of all
+allow rules is the effective permission. There is no "deny" rule in SGs
+— denies live in Network ACLs, which ARE stateless and ordered. Practical
+consequence: adding a tighter rule on the same port+source does NOT
+override an existing `0.0.0.0/0` rule — you must REMOVE the broader
+rule. This is precisely why the procedure aggregates to the WORST
+per-rule verdict, not the "best" or "most specific."
+
+### Stateful conntrack has a per-ENI ceiling
+
+Return traffic for an allowed outbound flow is auto-permitted via
+connection tracking. Each ENI's conntrack table is sized by instance
+type (see EC2 network performance specs — r5n.16xlarge ~600k entries,
+t3.micro far less). Under sustained high packets-per-second the table
+can exhaust, at which point AWS falls back to strict-flow pinning and
+some established flows may drop. This is NOT a reason to add inbound
+ephemeral rules — the SG is still stateful. It IS a reason to monitor
+`conntrack_allowance_exceeded` in CloudWatch `etwpm`.
+
+### Source field has four distinct shapes in the API
+
+`DescribeSecurityGroups` returns sources in four separate arrays:
+`IpRanges` (IPv4), `Ipv6Ranges` (IPv6), `UserIdGroupPairs` (SG refs),
+`PrefixListIds` (managed prefix lists). A naive auditor that only
+checks `IpRanges` will miss IPv6 exposure, SG-ref cycles, and
+prefix-list drift. Iterate ALL FOUR arrays every time. The
+classification table treats them uniformly; the API does not.
+
+### Quotas that change the audit posture
+
+- `sg-rules-per-sg` quota: default 60 inbound + 60 outbound rules per
+  SG (raisable). An SG near the limit is itself a smell — rule sprawl
+  obscures the real posture and slows dataplane propagation.
+- `SGs-per-ENI` quota: default 5. Effective permission across 5 SGs
+  is the union of up to 300 inbound rules per interface.
+- The VPC default SG **cannot be deleted** — only its rules can. CIS
+  5.4 specifically targets leaving it open. Always include the default
+  SG in scope even when "unused"; AWS re-attaches it to new ENIs in
+  some launch paths.
+
+### VPC peering, RAM sharing, and cross-VPC SG references
+
+- SG IDs are **region-scoped** and CANNOT be referenced from another
+  VPC, even over a peering connection. Cross-VPC rules must use CIDRs
+  — which means there is no SG-ref guardrail on the peer side.
+- Over peering, the peer VPC's effective posture depends on rules YOU
+  cannot see. Flag any peered-CIDR source as "external-trust" and
+  require periodic re-validation.
+- In AWS RAM shared subnets, participant accounts can create SGs in
+  the shared VPC. The owner account's audit MUST enumerate SGs across
+  all participants (`--owner self` filter excludes them — drop it).
+
+### Prefix-list versioning and drift
+
+Every modification to a managed prefix list bumps `Version`. Use
+`--version <current>` for optimistic locking. For periodic re-audit,
+store the version observed at last review and compare; if `Version`
+advanced without a corresponding change ticket, the list has drifted.
+AWS-managed lists (e.g., CloudFront `pl-xxxxxxxx` for global edge IPs)
+rotate entries as POPs are added — treat their classification as
+"valid as of timestamp T", not timeless.
+
+### AWS Config + Security Hub control IDs
+
+Map findings to the downstream tooling auditors actually run — they
+will find the finding in Security Hub before they read your report:
+
+| Finding | AWS Config managed rule | Security Hub control |
+| --- | --- | --- |
+| SSH (22) from `0.0.0.0/0` | `restricted-common-ports` | **EC2.2** |
+| RDP (3389) from `0.0.0.0/0` | `restricted-common-ports` | **EC2.18** |
+| SG not attached to any ENI | `ec2-security-group-attached-to-eni` | EC2.4 |
+| Default SG allows any traffic | — | **EC2.19** (CIS 5.4) |
+| Any other port from `0.0.0.0/0` | `vpc-sg-open-only-to-authorized-ports` | — |
+| Public launch + open SG combined | — | **EC2.15** |
+
+Cite BOTH the CIS control AND the Security Hub control ID in the
+REMEDIATION field — the remediation owner usually triages via
+Security Hub.
+
+### Reachability Analyzer confirms the actual path
+
+For borderline cases ("is the SG reachable through a TGW or peering
+route?"), use VPC Reachability Analyzer — it evaluates SG + route
+table + peering together, while the SG rule alone does not guarantee
+a reachable path:
+
+```
+aws ec2 create-network-insights-path \
+  --source <source-eni> --destination <ip> \
+  --protocol tcp --destination-port <port>
+aws ec2 start-network-insights-analysis \
+  --network-insights-path-id <path-id>
+```
+
+Use it to CONFIRM OPEN verdicts that depend on a specific ingress
+path, and to REFUTE RESTRICTED claims when a transit gateway makes
+the SG effectively reachable from an unexpected CIDR.
+
+### Effective enumeration queries
+
+The single most useful query for scoping an audit — find every SG in
+the region that allows a given CIDR (the `ip-permission.cidr` filter
+matches on substring, so use the exact value):
+
+```
+aws ec2 describe-security-groups \
+  --filters Name=ip-permission.cidr,Values=0.0.0.0/0 \
+            Name=ip-permission.from-port,Values=22 \
+  --query 'SecurityGroups[*].[GroupId,GroupName,VpcId]' --output table
+```
+
+For IPv6 exposure, repeat with `Name=ip-permission.ipv6-ranges.cidr,Values=::/0`.
 
 ## Classification logic (Process — per-rule evaluation, worst-case aggregation)
 
@@ -195,6 +330,35 @@ high-risk registry (§"High-risk port registry"). Examples:
   Entries are public AWS edge IPs, but CloudFront is a trusted CDN →
   **PUBLIC_NONCRITICAL** (not OPEN).
 
+- **IPv6 dual-stack (the most-missed exposure):** SG has `22 TCP ::/0`
+  with NO IPv4 rule. The model output may look "closed" if the auditor
+  only inspects `IpRanges`. `::/0` is PUBLIC, AWS IPv6 addresses are
+  globally routable by default, and 22 is CRITICAL → **OPEN**. Always
+  iterate BOTH `IpRanges` and `Ipv6Ranges` arrays. A "locked-down on
+  IPv4" SG that is wide-open on IPv6 is a common Shadowserver finding.
+
+- **Overlapping CIDR sources (union semantics):** SG has `22 TCP
+  0.0.0.0/0` AND `22 TCP 10.0.0.0/8` on the same port. AWS evaluates
+  each rule independently — there is no first-match and no deny in
+  SGs. The broader `0.0.0.0/0` rule is the effective exposure.
+  Per-rule verdicts: OPEN + RESTRICTED → aggregate **OPEN**. Add a
+  cleanup note: the `10.0.0.0/8` rule is redundant and obscures
+  posture — REMOVE it, do not "narrow" it.
+
+- **Split-horizon evasion:** SG has `443 TCP 0.0.0.0/1` AND
+  `443 TCP 128.0.0.0/1`. Neither rule literally equals `0.0.0.0/0`,
+  but their union covers the entire IPv4 space. Both are PUBLIC, port
+  443 is NON_CRITICAL → **PUBLIC_NONCRITICAL**. This pattern evades
+  naive `grep "0.0.0.0/0"` audits; always union complementary halves
+  (`/1` pairs, `/2` quads) before classifying.
+
+- **Prefix-list drift between audits:** At review T0, `pl-abcd1234`
+  contained only RFC 1918 CIDRs → RESTRICTED. At review T1, the list
+  owner added `0.0.0.0/0` to debug a vendor issue. The SG rule itself
+  did not change, but the effective verdict flipped to OPEN. Re-fetch
+  prefix-list entries on EVERY review cycle; compare `Version` to the
+  last-audited value. Drift without a change ticket is itself a finding.
+
 ## Risk scoring and compliance mapping
 
 ### CVSS-style severity per verdict
@@ -281,11 +445,22 @@ and should be cited in the REMEDIATION field.
   (`public`, `private`) are sent in cleartext in SNMPv1/v2c; the full
   network topology and configuration are leaked. Classify as OPEN.
 
-- NEVER assume overlapping CIDR rules are harmless. A port with BOTH
-  `0.0.0.0/0` and `10.0.0.0/8` sources means the broader (`0.0.0.0/0`)
-  rule is the effective exposure — the restrictive rule adds nothing.
-  Flag duplicates and overlaps as cleanup items; they obscure the
-  actual posture during manual review.
+- NEVER assume overlapping or redundant CIDR rules are harmless. AWS
+  evaluates every inbound allow rule independently (UNION semantics —
+  there is NO first-match priority and NO deny in SGs; deny lives in
+  NACLs). A port with BOTH `0.0.0.0/0` and `10.0.0.0/8` sources means
+  the broader (`0.0.0.0/0`) rule is the effective exposure; the
+  restrictive rule adds nothing and must be REMOVED, not narrowed.
+  Flag every duplicate and overlap as a cleanup item — they obscure
+  the real posture during manual review AND defeat naive
+  `grep "0.0.0.0/0"` audits.
+
+- NEVER miss split-horizon CIDR evasion. Two rules `0.0.0.0/1` and
+  `128.0.0.0/1` on the same port cover the ENTIRE IPv4 space, yet
+  neither literally equals `0.0.0.0/0`. The same applies to `/2` quad
+  splits and `/3` octets. Always union complementary halves before
+  classifying — a per-rule RESTRICTED verdict can hide a union that is
+  effectively PUBLIC.
 
 - NEVER trust a customer-managed prefix list as permanently RESTRICTED.
   The list owner can add public CIDRs at any time without changing the
@@ -487,24 +662,28 @@ For **RESTRICTED** security groups:
 
 ## Section taxonomy (CloudOps auditor pattern)
 
-This skill follows the CloudOps auditor skill pattern:
+**Pattern:** CloudOps Auditor — `Mindset → Process → Reference → Tool`.
+Each major section is tagged inline with its pattern role so the
+structure is machine-recognizable and aids comprehension:
 
 1. **Frontmatter** — name, description, version.
 2. **Activation keywords** — discoverability terms.
-3. **Reasoning framework** (Mindset) — the *why*.
-4. **Classification logic** (Process) — per-rule evaluation then
+3. **Quick verdict logic** — at-a-glance summary (progressive disclosure entry point).
+4. **Reasoning framework** `[Mindset]` — the *why*.
+5. **AWS dataplane expert details** `[Mindset]` — non-obvious AWS behavior.
+6. **Classification logic** `[Process]` — per-rule evaluation then
    worst-case aggregation, as formal pseudocode.
-5. **Risk scoring and compliance mapping** (Process) — CVSS severity +
+7. **Risk scoring and compliance mapping** `[Process]` — CVSS severity +
    CIS/PCI-DSS/NIST control IDs.
-6. **NEVER** (anti-patterns) — critical rules applied before verdict.
-7. **Source classification** (Reference) — CIDR / SG-ref / prefix-list
+8. **NEVER** `[Process]` — anti-patterns applied before verdict.
+9. **Source classification** `[Reference]` — CIDR / SG-ref / prefix-list
    decision table.
-8. **Prefix-list evaluation procedure** (Reference) — programmatic
-   inspection.
-9. **High-risk port registry** (Reference) — categorized port tables.
-10. **Output format** (Process) — per-SG report shape.
-11. **Pre-flight safety checks** (Process) — non-destructive guards.
-12. **Remediation guidance** (Process) — per-verdict action plan.
+10. **Prefix-list evaluation procedure** `[Reference]` — programmatic
+    inspection.
+11. **High-risk port registry** `[Reference]` — categorized port tables.
+12. **Output format** `[Tool]` — per-SG report shape.
+13. **Pre-flight safety checks** `[Process]` — non-destructive guards.
+14. **Remediation guidance** `[Tool]` — per-verdict action plan.
 
 ## Domain
 

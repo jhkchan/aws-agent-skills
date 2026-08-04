@@ -1,0 +1,231 @@
+# Eval test cases for securityhub-control-compliance-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: securityhub-control-compliance-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: s3-bpa-failed
+    description: Active FAILED finding for S3.2 (bucket-level BPA not set) — straightforward FAILED
+    input: |
+      Audit this Security Hub control finding and emit the compliance verdict.
+
+      Control: S3.2 (S3 Bucket-Level Public Access Prohibition)
+      Finding JSON (ASFF):
+        AwsAccountId: "123456789012"
+        Region: "us-east-1"
+        GeneratorId: "arn:aws:securityhub:::ruleset/foundational-security-best-practices/v/1.0.0/S3.2"
+        Compliance:
+          Status: FAILED
+          StatusReasons: []
+        Workflow:
+          Status: NEW
+        RecordState: ACTIVE
+        Severity:
+          Label: HIGH
+        UpdatedAt: "2026-08-01T12:00:00Z"
+        FirstObservedAt: "2026-07-15T08:00:00Z"
+        Resources:
+          - Type: "Aws::S3::Bucket"
+            Id: "arn:aws:s3:::app-uploads-prod"
+    expected_verdict: FAILED
+    assertions:
+      must_contain:
+        - "FAILED"
+        - "S3.2"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PASSED"
+        - "VERDICT: NOT_APPLICABLE"
+
+  - id: iam-password-policy-passed
+    description: Active PASSED finding for IAM.7 (password policy) — straightforward PASSED
+    input: |
+      Audit this Security Hub control finding and emit the compliance verdict.
+
+      Control: IAM.7 (IAM Password Policy)
+      Finding JSON (ASFF):
+        AwsAccountId: "123456789012"
+        Region: "us-east-1"
+        GeneratorId: "arn:aws:securityhub:::ruleset/foundational-security-best-practices/v/1.0.0/IAM.7"
+        Compliance:
+          Status: PASSED
+          StatusReasons: []
+        Workflow:
+          Status: RESOLVED
+        RecordState: ACTIVE
+        Severity:
+          Label: MEDIUM
+        UpdatedAt: "2026-08-01T06:00:00Z"
+        Resources:
+          - Type: "Aws::IAM::Account"
+            Id: "arn:aws:iam::123456789012:root"
+    expected_verdict: PASSED
+    assertions:
+      must_contain:
+        - "PASSED"
+        - "IAM.7"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FAILED"
+        - "VERDICT: NOT_APPLICABLE"
+
+  - id: not-available-no-resources
+    description: NOT_AVAILABLE with NO_RESOURCES StatusReason — no Redshift clusters, control does not apply
+    input: |
+      Audit this Security Hub control finding and emit the compliance verdict.
+
+      Control: Redshift.1 (Redshift Clusters Public Access)
+      Finding JSON (ASFF):
+        AwsAccountId: "123456789012"
+        Region: "us-east-1"
+        GeneratorId: "arn:aws:securityhub:::ruleset/foundational-security-best-practices/v/1.0.0/Redshift.1"
+        Compliance:
+          Status: NOT_AVAILABLE
+          StatusReasons:
+            - Code: NO_RESOURCES
+              Description: "No Redshift clusters found in this account."
+        Workflow:
+          Status: NEW
+        RecordState: ACTIVE
+        Severity:
+          Label: MEDIUM
+        UpdatedAt: "2026-08-01T12:00:00Z"
+        Resources: []
+    expected_verdict: NOT_APPLICABLE
+    assertions:
+      must_contain:
+        - "NOT_APPLICABLE"
+        - "Redshift.1"
+        - "VERDICT"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FAILED"
+        - "VERDICT: PASSED"
+
+  - id: not-available-service-disabled
+    description: NOT_AVAILABLE with SUPPORTED_SERVICE_NOT_ENABLED — Config not enabled, monitoring gap is a WARNING
+    input: |
+      Audit this Security Hub control finding and emit the compliance verdict.
+
+      Control: Config.1 (AWS Config Enabled)
+      Finding JSON (ASFF):
+        AwsAccountId: "123456789012"
+        Region: "eu-west-2"
+        GeneratorId: "arn:aws:securityhub:::ruleset/foundational-security-best-practices/v/1.0.0/Config.1"
+        Compliance:
+          Status: NOT_AVAILABLE
+          StatusReasons:
+            - Code: SUPPORTED_SERVICE_NOT_ENABLED
+              Description: "AWS Config is not enabled in eu-west-2."
+        Workflow:
+          Status: NEW
+        RecordState: ACTIVE
+        Severity:
+          Label: MEDIUM
+        UpdatedAt: "2026-08-01T12:00:00Z"
+        Resources: []
+    expected_verdict: WARNING
+    assertions:
+      must_contain:
+        - "WARNING"
+        - "Config.1"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PASSED"
+        - "VERDICT: FAILED"
+
+  - id: suppressed-failed
+    description: FAILED finding that was SUPPRESSED — control is still failing, governance concern is WARNING
+    input: |
+      Audit this Security Hub control finding and emit the compliance verdict.
+
+      Control: EC2.15 (EC2 Security Group 0.0.0.0/0 on Admin Port)
+      Finding JSON (ASFF):
+        AwsAccountId: "123456789012"
+        Region: "us-east-1"
+        GeneratorId: "arn:aws:securityhub:::ruleset/foundational-security-best-practices/v/1.0.0/EC2.15"
+        Compliance:
+          Status: FAILED
+          StatusReasons: []
+        Workflow:
+          Status: SUPPRESSED
+        RecordState: ACTIVE
+        Severity:
+          Label: HIGH
+        UpdatedAt: "2026-07-20T10:00:00Z"
+        FirstObservedAt: "2026-06-01T08:00:00Z"
+        Resources:
+          - Type: "Aws::EC2::SecurityGroup"
+            Id: "arn:aws:ec2:us-east-1:123456789012:security-group/sg-0abc123"
+    expected_verdict: WARNING
+    assertions:
+      must_contain:
+        - "WARNING"
+        - "EC2.15"
+        - "VERDICT"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PASSED"
+        - "VERDICT: NOT_APPLICABLE"
+
+  - id: archived-finding
+    description: ARCHIVED finding — stale, resource likely deleted, not currently applicable
+    input: |
+      Audit this Security Hub control finding and emit the compliance verdict.
+
+      Control: CloudTrail.1 (CloudTrail Should Be Enabled)
+      Finding JSON (ASFF):
+        AwsAccountId: "123456789012"
+        Region: "us-east-1"
+        GeneratorId: "arn:aws:securityhub:::ruleset/foundational-security-best-practices/v/1.0.0/CloudTrail.1"
+        Compliance:
+          Status: FAILED
+          StatusReasons: []
+        Workflow:
+          Status: RESOLVED
+        RecordState: ARCHIVED
+        Severity:
+          Label: HIGH
+        UpdatedAt: "2026-06-01T12:00:00Z"
+        FirstObservedAt: "2026-05-01T08:00:00Z"
+        Resources:
+          - Type: "Aws::CloudTrail::Trail"
+            Id: "arn:aws:cloudtrail:us-east-1:123456789012:trail/old-trail"
+    expected_verdict: NOT_APPLICABLE
+    assertions:
+      must_contain:
+        - "NOT_APPLICABLE"
+        - "CloudTrail.1"
+        - "VERDICT"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FAILED"
+        - "VERDICT: PASSED"
