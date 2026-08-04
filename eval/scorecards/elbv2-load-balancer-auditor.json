@@ -1,0 +1,70 @@
+{
+  "skill": "elbv2-load-balancer-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many expert\u2011only details (e.g., default ELBSecurityPolicy\u20112016\u201108 includes TLS\u202f1.0/1.1, ALB cross\u2011zone is immutable, NLB health\u2011check type nuance, the TLS\u2011version\u2011and\u2011cipher\u2011suite attribute impact on forensic visibility, deletion\u2011protection error semantics, and the exact list of insecure vs. acceptable SslPolicy names). A capable model could list policies, but the decision\u2011tree thresholds, default\u2011policy exception, and hidden bucket\u2011policy failure note constitute genuine delta. Missing: no explicit guidance on how to programmatically map custom SslPolicy protocol/cipher lists to the insecure/secure decision beyond a brief mention."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific audit mindset: worst\u2011finding wins, type\u2011gate pre\u2011flight, step\u2011ordered classification, mandatory confirmation before any mutating CLI, and precise remediation commands. Procedures are concrete and ordered. Slight deduction for the lack of a concrete script to fetch missing fields (e.g., auto\u2011retry when listener data is absent) and for not embedding the health\u2011check\u2011type rule into the IDLE step."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never flag ALB cross\u2011zone, never treat NLB TCP as missing TLS, never flag 0.0.0.0/0 on ports 80/443 for internet\u2011facing ALB). One minor omission: it does not explicitly warn against using the default security group on an ALB, which is a common pitfall."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are well\u2011defined. The \"when_to_use\" field and detailed metadata give reliable activation cues. Deduct one point because the description could more explicitly state the exact input shape (JSON schema) rather than a prose block."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (one\u2011line takeaway, quick reference, pre\u2011flight, stepwise process, output format, anti\u2011patterns, safety checks, remediation, deep reference). Nonetheless, the deep reference section dumps a large amount of extra detail that could overload the agent before the core decision tree is needed, so a small deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom precisely: destructive actions require explicit CONFIRM gate; classification is deterministic; remediation commands are provided but only after confirmation. No over\u2011constraining of creative tasks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process steps \u2192 Output \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation \u2192 Deep reference) that aligns with the expected skill template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a clear decision tree, concrete CLI remediation examples, and worked output examples that an agent can follow. Missing handling for pagination of describe\u2011* calls, and no guidance for verifying S3 bucket policy failures (only noted as live\u2011account follow\u2011up), which could cause false\u2011positive NO_ACCESS_LOGS classifications."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 47542,
+  "latency_ms": 8600,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

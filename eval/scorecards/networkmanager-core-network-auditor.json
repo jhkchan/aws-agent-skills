@@ -1,0 +1,70 @@
+{
+  "skill": "networkmanager-core-network-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many deep, non\u2011obvious Cloud WAN specifics (AttachmentStatus vs State, silent CIDR overlap, LATEST vs LIVE semantics, default segment global connectivity, rule\u2011number ordering, multi\u2011CIDR advertisement, require\u2011acceptance defaults, NFG bypass, quota\u2011near\u2011cap behavior, per\u2011edge propagation) that a generic model would not know. Minor omission: no explicit mention of IAM condition keys beyond aws:SourceAccount/Arn for tightening policies."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines a clear AWS\u2011specific audit workflow: pre\u2011flight metadata gate, pagination handling, step\u2011wise worst\u2011verdict aggregation, concrete CIDR overlap algorithm, mandatory confirmation before state\u2011changing CLI calls, and precise remediation commands. Slight deduction for lacking explicit retry/back\u2011off strategy for throttling and for not spelling out how to programmatically loop through pagination tokens."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never trust AttachmentState, never skip CIDR overlap, never treat LATEST as LIVE, never assume default segment is isolated). Minor omission: no explicit warning about IAM policy simulator misuse, but overall strong."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Full frontmatter, clear description, when\u2011to\u2011use, activation triggers, and an invocation schema. The only slight weakness is the schema is described in prose rather than a strict JSON schema, but activation criteria are unambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Top\u2011level quick reference and mindset give a high\u2011level view; detailed steps, algorithms, and remediation are nested later. However, the document is dense and some critical rules (e.g., NFG bypass) are buried deep, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated with CONFIRM prompts, policy backup, and preference for additive changes. Auditing (read\u2011only) is left unrestricted, matching task fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Safety \u2192 Remediation. The structure is consistent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, decision tree, error handling for malformed JSON, pagination loops, and worked examples. Slight gap: does not address API throttling or retry logic, but an agent could still execute the audit successfully."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 34956,
+  "latency_ms": 11293,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

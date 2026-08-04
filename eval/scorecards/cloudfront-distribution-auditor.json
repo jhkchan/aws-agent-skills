@@ -1,0 +1,70 @@
+{
+  "skill": "cloudfront-distribution-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill supplies many expert\u2011level specifics that a generic model would not reliably know: the exact acceptable TLS minimum version (TLSv1.2_2021) versus insecure older suffixes, the security impact of S3 website endpoints, the distinction between OAC and legacy OAI (including SSE\u2011KMS implications), the mandatory us-east-1 region for CloudFront WAF ACLs, logging bucket ACL requirements, and the deprecation of field\u2011level encryption. These details constitute genuine delta, but a large portion (e.g., basic TLS and OAC concepts) restates common knowledge, so full 20 is not awarded."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, ordered audit procedure: pre\u2011flight gating, step\u2011by\u2011step classification, pagination handling for list\u2011distributions, ETag management for updates, and a mandatory confirmation gate before any state\u2011changing CLI call. The process is concrete and CloudFront\u2011focused, though a few steps (e.g., \u201crun the CLI\u201d) are generic rather than uniquely AWS\u2011tailored, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning for each pitfall (e.g., never accept TLSv1.2_2019, never treat allow\u2011all as safe, never misinterpret OAI vs OAC). The warnings are experience\u2011driven and explain why they are dangerous. One minor shortfall is the absence of a specific anti\u2011pattern for missing bucket policy updates when creating OAC, which would have completed the set."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields, rich description, activation triggers, and a clear invocation schema. The description could more explicitly state the exact trigger phrase for the agent, hence a single point loss."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information: a one\u2011line mindset, a quick\u2011reference table, detailed stepwise logic, anti\u2011pattern section, safety checks, and remediation guidance. Critical rules are not buried, but the initial sections contain a dense step table and many bullet points, which could overload a first\u2011pass reader before they know which parts are immediately needed."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated with explicit CONFIRM prompts, backup steps, ETag checks, and propagation delay warnings. Creative tasks (classification) are left unconstrained, matching task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Stepwise Process \u2192 Output format \u2192 Edge\u2011case handling \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation. Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a clear decision tree, CLI remediation snippets, and full output template, enabling an agent to act. Minor gaps: handling of partially malformed configs could be more detailed, and the skill does not give explicit fallback when real\u2011time logging is enabled but standard logging is off."
+    }
+  ],
+  "total_score": 110,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 39728,
+  "latency_ms": 13257,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

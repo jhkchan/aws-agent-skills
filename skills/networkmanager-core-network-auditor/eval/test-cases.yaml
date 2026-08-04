@@ -1,0 +1,380 @@
+# Eval test cases for networkmanager-core-network-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: networkmanager-core-network-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: detached-vpc-attachment
+    description: >-
+      Core network with a VPC attachment in DETACHED status — active
+      traffic disruption, workloads unreachable.
+    input: |
+      Core network id: core-network-detached-vpc-attachment
+      Core network ARN: arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-detached-vpc-attachment
+      OwnerAccountId: 111111111111
+      State: AVAILABLE
+      Policy generation (LATEST): 5
+      Policy generation (LIVE): 5
+
+      Attachments:
+        - AttachmentId: attachment-aaa111
+          ResourceType: vpc
+          ResourceArn: arn:aws:ec2:us-east-1:111111111111:vpc/vpc-aaa111
+          AttachmentType: VPC
+          State: AVAILABLE
+          AttachmentStatus: DETACHED
+          EdgeLocation: us-east-1
+          Segment: prod
+          Cidrs: [10.0.1.0/24]
+
+      Resource policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "networkmanager:*",
+              "Resource": "arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-detached-vpc-attachment"
+            }
+          ]
+        }
+
+      Core network policy (segment-actions):
+        - segment: prod
+          share-with: [prod]
+      Emit the standard VERDICT block (CORE_NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: DETACHED_ATTACHMENT
+    assertions:
+      must_contain:
+        - "DETACHED_ATTACHMENT"
+        - "detached-vpc-attachment"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DETACHED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CIDR_OVERLAP"
+
+  - id: permissive-resource-policy
+    description: >-
+      Core network resource policy granting networkmanager:* to Principal "*"
+      with no restrictive condition — any AWS account can inject routes.
+    input: |
+      Core network id: core-network-permissive-resource-policy
+      Core network ARN: arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-permissive-resource-policy
+      OwnerAccountId: 111111111111
+      State: AVAILABLE
+      Policy generation (LATEST): 3
+      Policy generation (LIVE): 3
+
+      Attachments:
+        - AttachmentId: attachment-bbb222
+          ResourceType: vpc
+          ResourceArn: arn:aws:ec2:us-east-1:111111111111:vpc/vpc-bbb222
+          AttachmentType: VPC
+          State: AVAILABLE
+          AttachmentStatus: ATTACHED
+          EdgeLocation: us-east-1
+          Segment: prod
+          Cidrs: [10.1.0.0/24]
+
+      Resource policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "OpenAccess",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "networkmanager:*",
+              "Resource": "arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-permissive-resource-policy"
+            }
+          ]
+        }
+
+      Core network policy (segment-actions):
+        - segment: prod
+          share-with: [prod]
+      Emit the standard VERDICT block (CORE_NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PERMISSIVE_POLICY
+    assertions:
+      must_contain:
+        - "PERMISSIVE_POLICY"
+        - "permissive-resource-policy"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DETACHED_ATTACHMENT"
+
+  - id: overlapping-cidr-two-attachments
+    description: >-
+      Two VPC attachments with overlapping CIDR blocks (10.0.0.0/16 and
+      10.0.1.0/24) across different segments — silent routing ambiguity.
+    input: |
+      Core network id: core-network-overlapping-cidr-two-attachments
+      Core network ARN: arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-overlapping-cidr-two-attachments
+      OwnerAccountId: 111111111111
+      State: AVAILABLE
+      Policy generation (LATEST): 2
+      Policy generation (LIVE): 2
+
+      Attachments:
+        - AttachmentId: attachment-ccc333
+          ResourceType: vpc
+          ResourceArn: arn:aws:ec2:us-east-1:111111111111:vpc/vpc-ccc333
+          AttachmentType: VPC
+          State: AVAILABLE
+          AttachmentStatus: ATTACHED
+          EdgeLocation: us-east-1
+          Segment: prod
+          Cidrs: [10.0.0.0/16]
+        - AttachmentId: attachment-ddd444
+          ResourceType: vpc
+          ResourceArn: arn:aws:ec2:us-west-2:111111111111:vpc/vpc-ddd444
+          AttachmentType: VPC
+          State: AVAILABLE
+          AttachmentStatus: ATTACHED
+          EdgeLocation: us-west-2
+          Segment: non-prod
+          Cidrs: [10.0.1.0/24]
+
+      Resource policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "networkmanager:*",
+              "Resource": "arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-overlapping-cidr-two-attachments"
+            }
+          ]
+        }
+
+      Core network policy (segment-actions):
+        - segment: prod
+          share-with: [prod]
+        - segment: non-prod
+          share-with: [non-prod]
+      Emit the standard VERDICT block (CORE_NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CIDR_OVERLAP
+    assertions:
+      must_contain:
+        - "CIDR_OVERLAP"
+        - "overlapping-cidr-two-attachments"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DETACHED_ATTACHMENT"
+
+  - id: policy-generation-mismatch
+    description: >-
+      Core network where LATEST policy generation (4) differs from LIVE (3) —
+      changes staged but not deployed, running network may not match audited policy.
+    input: |
+      Core network id: core-network-policy-generation-mismatch
+      Core network ARN: arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-policy-generation-mismatch
+      OwnerAccountId: 111111111111
+      State: AVAILABLE
+      Policy generation (LATEST): 4
+      Policy generation (LIVE): 3
+
+      Attachments:
+        - AttachmentId: attachment-eee555
+          ResourceType: vpc
+          ResourceArn: arn:aws:ec2:us-east-1:111111111111:vpc/vpc-eee555
+          AttachmentType: VPC
+          State: AVAILABLE
+          AttachmentStatus: ATTACHED
+          EdgeLocation: us-east-1
+          Segment: prod
+          Cidrs: [10.2.0.0/24]
+
+      Resource policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "networkmanager:*",
+              "Resource": "arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-policy-generation-mismatch"
+            }
+          ]
+        }
+
+      Core network policy (segment-actions):
+        - segment: prod
+          share-with: [prod]
+      Emit the standard VERDICT block (CORE_NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "policy-generation-mismatch"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DETACHED_ATTACHMENT"
+
+  - id: well-segmented-core-network
+    description: >-
+      Well-configured core network with proper segment isolation, all
+      attachments ATTACHED, no CIDR overlap, same-account policy, LIVE
+      equals LATEST — clean posture.
+    input: |
+      Core network id: core-network-well-segmented-core-network
+      Core network ARN: arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-well-segmented-core-network
+      OwnerAccountId: 111111111111
+      State: AVAILABLE
+      Policy generation (LATEST): 7
+      Policy generation (LIVE): 7
+
+      Attachments:
+        - AttachmentId: attachment-fff666
+          ResourceType: vpc
+          ResourceArn: arn:aws:ec2:us-east-1:111111111111:vpc/vpc-fff666
+          AttachmentType: VPC
+          State: AVAILABLE
+          AttachmentStatus: ATTACHED
+          EdgeLocation: us-east-1
+          Segment: prod
+          Cidrs: [10.10.0.0/24]
+        - AttachmentId: attachment-ggg777
+          ResourceType: vpc
+          ResourceArn: arn:aws:ec2:us-east-1:111111111111:vpc/vpc-ggg777
+          AttachmentType: VPC
+          State: AVAILABLE
+          AttachmentStatus: ATTACHED
+          EdgeLocation: us-east-1
+          Segment: non-prod
+          Cidrs: [10.20.0.0/24]
+
+      Resource policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "networkmanager:*",
+              "Resource": "arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-well-segmented-core-network"
+            }
+          ]
+        }
+
+      Core network policy (segment-actions):
+        - segment: prod
+          share-with: [prod]
+        - segment: non-prod
+          share-with: [non-prod]
+      Emit the standard VERDICT block (CORE_NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "well-segmented-core-network"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: DETACHED_ATTACHMENT"
+        - "VERDICT: CIDR_OVERLAP"
+
+  - id: detached-and-overlap-compound
+    description: >-
+      Core network with BOTH a DETACHED attachment and overlapping CIDRs
+      across segments — worst verdict (DETACHED_ATTACHMENT) must win.
+    input: |
+      Core network id: core-network-detached-and-overlap-compound
+      Core network ARN: arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-detached-and-overlap-compound
+      OwnerAccountId: 111111111111
+      State: AVAILABLE
+      Policy generation (LATEST): 3
+      Policy generation (LIVE): 3
+
+      Attachments:
+        - AttachmentId: attachment-hhh888
+          ResourceType: vpc
+          ResourceArn: arn:aws:ec2:us-east-1:111111111111:vpc/vpc-hhh888
+          AttachmentType: VPC
+          State: AVAILABLE
+          AttachmentStatus: DETACHED
+          EdgeLocation: us-east-1
+          Segment: prod
+          Cidrs: [10.0.0.0/16]
+        - AttachmentId: attachment-iii999
+          ResourceType: vpc
+          ResourceArn: arn:aws:ec2:us-west-2:111111111111:vpc/vpc-iii999
+          AttachmentType: VPC
+          State: AVAILABLE
+          AttachmentStatus: ATTACHED
+          EdgeLocation: us-west-2
+          Segment: non-prod
+          Cidrs: [10.0.1.0/24]
+
+      Resource policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccess",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+              "Action": "networkmanager:*",
+              "Resource": "arn:aws:networkmanager:us-east-1:111111111111:core-network/core-network-detached-and-overlap-compound"
+            }
+          ]
+        }
+
+      Core network policy (segment-actions):
+        - segment: prod
+          share-with: [prod]
+        - segment: non-prod
+          share-with: [non-prod]
+      Emit the standard VERDICT block (CORE_NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: DETACHED_ATTACHMENT
+    assertions:
+      must_contain:
+        - "DETACHED_ATTACHMENT"
+        - "detached-and-overlap-compound"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"

@@ -30,8 +30,15 @@ incomplete, and CI runs the assertion layer on every PR.
 | acm-certificate-expiry-auditor | amazon.nova-pro-v1:0 | 102/120 | B | 5/6 | 13.1s | 31009 |
 | autoscaling-group-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 18.9s | 39803 |
 | backup-plan-auditor | amazon.nova-pro-v1:0 | 115/120 | A | 6/6 | 8.5s | 30595 |
+| billing-account-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 13.4s | 37235 |
+| budgets-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.2s | 37761 |
+| ce-cost-anomaly-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 30.5s | 36151 |
+| cloudfront-distribution-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 13.3s | 39728 |
 | cognito-idp-user-pool-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 6.8s | 41140 |
 | compute-optimizer-findings-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.8s | 35720 |
+| cost-optimization-hub-recommendations-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.3s | 37941 |
+| cur-cost-usage-report-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 7.0s | 38402 |
+| directconnect-auditor | amazon.nova-pro-v1:0 | 105/120 | B | 6/6 | 10.7s | 42824 |
 | dlm-lifecycle-policy-auditor | amazon.nova-pro-v1:0 | 112/120 | A | 6/6 | 6.2s | 41975 |
 | ebs-volume-auditor | amazon.nova-pro-v1:0 | 105/120 | B | 6/6 | 18.7s | 41341 |
 | ec2-security-group-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 5/5 | 11.5s | 38372 |
@@ -39,11 +46,14 @@ incomplete, and CI runs the assertion layer on every PR.
 | ecs-task-definition-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 13.9s | 45015 |
 | efs-filesystem-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 38429 |
 | eks-cluster-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.7s | 34838 |
+| elbv2-load-balancer-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 8.6s | 47542 |
 | guardduty-finding-severity-triage | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.3s | 55940 |
 | iam-least-privilege-advisor | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 7.8s | 33835 |
 | inspector2-coverage-finding-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.3s | 52550 |
 | kms-key-policy-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.2s | 49516 |
 | lambda-runtime-deprecation-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.6s | 44874 |
+| networkmanager-core-network-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.3s | 34956 |
+| route53-record-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.8s | 37358 |
 | s3-public-access-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 5/5 | 14.7s | 40044 |
 | secretsmanager-rotation-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 11.2s | 48554 |
 | securityhub-control-compliance-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 47500 |
@@ -69,11 +79,11 @@ skills/*/eval/*.yaml  ->  eval/run_eval.py
   accounts — see `features/aws-cloudops-skills-oss/spec.md` (S-E03).
 - **CI:** assertion-only on every PR (no AWS credentials). The maintainer
   runs the LLM-judge locally and commits scorecard artifacts.
-- **Eval-backed standard: Grade A (>=108/120)** — 21 of 23 shipped skills meet
-  it; `acm-certificate-expiry-auditor` (102) and `ebs-volume-auditor` (105) ship
-  at honest Grade B as documented exceptions. The eval is truthful about each
-  skill's measured quality (median-of-3 judge); every shipped skill is measured,
-  none assert quality without evidence.
+- **Eval-backed standard: Grade A (>=108/120)** — 30 of 33 shipped skills meet
+  it; `acm-certificate-expiry-auditor` (102), `directconnect-auditor` (105), and
+  `ebs-volume-auditor` (105) ship at honest Grade B as documented exceptions. The
+  eval is truthful about each skill's measured quality (median-of-3 judge); every
+  shipped skill is measured, none assert quality without evidence.
 
 ## Quickstart
 

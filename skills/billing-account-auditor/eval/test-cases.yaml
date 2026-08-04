@@ -1,0 +1,221 @@
+# Eval test cases for billing-account-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: billing-account-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: root-billing-only-no-mfa
+    description: >-
+      Standalone account with root MFA disabled and IAM billing access
+      DEACTIVATED — only root can reach billing and root is unprotected.
+    input: |
+      Account id: 111111111111 (alias: root-billing-only-no-mfa)
+      Account type: Standalone
+      Cost Explorer: Enabled
+      Billing configuration snapshot:
+        Account-level IAM billing access: DEACTIVATED
+        AccountMFAEnabled: 0
+        AccountAccessKeysPresent: 0
+        IAM billing principals: none (no user/group/role has aws-portal:*, ce:*, cur:*, budgets:*)
+        Cost Anomaly Detection monitors: none
+        Billing budgets: none
+        Free-tier usage alerts: not enabled
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: ROOT_BILLING
+    assertions:
+      must_contain:
+        - "ROOT_BILLING"
+        - "root-billing-only-no-mfa"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "AccountMFAEnabled"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ANOMALY_DETECTION"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: root-access-keys-present
+    description: >-
+      Account otherwise fully configured but root has active access keys —
+      the single most dangerous billing configuration, trumps everything.
+    input: |
+      Account id: 222222222222 (alias: root-access-keys-present)
+      Account type: Standalone
+      Cost Explorer: Enabled
+      Billing configuration snapshot:
+        Account-level IAM billing access: ACTIVATED
+        AccountMFAEnabled: 1
+        AccountAccessKeysPresent: 1
+        IAM billing principals:
+          - Group "FinOpsViewers": aws-portal:ViewBilling, ce:GetCostAndUsage, budgets:ViewBudget
+        Cost Anomaly Detection monitors: 1 (AllServicesMonitor, DIMENSIONAL)
+        Cost Anomaly Detection subscriptions: 1 (threshold $100, IMMEDIATE)
+        Billing budgets: 1 (MonthlyCostBudget, $5000, 80% ACTUAL alert)
+        Free-tier usage alerts: enabled
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: ROOT_BILLING
+    assertions:
+      must_contain:
+        - "ROOT_BILLING"
+        - "root-access-keys-present"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "AccountAccessKeysPresent"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ANOMALY_DETECTION"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-anomaly-detection
+    description: >-
+      Root secured, billing delegated to IAM, budgets and free-tier alerts
+      configured, but Cost Anomaly Detection not enabled — cost spikes
+      go undetected.
+    input: |
+      Account id: 333333333333 (alias: no-anomaly-detection)
+      Account type: Standalone
+      Cost Explorer: Enabled
+      Billing configuration snapshot:
+        Account-level IAM billing access: ACTIVATED
+        AccountMFAEnabled: 1
+        AccountAccessKeysPresent: 0
+        IAM billing principals:
+          - Group "FinOpsAdmins": aws-portal:ViewBilling, aws-portal:ModifyBilling, ce:*, budgets:*, cur:*
+        Cost Anomaly Detection monitors: none
+        Cost Anomaly Detection subscriptions: none
+        Billing budgets: 1 (MonthlyTotal, $3000, 80% and 100% ACTUAL alerts)
+        Free-tier usage alerts: enabled
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ANOMALY_DETECTION
+    assertions:
+      must_contain:
+        - "NO_ANOMALY_DETECTION"
+        - "no-anomaly-detection"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: ROOT_BILLING"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-no-budgets
+    description: >-
+      Root secured, billing delegated, CAD enabled, free-tier alerts on,
+      but zero billing budgets — no spend guardrails.
+    input: |
+      Account id: 444444444444 (alias: config-gap-no-budgets)
+      Account type: Standalone
+      Cost Explorer: Enabled
+      Billing configuration snapshot:
+        Account-level IAM billing access: ACTIVATED
+        AccountMFAEnabled: 1
+        AccountAccessKeysPresent: 0
+        IAM billing principals:
+          - Group "BillingAdmins": aws-portal:ViewBilling, ce:GetCostAndUsage, budgets:ViewBudget
+        Cost Anomaly Detection monitors: 1 (AllServicesMonitor, DIMENSIONAL)
+        Cost Anomaly Detection subscriptions: 1 (threshold $50, IMMEDIATE)
+        Billing budgets: none
+        Free-tier usage alerts: enabled
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-no-budgets"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: ROOT_BILLING"
+        - "VERDICT: NO_ANOMALY_DETECTION"
+
+  - id: config-gap-freetier-alerts-off
+    description: >-
+      Root secured, billing delegated, CAD enabled, budgets configured,
+      but free-tier usage alerts not enabled — surprise charges possible.
+    input: |
+      Account id: 555555555555 (alias: config-gap-freetier-alerts-off)
+      Account type: Standalone
+      Cost Explorer: Enabled
+      Billing configuration snapshot:
+        Account-level IAM billing access: ACTIVATED
+        AccountMFAEnabled: 1
+        AccountAccessKeysPresent: 0
+        IAM billing principals:
+          - Group "FinOpsViewers": aws-portal:ViewBilling, ce:GetCostAndUsage, budgets:ViewBudget
+        Cost Anomaly Detection monitors: 1 (AllServicesMonitor, DIMENSIONAL)
+        Cost Anomaly Detection subscriptions: 1 (threshold $100, IMMEDIATE)
+        Billing budgets: 1 (MonthlyCostBudget, $2000, 50%, 80%, 100% ACTUAL alerts)
+        Free-tier usage alerts: not enabled
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-freetier-alerts-off"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: ROOT_BILLING"
+        - "VERDICT: NO_ANOMALY_DETECTION"
+
+  - id: all-configured-ok
+    description: >-
+      Fully configured account — root MFA on, no root keys, IAM billing
+      delegation active, CAD with subscriptions, budgets with alerts,
+      free-tier alerts on. Clean posture.
+    input: |
+      Account id: 666666666666 (alias: all-configured-ok)
+      Account type: Standalone
+      Cost Explorer: Enabled
+      Billing configuration snapshot:
+        Account-level IAM billing access: ACTIVATED
+        AccountMFAEnabled: 1
+        AccountAccessKeysPresent: 0
+        IAM billing principals:
+          - Group "FinOpsAdmins": aws-portal:ViewBilling, aws-portal:ModifyBilling, ce:*, budgets:*, cur:*
+        Cost Anomaly Detection monitors: 1 (AllServicesMonitor, DIMENSIONAL)
+        Cost Anomaly Detection subscriptions: 1 (threshold $100, IMMEDIATE)
+        Billing budgets: 1 (MonthlyCostBudget, $5000, 80% and 100% ACTUAL alerts)
+        Free-tier usage alerts: enabled
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "all-configured-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ROOT_BILLING"
+        - "VERDICT: NO_ANOMALY_DETECTION"
+        - "VERDICT: CONFIG_GAP"

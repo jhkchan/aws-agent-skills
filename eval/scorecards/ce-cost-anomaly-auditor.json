@@ -1,0 +1,70 @@
+{
+  "skill": "ce-cost-anomaly-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Introduces concrete, non\u2011obvious thresholds (40% coverage floor, $100 default, 5\u201110% of spend, $5k IMMEDIATE\u2011monitor gate, 7\u2011day coverage look\u2011back, 10\u2011day ML baseline) and a step\u2011wise decision tree that a competent model would not normally provide."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific workflow: pre\u2011flight permission checks, pagination drain, backup before update, confirmation gate, and step\u2011wise classification. Lacks a concrete code snippet or pseudo\u2011loop for handling pagination tokens, leaving the procedure slightly vague."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Extensive NEVER list with clear reasoning (e.g., never treat frequency as detection cadence, never leave $100 default on low\u2011spend accounts). One minor omission: no explicit warning about using the $100 default on high\u2011spend accounts where it creates noise."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete front\u2011matter, clear description of WHAT the skill does, WHEN to invoke, and a rich keyword/trigger list. Activation schema is well defined, enabling reliable skill selection."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (Mindset \u2192 Quick reference \u2192 Process \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation), but the initial sections are dense, causing some cognitive overload before a user reaches the concise top\u2011level summary."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Imposes tight safety gates (confirmation prompt, permission checks, backup of current config) before any destructive CLI action, matching the fragility of cost\u2011related changes. Lacks an explicit hard limit on threshold values beyond recommendation, but overall calibration is strong."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable, well\u2011structured pattern (Mindset \u2192 Reference \u2192 Process \u2192 Output \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation \u2192 Deep reference) that aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, decision tree, output format, and worked examples that let an agent execute the audit end\u2011to\u2011end. Lacks guidance for batch processing across many accounts or handling pagination errors, which could hinder large\u2011scale automation."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 36151,
+  "latency_ms": 30477,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

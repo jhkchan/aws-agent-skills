@@ -1,0 +1,70 @@
+{
+  "skill": "cur-cost-usage-report-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill provides many non\u2011obvious, expert\u2011level details (48h/72h staleness thresholds, manifest file as the authoritative freshness signal, exact bucket\u2011policy conditions for billingreports.amazonaws.com, impact of RefreshClosedReports, schema\u2011drift behavior of Glue partitions, legacy cur\u20111.0 column differences, etc.) that go beyond what a generic model already knows."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "A clear AWS\u2011specific step\u2011by\u2011step procedure is given (pre\u2011flight account\u2011type check, region enforcement, manifest extraction, ordered verdict steps, CLI commands). The ordering of bucket\u2011policy verification relative to manifest freshness could be more explicit, so one point is deducted."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete reasons (linked\u2011account mis\u2011classification, early\u2011stale false positive, Athena format alone insufficient, deleting CUR, missing BillingViewArn, partition\u2011filter omission, lifecycle deletion, etc.). One small omission: no explicit NEVER rule about treating a missing manifest during the first 2 days of a billing period as stale (covered elsewhere but not in the NEVER list)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. However, the input schema lacks an explicit validation checklist for required fields (e.g., TimeUnit, Format), so one point is deducted."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information sensibly (Mindset \u2192 Quick reference \u2192 Input schema \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011patterns \u2192 Remediation). The quick\u2011reference table mixes thresholds with step numbers, adding a slight cognitive load, leading to a two\u2011point deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and backup steps, matching the fragility of CUR modifications. A minor gap is the lack of guidance on throttling limits when auditing many accounts concurrently, so one point is deducted."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Quick reference \u2192 Input schema \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011patterns \u2192 Remediation \u2192 Deep reference). The pattern is clear and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill supplies a decision tree, CLI commands, output format, and worked examples, enabling an agent to act. Missing are concrete parsing instructions for the manifest timestamp (date format handling, pagination of S3 list\u2011objects) and explicit handling of multiple report definitions when aggregating the worst verdict, which could lead to ambiguous implementations."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 38402,
+  "latency_ms": 7018,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

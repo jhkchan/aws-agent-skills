@@ -1,0 +1,281 @@
+# Eval test cases for cur-cost-usage-report-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cur-cost-usage-report-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-cur-account
+    description: >-
+      Payer account with zero CUR report definitions — no line-item cost
+      visibility at all.
+    input: |
+      Account type: payer (management account)
+      Region: us-east-1
+
+      describe-report-definitions output:
+      {
+        "ReportDefinitions": []
+      }
+
+      Emit the standard VERDICT block (REPORT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_CUR
+    assertions:
+      must_contain:
+        - "NO_CUR"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "payer"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: STALE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: stale-hourly-not-refreshing
+    description: >-
+      Hourly CUR with cur-1.0 and Athena integration, but latest manifest is
+      9 days old — delivery pipeline has stopped.
+    input: |
+      Account type: payer (management account)
+      Region: us-east-1
+      Evaluation date: 2026-08-04
+
+      describe-report-definitions output:
+      {
+        "ReportDefinitions": [
+          {
+            "ReportName": "stale-hourly-not-refreshing",
+            "TimeUnit": "HOURLY",
+            "Format": "Parquet",
+            "Compression": "Parquet",
+            "AdditionalSchemaElements": ["Resources"],
+            "S3Bucket": "cur-bucket-prod",
+            "S3Prefix": "cur/",
+            "S3Region": "us-east-1",
+            "AdditionalArtifacts": ["ATHENA"],
+            "RefreshClosedReports": true,
+            "ReportVersion": "cur-1.0"
+          }
+        ]
+      }
+
+      S3 latest manifest timestamp: 2026-07-26T14:00:00Z (9 days ago)
+      S3 bucket versioning: Enabled
+
+      Emit the standard VERDICT block (REPORT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: STALE
+    assertions:
+      must_contain:
+        - "STALE"
+        - "stale-hourly-not-refreshing"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_CUR"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-gzip-no-athena
+    description: >-
+      Hourly CUR with cur-1.0 and fresh data, but Format is CSV/GZIP with no
+      Athena integration and S3 versioning disabled.
+    input: |
+      Account type: payer (management account)
+      Region: us-east-1
+      Evaluation date: 2026-08-04
+
+      describe-report-definitions output:
+      {
+        "ReportDefinitions": [
+          {
+            "ReportName": "config-gap-gzip-no-athena",
+            "TimeUnit": "HOURLY",
+            "Format": "textOrCsv",
+            "Compression": "GZIP",
+            "AdditionalSchemaElements": ["Resources"],
+            "S3Bucket": "cur-bucket-legacy",
+            "S3Prefix": "cur/",
+            "S3Region": "us-east-1",
+            "AdditionalArtifacts": [],
+            "RefreshClosedReports": true,
+            "ReportVersion": "cur-1.0"
+          }
+        ]
+      }
+
+      S3 latest manifest timestamp: 2026-08-04T06:00:00Z (4 hours ago)
+      S3 bucket versioning: Suspended
+
+      Emit the standard VERDICT block (REPORT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-gzip-no-athena"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_CUR"
+        - "VERDICT: STALE"
+
+  - id: config-gap-legacy-no-resources
+    description: >-
+      Daily CUR with legacy report version (not cur-1.0), missing Resources
+      schema element, and RefreshClosedReports false — multiple config gaps.
+    input: |
+      Account type: payer (management account)
+      Region: us-east-1
+      Evaluation date: 2026-08-04
+
+      describe-report-definitions output:
+      {
+        "ReportDefinitions": [
+          {
+            "ReportName": "config-gap-legacy-no-resources",
+            "TimeUnit": "DAILY",
+            "Format": "Parquet",
+            "Compression": "Parquet",
+            "AdditionalSchemaElements": [],
+            "S3Bucket": "cur-bucket-shared",
+            "S3Prefix": "reports/",
+            "S3Region": "us-east-1",
+            "AdditionalArtifacts": ["ATHENA"],
+            "RefreshClosedReports": false,
+            "ReportVersion": "legacy-v0"
+          }
+        ]
+      }
+
+      S3 latest manifest timestamp: 2026-08-03T12:00:00Z (less than 24 hours ago)
+      S3 bucket versioning: Enabled
+
+      Emit the standard VERDICT block (REPORT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-legacy-no-resources"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_CUR"
+        - "VERDICT: STALE"
+
+  - id: ok-full-config
+    description: >-
+      Fully configured hourly CUR with cur-1.0, Parquet format, Athena
+      integration, Resources schema element, RefreshClosedReports enabled,
+      S3 versioning enabled, and fresh data — healthy pipeline.
+    input: |
+      Account type: payer (management account)
+      Region: us-east-1
+      Evaluation date: 2026-08-04
+
+      describe-report-definitions output:
+      {
+        "ReportDefinitions": [
+          {
+            "ReportName": "ok-full-config",
+            "TimeUnit": "HOURLY",
+            "Format": "Parquet",
+            "Compression": "Parquet",
+            "AdditionalSchemaElements": ["Resources"],
+            "S3Bucket": "cur-bucket-prod",
+            "S3Prefix": "cur/",
+            "S3Region": "us-east-1",
+            "AdditionalArtifacts": ["ATHENA"],
+            "RefreshClosedReports": true,
+            "ReportVersion": "cur-1.0"
+          }
+        ]
+      }
+
+      S3 latest manifest timestamp: 2026-08-04T08:00:00Z (2 hours ago)
+      S3 bucket versioning: Enabled
+
+      Emit the standard VERDICT block (REPORT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ok-full-config"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_CUR"
+        - "VERDICT: STALE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-no-versioning-refresh-false
+    description: >-
+      Hourly CUR with cur-1.0, Parquet, Athena enabled, Resources included,
+      and fresh data — but S3 versioning disabled and RefreshClosedReports
+      false.
+    input: |
+      Account type: payer (management account)
+      Region: us-east-1
+      Evaluation date: 2026-08-04
+
+      describe-report-definitions output:
+      {
+        "ReportDefinitions": [
+          {
+            "ReportName": "config-gap-no-versioning-refresh-false",
+            "TimeUnit": "HOURLY",
+            "Format": "Parquet",
+            "Compression": "Parquet",
+            "AdditionalSchemaElements": ["Resources"],
+            "S3Bucket": "cur-bucket-no-versioning",
+            "S3Prefix": "cur/",
+            "S3Region": "us-east-1",
+            "AdditionalArtifacts": ["ATHENA"],
+            "RefreshClosedReports": false,
+            "ReportVersion": "cur-1.0"
+          }
+        ]
+      }
+
+      S3 latest manifest timestamp: 2026-08-04T06:00:00Z (4 hours ago)
+      S3 bucket versioning: NotEnabled
+
+      Emit the standard VERDICT block (REPORT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-no-versioning-refresh-false"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_CUR"
+        - "VERDICT: STALE"

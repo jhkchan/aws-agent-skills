@@ -1,0 +1,423 @@
+# Eval test cases for directconnect-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Test case IDs are embedded in the connectionId fields so the model's
+# output naturally contains the test case slug (matching the KMS seed's
+# pattern of embedding IDs in key ARNs).
+skill: directconnect-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: single-connection-no-redundancy
+    description: >-
+      Single Direct Connect connection at one location with no LAG and no
+      backup path — entire hybrid network depends on one fibre path.
+    input: |
+      Direct Connect topology for account 111111111111 (region us-east-1):
+
+      Connections (aws directconnect describe-connections):
+      - connectionId: dxcon-single-connection-no-redundancy
+        connectionName: dc-to-hq
+        connectionState: available
+        bandwidth: 1Gbps
+        location: EqSE2
+        region: us-east-1
+        lagId: null
+        connectionMode: standard
+        macSecCapable: false
+        encryptionMode: no_encrypt
+        hasLogicalRedundancy: no
+
+      Virtual interfaces (aws directconnect describe-virtual-interfaces):
+      - virtualInterfaceId: dxvif-single-connection-no-redundancy-prod
+        virtualInterfaceType: private
+        connectionId: dxcon-single-connection-no-redundancy
+        vlan: 101
+        bgpPeers:
+          - asn: 64512
+            bgpStatus: down
+            authKey: null
+
+      Direct Connect Gateways: none
+
+      Emit the standard VERDICT block (CONNECTION, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: SINGLE_CONNECTION
+    assertions:
+      must_contain:
+        - "SINGLE_CONNECTION"
+        - "single-connection-no-redundancy"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "EqSE2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: same-location-pseudo-diversity
+    description: >-
+      Two Direct Connect connections at the same DX location (EqSE2) — both
+      cross-connect into the same facility, sharing power, cooling, and
+      meet-me-room. Pseudo-diversity, not facility diversity.
+    input: |
+      Direct Connect topology for account 111111111111 (region us-east-1):
+
+      Connections (aws directconnect describe-connections):
+      - connectionId: dxcon-same-location-pseudo-diversity-1
+        connectionName: primary
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqSE2
+        region: us-east-1
+        lagId: null
+        connectionMode: standard
+        macSecCapable: true
+        encryptionMode: must_encrypt
+      - connectionId: dxcon-same-location-pseudo-diversity-2
+        connectionName: backup
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqSE2
+        region: us-east-1
+        lagId: null
+        connectionMode: standard
+        macSecCapable: true
+        encryptionMode: must_encrypt
+
+      Virtual interfaces (aws directconnect describe-virtual-interfaces):
+      - virtualInterfaceId: dxvif-same-location-pseudo-diversity-1
+        virtualInterfaceType: private
+        connectionId: dxcon-same-location-pseudo-diversity-1
+        vlan: 101
+        bgpPeers:
+          - asn: 64500
+            bgpStatus: up
+            authKeyState: configured
+      - virtualInterfaceId: dxvif-same-location-pseudo-diversity-2
+        virtualInterfaceType: private
+        connectionId: dxcon-same-location-pseudo-diversity-2
+        vlan: 102
+        bgpPeers:
+          - asn: 64500
+            bgpStatus: up
+            authKeyState: configured
+
+      Direct Connect Gateway: dxgw-prod (both VIFs attached)
+
+      Emit the standard VERDICT block (CONNECTION, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: SINGLE_CONNECTION
+    assertions:
+      must_contain:
+        - "SINGLE_CONNECTION"
+        - "same-location-pseudo-diversity"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: macsec-disabled-dedicated
+    description: >-
+      Two diverse Direct Connect connections at MACSec-capable locations, both
+      10 Gbps dedicated, but encryptionMode is no_encrypt on both —
+      cleartext physical link.
+    input: |
+      Direct Connect topology for account 111111111111 (region us-east-1):
+
+      Connections (aws directconnect describe-connections):
+      - connectionId: dxcon-macsec-disabled-dedicated-primary
+        connectionName: primary
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqSE2
+        region: us-east-1
+        lagId: null
+        connectionMode: standard
+        macSecCapable: true
+        encryptionMode: no_encrypt
+      - connectionId: dxcon-macsec-disabled-dedicated-backup
+        connectionName: backup
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqDC2
+        region: us-east-1
+        lagId: null
+        connectionMode: standard
+        macSecCapable: true
+        encryptionMode: no_encrypt
+
+      Virtual interfaces (aws directconnect describe-virtual-interfaces):
+      - virtualInterfaceId: dxvif-macsec-disabled-dedicated-1
+        virtualInterfaceType: private
+        connectionId: dxcon-macsec-disabled-dedicated-primary
+        vlan: 101
+        bgpPeers:
+          - asn: 64500
+            bgpStatus: up
+            authKeyState: configured
+      - virtualInterfaceId: dxvif-macsec-disabled-dedicated-2
+        virtualInterfaceType: private
+        connectionId: dxcon-macsec-disabled-dedicated-backup
+        vlan: 102
+        bgpPeers:
+          - asn: 64500
+            bgpStatus: up
+            authKeyState: configured
+
+      Direct Connect Gateway: dxgw-prod (both VIFs attached)
+
+      Emit the standard VERDICT block (CONNECTION, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "macsec-disabled-dedicated"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "no_encrypt"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: SINGLE_CONNECTION"
+
+  - id: bgp-public-vif-no-auth
+    description: >-
+      Two diverse Direct Connect connections with MACSec must_encrypt enabled,
+      but the public VIF has no BGP MD5 authKey — route-hijack vector for the
+      customer's public prefix.
+    input: |
+      Direct Connect topology for account 111111111111 (region us-east-1):
+
+      Connections (aws directconnect describe-connections):
+      - connectionId: dxcon-bgp-public-vif-no-auth-primary
+        connectionName: primary
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqSE2
+        region: us-east-1
+        lagId: null
+        connectionMode: standard
+        macSecCapable: true
+        encryptionMode: must_encrypt
+      - connectionId: dxcon-bgp-public-vif-no-auth-backup
+        connectionName: backup
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqDC2
+        region: us-east-1
+        lagId: null
+        connectionMode: standard
+        macSecCapable: true
+        encryptionMode: must_encrypt
+
+      Virtual interfaces (aws directconnect describe-virtual-interfaces):
+      - virtualInterfaceId: dxvif-bgp-public-vif-no-auth-public
+        virtualInterfaceType: public
+        connectionId: dxcon-bgp-public-vif-no-auth-primary
+        vlan: 200
+        customerAddress: 203.0.113.10/30
+        amazonAddress: 203.0.113.9/30
+        advertisedPrefixes: ["203.0.113.0/24"]
+        bgpPeers:
+          - asn: 65000
+            bgpStatus: up
+            authKey: null
+      - virtualInterfaceId: dxvif-bgp-public-vif-no-auth-private
+        virtualInterfaceType: private
+        connectionId: dxcon-bgp-public-vif-no-auth-backup
+        vlan: 101
+        bgpPeers:
+          - asn: 64500
+            bgpStatus: up
+            authKey: null
+
+      BGP peer authoritative state (aws directconnect describe-bgp-peers):
+      - virtualInterfaceId: dxvif-bgp-public-vif-no-auth-public
+        bgpPeerId: bgp-public-1
+        asn: 65000
+        bgpStatus: up
+        authKeyState: never-configured-at-creation
+      - virtualInterfaceId: dxvif-bgp-public-vif-no-auth-private
+        bgpPeerId: bgp-private-1
+        asn: 64500
+        bgpStatus: up
+        authKeyState: configured
+
+      Direct Connect Gateway: dxgw-prod (private VIF attached)
+
+      Emit the standard VERDICT block (CONNECTION, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "bgp-public-vif-no-auth"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "public"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: SINGLE_CONNECTION"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: loa-stale-requested
+    description: >-
+      Two diverse production connections with full MACSec must_encrypt and BGP
+      auth, but a newly-provisioned third connection has been stuck in
+      requested state for 6 business days with no LOA-CFA issued — the partner
+      cannot cross-connect.
+    input: |
+      Direct Connect topology for account 111111111111 (region us-east-1):
+
+      Connections (aws directconnect describe-connections):
+      - connectionId: dxcon-loa-stale-requested-primary
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqSE2
+        macSecCapable: true
+        encryptionMode: must_encrypt
+      - connectionId: dxcon-loa-stale-requested-backup
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqDC2
+        macSecCapable: true
+        encryptionMode: must_encrypt
+      - connectionId: dxcon-loa-stale-requested-tertiary
+        connectionState: requested
+        bandwidth: 10Gbps
+        location: EqDA1
+        macSecCapable: true
+        encryptionMode: must_encrypt
+        loaIssueStatus: stale (6 business days in requested, no LOA-CFA issued)
+        loaIssuedAt: null
+
+      Virtual interfaces (aws directconnect describe-virtual-interfaces):
+      - virtualInterfaceId: dxvif-loa-stale-requested-1
+        virtualInterfaceType: private
+        connectionId: dxcon-loa-stale-requested-primary
+        bgpPeers:
+          - asn: 64500
+            bgpStatus: up
+            authKeyState: configured
+      - virtualInterfaceId: dxvif-loa-stale-requested-2
+        virtualInterfaceType: private
+        connectionId: dxcon-loa-stale-requested-backup
+        bgpPeers:
+          - asn: 64500
+            bgpStatus: up
+            authKeyState: configured
+
+      Direct Connect Gateway: dxgw-prod (both VIFs attached)
+
+      Emit the standard VERDICT block (CONNECTION, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "loa-stale-requested"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "requested"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: SINGLE_CONNECTION"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: all-clean-macsec-must-encrypt
+    description: >-
+      Two diverse Direct Connect connections at distinct locations (EqSE2 +
+      EqDC2) with MACSec must_encrypt, redundant private VIFs attached to a
+      DXGW for multi-region failover, BGP up with auth on both — clean posture.
+    input: |
+      Direct Connect topology for account 111111111111 (region us-east-1):
+
+      Connections (aws directconnect describe-connections):
+      - connectionId: dxcon-all-clean-macsec-must-encrypt-primary
+        connectionName: primary
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqSE2
+        region: us-east-1
+        lagId: null
+        connectionMode: standard
+        macSecCapable: true
+        encryptionMode: must_encrypt
+      - connectionId: dxcon-all-clean-macsec-must-encrypt-backup
+        connectionName: backup
+        connectionState: available
+        bandwidth: 10Gbps
+        location: EqDC2
+        region: us-east-1
+        lagId: null
+        connectionMode: standard
+        macSecCapable: true
+        encryptionMode: must_encrypt
+
+      Virtual interfaces (aws directconnect describe-virtual-interfaces):
+      - virtualInterfaceId: dxvif-all-clean-macsec-must-encrypt-1
+        virtualInterfaceType: private
+        connectionId: dxcon-all-clean-macsec-must-encrypt-primary
+        vlan: 101
+        bgpPeers:
+          - asn: 64500
+            bgpStatus: up
+            authKeyState: configured
+      - virtualInterfaceId: dxvif-all-clean-macsec-must-encrypt-2
+        virtualInterfaceType: private
+        connectionId: dxcon-all-clean-macsec-must-encrypt-backup
+        vlan: 102
+        bgpPeers:
+          - asn: 64500
+            bgpStatus: up
+            authKeyState: configured
+
+      Direct Connect Gateway: dxgw-prod
+      DXGW attachments:
+        - directConnectGatewayId: dxgw-prod
+          virtualInterfaceId: dxvif-all-clean-macsec-must-encrypt-1
+        - directConnectGatewayId: dxgw-prod
+          virtualInterfaceId: dxvif-all-clean-macsec-must-encrypt-2
+
+      Emit the standard VERDICT block (CONNECTION, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "all-clean-macsec-must-encrypt"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: SINGLE_CONNECTION"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"

@@ -1,0 +1,259 @@
+# Eval test cases for elbv2-load-balancer-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: elbv2-load-balancer-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: insecure-listener-tls10
+    description: >-
+      Internet-facing ALB with HTTPS listener using ELBSecurityPolicy-TLS-1.0-2015-04
+      — TLS 1.0/1.1 enabled, traffic vulnerable to protocol-downgrade attacks.
+      Everything else is clean (access logs on, SG scoped to 443, healthy targets).
+    input: |
+      Load balancer ARN: arn:aws:elasticloadbalancing:us-east-1:111111111111:load-balancer/app/insecure-listener-tls10/abc123def
+      Type: application
+      Scheme: internet-facing
+      State: active
+      Security groups: sg-0aaa1111
+      Access logs: enabled (S3 bucket: alb-logs-prod, prefix: web)
+      Deletion protection: enabled
+      Cross-zone load balancing: enabled (always on for ALB)
+
+      Listeners:
+        - Protocol: HTTPS, Port: 443
+          SslPolicy: ELBSecurityPolicy-TLS-1.0-2015-04
+          DefaultAction: forward to tg-web-prod
+
+      Security group sg-0aaa1111 inbound rules:
+        - TCP 443 from 0.0.0.0/0
+
+      Target groups:
+        - tg-web-prod: 3 registered targets (all healthy)
+
+      Emit the standard VERDICT block (LB, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INSECURE_LISTENER
+    assertions:
+      must_contain:
+        - "INSECURE_LISTENER"
+        - "insecure-listener-tls10"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "TLS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PERMISSIVE_SG"
+
+  - id: permissive-sg-all-ports
+    description: >-
+      Internet-facing ALB with strong TLS policy and access logs enabled, but
+      the security group allows 0.0.0.0/0 on TCP 0-65535 — every port exposed
+      to the internet.
+    input: |
+      Load balancer ARN: arn:aws:elasticloadbalancing:us-east-1:111111111111:load-balancer/app/permissive-sg-all-ports/def456ghi
+      Type: application
+      Scheme: internet-facing
+      State: active
+      Security groups: sg-0bbb2222
+      Access logs: enabled (S3 bucket: alb-logs-prod, prefix: api)
+      Deletion protection: enabled
+
+      Listeners:
+        - Protocol: HTTPS, Port: 443
+          SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+          DefaultAction: forward to tg-api-prod
+
+      Security group sg-0bbb2222 inbound rules:
+        - TCP 0-65535 from 0.0.0.0/0
+        - TCP 0-65535 from ::/0
+
+      Target groups:
+        - tg-api-prod: 2 registered targets (all healthy)
+
+      Emit the standard VERDICT block (LB, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PERMISSIVE_SG
+    assertions:
+      must_contain:
+        - "PERMISSIVE_SG"
+        - "permissive-sg-all-ports"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INSECURE_LISTENER"
+
+  - id: no-access-logs-internal
+    description: >-
+      Internal ALB with strong TLS, restricted SG, healthy targets, and deletion
+      protection on — but access logs are disabled. No forensic trail for
+      incident response.
+    input: |
+      Load balancer ARN: arn:aws:elasticloadbalancing:us-east-1:111111111111:load-balancer/app/no-access-logs-internal/jkl789mno
+      Type: application
+      Scheme: internal
+      State: active
+      Security groups: sg-0ccc3333
+      Access logs: disabled
+      Deletion protection: enabled
+
+      Listeners:
+        - Protocol: HTTPS, Port: 443
+          SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+          DefaultAction: forward to tg-internal-svc
+
+      Security group sg-0ccc3333 inbound rules:
+        - TCP 443 from 10.0.0.0/8
+
+      Target groups:
+        - tg-internal-svc: 2 registered targets (all healthy)
+
+      Emit the standard VERDICT block (LB, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ACCESS_LOGS
+    assertions:
+      must_contain:
+        - "NO_ACCESS_LOGS"
+        - "no-access-logs-internal"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INSECURE_LISTENER"
+
+  - id: idle-no-targets
+    description: >-
+      Internal ALB with clean TLS, access logs enabled, restricted SG, deletion
+      protection on — but the target group has zero registered targets. The LB
+      is accepting traffic but returning 502 to every request.
+    input: |
+      Load balancer ARN: arn:aws:elasticloadbalancing:us-east-1:111111111111:load-balancer/app/idle-no-targets/pqr012stu
+      Type: application
+      Scheme: internal
+      State: active
+      Security groups: sg-0ddd4444
+      Access logs: enabled (S3 bucket: alb-logs-prod, prefix: legacy)
+      Deletion protection: enabled
+
+      Listeners:
+        - Protocol: HTTPS, Port: 443
+          SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+          DefaultAction: forward to tg-legacy-app
+
+      Security group sg-0ddd4444 inbound rules:
+        - TCP 443 from 10.0.0.0/8
+
+      Target groups:
+        - tg-legacy-app: 0 registered targets
+
+      Emit the standard VERDICT block (LB, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: IDLE
+    assertions:
+      must_contain:
+        - "IDLE"
+        - "idle-no-targets"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INSECURE_LISTENER"
+
+  - id: nlb-config-gap
+    description: >-
+      Internet-facing NLB with TCP passthrough listener (no TLS termination),
+      access logs enabled, healthy targets — but cross-zone load balancing is
+      disabled and deletion protection is off. Two CONFIG_GAP findings.
+    input: |
+      Load balancer ARN: arn:aws:elasticloadbalancing:us-east-1:111111111111:load-balancer/net/nlb-config-gap/vwx345yz
+      Type: network
+      Scheme: internet-facing
+      State: active
+      Access logs: enabled (S3 bucket: nlb-logs-prod, prefix: tcp)
+      Cross-zone load balancing: disabled
+      Deletion protection: disabled
+
+      Listeners:
+        - Protocol: TCP, Port: 443
+          SslPolicy: (none — TCP passthrough, no TLS termination)
+          DefaultAction: forward to tg-nlb-prod
+
+      Target groups:
+        - tg-nlb-prod: 2 registered targets (all healthy)
+
+      Emit the standard VERDICT block (LB, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "nlb-config-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INSECURE_LISTENER"
+
+  - id: clean-ok
+    description: >-
+      Internet-facing ALB with TLS 1.2+ policy, HTTP-to-HTTPS redirect, access
+      logs enabled, SG scoped to listener ports, healthy targets, deletion
+      protection on. All dimensions pass.
+    input: |
+      Load balancer ARN: arn:aws:elasticloadbalancing:us-east-1:111111111111:load-balancer/app/clean-ok/aaa999bbb
+      Type: application
+      Scheme: internet-facing
+      State: active
+      Security groups: sg-0eee5555
+      Access logs: enabled (S3 bucket: alb-logs-prod, prefix: prod)
+      Deletion protection: enabled
+      WAF: associated (web-acl: waf-prod-acl)
+
+      Listeners:
+        - Protocol: HTTPS, Port: 443
+          SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+          DefaultAction: forward to tg-prod-web
+        - Protocol: HTTP, Port: 80
+          DefaultAction: redirect to HTTPS://#{host}:443/#{path}?#{query} (HTTP_301)
+
+      Security group sg-0eee5555 inbound rules:
+        - TCP 443 from 0.0.0.0/0
+        - TCP 80 from 0.0.0.0/0
+
+      Target groups:
+        - tg-prod-web: 4 registered targets (all healthy)
+
+      Emit the standard VERDICT block (LB, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "clean-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSECURE_LISTENER"
+        - "VERDICT: PERMISSIVE_SG"

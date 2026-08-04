@@ -1,0 +1,70 @@
+{
+  "skill": "directconnect-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides several non\u2011trivial expert insights that a generic model would not enumerate (e.g., silent\u2011downgrade risk of `should_encrypt`, 5\u2011day LOA\u2011CFA timeout, write\u2011only nature of `bgpAuthKey`, and the exact interpretation of `hasLogicalRedundancy`). However, much of the content restates publicly documented AWS behaviours, so it does not reach the absolute maximum."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Defines a clear AWS\u2011specific audit flow (redundancy \u2192 MACSec \u2192 BGP/LOA/VIF) with concrete CLI commands and pre\u2011flight safety gates. The procedure is solid but occasionally vague (e.g., \u201crun pagination\u201d without explicit loop syntax) and lacks a single canonical checklist to enforce the mindset."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains an extensive NEVER list with concrete reasons (e.g., never count LAG members as independent units, never treat `bgpAuthKey: null` as missing auth). Only minor omission: it does not explicitly warn about using `describe-virtual-interfaces --connection-id` which can miss swapped VIFs, though this is mentioned elsewhere."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete (description, keywords, activation_triggers, invocation_schema). The when_to_use narrative is detailed, but the activation triggers include free\u2011text phrases that could cause false positives; a more structured intent schema would improve reliability."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The document starts with a concise Quick\u2011Start then expands into deep sections, which is good layering. However, the Quick\u2011Start already embeds the full four\u2011step algorithm and many edge\u2011case tables, leading to some cognitive overload before a reader can decide to dive deeper."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit confirmation prompts and include lead\u2011time warnings (e.g., provisioning new connections takes weeks). The only shortfall is the lack of explicit rate\u2011limiting or role\u2011based restrictions for automated remediation."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Quick start \u2192 Critical rules \u2192 Mindset \u2192 Process \u2192 Output \u2192 Examples \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation). The structure is consistent, though the mix of markdown tables and free\u2011form text makes the pattern slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a deterministic output format, decision tree, concrete CLI remediation steps, and error handling for malformed JSON. Missing: explicit handling of partial API failures (e.g., describe\u2011bgp\u2011peers throttling) and a fallback strategy when required fields are absent."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 42824,
+  "latency_ms": 10716,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

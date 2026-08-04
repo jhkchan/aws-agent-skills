@@ -1,0 +1,70 @@
+{
+  "skill": "route53-record-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many expert nuances (ALIAS TTL ignored, weight\u20110 drain, KSK rollover DS window, secondary health\u2011check policy) that a generic model may not know, but the core concepts (health\u2011check coverage, DNSSEC gaps, dangling ALIAS) are already common knowledge for competent CloudOps engineers, so the added delta is limited."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers AWS\u2011specific procedures (pagination flags, exact CLI commands for health\u2011check creation, DNSSEC enablement, DS publishing) and a clear mindset. Missing a precise ordering rule for pagination parameters (which flag must be used first) leaves a small procedural gap."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never flag health checks on simple routing, never flag DNSSEC on private zones). However, it omits a few experienced pitfalls such as never treating a stale HealthCheckId as a health\u2011check failure without checking its existence, and lacks a specific warning about over\u2011relying on EvaluateTargetHealth=false on ALIAS failover records."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, activation triggers, and invocation schema are present and clear. The only shortfall is the absence of an explicit JSON schema for the input payload (required fields, types), which could cause ambiguous activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation), but the early sections are dense and contain many details that could overload the agent before it knows what to request."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated with mandatory confirmation, state backup, UPSERT preference, and explicit safety checks; creative tasks are left unconstrained. Calibration matches task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a clear, recognizable structure (Mindset, Quick reference, Pre\u2011flight, Process, Output format, Edge\u2011case handling, Anti\u2011patterns, Safety, Remediation) that aligns with established skill patterns."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete decision trees, CLI snippets, example outputs, and remediation JSON, enabling an agent to act. Lacks explicit handling of temporary DNS resolution failures (transient NXDOMAIN) and does not include a check for stale HealthCheckId existence before flagging, which could cause false positives."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 37358,
+  "latency_ms": 9779,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

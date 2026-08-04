@@ -1,0 +1,54 @@
+# Eval configuration for elbv2-load-balancer-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: elbv2-load-balancer-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: insecure-listener-tls10
+    difficulty: medium
+    prompt_file: prompts/insecure-listener-tls10.md
+    baseline_file: baselines/insecure-listener-tls10.md
+    expected_verdict: INSECURE_LISTENER
+    expected_risk: CRITICAL
+  - id: permissive-sg-all-ports
+    difficulty: easy
+    prompt_file: prompts/permissive-sg-all-ports.md
+    baseline_file: baselines/permissive-sg-all-ports.md
+    expected_verdict: PERMISSIVE_SG
+    expected_risk: HIGH
+  - id: no-access-logs-internal
+    difficulty: medium
+    prompt_file: prompts/no-access-logs-internal.md
+    baseline_file: baselines/no-access-logs-internal.md
+    expected_verdict: NO_ACCESS_LOGS
+    expected_risk: HIGH
+  - id: idle-no-targets
+    difficulty: easy
+    prompt_file: prompts/idle-no-targets.md
+    baseline_file: baselines/idle-no-targets.md
+    expected_verdict: IDLE
+    expected_risk: MEDIUM
+  - id: nlb-config-gap
+    difficulty: hard
+    prompt_file: prompts/nlb-config-gap.md
+    baseline_file: baselines/nlb-config-gap.md
+    expected_verdict: CONFIG_GAP
+    expected_risk: MEDIUM
+  - id: clean-ok
+    difficulty: easy
+    prompt_file: prompts/clean-ok.md
+    baseline_file: baselines/clean-ok.md
+    expected_verdict: OK
+    expected_risk: LOW

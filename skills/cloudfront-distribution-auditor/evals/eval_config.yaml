@@ -1,0 +1,48 @@
+# Eval configuration for cloudfront-distribution-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudfront-distribution-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: tls-v1-allow-all
+    difficulty: easy
+    prompt_file: prompts/tls-v1-allow-all.md
+    baseline_file: baselines/tls-v1-allow-all.md
+    expected_verdict: INSECURE_TLS
+  - id: s3-origin-no-access-control
+    difficulty: medium
+    prompt_file: prompts/s3-origin-no-access-control.md
+    baseline_file: baselines/s3-origin-no-access-control.md
+    expected_verdict: NO_OAC
+  - id: missing-waf-and-logging
+    difficulty: medium
+    prompt_file: prompts/missing-waf-and-logging.md
+    baseline_file: baselines/missing-waf-and-logging.md
+    expected_verdict: CONFIG_GAP
+  - id: fully-secured-distribution
+    difficulty: easy
+    prompt_file: prompts/fully-secured-distribution.md
+    baseline_file: baselines/fully-secured-distribution.md
+    expected_verdict: OK
+  - id: insecure-origin-protocol
+    difficulty: hard
+    prompt_file: prompts/insecure-origin-protocol.md
+    baseline_file: baselines/insecure-origin-protocol.md
+    expected_verdict: INSECURE_TLS
+  - id: legacy-oai-and-geo-gap
+    difficulty: hard
+    prompt_file: prompts/legacy-oai-and-geo-gap.md
+    baseline_file: baselines/legacy-oai-and-geo-gap.md
+    expected_verdict: CONFIG_GAP

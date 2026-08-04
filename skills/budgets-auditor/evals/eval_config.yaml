@@ -1,0 +1,54 @@
+# Eval configuration for budgets-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: budgets-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-budgets-account
+    difficulty: easy
+    prompt_file: prompts/no-budgets-account.md
+    baseline_file: baselines/no-budgets-account.md
+    expected_verdict: NO_BUDGET
+    expected_risk: HIGH
+  - id: budget-without-notifications
+    difficulty: easy
+    prompt_file: prompts/budget-without-notifications.md
+    baseline_file: baselines/budget-without-notifications.md
+    expected_verdict: NO_ALERT
+    expected_risk: HIGH
+  - id: sns-policy-missing
+    difficulty: hard
+    prompt_file: prompts/sns-policy-missing.md
+    baseline_file: baselines/sns-policy-missing.md
+    expected_verdict: CONFIG_GAP
+    expected_risk: HIGH
+  - id: single-threshold-actual-only
+    difficulty: medium
+    prompt_file: prompts/single-threshold-actual-only.md
+    baseline_file: baselines/single-threshold-actual-only.md
+    expected_verdict: CONFIG_GAP
+    expected_risk: MEDIUM
+  - id: well-configured-with-zero-spend
+    difficulty: easy
+    prompt_file: prompts/well-configured-with-zero-spend.md
+    baseline_file: baselines/well-configured-with-zero-spend.md
+    expected_verdict: OK
+    expected_risk: LOW
+  - id: new-account-no-zero-spend
+    difficulty: hard
+    prompt_file: prompts/new-account-no-zero-spend.md
+    baseline_file: baselines/new-account-no-zero-spend.md
+    expected_verdict: CONFIG_GAP
+    expected_risk: MEDIUM

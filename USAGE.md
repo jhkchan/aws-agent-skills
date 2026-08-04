@@ -36,6 +36,15 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-efs-filesystem` | 2 Audit | Audit EFS filesystems for encryption-at-rest, public filesystem policy, TLS enforcement, lifecycle management, and access point governance — emits UNENCRYPTED/PUBLIC_POLICY/CONFIG_GAP/OK per filesystem (routes to `efs-filesystem-auditor`) |
 | `/aws:audit-dlm-lifecycle-policy` | 2 Audit | Audit DLM EBS snapshot lifecycle policies for disabled state, empty tag/resource targets, invalid schedules, weak retention, missing cross-region copy (DR gap), CopyTags metadata loss, and per-volume snapshot quota risk — emits NO_POLICY/MISCONFIGURED/CONFIG_GAP/OK per policy (routes to `dlm-lifecycle-policy-auditor`) |
 | `/aws:audit-ebs-volume` | 2 Audit | Audit EBS volumes and snapshots for unencrypted state, unattached cost waste, legacy gp2/io1/standard volume types (gp3/io2 upgrade), stale snapshots (with FSR cost-dominance check), and public-snapshot block-data exposure — emits UNENCRYPTED/UNATTACHED/LEGACY_TYPE/STALE_SNAPSHOT/PUBLIC_SNAPSHOT/OK per resource (routes to `ebs-volume-auditor`) |
+| `/aws:audit-budgets` | 2 Audit | Audit AWS Budgets for cost-overrun blind spots — zero budgets, decorative budgets (no notifications), SNS topic policies that silently block delivery (missing budgets.amazonaws.com publish), single-threshold/no-forecast alerts, breached or on-track-to-breach spend, and missing zero-spend guardrails for new accounts — emits NO_BUDGET/NO_ALERT/CONFIG_GAP/OK per account (routes to `budgets-auditor`) |
+| `/aws:audit-route53-records` | 2 Audit | Audit Route 53 records for missing health checks on weighted/failover/latency routing, dangling ALIAS targets, DNSSEC gaps, public-zone private-IP exposure, TTL inconsistency — emits NO_HEALTH_CHECK/DNSSEC_GAP/DANGLING/CONFIG_GAP/OK per record (routes to `route53-record-auditor`) |
+| `/aws:audit-cur-cost-usage-report` | 2 Audit | Audit Cost and Usage Report (CUR) for coverage, staleness, report version, Athena integration, S3 versioning, and time-horizon health — emits NO_CUR/STALE/CONFIG_GAP/OK per report (routes to `cur-cost-usage-report-auditor`) |
+| `/aws:audit-cost-optimization-hub` | 2 Audit | Audit Cost Optimization Hub for recommendation enablement, member-account coverage, effort-level distribution, and stale high-value unactioned recommendations — emits DISABLED/NO_MEMBER_ACCOUNTS/HIGH_EFFORT/CONFIG_GAP/OK per account (routes to `cost-optimization-hub-recommendations-auditor`) |
+| `/aws:audit-billing-account` | 2 Audit | Audit AWS account billing posture — root MFA and access keys, IAM user/group billing access delegation, Cost Anomaly Detection enablement, billing budgets, and free-tier usage alerts — emits ROOT_BILLING/NO_ANOMALY_DETECTION/CONFIG_GAP/OK per account (routes to `billing-account-auditor`) |
+| `/aws:audit-ce-cost-anomaly` | 2 Audit | Audit Cost Explorer anomaly-detection subscriptions (monitor type, subscription frequency, threshold calibration), RI/SP commitment coverage gaps on steady-state compute, idle-resource detection readiness (CUR resource-ID gating), and report-subscription cadence (IMMEDIATE vs WEEKLY mismatch) — emits NO_ANOMALY_SUB/LOW_RI_COVERAGE/CONFIG_GAP/OK per account (routes to `ce-cost-anomaly-auditor`) |
+| `/aws:audit-elbv2-load-balancer` | 2 Audit | Audit ALB/NLB for insecure TLS listener policies (TLS 1.0/1.1, weak ciphers), disabled access logs, permissive security groups, idle load balancers (no targets), disabled cross-zone (NLB), and missing deletion protection — emits INSECURE_LISTENER/NO_ACCESS_LOGS/PERMISSIVE_SG/IDLE/CONFIG_GAP/OK per LB (routes to `elbv2-load-balancer-auditor`) |
+| `/aws:audit-networkmanager-core-network` | 2 Audit | Audit Network Manager (Cloud WAN) core networks for detached attachments, permissive resource/segment policies, CIDR overlap, and LATEST-vs-LIVE policy mismatch — emits DETACHED_ATTACHMENT/PERMISSIVE_POLICY/CIDR_OVERLAP/CONFIG_GAP/OK per core network (routes to `networkmanager-core-network-auditor`) |
+| `/aws:audit-directconnect-topology` | 2 Audit | Audit Direct Connect topology for single-path failure risk (same-POP pseudo-diversity), MACSec `should_encrypt`/`no_encrypt` on capable hardware, public-VIF BGP MD5 (route-hijack defence), VIF redundancy via DXGW, and LOA-CFA provisioning state — emits SINGLE_CONNECTION/NO_ENCRYPTION/CONFIG_GAP/OK per topology (routes to `directconnect-auditor`) |
 
 Every command has a natural-language equivalent — the orchestrator routes
 identically.
@@ -1370,6 +1379,603 @@ for a PCI-DSS audit walkthrough (unencrypted gp2 data volume with
 DeleteOnTermination: true) covering severity aggregation, the
 encryption-immutability remediation flow, account-level root-cause
 escalation, and the assume-breach snapshot-lineage workflow.
+
+---
+
+### 23. cur-cost-usage-report-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-cur-cost-usage-report` — or route via `/aws:pipeline`.
+
+**What it does:** Audits AWS Cost and Usage Report (CUR) configurations for
+FinOps data pipeline health. Checks whether CUR is configured at all (NO_CUR),
+whether data is fresh (STALE — hourly manifest > 48h, daily > 72h), and for
+configuration gaps (CONFIG_GAP — wrong report version, CSV/GZIP format
+blocking Athena, missing ATHENA artifact, S3 versioning disabled, missing
+Resources schema element, RefreshClosedReports false). Emits a deterministic
+verdict (NO_CUR | STALE | CONFIG_GAP | OK) per report definition.
+
+**When to invoke (trigger phrases):**
+
+- "audit this Cost and Usage Report"
+- "is my CUR healthy?"
+- "check CUR Athena integration"
+- "why is my CUR stale?"
+- "CUR not delivering to S3"
+- "Athena cost query empty"
+- "CUR report version check"
+- "is hourly refresh enabled"
+- "FinOps data pipeline audit"
+- reviewing CUR before a cost-optimization initiative
+
+**Example prompt:**
+
+```
+You: "Our hourly CUR hasn't delivered in 9 days and Athena queries
+     return empty. The format is CSV/GZIP. What's wrong?"
+```
+
+**Expected behavior:**
+
+1. Classifies freshness: 9-day-old manifest for hourly cadence exceeds
+   the 48h staleness threshold (Step 2a).
+2. Emits VERDICT: STALE — delivery pipeline has stopped.
+3. Enumerates all CONFIG_GAP findings: CSV/GZIP blocks Athena (Step 3b),
+   no ATHENA artifact (Step 3c), versioning state.
+4. Provides specific remediation: diagnose delivery stall, switch to
+   Parquet, add ATHENA artifact, run crawler CFN template.
+
+**End-to-end scenario:** see
+[`skills/cur-cost-usage-report-auditor/examples/end-to-end.md`](skills/cur-cost-usage-report-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (stale delivery + CSV format + no Athena +
+no versioning + RefreshClosedReports false) covering ordered classification,
+staleness thresholds, and the per-dimension remediation workflow.
+
+---
+
+### 23. elbv2-load-balancer-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-elbv2-load-balancer`
+
+**What it does:** Audits AWS ELBv2 load balancers (ALB/NLB) for insecure TLS
+listener policies (TLS 1.0/1.1, weak ciphers, cleartext HTTP with no HTTPS
+redirect), disabled access logs, permissive security groups (all-ports-open,
+internal-LB-exposed-to-internet), idle load balancers (zero healthy targets),
+disabled cross-zone load balancing (NLB only — ALB cross-zone is always on),
+and missing deletion protection. Emits a deterministic categorical verdict
+(INSECURE_LISTENER | NO_ACCESS_LOGS | PERMISSIVE_SG | IDLE | CONFIG_GAP | OK)
+per load balancer with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this load balancer"
+- "check ALB TLS policy"
+- "is my NLB secure"
+- "load balancer access logs disabled"
+- "permissive security group ALB"
+- "idle load balancer no targets"
+- "cross-zone load balancing NLB"
+- "deletion protection load balancer"
+- "ELBSecurityPolicy TLS 1.0"
+- "ELBSecurityPolicy-2016-08"
+- reviewing an ALB or NLB before production deployment or a compliance audit
+
+**Example prompt:**
+
+```
+You: "This ALB uses ELBSecurityPolicy-2016-08 on its HTTPS listener and
+     access logs are disabled. PCI-DSS audit next week — what's the risk?"
+```
+
+**Expected behavior:**
+
+1. Classifies the SslPolicy: ELBSecurityPolicy-2016-08 includes TLS 1.0/1.1
+   — deprecated by PCI-DSS, vulnerable to protocol-downgrade attacks.
+2. Emits VERDICT: INSECURE_LISTENER (Step 1 — worst finding wins).
+3. Identifies the access-logs gap as an additional HIGH finding (Step 3).
+4. Provides CLI remediation: modify-listener SslPolicy to
+   ELBSecurityPolicy-TLS13-1-2-2021-06, enable access logs with
+   modify-load-balancer-attributes.
+
+**End-to-end scenario:** see
+[`skills/elbv2-load-balancer-auditor/examples/end-to-end.md`](skills/elbv2-load-balancer-auditor/examples/end-to-end.md)
+for a PCI-DSS audit walkthrough (TLS 1.0 default policy + disabled access
+logs) covering verdict aggregation, the default-policy-is-insecure insight,
+and the per-verdict CLI remediation workflow.
+
+---
+
+### 24. route53-record-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-route53-records` — or route via `/aws:pipeline`.
+
+**What it does:** Audits Route 53 record sets for missing health checks on
+routing-policy records (failover, weighted, latency, geolocation, multivalue),
+dangling ALIAS targets pointing to deleted AWS resources (ELB, CloudFront, S3
+website, API Gateway), DNSSEC signing gaps on public hosted zones, private-IP
+exposure in public zones, and TTL inconsistency within routing groups. Emits a
+deterministic verdict (NO_HEALTH_CHECK | DNSSEC_GAP | DANGLING | CONFIG_GAP | OK)
+per record with enumerated findings and CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit these Route 53 records"
+- "is my DNS failover configured correctly?"
+- "dangling DNS record"
+- "missing health check on failover"
+- "DNSSEC not enabled"
+- "public hosted zone exposure"
+- "Route 53 TTL inconsistency"
+- "subdomain takeover risk"
+- reviewing Route 53 records before production deployment or traffic surge
+
+**Example prompt:**
+
+```
+You: "Our failover PRIMARY for api.example.com has no health check.
+     Is that a problem? The zone also doesn't have DNSSEC."
+```
+
+**Expected behavior:**
+
+1. Classifies the failover PRIMARY as NO_HEALTH_CHECK/CRITICAL (Step 2a) —
+   Route 53 can never detect primary failure; failover is functionally
+   disabled.
+2. Notes the DNSSEC gap as an additive HIGH finding (Step 3a) —
+   cache-poisoning susceptibility.
+3. Recognises that failover SECONDARY without health check is valid
+   fail-open behaviour (not flagged as NO_HEALTH_CHECK).
+4. Provides remediation: create-health-check, change-resource-record-sets
+   UPSERT, enable-hosted-zone-dnssec + create-key-signing-key + publish DS
+   record at registrar.
+
+**End-to-end scenario:** see
+[`skills/route53-record-auditor/examples/end-to-end.md`](skills/route53-record-auditor/examples/end-to-end.md)
+for a pre-traffic-surge audit walkthrough (failover PRIMARY without health
+check + dangling CloudFront ALIAS + DNSSEC gap) covering severity aggregation,
+the failover-disabled insight, and the assume-takeover remediation workflow.
+
+---
+
+### 24. cloudfront-distribution-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-cloudfront-distribution`
+
+**CLI route:**
+
+```bash
+node cli/bin/cli.js route "audit my CloudFront distribution"
+```
+
+**What it does:** Audits CloudFront distributions for insecure TLS viewer
+minimum protocol versions (TLSv1.2_2021 threshold — the year suffix is the
+cipher policy, not the TLS version), viewer protocol policy (allow-all),
+custom origin protocol (http-only / match-viewer), S3 website endpoint
+origins (forces public bucket), missing Origin Access Control on S3 origins
+(OAC vs legacy OAI distinction), missing WAF Web ACL association, disabled
+access logging, absent geographic restrictions, and empty default root
+object. Emits a deterministic verdict
+(INSECURE_TLS | NO_OAC | CONFIG_GAP | OK) per distribution.
+
+**When to invoke (trigger phrases):**
+
+- "audit this CloudFront distribution"
+- "is my CloudFront TLS secure"
+- "check CloudFront OAC"
+- "is OAC configured on my S3 origin"
+- "does my distribution have a WAF"
+- "CloudFront logging disabled"
+- "geo restriction CloudFront"
+- "ViewerProtocolPolicy allow-all"
+- "OriginProtocolPolicy http-only"
+- "S3 website endpoint origin"
+- "hardening CloudFront before production"
+
+**Example prompt:**
+
+```
+You: "This distribution uses TLSv1.2_2019 minimum protocol, the S3 origin
+     has no OAC, and logging is disabled. Marketing site launch is tomorrow
+     — what's the verdict and remediation?"
+```
+
+**Expected behavior:**
+
+1. Classifies as INSECURE_TLS — TLSv1.2_2019 still permits CBC-mode ciphers;
+   TLSv1.2_2021 restricts to AEAD-only (Step 2).
+2. Also flags NO_OAC — S3 origin with no OAC and no OAI means the bucket
+   must be publicly readable (Step 5).
+3. Cites the CONFIG_GAP items (no WAF, no logging) as additional findings.
+4. Provides CLI remediation: update MinimumProtocolVersion, create OAC and
+   attach to origin, update S3 bucket policy, enable logging.
+
+**End-to-end scenario:** see
+[`skills/cloudfront-distribution-auditor/examples/end-to-end.md`](skills/cloudfront-distribution-auditor/examples/end-to-end.md)
+for a marketing-site launch audit (TLSv1.2_2019 + no OAC + no logging)
+covering cipher-suite-difference reasoning, the OAI-vs-OAC migration
+workflow, and per-verdict CLI remediation.
+
+---
+
+### 25. billing-account-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-billing-account`
+
+**What it does:** Audits an AWS account's billing posture across five
+dimensions — root account security (MFA enabled, zero access keys), IAM
+user/group billing access delegation vs root-only, Cost Anomaly Detection
+enablement, billing budgets/alerts coverage, and free-tier usage alerts.
+Emits a deterministic verdict
+(ROOT_BILLING | NO_ANOMALY_DETECTION | CONFIG_GAP | OK) per account with
+enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit my billing configuration"
+- "check billing access"
+- "is Cost Anomaly Detection enabled"
+- "do I have billing budgets"
+- "is root MFA enabled"
+- "billing alerts configured"
+- "free tier usage alerts"
+- "who can access billing"
+- "root account billing access"
+- "root access keys present"
+- "FinOps audit"
+- reviewing an account's billing posture before a FinOps compliance review
+
+**Example prompt:**
+
+```
+You: "This account has root MFA on, IAM billing access activated,
+     Cost Explorer enabled, one CAD monitor, one budget at $5000, and
+     free-tier alerts on. But I just found a root access key — what's
+     the billing verdict?"
+```
+
+**Expected behavior:**
+
+1. Classifies the account as ROOT_BILLING (CRITICAL) — Step 1, because
+   root access keys bypass MFA for every billing API call. This is the
+   single most dangerous billing configuration and trumps all other
+   dimensions.
+2. Notes that root MFA being enabled is OK but irrelevant for API attacks
+   using the access key — MFA protects console sign-in only.
+3. Acknowledges the good configuration on all other dimensions (IAM
+   delegation active, CAD with subscription, budget with alert, free-tier
+   alerts on) as OK findings.
+4. Provides the correct remediation: sign in as root in the console to
+   delete the key (root keys cannot be managed by IAM users via CLI),
+   then audit CloudTrail for `userIdentity.type: "Root"` billing API
+   calls during the exposure window.
+
+**End-to-end scenario:** see
+[`skills/billing-account-auditor/examples/end-to-end.md`](skills/billing-account-auditor/examples/end-to-end.md)
+for a FinOps compliance audit walkthrough (root access keys on an
+otherwise clean account) covering worst-finding aggregation, the
+MFA-bypass reasoning, and the root-only key-deletion remediation flow.
+
+---
+
+### 23. networkmanager-core-network-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-networkmanager-core-network`
+
+**What it does:** Audits AWS Network Manager (Cloud WAN) core networks
+for detached attachments (active traffic disruption), permissive resource
+policies (wildcard or cross-account principals), CIDR overlap across VPC
+attachments (silent routing ambiguity), and configuration gaps (LATEST vs
+LIVE policy mismatch, orphaned segment references). Emits a deterministic
+verdict (DETACHED_ATTACHMENT | PERMISSIVE_POLICY | CIDR_OVERLAP |
+CONFIG_GAP | OK) per core network with enumerated findings and specific
+CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this core network"
+- "check Cloud WAN attachment status"
+- "CIDR overlap in core network"
+- "segment isolation check"
+- "core network resource policy"
+- "LATEST vs LIVE policy"
+- "detached VPC attachment"
+- "core network audit"
+- "Cloud WAN audit"
+- reviewing a core network policy before production deployment or
+  opening it to cross-account teams
+
+**Example prompt:**
+
+```
+You: "This Cloud WAN core network has a prod VPC and a non-prod VPC
+     attached. The prod VPC is 10.0.0.0/16 and the non-prod is
+     10.0.1.0/24. Are they safe to open to the shared-services team?"
+```
+
+**Expected behavior:**
+
+1. Detects the CIDR overlap (10.0.1.0/24 is inside 10.0.0.0/16) —
+   CIDR_OVERLAP verdict. Explains that Cloud WAN silently accepts
+   overlapping CIDRs with no creation-time validation.
+2. Checks AttachmentStatus (not just State) for every attachment —
+   AVAILABLE + ATTACHED passes; AVAILABLE + DETACHED triggers
+   DETACHED_ATTACHMENT.
+3. Evaluates the resource policy for wildcard or cross-account
+   principals without conditions — flags as PERMISSIVE_POLICY.
+4. Verifies LATEST policy generation equals LIVE — a mismatch is a
+   CONFIG_GAP (changes staged but not deployed).
+5. Aggregates to the worst verdict: DETACHED_ATTACHMENT > CIDR_OVERLAP
+   > PERMISSIVE_POLICY > CONFIG_GAP > OK.
+
+**End-to-end scenario:** see
+[`skills/networkmanager-core-network-auditor/examples/end-to-end.md`](skills/networkmanager-core-network-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (CIDR overlap + cross-account resource
+policy) covering severity aggregation, the State-vs-Status distinction,
+multi-CIDR VPC advertisement, and CLI remediation.
+
+---
+
+### 26. cost-optimization-hub-recommendations-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-cost-optimization-hub`
+
+**What it does:** Audits AWS Cost Optimization Hub configuration for
+recommendation enablement, member-account coverage in Organizations,
+effort-level distribution, and stale high-value unactioned recommendations.
+Emits a deterministic verdict
+(DISABLED | NO_MEMBER_ACCOUNTS | HIGH_EFFORT | CONFIG_GAP | OK) per account
+with enumerated findings and CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit cost optimization hub"
+- "are cost optimization recommendations enabled"
+- "check member account enrollment cost optimization"
+- "effort level distribution recommendations"
+- "stale high-value recommendations"
+- "unactioned cost optimization recommendations"
+- "savings estimation mode check"
+- "FinOps audit cost optimization hub"
+
+**Example prompt:**
+
+```
+You: "Cost Optimization Hub is enrolled but all recommendations are High
+     effort and savingsEstimationMode is BEFORE_DISCOUNTS. What's the gap?"
+```
+
+**Expected behavior:**
+
+1. Applies the ordered classification (enablement -> member coverage ->
+   effort distribution -> config gaps -> OK).
+2. Emits VERDICT: HIGH_EFFORT (Step 3 — no Low/Medium effort quick wins
+   remain).
+3. Identifies the BEFORE_DISCOUNTS savings estimation mode as an additional
+   CONFIG_GAP finding (Step 4b).
+4. Provides remediation: verify CloudWatch agent deployment, switch to
+   AFTER_DISCOUNTS mode, prioritize remaining recommendations by ROI.
+
+**End-to-end scenario:** see
+[`skills/cost-optimization-hub-recommendations-auditor/examples/end-to-end.md`](skills/cost-optimization-hub-recommendations-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (stale high-value recs + BEFORE_DISCOUNTS
+mode + partial member enrollment) covering multi-finding aggregation, the
+savings-overstatement concept, and low-effort-first remediation ordering.
+
+### 23. directconnect-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-directconnect-topology`
+
+**What it does:** Audits AWS Direct Connect topology for hybrid-network
+resilience and link-security posture — physical-layer redundancy (2+
+connections at **diverse** DX locations, not the same POP — same-location
+pairs are pseudo-diversity), MACSec (IEEE 802.1AE) enforcement on capable
+dedicated hardware (distinguishing `must_encrypt` from silent-downgrade
+`should_encrypt`), BGP MD5 auth on public VIFs (route-hijack defence for
+advertised public prefixes), virtual-interface redundancy across diverse
+connections via a Direct Connect Gateway (multi-region failover), and
+LOA-CFA provisioning state for connections stuck in `requested`. Emits a
+deterministic verdict
+(SINGLE_CONNECTION | NO_ENCRYPTION | CONFIG_GAP | OK) per topology with
+enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this Direct Connect connection"
+- "is my DX redundant"
+- "MACSec check Direct Connect"
+- "BGP auth public VIF"
+- "LOA stuck pending"
+- "diverse location Direct Connect"
+- "single path failure risk DX"
+- "route hijack public VIF"
+- "LAG redundancy audit"
+- "Direct Connect Gateway failover"
+- "should_encrypt vs must_encrypt"
+- reviewing a Direct Connect topology before production cutover or a
+  compliance audit
+
+**Example prompt:**
+
+```
+You: "We just brought up a second Direct Connect connection for
+     redundancy. Both terminate at EqSE2. Production hybrid apps depend
+     on this link — give me the verdict before we declare cutover."
+```
+
+**Expected behavior:**
+
+1. Classifies the topology as SINGLE_CONNECTION (HIGH) — Step 1, the
+   worst verdict. Both connections share location EqSE2, so a single
+   facility event takes both down. Cites the location-diversity rule
+   explicitly.
+2. Notes the public VIF without BGP MD5 (CONFIG_GAP, MEDIUM) as a
+   secondary finding — route-hijack vector for the advertised prefix.
+3. Surfaces MACSec `must_encrypt` on both connections as an OK dimension
+   (does not change the verdict; not the worst finding).
+4. Provides the correct 4-step remediation: provision a third connection
+   at a different DX location (with lead-time caveat: 2-6 weeks),
+   re-create the public VIF with `--auth-key` (BGP auth is not
+   modifiable in-place), migrate routes via AS-path prepending, and
+   optionally add IPsec VPN overlay if procurement is blocked.
+
+**End-to-end scenario:** see
+[`skills/directconnect-auditor/examples/end-to-end.md`](skills/directconnect-auditor/examples/end-to-end.md)
+for a pre-cutover audit walkthrough (two same-POP connections with a
+BGP-auth-less public VIF) covering location-diversity reasoning, the
+`bgpAuthKey` write-only gotcha, worst-finding aggregation, and the
+destructive VIF re-creation workflow.
+
+---
+
+### 27. budgets-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-budgets`
+
+**What it does:** Audits AWS Budgets for cost-overrun blind spots: accounts
+with zero budgets (NO_BUDGET), budgets configured without notifications or
+with empty subscriber lists (NO_ALERT — decorative budgets), SNS topic
+policies that silently block delivery because they omit the
+`budgets.amazonaws.com` publish principal, single-threshold or no-early-
+warning alert sets, COST budgets with ACTUAL-only notifications and no
+FORECASTED signal, breached or on-track-to-breach actual-vs-forecast spend
+with no matching notification, and missing zero-spend guardrails for new or
+sandbox accounts. Emits a deterministic verdict
+(NO_BUDGET | NO_ALERT | CONFIG_GAP | OK) per account with enumerated findings
+and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit my AWS budgets"
+- "check budget alerts"
+- "is my budget wired to SNS"
+- "budget notification threshold"
+- "zero-spend budget"
+- "cost overrun alert"
+- "budget forecast exceeded"
+- "spend posture audit"
+- "budget SNS policy"
+- "decorative budget"
+- "budget not alerting"
+- "budget alerts not working"
+- reviewing cost budgets before a billing review or production cutover
+
+**Example prompt:**
+
+```
+You: "We configured a budget but the alerts never arrive. Audit our
+     spend posture before the monthly billing review."
+```
+
+**Expected behavior:**
+
+1. Classifies the account as CONFIG_GAP — a 100% ACTUAL notification is
+   wired to an SNS topic whose policy grants the account root but NOT the
+   `budgets.amazonaws.com` service principal (Step 3 — silent delivery
+   failure).
+2. Notes the single 100% threshold leaves no reaction time (Step 4) and the
+   absence of any FORECASTED notification removes the only lead-time signal
+   given 8-14h cost-data lag (Step 5).
+3. Surfaces the on-track breach: ForecastedSpend > BudgetLimit with no
+   FORECASTED notification to fire on it (Step 6).
+4. Provides additive remediation: back up the topic policy first, add the
+   budgets service principal statement, then add a FORECASTED + an early-
+   warning notification, while confirming total notifications stay <= 11.
+
+**End-to-end scenario:** see
+[`skills/budgets-auditor/examples/end-to-end.md`](skills/budgets-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (silent SNS delivery failure + single-
+threshold + no-forecast + on-track breach) covering the
+service-principal-vs-root distinction, cost-data-lag reasoning, and the
+additive remediation ordering.
+
+---
+
+### 28. ce-cost-anomaly-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-ce-cost-anomaly`
+
+**What it does:** Audits AWS Cost Explorer (CE) anomaly-detection
+subscriptions, Savings Plan/RI coverage gaps, idle-resource detection
+readiness, and report-subscription cadence. Checks for zero CAD monitors
+or zero subscriptions (NO_ANOMALY_SUB — total cost-spike blind spot),
+steady-state eligible compute spend (>$1k/mo) with RI coverage < 40% AND
+SP coverage < 40% (LOW_RI_COVERAGE — on-demand leak), and configuration
+quality gaps: an IMMEDIATE monitor paired with a WEEKLY subscription
+(notification latency >> detection latency), the $100 default threshold
+on a free-tier or low-spend account, DAILY-only monitors with no
+IMMEDIATE on accounts > $5k/mo, no CUR v2 with resource IDs (idle-
+resource detection impossible via CE), and narrow monitor scope with no
+org/linked-account breadth. Emits a deterministic verdict
+(NO_ANOMALY_SUB | LOW_RI_COVERAGE | CONFIG_GAP | OK) per account with
+enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit Cost Anomaly Detection"
+- "check my anomaly subscription"
+- "is CAD wired correctly"
+- "RI coverage gap"
+- "Savings Plan coverage"
+- "anomaly threshold too high"
+- "idle resource detection"
+- "IMMEDIATE vs DAILY monitor"
+- "cost spike alerting"
+- "commitment gap"
+- "on-demand leak"
+- reviewing CE/CAD configuration before a billing review or quarterly
+  FinOps assessment
+
+**Example prompt:**
+
+```
+You: "Review our Cost Explorer and Cost Anomaly Detection setup before
+     the quarterly billing review. We spend about $20k/month on
+     steady-state EC2 and want to make sure we're not leaking on-demand
+     spend or missing cost spikes."
+```
+
+**Expected behavior:**
+
+1. Classifies the account as LOW_RI_COVERAGE — $18k/mo eligible EC2
+   spend with 22% RI / 12% SP coverage (Step 2 — commitment strategy
+   absent or undersized on a steady-state fleet).
+2. Notes the IMMEDIATE monitor is paired with a WEEKLY subscription
+   (Step 3a — the monitor detects in ~5 min but the subscription
+   delivers a digest 7 days later; the operator sees the spike a week
+   late).
+3. Flags the $100 default threshold as miscalibrated for a $20k/mo
+   account (Step 3b — recommended ~$1000-$2000, i.e. 5-10% of monthly
+   spend).
+4. Distinguishes coverage (USAGE offset by commitment — the leak to
+   close) from utilization (COMMITMENT consumed — over-buy waste). The
+   LOW_RI_COVERAGE verdict means "run a commitment analysis," not "buy
+   RIs today."
+
+**End-to-end scenario:** see
+[`skills/ce-cost-anomaly-auditor/examples/end-to-end.md`](skills/ce-cost-anomaly-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (frequency mismatch + threshold
+miscalibration + low coverage) covering the frequency-vs-detection-
+cadence distinction, the coverage-vs-utilization distinction, and the
+additive remediation ordering.
 
 ---
 

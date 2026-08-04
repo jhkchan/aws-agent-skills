@@ -1,0 +1,269 @@
+# Eval test cases for route53-record-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: route53-record-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: failover-primary-no-healthcheck
+    description: >-
+      Failover PRIMARY A record (ALIAS to ALB) with no HealthCheckId in a
+      public hosted zone with DNSSEC enabled. Route 53 can never detect
+      primary failure — failover is functionally disabled.
+    input: |
+      Record set id: failover-primary-no-healthcheck
+      Hosted zone: Z1A2B3C4D5E6F7G8 (public, example.com)
+      DNSSEC: enabled (KSK active, DS record published at parent)
+
+      Record set:
+        Name: api.example.com
+        Type: A
+        RoutingPolicy: failover
+        SetIdentifier: primary
+        Failover: PRIMARY
+        TTL: 60
+        AliasTarget:
+          DNSName: internal-alb-1234567890.us-east-1.elb.amazonaws.com
+          EvaluateTargetHealth: false
+        (no HealthCheckId)
+
+      Emit the standard VERDICT block (RECORD, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+    expected_verdict: NO_HEALTH_CHECK
+    assertions:
+      must_contain:
+        - "NO_HEALTH_CHECK"
+        - "api.example.com"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "CRITICAL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DANGLING"
+        - "VERDICT: DNSSEC_GAP"
+
+  - id: dangling-alias-deleted-elb
+    description: >-
+      ALIAS A record pointing to a deleted ELB DNS name. The load balancer
+      no longer exists — the record causes NXDOMAIN (immediate outage).
+    input: |
+      Record set id: dangling-alias-deleted-elb
+      Hosted zone: Z2B3C4D5E6F7G8H9 (public, app.example.com)
+      DNSSEC: enabled (KSK active)
+
+      Record set:
+        Name: legacy.app.example.com
+        Type: A
+        RoutingPolicy: simple
+        TTL: 300
+        AliasTarget:
+          DNSName: deleted-alb-9876543210.us-east-1.elb.amazonaws.com
+          EvaluateTargetHealth: true
+        Target status: ELB deleted (confirmed via describe-load-balancers — DNS name not found)
+
+      Emit the standard VERDICT block (RECORD, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+    expected_verdict: DANGLING
+    assertions:
+      must_contain:
+        - "DANGLING"
+        - "legacy.app.example.com"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "deleted"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_HEALTH_CHECK"
+        - "VERDICT: DNSSEC_GAP"
+
+  - id: dnssec-gap-public-zone
+    description: >-
+      Simple-routing A record in a public hosted zone with no DNSSEC
+      signing. The zone is susceptible to cache-poisoning attacks.
+    input: |
+      Record set id: dnssec-gap-public-zone
+      Hosted zone: Z3C4D5E6F7G8H9I0 (public, prod.example.com)
+      DNSSEC: not enabled (no KSK or ZSK configured, KeySigningKeys array empty)
+
+      Record set:
+        Name: www.prod.example.com
+        Type: A
+        RoutingPolicy: simple
+        TTL: 300
+        ResourceRecords:
+          - Value: 203.0.113.10
+
+      Emit the standard VERDICT block (RECORD, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+    expected_verdict: DNSSEC_GAP
+    assertions:
+      must_contain:
+        - "DNSSEC_GAP"
+        - "www.prod.example.com"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "HIGH"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DANGLING"
+        - "VERDICT: NO_HEALTH_CHECK"
+
+  - id: weighted-no-healthcheck
+    description: >-
+      Two weighted A records (weight 50 each) with no HealthCheckId in a
+      public zone with DNSSEC enabled. Traffic is distributed to endpoints
+      even if they are dead.
+    input: |
+      Record set id: weighted-no-healthcheck
+      Hosted zone: Z4D5E6F7G8H9I0J1 (public, canary.example.com)
+      DNSSEC: enabled (KSK active, DS published)
+
+      Record sets:
+        Name: svc.canary.example.com
+        Type: A
+        RoutingPolicy: weighted
+        SetIdentifier: blue
+        Weight: 50
+        TTL: 60
+        ResourceRecords:
+          - Value: 203.0.113.20
+        (no HealthCheckId)
+
+        Name: svc.canary.example.com
+        Type: A
+        RoutingPolicy: weighted
+        SetIdentifier: green
+        Weight: 50
+        TTL: 60
+        ResourceRecords:
+          - Value: 203.0.113.21
+        (no HealthCheckId)
+
+      Emit the standard VERDICT block (RECORD, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+    expected_verdict: NO_HEALTH_CHECK
+    assertions:
+      must_contain:
+        - "NO_HEALTH_CHECK"
+        - "svc.canary.example.com"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "HIGH"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DANGLING"
+        - "VERDICT: DNSSEC_GAP"
+
+  - id: ttl-inconsistency-weighted
+    description: >-
+      Two weighted A records with health checks but inconsistent TTLs (300
+      vs 3600 — 12x variance). Resolvers cache the records for different
+      durations, breaking traffic-distribution assumptions.
+    input: |
+      Record set id: ttl-inconsistency-weighted
+      Hosted zone: Z5E6F7G8H9I0J1K2 (public, deploy.example.com)
+      DNSSEC: enabled (KSK active, DS published)
+
+      Record sets:
+        Name: app.deploy.example.com
+        Type: A
+        RoutingPolicy: weighted
+        SetIdentifier: stable
+        Weight: 90
+        TTL: 300
+        ResourceRecords:
+          - Value: 203.0.113.30
+        HealthCheckId: hc-stable-12345
+
+        Name: app.deploy.example.com
+        Type: A
+        RoutingPolicy: weighted
+        SetIdentifier: canary
+        Weight: 10
+        TTL: 3600
+        ResourceRecords:
+          - Value: 203.0.113.31
+        HealthCheckId: hc-canary-67890
+
+      Emit the standard VERDICT block (RECORD, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "app.deploy.example.com"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "MEDIUM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DANGLING"
+        - "VERDICT: NO_HEALTH_CHECK"
+        - "VERDICT: DNSSEC_GAP"
+
+  - id: clean-weighted-ok
+    description: >-
+      Two properly configured weighted A records with health checks,
+      consistent TTLs, in a public zone with DNSSEC enabled and DS
+      published. All audit dimensions pass.
+    input: |
+      Record set id: clean-weighted-ok
+      Hosted zone: Z6F7G8H9I0J1K2L3 (public, prod2.example.com)
+      DNSSEC: enabled (KSK active, DS published at parent)
+
+      Record sets:
+        Name: api.prod2.example.com
+        Type: A
+        RoutingPolicy: weighted
+        SetIdentifier: primary
+        Weight: 90
+        TTL: 60
+        ResourceRecords:
+          - Value: 203.0.113.40
+        HealthCheckId: hc-primary-aaa
+
+        Name: api.prod2.example.com
+        Type: A
+        RoutingPolicy: weighted
+        SetIdentifier: secondary
+        Weight: 10
+        TTL: 60
+        ResourceRecords:
+          - Value: 203.0.113.41
+        HealthCheckId: hc-secondary-bbb
+
+      Emit the standard VERDICT block (RECORD, VERDICT, REASON, RISK, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "api.prod2.example.com"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_HEALTH_CHECK"
+        - "VERDICT: DANGLING"
+        - "VERDICT: DNSSEC_GAP"
+        - "VERDICT: CONFIG_GAP"

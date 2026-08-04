@@ -1,0 +1,315 @@
+# Eval test cases for cost-optimization-hub-recommendations-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cost-optimization-hub-recommendations-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: disabled-coh
+    description: >-
+      Cost Optimization Hub not enrolled — recommendations disabled, zero
+      optimization signal flowing. Management account in an Organization.
+    input: |
+      Snapshot label: disabled-coh
+      Account: 111111111111 (management account, Organization with 15 member accounts)
+      Cost Optimization Hub configuration snapshot:
+        enrolled: false
+        enrollmentTimestamp: null
+        preferences:
+          savingsEstimationMode: null
+          memberOfServiceLevelOrganization: false
+        organizationContext: MANAGEMENT
+        orgMemberAccountCount: 15
+        memberAccountsVisible: 0
+        recommendations: []
+        totalEstimatedMonthlySavings: 0
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: DISABLED
+    assertions:
+      must_contain:
+        - "DISABLED"
+        - "disabled-coh"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: HIGH_EFFORT"
+
+  - id: org-no-members
+    description: >-
+      COH enrolled with AFTER_DISCOUNTS mode, but in an Organization management
+      account with 20 member accounts and zero member accounts visible — only
+      the management account is covered.
+    input: |
+      Snapshot label: org-no-members
+      Account: 111111111111 (management account, Organization with 20 member accounts)
+      Cost Optimization Hub configuration snapshot:
+        enrolled: true
+        enrollmentTimestamp: "2025-06-01T00:00:00Z"
+        preferences:
+          savingsEstimationMode: AFTER_DISCOUNTS
+          memberOfServiceLevelOrganization: false
+        organizationContext: MANAGEMENT
+        orgMemberAccountCount: 20
+        memberAccountsVisible: 0
+        recommendations:
+          - resourceId: "i-0mgmtserver01"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Rightsize"
+            effortLevel: "Low"
+            estimatedSavings: 120.00
+            recommendationAgeInDays: 14
+            status: "not actioned"
+        totalEstimatedMonthlySavings: 120.00
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_MEMBER_ACCOUNTS
+    assertions:
+      must_contain:
+        - "NO_MEMBER_ACCOUNTS"
+        - "org-no-members"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DISABLED"
+        - "VERDICT: HIGH_EFFORT"
+
+  - id: high-effort-only
+    description: >-
+      COH enrolled, member accounts visible, but every outstanding
+      recommendation is High effort — no Low or Medium effort quick wins remain.
+    input: |
+      Snapshot label: high-effort-only
+      Account: 111111111111 (management account, Organization with 10 member accounts)
+      Cost Optimization Hub configuration snapshot:
+        enrolled: true
+        enrollmentTimestamp: "2024-11-01T00:00:00Z"
+        preferences:
+          savingsEstimationMode: AFTER_DISCOUNTS
+          memberOfServiceLevelOrganization: false
+        organizationContext: MANAGEMENT
+        orgMemberAccountCount: 10
+        memberAccountsVisible: 8
+        recommendations:
+          - resourceId: "i-0prodapp01"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Rightsize"
+            effortLevel: "High"
+            estimatedSavings: 400.00
+            recommendationAgeInDays: 30
+            status: "not actioned"
+          - resourceId: "i-0prodapp02"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Rightsize"
+            effortLevel: "High"
+            estimatedSavings: 350.00
+            recommendationAgeInDays: 25
+            status: "not actioned"
+          - resourceId: "db-prod-cluster01"
+            resourceType: "AWS::RDS::DBInstance"
+            actionType: "Migrate"
+            effortLevel: "High"
+            estimatedSavings: 280.00
+            recommendationAgeInDays: 18
+            status: "not actioned"
+          - resourceId: "lambda-batch-processor"
+            resourceType: "AWS::Lambda::Function"
+            actionType: "Modify"
+            effortLevel: "High"
+            estimatedSavings: 150.00
+            recommendationAgeInDays: 12
+            status: "not actioned"
+        totalEstimatedMonthlySavings: 1180.00
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: HIGH_EFFORT
+    assertions:
+      must_contain:
+        - "HIGH_EFFORT"
+        - "high-effort-only"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DISABLED"
+        - "VERDICT: NO_MEMBER_ACCOUNTS"
+
+  - id: stale-high-value-unactioned
+    description: >-
+      COH enrolled, member accounts visible, mixed effort levels, AFTER_DISCOUNTS
+      mode — but 2 recommendations with >=$500/mo savings have been unactioned
+      for over 90 days.
+    input: |
+      Snapshot label: stale-high-value-unactioned
+      Account: 111111111111 (management account, Organization with 12 member accounts)
+      Cost Optimization Hub configuration snapshot:
+        enrolled: true
+        enrollmentTimestamp: "2024-06-01T00:00:00Z"
+        preferences:
+          savingsEstimationMode: AFTER_DISCOUNTS
+          memberOfServiceLevelOrganization: false
+        organizationContext: MANAGEMENT
+        orgMemberAccountCount: 12
+        memberAccountsVisible: 10
+        recommendations:
+          - resourceId: "i-0prodapp01"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Rightsize"
+            effortLevel: "Low"
+            estimatedSavings: 850.00
+            recommendationAgeInDays: 95
+            status: "not actioned"
+          - resourceId: "i-0devtest01"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Terminate"
+            effortLevel: "Low"
+            estimatedSavings: 620.00
+            recommendationAgeInDays: 112
+            status: "not actioned"
+          - resourceId: "i-0staging01"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Rightsize"
+            effortLevel: "Medium"
+            estimatedSavings: 180.00
+            recommendationAgeInDays: 20
+            status: "not actioned"
+        totalEstimatedMonthlySavings: 1650.00
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "stale-high-value-unactioned"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DISABLED"
+        - "VERDICT: NO_MEMBER_ACCOUNTS"
+        - "VERDICT: HIGH_EFFORT"
+
+  - id: before-discounts-savings-mode
+    description: >-
+      COH enrolled, member accounts visible, mixed effort levels, no stale
+      high-value recs — but savingsEstimationMode is BEFORE_DISCOUNTS, which
+      overstates savings by ignoring existing RI/SP commitments.
+    input: |
+      Snapshot label: before-discounts-savings-mode
+      Account: 111111111111 (management account, Organization with 8 member accounts)
+      Cost Optimization Hub configuration snapshot:
+        enrolled: true
+        enrollmentTimestamp: "2024-09-01T00:00:00Z"
+        preferences:
+          savingsEstimationMode: BEFORE_DISCOUNTS
+          memberOfServiceLevelOrganization: false
+        organizationContext: MANAGEMENT
+        orgMemberAccountCount: 8
+        memberAccountsVisible: 8
+        recommendations:
+          - resourceId: "i-0webserver01"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Rightsize"
+            effortLevel: "Low"
+            estimatedSavings: 210.00
+            recommendationAgeInDays: 15
+            status: "not actioned"
+          - resourceId: "i-0webserver02"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Rightsize"
+            effortLevel: "Medium"
+            estimatedSavings: 180.00
+            recommendationAgeInDays: 10
+            status: "not actioned"
+        totalEstimatedMonthlySavings: 390.00
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "before-discounts-savings-mode"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DISABLED"
+        - "VERDICT: HIGH_EFFORT"
+
+  - id: clean-production-config
+    description: >-
+      COH enrolled, all member accounts visible, mixed effort levels, no stale
+      high-value recs, AFTER_DISCOUNTS mode — clean production posture.
+    input: |
+      Snapshot label: clean-production-config
+      Account: 111111111111 (management account, Organization with 6 member accounts)
+      Cost Optimization Hub configuration snapshot:
+        enrolled: true
+        enrollmentTimestamp: "2024-03-01T00:00:00Z"
+        preferences:
+          savingsEstimationMode: AFTER_DISCOUNTS
+          memberOfServiceLevelOrganization: false
+        organizationContext: MANAGEMENT
+        orgMemberAccountCount: 6
+        memberAccountsVisible: 6
+        recommendations:
+          - resourceId: "i-0appserver01"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Rightsize"
+            effortLevel: "Low"
+            estimatedSavings: 120.00
+            recommendationAgeInDays: 8
+            status: "not actioned"
+          - resourceId: "i-0appserver02"
+            resourceType: "AWS::EC2::Instance"
+            actionType: "Rightsize"
+            effortLevel: "Medium"
+            estimatedSavings: 95.00
+            recommendationAgeInDays: 5
+            status: "not actioned"
+          - resourceId: "lambda-data-processor"
+            resourceType: "AWS::Lambda::Function"
+            actionType: "Modify"
+            effortLevel: "High"
+            estimatedSavings: 80.00
+            recommendationAgeInDays: 3
+            status: "not actioned"
+        totalEstimatedMonthlySavings: 295.00
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "clean-production-config"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: DISABLED"
+        - "VERDICT: NO_MEMBER_ACCOUNTS"
+        - "VERDICT: HIGH_EFFORT"
+        - "VERDICT: CONFIG_GAP"

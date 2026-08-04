@@ -1,0 +1,70 @@
+{
+  "skill": "billing-account-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many expert\u2011only details (root access\u2011key bypasses MFA, master\u2011switch overrides IAM, Cost Explorer must be enabled before CAD, CAD region\u2011pinning, budgets quota, free\u2011tier alerts routing, console\u2011only aws-portal actions, etc.) that go beyond a generic model\u2019s knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, ordered procedure (pre\u2011flight, step\u2011wise classification, confirmation gate, remediation steps) with exact CLI commands. Minor loss for occasional generic phrasing (e.g., \"check security\") that could be tighter."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., AdministratorAccess does NOT grant billing, never treat root keys as non\u2011critical, never use wrong API for root MFA) and clear operational impact."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete frontmatter, clear description, explicit when\u2011to\u2011use, robust activation triggers, and a well\u2011defined invocation schema."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (quick reference, then deep sections) but the document is dense; some critical rules (e.g., member\u2011account handling) are buried deep, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated (confirmation prompt, note on irreversibility of root\u2011key deletion), while read\u2011only/creative steps are left flexible."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation) that aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a complete decision tree, exact CLI snippets, error handling for incomplete snapshots, and worked examples; minor omission of pagination/error\u2011code handling prevents a perfect score."
+    }
+  ],
+  "total_score": 114,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 37235,
+  "latency_ms": 13355,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

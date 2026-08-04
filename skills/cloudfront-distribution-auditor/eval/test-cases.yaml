@@ -1,0 +1,292 @@
+# Eval test cases for cloudfront-distribution-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudfront-distribution-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: tls-v1-allow-all
+    description: >-
+      CloudFront distribution with TLSv1 minimum protocol and allow-all viewer
+      protocol policy — both TLS version and viewer protocol are insecure.
+    input: |
+      Distribution id: E1A2B3C4D5 (tls-v1-allow-all)
+      Distribution config:
+        Enabled: true
+        DefaultCacheBehavior:
+          TargetOriginId: S3-origin
+          ViewerProtocolPolicy: allow-all
+          AllowedMethods: {Items: [HEAD, GET], Quantity: 2}
+        Origins:
+          Items:
+            - Id: S3-origin
+              DomainName: mybucket.s3.amazonaws.com
+              OriginAccessControlId: E2QWERTY1234567
+              S3OriginConfig:
+                OriginAccessIdentity: ""
+        ViewerCertificate:
+          MinimumProtocolVersion: TLSv1
+          SSLSupportMethod: sni-only
+        WebACLId: arn:aws:wafv2:us-east-1:111111111111:webacl/prod-waf/abc123
+        Logging:
+          Enabled: true
+          Bucket: cf-logs.s3.amazonaws.com
+          Prefix: "tls-v1/"
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: whitelist
+            Items: [US, CA]
+        DefaultRootObject: index.html
+      Emit the standard VERDICT block (DISTRIBUTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INSECURE_TLS
+    assertions:
+      must_contain:
+        - "INSECURE_TLS"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "allow-all"
+        - "TLSv1"
+      must_not_contain:
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: s3-origin-no-access-control
+    description: >-
+      S3 REST origin with no OAC and no legacy OAI — bucket must be publicly
+      readable, allowing direct origin bypass.
+    input: |
+      Distribution id: E2B3C4D5E6 (s3-origin-no-access-control)
+      Distribution config:
+        Enabled: true
+        DefaultCacheBehavior:
+          TargetOriginId: S3-origin
+          ViewerProtocolPolicy: https-only
+          AllowedMethods: {Items: [HEAD, GET], Quantity: 2}
+        Origins:
+          Items:
+            - Id: S3-origin
+              DomainName: appbucket.s3.amazonaws.com
+              OriginAccessControlId: ""
+              S3OriginConfig:
+                OriginAccessIdentity: ""
+        ViewerCertificate:
+          MinimumProtocolVersion: TLSv1.2_2021
+          SSLSupportMethod: sni-only
+        WebACLId: arn:aws:wafv2:us-east-1:111111111111:webacl/app-waf/def456
+        Logging:
+          Enabled: true
+          Bucket: cf-logs.s3.amazonaws.com
+          Prefix: "no-oac/"
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: whitelist
+            Items: [US, CA, GB]
+        DefaultRootObject: index.html
+      Emit the standard VERDICT block (DISTRIBUTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_OAC
+    assertions:
+      must_contain:
+        - "NO_OAC"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "OAC"
+      must_not_contain:
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: missing-waf-and-logging
+    description: >-
+      Distribution with strong TLS, OAC configured, but missing WAF Web ACL
+      and access logging disabled — defense-in-depth gaps.
+    input: |
+      Distribution id: E3C4D5E6F7 (missing-waf-and-logging)
+      Distribution config:
+        Enabled: true
+        DefaultCacheBehavior:
+          TargetOriginId: S3-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: {Items: [HEAD, GET], Quantity: 2}
+        Origins:
+          Items:
+            - Id: S3-origin
+              DomainName: content.s3.amazonaws.com
+              OriginAccessControlId: E2OACXYZ9876543
+              S3OriginConfig:
+                OriginAccessIdentity: ""
+        ViewerCertificate:
+          MinimumProtocolVersion: TLSv1.2_2021
+          SSLSupportMethod: sni-only
+        WebACLId: ""
+        Logging:
+          Enabled: false
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: whitelist
+            Items: [US, CA]
+        DefaultRootObject: index.html
+      Emit the standard VERDICT block (DISTRIBUTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "WAF"
+      must_not_contain:
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INSECURE_TLS"
+
+  - id: fully-secured-distribution
+    description: >-
+      Distribution with TLSv1.2_2021, https-only viewer protocol, OAC on S3
+      origin, WAF associated, logging enabled, geo whitelist, default root
+      object set — clean posture across all dimensions.
+    input: |
+      Distribution id: E4D5E6F7G8 (fully-secured-distribution)
+      Distribution config:
+        Enabled: true
+        DefaultCacheBehavior:
+          TargetOriginId: S3-origin
+          ViewerProtocolPolicy: https-only
+          AllowedMethods: {Items: [HEAD, GET], Quantity: 2}
+        Origins:
+          Items:
+            - Id: S3-origin
+              DomainName: prod-content.s3.us-east-1.amazonaws.com
+              OriginAccessControlId: E2OACPROD1234567
+              S3OriginConfig:
+                OriginAccessIdentity: ""
+        ViewerCertificate:
+          MinimumProtocolVersion: TLSv1.2_2021
+          SSLSupportMethod: sni-only
+        WebACLId: arn:aws:wafv2:us-east-1:111111111111:webacl/prod-acl/aaa111
+        Logging:
+          Enabled: true
+          Bucket: prod-cf-logs.s3.amazonaws.com
+          Prefix: "prod/"
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: whitelist
+            Items: [US, CA, GB, AU]
+        DefaultRootObject: index.html
+      Emit the standard VERDICT block (DISTRIBUTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSECURE_TLS"
+        - "VERDICT: NO_OAC"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: insecure-origin-protocol
+    description: >-
+      Custom origin with OriginProtocolPolicy http-only — CloudFront connects
+      to the origin over plaintext HTTP, exposing origin traffic.
+    input: |
+      Distribution id: E5E6F7G8H9 (insecure-origin-protocol)
+      Distribution config:
+        Enabled: true
+        DefaultCacheBehavior:
+          TargetOriginId: custom-origin
+          ViewerProtocolPolicy: https-only
+          AllowedMethods: {Items: [HEAD, GET], Quantity: 2}
+        Origins:
+          Items:
+            - Id: custom-origin
+              DomainName: api.example.com
+              CustomOriginConfig:
+                OriginProtocolPolicy: http-only
+                HTTPPort: 80
+                HTTPSPort: 443
+        ViewerCertificate:
+          MinimumProtocolVersion: TLSv1.2_2021
+          SSLSupportMethod: sni-only
+        WebACLId: arn:aws:wafv2:us-east-1:111111111111:webacl/api-waf/bbb222
+        Logging:
+          Enabled: true
+          Bucket: cf-logs.s3.amazonaws.com
+          Prefix: "api/"
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: blacklist
+            Items: [CN, RU]
+        DefaultRootObject: index.html
+      Emit the standard VERDICT block (DISTRIBUTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INSECURE_TLS
+    assertions:
+      must_contain:
+        - "INSECURE_TLS"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "http-only"
+      must_not_contain:
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: legacy-oai-and-geo-gap
+    description: >-
+      S3 origin with legacy OAI but no OAC, and no geographic restrictions —
+      deprecated origin access mechanism plus missing geo controls.
+    input: |
+      Distribution id: E6F7G8H9I0 (legacy-oai-and-geo-gap)
+      Distribution config:
+        Enabled: true
+        DefaultCacheBehavior:
+          TargetOriginId: S3-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: {Items: [HEAD, GET], Quantity: 2}
+        Origins:
+          Items:
+            - Id: S3-origin
+              DomainName: legacy-bucket.s3.amazonaws.com
+              OriginAccessControlId: ""
+              S3OriginConfig:
+                OriginAccessIdentity: origin-access-identity/cloudfront/E1A2B3C4D5
+        ViewerCertificate:
+          MinimumProtocolVersion: TLSv1.2_2021
+          SSLSupportMethod: sni-only
+        WebACLId: arn:aws:wafv2:us-east-1:111111111111:webacl/app-waf/ccc333
+        Logging:
+          Enabled: true
+          Bucket: cf-logs.s3.amazonaws.com
+          Prefix: "legacy/"
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: none
+            Items: []
+        DefaultRootObject: index.html
+      Emit the standard VERDICT block (DISTRIBUTION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "OAC"
+      must_not_contain:
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INSECURE_TLS"

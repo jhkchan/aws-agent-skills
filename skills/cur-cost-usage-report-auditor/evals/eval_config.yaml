@@ -1,0 +1,48 @@
+# Eval configuration for cur-cost-usage-report-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cur-cost-usage-report-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-cur-account
+    difficulty: easy
+    prompt_file: prompts/no-cur-account.md
+    baseline_file: baselines/no-cur-account.md
+    expected_verdict: NO_CUR
+  - id: stale-hourly-not-refreshing
+    difficulty: medium
+    prompt_file: prompts/stale-hourly-not-refreshing.md
+    baseline_file: baselines/stale-hourly-not-refreshing.md
+    expected_verdict: STALE
+  - id: config-gap-gzip-no-athena
+    difficulty: medium
+    prompt_file: prompts/config-gap-gzip-no-athena.md
+    baseline_file: baselines/config-gap-gzip-no-athena.md
+    expected_verdict: CONFIG_GAP
+  - id: config-gap-legacy-no-resources
+    difficulty: hard
+    prompt_file: prompts/config-gap-legacy-no-resources.md
+    baseline_file: baselines/config-gap-legacy-no-resources.md
+    expected_verdict: CONFIG_GAP
+  - id: ok-full-config
+    difficulty: easy
+    prompt_file: prompts/ok-full-config.md
+    baseline_file: baselines/ok-full-config.md
+    expected_verdict: OK
+  - id: config-gap-no-versioning-refresh-false
+    difficulty: hard
+    prompt_file: prompts/config-gap-no-versioning-refresh-false.md
+    baseline_file: baselines/config-gap-no-versioning-refresh-false.md
+    expected_verdict: CONFIG_GAP

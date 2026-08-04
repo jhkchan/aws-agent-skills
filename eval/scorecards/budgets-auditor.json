@@ -1,0 +1,70 @@
+{
+  "skill": "budgets-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many expert\u2011only details (cost\u2011data lag hours, exact SNS policy statement, auto\u2011adjusting budget semantics, hard quota of 11 notifications, RI/SP budget type nuances, and a step\u2011by\u2011step audit decision tree). These facts are not generally known by a baseline model, but most of the content could be derived from AWS documentation, so it falls short of a perfect 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: pagination of describe\u2011budgets, forced us\u2011east\u20111 region, required IAM permissions, organization\u2011level payer budget handling, and explicit pre\u2011flight checks. Missing only a concrete step for checking the 11\u2011notification limit before adding new notifications."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., silent SNS policy failure, decorative budgets, single\u2011threshold danger, cost\u2011data lag). Only minor omission: no explicit NEVER rule about unconfirmed email subscriptions, which is mentioned elsewhere but not in the NEVER block."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present, giving an agent clear when to invoke. Lacks a concrete example of the expected JSON/YAML input structure, which would make activation 100% reliable."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Top\u2011level sections (Mindset, Quick reference, Process) give a concise overview, with deeper details (deep reference, remediation) later. However the document is dense; some critical rules (e.g., SNS policy check) are buried in the long \u201cStep 3\u201d description, creating potential cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom well: read\u2011only audit steps are permissive, while any state\u2011changing remediation requires explicit CONFIRM prompts, additive changes, and backup of policies. No over\u2011constraining of creative audit tasks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation). Minor inconsistency in ordering of safety checks vs remediation makes it slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a clear decision tree, output format, CLI remediation snippets, and worked examples that let an agent execute the audit end\u2011to\u2011end. Slight weakness: the exact field names for ActualSpend vs ForecastedSpend in the Budgets API response are not spelled out, which could cause ambiguity in implementation."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 37761,
+  "latency_ms": 12184,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

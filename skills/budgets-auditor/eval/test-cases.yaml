@@ -1,0 +1,361 @@
+# Eval test cases for budgets-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: budgets-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-budgets-account
+    description: >-
+      Account has zero budgets of any type — total spend blind spot. Default
+      state for a newly created account; highest-risk FinOps posture.
+    input: |
+      Audit reference: no-budgets-account
+      Account id: 111111111111
+      Account context: newly created production account, no prior budget history.
+
+      Budget inventory (aws budgets describe-budgets):
+        Budgets: []
+
+      Notifications for each budget: (none — no budgets exist)
+      SNS topic policies: (none — no budget subscribers exist)
+      Calculated spend: (no budgets to calculate against)
+
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: NO_BUDGET
+    assertions:
+      must_contain:
+        - "NO_BUDGET"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "111111111111"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: NO_ALERT"
+
+  - id: budget-without-notifications
+    description: >-
+      A single MONTHLY COST budget exists with a $10000 limit and is not
+      breached, but it has zero notifications — the budget is decorative;
+      spend is tracked in the console but nobody is alerted.
+    input: |
+      Audit reference: budget-without-notifications
+      Account id: 222222222222
+      Account context: established production account.
+
+      Budget inventory (aws budgets describe-budgets):
+        - BudgetName: monthly-total
+          BudgetType: COST
+          TimeUnit: MONTHLY
+          BudgetLimit: {Amount: 10000.0, Unit: USD}
+          CostTypes: {IncludeTax: true, UseAmortized: false, IncludeDiscount: true}
+          CalculatedSpend:
+            ActualSpend: {Amount: 4200.0, Unit: USD}
+            ForecastedSpend: {Amount: 9100.0, Unit: USD}
+
+      Notifications for "monthly-total" (aws budgets describe-notifications-for-budget):
+        Notifications: []
+
+      SNS topic policies: (no SNS subscribers configured)
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: NO_ALERT
+    assertions:
+      must_contain:
+        - "NO_ALERT"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "monthly-total"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_BUDGET"
+
+  - id: sns-policy-missing
+    description: >-
+      Budget with an ACTUAL 100% notification wired to an SNS topic whose
+      policy does NOT grant budgets.amazonaws.com sns:Publish — alerts are
+      dispatched but silently rejected at delivery. Single threshold compounds
+      the gap.
+    input: |
+      Audit reference: sns-policy-missing
+      Account id: 333333333333
+      Account context: production account with a budget configured but alerts
+      never seem to arrive.
+
+      Budget inventory (aws budgets describe-budgets):
+        - BudgetName: monthly-total
+          BudgetType: COST
+          TimeUnit: MONTHLY
+          BudgetLimit: {Amount: 5000.0, Unit: USD}
+          CostTypes: {IncludeTax: true, UseAmortized: false, IncludeDiscount: true}
+          CalculatedSpend:
+            ActualSpend: {Amount: 3100.0, Unit: USD}
+            ForecastedSpend: {Amount: 4700.0, Unit: USD}
+
+      Notifications for "monthly-total":
+        - NotificationType: ACTUAL
+          Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100.0
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: arn:aws:sns:us-east-1:333333333333:budget-alerts
+
+      SNS topic policy for arn:aws:sns:us-east-1:333333333333:budget-alerts:
+        {
+          "Version": "2008-10-17",
+          "Id": "__default_policy_ID",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::333333333333:root"},
+              "Action": "SNS:Publish",
+              "Resource": "arn:aws:sns:us-east-1:333333333333:budget-alerts"
+            }
+          ]
+        }
+      (Note: the policy grants the account root publish, but does NOT grant the
+      budgets.amazonaws.com service principal publish.)
+
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "budgets.amazonaws.com"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_BUDGET"
+        - "VERDICT: NO_ALERT"
+
+  - id: single-threshold-actual-only
+    description: >-
+      Budget with only a single 100% ACTUAL notification and no FORECASTED
+      notification, wired to a properly-policy SNS topic. The wiring is correct
+      but the threshold set leaves no reaction time and no predictive signal.
+    input: |
+      Audit reference: single-threshold-actual-only
+      Account id: 444444444444
+      Account context: production account, budget alerts deliver but always
+      arrive after the spend is already incurred.
+
+      Budget inventory (aws budgets describe-budgets):
+        - BudgetName: monthly-total
+          BudgetType: COST
+          TimeUnit: MONTHLY
+          BudgetLimit: {Amount: 8000.0, Unit: USD}
+          CostTypes: {IncludeTax: true, UseAmortized: false, IncludeDiscount: true}
+          CalculatedSpend:
+            ActualSpend: {Amount: 5400.0, Unit: USD}
+            ForecastedSpend: {Amount: 7600.0, Unit: USD}
+
+      Notifications for "monthly-total":
+        - NotificationType: ACTUAL
+          Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100.0
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: SNS
+              Address: arn:aws:sns:us-east-1:444444444444:budget-alerts
+
+      SNS topic policy for arn:aws:sns:us-east-1:444444444444:budget-alerts:
+        {
+          "Version": "2008-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "budgets.amazonaws.com"},
+              "Action": "SNS:Publish",
+              "Resource": "arn:aws:sns:us-east-1:444444444444:budget-alerts"
+            }
+          ]
+        }
+      (Note: SNS policy is correctly configured for budgets delivery.)
+
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "monthly-total"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_BUDGET"
+        - "VERDICT: NO_ALERT"
+
+  - id: well-configured-with-zero-spend
+    description: >-
+      Established production account with a properly configured MONTHLY COST
+      budget: multi-threshold (50/80/100) with both ACTUAL and FORECASTED
+      notifications, SNS topic policy grants budgets.amazonaws.com publish,
+      not breached. Plus a zero-spend guardrail budget for the sandbox
+      workload also present. Clean posture.
+    input: |
+      Audit reference: well-configured-with-zero-spend
+      Account id: 555555555555
+      Account context: established production account with a sandbox
+      environment co-located; FinOps review before billing sign-off.
+
+      Budget inventory (aws budgets describe-budgets):
+        - BudgetName: monthly-total
+          BudgetType: COST
+          TimeUnit: MONTHLY
+          BudgetLimit: {Amount: 12000.0, Unit: USD}
+          CostTypes: {IncludeTax: true, UseAmortized: false, IncludeDiscount: true}
+          CalculatedSpend:
+            ActualSpend: {Amount: 6800.0, Unit: USD}
+            ForecastedSpend: {Amount: 10500.0, Unit: USD}
+        - BudgetName: zero-spend-guardrail
+          BudgetType: COST
+          TimeUnit: MONTHLY
+          BudgetLimit: {Amount: 0.01, Unit: USD}
+          CostTypes: {IncludeTax: true, UseAmortized: false, IncludeDiscount: true}
+          CalculatedSpend:
+            ActualSpend: {Amount: 0.0, Unit: USD}
+            ForecastedSpend: {Amount: 0.0, Unit: USD}
+
+      Notifications for "monthly-total":
+        - NotificationType: ACTUAL
+          Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 50.0, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: SNS, Address: arn:aws:sns:us-east-1:555555555555:budget-alerts}]
+        - NotificationType: FORECASTED
+          Notification: {NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 80.0, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: SNS, Address: arn:aws:sns:us-east-1:555555555555:budget-alerts}]
+        - NotificationType: ACTUAL
+          Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 100.0, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: SNS, Address: arn:aws:sns:us-east-1:555555555555:budget-alerts}]
+
+      Notifications for "zero-spend-guardrail":
+        - NotificationType: ACTUAL
+          Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 100.0, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: SNS, Address: arn:aws:sns:us-east-1:555555555555:budget-alerts}]
+
+      SNS topic policy for arn:aws:sns:us-east-1:555555555555:budget-alerts:
+        {
+          "Version": "2008-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "budgets.amazonaws.com"},
+              "Action": "SNS:Publish",
+              "Resource": "arn:aws:sns:us-east-1:555555555555:budget-alerts"
+            }
+          ]
+        }
+
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "zero-spend-guardrail"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_BUDGET"
+        - "VERDICT: NO_ALERT"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: new-account-no-zero-spend
+    description: >-
+      A new sandbox account with one COST budget that has correct multi-
+      threshold alerting (50/80/100 ACTUAL+FORECASTED) and a valid SNS policy,
+      but no zero-spend guardrail budget. The alerting is fine; the gap is the
+      missing guardrail for catching unauthorized spend immediately on a new
+      account.
+    input: |
+      Audit reference: new-account-no-zero-spend
+      Account id: 666666666666
+      Account context: new sandbox account, provisioned last week, expected
+      minimal spend.
+
+      Budget inventory (aws budgets describe-budgets):
+        - BudgetName: monthly-total
+          BudgetType: COST
+          TimeUnit: MONTHLY
+          BudgetLimit: {Amount: 500.0, Unit: USD}
+          CostTypes: {IncludeTax: true, UseAmortized: false, IncludeDiscount: true}
+          CalculatedSpend:
+            ActualSpend: {Amount: 45.0, Unit: USD}
+            ForecastedSpend: {Amount: 180.0, Unit: USD}
+
+      Notifications for "monthly-total":
+        - NotificationType: ACTUAL
+          Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 50.0, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: SNS, Address: arn:aws:sns:us-east-1:666666666666:budget-alerts}]
+        - NotificationType: FORECASTED
+          Notification: {NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 80.0, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: SNS, Address: arn:aws:sns:us-east-1:666666666666:budget-alerts}]
+        - NotificationType: ACTUAL
+          Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 100.0, ThresholdType: PERCENTAGE}
+          Subscribers: [{SubscriptionType: SNS, Address: arn:aws:sns:us-east-1:666666666666:budget-alerts}]
+
+      SNS topic policy for arn:aws:sns:us-east-1:666666666666:budget-alerts:
+        {
+          "Version": "2008-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "budgets.amazonaws.com"},
+              "Action": "SNS:Publish",
+              "Resource": "arn:aws:sns:us-east-1:666666666666:budget-alerts"
+            }
+          ]
+        }
+
+      (Note: no zero-spend or low-spend guardrail budget exists in the
+      inventory.)
+
+      Emit the standard VERDICT block (ACCOUNT, VERDICT, REASON, FINDINGS,
+      REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "666666666666"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_BUDGET"
+        - "VERDICT: NO_ALERT"
