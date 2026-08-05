@@ -648,6 +648,13 @@ queuing. Standard topics have effectively unlimited throughput. Batch
 publish (`PublishBatch`) sends up to 10 messages per API call, but the
 aggregate rate limit still applies.
 
+## Recent AWS features (2024-2026)
+
+- **SNS message data protection (2024):** SNS now provides message data protection policies that can detect and block sensitive data (PII, financial data) in published messages. Auditors should verify that data protection policies are enabled on topics processing user-generated content.
+- **FIFO topic delivery status logging (2024-2025):** Enhanced delivery status logging for FIFO topics. Auditors should verify that delivery status logging is enabled — FIFO topics with missing delivery status logging can silently lose messages.
+- **Cross-region delivery improvements (2024):** SNS cross-region message delivery via AWS X-Ray tracing integration. No new audit-surface fields, but auditors should verify that cross-region SNS subscriptions have appropriate DLQs.
+- **SNS-to-SQS SSE-KMS consistency requirement (2024):** SNS topics and SQS subscriptions must use compatible KMS keys for SSE-KMS. Auditors should verify that the topic KMS key policy grants `kms:Decrypt` to the SQS queue's consumer role.
+
 ## Domain
 
 AWS CloudOps / App Integration Security & Compliance.

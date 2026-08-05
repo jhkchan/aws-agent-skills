@@ -958,6 +958,13 @@ applying any fix in bulk, run an audit-only pass:
   does not apply to this account's resource profile.
 - **Integration findings:** Route to the appropriate detector skill.
 
+## Recent AWS features (2024-2026)
+
+- **Security Hub central configuration (2024-2025):** Security Hub now supports central configuration management across an Organization, enabling consistent standard enablement and control configuration from the delegated administrator account. Auditors should verify that the central configuration policy is deployed and that member accounts have not locally overridden critical controls.
+- **Automated Security Response on AWS (2024):** The ASR solution provides pre-built EventBridge-to-SSM remediation playbooks for Security Hub findings. Auditors should verify that ASR playbooks are deployed for critical controls and that the SSM automation documents have scoped IAM roles.
+- **Control lifecycle updates (2024-2025):** Security Hub periodically updates control specifications and adds new controls. Auditors should verify that newly released controls are evaluated and that disabled controls are documented with justification.
+- **Security Hub integration with Audit Manager (2024):** Enhanced integration allowing Security Hub findings to feed Audit Manager evidence collection. Auditors should verify that the integration is configured for compliance frameworks that require evidence of continuous monitoring.
+
 ## Domain
 
 AWS CloudOps / Security Hub Compliance & Posture Management.

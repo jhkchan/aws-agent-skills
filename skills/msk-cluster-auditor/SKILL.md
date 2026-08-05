@@ -620,6 +620,13 @@ REMEDIATION:
    describe-cluster output — fetch separately with
    `aws kafka describe-configuration`).
 
+## Recent AWS features (2024-2026)
+
+- **MSK Serverless GA (2024):** MSK Serverless auto-scales capacity without managing brokers. Auditors should note that MSK Serverless changes the audit surface — there are no broker instances to audit (no broker public access, no per-broker logging). Instead, verify the serverless cluster's VPC configuration, IAM/TLS authentication, and Kafka version compatibility.
+- **MSK Connect updates (2024-2025):** Enhanced MSK Connect with more connector types and improved error handling. Auditors should verify that MSK Connect worker configurations use encrypted connections and that connector logs are enabled.
+- **KRaft mode (2024-2025):** MSK now supports KRaft (Kafka Raft) mode, eliminating the ZooKeeper dependency. Auditors should verify that KRaft-mode clusters have appropriate monitoring — ZooKeeper-specific metrics no longer apply.
+- **IAM authentication enhancements (2024):** Expanded IAM auth support for Kafka client connections. Auditors should verify that clusters enforce IAM or TLS client authentication and that `unauthenticated` access is disabled.
+
 ## Domain
 
 AWS CloudOps / MSK Analytics Security & Compliance.

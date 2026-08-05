@@ -838,6 +838,15 @@ with SigV4 and have `lambda:InvokeFunctionUrl` permission. This is
 incompatible with browser-based direct calls (browsers cannot sign SigV4
 requests without a backend).
 
+## Recent AWS features (2024-2026)
+
+- **Lambda MicroVM / isolated sandboxes (2025-2026):** AWS introduced MicroVM support for Lambda, providing isolated sandboxes with full lifecycle control. Auditors should verify that functions requiring stronger isolation (e.g., multi-tenant SaaS) use the MicroVM isolation level — this is a new configuration field to audit.
+- **SnapStart for Python and Ruby (2024-2025):** SnapStart (previously Java-only) now supports Python and Ruby runtimes. Auditors should verify that latency-sensitive Python/Ruby functions have SnapStart enabled, and that SnapStart initialization code does not cache stale credentials (a known SnapStart security consideration).
+- **Response streaming (2024):** Lambda response streaming via Function URLs allows sending partial responses before completion. Auditors should note that streaming functions with `AuthType: NONE` expose a public streaming endpoint — the same PUBLIC_EXPOSURE classification applies.
+- **New runtimes — python3.13, nodejs22.x (2024-2025):** The skill already tracks these in the supported-runtime table. Auditors should verify that new projects use the latest runtime and that deprecated runtimes are migrated on schedule.
+- **Lambda Web Adapter (2024):** Lambda Web Adapter allows running web frameworks (FastAPI, Express, Spring Boot) on Lambda. No new audit-surface fields, but auditors should note that Web Adapter functions may expose additional HTTP endpoints via Function URLs.
+- **Environment variable size increase (2024):** Lambda increased the total environment variable size limit from 4 KB to 8 KB. This does not change the audit logic but means auditors should be more vigilant about plaintext secrets in environment variables — the larger size makes it easier to embed secrets accidentally.
+
 ## Domain
 
 AWS CloudOps / Lambda Compute Security & Runtime Compliance.

@@ -1028,6 +1028,13 @@ contract):
    allow the purge to proceed. Document the deletion in the change
    management record.
 
+## Recent AWS features (2024-2026)
+
+- **Cross-account secret access (2024):** Secrets Manager now supports cross-account secret access via resource policies. Auditors should verify that cross-account access policies include `aws:SourceAccount` conditions and that only intended accounts can read secrets.
+- **Rotation strategy templates (2024-2025):** New rotation Lambda templates for additional database engines and third-party services. Auditors should verify that the rotation Lambda uses the latest template version and that custom rotation functions follow AWS best practices.
+- **Amazon Q integration (2024):** Secrets Manager integrates with Amazon Q Developers for secret detection in code. No direct audit-surface change, but auditors should verify that Q's scanning does not inadvertently expose secret values in logs.
+- **Secret replication across regions (2024):** Secrets can now be replicated across regions for DR. Auditors should verify that replicated secrets have equivalent KMS encryption in the destination region and that rotation status is consistent across replicas.
+
 ## Domain
 
 AWS CloudOps / Secrets Manager Security & Compliance.

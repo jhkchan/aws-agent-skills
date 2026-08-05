@@ -510,6 +510,13 @@ REMEDIATION:
 3. Verify the landing zone version is current:
    `aws controltower get-landing-zone` and compare `latestAvailableVersion`.
 
+## Recent AWS features (2024-2026)
+
+- **Control Tower extensible controls (2024-2025):** Control Tower now supports enabling third-party and custom detective controls beyond the built-in guardrails. Auditors should inventory all enabled controls (built-in + extensible) and verify that preventive controls are not silently overridden by SCP modifications.
+- **Landing Zone version updates (v3.3+, 2024-2025):** Each Landing Zone version adds new mandatory controls and SCP updates. Auditors should verify that the landing zone version is current — outdated versions may lack controls for newly launched AWS services.
+- **External governance (2024):** Control Tower can now be managed programmatically via APIs and CloudFormation. Auditors should verify that API-driven changes to controls are tracked via CloudTrail and that drift detection covers programmatic modifications.
+- **Proactive controls:** Control Tower introduced proactive controls that validate resource configurations before deployment. Auditors should verify that proactive controls are enabled for critical resource types.
+
 ## Domain
 
 AWS CloudOps / Control Tower Governance & Compliance.

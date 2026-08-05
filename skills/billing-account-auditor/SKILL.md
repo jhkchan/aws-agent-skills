@@ -631,6 +631,12 @@ REMEDIATION:
 2. Recommend periodic review of budget thresholds as spend patterns change.
 3. Recommend reviewing CAD anomaly reports weekly to tune thresholds.
 
+## Recent AWS features (2024-2026)
+
+- **AWS Billing Conductor updates (2024):** Billing Conductor now supports proportional splitting with CUR 2.0. Auditors should check whether Billing Conductor is enabled and whether the billing group pipeline is healthy — misconfigured billing conductors produce incorrect chargebacks.
+- **FOCUS-aligned billing (2025):** AWS introduced FOCUS-compatible cost data exports. Auditors should verify that cost reporting aligns with the FOCUS spec if the organization uses cross-cloud FinOps tooling.
+- **Cost Anomaly Detection improvements:** CAD now supports more granular dimensions and improved ML models. No new audit-surface fields, but auditors should re-evaluate anomaly detection thresholds after upgrades.
+
 ## Domain
 
 AWS CloudOps / FinOps Billing Governance & Account Security.

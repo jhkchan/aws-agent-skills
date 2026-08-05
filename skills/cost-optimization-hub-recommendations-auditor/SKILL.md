@@ -689,6 +689,12 @@ All-Up RI at 60% discount. RIGHT-SIZE to m5.large ($0.096/hr):
 
 The BEFORE_DISCOUNTS number is 5x the real incremental savings.
 
+## Recent AWS features (2024-2026)
+
+- **GA with expanded recommendation types (2024):** Cost Optimization Hub moved to GA with new recommendation types including EBS volume right-sizing, ECS task right-sizing, and Savings Plan exchange recommendations. Auditors should verify that all applicable recommendation types are enabled in the COH preferences.
+- **Resource-level filtering (2024-2025):** COH now supports resource-level and account-level filtering on recommendations. Auditors should verify that exclusions are documented and intentional — silently excluded resources can hide significant waste.
+- **Integration with AWS Compute Optimizer:** COH now aggregates Compute Optimizer findings directly. Auditors should cross-reference COH recommendations with Compute Optimizer findings to ensure consistency.
+
 ## Domain
 
 AWS FinOps / Cost Optimization Hub Configuration & Governance.

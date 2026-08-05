@@ -538,6 +538,12 @@ inherits through. The 5-SCP quota includes FullAWSAccess.
 - 5 SCPs per target (root, each OU, each account). Hard limit.
 - SCP document: 5,120 characters max (serialized JSON).
 
+## Recent AWS features (2024-2026)
+
+- **Declarative policy type (2024-2025):** Organizations introduced a new `DECLARATIVE` policy type alongside `TAG`, `BACKUP`, and `AISERVICES_OPT_OUT` policies. Declarative policies enforce configuration baselines across accounts. Auditors should verify that declarative policies are deployed for critical configuration baselines and that they do not conflict with existing Config rules.
+- **New SCP condition keys (2024-2025):** Additional condition keys available in SCPs including `aws:SourceOrgID`, `aws:SourceOrgPaths`, and region restriction keys. Auditors should verify that SCPs use the strongest available condition keys and that region-restriction SCPs cover all required services.
+- **SCP evaluation improvements (2024):** Enhanced SCP evaluation engine with better conflict resolution. No new audit-surface fields, but auditors should re-test SCP effectiveness after evaluation engine updates — previously ineffective SCP conditions may now work.
+
 ## Domain
 
 AWS CloudOps / Organizations Governance & Compliance.

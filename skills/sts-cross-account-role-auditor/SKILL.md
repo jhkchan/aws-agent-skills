@@ -1030,6 +1030,13 @@ attacker who assumes the role can actually do. Recommend adding a permissions
 boundary to any role classified as EXTERNAL_TRUST or WILDCARD_TRUST as an
 interim containment measure while the trust policy is being remediated.
 
+## Recent AWS features (2024-2026)
+
+- **STS session tagging (2024-2025):** STS now supports passing session tags during AssumeRole, enabling attribute-based access control. Auditors should verify that cross-account trust policies that accept session tags use `aws:RequestTag` conditions to constrain which tags can be assumed — an unconstrained session tag policy can be abused to bypass ABAC controls.
+- **External ID enforcement improvements (2024):** Enhanced confused-deputy protection guidance and API validation. Auditors should verify that all cross-account trust policies for third-party (SaaS vendor) roles include a strong `sts:ExternalId` condition — this remains the primary defense against confused-deputy attacks.
+- **IAM Access Analyzer integration with STS (2024):** Access Analyzer now flags cross-account trust policies that allow assumption without conditions. Auditors should cross-reference STS trust policy analysis with Access Analyzer external-access findings.
+- **Role chaining detection (2024-2025):** Enhanced CloudTrail logging for role chaining (AssumeRole followed by AssumeRole). Auditors should verify that role-chaining patterns (A assumes B which assumes C) are documented and that the effective trust boundary includes all intermediary roles.
+
 ## References
 
 See `references/trust-policy-hardening-guide.md` for the confused-deputy

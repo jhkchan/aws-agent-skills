@@ -590,6 +590,13 @@ Check `PermissionType` for each share. `CONTRIBUTOR` grants write access —
 the shared principal can modify answers. Restrict to `READ` unless active
 collaboration is intended.
 
+## Recent AWS features (2024-2026)
+
+- **Well-Architected Framework updates (2024-2025):** AWS published updates to the Well-Architected Framework including sustainability pillar refinements and machine learning lens updates. Auditors should verify that reviews use the latest framework version and that new best-practice questions are addressed.
+- **Custom lenses GA (2024):** Custom lenses allow organizations to define their own Well-Architected review questions. Auditors should verify that custom lenses are versioned, documented, and reviewed for alignment with organizational policies.
+- **Well-Architected Tool API enhancements (2024-2025):** Expanded API support for programmatic workload creation, milestone management, and report generation. Auditors should verify that API-driven workload updates are tracked and that milestone API calls are logged in CloudTrail.
+- **Integration with AWS Resilience Hub (2024):** Well-Architected Tool now integrates with Resilience Hub for reliability pillar deep-dives. Auditors should verify that reliability findings from Resilience Hub are incorporated into WA reviews.
+
 ## Domain
 
 AWS CloudOps / Well-Architected Governance & Review Compliance.

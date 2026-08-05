@@ -493,6 +493,13 @@ REMEDIATION:
 3. For production workloads, recommend a cross-region copy action if not
    already configured.
 
+## Recent AWS features (2024-2026)
+
+- **Logically air-gapped vaults (2024-2025):** AWS Backup now supports logically air-gapped vaults that are immutable and isolated from the source account. Auditors should check whether compliance-critical backups (financial, healthcare) use air-gapped vaults instead of standard vaults — this is a stronger control than vault lock alone.
+- **Continuous backups for more resource types:** Point-in-time recovery (PITR) continuous backup now supports Amazon EFS, FSx, and CloudFormation stacks in addition to EC2/EBS/DynamoDB. Auditors should verify that PITR is enabled for all supported resource types, not just EBS.
+- **Backup audit manager GA (2024):** Backup Audit Manager provides pre-built frameworks for backup compliance reporting. Auditors should check whether audit-manager frameworks are deployed alongside backup plans — the backup-plan audit and the audit-manager audit are complementary.
+- **Recovery point indexing and search (2025):** Backup vaults now support indexing for granular file-level recovery. This does not change the audit verdict but affects the remediation guidance — point operators to indexing for faster recovery point search.
+
 ## Domain
 
 AWS CloudOps / Backup, Recovery & Resilience Compliance.

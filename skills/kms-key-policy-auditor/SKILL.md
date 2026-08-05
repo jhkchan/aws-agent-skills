@@ -869,6 +869,14 @@ setting. Policy fixes must be applied to each replica via
 `aws kms describe-key` → `MultiRegionConfiguration` → replicate ARNs →
 apply per-replica. KMS does NOT sync key policies across replicas.
 
+## Recent AWS features (2024-2026)
+
+- **On-demand key rotation (2024):** KMS now supports on-demand key rotation for customer-managed keys in addition to the annual automatic rotation. Auditors should verify that critical keys have rotation enabled (either automatic or on-demand) — the `RotationEnabled` field in `describe-key` now reflects both automatic and on-demand rotations.
+- **HMAC key support GA (2024):** KMS now supports HMAC (Hash-based Message Authentication Code) keys (`KeySpec: HMAC_*`). Auditors should verify that HMAC key policies follow the same cross-account restrictions as encryption keys — an HMAC key with `Principal: "*"` is equally dangerous.
+- **External Key Store (XKS) updates (2024-2025):** XKS allows using external (on-premises) key material with KMS. Auditors should verify that XKS connectivity is healthy (the XKS proxy endpoint is reachable and authenticated) — an unreachable XKS means encryption/decryption operations silently fail.
+- **Multi-Region keys enhancements (2024):** Improved multi-region key replica management. Auditors should verify that multi-region primary keys have appropriate policy guards and that replica keys in other regions do not have broader policies than the primary.
+- **Key spec expansion (2024-2025):** New key specs including `RSA_4096`, `ML_*` (post-quantum hybrid key exchange for TLS). Auditors should verify that key specs match the encryption requirements — using RSA_2048 for workloads that require RSA_4096 is a compliance gap.
+
 ## Domain
 
 AWS CloudOps / KMS Encryption Security & Compliance.

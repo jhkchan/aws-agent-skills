@@ -1092,6 +1092,14 @@ WORST VERDICT: CRITICAL (from CryptocurrencyClient finding)
    a scanner IP that was authorized may become compromised. Review
    suppression filters quarterly.
 
+## Recent AWS features (2024-2026)
+
+- **Runtime Monitoring for ECS/EKS (2024-2025):** GuardDuty Runtime Monitoring provides runtime threat detection for ECS (Fargate and EC2) and EKS workloads, including new finding types like `RuntimeBehavior:ECS/AnomalousBehavior`, `RuntimeBehavior:EKS/AnomalousBehavior`, and `Trojan:ECS/*` / `Trojan:EKS/*`. Auditors should add these finding types to the Step 2/3 CRITICAL/HIGH lists — runtime malware detection on containers is a strong compromise signal.
+- **Malware Protection v2 (2024-2025):** Enhanced malware scanning for EBS volumes with faster scan times and broader file-system coverage. New finding types include `Trojan:EC2/SuspiciousFile` with improved hash-based detection. The skill already covers `SuspiciousFile` as HIGH.
+- **New detector types (2024-2025):** GuardDuty added new finding types including `Exfiltration:S3/AnomalousBehavior`, `Impact:S3/AnomalousBehavior`, and `DefenseEvasion:S3/*`. Auditors should verify that these finding types are not globally suppressed in archive filters — they represent high-value detections.
+- **Network-origin behavior analytics (2024):** Enhanced network behavior analytics that detect anomalous outbound connections patterns. No new finding-type strings, but the existing `UnauthorizedAccess:EC2/MaliciousIPCaller` detections now include broader threat-intel correlation.
+- **EKS Protection and RDS Protection (2024-2025):** GuardDuty now offers EKS Protection (runtime + API audit monitoring) and RDS Protection (brute-force detection for RDS). Auditors should verify these features are enabled on the detector.
+
 ## References
 
 - AWS GuardDuty finding types:

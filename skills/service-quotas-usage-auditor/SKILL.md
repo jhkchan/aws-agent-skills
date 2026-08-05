@@ -597,6 +597,12 @@ quotas via `list-service-quotas --account-id <id>` but CANNOT submit
 increase requests on their behalf — each member account must submit
 its own request.
 
+## Recent AWS features (2024-2026)
+
+- **Organization-level quota management (2024-2025):** Service Quotas now supports viewing and requesting quota increases across all accounts in an Organization from the management account. Auditors should verify that the management account has visibility into member-account quota utilization and that organization-level quota requests are tracked.
+- **Additional trackable quotas (2024):** More AWS services now expose `UsageMetric` data for Service Quotas tracking. Auditors should re-check quotas that were previously non-trackable — many have been updated with CloudWatch metrics.
+- **Quota increase request automation:** Enhanced API support for programmatic quota increase requests. No new audit-surface fields, but auditors should verify that automated quota requests have approval workflows (not auto-approved without review).
+
 ## Domain
 
 AWS CloudOps / Service Quotas Capacity Management & Monitoring.

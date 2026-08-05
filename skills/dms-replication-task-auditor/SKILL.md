@@ -519,6 +519,12 @@ REMEDIATION:
 3. Recommend a CloudWatch alarm on DMS task log filter patterns for `ERROR`
    and `WARNING` entries during migration.
 
+## Recent AWS features (2024-2026)
+
+- **DMS Serverless (2024):** DMS now offers a serverless deployment option that auto-scales capacity without pre-provisioning replication instances. Auditors should note that serverless DMS changes the audit surface — there is no replication instance to audit (no public-accessibility, single-AZ, or KMS checks on the instance). Instead, auditors should verify DMS Serverless configuration (max DCUs, VPC settings).
+- **Enhanced schema conversion (2024-2025):** DMS Schema Conversion (formerly SCT) is now integrated into the DMS console. No new audit-surface fields for the replication task itself.
+- **Replication config (2024):** DMS introduced a new `ReplicationConfig` API for serverless replications. Auditors should verify that the replication config has appropriate `ComputeConfig` settings (replication subnet group, VPC security group, KMS key).
+
 ## Domain
 
 AWS CloudOps / DMS Migration Security & Data Integrity.

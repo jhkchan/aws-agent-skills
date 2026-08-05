@@ -1013,6 +1013,14 @@ are non-negotiable:
 | LOW | Track in backlog; include in routine patching cycles. | Monthly/quarterly |
 | COVERED | No action. Verify coverage monitoring (CloudWatch/EventBridge on Inspector2 coverage changes). Recommend ECR enhanced scanning for long-lived images. | N/A |
 
+## Recent AWS features (2024-2026)
+
+- **Lambda function code scanning (2024):** Inspector now scans Lambda function code (not just packages) for vulnerabilities. This adds `LambdaFunctionCode` as a scan type. Auditors should verify that Lambda code scanning is enabled in the Inspector2 configuration — it is a separate enablement flag from Lambda package scanning.
+- **SBOM export (2024):** Inspector can now export Software Bill of Materials (SBOM) in CycloneDX format for EC2, ECR, and Lambda resources. Auditors should verify that SBOM export is configured for compliance-sensitive workloads.
+- **Amazon Q vulnerability remediation (2024-2025):** Inspector integrates with Amazon Q for AI-driven vulnerability remediation suggestions. No new audit-surface fields, but auditors should note that remediation tracking now includes Q-generated fix suggestions.
+- **Enhanced network reachability analysis (2024):** Inspector's network reachability analysis now includes broader coverage of security group configurations and ENI attachment states. Auditors should verify that network reachability findings are correlated with current security group state (not stale SG rules).
+- **Deep inspection GA (2024-2025):** Inspector Deep Inspection scans all packages on EC2 instances (not just OS-level). Auditors should verify that Deep Inspection is enabled for production instances — it requires SSM Agent and additional configuration.
+
 ## References
 
 - AWS Inspector2 Documentation: coverage statistics, finding types, and

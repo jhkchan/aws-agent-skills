@@ -670,6 +670,13 @@ An access point:
 | No (empty) | IAM alone governs — only principals with an IAM `elasticfilesystem:Client*` Allow can mount | Not possible without IAM policy (no resource policy to grant) |
 | Yes (attached) | Both filesystem policy and IAM evaluated — either can Allow, explicit Deny in either blocks | Both must Allow (intersection) — filesystem policy must explicitly grant the cross-account principal |
 
+## Recent AWS features (2024-2026)
+
+- **EFS Intelligent Tiering GA (2024):** EFS Intelligent-Tiering automatically moves infrequently accessed files to the Infrequent Access (IA) storage class. Auditors should verify that lifecycle policies are configured — without Intelligent Tiering, all files remain in Standard class at full cost.
+- **EFS automatic backups via AWS Backup (2024):** EFS now supports continuous backups via AWS Backup. Auditors should verify that EFS filesystems are enrolled in AWS Backup plans with continuous backup enabled (PITR).
+- **EFS access points enhancements (2024):** Access points now support more granular POSIX identity enforcement. Auditors should verify that access points are used for application access (rather than root-level mount targets) and that the access point root directory is scoped appropriately.
+- **EFS file system policy improvements:** Enhanced file system policy evaluation. Auditors should verify that file system policies do not grant `Principal: "*"` without restrictive conditions.
+
 ## Domain
 
 AWS CloudOps / EFS Storage Security & Compliance.

@@ -591,6 +591,14 @@ REMEDIATION:
 3. Recommend reviewing captured data quarterly to confirm sampling is
   representative.
 
+## Recent AWS features (2024-2026)
+
+- **Inference Components (2024):** SageMaker Inference Components allow deploying multiple models on a single endpoint with independent scaling. Auditors should verify that each model within an inference component has appropriate IAM permissions and that the container image is scanned for vulnerabilities.
+- **Zero-downtime endpoint updates (2024):** SageMaker now supports zero-downtime blue/green endpoint updates. Auditors should verify that production endpoints use rolling or blue/green update strategies rather than the default replace strategy.
+- **SageMaker HyperPod (2024-2025):** HyperPod provides managed distributed training clusters. Auditors should verify that HyperPod instances have encrypted EBS volumes, scoped execution roles, and appropriate VPC configuration.
+- **SageMaker Unified Studio (2025):** Unified Studio integrates SageMaker Studio, EMR, and data governance. Auditors should verify that Unified Studio's IAM domain roles are scoped appropriately and that data access is governed by Lake Formation.
+- **EKS-based SageMaker inference (2024):** SageMaker can now run inference workloads on EKS clusters. Auditors should verify that the EKS-based inference uses appropriate pod-level IAM and security policies.
+
 ## Domain
 
 AWS CloudOps / SageMaker AI/ML Security & Production Readiness.

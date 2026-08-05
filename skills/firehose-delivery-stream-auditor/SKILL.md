@@ -759,6 +759,13 @@ backup on the S3 staging/backup layer (Steps 1, 3, 5). Skip Step 2's
 size hints unless the destination exposes native buffering (most do
 in seconds only, not MiB).
 
+## Recent AWS features (2024-2026)
+
+- **Apache Iceberg support (2024-2025):** Firehose can now deliver data directly to Apache Iceberg tables in S3. Auditors should verify that Iceberg table destinations have appropriate KMS encryption and that the commit frequency is tuned for the workload.
+- **Snowflake and Redshift destination improvements (2024):** Enhanced Snowflake and Redshift destination support with improved buffering and error handling. Auditors should verify that destination credentials use Secrets Manager rather than plaintext.
+- **Microsoft Fabric / OneLake destination (2024-2025):** Firehose now supports Microsoft Fabric OneLake as a destination. Auditors should verify that cross-cloud credentials are scoped appropriately.
+- **Data transformation with Lambda — enhanced error handling:** Improved Lambda transformation error reporting with dead-letter queue support. The skill already covers this, but auditors should verify the DLQ is configured and monitored.
+
 ## Domain
 
 AWS CloudOps / Kinesis Data Firehose Analytics & Data-Protection.

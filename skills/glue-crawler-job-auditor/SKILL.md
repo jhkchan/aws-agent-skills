@@ -777,6 +777,13 @@ encryption before it is stored in the Glue internal state store. A job with
 `CSE-KMS` bookmarks that loses `kms:Decrypt` on the bookmark key fails at
 bookmark read — an operational break, not a security finding.
 
+## Recent AWS features (2024-2026)
+
+- **Glue 5.0 (Spark 3.5, Python 3.11) (2024-2025):** Glue now supports Spark 3.5 and Python 3.11 with Glue version 5.0. Auditors should verify that jobs are upgraded from Glue 3.0/4.0 — older versions may have unpatched vulnerabilities in their runtime.
+- **Glue Flex execution class (2024):** Glue Flex uses spare compute capacity at a lower cost. Auditors should verify whether production jobs use Flex (which can be interrupted) vs Standard execution — Flex is appropriate for batch/non-critical jobs only.
+- **Glue Data Quality GA (2024):** Glue Data Quality enables automated data quality rules on catalog tables. Auditors should verify that data quality rules are configured for regulated datasets and that rule evaluation failures trigger alerts.
+- **Cross-account catalog sharing improvements (2024):** Enhanced Lake Formation cross-account catalog sharing. Auditors should verify that Glue crawlers accessing cross-account catalogs have appropriate Lake Formation grants.
+
 ## Domain
 
 AWS CloudOps / Glue Analytics Security & Compliance.

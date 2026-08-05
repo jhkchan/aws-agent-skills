@@ -725,6 +725,13 @@ Step 1 (NO_RETENTION) once the data is confirmed.
      subscription filter to a security-tooling account with a
      destination policy scoped via `aws:SourceAccount`.
 
+## Recent AWS features (2024-2026)
+
+- **CloudWatch Logs Infrequent Access log class (2024):** Logs now supports an `STANDARD` vs `INFREQUENT_ACCESS` log class. Auditors should verify that high-volume, low-query log groups (e.g., VPC Flow Logs, audit trails) are assigned to the Infrequent Access class for cost optimization, and that the log class is intentional — not silently defaulted.
+- **Account-level data protection policies (2024):** CloudWatch Logs now supports account-level data protection policies that mask sensitive data (PII, credentials) in log events. Auditors should verify that data protection policies are enabled, especially for log groups ingesting application logs that may contain PII.
+- **CloudWatch Logs data lifecycle (2025):** Integrated lifecycle management that can transition logs to S3, Glacier, or delete based on policies. Auditors should check whether the lifecycle policy aligns with compliance retention requirements.
+- **Subscription filter improvements (2024):** Enhanced subscription filter support with Kinesis Data Firehose destination and cross-account delivery. Auditors should verify that subscription filter fan-out does not create silent data-loss vectors when destinations are misconfigured.
+
 ## Domain
 
 AWS CloudOps / Management & Governance — CloudWatch Logs cost, security,

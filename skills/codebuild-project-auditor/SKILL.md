@@ -840,6 +840,13 @@ in a README) can fetch the latest build status indefinitely. Revoking
 access requires disabling the badge (`badgeEnabled: false`), which
 breaks any embedded references.
 
+## Recent AWS features (2024-2026)
+
+- **macOS build environments (2024):** CodeBuild now supports macOS (mac1) fleet instances for iOS/macOS application builds. Auditors should note that macOS fleets have different networking and IAM considerations — they run on dedicated hardware and may have different VPC attachment behavior.
+- **GitLab integration (2024):** CodeBuild can now use GitLab as a source provider via CodeStar Connections. Auditors should verify that the connection ARN is scoped appropriately and that the source credential does not use long-lived tokens.
+- **Lambda compute for builds (2024-2025):** CodeBuild now supports Lambda-based builds for lightweight, fast execution. This changes the audit surface for VPC networking — Lambda-based builds use VPC configuration differently from EC2-based builds.
+- **Fleet VPC support (2024):** CodeBuild fleets now support VPC attachment. Auditors should verify that builds accessing private resources have fleet VPC configuration and that the fleet security group does not expose unnecessary ports.
+
 ## Domain
 
 AWS CloudOps / Developer Tools (CodeBuild) Security & Compliance.

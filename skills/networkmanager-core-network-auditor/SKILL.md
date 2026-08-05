@@ -600,6 +600,12 @@ REMEDIATION:
    and `CoreNetworkPolicyChange` events.
 3. Verify LATEST equals LIVE after every policy commit.
 
+## Recent AWS features (2024-2026)
+
+- **Core Network policy versioning and rollback (2024):** Core network policies now support versioned changes with rollback capability. Auditors should verify that the LATEST policy version matches the LIVE policy version — a mismatch indicates an unexecuted change.
+- **Cloud WAN resource policy enhancements (2024-2025):** Improved cross-account resource policies for core network attachments. Auditors should verify that resource policies include `aws:SourceAccount` conditions for cross-account attachments.
+- **Segment actions and route table improvements (2024):** Enhanced segment actions with more granular routing controls. Auditors should verify that `segment-actions` with `share-with` do not inadvertently allow cross-segment traffic that should be isolated.
+
 ## Domain
 
 AWS CloudOps / Network Manager (Cloud WAN) Core Network Security and Compliance.

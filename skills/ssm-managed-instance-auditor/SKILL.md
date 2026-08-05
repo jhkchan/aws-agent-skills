@@ -836,6 +836,14 @@ instance subnet.
 An agent older than v2.3.12.0 cannot do Session Manager regardless of
 IAM — flag as CONFIG_GAP even if `PingStatus: Active`.
 
+## Recent AWS features (2024-2026)
+
+- **SSM Quick Setup (2024):** Quick Setup provides pre-configured SSM baselines (patch policies, session manager, inventory) deployable via CloudFormation. Auditors should verify that Quick Setup configurations match organizational baselines and that Quick Setup-managed resources are not locally overridden.
+- **Session Manager port forwarding and SSH proxy (2024-2025):** Enhanced Session Manager with native SSH proxy support and port forwarding without requiring bastion hosts. Auditors should verify that Session Manager logging is enabled for port-forwarding sessions — without logging, port-forwarding creates an unmonitored access path.
+- **Hybrid Activator (2024):** SSM Hybrid Activator enables on-premises servers and edge devices to be managed by SSM. Auditors should verify that hybrid-activated instances have appropriate IAM service roles and that the activation code is not shared across environments.
+- **Patch baseline enhancements (2024-2025):** Enhanced patch baselines with Amazon Linux 2023 support, Debian/Ubuntu package manager improvements, and patch compliance reporting. Auditors should verify that patch baselines cover all managed OS types in the fleet.
+- **SSM Document versioning (2024):** SSM Documents now support versioning. Auditors should verify that association documents reference a specific version (not `$LATEST`) for production stability.
+
 ## Domain
 
 AWS CloudOps / Systems Manager Operational Posture & Compliance.

@@ -920,6 +920,12 @@ queries if noise was added before the failure.
 The collaboration config shows only the ARN; state is fetched
 separately via `cleanroomsml get-configured-audience-model`.
 
+## Recent AWS features (2024-2026)
+
+- **ID mapping tables (2024-2025):** Clean Rooms now supports ID mapping tables for identity resolution across collaborators without exposing raw PII. Auditors should verify that ID mapping tables are properly configured and that the collaboration's privacy budget accounts for mapping queries.
+- **Differential privacy enhancements (2024):** Expanded differential privacy controls with per-analysis epsilon tracking and aggregate constraints. Auditors should verify that epsilon budgets are appropriate for the collaboration's query volume and that epsilon spend is monitored.
+- **ML model collaboration (2024-2025):** Clean Rooms now supports collaborative ML training. This adds a new audit dimension — verify that model training queries are bounded by the privacy budget and that model artifacts do not leak raw data.
+
 ## Domain
 
 AWS CloudOps / Clean Rooms Collaboration Privacy & Compliance.

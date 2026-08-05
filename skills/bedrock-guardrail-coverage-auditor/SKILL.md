@@ -503,6 +503,13 @@ deployments require creating the guardrail in each region independently.
 Cross-region inference profiles evaluate the guardrail in the invocation
 region, not the model's home region.
 
+## Recent AWS features (2024-2026)
+
+- **Guardrails GA and enhanced (2024-2025):** Bedrock Guardrails moved from preview to GA with new policy types: contextual grounding control (grounding and relevance filters), denied topics, content filters (hate, insult, sexual, violence), word filters, and sensitive information filters (PII and regex). Auditors must check whether all applicable policy types are configured, not just content filters.
+- **Cross-region inference profiles (2024):** Guardrails now evaluate on cross-region inference profiles in the invocation region. Auditors should verify that guardrail coverage follows models deployed via inference profiles — a guardrail created in one region may not protect a model invoked through a cross-region profile.
+- **Guardrail versioning (2024-2025):** Guardrails support versioned drafts (DRAFT vs READY). Auditors should check that production applications reference a READY-published guardrail version, not a DRAFT, and that outdated versions are cleaned up.
+- **Application-level guardrail bypass:** Bedrock applications (Agents, Knowledge Bases) can reference guardrails. Auditors should verify that every model-invoking application has a guardrail attached — the audit surface includes not just standalone models but Agents, Knowledge Bases, and inference profiles.
+
 ## Domain
 
 AWS CloudOps / Bedrock Generative AI Safety & Compliance.

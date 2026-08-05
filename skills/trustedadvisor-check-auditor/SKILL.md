@@ -809,6 +809,13 @@ setup before relying on the management account's TA data.
 | **Performance** | High Performance Assurance, EC2 Instance Optimization, EBS I/O Performance | WARNING_CHECK |
 | **Service Limits** | EC2 Instance Limit, VPC Limit, EBS Volume Count, Auto Scaling Groups, IAM Roles | Step 3 (graduated) |
 
+## Recent AWS features (2024-2026)
+
+- **Trusted Advisor recommendations API GA (2024):** The Trusted Advisor recommendations API is now available to all customers (previously Business/Enterprise only). Auditors should verify that the API is integrated with monitoring/automation systems and that recommendation refresh is scheduled.
+- **Organization-level checks (2024-2025):** Trusted Advisor now provides organization-wide check aggregation from the management account. Auditors should verify that the management account can access all member-account check results and that consolidated reports are generated.
+- **New check categories (2024):** Additional checks for newer AWS services and best practices. Auditors should verify that check exclusion lists do not silently disable newly added checks.
+- **Integration with Cost Optimization Hub (2024):** Trusted Advisor cost checks now feed into COH recommendations. Auditors should cross-reference TA cost checks with COH to ensure consistency.
+
 ## Domain
 
 AWS CloudOps / Trusted Advisor Governance & Operational Excellence.

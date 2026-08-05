@@ -886,6 +886,10 @@ production Audit Manager estates.
   one full cycle before re-reading compliance% — re-auditing during the
   propagation window produces a false `INCOMPLETE_EVIDENCE`.
 
+## Recent AWS features (2024-2026)
+
+No significant recent feature launches affecting the audit surface as of 2026-08. Audit Manager's core functionality (assessments, frameworks, delegations, evidence collection) has been stable with no new configuration fields or security settings that change the audit logic.
+
 ## Domain
 
 AWS CloudOps / Audit Manager Governance & Compliance Evidence Integrity.

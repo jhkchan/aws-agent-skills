@@ -627,6 +627,12 @@ Optimizer's Lambda recommendations model this trade-off, but always verify
 with `aws lambda get-function` and CloudWatch Duration metrics
 post-change.
 
+## Recent AWS features (2024-2026)
+
+- **EBS volume recommendations (2024):** Compute Optimizer now provides right-sizing recommendations for EBS volumes (gp2 to gp3, io1 to io2, size adjustments). Auditors should include EBS findings in the cost-optimization review alongside EC2 and Lambda.
+- **Enhanced finding filters and trade-off analysis (2024-2025):** Compute Optimizer now supports filtering by workload metadata and trade-off analysis between cost and performance risk. Auditors should verify that the finding confidence and performance-risk thresholds are appropriate before acting on recommendations.
+- **ECS service recommendations (2024):** Compute Optimizer now provides right-sizing recommendations for ECS services (CPU and memory task-size optimization). Auditors should include ECS task-definition findings in the optimization review.
+
 ## Domain
 
 AWS CloudOps / Compute Cost Optimization & Right-Sizing.

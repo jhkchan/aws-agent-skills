@@ -796,6 +796,13 @@ in the custom parameter group (same workflow as require_ssl).
 5. For multi-AZ clusters, verify the `MultiAZ` deployment status is
    still in sync across AZs.
 
+## Recent AWS features (2024-2026)
+
+- **Redshift Serverless GA and enhanced (2024-2025):** Redshift Serverless auto-scales compute based on workload. Auditors should note that Serverless workgroups have a different audit surface than provisioned clusters — verify encryption, VPC security groups, and `maxRPU` (base capacity) settings at the workgroup level.
+- **Zero-ETL integration with Aurora (2024-2025):** Redshift now supports Zero-ETL integration that replicates Aurora data to Redshift automatically. Auditors should verify that the Zero-ETL integration IAM role is scoped appropriately and that data replication does not bypass encryption requirements.
+- **Data sharing enhancements (2024):** Improved cross-namespace and cross-account data sharing. Auditors should verify that data share consumers have appropriate Lake Formation or Redshift-scoped permissions and that consumer namespaces are documented.
+- **Redshift ML improvements (2024):** Enhanced SageMaker integration for ML model creation from Redshift. Auditors should verify that the Redshift-SageMaker IAM role does not have wildcard permissions.
+
 ## Related skills
 
 - **kms-key-policy-auditor:** audit the KMS key policy when a

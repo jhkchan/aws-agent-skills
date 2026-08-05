@@ -707,6 +707,14 @@ noted in the verdict reason when observed:
   internet, but it widens in-account blast radius if the VPC is shared
   (transit-gateway peering, shared subnets). Note as defense-in-depth.
 
+## Recent AWS features (2024-2026)
+
+- **S3 directory buckets for analytics (2024-2025):** S3 directory buckets (`AWS::S3Express::DirectoryBucket`) provide single-digit-millisecond latency for analytics workloads. These have a different bucket-level BPA model — auditors should verify that directory bucket access controls are equivalent to standard buckets and that directory bucket policies do not grant public access.
+- **S3 Access Grants (2024):** S3 Access Grants provides identity-based access management for S3 data, simplifying permission management at scale. Auditors should verify that Access Grants instances are configured with scoped locations and that the IAM role for Access Grants is least-privilege.
+- **S3 Tables (2024-2025):** S3 Tables provide managed tabular storage (Apache Iceberg) directly in S3. Auditors should verify that table bucket policies follow the same BPA and encryption standards as standard buckets.
+- **New storage classes — S3 Express One Zone (2024):** `EXPRESS_ONE_ZONE` storage class for low-latency workloads. No audit-surface change for access control, but auditors should note that Express One Zone is single-AZ — verify that data durability requirements accommodate single-zone storage.
+- **S3 Object Versioning default behavior changes (2024-2025):** AWS is moving toward enabling S3 Object Versioning by default on new buckets. Auditors should verify that versioning is intentionally enabled or disabled (not silently defaulted) and that lifecycle rules handle versioned objects.
+
 ## References
 
 - `references/bpa-settings-and-cli-commands.md` — full BPA enablement

@@ -742,6 +742,14 @@ AWS documentation — they come from operating WAFv2 at scale:
 3. Review sampled requests quarterly to detect new false-positive patterns
    and emerging attack signatures.
 
+## Recent AWS features (2024-2026)
+
+- **Bot Control API (2024):** AWS WAF Bot Control now exposes API-based bot classification and reputation scoring. Auditors should verify that Bot Control managed rule groups are deployed on public-facing Web ACLs and that the rule group uses `BLOCK` (not `COUNT`) for known bot categories.
+- **CAPTCHA and Challenge action enhancements (2024-2025):** WAF CAPTCHA and Challenge actions now support more configuration options including interstitial page customization and mobile SDK support. Auditors should verify that CAPTCHA/Challenge actions are used on sensitive endpoints (login, registration) and that the challenge timeout is appropriate.
+- **Rate-based rule improvements (2024):** Rate-based rules now support custom keys (header, query parameter, cookie) for more granular rate limiting. Auditors should verify that rate-based rules use the correct aggregation key — a rate rule keyed on `ip` may miss attackers behind a shared NAT, while a rule keyed on a session header may be bypassed by rotating headers.
+- **ATP (Account Takeover Protection) updates (2024-2025):** Enhanced ATP with credential checking against known-breached password databases and suspicious login pattern detection. Auditors should verify that ATP managed rule groups are deployed on authentication endpoints.
+- **WAF integration with CloudFront and API Gateway (2024):** Expanded WAF integration with support for more request inspection points. Auditors should verify that WAF Web ACLs are attached to both CloudFront distributions and API Gateway stages for defense-in-depth.
+
 ## References
 
 See `references/managed-rule-group-reference.md` for the full managed rule

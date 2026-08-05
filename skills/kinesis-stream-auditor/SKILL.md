@@ -751,6 +751,12 @@ This gives a 20% buffer before data loss begins.
   managed by AWS). Customer-managed CMKs support rotation via
   `aws kms enable-key-rotation`.
 
+## Recent AWS features (2024-2026)
+
+- **On-demand capacity mode updates (2024-2025):** On-demand streams now support higher throughput limits and automatic capacity adaptation. Auditors should verify that on-demand streams are not over-provisioned for workloads that have steady, predictable throughput (provisioned mode would be cheaper).
+- **Enhanced fan-out consumer improvements (2024):** Enhanced fan-out now supports more consumers per stream (up to 20). Auditors should verify that consumer count is within limits and that consumers have appropriate CloudWatch alarms on `IteratorAgeMilliseconds`.
+- **Stream consumer checkpointing via KCL:** Enhanced Kinesis Client Library (KCL) support for checkpointing. No new audit-surface fields, but auditors should verify that consumers have proper checkpoint strategies to avoid data reprocessing.
+
 ## Domain
 
 AWS CloudOps / Kinesis Data Streams Security, Cost, and Operational Auditing.

@@ -644,6 +644,13 @@ REMEDIATION:
 2. Recommend periodic re-audit when rules or targets are added.
 3. Verify DLQ alarms are wired to an operational response channel.
 
+## Recent AWS features (2024-2026)
+
+- **EventBridge global endpoints GA (2024):** Global endpoints provide automatic failover for event buses across regions. Auditors should verify that the global endpoint's secondary bus has equivalent security configuration (bus policy, KMS encryption, DLQ) as the primary.
+- **EventBridge Scheduler (2024-2025):** EventBridge Scheduler is a separate service for managed scheduled events. Auditors should verify that scheduler targets have scoped IAM roles and that the schedule does not inadvertently trigger public endpoints.
+- **Schema registry updates (2024):** Enhanced schema registry with OpenAPI and JSON Schema support. No new audit-surface fields.
+- **Cross-account event bus enhancements (2024):** Improved cross-account PutEvents support with resource-based policy evaluation. Auditors should verify that cross-account bus policies include `aws:SourceAccount` conditions.
+
 ## Domain
 
 AWS CloudOps / EventBridge Security & App Integration.

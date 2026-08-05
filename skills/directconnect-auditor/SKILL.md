@@ -797,6 +797,12 @@ and re-audit. If the issue persists, the API response was truncated mid-stream.
 3. Recommend a quarterly diversity review: new DX locations may have opened
    closer to your DC, enabling tighter RTOs.
 
+## Recent AWS features (2024-2026)
+
+- **MACsec GA on more locations and device types (2024):** MACsec link encryption is now available on additional DX locations and MAC-capable devices. Auditors should re-check whether connections that previously could not enable MACsec now support it — the location list has expanded significantly.
+- **CloudWatch monitoring for Direct Connect (2024):** Enhanced CloudWatch metrics for DX connections including per-VIF metrics and connection health insights. Auditors should verify that CloudWatch alarms are configured on connection state changes and BGP flap events.
+- **Direct Connect Gateway enhancements (2024-2025):** Improved DX Gateway with support for more VIFs and transit VIF integration. No new audit-surface fields, but auditors should verify that transit gateway associations use the correct allowed prefixes.
+
 ## Domain
 
 AWS CloudOps / Hybrid Networking Resilience & Compliance.

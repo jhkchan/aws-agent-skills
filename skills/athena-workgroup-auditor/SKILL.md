@@ -904,6 +904,13 @@ Configuration. Treat Spark workgroups as a separate audit surface
 (the verdict categories still apply, but the DSL evaluation is
 skipped in favor of Spark sizing checks).
 
+## Recent AWS features (2024-2026)
+
+- **Athena capacity reservations (2024):** Workgroups can now be associated with capacity reservations for predictable query throughput. Auditors should check whether a workgroup has a capacity reservation attached and whether it matches expected workloads — unreserved workgroups may face throttling under concurrency limits.
+- **Athena Spark and notebook workgroups (2024-2025):** Spark-enabled workgroups have different engine configurations than standard SQL workgroups. The BytesScannedCutoffPerQuery limit does not apply to Spark workgroups — instead, DPU limits apply. Auditors must check the engine version and apply the correct cost-control dimension.
+- **Parameterized queries (2024):** Named queries can now accept parameters. This does not change the audit surface but means that IAM policy evaluation on `athena:StartQueryExecution` may need to account for parameterized query execution.
+- **Cross-account workgroup queries:** Athena now supports cross-account access to workgroups via Lake Formation cross-account grants. Auditors should verify that cross-account workgroup access is intentional and bounded by Lake Formation permissions.
+
 ## Domain
 
 AWS CloudOps / Athena Analytics Security, Cost Control & Compliance.

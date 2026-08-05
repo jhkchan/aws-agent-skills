@@ -703,6 +703,12 @@ organizations using AWS Organizations cost hierarchy, the
 `BillingViewArn` field scopes a CUR to a specific billing view (a
 subset of linked accounts).
 
+## Recent AWS features (2024-2026)
+
+- **CUR 2.0 with FOCUS spec support (2024-2025):** AWS introduced CUR 2.0 with alignment to the FinOps Open Cost and Usage Specification (FOCUS). Auditors should verify that CUR 2.0 reports are configured for cross-cloud FinOps tooling compatibility — the schema differs from CUR 1.0.
+- **Hourly refresh improvements:** CUR delivery now supports more reliable hourly refresh. Auditors should verify that the report version and refresh cadence meet the organization's FinOps requirements.
+- **Athena integration with CUR 2.0:** Athena integration now works with CUR 2.0 format. Auditors should verify that Athena table DDL matches the CUR version in use.
+
 ## Domain
 
 AWS CloudOps / FinOps — Cost Visibility and Data Pipeline Health.

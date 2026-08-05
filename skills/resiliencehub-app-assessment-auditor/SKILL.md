@@ -826,6 +826,13 @@ These are distinct signals:
 Both are staleness signals, but they have different root causes and
 different detection paths.
 
+## Recent AWS features (2024-2026)
+
+- **Resilience Hub Terraform support (2024):** Resilience Hub now supports Terraform as an app template source. Auditors should verify that the Terraform template version matches the deployed infrastructure — template drift means the assessment does not reflect reality.
+- **Enhanced assessment scheduling (2024-2025):** Improved assessment scheduling with scheduled re-assessment and drift detection. Auditors should verify that assessments are scheduled to re-run after infrastructure changes, not just on a fixed calendar.
+- **New resiliency policy tiers:** Additional policy tiers and RTO/RPO calibration options. Auditors should verify that the resiliency policy matches the application's actual business-criticality tier.
+- **Integration with Amazon Q (2024-2025):** AI-driven resiliency recommendations. No new audit-surface fields.
+
 ## Domain
 
 AWS CloudOps / Resilience Hub Application Resiliency & Compliance.

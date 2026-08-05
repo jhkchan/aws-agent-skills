@@ -713,6 +713,13 @@ post-remediation validation, but do not change the verdict classification:
   scales. NLB is the only choice when static IPs are required — but migrating
   ALB→NLB loses WAF, content-based routing, and HTTP-level features.
 
+## Recent AWS features (2024-2026)
+
+- **TLS 1.3 support on ALB (2024):** ALB now supports TLS 1.3 for listener connections. Auditors should verify that the security policy is updated to include TLS 1.3 while maintaining a minimum of TLS 1.2.
+- **mTLS on NLB (2024-2025):** NLB now supports mutual TLS (mTLS) for TCP listeners. Auditors should verify that mTLS is enabled on NLBs fronting internal APIs and that certificate revocation checking is configured.
+- **ALB routing enhancements (2024):** Weighted routing, hostname-based routing, and query-string-based routing improvements. No new audit-surface fields, but auditors should verify that routing rules do not inadvertently bypass WAF rules on specific paths.
+- **Capacity reservations integration:** ALB integration with Capacity Reservations for more predictable scaling. No direct audit-surface change.
+
 ## Domain
 
 AWS CloudOps / ELBv2 Load Balancer Security & Compliance.

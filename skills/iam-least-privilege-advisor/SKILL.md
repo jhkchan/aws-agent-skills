@@ -644,6 +644,13 @@ API usage:
 - Factor common action+resource pairs into a reusable managed policy.
 - If the policy is CloudTrail-derived, partition by event source.
 
+## Recent AWS features (2024-2026)
+
+- **IAM Access Analyzer unused-access GA (2024):** Access Analyzer's unused-access analysis is now GA, generating findings for unused IAM roles, access keys, passwords, permissions, and SCPs. This directly supports the least-privilege audit — auditors should cross-reference unused-access findings with the IAM policy analysis to identify both over-broad AND unused permissions.
+- **Identity Center (SSO) updates (2024-2025):** AWS IAM Identity Center received enhanced permission set management and application assignment features. Auditors should verify that Identity Center permission sets do not include wildcard actions and that application assignments are scoped to necessary principals only.
+- **New condition keys (2024-2025):** AWS added new global condition keys including `aws:SourceOrgID`, `aws:SourceOrgPaths`, and enhanced `aws:CalledVia` / `aws:CalledViaFirst` / `aws:CalledViaLast`. Auditors should verify that policies use the strongest available condition key for service-to-service integrations.
+- **Session policies and permissions boundaries awareness:** The analysis should account for permissions boundaries and session policies when computing effective permissions — an over-permissive IAM policy may be mitigated by a boundary. However, the absence of a boundary means the IAM policy IS the effective permission.
+
 ## References
 
 See `references/policy-analysis-guide.md` for the wildcard pattern reference

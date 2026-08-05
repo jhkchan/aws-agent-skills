@@ -873,6 +873,14 @@ queryable via `describe-task-definition` until deregistered. This means:
 | `DAC_READ_SEARCH` | `open_by_handle_at` to read any file on the host filesystem bypassing permissions |
 | `SYS_RAWIO` | Direct disk I/O — can read/write raw blocks, bypassing the filesystem layer |
 
+## Recent AWS features (2024-2026)
+
+- **EBS volumes for ECS tasks (2024):** ECS tasks can now mount EBS volumes in addition to EFS. This changes the audit surface — auditors should verify that EBS volumes attached to ECS tasks are encrypted and that the task role has scoped KMS permissions.
+- **Fargate EFA support (2024-2025):** AWS Fargate now supports Elastic Fabric Adapter (EFA) for HPC/ML workloads. Auditors should verify that EFA-enabled tasks are placed on instances that support EFA and that the security group allows EFA traffic.
+- **Deployment circuit breaker (2024):** ECS deployment circuit breaker automatically rolls back failed deployments. Auditors should verify that the circuit breaker is enabled on production services — without it, a bad deployment stays in place requiring manual intervention.
+- **Service Connect (2024):** ECS Service Connect provides built-in service discovery and load balancing. Auditors should verify that Service Connect configurations do not bypass security group controls and that inter-service traffic is properly encrypted.
+- **Health check policy (2024-2025):** Enhanced health check policies with graceful shutdown support. Auditors should verify that `deregistrationDelay` and `healthCheckGracePeriod` are tuned for the workload — too short causes premature termination, too long delays rollback.
+
 ## Domain
 
 AWS CloudOps / ECS Compute Security & Container Hardening.

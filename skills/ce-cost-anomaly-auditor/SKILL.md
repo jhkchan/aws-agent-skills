@@ -547,6 +547,11 @@ FinOps benchmark, not arbitrary:
   point and over-alerts. This is documented behaviour, not a
   misconfiguration.
 
+## Recent AWS features (2024-2026)
+
+- **Improved anomaly detection ML model (2024-2025):** Cost Anomaly Detection upgraded its detection model with more granular dimension support and reduced false-positive rates. Auditors should re-evaluate subscription thresholds after model upgrades — the old thresholds may produce different alert patterns with the new model.
+- **Daily vs hourly anomaly evaluation:** CAD now supports hourly evaluation cadence for more responsive detection. Auditors should verify that critical accounts use hourly cadence rather than daily, as the skill recommends.
+
 ## Domain
 
 AWS CloudOps / FinOps Cost Visibility & Commitment Strategy.

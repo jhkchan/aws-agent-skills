@@ -632,6 +632,13 @@ recovered AZ and terminates extras in other AZs. This can temporarily exceed
 is suspended, the ASG does not rebalance after AZ failures — capacity remains
 uneven until manual intervention.
 
+## Recent AWS features (2024-2026)
+
+- **Instance maintenance policy (2024):** ASGs now support an instance maintenance policy that defines behavior (STOP, TERMINATE, or WAIT) during infrastructure events. Auditors should check whether critical ASGs have this policy configured — without it, AWS may take default actions that disrupt workloads during scheduled maintenance.
+- **Warm pools GA (2024):** Warm pools keep pre-initialized instances ready to scale out faster. Auditors should verify that warm pool size and min/max limits are appropriate — a misconfigured warm pool can silently drain capacity budget without serving traffic.
+- **Predictive scaling v2 (2024-2025):** Enhanced predictive scaling with custom metric specifications and forecast-only mode. Auditors should check whether predictive scaling is enabled for stateful ASGs with predictable traffic patterns, and whether the custom metric pair (load vs utilization) is correctly configured.
+- **Capacity rebalance GA:** The skill already covers this, but note that capacity rebalance is now the recommended setting for Spot-backed ASGs — without it, Spot interruptions can cause cascading failures when replacement instances launch after the old ones are marked for termination.
+
 ## Domain
 
 AWS CloudOps / Compute Elasticity & Auto Scaling Health.

@@ -723,6 +723,13 @@ REMEDIATION:
 3. Verify conformance pack deployments remain in `CREATE_COMPLETE` or
    `UPDATE_COMPLETE` status.
 
+## Recent AWS features (2024-2026)
+
+- **New resource types for recording (2024-2025):** AWS Config now supports recording for many additional resource types (S3 directory buckets, VPC Lattice resources, Clean Rooms, Bedrock resources). Auditors should verify that `allSupported=true` is set to automatically capture new resource types, or manually add newly relevant types to the recording scope.
+- **Config conformance pack updates (2024):** New sample conformance packs for compliance frameworks. Auditors should verify that deployed conformance packs match the organization's active compliance requirements and are not stale.
+- **Organization config aggregator enhancements:** Improved multi-account aggregation with better error reporting. Auditors should verify that the aggregator includes all organization accounts and that authorization errors are resolved.
+- **Config rule evaluation frequency:** Enhanced support for periodic evaluation intervals. Auditors should verify that critical rules use appropriate evaluation frequency — over-triggered periodic rules consume Lambda budget, while under-triggered rules miss configuration drift.
+
 ## Domain
 
 AWS CloudOps / Config Governance & Compliance Coverage.

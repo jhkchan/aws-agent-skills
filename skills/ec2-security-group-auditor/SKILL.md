@@ -660,6 +660,12 @@ For **RESTRICTED** security groups:
   changing the SG rule.
 - Recommend enabling VPC Flow Logs for ongoing auditing.
 
+## Recent AWS features (2024-2026)
+
+- **Security group VPC associations (2024):** Security groups can now be associated with specific VPCs, and VPC-scoped security groups can be shared across accounts via RAM. Auditors should verify that cross-account shared security groups do not inadvertently grant inbound exposure to unexpected principals.
+- **VPC Lattice security policy integration (2024-2025):** VPC Lattice uses its own authorization model but interacts with security groups. Auditors should note that Lattice-managed traffic may not appear in standard security group rule evaluation — verify that Lattice target groups have appropriate authorization policies.
+- **Prefix list improvements (2024):** Managed prefix lists now support more entries and customer-managed prefix lists can be shared across accounts. Auditors should verify that shared prefix lists are governed — a compromised prefix list can silently widen security group ingress.
+
 ## Section taxonomy (CloudOps auditor pattern)
 
 **Pattern:** CloudOps Auditor — `Mindset → Process → Reference → Tool`.

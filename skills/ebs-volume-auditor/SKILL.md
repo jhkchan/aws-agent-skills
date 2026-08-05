@@ -306,6 +306,13 @@ REMEDIATION: None required. Recommend enabling account-level encryption-by-defau
 
 **Cross-region snapshot copy:** `copy-snapshot` replicates to a destination region with a different snapshot-id. Public/private state does NOT propagate — each region's registry is independent. Encrypted cross-region copy requires a destination-region KMS key. Cross-region copy is billable (per-GB transfer + destination storage) — surface the cost before bulk operations.
 
+## Recent AWS features (2024-2026)
+
+- **Snapshots Archive and Recycling Bin (2024):** EBS Snapshots Archive enables tiering snapshots to a lower-cost archive tier, and the Recycling Bin retains deleted snapshots for recovery. Auditors should verify that the recycling bin retention period is appropriate (too short = permanent data loss on accidental delete; too long = cost accumulation) and that archived snapshots are tracked.
+- **Fast Snapshot Restore (FSR) GA:** FSR eliminates initialization latency on restored volumes. Auditors should verify that FSR is enabled only where needed (it has a significant per-zone cost) and that FSR zones match the application's deployment zones.
+- **io2 Block Express GA (2024):** io2 Block Express volumes support up to 256,000 IOPS and 4,000 MB/s throughput. Auditors should verify that high-performance workloads use io2 Block Express rather than over-provisioning gp3.
+- **EBS default encryption at account level:** Auditors should verify that account-level default encryption is enabled — this prevents creation of unencrypted volumes even when the caller forgets the encryption flag.
+
 ## Domain
 
 AWS CloudOps / EBS Storage Security & Cost Optimisation.

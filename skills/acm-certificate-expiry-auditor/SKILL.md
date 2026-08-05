@@ -366,6 +366,11 @@ The re-import replaces the cert+key in place; the ARN, all references, and tags 
 
 A wildcard certificate (`*.example.com`) covers exactly one DNS label: `api.example.com` is covered; `v1.api.example.com` is NOT. Multi-level wildcards (`*.*.example.com`) are not supported by any public CA. When auditing, cross-check the requested domain names against the actual subdomains the workload serves.
 
+## Recent AWS features (2024-2026)
+
+- **ECDSA P-256 public certificates (2024):** ACM now issues ECDSA P-256 certificates through Amazon Trust Services (ATS) for public-facing certificates. Auditors should note RSA vs ECDSA key algorithms when assessing certificate posture — ECDSA offers smaller key sizes and faster TLS handshakes.
+- **No significant audit-surface changes otherwise:** ACM's core functionality (managed renewal, DNS/Email validation, private CA integration) has been stable. No new security settings or configuration fields that change the audit logic have been introduced.
+
 ## Domain
 
 AWS CloudOps / ACM TLS Certificate Lifecycle & Compliance.

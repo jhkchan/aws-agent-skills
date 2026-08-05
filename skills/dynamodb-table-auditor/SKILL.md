@@ -684,6 +684,13 @@ again. This means:
 - KMS key disablement takes 5 minutes to take effect on DynamoDB (the cache
   window). Plan for this delay when rotating or disabling keys.
 
+## Recent AWS features (2024-2026)
+
+- **DynamoDB table classes — Standard and Standard-IA (2024):** Tables can now be assigned the `STANDARD` or `STANDARD_INFREQUENT_ACCESS` table class. Auditors should verify that infrequently accessed tables use Standard-IA for cost optimization, and that high-throughput tables remain on Standard.
+- **Incremental export to S3 (2024):** DynamoDB now supports incremental exports to S3 in addition to full-table exports. Auditors should verify that export-to-S3 is configured with appropriate KMS encryption and that the S3 destination bucket has lifecycle policies.
+- **Amazon Q integration (2024-2025):** DynamoDB now integrates with Amazon Q for natural-language queries. No direct audit-surface change, but auditors should verify that Q integration does not grant unexpected IAM access to table data.
+- **Global Tables v2 replication enhancements (2024):** Improved global tables with faster replication and new CloudWatch metrics for replication latency. Auditors should verify that replication alarms are configured on `ReplicationLatency` for multi-region tables.
+
 ## Domain
 
 AWS CloudOps / DynamoDB Table Hardening & Compliance.

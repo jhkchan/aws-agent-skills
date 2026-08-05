@@ -707,6 +707,12 @@ transition old artifacts to cheaper storage tiers or expire them. A pipeline
 that runs 50 times/day generates ~100+ artifact objects daily — without
 lifecycle rules, the bucket grows without bound.
 
+## Recent AWS features (2024-2026)
+
+- **CodePipeline V2 (2024-2025):** V2 pipelines introduce triggers (Git-based, scheduled), pipeline-level variables, and stage-level execution modes. Auditors should verify that V2 pipelines use triggers scoped to specific branches (not wildcard) and that pipeline variables do not leak secrets in plaintext.
+- **CodePipeline.compute / EC2 runner (2025):** CodePipeline can now provision EC2 runners for action execution (similar to GitHub Actions self-hosted runners). Auditors should verify that the runner IAM role and VPC configuration are scoped appropriately.
+- **Cross-account actions with IAM role chaining:** Enhanced cross-account deployment support. Auditors should verify that cross-account action roles have ExternalId conditions and are not wildcard-principal.
+
 ## Domain
 
 AWS CloudOps / CodePipeline CI/CD Security & Compliance.

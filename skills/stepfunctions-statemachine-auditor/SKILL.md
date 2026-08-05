@@ -808,6 +808,14 @@ Each `Task` state's `Resource` ARN maps to a specific IAM action:
 A scoped execution role grants only the actions corresponding to the
 definition's `Resource` ARNs, on the specific resource ARNs (not `*`).
 
+## Recent AWS features (2024-2026)
+
+- **Distributed Map state enhancements (2024-2025):** Distributed Map now supports more item sources (S3 cross-account, DynamoDB) and higher concurrency limits. Auditors should verify that Distributed Map configurations have appropriate `MaxConcurrency` and `ToleratedFailurePercentage` settings — an unbounded Distributed Map can exhaust downstream API quotas.
+- **Synchronous Express workflows (Sync) (2024):** Express workflows can now be invoked synchronously via the API. Auditors should verify that synchronous Express workflows have appropriate timeout and error-handling configurations — they cannot use the standard retry/DLQ mechanisms.
+- **Step Functions Editor v2 (2024):** The new visual editor supports Workflow Studio with improved ASL validation. No new audit-surface fields.
+- **Resource-based policies for state machines (2024-2025):** Enhanced resource-based policy support allowing cross-account state machine execution. Auditors should verify that cross-account execution policies include `aws:SourceAccount` conditions and that `Principal: "*"` policies are bounded.
+- **Payload validation (2024):** Step Functions now supports JSON Schema-based payload validation on state inputs. Auditors should verify that payload validation schemas are defined for states handling external input — validation prevents malformed data from propagating through the workflow.
+
 ## Domain
 
 AWS CloudOps / Step Functions Observability, Security & ASL Correctness.

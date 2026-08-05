@@ -675,6 +675,13 @@ aws sqs set-queue-attributes --queue-url <dlq-url> \
 3. For FIFO queues, recommend monitoring message-group age via the
    `ApproximateAgeOfOldestMessage` CloudWatch metric.
 
+## Recent AWS features (2024-2026)
+
+- **SQS paused queues (2024):** SQS now supports pausing message delivery without deleting messages. Auditors should verify that production queues are not inadvertently paused — a paused queue silently stops message consumption.
+- **Message retention period increase (2024):** SQS now supports message retention up to 14 days (previously 4 days). Auditors should verify that retention periods are appropriate — excessive retention on high-throughput queues can cause cost accumulation.
+- **SSE-SQS vs SSE-KMS (2024):** SQS now supports server-side encryption with SQS-managed keys (SSE-SQS) as a simpler alternative to SSE-KMS. Auditors should verify which encryption mode is in use — SSE-KMS provides customer-controlled keys but requires KMS key policy management, while SSE-SQS is simpler but less granular.
+- **Dead-letter queue redrive (2024-2025):** SQS now supports `StartMessageMoveTask` API for redriving messages from DLQ back to the source queue. Auditors should verify that redrive operations are logged in CloudTrail and that redriven messages do not cause duplicate processing.
+
 ## Domain
 
 AWS CloudOps / App Integration — SQS Messaging Security & Reliability.

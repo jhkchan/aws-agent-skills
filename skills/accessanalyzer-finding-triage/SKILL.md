@@ -993,6 +993,13 @@ in the account that owns the analyzer.
 - SNS/SQS cross-account event delivery (filter on the monitoring account
   principal)
 
+## Recent AWS features (2024-2026)
+
+- **Unused-access analysis GA (2024):** UnusedIAMRole, UnusedIAMUserAccessKey, UnusedIAMPermission, and UnusedServiceControlPolicy finding types are now GA for account and organization analyzers. The skill already covers these, but auditors should expect a higher volume of unused-access findings now that the feature is enabled by default on new analyzers.
+- **New supported resource types:** Access Analyzer now evaluates resource-based policies for S3 directory buckets (`AWS::S3Express::DirectoryBucket`), VPC endpoints (`AWS::EC2::VPCE`), and CloudWatch Logs resource policies. Findings from these new types flow through the same triage logic — ensure archive rules account for them.
+- **External-access analyzer for KMS and Secrets Manager:** expanded coverage means more granular findings for KMS key grants and Secrets Manager resource policies. The Delta 4 (kms:CreateGrant escalation) logic applies to these new finding shapes.
+- **Organization-level analyzer enhancements:** delegated administrator can now manage archive rules across the org centrally, and unused-access findings include `UnusedServiceControlPolicy` which affects SCP audit posture.
+
 ## Domain
 
 AWS CloudOps / IAM Access Analyzer Security & Compliance.

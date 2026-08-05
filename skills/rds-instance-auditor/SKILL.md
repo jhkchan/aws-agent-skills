@@ -755,6 +755,14 @@ not read-capable; for read scaling, provision Read Replicas separately.
   short retention is a compliance nuance, not a hard config gap — note it in
   FINDINGS as a compliance advisory, do not drive the verdict from it.
 
+## Recent AWS features (2024-2026)
+
+- **Blue/Green deployments GA (2024):** RDS Blue/Green deployments create a staging environment with replicated data for zero-downtime database updates. Auditors should verify that production databases use Blue/Green for major version upgrades — the switch is safer than in-place upgrades.
+- **Aurora Serverless v2 scaling improvements (2024-2025):** Enhanced Aurora Serverless v2 with faster scaling and more predictable capacity. Auditors should verify that Serverless v2 `MinCapacity` and `MaxCapacity` settings are appropriate — too-low MinCapacity causes cold-start latency, too-high MaxCapacity wastes cost.
+- **IAM database authentication enhancements (2024):** Improved IAM database auth with longer token validity and broader engine support. Auditors should verify that IAM auth is used instead of password auth for application database connections where the engine supports it.
+- **RDS Custom enhancements (2024):** RDS Custom for SQL Server and Oracle with more OS-level customization. Auditors should verify that RDS Custom instances have appropriate OS-level patching — AWS manages the database engine but not the OS.
+- **Multi-tenant databases (2025):** RDS for Oracle supports multi-tenant container databases (CDB/PDB). Auditors should verify that PDB-level security configurations are equivalent across all tenant PDBs.
+
 ## Domain
 
 AWS CloudOps / RDS Database Security, Availability & Operational Posture.

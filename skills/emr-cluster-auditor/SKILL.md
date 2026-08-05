@@ -500,6 +500,12 @@ REMEDIATION:
 3. Recommend scoping the default managed policies to specific bucket ARNs as
    defense-in-depth.
 
+## Recent AWS features (2024-2026)
+
+- **EMR Serverless GA and enhanced (2024-2025):** EMR Serverless allows running Spark/Hive applications without managing clusters. Auditors should note that EMR Serverless changes the audit surface — there is no EC2 instance group or security group to audit. Instead, verify the EMR Serverless application's VPC configuration, KMS encryption, and execution role.
+- **EMR on EKS updates (2024):** Enhanced EMR on EKS with Spark 3.5 support and improved pod-level IAM. Auditors should verify that the EMR execution role on EKS is scoped to the namespace and that Spark UI access is authenticated.
+- **EMR managed scaling improvements (2024-2025):** Improved managed scaling with spot instance diversification. No new audit-surface fields, but auditors should verify that the managed scaling policy does not create single-AZ concentration.
+
 ## Domain
 
 AWS CloudOps / EMR Analytics Security & Compliance.

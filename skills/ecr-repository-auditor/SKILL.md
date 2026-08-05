@@ -826,6 +826,13 @@ This means a PUBLIC repository policy on the source propagates to all
 replicas automatically. If you tighten the source policy, the replicas are
 updated on the next replication cycle. Audit replicas independently.
 
+## Recent AWS features (2024-2026)
+
+- **ECR Enhanced Scanning (2024-2025):** ECR Enhanced Scanning now uses Amazon Inspector to scan for both OS package vulnerabilities and language package vulnerabilities (Python, Java, Node.js, etc.). Auditors should verify that `scanType` is set to `ENHANCED` (not `BASIC`) on production repositories — basic scanning only covers OS packages.
+- **Pull-through cache rules (2024):** ECR pull-through cache allows pulling images from upstream registries (Docker Hub, Quay, public ECR) and caching them locally. Auditors should verify that pull-through cache repositories have appropriate lifecycle policies — cached images can accumulate without cleanup.
+- **Replication across regions/accounts (2024):** ECR cross-region and cross-account replication is now GA. Auditors should verify that replicated repositories in other regions/accounts have equivalent security policies (scan-on-push, tag immutability, lifecycle).
+- **Lifecycle policy enhancements (2024):** Improved lifecycle policy rules with more filtering options. Auditors should verify that lifecycle policies cover untagged images and that the policy does not accidentally delete production images.
+
 ## Domain
 
 AWS CloudOps / ECR Container Registry Security & Supply-Chain Compliance.

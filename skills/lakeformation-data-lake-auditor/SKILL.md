@@ -739,6 +739,13 @@ LF grants have **no version history**. `GrantPermissions` and
 `RevokePermissions` modify the grant set in place — no diff, no rollback.
 Treat every grant modification as irreversible.
 
+## Recent AWS features (2024-2026)
+
+- **Lake Formation governed tables and Apache Iceberg support (2024-2025):** Lake Formation now supports Apache Iceberg table format with governed table features (ACID transactions, time travel). Auditors should verify that Iceberg tables have appropriate LF-tag policies and that cross-account access to governed tables uses Lake Formation grants (not S3 bucket policies directly).
+- **Row-level and column-level security enhancements (2024):** Enhanced cell-level security with DataCellsFilter improvements. Auditors should verify that sensitive columns have DataCellsFilter rules and that `ColumnWildcard` SELECT is not granted without a corresponding filter.
+- **LF-tags governance (2024-2025):** Improved LF-tag-based access control with tag inheritance. Auditors should verify that LF-tag policies are not overly broad (e.g., `dba:*` tag granting full access to all databases).
+- **Amazon Q integration (2024):** Lake Formation integrates with Amazon Q for natural-language data queries. Auditors should verify that Q's IAM role is scoped to only the data it should access.
+
 ## Domain
 
 AWS CloudOps / Lake Formation Data Lake Security & Compliance.

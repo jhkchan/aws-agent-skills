@@ -623,6 +623,13 @@ deviations (typically 3x+ over baseline for several minutes). It does NOT
 analyze individual events for suspiciousness — that is the job of GuardDuty
 or Security Hub. Insights detects "unusual volume," not "malicious activity."
 
+## Recent AWS features (2024-2026)
+
+- **CloudTrail Lake (2024-2025):** CloudTrail Lake enables SQL-based querying of event data without S3/Athena. Auditors should verify that CloudTrail Lake is configured as a supplementary query surface, and that its retention period meets compliance requirements — Lake has its own separate retention independent of the S3 trail.
+- **Expanded data event coverage (2024-2025):** CloudTrail now records data events for additional resource types including S3 directory buckets, Lambda layers, and CloudFront KeyValueStore. Auditors should verify that data event logging covers these new resource types where applicable.
+- **CloudTrail Insights enhancements (2024):** Insights now supports anomaly detection on write management events with improved accuracy. Auditors should re-evaluate whether Insights is enabled on all organization trails — it is often overlooked.
+- **Federation with CloudTrail Lake:** Lake now supports cross-account and cross-org event federation. Auditors should verify that the federation configuration includes all member accounts and that no accounts are silently excluded.
+
 ## Domain
 
 AWS CloudOps / CloudTrail Governance, Compliance & Forensic Readiness.

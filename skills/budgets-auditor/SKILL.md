@@ -680,6 +680,12 @@ un-billed spend.
 - Subscriber types: SNS, EMAIL, EMAIL_JSON, SQS, CHATBOT (us-east-1 for
   budget notifications).
 
+## Recent AWS features (2024-2026)
+
+- **Budget filters on cost allocation tags (2024):** AWS Budgets now supports filtering by cost allocation tags, dimensions, and expressions. Auditors should verify that budgets are scoped appropriately — an unfiltered budget may mask departmental cost overruns, while an over-filtered budget may miss account-level spend.
+- **Zero-spend budgets (2024):** Budgets with a zero-spend threshold for sandbox/new accounts. Auditors should check whether new accounts have a zero-spend guardrail budget, as the skill already recommends.
+- **Savings Plan utilization and coverage budgets (2024):** Budgets can now monitor Savings Plan utilization and coverage metrics directly. Auditors should verify that commitment-utilization budgets exist alongside cost budgets.
+
 ## Domain
 
 AWS CloudOps / FinOps Cost Control & Spend Visibility.

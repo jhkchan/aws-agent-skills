@@ -752,6 +752,12 @@ key. If the role's inline policy is narrowed (e.g., by a least-privilege
 sweep that removed `kms:Decrypt`), DLM silently fails on encrypted volumes.
 This is a common side-effect of IAM hygiene campaigns.
 
+## Recent AWS features (2024-2026)
+
+- **DLM policy type expansion (2024-2025):** DLM now supports additional policy types beyond EBS snapshots, including policies for EBS-backed AMIs. Auditors should verify that all policy types are accounted for — an AMI lifecycle policy may run alongside snapshot policies and create redundant or conflicting schedules.
+- **Cross-region copy improvements (2024):** Enhanced cross-region copy with tag preservation and encryption key mapping. Auditors should verify that cross-region copy policies correctly map KMS keys (source-region key ARNs will not work in the destination region).
+- **Policy schedule improvements:** DLM now supports more flexible schedule configurations including variable retention tiers. Auditors should verify that retention tiers are compliant with backup policies.
+
 ## Domain
 
 AWS CloudOps / Storage & Backup Resilience (DLM EBS Snapshot Lifecycle).

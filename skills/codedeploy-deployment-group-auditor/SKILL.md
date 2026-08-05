@@ -722,6 +722,12 @@ deployment config determines how quickly traffic shifts from old to new.
   deployment group. Burst remediation across many groups requires
   serialization, not parallel shells.
 
+## Recent AWS features (2024-2026)
+
+- **Blue/green deployments for ECS (2024):** CodeDeploy now supports blue/green deployments for Amazon ECS services via App Mesh or NLB traffic shifting. Auditors should verify that ECS blue/green deployment configs have appropriate termination wait times — the skill already checks this for EC2/Lambda.
+- **Zonal deployment configuration (2024-2025):** CodeDeploy can now deploy one Availability Zone at a time for EC2/in-place deployments. Auditors should verify that zonal configs have appropriate rollback triggers per zone.
+- **Automatic rollback enhancements (2024):** Enhanced automatic rollback with CloudWatch alarm integration improvements. No new audit-surface fields, but auditors should verify that rollback alarms cover both deployment health and application health metrics.
+
 ## Domain
 
 AWS CloudOps / CodeDeploy Deployment Safety & Compliance.

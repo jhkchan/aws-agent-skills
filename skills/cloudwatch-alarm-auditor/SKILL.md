@@ -659,6 +659,12 @@ regardless of any child alarm Period). The expression resolves each
 operators (AND, OR, NOT) combine the results. The composite then follows the
 same Act step as metric alarms.
 
+## Recent AWS features (2024-2026)
+
+- **OpenTelemetry native metrics (2024):** CloudWatch now ingests OpenTelemetry-format metrics natively. Alarms built on OTel metrics may have different namespace and dimension structures. Auditors should verify that alarms on OTel metrics use correct namespace/dimension mappings.
+- **Composite alarm improvements (2024):** Composite alarms now support more complex boolean expressions and can reference alarms across regions. Auditors should verify that composite alarm rules are not overly complex (cascading alarm dependencies can create silent blind spots if one component is deleted).
+- **Metric math enhancements:** Additional statistical functions and period support. No new audit-surface fields, but auditors should verify that alarms using metric math are not silently broken by dimension changes.
+
 ## Domain
 
 AWS CloudOps / CloudWatch Observability & Alarm Reliability.

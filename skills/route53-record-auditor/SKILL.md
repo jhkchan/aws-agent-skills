@@ -590,6 +590,13 @@ REMEDIATION:
 3. For public zones, verify the DS record remains published after any KSK
    rollover.
 
+## Recent AWS features (2024-2026)
+
+- **DNSSEC improvements (2024):** Route 53 DNSSEC signing now supports more key algorithms and automated key rotation. Auditors should verify that DNSSEC is enabled on all public hosted zones and that KMS keys used for signing have rotation enabled.
+- **Application Recovery Controller integration (2024-2025):** Route 53 ARC routing controls integrate with health checks for regional failover. Auditors should verify that ARC routing control health checks are monitored and that failover tested scenarios are documented.
+- **Geoproximity and calculator routing policies (2024):** New geoproximity routing with bias settings. No new audit-surface fields, but auditors should verify that geo-based routing policies have health checks on all routed endpoints.
+- **CNAME flattening at zone apex:** Enhanced CNAME flattening support. No audit-surface change.
+
 ## Domain
 
 AWS CloudOps / Route 53 DNS Security & Reliability.

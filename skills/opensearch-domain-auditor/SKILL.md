@@ -426,6 +426,13 @@ the access policy.
    `AccessDeniedException`.
 6. **NEVER disable FGAC as remediation** — wipes all roles/mappings/users.
 
+## Recent AWS features (2024-2026)
+
+- **OpenSearch Serverless GA (2024-2025):** OpenSearch Serverless provides auto-scaling search and analytics without cluster management. Auditors should note that Serverless collections have a different audit surface than provisioned domains — verify encryption, VPC access, and data-access policies at the collection level.
+- **Security Analytics (2024):** OpenSearch Security Analytics provides threat detection rules and alerting on log data. Auditors should verify that security analytics detectors are configured for compliance-relevant log types (CloudTrail, VPC Flow Logs).
+- **Fine-grained access control improvements (2024):** Enhanced FGAC with roles-based access control. Auditors should verify that the master user is not a shared account and that backend roles are scoped appropriately.
+- **SAML authentication enhancements (2024-2025):** Improved SAML integration for OpenSearch Dashboards. Auditors should verify that SAML provider metadata is current and that IdP-initiated SSO is configured correctly.
+
 ## Domain
 
 AWS CloudOps / OpenSearch Analytics Security & Compliance.

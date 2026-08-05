@@ -655,6 +655,14 @@ prioritizes by immediate exploitability.
 3. For defense-in-depth, consider adding response headers (Strict-Transport-
    Security, Content-Security-Policy) via CloudFront response-headers policies.
 
+## Recent AWS features (2024-2026)
+
+- **VPC origins (2024-2025):** CloudFront now supports VPC origins, enabling distribution of private content from VPC-attached ALBs, NLBs, EC2 instances, and ECS services without internet exposure. Auditors should check whether distributions using VPC origins have appropriate origin security groups and that the VPC origin is not inadvertently exposed.
+- **KeyValueStore (2024):** CloudFront KeyValueStore allows serverless key-value data for CloudFront Functions. This does not change the audit verdict but auditors should note that KVS data is mutable and could be used to inject configuration that bypasses origin checks.
+- **Continuous deployment (2024):** CloudFront continuous deployment allows traffic shifting between distribution versions (canary, blue/green). Auditors should verify that the staging distribution has equivalent security configuration (WAF, TLS, OAC) as the primary — a security regression during traffic shifting is a real risk.
+- **TLS 1.3 viewer support (2024):** CloudFront now supports TLS 1.3 for viewer connections. Auditors should recommend upgrading the minimum TLS version to TLSv1.2_2021 or TLSv1.3 where applicable.
+- **Origin Access Control (OAC) for Lambda and MediaStore (2024-2025):** OAC now supports Lambda Function URLs and MediaStore origins in addition to S3. Auditors should verify OAC coverage on all origin types, not just S3.
+
 ## Domain
 
 AWS CloudOps / CloudFront Edge Security & Compliance.

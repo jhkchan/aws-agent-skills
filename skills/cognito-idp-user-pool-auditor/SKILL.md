@@ -759,6 +759,13 @@ public client (Rule 1d), remove `ALLOW_ADMIN_USER_PASSWORD_AUTH` from
 - Review app-client inventory for unused clients (delete clients that are
   no longer in use to reduce attack surface).
 
+## Recent AWS features (2024-2026)
+
+- **Passwordless authentication with WebAuthn / PASSKEY_DEFAULT (2024-2025):** Cognito now supports passwordless authentication via WebAuthn (passkeys) and PASSKEY_DEFAULT sign-in mode. Auditors should verify that user pools handling sensitive data have passkey-based MFA or passwordless enabled as a stronger alternative to SMS/TOTP MFA.
+- **Token revocation and refresh token rotation (2024):** Enhanced token lifecycle management with token revocation API and refresh token rotation. Auditors should verify that `RefreshTokenValidity` is not excessively long and that token revocation is wired into the application's logout flow.
+- **Advanced Security Features (ASF) updates (2024):** ASF now includes improved WAF integration and adaptive authentication. Auditors should verify that `AdvancedSecurityMode` is set to `ENFORCED` (not `AUDIT`) for production pools — AUDIT mode only logs threats without blocking.
+- **Hosted UI custom domain SNI:** Enhanced custom domain support for the hosted UI. No new audit-surface fields, but auditors should verify that custom domains have valid ACM certificates and TLS configuration.
+
 ## References
 
 See the AWS Cognito Identity Provider documentation for:

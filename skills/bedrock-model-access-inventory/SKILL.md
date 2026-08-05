@@ -517,6 +517,14 @@ REMEDIATION:
 3. Recommend CloudWatch alarms on invocation-volume spikes.
 4. Recommend quarterly review of provisioned throughput commitments.
 
+## Recent AWS features (2024-2026)
+
+- **Cross-region inference profiles (2024-2025):** Bedrock now supports cross-region inference profiles that route requests across regions for higher throughput. Auditors must account for inference profiles in the model-access inventory — a model may appear accessible but its inference profile may not be enabled, or vice versa.
+- **Bedrock marketplace models (2024):** Third-party models (e.g., Llama, Mistral) are now available via Bedrock Marketplace. These models have different access-request flows than first-party models. Auditors should inventory marketplace models separately and verify their invocation logging coverage.
+- **Provisioned throughput with inference profiles:** Provisioned throughput commitments now interact with cross-region inference profiles. Auditors should verify that provisioned throughput units (PTUs) are not over-committed or under-utilized, and that model unit (MU) quotas are tracked.
+- **Model distillation and evaluation jobs (2024-2025):** Bedrock Distillation and Evaluation Jobs are new capabilities that create additional invocation surfaces. Auditors should verify these jobs are covered by invocation logging and guardrails.
+- **New model families (2024-2026):** Amazon Nova models (Micro/Lite/Pro/Premier), Claude 3.5/4 (Sonnet/Haiku/Opus), Llama 3/4, and DeepSeek models expand the model-access inventory surface. Each new model requires its own access-request and IAM evaluation.
+
 ## Domain
 
 AWS CloudOps / Bedrock AI-ML Security & Compliance.

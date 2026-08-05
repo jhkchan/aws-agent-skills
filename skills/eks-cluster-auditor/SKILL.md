@@ -630,6 +630,14 @@ REMEDIATION:
 3. Consider enabling EKS Auto Mode or Karpenter for node lifecycle
    management to reduce operational overhead.
 
+## Recent AWS features (2024-2026)
+
+- **EKS Access Entries (2024-2025):** EKS Access Entries replace the `aws-auth` ConfigMap for IAM-to-Kubernetes authentication mapping. Auditors should verify that access entries are used instead of (or in addition to) the ConfigMap, and that no access entry maps a broad principal to `system:masters`. The ConfigMap approach is deprecated.
+- **EKS Auto Mode (2024-2025):** EKS Auto Mode manages node provisioning, scaling, and lifecycle automatically. Auditors should note that Auto Mode changes the node audit surface — node security groups, AMI versions, and instance profiles are managed by EKS rather than custom node groups. Verify that Auto Mode configuration does not inadvertently create permissive security groups.
+- **EKS Pod Identity (2024):** EKS Pod Identity provides IAM credentials to pods without OIDC trust policies. Auditors should verify that Pod Identity associations use scoped IAM roles and that the EKS Pod Identity Agent addon is installed and up-to-date.
+- **EKS Hybrid Nodes (2025):** EKS now supports on-premises nodes attached to EKS clusters. Auditors should verify that hybrid node security groups and IAM roles are scoped appropriately — hybrid nodes may have different network exposure than cloud-managed nodes.
+- **Pod-level security:** Enhanced pod security standards (PSS) enforcement. Auditors should verify that PSS is set to `restricted` (not `baseline` or `privileged`) for production namespaces.
+
 ## Domain
 
 AWS CloudOps / EKS Compute Security & Compliance.

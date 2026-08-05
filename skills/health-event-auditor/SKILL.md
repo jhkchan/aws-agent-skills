@@ -798,6 +798,12 @@ A Basic/Developer account still receives EventBridge Health events —
 the API gating is for direct programmatic audit, not delivery.
 EventBridge-driven automations work even on Basic-tier accounts.
 
+## Recent AWS features (2024-2026)
+
+- **Health Dashboard refresh (2024-2025):** The AWS Health Dashboard was redesigned with a unified view for account and organizational events. The organizational view is now enabled by default for management accounts. Auditors should verify that the org-level Health Dashboard is accessible to security/ops teams.
+- **Health Aware notifications (2024):** Enhanced EventBridge integration for Health events with more detailed event metadata. Auditors should verify that EventBridge rules for `aws.health` events are configured for critical event categories (issue, scheduledChange).
+- **RCA (Root Cause Analysis) events (2024):** AWS Health now publishes RCA summaries for resolved incidents. No new audit-surface fields, but auditors should verify that RCAs are reviewed and tracked.
+
 ## Domain
 
 AWS CloudOps / AWS Health Operational Event Management.

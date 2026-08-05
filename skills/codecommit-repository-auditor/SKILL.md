@@ -505,6 +505,11 @@ critical events go unalerted.
 Multiple statements are AND-ed. Empty `ApprovalPoolMembers` means any
 principal with `codecommit:ApprovePullRequest` can approve.
 
+## Recent AWS features (2024-2026)
+
+- **CodeCommit closed to new customers (2024):** AWS stopped onboarding new CodeCommit customers. Existing customers can continue using the service, but no new features are being added. Auditors should flag CodeCommit as a deprecation/migration risk — the skill already covers this as DEPRECATION_RISK. Recommend migration to GitHub, GitLab, or Bitbucket for any repos with long-term lifecycle expectations.
+- **No new feature launches:** CodeCommit has received no new security features, configuration fields, or capabilities since the freeze. The audit surface is static.
+
 ## Domain
 
 AWS CloudOps / Developer Tools Security & CodeCommit Migration Assessment.
