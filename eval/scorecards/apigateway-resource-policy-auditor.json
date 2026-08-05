@@ -1,0 +1,70 @@
+{
+  "skill": "apigateway-resource-policy-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds many specific AWS nuances (API keys are not authentication, HTTP APIs lack resource policies, ANY method covers all verbs, EDGE source\u2011IP semantics, default account\u2011level throttle, WAF association constraints, deployment timing, etc.). However, the bulk of the content restates publicly documented behavior and does not introduce a novel decision tree or unique threshold, so it falls short of a perfect delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a detailed, ordered audit procedure (steps 0\u20116, safety gates, remediation flow). Pagination handling is only mentioned in a side note and not woven into the main workflow, and some steps are generic (e.g., \"verify the API exists\"), reducing AWS\u2011specific procedural depth."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains an extensive NEVER list with concrete reasons (e.g., API keys are not auth, never treat EDGE SourceIp as reliable, never ignore ANY method). A few items lack quantitative impact explanation, slightly weakening the anti\u2011pattern depth."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and KEYWORDS. Activation triggers and invocation schema are well defined, enabling reliable skill activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (Mindset, Quick reference, Pre\u2011flight, Process, Output, Edge\u2011cases, Anti\u2011patterns, Safety, Remediation), but the initial sections contain many details before the core audit steps, creating some cognitive overload; tighter front\u2011loading would improve progressive disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by a mandatory confirmation step and safety checks, matching fragility. The read\u2011only audit path could explicitly state that no state\u2011changing commands will be emitted, a minor calibration omission."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a consistent internal structure (Mindset \u2192 Steps \u2192 Output \u2192 Edge Cases \u2192 Anti\u2011Patterns \u2192 Safety \u2192 Remediation) but does not map to a named industry\u2011standard pattern, losing one point for recognizability."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides clear output format, CLI remediation commands, and worked examples that align with the skill. Missing explicit handling for HTTP API resource\u2011policy N/A in the output and limited error handling for missing API IDs prevent a perfect score."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 36506,
+  "latency_ms": 36443,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

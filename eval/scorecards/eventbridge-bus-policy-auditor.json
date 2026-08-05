@@ -1,0 +1,70 @@
+{
+  "skill": "eventbridge-bus-policy-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many nuanced, expert\u2011level details not commonly known by a generic model (e.g., blast\u2011radius of events:PutEvents, valid vs. no\u2011op condition keys, default bus service\u2011principal allowances, per\u2011target DLQ requirement, KMS key ownership implications, CIDR strength thresholds, bus\u2011policy size limit, API\u2011destination auth nuances). Minor gaps: no mention of cross\u2011region bus limits or archive retention cost caps."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers a concrete, AWS\u2011specific step\u2011by\u2011step audit flow (Step\u202f0\u20119) with ordering, classification logic, and safety\u2011gate procedures. Slight deduction for lacking an explicit flowchart or pseudo\u2011code for pagination loops."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER list is extensive and explains why each pattern is dangerous. It omits a few common pitfalls, such as warning against using overly broad Resource \"*\" in policies and the risk of duplicate statement\u2011ids in put\u2011permission, reducing the completeness of the anti\u2011pattern guidance."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is well\u2011formed with description, keywords, activation triggers, and an invocation schema. It lacks an explicit output schema definition and does not provide a machine\u2011readable input validation schema, which would improve reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Content is layered: high\u2011level mindset, quick reference table, then detailed steps, anti\u2011patterns, safety checks, remediation. Some early sections are dense, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions (e.g., put\u2011permission, update\u2011event\u2011bus) are gated by mandatory confirmation prompts, backup steps, and safety checks. Non\u2011destructive audit steps are left open, matching the task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a clear, recognizable structure (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation) that aligns with established skill patterns."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides concrete decision trees, output format, and ready\u2011to\u2011run CLI remediation commands. It does not explicitly cover handling of API throttling, pagination errors, or malformed responses beyond a generic error block, leaving a small gap in real\u2011world execution robustness."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 40249,
+  "latency_ms": 12865,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

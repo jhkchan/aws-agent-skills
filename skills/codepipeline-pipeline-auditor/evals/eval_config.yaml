@@ -1,0 +1,48 @@
+# Eval configuration for codepipeline-pipeline-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: codepipeline-pipeline-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-encryption-artifact-store
+    difficulty: easy
+    prompt_file: prompts/no-encryption-artifact-store.md
+    baseline_file: baselines/no-encryption-artifact-store.md
+    expected_verdict: NO_ENCRYPTION
+  - id: overpermissive-cross-account-role
+    difficulty: medium
+    prompt_file: prompts/overpermissive-cross-account-role.md
+    baseline_file: baselines/overpermissive-cross-account-role.md
+    expected_verdict: OVERPERMISSIVE_ROLE
+  - id: disabled-stage-transition
+    difficulty: medium
+    prompt_file: prompts/disabled-stage-transition.md
+    baseline_file: baselines/disabled-stage-transition.md
+    expected_verdict: DISABLED_STAGE
+  - id: weak-source-no-approval
+    difficulty: hard
+    prompt_file: prompts/weak-source-no-approval.md
+    baseline_file: baselines/weak-source-no-approval.md
+    expected_verdict: CONFIG_GAP
+  - id: well-configured-pipeline
+    difficulty: easy
+    prompt_file: prompts/well-configured-pipeline.md
+    baseline_file: baselines/well-configured-pipeline.md
+    expected_verdict: OK
+  - id: multiple-findings-encryption-wins
+    difficulty: hard
+    prompt_file: prompts/multiple-findings-encryption-wins.md
+    baseline_file: baselines/multiple-findings-encryption-wins.md
+    expected_verdict: NO_ENCRYPTION

@@ -1,0 +1,70 @@
+{
+  "skill": "stepfunctions-statemachine-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "The skill introduces several non\u2011obvious, senior\u2011engineer insights that a generic model would not enumerate: the default 60\u2011second TimeoutSeconds for Tasks, the Express\u2011workflow X\u2011Ray no\u2011op, the need for HeartbeatSeconds on Activity tasks, the requirement for xray:PutTraceSegments and logs:* permissions, the RedriveExecution feature added Nov\u202f2024, and the pre\u2011Nov\u202f2022 limitation of States.ALL not catching States.Timeout. These concrete thresholds and exceptions constitute genuine expert knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, ordered procedure (Step\u202f0\u20115) that mirrors real audit workflows: pre\u2011flight type gate, logging check, tracing check, IAM role blast\u2011radius analysis, ASL structural validation, and worst\u2011finding aggregation. The steps reference exact AWS CLI commands and policy\u2011enumeration techniques, which go beyond generic \"check security\" advice."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning for each pitfall (wildcard actions, includeExecutionData false, Express tracing, etc.). Lacks a few anti\u2011patterns such as never relying on the default log group without verifying logging permissions and omits a warning about using Redrive on pre\u2011Nov\u20112022 runtimes."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present and well\u2011formed. Activation triggers are simple strings; a more precise regex or schema could improve reliable activation, hence a small deduction."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information: a one\u2011line Mindset summary, a quick\u2011reference table, then detailed Critical Rules, Pre\u2011flight, Step\u2011by\u2011Step Process, Output format, Worked example, and deep reference. While most critical rules are presented early, some deep\u2011reference material could be deferred to a separate appendix; nevertheless the core decision flow is presented concisely without overwhelming the agent."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (e.g., role policy changes, state\u2011machine updates) are tightly constrained with a mandatory CONFIRMATION GATE and explicit backup commands. Observability checks (logging, tracing) are calibrated to the fragility of the operation, while remediation guidance for non\u2011destructive improvements (e.g., adding Catch blocks) is permissive. Calibration is well\u2011matched to task risk."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern used in CloudOps skills: Mindset \u2192 Quick reference \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Process steps \u2192 Output format \u2192 Worked example \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation \u2192 Deep reference. This coherent structure aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides decision trees, deterministic output format, CLI remediation snippets, and worked examples. Missing explicit error\u2011handling for malformed JSON definitions beyond a generic ERROR block and no decision branch for missing workflow type beyond assuming STANDARD, which could cause ambiguous execution."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 46991,
+  "latency_ms": 16317,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

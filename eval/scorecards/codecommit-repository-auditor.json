@@ -1,0 +1,70 @@
+{
+  "skill": "codecommit-repository-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill contains many deep CodeCommit specifics (immutability of kmsEncryptionKeyId, IAM\u2011only branch protection, deprecation status, wildcard linking of approval templates, pagination limits, etc.) that a generic model would not enumerate. However, it does not provide a concrete decision\u2011tree algorithm for matching repository names to template wildcards nor novel thresholds, so the added delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (order of steps, IAM enumeration, pagination handling). The description of pagination and throttling is present but lacks exact CLI pagination loops or back\u2011off logic, making the procedure slightly generic."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "A thorough NEVER list is provided with concrete reasons (e.g., never omit DEPRECATION_RISK, never treat numberOfApprovalsNeeded:0 as valid). The list omits a brief rationale for why CMK rotation matters beyond \u201cnote as additive finding,\u201d leaving a small gap in anti\u2011pattern explanation."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present. Triggers such as \"audit this CodeCommit repository\" are somewhat vague and could fire unintentionally, reducing reliability of activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "Information is layered (Mindset \u2192 Quick reference \u2192 Steps \u2192 Deep reference), but the document front\u2011loads a large amount of detail before the core decision tree, risking cognitive overload and burying critical rules deep in the \"Deep reference\" section."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and warnings about IAM policy scope. The calibration could be tighter for IAM policy changes (no explicit constraint on which role to modify), but overall well\u2011matched to fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable structure (Mindset, Process, Output, Edge Cases, Anti\u2011Patterns, Remediation, Deep Reference). It lacks a formal \"Philosophy\" heading, making the pattern slightly incomplete."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides clear output format, worked examples, and remediation CLI snippets. Missing explicit handling of pagination errors, throttling back\u2011off, and automated decision\u2011tree code for wildcard matching reduces immediate executability in edge cases."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 40318,
+  "latency_ms": 11659,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

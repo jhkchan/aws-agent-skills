@@ -1,0 +1,438 @@
+# Eval test cases for codebuild-project-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Test-case identifiers are embedded in the CodeBuild project name and
+# serviceRoleArn so the model naturally echoes them in the PROJECT field of
+# its output. must_contain tokens are CONCEPT-shaped (verdict tokens, public
+# leak markers) — not API field names — to keep the assertion layer
+# robust against paraphrase.
+skill: codebuild-project-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: privileged-dind-no-docker
+    description: >-
+      CodeBuild project with environment.privilegedMode=true and an inline
+      buildspec containing no Docker commands — host-equivalent container
+      privilege with no Docker justification.
+    input: |
+      Project name: arn:aws:codebuild:us-east-1:111111111111:project/privileged-dind-no-docker
+      Project config (batch-get-projects output, abridged):
+
+        {
+          "name": "privileged-dind-no-docker",
+          "source": {
+            "type": "CODECOMMIT",
+            "buildspec": "version: 0.2\nphases:\n  build:\n    commands:\n      - mvn clean install\n      - aws s3 cp target/app.jar s3://artifacts-bucket/"
+          },
+          "environment": {
+            "type": "LINUX_CONTAINER",
+            "image": "aws/codebuild/standard:7.0",
+            "computeType": "BUILD_GENERAL1_SMALL",
+            "privilegedMode": true
+          },
+          "serviceRole": "arn:aws:iam::111111111111:role/service-role/CodeBuild-privileged-dind-no-docker",
+          "badgeEnabled": false,
+          "logsConfig": {
+            "cloudWatchLogs": {"status": "ENABLED"},
+            "s3Logs": {"status": "DISABLED"}
+          },
+          "artifacts": {"encryptionDisabled": false},
+          "vpcConfig": {
+            "vpcId": "vpc-aaa",
+            "subnets": ["subnet-private-1", "subnet-private-2"],
+            "securityGroupIds": ["sg-build-egress-only"]
+          }
+        }
+      Emit the standard VERDICT block (PROJECT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PRIVILEGED
+    assertions:
+      must_contain:
+        - "PRIVILEGED"
+        - "privileged-dind-no-docker"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: SECRET_LEAK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: secret-env-plaintext-leak
+    description: >-
+      CodeBuild project with an environmentVariables entry named DB_PASSWORD
+      of type PLAINTEXT — credential is committed in cleartext to the
+      project config.
+    input: |
+      Project name: arn:aws:codebuild:us-east-1:111111111111:project/secret-env-plaintext-leak
+      Project config (batch-get-projects output, abridged):
+
+        {
+          "name": "secret-env-plaintext-leak",
+          "source": {
+            "type": "GITHUB",
+            "buildspec": "version: 0.2\nphases:\n  build:\n    commands:\n      - npm ci && npm test"
+          },
+          "environment": {
+            "type": "LINUX_CONTAINER",
+            "image": "aws/codebuild/standard:7.0",
+            "computeType": "BUILD_GENERAL1_SMALL",
+            "privilegedMode": false,
+            "environmentVariables": [
+              {"name": "NODE_ENV", "value": "test", "type": "PLAINTEXT"},
+              {"name": "DB_PASSWORD", "value": "Sup3r$ecret#2026-abc123XYZ", "type": "PLAINTEXT"},
+              {"name": "GITHUB_TOKEN", "value": "ghp_abcDEF1234567890XYZ", "type": "PLAINTEXT"}
+            ]
+          },
+          "serviceRole": "arn:aws:iam::111111111111:role/service-role/CodeBuild-secret-env-leak",
+          "badgeEnabled": false,
+          "logsConfig": {
+            "cloudWatchLogs": {"status": "ENABLED"},
+            "s3Logs": {"status": "DISABLED"}
+          },
+          "artifacts": {"encryptionDisabled": false},
+          "vpcConfig": {
+            "vpcId": "vpc-aaa",
+            "subnets": ["subnet-private-1", "subnet-private-2"],
+            "securityGroupIds": ["sg-build-egress-only"]
+          }
+        }
+      Emit the standard VERDICT block (PROJECT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: SECRET_LEAK
+    assertions:
+      must_contain:
+        - "SECRET_LEAK"
+        - "secret-env-plaintext-leak"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PRIVILEGED"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: s3-logs-no-kms-encryption
+    description: >-
+      CodeBuild project with s3LogsConfig.encryptionDisabled=true AND no
+      kmsKeyArn — build logs written to S3 without customer-managed SSE-KMS.
+    input: |
+      Project name: arn:aws:codebuild:us-east-1:111111111111:project/s3-logs-no-kms-encryption
+      Project config (batch-get-projects output, abridged):
+
+        {
+          "name": "s3-logs-no-kms-encryption",
+          "source": {
+            "type": "CODECOMMIT",
+            "buildspec": "version: 0.2\nphases:\n  build:\n    commands:\n      - ./gradlew build"
+          },
+          "environment": {
+            "type": "LINUX_CONTAINER",
+            "image": "aws/codebuild/standard:7.0",
+            "computeType": "BUILD_GENERAL1_SMALL",
+            "privilegedMode": false
+          },
+          "serviceRole": "arn:aws:iam::111111111111:role/service-role/CodeBuild-s3-logs-no-kms-encryption",
+          "badgeEnabled": false,
+          "logsConfig": {
+            "cloudWatchLogs": {"status": "DISABLED"},
+            "s3Logs": {
+              "status": "ENABLED",
+              "location": "arn:aws:s3:::codebuild-logs-bucket/s3-logs-no-kms-encryption",
+              "encryptionDisabled": true
+            }
+          },
+          "artifacts": {"encryptionDisabled": true},
+          "vpcConfig": {
+            "vpcId": "vpc-aaa",
+            "subnets": ["subnet-private-1", "subnet-private-2"],
+            "securityGroupIds": ["sg-build-egress-only"]
+          }
+        }
+      Emit the standard VERDICT block (PROJECT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "s3-logs-no-kms-encryption"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PRIVILEGED"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: overpermissive-build-role
+    description: >-
+      CodeBuild project whose service role has an identity-based policy
+      granting Action="*" on Resource="*" — admin wildcard on the role
+      assumed during every build.
+    input: |
+      Project name: arn:aws:codebuild:us-east-1:111111111111:project/overpermissive-build-role
+      Project config (batch-get-projects output, abridged):
+
+        {
+          "name": "overpermissive-build-role",
+          "source": {
+            "type": "CODECOMMIT",
+            "buildspec": "version: 0.2\nphases:\n  build:\n    commands:\n      - ./build.sh"
+          },
+          "environment": {
+            "type": "LINUX_CONTAINER",
+            "image": "aws/codebuild/standard:7.0",
+            "computeType": "BUILD_GENERAL1_SMALL",
+            "privilegedMode": false,
+            "environmentVariables": [
+              {"name": "APP_ENV", "value": "ci", "type": "PLAINTEXT"}
+            ]
+          },
+          "serviceRole": "arn:aws:iam::111111111111:role/service-role/CodeBuild-overpermissive-build-role",
+          "badgeEnabled": false,
+          "logsConfig": {
+            "cloudWatchLogs": {"status": "ENABLED"},
+            "s3Logs": {
+              "status": "ENABLED",
+              "location": "arn:aws:s3:::codebuild-logs-bucket/overpermissive-build-role",
+              "encryptionDisabled": false,
+              "kmsKeyArn": "arn:aws:kms:us-east-1:111111111111:key/abc-123"
+            }
+          },
+          "artifacts": {"encryptionDisabled": false},
+          "vpcConfig": {
+            "vpcId": "vpc-aaa",
+            "subnets": ["subnet-private-1", "subnet-private-2"],
+            "securityGroupIds": ["sg-build-egress-only"]
+          }
+        }
+
+      Service role identity-based policy (CodeBuild-overpermissive-build-role):
+
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "*",
+              "Resource": "*"
+            }
+          ]
+        }
+      Emit the standard VERDICT block (PROJECT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE_ROLE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE_ROLE"
+        - "overpermissive-build-role"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PRIVILEGED"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: badge-public-status-leak
+    description: >-
+      CodeBuild project with badgeEnabled=true and an otherwise clean
+      posture (no privileged mode, no plaintext secrets, SSE-KMS logs,
+      scoped service role) — public build-status badge leaks project
+      existence and build state to anyone with the URL.
+    input: |
+      Project name: arn:aws:codebuild:us-east-1:111111111111:project/badge-public-status-leak
+      Project config (batch-get-projects output, abridged):
+
+        {
+          "name": "badge-public-status-leak",
+          "source": {
+            "type": "GITHUB",
+            "buildspec": "version: 0.2\nphases:\n  build:\n    commands:\n      - npm ci && npm test"
+          },
+          "environment": {
+            "type": "LINUX_CONTAINER",
+            "image": "aws/codebuild/standard:7.0",
+            "computeType": "BUILD_GENERAL1_SMALL",
+            "privilegedMode": false,
+            "environmentVariables": [
+              {"name": "NODE_ENV", "value": "test", "type": "PLAINTEXT"}
+            ]
+          },
+          "serviceRole": "arn:aws:iam::111111111111:role/service-role/CodeBuild-badge-public-status-leak",
+          "badgeEnabled": true,
+          "logsConfig": {
+            "cloudWatchLogs": {"status": "ENABLED"},
+            "s3Logs": {
+              "status": "ENABLED",
+              "location": "arn:aws:s3:::codebuild-logs-bucket/badge-public-status-leak",
+              "encryptionDisabled": false,
+              "kmsKeyArn": "arn:aws:kms:us-east-1:111111111111:key/abc-123"
+            }
+          },
+          "artifacts": {"encryptionDisabled": false},
+          "vpcConfig": {
+            "vpcId": "vpc-aaa",
+            "subnets": ["subnet-private-1", "subnet-private-2"],
+            "securityGroupIds": ["sg-build-egress-only"]
+          }
+        }
+
+      Service role identity-based policy (scoped):
+
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["codebuild:CreateReport", "codebuild:UpdateReport", "codebuild:BatchPut*"],
+              "Resource": "arn:aws:codebuild:us-east-1:111111111111:project/badge-public-status-leak"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:PutObject"],
+              "Resource": "arn:aws:s3:::codebuild-logs-bucket/badge-public-status-leak/*"
+            }
+          ]
+        }
+      Emit the standard VERDICT block (PROJECT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "badge-public-status-leak"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PRIVILEGED"
+        - "VERDICT: SECRET_LEAK"
+
+  - id: clean-hardened-codebuild
+    description: >-
+      Hardened CodeBuild project: privilegedMode false, no plaintext
+      secrets, SSE-KMS logs and artifacts, scoped service role (named
+      actions on specific ARNs), private VPC subnets, badge disabled —
+      all dimensions pass.
+    input: |
+      Project name: arn:aws:codebuild:us-east-1:111111111111:project/clean-hardened-codebuild
+      Project config (batch-get-projects output, abridged):
+
+        {
+          "name": "clean-hardened-codebuild",
+          "source": {
+            "type": "GITHUB",
+            "buildspec": "version: 0.2\nphases:\n  build:\n    commands:\n      - npm ci && npm test"
+          },
+          "environment": {
+            "type": "LINUX_CONTAINER",
+            "image": "aws/codebuild/standard:7.0",
+            "computeType": "BUILD_GENERAL1_SMALL",
+            "privilegedMode": false,
+            "environmentVariables": [
+              {"name": "NODE_ENV", "value": "test", "type": "PLAINTEXT"},
+              {"name": "DB_PASSWORD", "value": "arn:aws:secretsmanager:us-east-1:111111111111:secret:db-password-abc", "type": "SECRETS_MANAGER"}
+            ],
+            "secretsManager": [
+              {"secretsManagerArn": "arn:aws:secretsmanager:us-east-1:111111111111:secret:db-password-abc", "name": "DB_PASSWORD", "type": "SECRETS_MANAGER"}
+            ]
+          },
+          "serviceRole": "arn:aws:iam::111111111111:role/service-role/CodeBuild-clean-hardened-codebuild",
+          "badgeEnabled": false,
+          "logsConfig": {
+            "cloudWatchLogs": {"status": "ENABLED"},
+            "s3Logs": {
+              "status": "ENABLED",
+              "location": "arn:aws:s3:::codebuild-logs-bucket/clean-hardened-codebuild",
+              "encryptionDisabled": false,
+              "kmsKeyArn": "arn:aws:kms:us-east-1:111111111111:key/abc-123"
+            }
+          },
+          "artifacts": {"encryptionDisabled": false},
+          "vpcConfig": {
+            "vpcId": "vpc-aaa",
+            "subnets": ["subnet-private-1", "subnet-private-2"],
+            "securityGroupIds": ["sg-build-egress-only"]
+          }
+        }
+
+      Service role identity-based policy (scoped, named actions):
+
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["codebuild:CreateReport", "codebuild:UpdateReport", "codebuild:BatchPut*"],
+              "Resource": "arn:aws:codebuild:us-east-1:111111111111:project/clean-hardened-codebuild"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:PutObject"],
+              "Resource": "arn:aws:s3:::codebuild-logs-bucket/clean-hardened-codebuild/*"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["kms:GenerateDataKey*", "kms:Decrypt"],
+              "Resource": "arn:aws:kms:us-east-1:111111111111:key/abc-123"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["secretsmanager:GetSecretValue"],
+              "Resource": "arn:aws:secretsmanager:us-east-1:111111111111:secret:db-password-abc"
+            }
+          ]
+        }
+
+      Service role trust policy (scoped to project):
+
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "codebuild.amazonaws.com"},
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceArn": "arn:aws:codebuild:us-east-1:111111111111:project/clean-hardened-codebuild"
+                }
+              }
+            }
+          ]
+        }
+      Emit the standard VERDICT block (PROJECT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "clean-hardened-codebuild"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PRIVILEGED"
+        - "VERDICT: SECRET_LEAK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+        - "VERDICT: CONFIG_GAP"

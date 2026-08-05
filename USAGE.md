@@ -54,6 +54,15 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-controltower-controls` | 2 Audit | Audit Control Tower landing-zone state, enabled controls (preventive/detective/proactive), SCP drift, guardrail enforcement integrity, Config recorder gaps, and account-factory baseline health — emits DRIFT/DISABLED_CONTROL/CONFIG_GAP/OK per OU or landing zone (routes to `controltower-control-auditor`) |
 | `/aws:audit-wellarchitected-workload` | 2 Audit | Audit Well-Architected Tool workloads for review staleness (effectiveReviewDate > 180 days), per-pillar high-risk issue counts (security zero-tolerance + aggregate > 5), milestone tracking gaps, UNANSWERED majority, and remediation plan completeness — emits STALE_REVIEW/HIGH_RISK/CONFIG_GAP/OK per workload (routes to `wellarchitected-workload-auditor`) |
 | `/aws:audit-organizations-scp` | 2 Audit | Audit Organizations SCPs for effective permissions across the OU hierarchy — FullAWSAccess inheritance, deny-list guardrails (LeaveOrganization, security-service disruption, region restriction), account-level overrides, silently ineffective condition keys — emits PERMISSIVE_SCP/MISSING_GUARDRAIL/CONFIG_GAP/OK per target (routes to `organizations-scp-auditor`) |
+| `/aws:audit-codecommit-repository` | 2 Audit | Audit CodeCommit repositories for approval-rule-template coverage, customer-managed KMS encryption, default-branch deletion protection (IAM enforced, not native), notification-rule alerting, and the CodeCommit service-wide deprecation/maintenance risk — emits NO_APPROVAL_RULE/NO_ENCRYPTION/CONFIG_GAP/DEPRECATION_RISK/OK per repository (routes to `codecommit-repository-auditor`) |
+| `/aws:audit-codebuild-project` | 2 Audit | Audit CodeBuild projects for privileged mode (Docker-in-Docker host access without Docker justification), plaintext secrets in environmentVariables, unencrypted S3 logs and build artifacts (encryptionDisabled=true / no kmsKeyArn), over-permissive service-role blast radius (admin wildcard, PassRole on `*`, unscoped `codebuild.amazonaws.com` trust policy), VPC config (missing or public-subnet isolation), and public build-status badge leakage — emits PRIVILEGED/SECRET_LEAK/NO_ENCRYPTION/OVERPERMISSIVE_ROLE/CONFIG_GAP/OK per project (routes to `codebuild-project-auditor`) |
+| `/aws:audit-apigateway-resource-policy` | 2 Audit | Audit API Gateway REST/HTTP APIs for unauthenticated public methods (authorizationType NONE), API-key-as-auth misuse, cross-account resource policy grants, missing usage plans and rate limiting, and absent WAF Web ACL associations — emits PUBLIC_NO_AUTH/NO_RATE_LIMIT/CONFIG_GAP/OK per API (routes to `apigateway-resource-policy-auditor`) |
+| `/aws:audit-codedeploy-deployment-group` | 2 Audit | Audit CodeDeploy deployment groups for auto-rollback enablement (DEPLOYMENT_FAILURE trigger), CloudWatch alarm monitoring (enabled + populated, ignorePollAlarmFailure), deployment-config risk (AllAtATime, zero minimum-healthy-hosts), and blue/green termination posture (immediate termination, no traffic control) — emits NO_ROLLBACK/NO_ALARMS/CONFIG_GAP/OK per deployment group (routes to `codedeploy-deployment-group-auditor`) |
+| `/aws:audit-sqs-dlq-policy` | 2 Audit | Audit SQS queues for missing or misconfigured dead-letter queue (DLQ), public access via Principal:* queue policies, encryption-at-rest gaps (SSE-SQS / SSE-KMS), maxReceiveCount tuning, DLQ retention periods, and cross-account DLQ accessibility — emits NO_DLQ/PUBLIC_ACCESS/NO_ENCRYPTION/CONFIG_GAP/OK per queue (routes to `sqs-dlq-policy-auditor`) |
+| `/aws:audit-eventbridge-bus-policy` | 2 Audit | Audit EventBridge event buses for public event-injection (Principal:* + PutEvents), missing per-target DLQs, absent customer-managed KMS key, and archive gaps — emits PUBLIC_BUS/NO_DLQ/NO_ENCRYPTION/CONFIG_GAP/OK per bus (routes to `eventbridge-bus-policy-auditor`) |
+| `/aws:audit-sns-topic-public-subscription` | 2 Audit | Audit SNS topics for public subscription exposure (Principal:* with sns:Subscribe/Publish in topic policy), missing KMS encryption, delivery-status logging gaps, FIFO deduplication misconfiguration, and cross-account subscriptions — emits PUBLIC_SUBSCRIPTION/NO_ENCRYPTION/CONFIG_GAP/OK per topic (routes to `sns-topic-public-subscription-auditor`) |
+| `/aws:audit-codepipeline-pipeline` | 2 Audit | Audit CodePipeline pipelines for artifact-store encryption (KMS CMK), cross-account deploy roles, disabled stage transitions, deprecated source credentials (GitHub v1 OAuth), and manual-approval gate coverage — emits NO_ENCRYPTION/OVERPERMISSIVE_ROLE/DISABLED_STAGE/CONFIG_GAP/OK per pipeline (routes to `codepipeline-pipeline-auditor`) |
+| `/aws:audit-stepfunctions-statemachine` | 2 Audit | Audit Step Functions state machines for execution logging coverage (level ALL + includeExecutionData), X-Ray tracing enablement (including the Express-workflow no-op trap), execution-role blast radius (wildcard actions, states:StartExecution chaining, iam:PassRole), and ASL definition validation (missing Catch/Retry on fallible Tasks, missing TimeoutSeconds, unreachable states, cyclic references without exit) — emits NO_LOGGING/NO_TRACING/OVERPERMISSIVE_ROLE/CONFIG_GAP/OK per state machine (routes to `stepfunctions-statemachine-auditor`) |
 
 Every command has a natural-language equivalent — the orchestrator routes
 identically.
@@ -2334,6 +2343,333 @@ for a full OU-hierarchy audit walkthrough covering FullAWSAccess
 mode-switch mechanics, Deny absolutism across the inheritance chain,
 unsupported condition-key detection, and the additive-Deny-SCP
 remediation workflow.
+
+---
+
+### codecommit-repository-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-codecommit-repository`
+
+**What it does:** Audits AWS CodeCommit repositories for approval-rule
+coverage, customer-managed KMS encryption, default-branch deletion
+protection (IAM enforced, not native), notification-rule alerting, and the
+CodeCommit service-wide deprecation/maintenance risk.
+
+**When to invoke (trigger phrases):**
+
+- "audit this CodeCommit repository"
+- "check CodeCommit approval rules"
+- "is my CodeCommit repo encrypted?"
+- "CodeCommit branch protection"
+- "CodeCommit notification rules"
+- "CodeCommit deprecation"
+- "should we migrate off CodeCommit?"
+
+**Example prompt:**
+
+```
+You: /aws:audit-codecommit-repository
+
+     "Audit this repo:
+     Repository name: my-app-backend
+     defaultBranch: main
+     kmsEncryptionKeyId: aws/codecommit
+     approvalRuleTemplates: []
+     notificationRules: []
+     branchProtectionIamPolicies: []
+     tags: {}"
+```
+
+**Expected behavior:**
+
+1. Emits VERDICT: NO_APPROVAL_RULE (no template linked — worst finding).
+2. Notes NO_ENCRYPTION (AWS-managed key) and CONFIG_GAP (no notifications,
+   no branch protection) as secondary findings.
+3. Always includes DEPRECATION_RISK finding (CodeCommit is deprecated).
+4. Remediation: create approval rule template, plan CMK migration, add IAM
+   branch protection, create CodeStar notification rules, evaluate migration.
+
+---
+
+### sqs-dlq-policy-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-sqs-dlq-policy`
+
+**What it does:** Audits AWS SQS queues for dead-letter-queue (DLQ)
+configuration gaps, public access via `Principal: "*"` queue policies,
+encryption-at-rest status (SSE-SQS / SSE-KMS), `maxReceiveCount` tuning,
+message-retention periods, and cross-account DLQ accessibility. Emits a
+deterministic verdict (NO_DLQ | PUBLIC_ACCESS | NO_ENCRYPTION | CONFIG_GAP |
+OK) per queue with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this SQS queue"
+- "is my SQS queue missing a DLQ"
+- "check SQS redrive policy"
+- "is my SQS queue public"
+- "SQS queue encryption"
+- "maxReceiveCount tuning"
+- "DLQ retention period"
+- "cross-account DLQ"
+- "poison pill SQS"
+- "harden SQS queue"
+- reviewing an SQS queue before production deployment or compliance audit
+
+**Example prompt:**
+
+```
+You: "This SQS queue has Principal:* in the policy and no DLQ configured.
+     Production cutover is tomorrow — what's the verdict and remediation?"
+```
+
+**Expected behavior:**
+
+1. Applies the ordered classification (public access → DLQ → encryption →
+   config gaps → OK).
+2. Emits VERDICT: PUBLIC_ACCESS (Step 1 — worst finding wins; the wildcard
+   principal with no condition is CRITICAL).
+3. Enumerates NO_DLQ as an additional HIGH finding (Step 2).
+4. Provides ordered CLI remediation: add aws:SourceArn condition or
+   remove wildcard principal, create and attach DLQ, enable SSE-SQS,
+   tune maxReceiveCount, set DLQ retention to 14 days.
+
+**Key distinction the skill makes:** `Principal: "*"` with an
+`aws:SourceArn` condition (the standard S3-event-notification or
+SNS-subscription pattern) is SAFE — the condition restricts access to the
+specific source resource. Only `Principal: "*"` with NO strong condition
+is classified as PUBLIC_ACCESS.
+
+**End-to-end scenario:** see
+[`skills/sqs-dlq-policy-auditor/examples/end-to-end.md`](skills/sqs-dlq-policy-auditor/examples/end-to-end.md)
+for a holiday-traffic audit walkthrough (public access via legacy wildcard
+statement + safe S3-notification statement + DLQ retention gap) covering
+the Principal:"*" SourceArn distinction, severity aggregation, and the
+assume-breach remediation workflow.
+
+---
+
+### eventbridge-bus-policy-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-eventbridge-bus-policy`
+
+**What it does:** Audits AWS EventBridge event buses for public
+event-injection exposure (`Principal: "*"` or cross-account with
+`events:PutEvents` and no strong condition), missing dead-letter queues
+on rule targets, absent customer-managed KMS encryption
+(`KmsKeyIdentifier`), and archive/enrichment gaps. Emits a deterministic
+verdict (PUBLIC_BUS | NO_DLQ | NO_ENCRYPTION | CONFIG_GAP | OK) per bus
+with enumerated findings and specific remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this event bridge bus"
+- "is my event bus public"
+- "check eventbridge bus policy"
+- "event injection risk"
+- "missing DLQ on rule"
+- "is event bridge encrypted"
+- "event bus cross-account"
+- "Principal star eventbridge"
+- "dead-letter queue check"
+- "event bridge archive gap"
+- reviewing an EventBridge bus before production deployment
+
+**Example prompt:**
+
+```
+You: "This event bus grants events:PutEvents to Principal {AWS: *} with
+     no condition. The rule targets don't have DLQs. What's the risk?"
+```
+
+**Expected behavior:**
+
+1. Classifies the principal scope (wildcard), action danger (INJECT —
+   PutEvents is an event-injection blast-radius multiplier), and
+   condition strength (none).
+2. Emits VERDICT: PUBLIC_BUS (Step 5a — wildcard PutEvents, no
+   condition).
+3. Identifies the DLQ gap as an additional NO_DLQ finding.
+4. Provides assume-breach remediation: scope the principal, add
+   conditions, attach DLQs, associate CMK, create archive.
+
+**End-to-end scenario:** see
+[`skills/eventbridge-bus-policy-auditor/examples/end-to-end.md`](skills/eventbridge-bus-policy-auditor/examples/end-to-end.md)
+for a multi-finding audit walkthrough (wildcard PutEvents + missing
+per-target DLQs + absent CMK) covering event-injection reasoning, the
+root-delegation exception, per-target DeadLetterConfig semantics, and
+severity aggregation.
+
+### codepipeline-pipeline-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-codepipeline-pipeline`
+
+**What it does:** Audits AWS CodePipeline pipelines for artifact-store
+encryption (KMS CMK presence), cross-account or over-permissive action
+roles, disabled stage transitions, source-action credential posture
+(GitHub v1 OAuth vs CodeStar Connection), and manual-approval gate
+coverage.
+
+**When to invoke (trigger phrases):**
+
+- "audit this CodePipeline pipeline"
+- "is my pipeline artifact store encrypted?"
+- "check for disabled stage transitions"
+- "cross-account deploy role in pipeline"
+- "GitHub v1 source deprecated"
+- "missing manual approval gate"
+- "over-permissive pipeline role"
+- "CodeStar Connection check"
+
+**Example prompt:**
+
+```
+You: /aws:audit-codepipeline-pipeline
+
+     "Audit this pipeline:
+     Pipeline name: prod-deploy-pipeline
+     artifactStore: { type: S3, location: my-bucket } (no encryptionKey)
+     Source: ThirdParty/GitHub (v1 OAuth)
+     Deploy: CloudFormation, RoleArn: arn:aws:iam::111111111111:role/Deploy
+     Pipeline state: all transitions enabled
+     Artifact bucket SSE: none"
+```
+
+**Expected behavior:**
+
+1. Emits VERDICT: NO_ENCRYPTION (artifact store has no CMK — worst finding).
+2. Notes CONFIG_GAP (GitHub v1 deprecated source) as secondary finding.
+3. Remediation: create CMK, grant pipeline role KMS permissions, migrate
+   to CodeStar Connection, update pipeline definition.
+
+**End-to-end scenario:** see
+[`skills/codepipeline-pipeline-auditor/examples/end-to-end.md`](skills/codepipeline-pipeline-auditor/examples/end-to-end.md)
+for a full production pipeline audit walkthrough covering artifact
+encryption gaps, deprecated source credential migration, missing approval
+gates, and the worst-finding aggregation logic.
+
+---
+
+### sns-topic-public-subscription-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-sns-topic-public-subscription`
+
+**What it does:** Audits SNS topics for public subscription exposure
+(Principal:"*" with sns:Subscribe/Publish in topic policy), missing KMS
+encryption, delivery-status logging gaps, FIFO deduplication
+misconfiguration, and cross-account subscriptions.
+
+**When to invoke (trigger phrases):**
+
+- "audit this SNS topic"
+- "is my SNS topic public?"
+- "SNS public subscription"
+- "who can subscribe to my topic?"
+- "SNS delivery logging"
+- "SNS FIFO deduplication"
+- "harden SNS topic policy"
+- reviewing an SNS topic before production deployment
+
+**Example prompt:**
+
+```
+You: "This SNS topic has Principal:* with sns:Subscribe in the policy and
+     no KMS encryption. What's the exposure?"
+```
+
+**Expected behavior:**
+
+1. Applies the ordered classification (public subscription → KMS encryption
+   → delivery logging → FIFO dedup → cross-account subs → aggregation).
+2. Emits VERDICT: PUBLIC_SUBSCRIPTION (Step 1 — Principal:"*" with
+   sns:Subscribe and no condition is push-based data exfiltration).
+3. Identifies NO_ENCRYPTION as an additional finding (Step 2).
+4. Provides assume-breach remediation: scope the principal, add
+   aws:SourceOwner condition, enable CMK encryption, configure delivery
+   logging.
+
+**Key distinction the skill makes:** `sns:Subscribe` with `Principal: "*"`
+is worse than the equivalent SQS public-read — SNS pushes messages to the
+subscriber automatically (no polling required), making it a passive,
+persistent data exfiltration pipe. `Principal: "*"` with `aws:SourceOwner`
+condition is downgraded to CONFIG_GAP (scoped but fragile).
+
+**End-to-end scenario:** see
+[`skills/sns-topic-public-subscription-auditor/examples/end-to-end.md`](skills/sns-topic-public-subscription-auditor/examples/end-to-end.md)
+for a multi-finding audit walkthrough (public Subscribe + no encryption +
+FIFO dedup off) covering push-exfiltration reasoning, the
+aws:SourceOwner downgrade, per-protocol delivery logging, and severity
+aggregation.
+
+---
+
+### stepfunctions-statemachine-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-stepfunctions-statemachine`
+
+**What it does:** Audits Step Functions state machines across four
+orthogonal dimensions — execution logging coverage (`level: ALL` +
+`includeExecutionData: true`), X-Ray tracing enablement (including the
+Express-workflow no-op trap where `TracingConfiguration.enabled: true`
+silently produces no X-Ray traces), execution-role blast radius
+(`Action "*"` on `Resource "*"`, service wildcards,
+`states:StartExecution` chaining, `iam:PassRole`), and ASL definition
+validation (fallible Tasks without Catch/Retry, missing `TimeoutSeconds`,
+unreachable states, cyclic references without exit, Choice without
+Default). Emits a deterministic verdict
+(`NO_LOGGING | NO_TRACING | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK`) per
+state machine with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this state machine"
+- "check Step Functions logging"
+- "is X-Ray tracing enabled?"
+- "is the execution role too broad?"
+- "validate this ASL definition"
+- "does this Task have error handling?"
+- "is this Express workflow traced?"
+- reviewing a state machine before production promotion
+
+**Example prompt:**
+
+```
+You: "This Standard workflow has logging level ALL but
+     includeExecutionData false. The role grants lambda:* on *. Is this
+     production-ready?"
+```
+
+**Expected behavior:**
+
+1. Classifies the execution role as OVERPERMISSIVE_ROLE (lambda wildcard
+   on `*` — fan-out access to every Lambda function in the account).
+2. Flags the `includeExecutionData: false` trap as NO_LOGGING — state
+   transitions are logged but NOT input/output payloads (forensically
+   near-useless).
+3. Aggregates by precedence: OVERPERMISSIVE_ROLE > NO_LOGGING, so the
+   verdict is OVERPERMISSIVE_ROLE with the logging gap in FINDINGS.
+4. Emits specific CLI remediation: scope the role to named actions on
+   specific ARNs, and `update-state-machine` with
+   `includeExecutionData=true`.
+
+**End-to-end scenario:** see
+[`skills/stepfunctions-statemachine-auditor/examples/end-to-end.md`](skills/stepfunctions-statemachine-auditor/examples/end-to-end.md)
+for a multi-finding audit walkthrough (over-permissive role +
+includeExecutionData trap on an order pipeline) covering precedence
+aggregation, the fan-out blast-radius concept, and the role-scoping +
+logging-fix remediation workflow.
 
 ---
 

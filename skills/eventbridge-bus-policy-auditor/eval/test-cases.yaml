@@ -1,0 +1,370 @@
+# Eval test cases for eventbridge-bus-policy-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: eventbridge-bus-policy-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-bus-wildcard-putevents
+    description: >-
+      Custom event bus granting events:PutEvents to Principal {"AWS": "*"}
+      with no restrictive condition — any AWS account can inject events and
+      trigger every rule on the bus.
+    input: |
+      Audit the following EventBridge event bus configuration. Emit the
+      standard VERDICT block (BUS, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Event bus name: custom-bus-public-bus-wildcard-putevents
+      Bus ARN: arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-public-bus-wildcard-putevents
+      KmsKeyIdentifier: (absent — bus uses AWS-owned key)
+
+      Bus policy:
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "events:*",
+            "Resource": "*"
+          },
+          {
+            "Sid": "OpenIngest",
+            "Effect": "Allow",
+            "Principal": {"AWS": "*"},
+            "Action": "events:PutEvents",
+            "Resource": "arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-public-bus-wildcard-putevents"
+          }
+        ]
+      }
+
+      Rules:
+        - Name: alert-rule
+          EventPattern: {"source": ["app.alerts"]}
+          Targets:
+            - Id: lambda-target
+              Arn: arn:aws:lambda:us-east-1:111111111111:function:alert-handler
+              DeadLetterConfig: (absent)
+
+      Archive: (none configured)
+    expected_verdict: PUBLIC_BUS
+    assertions:
+      must_contain:
+        - "PUBLIC_BUS"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: no-dlq-silent-drop
+    description: >-
+      Custom event bus with scoped same-account bus policy, customer-managed
+      KMS key, and archive configured — but rule targets have no
+      DeadLetterConfig, risking silent event loss after retry exhaustion.
+    input: |
+      Audit the following EventBridge event bus configuration. Emit the
+      standard VERDICT block (BUS, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Event bus name: custom-bus-no-dlq-silent-drop
+      Bus ARN: arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-no-dlq-silent-drop
+      KmsKeyIdentifier: arn:aws:kms:us-east-1:111111111111:key/cmk-eventbridge-prod
+
+      Bus policy:
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "events:*",
+            "Resource": "*"
+          },
+          {
+            "Sid": "AppPublish",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-publisher"},
+            "Action": "events:PutEvents",
+            "Resource": "arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-no-dlq-silent-drop"
+          }
+        ]
+      }
+
+      Rules:
+        - Name: order-processing-rule
+          EventPattern: {"source": ["app.orders"]}
+          Targets:
+            - Id: lambda-target
+              Arn: arn:aws:lambda:us-east-1:111111111111:function:order-handler
+              DeadLetterConfig: (absent)
+            - Id: sqs-target
+              Arn: arn:aws:sqs:us-east-1:111111111111:order-queue
+              DeadLetterConfig: (absent)
+
+      Archive:
+        - Name: orders-archive
+          EventSourceName: custom-bus-no-dlq-silent-drop
+          RetentionDays: 30
+    expected_verdict: NO_DLQ
+    assertions:
+      must_contain:
+        - "NO_DLQ"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: no-encryption-aws-managed
+    description: >-
+      Custom event bus with scoped bus policy, dead-letter queues on all rule
+      targets, and archive configured — but KmsKeyIdentifier is absent, so the
+      bus uses an AWS-owned key with no rotation control or decrypt-audit
+      capability.
+    input: |
+      Audit the following EventBridge event bus configuration. Emit the
+      standard VERDICT block (BUS, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Event bus name: custom-bus-no-encryption-aws-managed
+      Bus ARN: arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-no-encryption-aws-managed
+      KmsKeyIdentifier: (absent — bus uses AWS-owned key)
+
+      Bus policy:
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "events:*",
+            "Resource": "*"
+          },
+          {
+            "Sid": "AppPublish",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-publisher"},
+            "Action": "events:PutEvents",
+            "Resource": "arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-no-encryption-aws-managed"
+          }
+        ]
+      }
+
+      Rules:
+        - Name: signal-rule
+          EventPattern: {"source": ["app.signals"]}
+          Targets:
+            - Id: lambda-target
+              Arn: arn:aws:lambda:us-east-1:111111111111:function:signal-handler
+              DeadLetterConfig:
+                Arn: arn:aws:sqs:us-east-1:111111111111:signal-dlq
+
+      Archive:
+        - Name: signals-archive
+          EventSourceName: custom-bus-no-encryption-aws-managed
+          RetentionDays: 14
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: config-gap-no-archive
+    description: >-
+      Custom event bus with scoped bus policy, dead-letter queues on all
+      targets, and customer-managed KMS key — but no archive configured, so
+      there is no event-replay capability for incident recovery.
+    input: |
+      Audit the following EventBridge event bus configuration. Emit the
+      standard VERDICT block (BUS, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Event bus name: custom-bus-config-gap-no-archive
+      Bus ARN: arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-config-gap-no-archive
+      KmsKeyIdentifier: arn:aws:kms:us-east-1:111111111111:key/cmk-eventbridge-staging
+
+      Bus policy:
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "events:*",
+            "Resource": "*"
+          },
+          {
+            "Sid": "AppPublish",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-publisher"},
+            "Action": "events:PutEvents",
+            "Resource": "arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-config-gap-no-archive"
+          }
+        ]
+      }
+
+      Rules:
+        - Name: notify-rule
+          EventPattern: {"source": ["app.notify"]}
+          Targets:
+            - Id: lambda-target
+              Arn: arn:aws:lambda:us-east-1:111111111111:function:notify-handler
+              DeadLetterConfig:
+                Arn: arn:aws:sqs:us-east-1:111111111111:notify-dlq
+
+      Archive: (none configured)
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: ok-org-scoped-bus
+    description: >-
+      Custom event bus with a cross-account principal restricted by
+      aws:PrincipalOrgID (STRONG condition), dead-letter queues on all
+      targets, customer-managed KMS key, and archive configured — fully
+      secured posture.
+    input: |
+      Audit the following EventBridge event bus configuration. Emit the
+      standard VERDICT block (BUS, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Event bus name: custom-bus-ok-org-scoped-bus
+      Bus ARN: arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-ok-org-scoped-bus
+      KmsKeyIdentifier: arn:aws:kms:us-east-1:111111111111:key/cmk-eventbridge-prod
+
+      Bus policy:
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "events:*",
+            "Resource": "*"
+          },
+          {
+            "Sid": "CrossAccountOrgScoped",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::222222222222:role/app-publisher"},
+            "Action": "events:PutEvents",
+            "Resource": "arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-ok-org-scoped-bus",
+            "Condition": {
+              "StringEquals": {
+                "aws:PrincipalOrgID": "o-aabbccdded"
+              }
+            }
+          }
+        ]
+      }
+
+      Rules:
+        - Name: ingest-rule
+          EventPattern: {"source": ["app.ingest"]}
+          Targets:
+            - Id: lambda-target
+              Arn: arn:aws:lambda:us-east-1:111111111111:function:ingest-handler
+              DeadLetterConfig:
+                Arn: arn:aws:sqs:us-east-1:111111111111:ingest-dlq
+
+      Archive:
+        - Name: ingest-archive
+          EventSourceName: custom-bus-ok-org-scoped-bus
+          RetentionDays: 30
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "VERDICT: OK"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: public-bus-weak-source-ip
+    description: >-
+      Custom event bus granting events:PutEvents to Principal "*" with an
+      aws:SourceIp condition of 0.0.0.0/0 — the CIDR covers the entire
+      internet, so the condition provides zero restriction. The bus is
+      effectively public despite the nominal condition.
+    input: |
+      Audit the following EventBridge event bus configuration. Emit the
+      standard VERDICT block (BUS, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Event bus name: custom-bus-public-bus-weak-source-ip
+      Bus ARN: arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-public-bus-weak-source-ip
+      KmsKeyIdentifier: arn:aws:kms:us-east-1:111111111111:key/cmk-eventbridge-staging
+
+      Bus policy:
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "events:*",
+            "Resource": "*"
+          },
+          {
+            "Sid": "IpRestrictedIngest",
+            "Effect": "Allow",
+            "Principal": {"AWS": "*"},
+            "Action": "events:PutEvents",
+            "Resource": "arn:aws:events:us-east-1:111111111111:event-bus/custom-bus-public-bus-weak-source-ip",
+            "Condition": {
+              "IpAddress": {
+                "aws:SourceIp": "0.0.0.0/0"
+              }
+            }
+          }
+        ]
+      }
+
+      Rules:
+        - Name: webhook-rule
+          EventPattern: {"source": ["app.webhooks"]}
+          Targets:
+            - Id: lambda-target
+              Arn: arn:aws:lambda:us-east-1:111111111111:function:webhook-handler
+              DeadLetterConfig:
+                Arn: arn:aws:sqs:us-east-1:111111111111:webhook-dlq
+
+      Archive:
+        - Name: webhooks-archive
+          EventSourceName: custom-bus-public-bus-weak-source-ip
+          RetentionDays: 7
+    expected_verdict: PUBLIC_BUS
+    assertions:
+      must_contain:
+        - "PUBLIC_BUS"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"

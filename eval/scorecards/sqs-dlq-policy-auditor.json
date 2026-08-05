@@ -1,0 +1,70 @@
+{
+  "skill": "sqs-dlq-policy-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds concrete expert knowledge not commonly known: double\u2011encoded RedrivePolicy parsing, FIFO\u2011to\u2011FIFO DLQ constraint, visibility\u2011timeout \u00d7 maxReceiveCount retry window, Lambda event\u2011source\u2011mapping impact, RedriveAllowPolicy semantics, cross\u2011region ARN validation, and precise numeric thresholds (maxReceiveCount \u22641, >1000, retention <4\u202fdays). This depth provides genuine delta beyond a baseline model."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: pagination with --next-token, exact CLI attribute names (PascalCase), backup before SetQueueAttributes, mandatory confirmation before state\u2011changing actions, and ordered stepwise audit flow. Only minor generic phrasing (e.g., \"check for \u2026\") prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Provides an extensive NEVER list with concrete reasoning for each anti\u2011pattern (wildcard principal with weak condition, treating SSE\u2011SQS as unencrypted, maxReceiveCount\u202f=\u202f1, legacy Redrive API, etc.). No gaps observed."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete and includes description, activation triggers, invocation schema, and keywords. The \"when_to_use\" section is present but slightly verbose, making trigger detection marginally less crisp."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (quick reference, pre\u2011flight, stepwise process, edge cases), but the initial sections are dense and contain many rules that could overwhelm a first\u2011pass read, leading to some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive operations are tightly gated with explicit CONFIRM prompts, backups, and warnings about PurgeQueue. Creative/diagnostic tasks are left unrestricted, matching task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a clear, repeatable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Edge cases \u2192 Anti\u2011Patterns \u2192 Remediation), making the skill easy to recognize and navigate."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides working decision trees, concrete CLI remediation commands, handling of malformed JSON, and example model outputs that align with the specification. Slight deduction for the lack of an explicit step to fetch and verify a cross\u2011account DLQ's RedriveAllowPolicy in one command, requiring the user to infer the process."
+    }
+  ],
+  "total_score": 112,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 39513,
+  "latency_ms": 13183,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

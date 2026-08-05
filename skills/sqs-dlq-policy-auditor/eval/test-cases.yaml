@@ -1,0 +1,258 @@
+# Eval test cases for sqs-dlq-policy-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: sqs-dlq-policy-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-access-no-condition
+    description: >-
+      SQS queue with a wildcard Principal:"*" + sqs:SendMessage and no
+      restrictive condition — any AWS account can inject messages.
+    input: |
+      Queue URL: https://sqs.us-east-1.amazonaws.com/111111111111/public-access-no-condition
+      QueueArn: arn:aws:sqs:us-east-1:111111111111:public-access-no-condition
+      Attributes:
+        Policy:
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "OpenSend",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "sqs:SendMessage",
+                "Resource": "arn:aws:sqs:us-east-1:111111111111:public-access-no-condition"
+              }
+            ]
+          }
+        RedrivePolicy:
+          {"deadLetterTargetArn": "arn:aws:sqs:us-east-1:111111111111:public-access-no-condition-dlq", "maxReceiveCount": "5"}
+        SqsManagedSseEnabled: true
+        MessageRetentionPeriod: "345600"
+        VisibilityTimeout: "30"
+      Emit the standard VERDICT block (QUEUE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_ACCESS
+    assertions:
+      must_contain:
+        - "PUBLIC_ACCESS"
+        - "public-access-no-condition"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "CRITICAL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_DLQ"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: no-dlq-configured
+    description: >-
+      Standard SQS queue with no RedrivePolicy attribute — poison-pill
+      messages retry indefinitely with no dead-letter safety net.
+    input: |
+      Queue URL: https://sqs.us-east-1.amazonaws.com/111111111111/no-dlq-configured
+      QueueArn: arn:aws:sqs:us-east-1:111111111111:no-dlq-configured
+      Attributes:
+        Policy: (empty — no resource-based queue policy)
+        RedrivePolicy: (not set)
+        SqsManagedSseEnabled: true
+        MessageRetentionPeriod: "345600"
+        VisibilityTimeout: "30"
+      Emit the standard VERDICT block (QUEUE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_DLQ
+    assertions:
+      must_contain:
+        - "NO_DLQ"
+        - "no-dlq-configured"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "HIGH"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ACCESS"
+
+  - id: no-encryption-queue
+    description: >-
+      SQS queue with DLQ configured and no public policy, but neither
+      SqsManagedSseEnabled nor KmsMasterKeyId set — message bodies stored
+      in plaintext at rest.
+    input: |
+      Queue URL: https://sqs.us-east-1.amazonaws.com/111111111111/no-encryption-queue
+      QueueArn: arn:aws:sqs:us-east-1:111111111111:no-encryption-queue
+      Attributes:
+        Policy: (empty — no resource-based queue policy)
+        RedrivePolicy:
+          {"deadLetterTargetArn": "arn:aws:sqs:us-east-1:111111111111:no-encryption-queue-dlq", "maxReceiveCount": "5"}
+        KmsMasterKeyId: (not set)
+        SqsManagedSseEnabled: false
+        MessageRetentionPeriod: "345600"
+        VisibilityTimeout: "30"
+      Emit the standard VERDICT block (QUEUE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "no-encryption-queue"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "HIGH"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ACCESS"
+
+  - id: config-gap-maxreceive-one
+    description: >-
+      SQS queue with DLQ configured, SSE-SQS enabled, no public policy, but
+      maxReceiveCount set to 1 (too aggressive — any transient failure sends
+      the message straight to the DLQ) and DLQ retention only 1 day.
+    input: |
+      Queue URL: https://sqs.us-east-1.amazonaws.com/111111111111/config-gap-maxreceive-one
+      QueueArn: arn:aws:sqs:us-east-1:111111111111:config-gap-maxreceive-one
+      Attributes:
+        Policy: (empty — no resource-based queue policy)
+        RedrivePolicy:
+          {"deadLetterTargetArn": "arn:aws:sqs:us-east-1:111111111111:config-gap-maxreceive-one-dlq", "maxReceiveCount": "1"}
+        SqsManagedSseEnabled: true
+        MessageRetentionPeriod: "345600"
+        VisibilityTimeout: "30"
+      DLQ attributes:
+        QueueArn: arn:aws:sqs:us-east-1:111111111111:config-gap-maxreceive-one-dlq
+        MessageRetentionPeriod: "86400"
+      Emit the standard VERDICT block (QUEUE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-maxreceive-one"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "MEDIUM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ACCESS"
+        - "VERDICT: NO_DLQ"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: ok-clean-config
+    description: >-
+      SQS queue with named-principal policy, DLQ configured with maxReceiveCount
+      5, SSE-SQS enabled, DLQ retention at 14 days — all checks pass.
+    input: |
+      Queue URL: https://sqs.us-east-1.amazonaws.com/111111111111/ok-clean-config
+      QueueArn: arn:aws:sqs:us-east-1:111111111111:ok-clean-config
+      Attributes:
+        Policy:
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "AppConsumer",
+                "Effect": "Allow",
+                "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-consumer"},
+                "Action": ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
+                "Resource": "arn:aws:sqs:us-east-1:111111111111:ok-clean-config"
+              }
+            ]
+          }
+        RedrivePolicy:
+          {"deadLetterTargetArn": "arn:aws:sqs:us-east-1:111111111111:ok-clean-config-dlq", "maxReceiveCount": "5"}
+        SqsManagedSseEnabled: true
+        MessageRetentionPeriod: "345600"
+        VisibilityTimeout: "30"
+      DLQ attributes:
+        QueueArn: arn:aws:sqs:us-east-1:111111111111:ok-clean-config-dlq
+        MessageRetentionPeriod: "1209600"
+      Emit the standard VERDICT block (QUEUE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ok-clean-config"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PUBLIC_ACCESS"
+        - "VERDICT: NO_DLQ"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: public-source-arn-still-ok
+    description: >-
+      SQS queue with Principal:"*" in the queue policy but restricted by
+      aws:SourceArn condition (standard S3-event-notification pattern) —
+      access is genuinely scoped. DLQ configured, SSE-SQS enabled. Should
+      be classified OK, NOT PUBLIC_ACCESS.
+    input: |
+      Queue URL: https://sqs.us-east-1.amazonaws.com/111111111111/public-source-arn-still-ok
+      QueueArn: arn:aws:sqs:us-east-1:111111111111:public-source-arn-still-ok
+      Attributes:
+        Policy:
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "S3Notification",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "sqs:SendMessage",
+                "Resource": "arn:aws:sqs:us-east-1:111111111111:public-source-arn-still-ok",
+                "Condition": {
+                  "ArnEquals": {"aws:SourceArn": "arn:aws:s3:::notification-source-bucket"}
+                }
+              }
+            ]
+          }
+        RedrivePolicy:
+          {"deadLetterTargetArn": "arn:aws:sqs:us-east-1:111111111111:public-source-arn-still-ok-dlq", "maxReceiveCount": "5"}
+        SqsManagedSseEnabled: true
+        MessageRetentionPeriod: "345600"
+        VisibilityTimeout: "30"
+      DLQ attributes:
+        QueueArn: arn:aws:sqs:us-east-1:111111111111:public-source-arn-still-ok-dlq
+        MessageRetentionPeriod: "1209600"
+      Emit the standard VERDICT block (QUEUE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "public-source-arn-still-ok"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PUBLIC_ACCESS"
+        - "VERDICT: NO_DLQ"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"

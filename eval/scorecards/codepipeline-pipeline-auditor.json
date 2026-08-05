@@ -1,0 +1,70 @@
+{
+  "skill": "codepipeline-pipeline-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many expert\u2011level details not commonly known to a baseline model: cross\u2011region artifactStore encryption nuances, fragility of KMS alias ARNs, exact behavior of disabled stage transitions, deprecated GitHub v1 OAuth risks, interaction of CodeBuild encryption, and the need to snapshot pipelines before UpdatePipeline. These constitute genuine delta beyond generic knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific audit workflow with a precise order (pre\u2011flight validation \u2192 artifact encryption \u2192 role cross\u2011account check \u2192 transition state \u2192 source credential \u2192 approval gate) and supplies exact CLI commands for each remediation. Procedures are concrete to CodePipeline rather than generic security checks."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with explicit reasoning (e.g., never treat missing encryptionKey as OK, never confuse pipeline vs action roles, never assume disabled transitions appear in get\u2011pipeline). Missing only a few broader anti\u2011patterns such as bucket\u2011policy over\u2011exposure, which prevents a perfect score."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, includes description, keywords, activation triggers, and an invocation schema. The only shortfall is the absence of a concrete example input/output block, which would make activation marginally less reliable."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (quick reference, then detailed steps, then deep reference). However the skill front\u2011loads many sections, which can cause cognitive overload for a first\u2011time user, so a slight deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom well: destructive actions require explicit CONFIRM prompts and snapshot steps; audit logic is tight for fragile checks. Minor deduction because remediation steps assume IAM permissions without first verifying them."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation \u2192 Deep reference) that aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete output format, decision tree, and working CLI remediation examples, enabling an agent to act. Minor gaps: does not detail how to retrieve bucket SSE metadata or automate cross\u2011service checks (e.g., CodeBuild encryption), preventing a perfect score."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 39910,
+  "latency_ms": 13692,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

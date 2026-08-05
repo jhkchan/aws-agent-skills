@@ -1,0 +1,318 @@
+# Eval test cases for sns-topic-public-subscription-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: sns-topic-public-subscription-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-subscribe-no-condition
+    description: >-
+      Standard SNS topic granting sns:Subscribe and sns:Publish to Principal "*"
+      with no restrictive condition — push-based data exfiltration and message
+      injection by anyone.
+    input: |
+      Topic ARN: arn:aws:sns:us-east-1:111111111111:public-subscribe-no-condition
+      Topic attributes:
+        FifoTopic: false
+        KmsMasterKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-abc123
+        SubscriptionsConfirmed: 3
+        SQSSuccessFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+        SQSFailureFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+
+      Topic policy:
+
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "sns:*",
+            "Resource": "arn:aws:sns:us-east-1:111111111111:public-subscribe-no-condition"
+          },
+          {
+            "Sid": "OpenSubscribe",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+              "sns:Subscribe",
+              "sns:Publish"
+            ],
+            "Resource": "arn:aws:sns:us-east-1:111111111111:public-subscribe-no-condition"
+          }
+        ]
+      }
+
+      Emit the standard VERDICT block (TOPIC, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_SUBSCRIPTION
+    assertions:
+      must_contain:
+        - "PUBLIC_SUBSCRIPTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Principal"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: wildcard-sns-all-no-encryption
+    description: >-
+      Standard SNS topic granting sns:* to Principal "*" with no condition, no KMS
+      encryption, and no delivery status logging — full public control plus
+      unencrypted messages.
+    input: |
+      Topic ARN: arn:aws:sns:us-east-1:111111111111:wildcard-sns-all-no-encryption
+      Topic attributes:
+        FifoTopic: false
+        KmsMasterKeyId: (empty — no encryption configured)
+        SubscriptionsConfirmed: 5
+
+      Topic policy:
+
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "OpenAccess",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "sns:*",
+            "Resource": "arn:aws:sns:us-east-1:111111111111:wildcard-sns-all-no-encryption"
+          }
+        ]
+      }
+
+      Emit the standard VERDICT block (TOPIC, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_SUBSCRIPTION
+    assertions:
+      must_contain:
+        - "PUBLIC_SUBSCRIPTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "encryption"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-encryption-same-account
+    description: >-
+      Standard SNS topic with same-account-only principals and named actions, but
+      KmsMasterKeyId is empty — messages stored in plaintext at rest.
+    input: |
+      Topic ARN: arn:aws:sns:us-east-1:111111111111:no-encryption-same-account
+      Topic attributes:
+        FifoTopic: false
+        KmsMasterKeyId: (empty — no encryption configured)
+        SubscriptionsConfirmed: 2
+        SQSSuccessFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+        SQSFailureFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+
+      Topic policy:
+
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "sns:*",
+            "Resource": "arn:aws:sns:us-east-1:111111111111:no-encryption-same-account"
+          },
+          {
+            "Sid": "AppPublish",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-publisher"},
+            "Action": [
+              "sns:Publish",
+              "sns:GetTopicAttributes"
+            ],
+            "Resource": "arn:aws:sns:us-east-1:111111111111:no-encryption-same-account"
+          }
+        ]
+      }
+
+      Emit the standard VERDICT block (TOPIC, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_SUBSCRIPTION"
+
+  - id: fifo-no-dedup-config-gap
+    description: >-
+      FIFO SNS topic with same-account-only policy and CMK encryption, but
+      ContentBasedDeduplication is false — exactly-once guarantee silently broken
+      unless every publisher sends MessageDeduplicationId.
+    input: |
+      Topic ARN: arn:aws:sns:us-east-1:111111111111:fifo-no-dedup-config-gap.fifo
+      Topic attributes:
+        FifoTopic: true
+        ContentBasedDeduplication: false
+        KmsMasterKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-fifo456
+        SubscriptionsConfirmed: 1
+        SQSSuccessFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+        SQSFailureFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+
+      Topic policy:
+
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "sns:*",
+            "Resource": "arn:aws:sns:us-east-1:111111111111:fifo-no-dedup-config-gap.fifo"
+          }
+        ]
+      }
+
+      Emit the standard VERDICT block (TOPIC, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "deduplication"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_SUBSCRIPTION"
+
+  - id: source-owner-scoped-config-gap
+    description: >-
+      Standard SNS topic granting sns:Publish to Principal "*" but restricted by
+      aws:SourceOwner condition — scoped to the owning account but fragile, plus
+      delivery logging is missing.
+    input: |
+      Topic ARN: arn:aws:sns:us-east-1:111111111111:source-owner-scoped-config-gap
+      Topic attributes:
+        FifoTopic: false
+        KmsMasterKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-scoped789
+        SubscriptionsConfirmed: 4
+
+      Topic policy:
+
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "sns:*",
+            "Resource": "arn:aws:sns:us-east-1:111111111111:source-owner-scoped-config-gap"
+          },
+          {
+            "Sid": "ScopedPublish",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "sns:Publish",
+            "Resource": "arn:aws:sns:us-east-1:111111111111:source-owner-scoped-config-gap",
+            "Condition": {
+              "StringEquals": {
+                "aws:SourceOwner": "111111111111"
+              }
+            }
+          }
+        ]
+      }
+
+      Emit the standard VERDICT block (TOPIC, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PUBLIC_SUBSCRIPTION"
+        - "VERDICT: OK"
+
+  - id: clean-cmk-logging-ok
+    description: >-
+      Standard SNS topic with same-account-only policy, customer-managed KMS
+      encryption, delivery-status logging on all active protocols, no wildcard
+      principals — clean posture.
+    input: |
+      Topic ARN: arn:aws:sns:us-east-1:111111111111:clean-cmk-logging-ok
+      Topic attributes:
+        FifoTopic: false
+        KmsMasterKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-clean012
+        SubscriptionsConfirmed: 3
+        SQSSuccessFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+        SQSFailureFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+        HTTPSuccessFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+        HTTPFailureFeedbackRoleArn: arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+
+      Topic policy:
+
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "RootAccess",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+            "Action": "sns:*",
+            "Resource": "arn:aws:sns:us-east-1:111111111111:clean-cmk-logging-ok"
+          },
+          {
+            "Sid": "AppPublish",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-publisher"},
+            "Action": [
+              "sns:Publish",
+              "sns:GetTopicAttributes",
+              "sns:ListSubscriptionsByTopic"
+            ],
+            "Resource": "arn:aws:sns:us-east-1:111111111111:clean-cmk-logging-ok"
+          }
+        ]
+      }
+
+      Emit the standard VERDICT block (TOPIC, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PUBLIC_SUBSCRIPTION"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"

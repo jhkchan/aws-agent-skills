@@ -1,0 +1,295 @@
+# Eval test cases for codedeploy-deployment-group-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: codedeploy-deployment-group-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-rollback-no-alarms
+    description: >-
+      EC2 deployment group with autoRollbackConfiguration absent and
+      alarmConfiguration absent — no automatic recovery path and no
+      application-level monitoring during deployments.
+    input: |
+      Deployment group configuration (from aws deploy get-deployment-group):
+
+      Application: payment-api-app
+      Deployment group: no-rollback-no-alarms-dg
+      Deployment group ID: d-no-rollback-no-alarms
+      Compute platform: Server
+      Deployment config: CodeDeployDefault.OneAtATime
+      Deployment style: IN_PLACE (no traffic control needed for in-place)
+
+      autoRollbackConfiguration:
+        enabled: false
+        triggers: []
+
+      alarmConfiguration:
+        enabled: false
+        ignorePollAlarmFailure: false
+        alarms: []
+
+      Emit the standard VERDICT block (DEPLOYMENT_GROUP, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: NO_ROLLBACK
+    assertions:
+      must_contain:
+        - "NO_ROLLBACK"
+        - "no-rollback-no-alarms-dg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "rollback"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ALARMS"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: rollback-disabled-alarms-on
+    description: >-
+      Deployment group with alarm monitoring enabled (alarms populated) but
+      autoRollbackConfiguration.enabled is false — alarms fire but deployment
+      does not automatically recover.
+    input: |
+      Deployment group configuration (from aws deploy get-deployment-group):
+
+      Application: checkout-service-app
+      Deployment group: rollback-disabled-dg
+      Deployment group ID: d-rollback-disabled
+      Compute platform: Server
+      Deployment config: CodeDeployDefault.OneAtATime
+      Deployment style: IN_PLACE
+
+      autoRollbackConfiguration:
+        enabled: false
+        triggers: []
+
+      alarmConfiguration:
+        enabled: true
+        ignorePollAlarmFailure: false
+        alarms:
+          - name: HighErrorRate
+          - name: ElevatedLatency
+
+      Emit the standard VERDICT block (DEPLOYMENT_GROUP, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: NO_ROLLBACK
+    assertions:
+      must_contain:
+        - "NO_ROLLBACK"
+        - "rollback-disabled-dg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "rollback"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ALARMS"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: rollback-on-no-alarms
+    description: >-
+      Deployment group with auto-rollback properly enabled (DEPLOYMENT_FAILURE
+      trigger present) but alarmConfiguration.enabled is false — rollback
+      works for deployment-level failures but application-level failures are
+      invisible.
+    input: |
+      Deployment group configuration (from aws deploy get-deployment-group):
+
+      Application: user-profile-app
+      Deployment group: rollback-on-no-alarms-dg
+      Deployment group ID: d-rollback-on-no-alarms
+      Compute platform: Server
+      Deployment config: CodeDeployDefault.OneAtATime
+      Deployment style: IN_PLACE
+
+      autoRollbackConfiguration:
+        enabled: true
+        triggers:
+          - DEPLOYMENT_FAILURE
+          - DEPLOYMENT_STOP_ON_ALARM
+          - DEPLOYMENT_STOP_ON_REQUEST
+
+      alarmConfiguration:
+        enabled: false
+        ignorePollAlarmFailure: false
+        alarms: []
+
+      Emit the standard VERDICT block (DEPLOYMENT_GROUP, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: NO_ALARMS
+    assertions:
+      must_contain:
+        - "NO_ALARMS"
+        - "rollback-on-no-alarms-dg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "alarm"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ROLLBACK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: allatatime-config-gap
+    description: >-
+      Deployment group with auto-rollback and alarms properly configured but
+      deploymentConfigName is CodeDeployDefault.AllAtATime — all instances
+      are deployed simultaneously, making the entire fleet vulnerable during
+      deployment even with rollback enabled.
+    input: |
+      Deployment group configuration (from aws deploy get-deployment-group):
+
+      Application: search-index-app
+      Deployment group: allatatime-config-gap-dg
+      Deployment group ID: d-allatatime-config-gap
+      Compute platform: Server
+      Deployment config: CodeDeployDefault.AllAtATime
+      Deployment style: IN_PLACE
+
+      autoRollbackConfiguration:
+        enabled: true
+        triggers:
+          - DEPLOYMENT_FAILURE
+          - DEPLOYMENT_STOP_ON_ALARM
+
+      alarmConfiguration:
+        enabled: true
+        ignorePollAlarmFailure: false
+        alarms:
+          - name: SearchAPIErrorRate
+          - name: SearchLatencyP99
+
+      Emit the standard VERDICT block (DEPLOYMENT_GROUP, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "allatatime-config-gap-dg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "AllAtATime"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ROLLBACK"
+        - "VERDICT: NO_ALARMS"
+
+  - id: bluegreen-immediate-termination
+    description: >-
+      Blue/green deployment group with rollback and alarms enabled, OneAtATime
+      config, but terminationWaitTimeInMinutes is 0 — blue instances are
+      terminated immediately after green deployment success with no baking
+      window to catch delayed failures.
+    input: |
+      Deployment group configuration (from aws deploy get-deployment-group):
+
+      Application: realtime-chat-app
+      Deployment group: bluegreen-immediate-term-dg
+      Deployment group ID: d-bluegreen-immediate-term
+      Compute platform: Server
+      Deployment config: CodeDeployDefault.OneAtATime
+      Deployment style:
+        deploymentType: BLUE_GREEN
+        deploymentOption: WITH_TRAFFIC_CONTROL
+
+      autoRollbackConfiguration:
+        enabled: true
+        triggers:
+          - DEPLOYMENT_FAILURE
+          - DEPLOYMENT_STOP_ON_ALARM
+
+      alarmConfiguration:
+        enabled: true
+        ignorePollAlarmFailure: false
+        alarms:
+          - name: WebSocketConnectionDrop
+          - name: MessageQueueDepth
+
+      blueGreenConfiguration:
+        terminateBlueInstancesOnDeploymentSuccess:
+          action: TERMINATE
+          terminationWaitTimeInMinutes: 0
+
+      Emit the standard VERDICT block (DEPLOYMENT_GROUP, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "bluegreen-immediate-term-dg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "termination"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ROLLBACK"
+        - "VERDICT: NO_ALARMS"
+
+  - id: properly-configured-ok
+    description: >-
+      Deployment group with all safety dimensions properly configured:
+      auto-rollback with DEPLOYMENT_FAILURE trigger, alarm monitoring with
+      populated alarms, OneAtATime deployment config, in-place deployment
+      (no blue/green termination concerns).
+    input: |
+      Deployment group configuration (from aws deploy get-deployment-group):
+
+      Application: billing-api-app
+      Deployment group: properly-configured-ok-dg
+      Deployment group ID: d-properly-configured-ok
+      Compute platform: Server
+      Deployment config: CodeDeployDefault.OneAtATime
+      Deployment style: IN_PLACE
+
+      autoRollbackConfiguration:
+        enabled: true
+        triggers:
+          - DEPLOYMENT_FAILURE
+          - DEPLOYMENT_STOP_ON_ALARM
+          - DEPLOYMENT_STOP_ON_REQUEST
+
+      alarmConfiguration:
+        enabled: true
+        ignorePollAlarmFailure: false
+        alarms:
+          - name: BillingErrorRate
+          - name: BillingLatencyP99
+
+      Emit the standard VERDICT block (DEPLOYMENT_GROUP, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "properly-configured-ok-dg"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ROLLBACK"
+        - "VERDICT: NO_ALARMS"
+        - "VERDICT: CONFIG_GAP"

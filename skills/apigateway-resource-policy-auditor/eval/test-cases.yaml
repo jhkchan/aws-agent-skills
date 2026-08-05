@@ -1,0 +1,260 @@
+# Eval test cases for apigateway-resource-policy-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: apigateway-resource-policy-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-no-auth-any-method
+    description: >-
+      REST EDGE API with an ANY method set to authorizationType NONE and no
+      resource policy — fully public unauthenticated access to all HTTP verbs.
+    input: |
+      API id: api-public-no-auth-any-method
+      Protocol type: REST
+      Endpoint type: EDGE
+      Resource policy: (none)
+      Stage: prod (deployed)
+      Usage plans: (none associated)
+      WAF Web ACL: (not associated)
+
+      Methods:
+        Resource: /
+          ANY: authorizationType: NONE, apiKeyRequired: false
+
+      Emit the standard VERDICT block (API, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_NO_AUTH
+    assertions:
+      must_contain:
+        - "PUBLIC_NO_AUTH"
+        - "public-no-auth-any-method"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "NONE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: api-key-not-auth
+    description: >-
+      REST REGIONAL API with GET method authorizationType NONE but apiKeyRequired
+      true — API key is misused as authentication, which it is not.
+    input: |
+      API id: api-api-key-not-auth
+      Protocol type: REST
+      Endpoint type: REGIONAL
+      Resource policy: (none)
+      Stage: prod (deployed)
+      Usage plans: (none associated)
+      WAF Web ACL: (not associated)
+
+      Methods:
+        Resource: /orders
+          GET: authorizationType: NONE, apiKeyRequired: true
+
+      Emit the standard VERDICT block (API, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_NO_AUTH
+    assertions:
+      must_contain:
+        - "PUBLIC_NO_AUTH"
+        - "api-key-not-auth"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-usage-plan-no-throttle
+    description: >-
+      REST REGIONAL API with AWS_IAM auth on all methods but no usage plan
+      associated — no per-key rate limiting or quotas.
+    input: |
+      API id: api-no-usage-plan-no-throttle
+      Protocol type: REST
+      Endpoint type: REGIONAL
+      Resource policy: (none — same-account default access)
+      Stage: prod (deployed)
+      Usage plans: (none associated)
+      WAF Web ACL: (not associated)
+
+      Methods:
+        Resource: /data
+          GET: authorizationType: AWS_IAM, apiKeyRequired: false
+          POST: authorizationType: AWS_IAM, apiKeyRequired: false
+
+      Emit the standard VERDICT block (API, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_RATE_LIMIT
+    assertions:
+      must_contain:
+        - "NO_RATE_LIMIT"
+        - "no-usage-plan-no-throttle"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_NO_AUTH"
+
+  - id: cross-account-resource-policy
+    description: >-
+      REST REGIONAL API with AWS_IAM auth, usage plan with throttle, and WAF
+      associated, but resource policy grants execute-api:Invoke to Principal "*"
+      with no restrictive condition — broad cross-account exposure.
+    input: |
+      API id: api-cross-account-resource-policy
+      Protocol type: REST
+      Endpoint type: REGIONAL
+      Resource policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "OpenInvoke",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "execute-api:Invoke",
+              "Resource": "arn:aws:execute-api:us-east-1:111111111111:api-cross-account-resource-policy/prod/*/users"
+            }
+          ]
+        }
+      Stage: prod (deployed)
+      Usage plans: plan-secure (throttle: rateLimit=100, burstLimit=200; quota: limit=10000, period=DAY) — associated with API key
+      WAF Web ACL: api-waf-acl (associated)
+
+      Methods:
+        Resource: /users
+          GET: authorizationType: AWS_IAM, apiKeyRequired: false
+
+      Emit the standard VERDICT block (API, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "cross-account-resource-policy"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_NO_AUTH"
+
+  - id: no-waf-association
+    description: >-
+      REST REGIONAL API with COGNITO_USER_POOLS auth, usage plan with throttle
+      and quota, properly scoped resource policy, but no WAF Web ACL associated
+      with the stage — missing defense-in-depth layer.
+    input: |
+      API id: api-no-waf-association
+      Protocol type: REST
+      Endpoint type: REGIONAL
+      Resource policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "SameAccountOnly",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "execute-api:Invoke",
+              "Resource": "arn:aws:execute-api:us-east-1:111111111111:api-no-waf-association/*",
+              "Condition": {
+                "StringNotEquals": {
+                  "aws:SourceAccount": "111111111111"
+                }
+              }
+            }
+          ]
+        }
+      Stage: prod (deployed)
+      Usage plans: plan-secure (throttle: rateLimit=50, burstLimit=100; quota: limit=5000, period=DAY) — associated with API key
+      WAF Web ACL: (not associated)
+
+      Methods:
+        Resource: /profile
+          GET: authorizationType: COGNITO_USER_POOLS, authorizerId: abc123, apiKeyRequired: false
+
+      Emit the standard VERDICT block (API, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "no-waf-association"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_NO_AUTH"
+
+  - id: all-controls-ok
+    description: >-
+      REST REGIONAL API with COGNITO_USER_POOLS auth on all methods, usage plan
+      with throttle and quota, WAF Web ACL associated, and resource policy
+      restricting to same account — clean security posture across all dimensions.
+    input: |
+      API id: api-all-controls-ok
+      Protocol type: REST
+      Endpoint type: REGIONAL
+      Resource policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "SameAccountOnly",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "execute-api:Invoke",
+              "Resource": "arn:aws:execute-api:us-east-1:111111111111:api-all-controls-ok/*",
+              "Condition": {
+                "StringNotEquals": {
+                  "aws:SourceAccount": "111111111111"
+                }
+              }
+            }
+          ]
+        }
+      Stage: prod (deployed)
+      Usage plans: plan-prod (throttle: rateLimit=50, burstLimit=100; quota: limit=5000, period=DAY) — associated with API key
+      WAF Web ACL: prod-waf-acl (associated, includes AWSManagedRulesCommonRuleSet and a rate-based rule)
+
+      Methods:
+        Resource: /items
+          GET: authorizationType: COGNITO_USER_POOLS, authorizerId: usrpool-auth, apiKeyRequired: false
+          POST: authorizationType: COGNITO_USER_POOLS, authorizerId: usrpool-auth, apiKeyRequired: false
+
+      Emit the standard VERDICT block (API, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "all-controls-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PUBLIC_NO_AUTH"
+        - "VERDICT: NO_RATE_LIMIT"
+        - "VERDICT: CONFIG_GAP"

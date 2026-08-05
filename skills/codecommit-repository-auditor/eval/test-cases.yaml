@@ -1,0 +1,264 @@
+# Eval test cases for codecommit-repository-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: codecommit-repository-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-approval-rule
+    description: >-
+      CodeCommit repository with no approval rule template linked — pull requests
+      can be merged with zero code review. Direct integrity risk.
+    input: |
+      Audit the following CodeCommit repository configuration for security and
+      config gaps. Emit the standard VERDICT block (REPO, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Repository name: no-approval-rule
+      Repository metadata:
+        repositoryId: a1b2c3d4-0001-0001-0001-000000000001
+        defaultBranch: main
+        kmsEncryptionKeyId: aws/codecommit
+        approvalRuleTemplates: []
+        notificationRules: []
+        branchProtectionIamPolicies: []
+        tags: {}
+    expected_verdict: NO_APPROVAL_RULE
+    assertions:
+      must_contain:
+        - "NO_APPROVAL_RULE"
+        - "no-approval-rule"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DEPRECATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: no-cmk-encryption
+    description: >-
+      CodeCommit repository with an approval rule template linked (numberOfApprovalsNeeded: 2)
+      but using the AWS-managed KMS key aws/codecommit — no customer key control.
+    input: |
+      Audit the following CodeCommit repository configuration for security and
+      config gaps. Emit the standard VERDICT block (REPO, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Repository name: no-cmk-encryption
+      Repository metadata:
+        repositoryId: a1b2c3d4-0002-0002-0002-000000000002
+        defaultBranch: main
+        kmsEncryptionKeyId: aws/codecommit
+        approvalRuleTemplates:
+          - name: require-2-approvals
+            content:
+              Version: "2018-02-08"
+              Statements:
+                - Type: Approvers
+                  NumberOfApprovalsNeeded: 2
+        notificationRules: []
+        branchProtectionIamPolicies:
+          - effect: Deny
+            action: codecommit:DeleteBranch
+            condition: codecommit:References = refs/heads/main
+        tags: {}
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "no-cmk-encryption"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DEPRECATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_APPROVAL_RULE"
+
+  - id: config-gap-no-notifications
+    description: >-
+      CodeCommit repository with approval rule template, customer-managed KMS key,
+      and IAM branch protection — but no notification rules. Operational alerting gap.
+    input: |
+      Audit the following CodeCommit repository configuration for security and
+      config gaps. Emit the standard VERDICT block (REPO, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Repository name: config-gap-no-notifications
+      Repository metadata:
+        repositoryId: a1b2c3d4-0003-0003-0003-000000000003
+        defaultBranch: main
+        kmsEncryptionKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-repo-key-003
+        approvalRuleTemplates:
+          - name: require-1-approval
+            content:
+              Version: "2018-02-08"
+              Statements:
+                - Type: Approvers
+                  NumberOfApprovalsNeeded: 1
+        notificationRules: []
+        branchProtectionIamPolicies:
+          - effect: Deny
+            action: codecommit:DeleteBranch
+            condition: codecommit:References = refs/heads/main
+        tags: {}
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-no-notifications"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DEPRECATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_APPROVAL_RULE"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: deprecation-risk-clean
+    description: >-
+      CodeCommit repository with all config dimensions passing (approval rule, CMK
+      encryption, branch protection, notification rules) but no migration-
+      acknowledgment tag. The only risk is the service deprecation.
+    input: |
+      Audit the following CodeCommit repository configuration for security and
+      config gaps. Emit the standard VERDICT block (REPO, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Repository name: deprecation-risk-clean
+      Repository metadata:
+        repositoryId: a1b2c3d4-0004-0004-0004-000000000004
+        defaultBranch: main
+        kmsEncryptionKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-repo-key-004
+        approvalRuleTemplates:
+          - name: require-1-approval
+            content:
+              Version: "2018-02-08"
+              Statements:
+                - Type: Approvers
+                  NumberOfApprovalsNeeded: 1
+        notificationRules:
+          - name: pr-alerts
+            target: arn:aws:sns:us-east-1:111111111111:codecommit-alerts
+            eventTypes: [codecommit-pull-request-created, codecommit-pull-request-merged]
+        branchProtectionIamPolicies:
+          - effect: Deny
+            action: codecommit:DeleteBranch
+            condition: codecommit:References = refs/heads/main
+        tags: {}
+    expected_verdict: DEPRECATION_RISK
+    assertions:
+      must_contain:
+        - "DEPRECATION_RISK"
+        - "deprecation-risk-clean"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_APPROVAL_RULE"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: ok-migration-planned
+    description: >-
+      CodeCommit repository with all config dimensions passing AND a migration-
+      acknowledgment tag present. Fully compliant with migration planning in place.
+    input: |
+      Audit the following CodeCommit repository configuration for security and
+      config gaps. Emit the standard VERDICT block (REPO, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Repository name: ok-migration-planned
+      Repository metadata:
+        repositoryId: a1b2c3d4-0005-0005-0005-000000000005
+        defaultBranch: main
+        kmsEncryptionKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-repo-key-005
+        approvalRuleTemplates:
+          - name: require-1-approval
+            content:
+              Version: "2018-02-08"
+              Statements:
+                - Type: Approvers
+                  NumberOfApprovalsNeeded: 1
+        notificationRules:
+          - name: pr-alerts
+            target: arn:aws:sns:us-east-1:111111111111:codecommit-alerts
+            eventTypes: [codecommit-pull-request-created, codecommit-pull-request-merged]
+        branchProtectionIamPolicies:
+          - effect: Deny
+            action: codecommit:DeleteBranch
+            condition: codecommit:References = refs/heads/main
+        tags:
+          migration-plan: active
+          migration-target: github
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "VERDICT: OK"
+        - "ok-migration-planned"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DEPRECATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_APPROVAL_RULE"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: DEPRECATION_RISK"
+
+  - id: multiple-gaps-no-approval-no-encryption
+    description: >-
+      CodeCommit repository with multiple config gaps: no approval rule template,
+      AWS-managed KMS key, no notification rules, no branch protection. Verdict
+      should be NO_APPROVAL_RULE (highest-priority finding).
+    input: |
+      Audit the following CodeCommit repository configuration for security and
+      config gaps. Emit the standard VERDICT block (REPO, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Repository name: multiple-gaps-no-approval-no-encryption
+      Repository metadata:
+        repositoryId: a1b2c3d4-0006-0006-0006-000000000006
+        defaultBranch: main
+        kmsEncryptionKeyId: aws/codecommit
+        approvalRuleTemplates: []
+        notificationRules: []
+        branchProtectionIamPolicies: []
+        tags: {}
+    expected_verdict: NO_APPROVAL_RULE
+    assertions:
+      must_contain:
+        - "NO_APPROVAL_RULE"
+        - "multiple-gaps-no-approval-no-encryption"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DEPRECATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"

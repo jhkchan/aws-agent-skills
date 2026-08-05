@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "apigateway-resource-policy-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the API Gateway Resource Policy Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "public-no-auth-any-method",
+      "name": "EDGE REST API with ANY method authorizationType NONE — fully public unauthenticated",
+      "difficulty": "easy",
+      "prompt_file": "prompts/public-no-auth-any-method.md",
+      "baseline_file": "baselines/public-no-auth-any-method.md",
+      "expected_verdict": "PUBLIC_NO_AUTH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PUBLIC_NO_AUTH", "public-no-auth-any-method", "VERDICT", "REASON", "REMEDIATION", "NONE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "api-key-not-auth",
+      "name": "API key required but authorizationType NONE — API key is not authentication",
+      "difficulty": "hard",
+      "prompt_file": "prompts/api-key-not-auth.md",
+      "baseline_file": "baselines/api-key-not-auth.md",
+      "expected_verdict": "PUBLIC_NO_AUTH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PUBLIC_NO_AUTH", "api-key-not-auth", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-usage-plan-no-throttle",
+      "name": "AWS_IAM-authenticated API with no usage plan — no per-key rate limiting",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-usage-plan-no-throttle.md",
+      "baseline_file": "baselines/no-usage-plan-no-throttle.md",
+      "expected_verdict": "NO_RATE_LIMIT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_RATE_LIMIT", "no-usage-plan-no-throttle", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_NO_AUTH"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-resource-policy",
+      "name": "Resource policy Principal star on execute-api:Invoke — broad cross-account exposure",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-resource-policy.md",
+      "baseline_file": "baselines/cross-account-resource-policy.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "cross-account-resource-policy", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_NO_AUTH"]
+        }
+      ]
+    },
+    {
+      "id": "no-waf-association",
+      "name": "Authenticated API with usage plan but no WAF Web ACL — missing defense-in-depth",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-waf-association.md",
+      "baseline_file": "baselines/no-waf-association.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "no-waf-association", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_NO_AUTH"]
+        }
+      ]
+    },
+    {
+      "id": "all-controls-ok",
+      "name": "Cognito auth, usage plan, WAF, scoped resource policy — clean posture",
+      "difficulty": "easy",
+      "prompt_file": "prompts/all-controls-ok.md",
+      "baseline_file": "baselines/all-controls-ok.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "all-controls-ok", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PUBLIC_NO_AUTH", "VERDICT: NO_RATE_LIMIT", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

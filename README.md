@@ -28,6 +28,7 @@ incomplete, and CI runs the assertion layer on every PR.
 |---|---|---|---|---|---|---|
 | accessanalyzer-finding-triage | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.9s | 58002 |
 | acm-certificate-expiry-auditor | amazon.nova-pro-v1:0 | 102/120 | B | 5/6 | 13.1s | 31009 |
+| apigateway-resource-policy-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 36.4s | 36506 |
 | auditmanager-assessment-auditor | amazon.nova-pro-v1:0 | 106/120 | B | 6/6 | 10.8s | 41075 |
 | autoscaling-group-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 18.9s | 39803 |
 | backup-plan-auditor | amazon.nova-pro-v1:0 | 115/120 | A | 6/6 | 8.5s | 30595 |
@@ -36,6 +37,10 @@ incomplete, and CI runs the assertion layer on every PR.
 | ce-cost-anomaly-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 30.5s | 36151 |
 | cloudfront-distribution-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 13.3s | 39728 |
 | cloudtrail-org-trail-auditor | amazon.nova-pro-v1:0 | 105/120 | B | 6/6 | 5.4s | 40383 |
+| codebuild-project-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 16.4s | 49703 |
+| codecommit-repository-auditor | amazon.nova-pro-v1:0 | 103/120 | B | 6/6 | 11.7s | 40318 |
+| codedeploy-deployment-group-auditor | amazon.nova-pro-v1:0 | 105/120 | B | 6/6 | 12.2s | 35853 |
+| codepipeline-pipeline-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 13.7s | 39910 |
 | cognito-idp-user-pool-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 6.8s | 41140 |
 | compute-optimizer-findings-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.8s | 35720 |
 | config-recorder-coverage-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 35.6s | 43031 |
@@ -52,6 +57,7 @@ incomplete, and CI runs the assertion layer on every PR.
 | efs-filesystem-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 38429 |
 | eks-cluster-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.7s | 34838 |
 | elbv2-load-balancer-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 8.6s | 47542 |
+| eventbridge-bus-policy-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 12.9s | 40249 |
 | guardduty-finding-severity-triage | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.3s | 55940 |
 | iam-least-privilege-advisor | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 7.8s | 33835 |
 | inspector2-coverage-finding-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.3s | 52550 |
@@ -64,6 +70,9 @@ incomplete, and CI runs the assertion layer on every PR.
 | s3-public-access-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 5/5 | 14.7s | 40044 |
 | secretsmanager-rotation-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 11.2s | 48554 |
 | securityhub-control-compliance-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 47500 |
+| sns-topic-public-subscription-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.2s | 39910 |
+| sqs-dlq-policy-auditor | amazon.nova-pro-v1:0 | 112/120 | A | 6/6 | 13.2s | 39513 |
+| stepfunctions-statemachine-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 16.3s | 46991 |
 | sts-cross-account-role-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 9.3s | 47639 |
 | trustedadvisor-check-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 16.1s | 40241 |
 | wafv2-web-acl-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 12.1s | 43695 |
@@ -88,11 +97,11 @@ skills/*/eval/*.yaml  ->  eval/run_eval.py
   accounts — see `features/aws-cloudops-skills-oss/spec.md` (S-E03).
 - **CI:** assertion-only on every PR (no AWS credentials). The maintainer
   runs the LLM-judge locally and commits scorecard artifacts.
-- **Eval-backed standard: Grade A (>=108/120)** — 36 of 42 shipped skills meet
-  it; 6 ship at honest Grade B (acm 102, auditmanager 106, cloudtrail 105,
-  directconnect 105, ebs 105, rds 107) as documented exceptions. The eval is
-  truthful about each skill's measured quality (median-of-3 judge); every shipped
-  skill is measured, none assert quality without evidence.
+- **Eval-backed standard: Grade A (>=108/120)** — 43 of 51 shipped skills meet
+  it; 8 ship at honest Grade B (scores 102–107, marked in the table below) as
+  documented exceptions. The eval is truthful about each skill's measured quality
+  (median-of-3 judge); every shipped skill is measured, none assert quality
+  without evidence.
 
 ## Quickstart
 

@@ -1,0 +1,571 @@
+# Eval test cases for codepipeline-pipeline-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: codepipeline-pipeline-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-encryption-artifact-store
+    description: >-
+      Pipeline with an S3 artifact store that has no encryptionKey field —
+      artifacts (source code, templates, build outputs) are stored without a
+      customer-managed KMS key.
+    input: |
+      Pipeline name: no-encryption-artifact-store
+      Pipeline definition (JSON):
+
+      ```json
+      {
+        "pipeline": {
+          "name": "no-encryption-artifact-store",
+          "roleArn": "arn:aws:iam::111111111111:role/service-role-AWS-CodePipeline-Service",
+          "artifactStore": {
+            "type": "S3",
+            "location": "codepipeline-us-east-1-111111111111-store"
+          },
+          "stages": [
+            {
+              "name": "Source",
+              "actions": [
+                {
+                  "name": "Source",
+                  "actionTypeId": {
+                    "category": "Source",
+                    "owner": "AWS",
+                    "provider": "CodeStarConnection",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ConnectionArn": "arn:aws:codestar-connections:us-east-1:111111111111:connection/abc-123",
+                    "FullRepositoryId": "org/app",
+                    "BranchName": "main"
+                  },
+                  "outputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            },
+            {
+              "name": "Deploy",
+              "actions": [
+                {
+                  "name": "DeployCFN",
+                  "actionTypeId": {
+                    "category": "Deploy",
+                    "owner": "AWS",
+                    "provider": "CloudFormation",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ActionMode": "CREATE_UPDATE",
+                    "StackName": "app-stack",
+                    "RoleArn": "arn:aws:iam::111111111111:role/CloudFormationDeploy",
+                    "TemplatePath": "SourceOutput::template.yaml"
+                  },
+                  "inputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            }
+          ]
+        }
+      }
+      ```
+
+      Pipeline state: all stage transitions enabled.
+      Artifact bucket SSE configuration: none (no server-side encryption configured).
+
+      Emit the standard VERDICT block (PIPELINE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "UNENCRYPTED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: overpermissive-cross-account-role
+    description: >-
+      Pipeline with a CloudFormation deploy action whose RoleArn points to a
+      different AWS account (222222222222) than the pipeline owner
+      (111111111111) — cross-account deployment blast radius.
+    input: |
+      Pipeline name: overpermissive-cross-account-role
+      Pipeline definition (JSON):
+
+      ```json
+      {
+        "pipeline": {
+          "name": "overpermissive-cross-account-role",
+          "roleArn": "arn:aws:iam::111111111111:role/service-role-AWS-CodePipeline-Service",
+          "artifactStore": {
+            "type": "S3",
+            "location": "codepipeline-us-east-1-111111111111-store",
+            "encryptionKey": {
+              "id": "arn:aws:kms:us-east-1:111111111111:key/abc-123-def",
+              "type": "KMS"
+            }
+          },
+          "stages": [
+            {
+              "name": "Source",
+              "actions": [
+                {
+                  "name": "Source",
+                  "actionTypeId": {
+                    "category": "Source",
+                    "owner": "AWS",
+                    "provider": "CodeStarConnection",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ConnectionArn": "arn:aws:codestar-connections:us-east-1:111111111111:connection/xyz-789",
+                    "FullRepositoryId": "org/app",
+                    "BranchName": "main"
+                  },
+                  "outputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            },
+            {
+              "name": "Deploy",
+              "actions": [
+                {
+                  "name": "DeployCrossAccount",
+                  "actionTypeId": {
+                    "category": "Deploy",
+                    "owner": "AWS",
+                    "provider": "CloudFormation",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ActionMode": "CREATE_UPDATE",
+                    "StackName": "app-stack",
+                    "RoleArn": "arn:aws:iam::222222222222:role/CrossAccountDeploy",
+                    "TemplatePath": "SourceOutput::template.yaml"
+                  },
+                  "inputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            }
+          ]
+        }
+      }
+      ```
+
+      Pipeline state: all stage transitions enabled.
+      Artifact bucket SSE: SSE-KMS with the CMK referenced above.
+
+      Emit the standard VERDICT block (PIPELINE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE_ROLE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE_ROLE"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "222222222222"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: disabled-stage-transition
+    description: >-
+      Pipeline with a disabled inbound transition on the Deploy stage —
+      executions are blocked from advancing past Source.
+    input: |
+      Pipeline name: disabled-stage-transition
+      Pipeline definition (JSON):
+
+      ```json
+      {
+        "pipeline": {
+          "name": "disabled-stage-transition",
+          "roleArn": "arn:aws:iam::111111111111:role/service-role-AWS-CodePipeline-Service",
+          "artifactStore": {
+            "type": "S3",
+            "location": "codepipeline-us-east-1-111111111111-store",
+            "encryptionKey": {
+              "id": "arn:aws:kms:us-east-1:111111111111:key/def-456-ghi",
+              "type": "KMS"
+            }
+          },
+          "stages": [
+            {
+              "name": "Source",
+              "actions": [
+                {
+                  "name": "Source",
+                  "actionTypeId": {
+                    "category": "Source",
+                    "owner": "AWS",
+                    "provider": "CodeStarConnection",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ConnectionArn": "arn:aws:codestar-connections:us-east-1:111111111111:connection/src-123",
+                    "FullRepositoryId": "org/app",
+                    "BranchName": "main"
+                  },
+                  "outputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            },
+            {
+              "name": "Deploy",
+              "actions": [
+                {
+                  "name": "DeployCFN",
+                  "actionTypeId": {
+                    "category": "Deploy",
+                    "owner": "AWS",
+                    "provider": "CloudFormation",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ActionMode": "CREATE_UPDATE",
+                    "StackName": "app-stack",
+                    "RoleArn": "arn:aws:iam::111111111111:role/CloudFormationDeploy",
+                    "TemplatePath": "SourceOutput::template.yaml"
+                  },
+                  "inputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            }
+          ]
+        }
+      }
+      ```
+
+      Pipeline state (from get-pipeline-state):
+      ```
+      stageStates:
+        - stageName: Source
+          inboundTransitionState:
+            enabled: true
+        - stageName: Deploy
+          inboundTransitionState:
+            enabled: false
+            disabledReason: "Freeze for incident investigation — do not re-enable until INC-1234 is resolved"
+      ```
+
+      Artifact bucket SSE: SSE-KMS with the CMK referenced above.
+
+      Emit the standard VERDICT block (PIPELINE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: DISABLED_STAGE
+    assertions:
+      must_contain:
+        - "DISABLED_STAGE"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DISABLED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: weak-source-no-approval
+    description: >-
+      Production deploy pipeline using deprecated GitHub v1 OAuth source with
+      no manual approval gate — credential exposure and missing human checkpoint.
+    input: |
+      Pipeline name: weak-source-no-approval
+      Pipeline definition (JSON):
+
+      ```json
+      {
+        "pipeline": {
+          "name": "weak-source-no-approval",
+          "roleArn": "arn:aws:iam::111111111111:role/service-role-AWS-CodePipeline-Service",
+          "artifactStore": {
+            "type": "S3",
+            "location": "codepipeline-us-east-1-111111111111-store",
+            "encryptionKey": {
+              "id": "arn:aws:kms:us-east-1:111111111111:key/ghi-789-jkl",
+              "type": "KMS"
+            }
+          },
+          "stages": [
+            {
+              "name": "Source",
+              "actions": [
+                {
+                  "name": "GitHubSource",
+                  "actionTypeId": {
+                    "category": "Source",
+                    "owner": "ThirdParty",
+                    "provider": "GitHub",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "Owner": "my-org",
+                    "Repo": "production-app",
+                    "Branch": "main",
+                    "OAuthToken": "{{resolve:secretsmanager:github-token:SecretString:token}}",
+                    "PollForSourceChanges": "true"
+                  },
+                  "outputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            },
+            {
+              "name": "Deploy",
+              "actions": [
+                {
+                  "name": "DeployCFN",
+                  "actionTypeId": {
+                    "category": "Deploy",
+                    "owner": "AWS",
+                    "provider": "CloudFormation",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ActionMode": "CREATE_UPDATE",
+                    "StackName": "production-app",
+                    "RoleArn": "arn:aws:iam::111111111111:role/CloudFormationDeploy",
+                    "TemplatePath": "SourceOutput::template.yaml"
+                  },
+                  "inputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            }
+          ]
+        }
+      }
+      ```
+
+      Pipeline state: all stage transitions enabled.
+      Artifact bucket SSE: SSE-KMS with the CMK referenced above.
+
+      Emit the standard VERDICT block (PIPELINE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DEPRECATED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: well-configured-pipeline
+    description: >-
+      Well-configured production pipeline with CMK encryption, CodeStar
+      Connection source, manual approval gate with SNS notification, same-account
+      deploy role, and no disabled transitions.
+    input: |
+      Pipeline name: well-configured-pipeline
+      Pipeline definition (JSON):
+
+      ```json
+      {
+        "pipeline": {
+          "name": "well-configured-pipeline",
+          "roleArn": "arn:aws:iam::111111111111:role/service-role-AWS-CodePipeline-Service",
+          "artifactStore": {
+            "type": "S3",
+            "location": "codepipeline-us-east-1-111111111111-store",
+            "encryptionKey": {
+              "id": "arn:aws:kms:us-east-1:111111111111:key/jkl-012-mno",
+              "type": "KMS"
+            }
+          },
+          "stages": [
+            {
+              "name": "Source",
+              "actions": [
+                {
+                  "name": "Source",
+                  "actionTypeId": {
+                    "category": "Source",
+                    "owner": "AWS",
+                    "provider": "CodeStarConnection",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ConnectionArn": "arn:aws:codestar-connections:us-east-1:111111111111:connection/clean-123",
+                    "FullRepositoryId": "org/app",
+                    "BranchName": "main"
+                  },
+                  "outputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            },
+            {
+              "name": "Approval",
+              "actions": [
+                {
+                  "name": "ManualApproval",
+                  "actionTypeId": {
+                    "category": "Approval",
+                    "owner": "AWS",
+                    "provider": "Manual",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "NotificationArn": "arn:aws:sns:us-east-1:111111111111:pipeline-approval-topic",
+                    "CustomData": "Review and approve production deployment"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Deploy",
+              "actions": [
+                {
+                  "name": "DeployCFN",
+                  "actionTypeId": {
+                    "category": "Deploy",
+                    "owner": "AWS",
+                    "provider": "CloudFormation",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ActionMode": "CREATE_UPDATE",
+                    "StackName": "app-stack",
+                    "RoleArn": "arn:aws:iam::111111111111:role/CloudFormationDeploy",
+                    "TemplatePath": "SourceOutput::template.yaml"
+                  },
+                  "inputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            }
+          ]
+        }
+      }
+      ```
+
+      Pipeline state: all stage transitions enabled.
+      Artifact bucket SSE: SSE-KMS with the CMK referenced above.
+
+      Emit the standard VERDICT block (PIPELINE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "VERDICT: OK"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+        - "VERDICT: DISABLED_STAGE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: multiple-findings-encryption-wins
+    description: >-
+      Pipeline with multiple findings — no artifact store encryption, GitHub v1
+      source, disabled stage transition, and cross-account deploy role. The
+      worst finding (NO_ENCRYPTION) determines the verdict.
+    input: |
+      Pipeline name: multiple-findings-encryption-wins
+      Pipeline definition (JSON):
+
+      ```json
+      {
+        "pipeline": {
+          "name": "multiple-findings-encryption-wins",
+          "roleArn": "arn:aws:iam::111111111111:role/service-role-AWS-CodePipeline-Service",
+          "artifactStore": {
+            "type": "S3",
+            "location": "codepipeline-us-east-1-111111111111-store"
+          },
+          "stages": [
+            {
+              "name": "Source",
+              "actions": [
+                {
+                  "name": "GitHubSource",
+                  "actionTypeId": {
+                    "category": "Source",
+                    "owner": "ThirdParty",
+                    "provider": "GitHub",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "Owner": "my-org",
+                    "Repo": "app",
+                    "Branch": "main",
+                    "OAuthToken": "{{resolve:secretsmanager:github-token:SecretString:token}}",
+                    "PollForSourceChanges": "true"
+                  },
+                  "outputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            },
+            {
+              "name": "Deploy",
+              "actions": [
+                {
+                  "name": "DeployCrossAccount",
+                  "actionTypeId": {
+                    "category": "Deploy",
+                    "owner": "AWS",
+                    "provider": "CloudFormation",
+                    "version": "1"
+                  },
+                  "configuration": {
+                    "ActionMode": "CREATE_UPDATE",
+                    "StackName": "app-stack",
+                    "RoleArn": "arn:aws:iam::222222222222:role/CrossAccountDeploy",
+                    "TemplatePath": "SourceOutput::template.yaml"
+                  },
+                  "inputArtifacts": [{"name": "SourceOutput"}]
+                }
+              ]
+            }
+          ]
+        }
+      }
+      ```
+
+      Pipeline state (from get-pipeline-state):
+      ```
+      stageStates:
+        - stageName: Source
+          inboundTransitionState:
+            enabled: true
+        - stageName: Deploy
+          inboundTransitionState:
+            enabled: false
+            disabledReason: "Temporary freeze"
+      ```
+
+      Artifact bucket SSE configuration: none (no server-side encryption configured).
+
+      Emit the standard VERDICT block (PIPELINE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "UNENCRYPTED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"

@@ -1,0 +1,379 @@
+# Eval test cases for stepfunctions-statemachine-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Each test case embeds its identifier in the state machine ARN/name so the
+# model naturally echoes the ID without it being an assertion token. The
+# must_contain / must_not_contain assertions use CONCEPT tokens (verdict
+# values, output-structure headers) rather than test-case IDs or raw API
+# field names.
+skill: stepfunctions-statemachine-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-logging-standard-workflow
+    description: >-
+      Standard workflow with LoggingConfiguration.level set to OFF — no
+      CloudWatch Logs delivery, no durable per-state visibility beyond the
+      90-day execution-history fallback.
+    input: |
+      State machine ARN: arn:aws:states:us-east-1:111111111111:stateMachine:no-logging-standard-workflow
+      Type: STANDARD
+      LoggingConfiguration: {level: "OFF", includeExecutionData: false}
+      TracingConfiguration: {enabled: true}
+      RoleArn: arn:aws:iam::111111111111:role/sfn-execution-scoped
+      Role identity policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "lambda:InvokeFunction",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:order-processor"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["xray:PutTraceSegments", "xray:PutTelemetryRecords"],
+              "Resource": "*"
+            }
+          ]
+        }
+      Definition (ASL):
+        {
+          "StartAt": "ProcessOrder",
+          "States": {
+            "ProcessOrder": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:order-processor",
+              "TimeoutSeconds": 30,
+              "Retry": [{"ErrorEquals": ["Lambda.ServiceException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2.0}],
+              "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "ErrorHandler"}],
+              "Next": "OrderSucceeded"
+            },
+            "ErrorHandler": {"Type": "Fail", "Error": "OrderFailed", "Cause": "Lambda invocation failed"},
+            "OrderSucceeded": {"Type": "Succeed"}
+          }
+        }
+      Emit the standard VERDICT block (STATE_MACHINE, TYPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_LOGGING
+    assertions:
+      must_contain:
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "NO_LOGGING"
+        - "OFF"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+        - "VERDICT: NO_TRACING"
+
+  - id: no-tracing-standard-workflow
+    description: >-
+      Standard workflow with LoggingConfiguration at ALL + includeExecutionData true
+      and a scoped role, but TracingConfiguration.enabled is false — no X-Ray
+      distributed tracing across service integrations.
+    input: |
+      State machine ARN: arn:aws:states:us-east-1:111111111111:stateMachine:no-tracing-standard-workflow
+      Type: STANDARD
+      LoggingConfiguration: {level: "ALL", includeExecutionData: true}
+      TracingConfiguration: {enabled: false}
+      RoleArn: arn:aws:iam::111111111111:role/sfn-execution-scoped
+      Role identity policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "lambda:InvokeFunction",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:order-processor"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["logs:CreateLogDelivery", "logs:PutLogEvents", "logs:DescribeLogGroups"],
+              "Resource": "*"
+            }
+          ]
+        }
+      Definition (ASL):
+        {
+          "StartAt": "ProcessOrder",
+          "States": {
+            "ProcessOrder": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:order-processor",
+              "TimeoutSeconds": 30,
+              "Retry": [{"ErrorEquals": ["Lambda.ServiceException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2.0}],
+              "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "ErrorHandler"}],
+              "Next": "OrderSucceeded"
+            },
+            "ErrorHandler": {"Type": "Fail", "Error": "OrderFailed", "Cause": "Lambda invocation failed"},
+            "OrderSucceeded": {"Type": "Succeed"}
+          }
+        }
+      Emit the standard VERDICT block (STATE_MACHINE, TYPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_TRACING
+    assertions:
+      must_contain:
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "NO_TRACING"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_LOGGING"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+
+  - id: over-permissive-execution-role
+    description: >-
+      Standard workflow with logging ALL + includeExecutionData true and tracing
+      enabled, but the execution role grants Action "*" on Resource "*"
+      (admin-equivalent). The state machine can call any AWS service on any
+      resource.
+    input: |
+      State machine ARN: arn:aws:states:us-east-1:111111111111:stateMachine:over-permissive-execution-role
+      Type: STANDARD
+      LoggingConfiguration: {level: "ALL", includeExecutionData: true}
+      TracingConfiguration: {enabled: true}
+      RoleArn: arn:aws:iam::111111111111:role/sfn-execution-wildcard
+      Role trust policy:
+        {
+          "Effect": "Allow",
+          "Principal": {"Service": "states.amazonaws.com"},
+          "Action": "sts:AssumeRole"
+        }
+      Role identity policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {"Effect": "Allow", "Action": "*", "Resource": "*"}
+          ]
+        }
+      Definition (ASL):
+        {
+          "StartAt": "ProcessOrder",
+          "States": {
+            "ProcessOrder": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:order-processor",
+              "TimeoutSeconds": 30,
+              "Retry": [{"ErrorEquals": ["Lambda.ServiceException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2.0}],
+              "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "ErrorHandler"}],
+              "Next": "OrderSucceeded"
+            },
+            "ErrorHandler": {"Type": "Fail", "Error": "OrderFailed", "Cause": "Lambda invocation failed"},
+            "OrderSucceeded": {"Type": "Succeed"}
+          }
+        }
+      Emit the standard VERDICT block (STATE_MACHINE, TYPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE_ROLE
+    assertions:
+      must_contain:
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "OVERPERMISSIVE_ROLE"
+        - "wildcard"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_LOGGING"
+        - "VERDICT: NO_TRACING"
+
+  - id: missing-error-handling-config-gap
+    description: >-
+      Standard workflow with logging ALL + includeExecutionData, tracing enabled,
+      and a scoped execution role — but the Lambda Task state has NO Catch block
+      and NO Retry block. Any transient Lambda error fails the entire execution.
+    input: |
+      State machine ARN: arn:aws:states:us-east-1:111111111111:stateMachine:missing-error-handling-config-gap
+      Type: STANDARD
+      LoggingConfiguration: {level: "ALL", includeExecutionData: true}
+      TracingConfiguration: {enabled: true}
+      RoleArn: arn:aws:iam::111111111111:role/sfn-execution-scoped
+      Role identity policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "lambda:InvokeFunction",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:risky-handler"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "logs:PutLogEvents", "logs:CreateLogDelivery"],
+              "Resource": "*"
+            }
+          ]
+        }
+      Definition (ASL):
+        {
+          "StartAt": "InvokeRisky",
+          "States": {
+            "InvokeRisky": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:risky-handler",
+              "Next": "Done"
+            },
+            "Done": {"Type": "Succeed"}
+          }
+        }
+      Emit the standard VERDICT block (STATE_MACHINE, TYPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "CONFIG_GAP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+
+  - id: all-clean-ok
+    description: >-
+      Standard workflow with logging ALL + includeExecutionData true, tracing
+      enabled, scoped execution role (named actions on specific ARNs), and a
+      Lambda Task with Catch + Retry + TimeoutSeconds. All audit dimensions pass.
+    input: |
+      State machine ARN: arn:aws:states:us-east-1:111111111111:stateMachine:all-clean-ok
+      Type: STANDARD
+      LoggingConfiguration: {level: "ALL", includeExecutionData: true}
+      TracingConfiguration: {enabled: true}
+      RoleArn: arn:aws:iam::111111111111:role/sfn-execution-scoped
+      Role trust policy:
+        {
+          "Effect": "Allow",
+          "Principal": {"Service": "states.amazonaws.com"},
+          "Action": "sts:AssumeRole"
+        }
+      Role identity policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "lambda:InvokeFunction",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:order-processor"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "logs:PutLogEvents", "logs:CreateLogDelivery", "logs:DescribeLogGroups"],
+              "Resource": "*"
+            }
+          ]
+        }
+      Definition (ASL):
+        {
+          "StartAt": "ProcessOrder",
+          "States": {
+            "ProcessOrder": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:order-processor",
+              "TimeoutSeconds": 30,
+              "Retry": [{"ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2.0}],
+              "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "ErrorHandler"}],
+              "Next": "OrderSucceeded"
+            },
+            "ErrorHandler": {"Type": "Fail", "Error": "OrderFailed", "Cause": "Unhandled error"},
+            "OrderSucceeded": {"Type": "Succeed"}
+          }
+        }
+      Emit the standard VERDICT block (STATE_MACHINE, TYPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "VERDICT: OK"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_LOGGING"
+        - "VERDICT: NO_TRACING"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: express-tracing-noop
+    description: >-
+      Express workflow (Asynchronous) with LoggingConfiguration at ALL +
+      includeExecutionData true, TracingConfiguration.enabled set to true, a
+      scoped execution role, and a fully hardened ASL definition. The operator
+      believes X-Ray tracing is enabled, but TracingConfiguration is a no-op on
+      Express workflows — no X-Ray console traces are produced.
+    input: |
+      State machine ARN: arn:aws:states:us-east-1:111111111111:stateMachine:express-tracing-noop
+      Type: EXPRESS
+      LoggingConfiguration: {level: "ALL", includeExecutionData: true}
+      TracingConfiguration: {enabled: true}
+      RoleArn: arn:aws:iam::111111111111:role/sfn-execution-scoped
+      Role trust policy:
+        {
+          "Effect": "Allow",
+          "Principal": {"Service": "states.amazonaws.com"},
+          "Action": "sts:AssumeRole"
+        }
+      Role identity policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "lambda:InvokeFunction",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:quick-handler"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "logs:PutLogEvents", "logs:CreateLogDelivery", "logs:DescribeLogGroups"],
+              "Resource": "*"
+            }
+          ]
+        }
+      Definition (ASL):
+        {
+          "StartAt": "QuickInvoke",
+          "States": {
+            "QuickInvoke": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:111111111111:function:quick-handler",
+              "TimeoutSeconds": 30,
+              "Retry": [{"ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 1, "MaxAttempts": 2, "BackoffRate": 2.0}],
+              "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "ErrorHandler"}],
+              "Next": "Done"
+            },
+            "ErrorHandler": {"Type": "Fail", "Error": "QuickFailed", "Cause": "Unhandled"},
+            "Done": {"Type": "Succeed"}
+          }
+        }
+      Emit the standard VERDICT block (STATE_MACHINE, TYPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_TRACING
+    assertions:
+      must_contain:
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "NO_TRACING"
+        - "EXPRESS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_LOGGING"

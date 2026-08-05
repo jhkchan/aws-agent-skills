@@ -1,0 +1,70 @@
+{
+  "skill": "codebuild-project-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds concrete expert knowledge: exact verdict ordering, regex patterns for secret detection, the full\u2011replace update gotcha for CodeBuild, pagination of list\u2011projects, trust\u2011policy scoping conditions, and the distinction between encryptionDisabled vs. SSE\u2011S3. These details are not obvious to a generic model and constitute real delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: use of batch\u2011get\u2011projects, full JSON replace for environment updates, mandatory snapshot before remediation, IAM policy simulation, VPC subnet classification, and explicit ordering of audit steps. No generic \"check security\" only."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an extensive NEVER list with concrete reasoning (e.g., never flag PARAMETER_STORE as leak, never assume missing role policy is over\u2011permissive). Missing a few niche pitfalls (e.g., wildcard principals other than Service) prevents a perfect score."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present and precise. The only minor gap is the lack of an explicit example input payload, which would aid activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Content is layered (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Remediation). However the Mindset and Quick reference sections are dense, causing some cognitive overload before the core decision tree is reached."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained with confirmation prompts, snapshot steps, and full\u2011replace warnings. Creative tasks (e.g., optional notes) are left flexible. No over\u2011constrained or under\u2011constrained sections detected."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation \u2192 Deep reference) that matches the expected skill template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a full decision tree, working CLI examples, error handling for malformed JSON, and remediation steps. Slight weakness: offline VPC subnet classification is noted as a NOTE rather than a fallback rule, which could leave an agent without a definitive path in that scenario."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 49703,
+  "latency_ms": 16433,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

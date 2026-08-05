@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "codecommit-repository-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CodeCommit Repository Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-approval-rule",
+      "name": "No approval rule template linked — unreviewed code merges",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-approval-rule.md",
+      "baseline_file": "baselines/no-approval-rule.md",
+      "expected_verdict": "NO_APPROVAL_RULE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_APPROVAL_RULE", "no-approval-rule", "VERDICT", "REASON", "REMEDIATION", "DEPRECATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "no-cmk-encryption",
+      "name": "Approval rule present but AWS-managed KMS key — no customer key control",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-cmk-encryption.md",
+      "baseline_file": "baselines/no-cmk-encryption.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "no-cmk-encryption", "VERDICT", "REASON", "REMEDIATION", "DEPRECATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_APPROVAL_RULE"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-no-notifications",
+      "name": "Approval + CMK encryption OK but no notification rules — alerting gap",
+      "difficulty": "medium",
+      "prompt_file": "prompts/config-gap-no-notifications.md",
+      "baseline_file": "baselines/config-gap-no-notifications.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-no-notifications", "VERDICT", "REASON", "REMEDIATION", "DEPRECATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_APPROVAL_RULE", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "deprecation-risk-clean",
+      "name": "All config dimensions pass but no migration-acknowledgment tag",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deprecation-risk-clean.md",
+      "baseline_file": "baselines/deprecation-risk-clean.md",
+      "expected_verdict": "DEPRECATION_RISK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["DEPRECATION_RISK", "deprecation-risk-clean", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_APPROVAL_RULE", "VERDICT: NO_ENCRYPTION", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "ok-migration-planned",
+      "name": "All config dimensions pass with migration-acknowledgment tag — fully compliant",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ok-migration-planned.md",
+      "baseline_file": "baselines/ok-migration-planned.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["VERDICT: OK", "ok-migration-planned", "VERDICT", "REASON", "REMEDIATION", "DEPRECATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_APPROVAL_RULE", "VERDICT: NO_ENCRYPTION", "VERDICT: CONFIG_GAP", "VERDICT: DEPRECATION_RISK"]
+        }
+      ]
+    },
+    {
+      "id": "multiple-gaps-no-approval-no-encryption",
+      "name": "Multiple config gaps — verdict should be NO_APPROVAL_RULE (worst finding)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/multiple-gaps-no-approval-no-encryption.md",
+      "baseline_file": "baselines/multiple-gaps-no-approval-no-encryption.md",
+      "expected_verdict": "NO_APPROVAL_RULE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_APPROVAL_RULE", "multiple-gaps-no-approval-no-encryption", "VERDICT", "REASON", "REMEDIATION", "DEPRECATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

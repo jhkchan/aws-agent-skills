@@ -1,0 +1,70 @@
+{
+  "skill": "sns-topic-public-subscription-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Introduces multiple expert\u2011level details not usually known by a generic model: FIFO topics only accept SQS FIFO queues, default false ContentBasedDeduplication, per\u2011protocol delivery\u2011status logging plus required CloudWatch logs resource policy, cross\u2011account limitations of the AWS\u2011managed SNS CMK, the 30\u202fKiB SNS policy size limit, semantics of NotPrincipal and NotAction in Allow statements, and the exact retry/back\u2011off behavior of HTTP deliveries. These concrete facts constitute a genuine knowledge delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a full AWS\u2011specific audit workflow: pre\u2011flight metadata gating, pagination of list\u2011topics/subscriptions, verification of caller permissions, backup of topic attributes before mutation, confirmation prompts, and ordered remediation steps. The only shortfall is occasional generic phrasing (e.g., \"check security\") that could be tighter."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning for each pitfall (wildcard Subscribe, Publish, NotPrincipal, NotAction, AWS\u2011managed key cross\u2011account issues, etc.). Missing a few deeper anti\u2011patterns such as explicit KMS key\u2011policy pitfalls keeps it from full marks."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The output schema is described only in prose, not as a formal JSON schema, which is a minor omission."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document is layered (quick reference table, then deep sections) but the sheer volume and placement of critical rules (e.g., the NEVER list) deep in the text can cause cognitive overload for an agent that needs the top\u2011level verdict quickly."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive remediation steps are guarded by confirmation prompts and backup commands, showing good calibration. The remediation guidance could include a more explicit rollback plan for SetTopicAttributes changes, so it falls just short of perfect."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable audit\u2011skill pattern (mindset, quick reference, pre\u2011flight, process, output, anti\u2011patterns, safety, remediation, deep reference). Minor inconsistency in section naming prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides clear decision\u2011tree logic, CLI remediation commands, and example outputs, enabling an agent to act. Some required checks (e.g., verifying CloudWatch log\u2011resource policy) are not feasible in offline mode, and pagination error handling is not detailed, limiting full usability."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 39910,
+  "latency_ms": 17166,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}
