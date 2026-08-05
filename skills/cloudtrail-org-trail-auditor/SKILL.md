@@ -48,19 +48,25 @@ metadata:
   family: Governance
   verdict_shape: "NO_ORG_TRAIL | NO_ENCRYPTION | NO_VALIDATION | NO_INSIGHTS | CONFIG_GAP | OK"
   when_to_use: >-
-    Pre-compliance review of CloudTrail trail configuration, org-wide audit
-    coverage checks, log-file integrity validation, KMS-encryption
-    verification, CloudTrail Insights enablement checks, or forensic-readiness
-    posture audits across an AWS Organization.
+    Pre-compliance review of an AWS Organizations CloudTrail trail's
+    configuration: org-wide coverage, multi-region logging, KMS-encryption,
+    log-file integrity validation, Insights enablement, and log retention
+    posture.
+  when_not_to_use:
+    - "Single-account trail that is NOT part of an AWS Organization (different audit scope)."
+    - "CloudTrail Lake event-data-store queries (different API surface: list-event-data-stores / start-query)."
+    - "Configuring data-event selectors for S3/Lambda/DynamoDB resources (separate skill)."
+    - "Macie, GuardDuty, or Security Hub finding triage (use the dedicated triage skills)."
+    - "Cost-optimization of CloudTrail ingest volume (use a cost-audit skill)."
   activation_triggers:
-    - "audit this CloudTrail trail"
+    - "audit this CloudTrail org trail"
     - "is my org trail configured correctly"
-    - "check CloudTrail log file validation"
-    - "is CloudTrail encrypted with KMS"
-    - "are CloudTrail Insights enabled"
-    - "CloudTrail multi-region check"
-    - "CloudTrail org trail coverage"
-    - "verify CloudTrail forensic readiness"
+    - "check CloudTrail org trail log file validation"
+    - "is the CloudTrail org trail encrypted with KMS"
+    - "are CloudTrail Insights enabled on the org trail"
+    - "CloudTrail multi-region check on the org trail"
+    - "CloudTrail org trail coverage audit"
+    - "verify CloudTrail forensic readiness for the org"
   invocation_schema:
     type: object
     required: [trail_config]
@@ -89,45 +95,37 @@ metadata:
 
 # CloudTrail Organization Trail Auditor
 
+## Quick start (decision tree — read first)
+
+Evaluate dimensions in order; **the first failing dimension is the verdict.**
+
+| # | Check | Fail verdict | Risk |
+|---|---|---|---|
+| 1 | `IsOrganizationTrail: false` (from `describe-trails`) | **NO_ORG_TRAIL** | CRITICAL |
+| 2 | `KmsKeyId` null/empty (SSE-S3 defaults) | **NO_ENCRYPTION** | CRITICAL |
+| 3 | `LogFileValidationEnabled: false` | **NO_VALIDATION** | HIGH |
+| 4 | `InsightsSelectors: []` (from `get-insight-selectors`) | **NO_INSIGHTS** | MEDIUM |
+| 5 | `IsMultiRegionTrail: false` OR `CloudWatchLogsLogGroupArn: null` OR `IncludeGlobalServiceEvents: false` OR CW retention < 90 days | **CONFIG_GAP** | MEDIUM |
+| 6 | All above pass | **OK** | LOW |
+
+**Pre-flight gate (mandatory):** `get-trail-status` returns `IsLogging`. If `false`, append a CRITICAL finding regardless of the verdict, and recommend `start-logging`.
+
+**Invisible dependencies (require extra API calls — surface gaps in FINDINGS, never silently change the verdict):** Organizations trusted-service access for `cloudtrail.amazonaws.com`, S3 bucket-policy `s3:x-amz-acl: bucket-owner-full-control` ACL, KMS key-policy `kms:GenerateDataKey*` grant, S3 lifecycle rules on the log and digest prefixes.
+
+**Output one block per trail:** `TRAIL / VERDICT / REASON / FINDINGS / REMEDIATION` (see Output format).
+
 ## Mindset
 
 **One-line takeaway:** the verdict is the **first** failing dimension in a
-strict order of severity — org coverage is checked before encryption,
-encryption before validation, validation before insights, insights before
-config-gap. A trail that is not an org trail fails the most fundamental audit
-gate regardless of how well everything else is configured.
+strict order of severity — org coverage → encryption → validation → insights
+→ config-gap. A trail that is not an org trail fails the most fundamental
+audit gate regardless of how well everything else is configured.
 
-CloudTrail is the forensic bedrock of an AWS account. Every security
-investigation — breach timeline, insider-threat attribution, compliance audit,
-configuration drift — starts with CloudTrail logs. An org trail that is
-misconfigured does not merely "miss events"; it creates **silent blind spots**
-where an attacker's actions leave no trace.
-
-The rest of this skill supplies the depth: Step 0 enumerates the non-obvious
-CloudTrail behaviors that change classification; Steps 1-6 are the deterministic
-first-fail-wins decision tree. Skim the matrix below, then jump to Step 0.
-
-## Quick reference — verdict matrix
-
-| Dimension checked | Fail verdict | Risk level | Step |
-|---|---|---|---|
-| `IsOrganizationTrail: false` or absent | **NO_ORG_TRAIL** | CRITICAL | 1 |
-| `KmsKeyId` null / empty / SSE-S3 only | **NO_ENCRYPTION** | CRITICAL | 2 |
-| `LogFileValidationEnabled: false` | **NO_VALIDATION** | HIGH | 3 |
-| No Insights selectors or empty list | **NO_INSIGHTS** | MEDIUM | 4 |
-| Multi-region off, no CloudWatch Logs, no global events, no/short retention | **CONFIG_GAP** | MEDIUM | 5 |
-| All dimensions pass | **OK** | LOW | 6 |
-
-The verdict is the **first failing dimension** in the order above. A trail
-that fails org-trail AND encryption emits `NO_ORG_TRAIL` (the more fundamental
-gap), with the encryption finding listed in FINDINGS.
-
-> **Pre-flight critical:** four requirements are invisible to
-> `describe-trails` and cause silent failures on org trails — Organizations
-> trusted-service access for `cloudtrail.amazonaws.com`, the
-> `bucket-owner-full-control` S3 ACL condition, the KMS key policy
-> `kms:GenerateDataKey*` grant with the trail-ARN context, and S3 lifecycle
-> rules that expire the log or digest prefix. Deep-dive on each is in Step 0.
+CloudTrail is the forensic bedrock of an AWS account. A misconfigured org
+trail does not merely "miss events"; it creates **silent blind spots** where
+attacker actions leave no trace. Step 0 enumerates the non-obvious
+CloudTrail behaviors that change classification; Steps 1–6 are the
+deterministic first-fail-wins tree.
 
 ## Pre-flight: trail status gate (run before classification)
 
@@ -165,34 +163,32 @@ REMEDIATION: Retrieve the canonical config with `aws cloudtrail describe-trails 
 These behaviors change classification if ignored:
 
 - **`IsOrganizationTrail` is the org-coverage flag, not the multi-region flag.**
-  Many operators conflate them. An org trail with `IsMultiRegionTrail: false`
-  logs all accounts but only in the trail's home region — a lateral-movement
-  attack in `ap-southeast-1` leaves zero trace. Both must be `true` for
-  full org + full region coverage.
+  An org trail with `IsMultiRegionTrail: false` logs all accounts but only in
+  the trail's home region — a lateral-movement attack in `ap-southeast-1`
+  leaves zero trace. Both must be `true` for full org + full region coverage.
 
 - **Org trail requires `organizations:EnableAWSServiceAccess` for CloudTrail.**
-  If the AWS Organizations trusted-service access for CloudTrail was revoked
-  (or never enabled), the trail appears active (`IsLogging: true`) but silently
-  logs only the management account. Member-account events stop flowing. This is
-  invisible in `describe-trails` — check `aws organizations list-aws-service-
-  access-for-organization` for `SERVICE_PRINCIPAL: cloudtrail.amazonaws.com`.
+  If Organizations trusted-service access for CloudTrail is revoked, the trail
+  appears active (`IsLogging: true`) but silently logs only the management
+  account. Invisible in `describe-trails` — check `aws organizations
+  list-aws-service-access-for-organization` for
+  `SERVICE_PRINCIPAL: cloudtrail.amazonaws.com`.
 
 - **S3 bucket policy must grant `s3:x-amz-acl: bucket-owner-full-control`.**
   Without this condition, log objects delivered on behalf of member accounts
   are owned by the member account, not the management account. The management
-  account can list the objects (it owns the bucket) but cannot read them. This
-  produces a trail that "looks fine" but whose logs are inaccessible for
-  org-wide queries. The bucket policy must also allow `cloudtrail.amazonaws.com`
-  to `s3:GetBucketAcl`, `s3:ListBucket`, and `s3:PutObject`.
+  account can list the objects (it owns the bucket) but cannot read them. The
+  bucket policy must also allow `cloudtrail.amazonaws.com` to `s3:GetBucketAcl`,
+  `s3:ListBucket`, and `s3:PutObject`.
 
-- **`KmsKeyId` on the trail controls SSE-KMS for S3 log delivery, not
-  CloudTrail event encryption.** This KMS key encrypts the log files at rest
-  in S3. If `KmsKeyId` is null, S3 defaults to SSE-S3 (AES-256, Amazon-managed
-  key). SSE-S3 is encryption, but it is not customer-controlled — a compliance
-  framework requiring customer-managed keys (CMK) treats null KmsKeyId as
-  NO_ENCRYPTION. The key must be in the same region as the trail and its policy
-  must grant `cloudtrail.amazonaws.com` the `kms:GenerateDataKey*` and
-  `kms:Decrypt` permissions with the CloudTrail trail ARN as condition.
+- **`KmsKeyId` controls SSE-KMS for S3 log delivery, not "CloudTrail event
+  encryption."** If `KmsKeyId` is null, S3 defaults to SSE-S3 (AES-256,
+  Amazon-managed key). SSE-S3 IS encryption, but it is not customer-controlled
+  — a compliance framework requiring customer-managed keys treats null
+  `KmsKeyId` as NO_ENCRYPTION. The key must be in the trail's region and its
+  policy must grant `cloudtrail.amazonaws.com` the `kms:GenerateDataKey*` and
+  `kms:Decrypt` permissions with the CloudTrail trail ARN as encryption
+  context (`kms:EncryptionContext:aws:cloudtrail:arn = <trail-arn>`).
 
 - **Log file validation digest files live in a separate S3 prefix.** Digests
   are delivered to `<prefix>/CloudTrail-Digest/`. If an S3 lifecycle rule
@@ -201,70 +197,88 @@ These behaviors change classification if ignored:
   `LogFileValidationEnabled: true` and expired digests provides a false sense
   of integrity.
 
-- **CloudTrail Insights has its own billing dimension.** Insights is charged
-  per management event analyzed, on top of the first-free-copy. This is why
-  some orgs disable it despite the security value. The auditor flags its
-  absence as NO_INSIGHTS regardless of cost rationale — the remediation can
-  note the cost trade-off.
+- **CloudTrail Insights has its own billing dimension** (per management event
+  analyzed, on top of the first-free-copy). Some orgs disable it for cost;
+  the auditor still flags absence as NO_INSIGHTS — remediation can note the
+  cost trade-off.
 
 - **Insights selectors are a separate API call.** `describe-trails` does NOT
-  return Insight selectors. You must call `get-insight-selectors --trail-name
-  <name>` separately. If the input does not include insight-selector data, the
-  auditor should note the gap but cannot definitively classify NO_INSIGHTS —
-  request the data.
+  return them — call `get-insight-selectors --trail-name <name>` separately.
 
 - **`IncludeGlobalServiceEvents: false` silently drops IAM, STS, Route 53, and
-  CloudFront events.** These are "global" services whose events are logged in
-  the trail's home region (us-east-1 for org trails). Disabling them removes
-  the entire IAM/STS audit trail — the most security-critical event source.
-  This is a CONFIG_GAP finding.
+  CloudFront events.** These global-service events are logged in the trail's
+  home region (us-east-1 for org trails). Disabling them removes the entire
+  IAM/STS audit trail. This is a CONFIG_GAP finding.
 
 - **CloudWatch Logs retention is a log-group property, not a trail property.**
-  The trail delivers to the log group, but retention is configured on the log
-  group itself via `aws logs put-retention-policy`. A trail pointing to a log
-  group with `retentionInDays: null` ("Never expire") has no compliance
-  boundary on log lifetime — it accumulates indefinitely (cost + no
-  data-retention governance). Flag as CONFIG_GAP.
+  A trail pointing to a log group with `retentionInDays: null` ("Never
+  expire") has no compliance boundary on log lifetime. Flag as CONFIG_GAP.
 
-- **The 5-trail-per-region quota.** An account can have at most 5 trails per
-  region. If an org already has 5 trails in the management account's home
-  region, creating a new org trail requires deleting one first. This is an
-  operational constraint, not a security finding, but it may explain why an org
-  trail is missing.
+- **The 5-trail-per-region quota** is a hard limit. An account with 5 trails
+  in a region cannot create another without deleting one. Operational
+  constraint — not a security finding, but may explain a missing org trail.
 
 - **Trail ARN contains the management account ID, not the member account.**
-  An org trail ARN is `arn:aws:cloudtrail:<region>:<mgmt-account>:trail/<name>`.
-  When auditing from a member account, the trail will NOT appear in
-  `describe-trails` — this does not mean it does not exist. Verify from the
-  management account.
+  When auditing from a member account, the org trail will NOT appear in
+  `describe-trails` — verify from the management account.
 
 - **CloudTrail data events are NOT enabled by default — only management
-  events are logged.** A "fully configured" org trail with every dimension
-  green still records zero S3 `GetObject`/`PutObject`, Lambda `Invoke`, or
-  DynamoDB `GetItem`/`PutItem` activity unless an event selector explicitly
-  adds the data-resource ARNs (`s3:::*`, `lambda:::*`, `dynamodb:::*`). Data
-  events also have a separate billing dimension. The auditor cannot classify
-  data-event coverage from `describe-trails` — `get-event-selectors` is
-  required. Absence of data-event selectors is not in the verdict matrix
-  (it is a coverage gap, not a compliance gap), but it must be noted in
-  FINDINGS as a blind-spot warning.
+  events are logged.** A "fully configured" org trail still records zero S3
+  `GetObject`/`PutObject`, Lambda `Invoke`, or DynamoDB activity unless an
+  event selector adds the data-resource ARNs. `get-event-selectors` is
+  required; absence is a coverage gap (note in FINDINGS), not a verdict
+  failure.
 
 - **`lookup-events` API returns only the last 90 days and only management
-  events.** Auditors who use `aws cloudtrail lookup-events` to verify
-  "did this trail capture X?" get a misleadingly empty result for any event
-  older than 90 days or for any data event regardless of age. The S3 log
-  files are the authoritative long-term record — the lookup API is a
-  short-term operational tool, not an audit-of-record.
+  events.** Auditors using it to verify "did this trail capture X?" get a
+  misleadingly empty result for any event older than 90 days or any data
+  event. The S3 log files are the authoritative long-term record.
 
-- **Event selectors can silently exclude AWS KMS events.** KMS generates
-  very high event volume (Decrypt/Encrypt per S3 GET/PUT under SSE-KMS), so
-  legitimate `FieldByField` exclusions of `eventSource: kms.amazonaws.com`
-  are common in event selectors. This is operationally reasonable but
-  creates a forensics blind spot for KMS key abuse (e.g., decrypting
-  exfiltrated ciphertext). The auditor should call `get-event-selectors`
-  and surface any `ExcludeManagementEventSources` entry in FINDINGS as a
-  WARNING — it is not a verdict failure, but the operator must acknowledge
-  the trade-off.
+- **Event selectors can silently exclude AWS KMS events.** KMS generates very
+  high event volume (Decrypt/Encrypt per S3 GET/PUT under SSE-KMS), so
+  legitimate `ExcludeManagementEventSources: kms.amazonaws.com` entries are
+  common. This is operationally reasonable but creates a forensics blind spot
+  for KMS key abuse. Surface any exclusion in FINDINGS as a WARNING.
+
+- **`describe-trails` (LIST) and `get-trail` (GET) return different fields.**
+  `describe-trails` returns a summary list; `get-trail --name <name>` returns
+  the full `Trail` object including the full KMS context. For an authoritative
+  per-trail audit, prefer `get-trail` — `describe-trails` has been observed to
+  omit fields on trails created by CloudFormation stacks that set advanced
+  event selectors.
+
+- **First management-event copy is free per region, per account; a second
+  management-events trail in the same region incurs per-event billing.** A
+  common cost trap: an operator creates a "backup" org trail pointing to a
+  different bucket — silent double billing starts immediately. Surface a
+  WARNING if the input reveals multiple trails in one region.
+
+- **CloudTrail event delivery latency is typically 3–15 minutes, NOT the
+  "hourly" many operators assume.** The hourly window is the file-batching
+  cadence, but events for that window can land up to 15 minutes after the API
+  call. Operators investigating "did X happen in the last 5 minutes?" cannot
+  rely on CloudTrail — use CloudWatch Metrics or EventBridge for near-real-time
+  detection. This is also why `IsLogging: true` does not guarantee that
+  recently tested events are already in S3.
+
+- **`validate-logs` requires `s3:GetObject` on BOTH the log-file prefix AND
+  the digest prefix.** Most scoped-down audit roles grant only the log prefix
+  and silently fail validation with a generic "AccessDenied" buried in the
+  output. Verify the calling identity's role covers
+  `s3://<bucket>/<prefix>/CloudTrail-Digest/*` as well as the log prefix.
+
+- **Org-trail enablement propagation delay.** Flipping
+  `--is-organization-trail` on an existing trail takes 5–15 minutes before
+  shadow trails appear in member accounts and event delivery from member
+  accounts begins. An audit run in that window reports NO member-account
+  events even though configuration is correct — note this when classifying
+  a recently converted trail.
+
+- **CloudTrail log files use S3 multipart upload.** Subscribers wiring
+  EventBridge or S3 event notifications on the log prefix may receive
+  `s3:ObjectCreated:*` for the initiate-multipart-upload, not the
+  complete-multipart-upload — subscribers see partial or empty objects. SIEM
+  integrations should trigger on `CompleteMultipartUpload` only.
 
 ### Step 1: Organization trail check (NO_ORG_TRAIL — CRITICAL)
 
@@ -298,17 +312,30 @@ If `IsOrganizationTrail: true` (passed Step 1), check `KmsKeyId`:
   silently — the trail appears active but logs stop appearing in S3. Note as
   a WARNING in FINDINGS but do not fail the dimension.
 
-**Verify the S3 bucket policy grants CloudTrail the required ACL condition
-(this is invisible from `describe-trails` and silently breaks member-account
-log access on org trails):**
+**Verify the S3 bucket policy, KMS key policy, and S3 lifecycle rules
+(all three are invisible from `describe-trails` and silently break member-account
+log access on org trails). Run these in order; treat any non-conformance as a
+CONFIG_GAP finding:**
 
 ```bash
-aws s3api get-bucket-policy --bucket <S3BucketName> --query Policy --output text | jq '.Statement[] | select(.Principal.Service=="cloudtrail.amazonaws.com")'
-# Expected: an Allow on s3:PutObject with Condition StringEquals
-#           s3:x-amz-acl == bucket-owner-full-control
-aws kms describe-key --key-id <KmsKeyId> --query 'KeyMetadata.Policy' --output text | jq '.Statement[] | select(.Principal.Service=="cloudtrail.amazonaws.com")'
-# Expected: Allow on kms:GenerateDataKey*/kms:Decrypt with
-#           EncryptionContext:aws:cloudtrail:arn == <trail-arn>
+# 1. S3 bucket policy — must allow cloudtrail.amazonaws.com s3:PutObject with
+#    Condition StringEquals s3:x-amz-acl == bucket-owner-full-control.
+aws s3api get-bucket-policy --bucket <S3BucketName> --query Policy --output text \
+  | jq '.Statement[] | select(.Principal.Service=="cloudtrail.amazonaws.com")'
+
+# 2. KMS key policy — must allow cloudtrail.amazonaws.com kms:GenerateDataKey*
+#    and kms:Decrypt with EncryptionContext:aws:cloudtrail:arn == <trail-arn>.
+aws kms describe-key --key-id <KmsKeyId> --query 'KeyMetadata.Policy' --output text \
+  | jq '.Statement[] | select(.Principal.Service=="cloudtrail.amazonaws.com")'
+
+# 3. S3 lifecycle rules — must NOT expire the log prefix (<prefix>/) or the
+#    digest prefix (<prefix>/CloudTrail-Digest/) before the compliance window.
+aws s3api get-bucket-lifecycle-configuration --bucket <S3BucketName> --output json \
+  | jq '.Rules[] | select(.Filter.Prefix | test("^<prefix>(CloudTrail-Digest/)?"))'
+
+# 4. CloudWatch Logs retention — must be on the trail's log group, >= 90 days.
+aws logs describe-log-groups --log-group-name-prefix <CloudWatchLogsLogGroupArn-prefix> \
+  --query 'logGroups[*].[logGroupName,retentionInDays]' --output table
 ```
 
 ### Step 3: Log file validation check (NO_VALIDATION — HIGH)
@@ -327,20 +354,19 @@ If Steps 1-2 passed, check `LogFileValidationEnabled`:
 
 ### Step 4: CloudTrail Insights check (NO_INSIGHTS — MEDIUM)
 
-If Steps 1-3 passed, check Insights selectors:
+If Steps 1-3 passed, check Insights selectors. The rule is deterministic:
 
-- **No `InsightsSelectors` data provided** → The auditor cannot definitively
-  classify the Insights dimension. **Fallback verdict: OK with a WARNING** in
-  FINDINGS: "Insights selectors not provided — call
-  `aws cloudtrail get-insight-selectors --trail-name <name>` and re-audit to
-  close this dimension." Do NOT emit NO_INSIGHTS unless the input explicitly
-  states selectors are absent/empty — guessing inflates false positives. The
-  operator-facing REASON must say "Insights unverified (data missing)" so the
-  fallback is auditable, not silent.
+- **No `InsightsSelectors` data provided** → Verdict proceeds to Step 5 (does
+  NOT block OK), but the REASON field MUST begin with the literal phrase
+  `"Insights unverified"` and FINDINGS MUST include an `[UNVERIFIED]` line:
+  "Operator must call `aws cloudtrail get-insight-selectors --trail-name
+  <name>` to close this dimension." Do NOT emit `NO_INSIGHTS` without explicit
+  evidence (empty list); do NOT emit `OK` without surfacing the gap. The
+  fallback is operator-visible, never silent.
 
-- **`InsightsSelectors` is empty (`[]`) or not configured** → No anomaly
-  detection on API call volume or error rates. **Verdict: NO_INSIGHTS**
-  (MEDIUM risk).
+- **`InsightsSelectors` is empty (`[]`) or explicitly not configured** → No
+  anomaly detection on API call volume or error rates. **Verdict:
+  NO_INSIGHTS** (MEDIUM risk).
 
 - **`InsightsSelectors` present with `ApiCallRateInsight` and/or
   `ApiErrorRateInsight`** → Insights is enabled. Note: Insights requires a
@@ -401,86 +427,15 @@ REMEDIATION:
      aws s3 ls s3://<bucket>/CloudTrail-Digest/ --recursive | head -20
 ```
 
-## Anti-Patterns — NEVER
-
-- NEVER assume an org trail is multi-region. `IsOrganizationTrail` and
-  `IsMultiRegionTrail` are independent flags. An org trail logging only one
-  region creates a blind spot for every other region — an attacker can
-  operate from `eu-west-1` against a trail in `us-east-1` and leave no trace.
-
-- NEVER treat SSE-S3 (Amazon-managed key) as satisfying a KMS-encryption
-  requirement. SSE-S3 IS encryption, but the key is managed by AWS — the
-  customer cannot audit key usage, set key policies, or rotate on their own
-  schedule. Compliance frameworks requiring customer-managed keys treat null
-  `KmsKeyId` as NO_ENCRYPTION regardless of S3 default encryption.
-
-- NEVER classify a trail as OK without verifying `IsLogging: true`. A trail
-  with perfect configuration but `IsLogging: false` is collecting nothing.
-  `describe-trails` returns the config; `get-trail-status` returns the status.
-  They are separate API calls — checking only the config is a false OK.
-
-- NEVER assume CloudTrail Insights works immediately after enablement. It
-  requires a minimum 7-day baseline of management events before it can detect
-  anomalies. A newly enabled Insights selector will not produce findings in
-  the first week — this is normal, not a misconfiguration.
-
-- NEVER conflate CloudTrail log retention with CloudWatch Logs retention.
-  CloudTrail itself has no retention setting — logs persist in S3 until a
-  lifecycle policy removes them. CloudWatch Logs retention is a separate
-  property on the log group (`retentionInDays`). An audit that checks only
-  the trail config for retention misses both dimensions.
-
-- NEVER overlook the S3 bucket policy for org trails. The bucket must grant
-  `cloudtrail.amazonaws.com` `s3:PutObject` with condition
-  `s3:x-amz-acl: bucket-owner-full-control`. Without the ACL condition,
-  member-account logs are owned by the member account and the management
-  account cannot read them — the trail appears healthy but produces
-  inaccessible logs.
-
-- NEVER assume `IncludeGlobalServiceEvents: true` is the default in all
-  tooling. Terraform and CloudFormation templates that create trails sometimes
-  omit this field, and the default behavior varies by SDK version. Explicitly
-  verify it is `true` — disabling it drops the entire IAM/STS audit trail.
-
-- NEVER recommend deleting an existing org trail to "fix" a misconfiguration.
-  Update the trail in place with `aws cloudtrail update-trail`. Deleting and
-  recreating loses the trail name, S3 prefix continuity, and any CloudWatch
-  alarms or EventBridge rules keyed to the trail ARN.
-
-- NEVER ignore the KMS key policy when auditing CloudTrail KMS encryption.
-  The key must grant `cloudtrail.amazonaws.com` the `kms:GenerateDataKey*`
-  permission with the trail ARN in the condition. A `KmsKeyId` set on the
-  trail with a missing or restrictive key policy causes silent log-delivery
-  failure — the trail is "encrypted" but nothing is being written.
-
-- NEVER classify NO_INSIGHTS if the insight-selector data was not provided.
-  `describe-trails` does not return Insights selectors. If the input lacks
-  `get-insight-selectors` output, note the gap and request the data rather
-  than guessing.
-
-- NEVER assume a single-region trail is sufficient for an org, even if all
-  workloads are in one region. AWS global services (IAM, STS, Route 53) and
-  cross-region API calls (e.g., a Lambda in us-east-1 assuming a role in
-  eu-west-1) generate events in the source region. A single-region trail
-  misses the cross-region activity entirely.
-
-- NEVER overlook S3 lifecycle rules that expire the **log files themselves**,
-  not just the digest prefix. A common compliance failure is a blanket
-  `ExpirationInDays` rule on the whole bucket (or on `CloudTrail/` prefix)
-  that deletes raw log files after 30/60/90 days while leaving digests
-  intact — `validate-logs` then passes on a digest chain that points at
-  missing log files, and the audit trail silently shortens. The auditor
-  cannot see lifecycle rules from `describe-trails`; if S3 inventory or a
-  lifecycle policy summary is available, surface any non-versioned expiry on
-  the log prefix as a CONFIG_GAP finding.
-
 ## Pre-flight safety checks (run before any remediation CLI)
 
 - **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
   (`update-trail`, `start-logging`, `stop-logging`, `add-tags`, `put-insight-
   selectors`), the auditor MUST emit:
   `CONFIRM: About to <action> on trail <name> in account <account>. This
-  affects <consequence>. Proceed? (yes/no)`
+  affects <consequence>. Proceed? (yes/no)` and wait for an explicit `yes`
+  before emitting the CLI. Treat `delete-trail` as BLOCKED — see the NEVER
+  list.
 
 - **Capture current trail config for rollback:**
   `aws cloudtrail describe-trails --trail-name-list <name> --output json >
@@ -501,9 +456,75 @@ REMEDIATION:
   and that `aws organizations describe-organization` returns a valid org.
   A member account cannot create or update an org trail.
 
-- Prefer `update-trail` (in-place modification) over delete-and-recreate.
-  In-place updates preserve the trail ARN, S3 prefix, and all downstream
-  integrations (EventBridge, CloudWatch alarms, SIEM pipelines).
+## Anti-Patterns — NEVER
+
+- NEVER assume an org trail is multi-region. `IsOrganizationTrail` and
+  `IsMultiRegionTrail` are independent flags. An org trail logging only one
+  region creates a blind spot for every other region — an attacker can
+  operate from `eu-west-1` against a trail in `us-east-1` and leave no trace.
+
+- NEVER treat SSE-S3 (Amazon-managed key) as satisfying a KMS-encryption
+  requirement. SSE-S3 IS encryption, but the key is managed by AWS — the
+  customer cannot audit key usage, set key policies, or rotate on their own
+  schedule. Compliance frameworks requiring customer-managed keys treat null
+  `KmsKeyId` as NO_ENCRYPTION regardless of S3 default encryption.
+
+- NEVER classify a trail as OK without verifying `IsLogging: true`. A trail
+  with perfect configuration but `IsLogging: false` is collecting nothing.
+  `describe-trails` returns the config; `get-trail-status` returns the status.
+
+- NEVER assume CloudTrail Insights works immediately after enablement. It
+  requires a minimum 7-day baseline of management events before it can detect
+  anomalies.
+
+- NEVER conflate CloudTrail log retention with CloudWatch Logs retention.
+  CloudTrail itself has no retention setting — logs persist in S3 until a
+  lifecycle policy removes them. CloudWatch Logs retention is a separate
+  property on the log group (`retentionInDays`).
+
+- NEVER overlook the S3 bucket policy for org trails. The bucket must grant
+  `cloudtrail.amazonaws.com` `s3:PutObject` with condition
+  `s3:x-amz-acl: bucket-owner-full-control`. Without the ACL condition,
+  member-account logs are owned by the member account and the management
+  account cannot read them.
+
+- NEVER assume `IncludeGlobalServiceEvents: true` is the default in all
+  tooling. Terraform and CloudFormation templates sometimes omit this field;
+  the default varies by SDK version. Explicitly verify it is `true`.
+
+- NEVER recommend `delete-trail` to remediate any configuration gap.
+  `delete-trail` is irreversible, drops the trail name and S3 prefix
+  continuity, breaks downstream EventBridge rules and CloudWatch alarms keyed
+  to the trail ARN, and creates a forensic gap until a replacement trail
+  begins delivery. Always use `update-trail` (in-place modification); it
+  preserves the ARN, S3 prefix, and all downstream integrations. If a
+  deletion is genuinely required (e.g., trail-name conflict), require a
+  second operator confirmation and capture a backup first.
+
+- NEVER ignore the KMS key policy when auditing CloudTrail KMS encryption.
+  A `KmsKeyId` set on the trail with a missing or restrictive key policy
+  causes silent log-delivery failure — the trail is "encrypted" but nothing
+  is being written.
+
+- NEVER classify NO_INSIGHTS if the insight-selector data was not provided.
+  Surface the gap as `[UNVERIFIED]` per Step 4 — do not guess.
+
+- NEVER rely on a default S3 lifecycle configuration (e.g., a bucket-wide
+  `ExpirationInDays` shipped by a CDK construct or Terraform module) as the
+  CloudTrail retention control. S3 lifecycle expires objects silently — no
+  notification, no digest-chain check, no object lock. A common compliance
+  failure: the default rule deletes raw log files after 30/60/90 days while
+  digests remain, so `validate-logs` reports a green chain pointing at
+  missing files and the audit trail silently shortens. Always inspect
+  `aws s3api get-bucket-lifecycle-configuration` and surface any
+  non-versioned expiry on the log or digest prefix as CONFIG_GAP. Prefer S3
+  Object Lock + Glacier Deep Archive for compliance retention over lifecycle
+  expiry.
+
+- NEVER assume a single-region trail is sufficient for an org, even if all
+  workloads are in one region. AWS global services (IAM, STS, Route 53) and
+  cross-region API calls (e.g., a Lambda in us-east-1 assuming a role in
+  eu-west-1) generate events in the source region.
 
 ## Remediation guidance
 
@@ -572,7 +593,7 @@ REMEDIATION:
 2. Recommend periodic `validate-logs` runs (weekly digest verification).
 3. Recommend testing org-trail member-account visibility quarterly.
 
-## Deep reference: CloudTrail internals
+## Reference — CloudTrail internals (deep material)
 
 ### Org trail creation and member-account visibility
 
@@ -601,15 +622,6 @@ error rates per event source over a rolling window, then flags sustained
 deviations (typically 3x+ over baseline for several minutes). It does NOT
 analyze individual events for suspiciousness — that is the job of GuardDuty
 or Security Hub. Insights detects "unusual volume," not "malicious activity."
-
-### KMS encryption context for CloudTrail
-
-CloudTrail uses the encryption context pair
-`aws:cloudtrail:arn = <trail-arn>` when calling `kms:GenerateDataKey`. This
-context is visible in CloudTrail's own KMS event logs and in the KMS key
-policy condition. The key policy MUST allow CloudTrail service principal
-with this exact context — a policy allowing `kms:GenerateDataKey*` without
-the context condition is broader than necessary but functional.
 
 ## Domain
 

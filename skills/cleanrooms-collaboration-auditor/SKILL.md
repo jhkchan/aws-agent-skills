@@ -86,6 +86,25 @@ metadata:
 
 # Clean Rooms Collaboration Auditor
 
+## Quick start
+
+**Read-only:** emits findings + remediation text only — never executes
+state-changing commands.
+
+| Gate | Check | If failing |
+|---|---|---|
+| Membership | Any member `INVITED` or `REMOVED`? | **MEMBERSHIP_GAP** |
+| Privacy | DP off, epsilon >= 80% cap, no `aggregateConstraints`? | **PRIVACY_RISK** |
+| Config | Unresolved `${param}`, dangling alias, audience not `READY`? | **CONFIG_GAP** |
+| All pass | — | **OK** |
+
+Precedence: `MEMBERSHIP_GAP > PRIVACY_RISK > CONFIG_GAP > OK`.
+
+**Top 3 traps:** (1) `INVITED` member = MEMBERSHIP_GAP always;
+(2) DP `enabled: true` does NOT mean queries run with noise — check
+per-query `additionalAnalyses`; (3) epsilon never resets — it is a
+lifetime budget per member.
+
 ## Mindset
 
 **One-line takeaway:** the verdict is the **worst** finding across four
@@ -138,49 +157,6 @@ See the ordered steps below for edge cases. Deep Clean Rooms internals
 training pipeline) are in the [Deep reference](#deep-reference-clean-rooms-internals)
 section at the end.
 
-## Critical rules — read first (do NOT violate)
-
-These are the high-frequency, high-impact mistakes. Each is expanded in
-the NEVER list and Step 0 below — this block exists so an agent executing
-under time pressure sees them before any classification logic:
-
-1. **Any member in `INVITED` state is MEMBERSHIP_GAP — no exceptions.**
-   The member has not accepted; the collaboration is operationally
-   partial. Do not classify as OK regardless of how clean the privacy
-   config looks.
-2. **`differentialPrivacyConfig.enabled: true` is NOT proof that queries
-   run with DP noise.** The collaboration flag is the capability gate;
-   the per-query `additionalAnalyses` epsilon is the enforcement. A
-   query with `additionalAnalyses: 0` runs without DP noise even on a
-   DP-enabled collaboration. Always audit the most recent query's
-   epsilon value.
-3. **Epsilon does NOT reset at any calendar boundary.** It is a
-   monotonic per-member budget for the collaboration's lifetime. Once
-   exhausted, the only path is recreating the collaboration. Budget for
-   the lifetime at creation — there is no "monthly refill."
-4. **`queryLogStatus: DISABLED` is a CONFIG_GAP note, not a
-   PRIVACY_RISK verdict.** Query logging is an operational/forensic
-   dimension; it does not affect the privacy of protected queries.
-   Further, enabling it post-hoc requires recreating the collaboration
-   (one-way, set-at-creation flag).
-5. **Aggregate constraints (MIN/MAX) are the structural privacy floor;
-   DP is the noise layer on top.** A collaboration with DP enabled but
-   no aggregate constraints can still return singleton rows when noise
-   rounds a 1-row group up to threshold. Both layers must be present
-   for defense in depth.
-6. **The configured audience model lives in `cleanroomsml`, not
-   `cleanrooms`.** A collaboration can reference a valid-looking ARN
-   while the model is in `CREATE_FAILED`. Always fetch the model state
-   from `cleanroomsml get-configured-audience-model` separately.
-7. **Membership status is perspective-relative.** `ListMembers` returns
-   the collaboration's view; `GetMembership` returns the caller's own
-   view. A member can be ACTIVE from the creator's perspective but LEFT
-   from their own. Cross-reference both views in multi-party audits.
-8. **Never recommend deleting a collaboration as remediation without
-   explaining the blast radius** — it removes ALL members, configured
-   tables, analysis templates, and query history irreversibly. The
-   correct fix for one misconfigured member is `DeleteMember`.
-
 ## Pre-flight: collaboration metadata gate (run before classification)
 
 Before evaluating membership and privacy, classify the collaboration
@@ -197,11 +173,15 @@ or REMOVED members. For each collaboration, also page
 drain `nextToken` to completion.
 
 **Live-account pre-flight checks (skip if doing offline config-doc audit):**
-1. Verify the caller's identity can run
-   `cleanrooms:GetMembership` and `cleanrooms:ListMembers` — most read-only
-   auditor roles can list members but cannot see other members' epsilon
-   spend without the `cleanrooms:GetMembership` permission. Surface this
-   BEFORE the operator approves the audit.
+1. Verify the caller's IAM role grants `cleanrooms:GetMembership`,
+   `cleanrooms:ListMembers`, `cleanrooms:GetCollaboration`,
+   `cleanrooms:ListProtectedQueries`, and
+   `cleanrooms:GetConfiguredTableAnalysisRule` — most read-only auditor
+   roles can list members but cannot see other members' epsilon spend
+   without `GetMembership`, and cannot inspect aggregate constraints
+   without `GetConfiguredTableAnalysisRule`. If
+   `cleanroomsml:GetConfiguredAudienceModel` is missing, the audience
+   step will silently skip (note this as a coverage gap).
 2. Verify CloudTrail is logging `cleanrooms:StartProtectedQuery` and
    `cleanrooms:GetProtectedQuery` — these are the audit-grade events for
    privacy-budget spend forensics. Without them, you cannot reconstruct
@@ -365,6 +345,71 @@ experience. Each changes a verdict if ignored:
   the creator must re-invite. This is why Rule M1 fires regardless of
   how long the member has been INVITED; the operator either accepts
   or re-invites, there is no "wait longer" option.
+
+- **Configured table `allowedColumns` does NOT auto-sync with the
+  underlying Glue Data Catalog.** When a column is dropped from the
+  Glue table, the configured table still lists it in `allowedColumns`
+  — queries selecting that column fail with `Column not found` at
+  runtime, but the error message does not mention schema drift, it
+  points at the template. Conversely, a column ADDED to the Glue
+  table is invisible to the collaboration until explicitly added to
+  `allowedColumns` via `UpdateConfiguredTable`. This creates a silent
+  drift window. Always cross-reference the Glue table schema
+  (`aws glue get-table`) against the configured table's
+  `allowedColumns` during audit — any mismatch is a CONFIG_GAP.
+
+- **A protected query with `additionalAnalyses` epsilon below ~0.1
+  SUCCEEDS but produces statistically meaningless results.** The DP
+  noise added at very low epsilon overwhelms the signal — the output
+  rows are dominated by noise. The service provides no "low
+  confidence" warning or quality flag; the analyst receives SUCCEEDED
+  status with garbage data. This is a known DP property but the Clean
+  Rooms operational impact is invisible: analysts silently trust
+  low-epsilon results. Flag any member whose per-query epsilon
+  contributions are consistently below 0.1 as a usability risk in
+  FINDINGS, even though the verdict may be OK.
+
+- **Clean Rooms charges compute for every configured table referenced
+  in an analysis template's FROM/JOIN clauses, regardless of whether
+  the WHERE filter eliminates rows from that table.** A template that
+  JOINs 5 configured tables but only filters on 1 still incurs 5-table
+  scan cost. This is not documented in the pricing page — it surfaces
+  only in Cost Explorer under `CleanRooms` usage type. When auditing
+  template SQL, flag multi-table JOINs as a cost finding alongside
+  correctness — a template joining 4+ tables can cost 10x more than
+  a single-table query for the same row count.
+
+- **`ListProtectedQueries` returns results in reverse chronological
+  order and caps at 100 per page with NO total count field.** For
+  high-traffic collaborations, summing epsilon from a single page
+  UNDERCOUNTS actual spend — the API gives no indication how many
+  pages remain. You must drain `nextToken` to `null` and sum across
+  ALL pages. A collaboration with 500 queries requires 5 paginated
+  calls; missing any page produces a false "epsilon healthy" verdict.
+  This is the most common source of incorrect PRIVACY_RISK
+  classifications in production audits.
+
+- **Spark-engine collaborations (`analyticsEngine: SPARK`) use a
+  separate execution role that lives on the MEMBERSHIP, not the
+  collaboration.** The collaboration config does not show this role.
+  The execution role requires `iam:PassRole` for the Clean Rooms
+  service principal AND read access to the Glue Data Catalog. A
+  misconfigured execution role produces a generic
+  `AccessDeniedException` at query time that does NOT mention the
+  role — engineers chase the S3 bucket policy when the actual blocker
+  is the execution role's missing Glue `glue:GetTable` permission.
+  Always audit the membership's execution role separately for SPARK
+  collaborations.
+
+- **`GetConfiguredTableAnalysisRule` returns DIFFERENT response shapes
+  depending on `analysisRuleType`.** The `aggregateConstraints` field
+  exists ONLY on `AGGREGATION`-type rules — a `LIST`-type rule
+  response has no `aggregateConstraints` key at all. Naive auditors
+  flag "missing aggregateConstraints" on LIST rules, which is expected
+  behavior, not a defect. Only flag absent `aggregateConstraints` on
+  rules of type `AGGREGATION` where the table is used in
+  aggregation queries. Check `analysisRuleType` before evaluating
+  constraint presence.
 
 ### Step 1: Membership activation evaluation (MEMBERSHIP_GAP)
 
@@ -548,148 +593,90 @@ COLLABORATION: <collaboration-id or ARN>
 VERDICT: MEMBERSHIP_GAP | PRIVACY_RISK | CONFIG_GAP | OK
 REASON: <1-2 sentences citing the worst finding and its rule number>
 FINDINGS:
-  - [MEMBERSHIP_GAP] <finding description (Rule Mn)>
-  - [PRIVACY_RISK] <finding description (Rule Pn)>
-  - [CONFIG_GAP] <finding description (Rule An/Qn/Cn)>
-  - [OK] <dimension that passed>
+  - [SEVERITY] <finding description (Rule Xn)> — one line per finding
+EPSILON: <per-member spend: accountId:spent/cap, ...; or "N/A" if DP disabled>
 REMEDIATION: <specific action per finding, or "None required" if OK>
 ```
+
+Field rules:
+- **VERDICT**: exactly one value from the enum. No modifiers.
+- **FINDINGS**: list ALL dimension findings (not just the verdict
+  dimension). Each finding tagged with its severity bracket.
+- **EPSILON**: always present. Per-member breakdown so the operator
+  sees WHO is near-exhaustion, not just an aggregate.
+- **REMEDIATION**: numbered list, one action per finding.
 
 ### Worked example — collaboration with INVITED member and no DP
 
 ```text
 COLLABORATION: arn:aws:cleanrooms:us-east-1:111111111111:collaboration/abc-123
 VERDICT: MEMBERSHIP_GAP
-REASON: Member 222222222222 is in INVITED state (Rule M1) — collaboration
-is operationally partial. Differential privacy is also absent (Rule P1).
+REASON: Member 333333333333 is in INVITED state (Rule M1) — collaboration
+is operationally partial.
 FINDINGS:
-  - [MEMBERSHIP_GAP] Member 222222222222 in INVITED state (Rule M1) —
-    cannot run protected queries or contribute configured table
-  - [PRIVACY_RISK] differentialPrivacyConfig absent on collaboration
-    (Rule P1) — protected queries run with no DP noise
-  - [PRIVACY_RISK] Configured table cr-marketing-events has no
-    aggregateConstraints (Rule P3) — singleton-row re-identification
-    possible
-  - [OK] All declared analysis templates have resolved parameters and
-    valid table references
+  - [MEMBERSHIP_GAP] Member 333333333333 in INVITED state (Rule M1)
+  - [PRIVACY_RISK] differentialPrivacyConfig absent (Rule P1)
+EPSILON: 111: 0.5/10.0, 222: 0.3/10.0, 333: N/A (INVITED)
 REMEDIATION:
-  1. MEMBERSHIP_GAP — Have 222222222222 accept the invitation:
-     aws cleanrooms create-membership --collaboration-arn <arn>
-     --membership-display-name "222-analyst" --profile 222-profile.
-     Or revoke: aws cleanrooms delete-membership --membership-identifier
-     <membership-arn> if 222 is no longer intended.
-  2. PRIVACY_RISK — Enable differential privacy:
-     aws cleanrooms update-collaboration --collaboration-identifier
-     <id> --differential-privacy-config enabled=true.
-  3. PRIVACY_RISK — Add aggregate constraint MIN=10 on the configured
-     table: aws cleanrooms update-configured-table-analysis-rule
-     --configured-table-id cr-marketing-events ...
+  1. Have 333 accept: aws cleanrooms create-membership
+     --collaboration-arn <arn> --profile 333-profile
+  2. Enable DP: aws cleanrooms update-collaboration
+     --collaboration-identifier <id> --differential-privacy-config
+     enabled=true
 ```
 
-## Anti-Patterns — NEVER
+### Multi-collaboration batch output
 
-- NEVER classify a collaboration with a member in `INVITED` state as
-  `OK`. An INVITED member has not accepted the collaboration — they
-  cannot query, contribute data, or activate audiences. The
-  collaboration is operationally partial regardless of how clean the
-  privacy config looks.
+When auditing multiple collaborations (e.g., a full account sweep),
+emit ONE verdict block per collaboration, separated by `---`:
 
-- NEVER treat `differentialPrivacyConfig.enabled: true` as proof that
-  queries are running with DP noise. The collaboration-level flag is the
-  CAPABILITY gate; the per-query `additionalAnalyses` epsilon value is
-  the ENFORCEMENT. A query with `additionalAnalyses: 0` runs without DP
-  noise even on a DP-enabled collaboration. Always audit the most recent
-  protected query's epsilon contribution.
+```text
+COLLABORATION: <id-1>
+VERDICT: <verdict-1>
+...
+---
+COLLABORATION: <id-2>
+VERDICT: <verdict-2>
+...
+```
 
-- NEVER report a collaboration as PRIVACY_RISK based solely on
-  epsilon-spend percentage without naming the per-member spend. Epsilon
-  is per-member — one member at 95% spend and another at 5% is not a
-  uniform PRIVACY_RISK. The high-spend member is the bottleneck; report
-  per-member, not aggregate.
+End with a summary line:
+`SUMMARY: <N> collaborations audited — <count> MEMBERSHIP_GAP, <count>
+PRIVACY_RISK, <count> CONFIG_GAP, <count> OK.`
 
-- NEVER flag a `queryLogStatus: DISABLED` collaboration as PRIVACY_RISK.
-  Query logging is an operational/forensic dimension — it does not affect
-  the privacy of protected queries. Treat as a CONFIG_GAP note in the
-  FINDINGS list (operator should enable for forensics), not as a
-  verdict driver. Note that enabling queryLogStatus requires deleting and
-  recreating the collaboration — it is a one-way, set-at-creation flag.
+### Error and edge-case handling
 
-- NEVER classify a member with status string outside
-  {INVITED, ACTIVE, REMOVED, LEFT} as a known state. The canonical
-  Clean Rooms member statuses are these four. Any other value
-  (e.g., `PENDING`, `COLLABORATION_TIME`) is either a stale snapshot,
-  a private-preview feature, or a malformed input. Emit ERROR rather
-  than guessing semantics — false-positive MEMBERSHIP_GAP erodes trust.
-
-- NEVER assume a `SUCCEEDED` protected query means the result was
-  consumed correctly. The query status reflects the service-side
-  computation; the result rows are written to S3 in Parquet. A bucket
-  policy that blocks the member's PutObject produces a separate failure
-  mode that surfaces as `SUCCEEDED` query + empty S3 prefix. Always
-  cross-reference the S3 destination.
-
-- NEVER assume the configured audience model is `READY` because the
-  collaboration's `configuredAudienceModelArn` is set. The ARN is a
-  reference, not a state. Audience activation queries fail at runtime if
-  the model is in `CREATE_IN_PROGRESS` or `CREATE_FAILED`. Always fetch
-  the model state from `cleanroomsml get-configured-audience-model`.
-
-- NEVER treat the collaboration creator as a "wildcard" principal. The
-  creator is always the first member and is always ACTIVE; they cannot
-  be REMOVED without deleting the collaboration. A "creator's role is
-  too broad" finding is an IAM audit, not a Clean Rooms audit — route
-  to the iam-least-privilege-advisor skill.
-
-- NEVER skip the configured-table alias cross-reference. Analysis
-  templates reference aliases; configured tables expose aliases; the
-  collaboration's `configuredTables` list is the source of truth. A
-  template with a dangling alias (member removed their table) passes
-  static validation and fails only at query runtime. Audit the
-  alias set in BOTH the templates and the configuredTables list.
-
-- NEVER conflate `cleanrooms` (the collaboration API) with `cleanroomsml`
-  (the audience-model API). They are separate AWS service namespaces
-  with separate IAM permissions, separate CLI commands, and separate
-  CloudTrail event sources. A policy granting `cleanrooms:*` does NOT
-  grant `cleanroomsml:*`. An audit that checks only `cleanrooms` config
-  misses the audience-model state entirely.
-
-- NEVER recommend deleting a collaboration as remediation without
-  explaining the blast radius. Deleting a collaboration removes ALL
-  member memberships, ALL configured tables, ALL analysis templates,
-  and ALL protected-query history. It is irreversible. The correct
-  remediation for a single misconfigured member is to remove the member
-  (`DeleteMember`), not the collaboration.
-
-- NEVER assume epsilon "resets" at a calendar boundary. Clean Rooms
-  epsilon is a monotonic budget per member per collaboration; there is
-  no daily/monthly/annual reset. Once exhausted, the member cannot run
-  further DP-protected queries without recreating the collaboration or
-  obtaining a budget increase (via a new collaboration). Plan budgets
-  for the collaboration lifetime, not per period.
-
-- NEVER assume `analysis template` immutability means "always valid."
-  Templates are immutable per-creation, but the configured tables they
-  reference ARE mutable — a member can remove their configured table
-  after the template was created. The template remains valid by
-  creation-time checks; it fails only at runtime. Always cross-reference
-  template aliases against the live configuredTables list.
-
-- NEVER evaluate a collaboration's privacy posture without checking
-  `aggregateConstraints`. Differential privacy is the noise layer;
-  aggregate constraints are the structural floor. A collaboration with
-  DP enabled but no aggregate constraints can still return singleton
-  rows when the noise addition rounds a 1-row group up to the minimum
-  threshold. Both layers must be present for defense in depth.
-
-- NEVER treat a REMOVED member's historical queries as privacy-irrelevant.
-  REMOVED members' protected queries are retained in the collaboration
-  history; their epsilon contributions count toward the collaboration's
-  total spend permanently. Removing a member does NOT reclaim their
-  spent epsilon — the budget is consumed for the lifetime of the
-  collaboration.
+- **Malformed JSON input:** If the collaboration config is not parseable
+  (missing `members` key, unparseable JSON, missing
+  `collaborationIdentifier`), emit:
+  `VERDICT: ERROR — REASON: <specific defect>. REMEDIATION: Retrieve
+  canonical config with aws cleanrooms get-collaboration --output json.`
+  Do NOT attempt partial classification on a malformed document.
+- **Pagination failure (ThrottlingException):** If `list-collaborations`
+  or `list-protected-queries` returns a throttling error mid-pagination,
+  retry with exponential backoff: wait 1s, then 2s, then 4s, then 8s
+  (max 3 retries). If all retries fail, emit
+  `VERDICT: ERROR — REASON: Pagination incomplete due to API throttling
+  on page <N>. Epsilon sum may be undercounted.`
+  NEVER report OK if pagination was incomplete — the missing pages may
+  contain the highest-spend queries. Use `--cli-read-timeout 60
+  --cli-connect-timeout 30` on the initial call to reduce mid-stream
+  timeouts.
+- **Missing cleanroomsml permissions:** If
+  `cleanroomsml:GetConfiguredAudienceModel` returns
+  `AccessDeniedException`, emit the verdict WITHOUT the audience check
+  and add to FINDINGS: `[CONFIG_GAP] Audience model state unknown —
+  cleanroomsml:GetConfiguredAudienceModel denied. Cannot verify
+  audience readiness.`
 
 ## Pre-flight safety checks (run before any remediation CLI)
+
+**Read-only audit mode:** this skill operates in read-only mode by
+default. It emits findings and CLI remediation TEXT but NEVER executes
+state-changing commands. Set the explicit flag `AUDIT_READONLY=1` in
+automated pipelines to enforce this — when set, the skill MUST NOT emit
+CLI commands that execute, only their text representation for operator
+review.
 
 - **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
   (`UpdateCollaboration`, `DeleteMembership`, `DeleteCollaboration`,
@@ -703,34 +690,87 @@ REMEDIATION:
 - **Membership operations are not reversible without re-invitation.**
   `DeleteMembership` removes the member AND all their configured tables
   AND their analysis templates. Re-inviting requires
-  `CreateCollaboration` re-issue — the member must accept again. Confirm
-  the operator has notified the member's account owner before emitting
-  the CLI.
+  `CreateCollaboration` re-issue — the member must accept again.
 - **`UpdateCollaboration` cannot change the creator.** The creator
   member is immutable for the collaboration's lifetime. If the creator
   account is being decommissioned, the only path is to recreate the
-  collaboration under a new creator and re-invite all members — there is
-  no transfer-ownership API.
+  collaboration under a new creator and re-invite all members.
 - **Epsilon budget is not adjustable post-creation.** The per-member
-  epsilon cap is set when differential privacy is configured on the
-  collaboration. Increasing it requires recreating the collaboration
-  with a new cap. Recommend budgeting for the collaboration lifetime at
-  creation, not retroactively.
-- **Confirm the collaboration exists and is accessible:**
-  `aws cleanrooms get-collaboration --collaboration-id <id> --profile <p>`
-  — fail closed (skip remediation) if it returns an error.
+  epsilon cap is set when differential privacy is configured. Increasing
+  it requires recreating the collaboration.
 - **Capture current membership state for rollback:**
   `aws cleanrooms list-members --collaboration-id <id> --output json >
   /tmp/<id>-members-backup-$(date +%s).json` BEFORE any membership
   change. Membership changes are not versioned.
-- **Multi-region guardrail.** Clean Rooms is region-scoped. All members
-  must be in the same region as the collaboration. Before recommending
-  cross-account operations, verify the member's AWS account region
-  alignment — a member in the wrong region silently fails to activate.
+- **Multi-region guardrail.** Clean Rooms is region-scoped. Verify
+  member account region alignment before cross-account operations.
 - Prefer additive changes (add a member, add a constraint) over
-  destructive changes (remove a member) — additive changes are
-  reversible and do not risk breaking downstream audiences that depend
-  on the collaboration's data.
+  destructive changes.
+
+## Anti-Patterns — NEVER
+
+- NEVER ignore the S3 bucket policy on the protected-query output
+  destination. The result set — even with DP noise — contains real
+  user data. A bucket policy granting `s3:GetObject` to `*` or to
+  cross-account principals beyond the collaboration members silently
+  exposes the noised result set. Always audit the output bucket
+  policy: scope `s3:GetObject` to the collaboration's member account
+  ARNs only, and add an explicit `Deny` for `Principal: *` on the
+  prefix. This is the most common production leakage path — operators
+  widen the policy for a one-time export and forget to tighten it.
+
+- NEVER grant `cleanrooms:*` or `cleanroomsml:*` wildcard to the
+  auditor IAM role. The auditor needs only `Get*` and `List*`
+  permissions. Granting `cleanrooms:Delete*`,
+  `cleanrooms:Update*`, or `cleanrooms:StartProtectedQuery` to a
+  read-only audit principal violates least privilege and enables
+  accidental destruction of multi-party state. The auditor role should
+  be scoped to: `cleanrooms:Get*`, `cleanrooms:List*`,
+  `cleanroomsml:Get*`, `cleanroomsml:List*`, plus `glue:GetTable` for
+  schema-drift checks. Any broader scope is a finding.
+
+- NEVER classify a collaboration with a member in `INVITED` state as
+  `OK`. The collaboration is operationally partial regardless of how
+  clean the privacy config looks.
+
+- NEVER treat `differentialPrivacyConfig.enabled: true` as proof that
+  queries are running with DP noise. The per-query `additionalAnalyses`
+  epsilon is the enforcement, not the collaboration-level flag.
+
+- NEVER report PRIVACY_RISK based solely on aggregate epsilon-spend
+  percentage without naming the per-member spend. Epsilon is per-member.
+
+- NEVER assume a `SUCCEEDED` protected query means the result was
+  consumed correctly. The result rows are written to S3 in Parquet; a
+  bucket policy blocking the member's PutObject produces a silent
+  empty-prefix failure.
+
+- NEVER rely on `list-members` alone for membership status in a
+  multi-party audit. `ListMembers` returns the collaboration's view;
+  `GetMembership` returns the caller's OWN perspective. A member can
+  appear `ACTIVE` in `list-members` while having self-removed (`LEFT`
+  status in their own `get-membership` view). Always cross-reference
+  both APIs — a member listed as ACTIVE who has actually LEFT is a
+  silent MEMBERSHIP_GAP that surfaces only when their queries fail
+  with `AccessDeniedException`.
+
+- NEVER conflate `cleanrooms` with `cleanroomsml`. Separate service
+  namespaces, separate IAM permissions, separate CloudTrail event
+  sources. `cleanrooms:*` does NOT grant `cleanroomsml:*`.
+
+- NEVER recommend deleting a collaboration as remediation without
+  explaining the blast radius — it removes ALL members, configured
+  tables, analysis templates, and query history irreversibly.
+
+- NEVER assume epsilon resets at a calendar boundary. It is a monotonic
+  per-member budget for the collaboration's lifetime.
+
+- NEVER evaluate privacy posture without checking `aggregateConstraints`.
+  DP is the noise layer; aggregate constraints are the structural floor.
+
+- NEVER treat a REMOVED member's historical queries as
+  privacy-irrelevant. Their epsilon contributions count toward the
+  collaboration's total spend permanently.
 
 ## Remediation guidance
 
@@ -851,85 +891,34 @@ prevents a window where neither the old nor new controls are in effect.
 | Per-query `additionalAnalyses: 0` | NONE | DP noise is OFF for this specific query even if collaboration-level DP is enabled. |
 | Configured-table allowedColumns | STRUCTURAL | Not a privacy control per se; defines the column surface. A column not in allowedColumns cannot be selected. |
 
-## Deep reference: Clean Rooms internals
+## Reference: Clean Rooms internals
 
-### Differential privacy budget math
+### Configured table analysis rule types
 
-Clean Rooms uses epsilon-differential privacy. The per-member epsilon
-contribution for each protected query is specified in the query's
-`additionalAnalyses` field. The cumulative spend is the sum of all
-epsilon contributions across all queries the member has run. The cap is
-set per-member at collaboration creation (or via
-`UpdateCollaboration` before any query runs).
+| Rule type | Allows | Requires aggregateConstraints? |
+|---|---|---|
+| `LIST` | Row-selection queries only (no aggregation) | No |
+| `AGGREGATION` | Aggregation queries (COUNT, SUM, etc.) | Yes (MIN/MAX) |
+| `CUSTOM` | User-supplied SQL analysis rule | Depends on rule |
 
-Key non-obvious facts:
-
-- The cap is set when DP is FIRST enabled on the collaboration. It
-  cannot be increased without recreating the collaboration.
-- The cap is shared across all analysis templates a member runs queries
-  against — it is not per-template.
-- Epsilon is consumed even for FAILED queries if the noise was added
-  before the failure.
-- The `additionalAnalyses` field on a protected query is the epsilon
-  contribution for THAT query. The total spend is the integral of these
-  values across the member's query history.
-
-### Configured table join semantics
-
-A configured table exposes:
-
-1. `allowedColumns` — the subset of Glue-table columns visible to the
-   collaboration.
-2. `joinColumns` — the subset of `allowedColumns` that can be used in
-   JOIN clauses.
-3. `analysisRules` — per-table rules (LIST, AGGREGATION, CUSTOM) that
-   govern what query shapes are allowed.
-
-A configured table with `analysisRuleType: LIST` allows only
-row-selection queries (no aggregation). A table with `AGGREGATION`
-requires aggregate constraints (MIN/MAX). A `CUSTOM` rule allows a
-user-supplied SQL analysis rule — the most flexible and the most
-privacy-risky.
-
-### Clean Rooms ML integration model
-
-Audience activation uses a separate service (`cleanroomsml`). The
-collaboration references a `configuredAudienceModelArn`; the actual
-training pipeline lives in `cleanroomsml`. The model has its own
-lifecycle: `CREATE_IN_PROGRESS` → `READY` (or `CREATE_FAILED`) →
-`INACTIVE`. The collaboration config shows only the ARN — the state is
-fetched separately.
-
-Audience activation queries write their output to an S3 bucket
-configured on the `configuredAudienceModel` resource. A collaboration
-with audience activation enabled but no destination on the model fails
-at activation time. Always audit both the collaboration config AND the
-cleanroomsml model state.
+`CUSTOM` is the most flexible and the most privacy-risky — the
+member-supplied rule is not validated against aggregate constraints by
+default. Flag any `CUSTOM` rule as a review item during audit.
 
 ### Protected query lifecycle
 
-1. `StartProtectedQuery` — caller submits SQL (or template reference) +
-   parameters.
-2. Service validates the query against configured tables, aggregate
-   constraints, and DP budget.
-3. If DP is enabled and the per-query epsilon would exceed the member's
-   remaining budget, the query is REJECTED with `ServiceQuotaExceededException`.
-4. If all checks pass, the query runs and writes results to each
-   member's configured S3 output prefix in Parquet.
-5. The query transitions: `SUBMITTED` → `RUNNING` → `SUCCEEDED` (or
-   `FAILED` / `CANCELLED`).
+`SUBMITTED` → `RUNNING` → `SUCCEEDED` (or `FAILED` / `CANCELLED`).
+DP budget check happens at SUBMISSION; epsilon is charged at submission
+time, not result materialization. If the per-query epsilon exceeds the
+remaining budget, the query is REJECTED with
+`ServiceQuotaExceededException`. Epsilon is consumed even for FAILED
+queries if noise was added before the failure.
 
-A `SUCCEEDED` query does NOT mean the result was consumed. The S3
-output must be read separately; a bucket policy that blocks the
-member's read produces a silent empty result.
+### Clean Rooms ML lifecycle
 
-### Region scoping
-
-Clean Rooms collaborations are region-scoped. All members must be in
-the same region as the collaboration. Cross-region membership is not
-supported. The membership is created in the collaboration's region; a
-member account in a different region cannot activate. Always verify
-the region alignment in the membership ARN.
+`CREATE_IN_PROGRESS` → `READY` (or `CREATE_FAILED`) → `INACTIVE`.
+The collaboration config shows only the ARN; state is fetched
+separately via `cleanroomsml get-configured-audience-model`.
 
 ## Domain
 

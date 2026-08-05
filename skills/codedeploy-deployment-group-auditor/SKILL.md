@@ -50,11 +50,12 @@ metadata:
   family: DevTools
   verdict_shape: "NO_ROLLBACK | NO_ALARMS | CONFIG_GAP | OK"
   when_to_use: >-
-    Reviewing a CodeDeploy deployment group before production deployment,
-    validating auto-rollback configuration, checking CloudWatch alarm
-    monitoring during deployments, auditing deployment config risk
-    (AllAtATime vs OneAtATime), inspecting blue/green termination wait
-    time, or hardening deployment safety posture across an application.
+    Audit a CodeDeploy deployment group before production deployment.
+    Trigger example: "audit this CodeDeploy deployment group",
+    "is auto-rollback enabled on <dg>?", "check CodeDeploy alarms",
+    "AllAtATime deployment risk", "blue/green termination too fast".
+    Validates auto-rollback, alarm coverage, deployment-config risk, and
+    blue/green termination posture; emits a deterministic verdict per group.
   activation_triggers:
     - "audit this CodeDeploy deployment group"
     - "is auto-rollback enabled"
@@ -72,40 +73,52 @@ metadata:
     DEPLOYMENT_GROUP/VERDICT/REASON/FINDINGS/REMEDIATION block per
     deployment group, where VERDICT is in {NO_ROLLBACK, NO_ALARMS,
     CONFIG_GAP, OK, ERROR}.
+  invocation_example: |-
+    # Minimal valid input shape (offline audit)
+    {
+      "deploymentGroupName": "my-dg",
+      "applicationName": "my-app",
+      "computePlatform": "Server",
+      "deploymentConfigName": "CodeDeployDefault.OneAtATime",
+      "deploymentStyle": {"deploymentType": "IN_PLACE", "deploymentOption": "WITH_TRAFFIC_CONTROL"},
+      "autoRollbackConfiguration": {"enabled": true, "triggers": ["DEPLOYMENT_FAILURE"]},
+      "alarmConfiguration": {"enabled": true, "ignorePollAlarmFailure": false,
+        "alarms": [{"name": "HighErrorRate"}]}
+    }
+    # Expected output (single line per field, fixed order):
+    # DEPLOYMENT_GROUP: my-dg
+    # VERDICT: OK
+    # REASON: All four gates passed (Steps 1-4).
+    # FINDINGS:
+    #   - [OK] autoRollbackConfiguration enabled with DEPLOYMENT_FAILURE (Step 1)
+    #   - [OK] alarmConfiguration enabled with 1 alarm (Step 2)
+    # REMEDIATION: None required.
 ---
 
 # CodeDeploy Deployment Group Auditor
 
-## Mindset
-
-**One-line takeaway:** the verdict reflects the **first** safety gate that
-fails, evaluated in priority order — rollback before alarms before config —
-because a deployment without automatic rollback is a manual recovery
-exercise regardless of how good the alarm monitoring is.
-
-CodeDeploy is the safety gate between a new application revision and
-production traffic. Three things must work for a safe deployment:
-
-1. **Auto-rollback** must be enabled with the right triggers — without it,
-   a failed deployment requires manual intervention while instances are down.
-2. **CloudWatch alarms** must be enabled — they are the observability layer
-   that catches application-level failures (error rate, latency, health-check
-   breaches) that deployment-level checks miss.
-3. **Deployment config** must not be AllAtATime or have zero minimum healthy
-   hosts — the config determines how many instances are at risk simultaneously.
-
 ## Quick start — 4-line decision tree
 
-1. **No auto-rollback?** (`autoRollbackConfiguration.enabled: false` or
+Evaluate in order; **first match wins.**
+
+1. **No auto-rollback?** (`autoRollbackConfiguration.enabled: false` OR
    `DEPLOYMENT_FAILURE` missing from triggers) → **NO_ROLLBACK**
-2. **No alarms?** (`alarmConfiguration.enabled: false` or `alarms` empty)
+2. **No alarms?** (`alarmConfiguration.enabled: false` OR `alarms` empty)
    → **NO_ALARMS**
 3. **Risky config?** (`AllAtATime`, zero minimum-healthy-hosts, blue/green
    0-minute termination, `WITHOUT_TRAFFIC_CONTROL`) → **CONFIG_GAP**
 4. **All clear?** → **OK**
 
-First match wins — evaluate in order. The full thresholds, edge cases,
-and expert notes are below.
+## Mindset
+
+CodeDeploy is the safety gate between a new revision and production
+traffic. The verdict reflects the **first** safety gate that fails,
+evaluated in priority order — rollback before alarms before config —
+because a deployment without automatic rollback is a manual recovery
+exercise regardless of alarm coverage. Rationale: rollback + alarms
+partially mitigate a risky config, but nothing mitigates a missing
+rollback. The full thresholds, edge cases, and operator-only gotchas
+are in the Reference at the end.
 
 ## Quick reference — verdict thresholds
 
@@ -166,9 +179,10 @@ REMEDIATION: Retrieve the canonical config with `aws deploy get-deployment-group
 
 ## Process — Classification logic (apply in order, first match wins)
 
-### Step 0: Expert knowledge — non-obvious CodeDeploy behaviors
+### Step 0: Expert knowledge — operator-only behaviors that change classification
 
-These behaviors change classification if ignored:
+These behaviors are NOT in the AWS docs and change classification if ignored.
+Full details are in the Reference section at the end.
 
 - **`enabled: true` with partial triggers is a silent misconfiguration.**
   `autoRollbackConfiguration.enabled: true` with triggers that omit
@@ -181,8 +195,8 @@ These behaviors change classification if ignored:
   When CodeDeploy cannot reach CloudWatch (transient network, IAM permission
   gap, CloudWatch API throttle), it silently continues deploying as if all
   alarms are healthy. Infrastructure events that break CloudWatch connectivity
-  are exactly the events where alarm monitoring is most critical. Flag
-  `ignorePollAlarmFailure: true` as a WARNING finding regardless of verdict.
+  are exactly when alarm monitoring is most critical. Always flag
+  `ignorePollAlarmFailure: true` as a WARNING regardless of verdict.
 
 - **AllAtATime + auto-rollback is still dangerous.** AllAtATime deploys to
   every instance simultaneously. On failure, ALL instances are down before
@@ -190,25 +204,19 @@ These behaviors change classification if ignored:
   all instances. Total downtime = failure detection time + full rollback
   time. OneAtATime keeps N-1 instances healthy throughout.
 
-- **`terminationWaitTimeInMinutes: 0` eliminates the fallback fleet.**
-  Blue/green deployment provisions a green fleet and terminates blue instances
-  after success. With 0-minute wait, blue instances are terminated immediately.
-  If the green fleet has a delayed failure (memory leak, connection pool
-  exhaustion surfacing minutes after cutover), the known-good blue fleet is
-  already gone. Recommended minimum baking window: 5 minutes.
-
-- **`WITHOUT_TRAFFIC_CONTROL` blue/green is complexity without safety.**
-  Without traffic control, CodeDeploy deregisters blue instances from the ELB
-  and registers green instances — no gradual traffic shift. You get fleet
-  provisioning complexity without the instant-rollback benefit (flipping
-  traffic back to blue). With `WITH_TRAFFIC_CONTROL`, traffic shifts gradually
-  via the target group, and rollback is a traffic-weight change, not a
-  re-deployment.
+- **`terminationWaitTimeInMinutes: 0` (or absent — same thing) eliminates the
+  fallback fleet.** Blue/green deployment provisions a green fleet and
+  terminates blue instances after success. With 0-minute wait (the API default
+  when the block is omitted), blue instances are terminated immediately. A
+  delayed green-fleet failure (memory leak, connection pool exhaustion
+  surfacing minutes after cutover) finds the known-good blue fleet already
+  gone. Recommended minimum baking window: 5 minutes.
 
 - **OneAtATime on a single-instance deployment group is functionally
   AllAtATime.** If the deployment group targets only 1 instance (single EC2
   host via tag filter), OneAtATime deploys to that one instance — there is no
-  healthy instance to maintain. CodeDeploy does not warn about this.
+  healthy instance to maintain. CodeDeploy does not warn about this. Check
+  target breadth (EC2 tags, ASG count) when the fleet is small.
 
 - **Legacy `rollbackEnabled` vs `autoRollbackConfiguration`.** The deployment
   group API has a legacy `rollbackEnabled` boolean. The modern
@@ -217,32 +225,10 @@ These behaviors change classification if ignored:
   field does NOT enable proper trigger-based rollback. Always evaluate
   `autoRollbackConfiguration`.
 
-- **Alarm monitoring continues during rollback.** When auto-rollback triggers,
-  CodeDeploy deploys the previous revision while alarm monitoring continues.
-  If the rollback itself triggers an alarm, CodeDeploy does NOT roll back the
-  rollback — it marks the rollback deployment as failed and requires manual
-  intervention. This means a broken previous revision combined with a broken
-  current revision is an unrecoverable state without operator action.
-
-- **`DEPLOYMENT_STOP_ON_REQUEST` enables operator-initiated rollback.**
-  When this trigger is present, calling
-  `aws deploy stop-deployment --auto-rollback-allowed` triggers an automatic
-  rollback. Without it, stopping a deployment does NOT trigger rollback —
-  the operator must create a separate rollback deployment manually, losing
-  precious time during an active incident.
-
-- **Alarm polling has a startup blind spot.** CodeDeploy polls CloudWatch
-  alarms at approximately 60-second intervals, but the first poll occurs
-  after the first batch of instances has already been deployed. For
-  AllAtATime, the entire fleet may be deployed before the first alarm
-  evaluation completes — the alarms exist but cannot prevent damage on
-  fast deployments. This compounds the AllAtATime risk.
-
-- **Custom deployment configs are capped at 200 per region per account.**
-  Stale configs accumulate from CI/CD experiments and are never garbage-
-  collected. A deployment group referencing a deleted custom config fails
-  silently on the next deployment with `DeploymentConfigDoesNotExistException`.
-  Verify the referenced config still exists when auditing.
+- **`WITHOUT_TRAFFIC_CONTROL` blue/green is complexity without safety.**
+  Without traffic control, CodeDeploy deregisters blue instances from the ELB
+  and registers green instances — no gradual shift. Rollback requires a full
+  re-deployment, not a traffic-weight flip.
 
 ### Step 1: Auto-rollback evaluation (highest priority — first gate)
 
@@ -336,27 +322,48 @@ reflects operational priority: a missing rollback is more dangerous than a
 missing alarm, which is more dangerous than a risky config (because rollback
 + alarms partially mitigate config risk).
 
-## Output format (per deployment group)
+## Output format
+
+### Single deployment group
 
 ```text
 DEPLOYMENT_GROUP: <name>
-VERDICT: NO_ROLLBACK | NO_ALARMS | CONFIG_GAP | OK
-REASON: <1-2 sentences citing the failing gate and step number>
+VERDICT: NO_ROLLBACK | NO_ALARMS | CONFIG_GAP | OK | ERROR
+REASON: <one sentence citing the failing gate and step number>
 FINDINGS:
-  - [NO_ROLLBACK] <finding description (Step N)>
-  - [WARNING] <advisory finding that does not change verdict>
-  - [OK] <dimension that passed>
+  - [NO_ROLLBACK|NO_ALARMS|CONFIG_GAP|WARNING|OK] <description (Step N)>
 REMEDIATION: <specific action per finding, or "None required" if OK>
 ```
+
+**Field order is fixed.** Emit exactly one VERDICT line. The first
+finding tag in FINDINGS MUST match the verdict (except for OK and
+WARNING-only outputs). For an ERROR (unparseable input), use:
+`VERDICT: ERROR` + a REASON explaining the parse failure + a
+REMEDIATION pointing to the canonical `get-deployment-group` command.
+
+### Batch input (multiple deployment groups)
+
+When the input contains multiple deployment group documents (e.g.,
+`batch-get-deployment-groups` output, a CloudFormation stack with several
+`AWS::CodeDeploy::DeploymentGroup` resources, or a directory of JSON
+exports), emit **one verdict block per deployment group**, separated by a
+blank line. Preserve input order. Append a final summary line:
+
+```text
+SUMMARY: <N> deployment groups — <X> OK, <Y> CONFIG_GAP, <Z> NO_ALARMS, <W> NO_ROLLBACK, <E> ERROR
+```
+
+If any group fails to parse, emit its block as ERROR and continue with the
+next group — do NOT abort the batch on a single malformed entry.
 
 ### Worked example — AllAtATime with rollback enabled
 
 ```text
 DEPLOYMENT_GROUP: allatatime-config-gap-dg
 VERDICT: CONFIG_GAP
-REASON: Deployment config is CodeDeployDefault.AllAtATime — every instance is
-deployed simultaneously, meaning all instances are at risk during the deployment
-window even though auto-rollback and alarms are enabled (Step 3).
+REASON: deploymentConfigName is CodeDeployDefault.AllAtATime — every instance
+is deployed simultaneously, putting the entire fleet at risk during the
+deployment window (Step 3).
 FINDINGS:
   - [CONFIG_GAP] deploymentConfigName is CodeDeployDefault.AllAtATime (Step 3)
   - [OK] autoRollbackConfiguration enabled with DEPLOYMENT_FAILURE trigger (Step 1)
@@ -375,9 +382,7 @@ REMEDIATION:
 DEPLOYMENT_GROUP: bluegreen-immediate-term-dg
 VERDICT: CONFIG_GAP
 REASON: Blue/green deployment with terminationWaitTimeInMinutes of 0 —
-blue instances are terminated immediately after green success, eliminating
-the fallback fleet before delayed failures (memory leaks, connection pool
-exhaustion) can surface (Step 4).
+blue instances are terminated immediately after green success (Step 4).
 FINDINGS:
   - [CONFIG_GAP] terminationWaitTimeInMinutes is 0 (Step 4)
   - [OK] autoRollbackConfiguration enabled with DEPLOYMENT_FAILURE trigger (Step 1)
@@ -487,6 +492,27 @@ REMEDIATION:
   the behavioral change. Config changes take effect on the NEXT deployment —
   the current deployment is unaffected.
 
+- NEVER assume a missing `terminateBlueInstancesOnDeploymentSuccess` block is
+  safe. The API default is `terminationWaitTimeInMinutes: 0` — immediate
+  termination. An absent block is equivalent to a 0-minute wait, NOT to a
+  safe default. Always treat an absent block as CONFIG_GAP for blue/green.
+
+- NEVER assume `DEPLOYMENT_STOP_ON_ALARM` will catch a pre-existing breach.
+  CodeDeploy only reacts to OK→ALARM transitions during the in-progress
+  deployment; alarms already in ALARM state at `create-deployment` time do
+  NOT halt the deployment. Recommend operators confirm alarms are in OK
+  state before triggering a deploy.
+
+- NEVER assume CloudWatch alarm names in `alarmConfiguration.alarms` exist
+  in the deployment group's region. CodeDeploy does not validate alarm
+  existence at config time — a cross-region alarm name silently never fires.
+  Confirm each alarm resolves in-region.
+
+- NEVER pass a partial triggers list to `update-deployment-group`. The
+  `--auto-rollback-configuration` flag REPLACES the triggers list (it is
+  not additive). Operators frequently lose `DEPLOYMENT_STOP_ON_ALARM` by
+  passing only `DEPLOYMENT_FAILURE`. Always re-pass the full intended set.
+
 ## Pre-flight safety checks (run before any remediation CLI)
 
 - **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
@@ -498,6 +524,13 @@ REMEDIATION:
   `aws deploy get-deployment-group --application-name <app>
   --deployment-group-name <dg> --output json >
   /tmp/<dg>-backup-$(date +%s).json`
+- **Privilege-escalation warning.** Remediation commands require
+  `codedeploy:UpdateDeploymentGroup` — a permission rarely held by read-only
+  auditor roles. Before printing a CLI remediation, surface the exact IAM
+  action needed and confirm the operator's principal holds it. Treating a
+  remediation as "just run this" without IAM verification is a privilege-
+  escalation footgun: the operator may run it from a role with broader
+  scope than intended (e.g., a `*:*` admin fallback), bypassing guardrails.
 - Verify the service role has permissions for the target compute platform
   before updating config — EC2 needs Auto Scaling, ECS needs ELB + ECS
   task-set permissions.
@@ -581,7 +614,7 @@ REMEDIATION:
 4. For blue/green, verify the baking window (`terminationWaitTimeInMinutes`)
    is sufficient for the application's failure-detection latency.
 
-## Deep reference: CodeDeploy deployment internals
+## Reference — deployment internals & non-obvious behaviors
 
 ### Deployment lifecycle and rollback mechanics
 
@@ -598,15 +631,73 @@ shifts traffic back to the blue target group by changing listener rules,
 which is near-instant compared to a full re-deployment. This is why
 `WITH_TRAFFIC_CONTROL` is strongly preferred over `WITHOUT_TRAFFIC_CONTROL`.
 
-### Alarm polling during deployment
+### Non-obvious operational gotchas (senior-engineer knowledge)
 
-CodeDeploy polls CloudWatch alarms at approximately 60-second intervals
-during a deployment. If `ignorePollAlarmFailure` is `false` (recommended)
-and a poll fails, CodeDeploy marks the deployment as failed and triggers
-rollback (if `DEPLOYMENT_STOP_ON_ALARM` is in triggers). If
-`ignorePollAlarmFailure` is `true`, the failed poll is silently ignored and
-the deployment continues — the alarm safety net is bypassed without any
-visible signal to the operator.
+These do NOT appear in the AWS CodeDeploy documentation and are learned from
+production incidents. Read before classifying edge cases.
+
+- **`DEPLOYMENT_STOP_ON_ALARM` fires only on alarm *transition* into ALARM,
+  not on an ALARM state already present at deployment start.** A baseline
+  alarm that is already breaching when `create-deployment` runs does NOT halt
+  the deployment — CodeDeploy only reacts to OK→ALARM transitions during the
+  in-progress window. Pre-existing alarm state is a silent blind spot;
+  recommend operators confirm all deployment-group alarms are in OK state
+  before triggering a deploy.
+
+- **Alarm evaluation period vs. deployment window gap.** CloudWatch alarms
+  need `N` consecutive datapoints in ALARM (default 1, often 2-3) before
+  transitioning. A fast AllAtATime deployment can complete before the alarm
+  evaluation period elapses — the breach shows up after the fleet is already
+  replaced. Tune alarm `DatapointsToAlarm` to 1 for deployment-impact
+  metrics, or use a dedicated high-resolution alarm during deployments.
+
+- **Alarm polling startup blind spot.** CodeDeploy polls CloudWatch at ~60s
+  intervals, but the first poll occurs *after* the first batch has already
+  been deployed. For AllAtATime, the entire fleet may be deployed before the
+  first alarm evaluation completes — the alarms exist but cannot prevent
+  damage on fast deployments. This compounds the AllAtATime risk.
+
+- **Alarm monitoring continues during rollback — and a broken rollback is
+  unrecoverable.** When auto-rollback triggers, CodeDeploy deploys the
+  previous revision while alarm monitoring continues. If the rollback itself
+  triggers an alarm, CodeDeploy does NOT roll back the rollback — it marks
+  the rollback deployment as failed and requires manual intervention. A
+  broken previous revision combined with a broken current revision is an
+  unrecoverable state without operator action.
+
+- **`DEPLOYMENT_STOP_ON_REQUEST` is the operator-initiated rollback path.**
+  When this trigger is present, calling
+  `aws deploy stop-deployment --auto-rollback-allowed` triggers an automatic
+  rollback. Without it, stopping a deployment does NOT trigger rollback —
+  the operator must create a separate rollback deployment manually, losing
+  time during an active incident.
+
+- **Custom deployment configs are capped at 200 per region per account and
+  are NOT garbage-collected.** A deployment group referencing a deleted
+  custom config fails on the next deployment with
+  `DeploymentConfigDoesNotExistException` — verify the referenced config
+  still exists when auditing offline JSON.
+
+- **EC2 tag-group filters are AND-ed across keys but OR-ed within a key.**
+  `Key=env,Value=prod` + `Key=role,Value=web` matches instances tagged with
+  BOTH (env=prod AND role=web). A common mistake is reading this as OR-across
+  and producing an empty (or vastly oversized) target set. Always check
+  `ec2TagSet` AND `autoScalingGroups` + `ecsServices` to confirm target
+  breadth before classifying OneAtATime as safe.
+
+- **Revision bundle type is validated at install time, not at
+  `create-deployment`.** For S3-backed revisions, a mismatch between
+  `s3Location.bundleType` and the actual artifact produces
+  `RevisionUnsupportedFormatException` per-instance during installation —
+  the deployment object is created successfully, then fails wholesale.
+  Verify `targetRevision.s3Location.bundleType` matches the artifact when
+  auditing rollback posture (a corrupt pin blocks rollback).
+
+- **CloudWatch alarm names in `alarmConfiguration.alarms` are
+  region-scoped to the deployment group.** Alarms in a different region (e.g.
+  a multi-region dashboard alarm) silently never fire — CodeDeploy does not
+  validate alarm existence at config time. Confirm each alarm name resolves
+  in the deployment group's region.
 
 ### Compute platform specifics
 
@@ -618,6 +709,18 @@ visible signal to the operator.
 
 Lambda and ECS always use blue/green — there is no in-place option. The
 deployment config determines how quickly traffic shifts from old to new.
+
+### API quirks worth knowing
+
+- `batch-get-deployment-groups` returns a slightly different shape than
+  `get-deployment-group` (the batch wrapper omits `deploymentGroup` envelope
+  in some CLI versions). Always normalize before classifying.
+- `autoRollbackConfiguration` updates are *additive* — passing a new triggers
+  list in `update-deployment-group` replaces the entire list, not appends.
+  Operators frequently lose `DEPLOYMENT_STOP_ON_ALARM` this way.
+- `update-deployment-group` is rate-limited to roughly 1 call/sec per
+  deployment group. Burst remediation across many groups requires
+  serialization, not parallel shells.
 
 ## Domain
 

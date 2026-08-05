@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides concrete, non\u2011trivial thresholds (30\u2011day unattached, 90\u2011day stale, 180\u2011day archive), exact FSR cost ($0.06/hr per AZ), up\u2011to\u2011date 2026 pricing, and nuanced EBS internals (encryption immutability, gp3 vs gp2 performance model, io1 vs io2 durability). This is information a generic model would not enumerate without prompting, but some of it (e.g., encryption flag immutability) is already common knowledge, so it stops short of a perfect 20."
+      "justification": "Adds concrete expert details not usually known by a generic model: exact age thresholds (30\u202fd unattached, 90/180\u202fd stale), precise FSR cost ($0.06/hr per AZ), cost baselines for gp2/gp3/io1/io2, immutable encryption workflow, public snapshot risk definition, and cross\u2011region copy billing. However, some sections merely restate common AWS knowledge (e.g., \u201cencryption\u2011by\u2011default\u201d concept) and the method for deriving detachment duration (CloudTrail or tags) is mentioned but not fully specified, leaving a small knowledge gap."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Defines an AWS\u2011specific procedural flow: pre\u2011flight metadata gate, step\u2011wise classification, worst\u2011finding aggregation, and explicit remediation ordering. The only shortfall is a few generic checks (e.g., \"verify permissions\") that could be more AWS\u2011granular."
+      "justification": "Encodes AWS\u2011specific workflow: pagination handling, pre\u2011flight checks (encryption\u2011by\u2011default, IAM permissions), step\u2011wise classification, confirmation gate before destructive actions, and precise CLI commands (reset-snapshot-attribute, copy-snapshot, modify-volume). Some procedures are generic (e.g., \"check security\") which prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasoning (e.g., never enable encryption on an existing volume, never treat shared\u2011private as public). Missing a couple of niche pitfalls such as the danger of modifying a multi\u2011attach io1 volume without checking concurrency limits, which reduces the score."
+      "justification": "Comprehensive NEVER list with explicit reasoning for each pitfall (e.g., never enable encryption on an existing volume, never treat shared\u2011private snapshots as public, never auto\u2011delete without confirmation). Only minor shortfall is the absence of a specific warning about assuming snapshot\u2011chain incremental storage savings without verification."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, activation triggers and invocation schema are present, and the description explains purpose and when to use. Some triggers are vague (e.g., \"hardening EBS storage\") and could lead to accidental activation, so a small deduction."
+      "justification": "Complete frontmatter (name, version, author, license, compatibility, keywords, tags, metadata, activation triggers, invocation schema). Description clearly states WHAT the skill does, WHEN to invoke, and provides a deterministic verdict shape. No missing fields."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Anti\u2011Patterns \u2192 Deep reference). However, the document is dense; critical rules (e.g., confirmation gate) are buried deep, creating potential cognitive overload for a quick audit."
+      "justification": "Information is layered: quick\u2011start decision tree first, then mindset, pre\u2011flight, detailed process, output format, worked examples, anti\u2011patterns, and deep references. No overload at the top, but some deep technical notes (e.g., gp2 burst credit model) are embedded in the reference section rather than a separate \u201cadvanced\u201d layer, causing slight mixing of depth."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated with explicit CONFIRM prompts, never\u2011auto\u2011delete policy, and clear separation between read\u2011only audit and remediation. Slight deduction because the skill does not explicitly restrict cross\u2011region snapshot copy operations, which are also potentially costly."
+      "justification": "Destructive actions are tightly constrained with mandatory CONFIRM prompts and explicit \u201cnever auto\u2011delete\u201d rules. Creative or informational tasks (e.g., cost estimation) are given enough freedom. Only a small deduction because cost\u2011baseline numbers are static and not tied to dynamic region pricing, leaving a tiny over\u2011freedom for cost calculations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset, Quick reference, Process, Anti\u2011Patterns, Remediation, Deep reference). Minor ad\u2011hoc sections (e.g., Edge\u2011case handling) break strict uniformity."
+      "justification": "Follows a recognizable pattern (Quick start \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Safety checks \u2192 Reference) that aligns with established skill templates."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a full decision tree, exact CLI commands, output format, and worked examples that an agent can execute. Lacks handling for some edge cases (e.g., malformed timestamps, pagination limits) and the example output omits the required CONFIRM gate for the UNATTACHED case, indicating a small usability gap."
+      "justification": "Agent can execute the skill end\u2011to\u2011end: decision tree, CLI commands, confirmation gating, and formatted output are all provided. Edge cases such as malformed timestamps and missing fields are handled. Minor gaps: pagination loop details are high\u2011level, and deriving unattached\u2011duration relies on external CloudTrail data without a concrete query example, which could cause execution failure in some scenarios."
     }
   ],
-  "total_score": 105,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 41341,
-  "latency_ms": 18747,
+  "grade": "A",
+  "token_count": 35713,
+  "latency_ms": 15997,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0

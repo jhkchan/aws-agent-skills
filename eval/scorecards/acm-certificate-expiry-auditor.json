@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 15,
+      "score": 18,
       "max": 20,
-      "justification": "Provides concrete thresholds (60\u2011day renewal start, 30\u2011day hard stop), a full decision tree, and detailed anti\u2011pattern reasoning that a typical model would not enumerate, but most of the content restates publicly documented ACM behavior; missing coverage of multi\u2011region, cross\u2011account, and multi\u2011validation\u2011option edge cases."
+      "justification": "Introduces concrete, non\u2011trivial expert details not found in generic docs: 60\u2011day renewal start, 30\u2011day hard stop, exact risk mapping per certificate type, CloudFront us\u2011east\u20111 requirement, CAA re\u2011check on every renewal, 11\u2011retry schedule, quota limits, CT SCT count rules, and nuanced import\u2011re\u2011import windows. These constitute genuine delta, but some basics (e.g., \u201cACM can renew\u201d) are restated, so 2 points deducted."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Offers AWS\u2011specific procedures (CLI commands, confirmation gate, EventBridge monitoring) and a clear reasoning mindset, yet some steps are generic (e.g., \"verify CNAME is resolvable\") and it omits detailed steps for locating CloudFront mismatches or validating wildcard scope."
+      "justification": "Provides an AWS\u2011specific decision tree, exact CLI commands, mandatory confirmation gate before any state\u2011changing operation, and a monitoring recipe (EventBridge, CloudWatch, Config). The only shortfall is a few generic steps (e.g., \"check DNS\") that are not tied to a concrete AWS procedure, costing 2 points."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (CAA errors, validation CNAME loss, revocation checks, etc.), but lacks anti\u2011patterns around multi\u2011region certificate usage and neglects guidance on handling missing Certificate Transparency logs for imported certs."
+      "justification": "Extensive NEVER list with concrete reasoning (e.g., never downgrade EXPIRING_SOON+AMAZON_ISSUED below HIGH, never delete EXPIRED cert while InUseBy non\u2011empty, never assume wildcard covers multi\u2011level subdomains). Missing a specific anti\u2011pattern for quota\u2011exceeded errors, so 1 point is deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed; however the invocation schema is described in prose rather than a strict JSON schema, which slightly reduces reliability."
+      "justification": "Frontmatter includes description, version, author, keywords, activation triggers, and an invocation schema. The only weakness is the schema is described in prose rather than a formal JSON/YAML example, leading to a 1\u2011point deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered into sections (quick start, mindset, decision tree, anti\u2011patterns, remediation, monitoring), but the initial sections are dense and some critical rules (e.g., risk mapping) are buried deep, causing potential cognitive overload."
+      "justification": "Information is layered (quick start, mindset, decision tree, anti\u2011patterns, remediation, monitoring). The opening sections are dense, which could overload an agent before it knows when to invoke the skill; therefore 2 points are deducted."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 15,
       "max": 15,
-      "justification": "Destructive actions (re\u2011import, delete) are gated by an explicit confirmation step; non\u2011destructive audit steps are unrestricted, matching the fragility of the tasks."
+      "justification": "Destructive actions are gated by an explicit CONFIRM prompt; creative/diagnostic tasks are left free. Calibration matches fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (quick start \u2192 mindset \u2192 decision tree \u2192 anti\u2011patterns \u2192 remediation \u2192 monitoring \u2192 reference) that aids comprehension, though the pattern is not formally named."
+      "justification": "Follows a recognizable pattern (quick start \u2192 mindset \u2192 decision tree \u2192 anti\u2011patterns \u2192 remediation \u2192 monitoring \u2192 reference). Minor inconsistency in section naming prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 14,
       "max": 15,
-      "justification": "Model output examples correctly implement most branches, but the IMPORTED certificate example misapplies the risk rule: a 45\u2011day window should be MODERATE risk per the decision tree, yet the output labels it HIGH and urges immediate re\u2011import. This inconsistency shows a gap that could mislead an agent in production."
+      "justification": "Provides exact output format, worked examples, and a deterministic decision tree that an agent can follow. Lacks explicit handling for malformed timestamps beyond missing NotAfter, so 1 point is deducted."
     }
   ],
-  "total_score": 102,
+  "total_score": 110,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 31009,
-  "latency_ms": 13136,
-  "assertions_passed": false,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 1
+  "grade": "A",
+  "token_count": 36743,
+  "latency_ms": 12860,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
 }

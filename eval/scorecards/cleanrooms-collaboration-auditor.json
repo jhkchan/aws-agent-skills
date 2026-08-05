@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 18,
       "max": 20,
-      "justification": "The skill provides many Clean Rooms nuances (e.g., per\u2011member epsilon, perspective\u2011relative membership, 80% spend threshold) that a generic model would not know, but a large portion restates publicly documented behavior rather than delivering brand\u2011new expert insight. The 80% heuristic, while useful, is not an official AWS rule, so the knowledge is not fully novel."
+      "justification": "Provides many expert\u2011level Clean Rooms specifics (per\u2011member epsilon, 80% spend threshold, pagination limits, cross\u2011region member checks, aggregate\u2011constraint nuances). However, a few items (e.g., the 80% heuristic) are not documented facts but analyst conventions, so the skill does not add completely novel knowledge in those spots."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "The procedure flow (pre\u2011flight, step\u2011wise classification, confirmation gates) is AWS\u2011specific and well\u2011ordered, yet a few steps are generic (e.g., \u201cverify permissions\u201d) and not tied to Clean Rooms API nuances, preventing a perfect score."
+      "justification": "Encodes AWS\u2011specific audit flow: IAM pre\u2011flight checks, pagination with next\u2011token, cross\u2011referencing ListMembers/GetMembership, ordered rule evaluation, and remediation ordering. One point deducted because the IAM verification steps are described at a high level without an explicit checklist of required permissions."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The NEVER list is extensive and explains why each pitfall is dangerous, but it omits some common anti\u2011patterns such as cross\u2011account S3 bucket policy leakage for query results and over\u2011permissive IAM roles for Clean Rooms, leaving a gap in the anti\u2011pattern coverage."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never ignore S3 bucket policy, never grant cleanrooms:* to auditor role, never treat INVITED as OK). Lacks a specific warning about forgetting to enable bucket\u2011encryption or versioning, so deduct 1."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers and an invocation_schema are present. However, the schema is described in prose rather than a formal JSON schema, and the output format lacks a machine\u2011readable definition, which reduces reliability of automatic activation."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The activation_triggers list is verbose and some triggers are ambiguous (e.g., \"privacy budget audit\" could match unrelated queries). No formal JSON schema for the input is provided, which reduces strict compliance."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill is organized into sections and provides a quick\u2011reference table, but critical rules and many details are interleaved early (e.g., Critical rules block appears before the high\u2011level Process), causing some cognitive overload before the agent reaches the step\u2011by\u2011step flow."
+      "justification": "The document layers information (quick start \u2192 mindset \u2192 detailed steps \u2192 deep reference). However, the opening sections are dense and contain many rules, which can overload the reader before they know the high\u2011level purpose, costing 2 points."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions (DeleteMembership, DeleteCollaboration) are guarded by confirmation prompts, yet the skill still permits those commands without an explicit \u201cread\u2011only audit mode\u201d flag, so the calibration is strong but not perfectly tight for fragile operations."
+      "justification": "Calibrates freedom perfectly: read\u2011only mode enforced, explicit CONFIRM gate before any state\u2011changing CLI, tight constraints for destructive actions, and clear guidance on when to relax constraints (e.g., additive changes). No deduction."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation). The placement of Anti\u2011patterns before Safety checks is a minor deviation from a strictly linear pattern."
+      "justification": "Follows a recognizable pattern (quick start, mindset, pre\u2011flight, stepwise process, output format, anti\u2011patterns, remediation) that aligns with established skill templates."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides actionable CLI commands, decision\u2011tree style steps, and concrete output format with examples. Lacks explicit error\u2011handling for malformed JSON inputs beyond a generic ERROR block and does not show how to handle pagination failures or multi\u2011collaboration batch output, which could hinder fully automated use."
+      "justification": "Provides decision trees, detailed output format, pagination guidance, and error handling examples. Deducted points for lack of a concrete example of handling pagination throttling within the output block and for not showing a multi\u2011collaboration batch output example beyond the separator line."
     }
   ],
-  "total_score": 107,
+  "total_score": 110,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 48378,
-  "latency_ms": 19643,
+  "grade": "A",
+  "token_count": 47219,
+  "latency_ms": 20277,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides a detailed RDS\u2011specific decision tree, Aurora\u2011cluster scope nuances, immutable encryption migration workflow, and precise remediation CLI sequences that a generic model would not assemble automatically. However, most facts are restatements of AWS documentation (e.g., retention range 0\u201135) and no truly novel thresholds or proprietary heuristics are introduced."
+      "justification": "The skill provides many senior\u2011engineer insights (encryption immutability, Aurora cluster\u2011scope, pending\u2011modifications semantics, IOPS\u2011to\u2011storage ratio, KMS rotation limits, multi\u2011AZ failover client\u2011side impact, batch\u2011size safety, confirmation gating). However it omits concrete numeric thresholds for some controls (e.g., no explicit minimum BackupRetentionPeriod for regulated workloads, no quantitative IOPS\u2011to\u2011GB ratio values) and does not spell out the exact API error codes for the edge cases it mentions, leaving a small knowledge gap."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: pagination of describe\u2011db\u2011instances, pre\u2011flight safety checks, explicit confirmation gates, and step\u2011by\u2011step CLI remediation. Some steps (e.g., \u201cverify caller has rds:ModifyDBInstance\u201d) are generic security hygiene rather than AWS\u2011unique process."
+      "justification": "Encodes AWS\u2011specific procedures: paginated `describe-db-instances`, separate Aurora cluster fetch, batch size limit of 5, mandatory CONFIRM gate, precise CLI flags for each finding, and ordering of remediation. Lacks an explicit region\u2011parameter handling step, which forces the agent to infer the region."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "A comprehensive NEVER list is present with concrete reasoning (e.g., never try to enable encryption in\u2011place). A few items lack explicit \"why\" depth (e.g., the NEVER about not flagging BackupRetentionPeriod\u202f0 on Aurora mentions it is rejected but does not explain the operational impact), so the anti\u2011pattern coverage is strong but not flawless."
+      "justification": "Extensive NEVER list with concrete reasons (e.g., never use `modify-db-instance` to enable encryption, never flag Aurora instance fields for cluster\u2011scoped settings, never ignore pending modifications). Does not mention the anti\u2011pattern of relying on default security groups, which could lead to hidden exposure."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are well\u2011defined. The only minor gap is the absence of an explicit example of how an agent would parse the activation triggers, leaving a tiny ambiguity for reliable invocation."
+      "justification": "Complete frontmatter, clear description, when\u2011to\u2011use/when\u2011not\u2011to\u2011use, activation triggers, invocation schema, and a valid example. Missing a formal output\u2011schema definition beyond the free\u2011form text block, which could hinder automated validation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference, then deep sections) allowing on\u2011demand detail, but the initial sections are dense and critical rules are embedded in long paragraphs, causing some cognitive overload before reaching the concise tables."
+      "justification": "Uses layered sections (Quick start \u2192 Mindset \u2192 Philosophy \u2192 Steps \u2192 Output \u2192 Anti\u2011Patterns \u2192 Safety checks). However, the Quick start and Mindset sections are dense and expose many details early, creating some cognitive overload before the core decision tree."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly gated with CONFIRM prompts, snapshot prerequisites, and status checks. The only shortfall is the lack of an explicit limit on bulk remediation batch size (the safety limit is mentioned but not enforced by the skill), leaving a small freedom\u2011calibration gap."
+      "justification": "Calibrates freedom appropriately: destructive actions gated by CONFIRM, batch limits, no `--apply-immediately` for non\u2011urgent changes, and explicit safety checks. Does not explicitly calibrate remediation for read\u2011replica instances where Multi\u2011AZ is less critical."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (Mindset \u2192 Process \u2192 Output \u2192 Edge Cases \u2192 Anti\u2011Patterns \u2192 Remediation). It deviates slightly from a canonical template (missing a dedicated \"Philosophy\" header) which makes the pattern almost, but not perfectly, consistent."
+      "justification": "Follows a recognizable pattern (Quick start, Mindset, Philosophy, Stepwise process, Output format, Anti\u2011Patterns, Safety, Remediation). Minor ad\u2011hoc ordering of sections (e.g., Expert Edge Cases split between Philosophy and later sections) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "The decision tree, CLI remediation snippets, and output format enable an agent to act. Missing pieces include handling of pending\u2011modification notes in the FINDINGS output and a concrete example of error handling for malformed metadata beyond the generic error block, which could cause execution gaps."
+      "justification": "Provides a deterministic decision tree, working CLI examples, error\u2011handling blocks, pending\u2011value annotation, and batch processing guidance. Lacks a region field in the output schema and does not detail how to parse malformed JSON beyond a generic error block, which could cause execution gaps."
     }
   ],
-  "total_score": 107,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 43259,
-  "latency_ms": 11869,
+  "grade": "A",
+  "token_count": 46275,
+  "latency_ms": 10883,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0

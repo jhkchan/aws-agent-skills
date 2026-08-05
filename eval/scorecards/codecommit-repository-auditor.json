@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill contains many deep CodeCommit specifics (immutability of kmsEncryptionKeyId, IAM\u2011only branch protection, deprecation status, wildcard linking of approval templates, pagination limits, etc.) that a generic model would not enumerate. However, it does not provide a concrete decision\u2011tree algorithm for matching repository names to template wildcards nor novel thresholds, so the added delta is strong but not maximal."
+      "justification": "Provides many non\u2011obvious, expert\u2011level details (account\u2011level approval rule templates, immutable KMS key, exact IAM Deny condition syntax, wildcard matching algorithm, deprecation risk handling, CMK rotation compliance impact, cross\u2011service notification lookup) that a generic model would not enumerate. Minor gap: does not explicitly call out the 100\u2011template pagination limit in the decision tree (only in reference), so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (order of steps, IAM enumeration, pagination handling). The description of pagination and throttling is present but lacks exact CLI pagination loops or back\u2011off logic, making the procedure slightly generic."
+      "justification": "Encodes AWS\u2011specific procedures: pagination with back\u2011off, IAM enumeration for branch\u2011protection, exact CLI remediation steps, pre\u2011flight confirmation gate, role\u2011scoping rules. Lacks a precise step\u2011by\u2011step filter to extract only the DeleteBranch Deny statements from IAM policies, causing a minor procedural gap."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "A thorough NEVER list is provided with concrete reasons (e.g., never omit DEPRECATION_RISK, never treat numberOfApprovalsNeeded:0 as valid). The list omits a brief rationale for why CMK rotation matters beyond \u201cnote as additive finding,\u201d leaving a small gap in anti\u2011pattern explanation."
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., never treat NO_ENCRYPTION as unencrypted, never assume default branch is main, never ignore CMK rotation). Only minor shortfall: the list does not explicitly warn about assuming IAM policies apply to admin roles, which could be a pitfall."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present. Triggers such as \"audit this CodeCommit repository\" are somewhat vague and could fire unintentionally, reducing reliability of activation."
+      "justification": "Frontmatter includes description, when_to_use, activation_triggers, invocation_schema, keywords, tags, and verdict shape. Invocation_schema is vague (does not define exact JSON fields for the configuration bundle), so activation could be ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered (Mindset \u2192 Quick reference \u2192 Steps \u2192 Deep reference), but the document front\u2011loads a large amount of detail before the core decision tree, risking cognitive overload and burying critical rules deep in the \"Deep reference\" section."
+      "justification": "Layers information well (quick\u2011start decision tree, then philosophy, then detailed process, then anti\u2011patterns, then remediation). However, the quick\u2011start section already contains most of the decision logic, which may overload a first\u2011time reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are gated by explicit CONFIRM prompts and warnings about IAM policy scope. The calibration could be tighter for IAM policy changes (no explicit constraint on which role to modify), but overall well\u2011matched to fragility."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts, role\u2011scoping, warnings about default\u2011branch changes, and recovery windows. Calibration matches fragility of the tasks."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (Mindset, Process, Output, Edge Cases, Anti\u2011Patterns, Remediation, Deep Reference). It lacks a formal \"Philosophy\" heading, making the pattern slightly incomplete."
+      "justification": "Follows a clear, repeatable pattern (quick start \u2192 mindset \u2192 process \u2192 anti\u2011patterns \u2192 safety \u2192 remediation \u2192 reference) that aligns with the expected skill structure."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides clear output format, worked examples, and remediation CLI snippets. Missing explicit handling of pagination errors, throttling back\u2011off, and automated decision\u2011tree code for wildcard matching reduces immediate executability in edge cases."
+      "justification": "Provides decision tree, output format, concrete CLI commands, pagination loops, and remediation steps, enabling an agent to act. However, the output format is plain text rather than a structured schema, the handling of multiple approval\u2011template statements is only described qualitatively, and error handling for throttling is mentioned but not integrated into a reusable procedure, leaving gaps for edge\u2011case execution."
     }
   ],
-  "total_score": 103,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 40318,
-  "latency_ms": 11659,
+  "grade": "A",
+  "token_count": 32563,
+  "latency_ms": 8228,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0

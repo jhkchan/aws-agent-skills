@@ -47,18 +47,14 @@ metadata:
   family: Management
   verdict_shape: "APPROACHING_LIMIT | NO_ALARM | CONFIG_GAP | OK"
   when_to_use: >-
-    Reviewing Service Quotas utilization per service, checking for quotas
-    approaching their limit (>=80%), auditing CloudWatch alarm coverage on
-    AWS/Usage metrics, validating quota increase request history, or
-    identifying adjustable quotas stuck at default with rising usage.
+    Auditing AWS Service Quotas utilization, CloudWatch alarm coverage on
+    AWS/Usage metrics, and quota increase request history.
   activation_triggers:
     - "audit service quotas"
     - "check quota utilization"
     - "approaching service limit"
     - "quota increase request"
     - "cloudwatch alarm on quota"
-    - "applied vs default quota"
-    - "AWS/Usage metric"
     - "service limits audit"
   invocation_schema: >-
     Input: either (a) a Service Quotas snapshot (quota code, service code,
@@ -96,7 +92,7 @@ support case grinds through the approval process.
 | Utilization >= 80% of applied quota (inclusive: exactly 80% counts) | **APPROACHING_LIMIT** | 1 |
 | `Adjustable: false` AND utilization >= 50% | **CONFIG_GAP** | 2b |
 | Increase request DENIED/NOT_APPROVED AND utilization >= 50% | **CONFIG_GAP** | 2c |
-| At AWS default, `Adjustable: true`, utilization >= 50%, no recent request | **CONFIG_GAP** | 2d |
+| At AWS default, `Adjustable: true`, utilization >= 50%, request history completely empty | **CONFIG_GAP** | 2d |
 | No `UsageMetric` block defined | **CONFIG_GAP** | 2a |
 | Has `UsageMetric`, utilization < 80%, no CloudWatch alarm | **NO_ALARM** | 3 |
 | Utilization < 50%, alarm in place or N/A | **OK** | 4 |
@@ -133,14 +129,12 @@ quotas. The same applies to
 paginator to completion — the long tail often contains the quota that
 matters.
 
-**Malformed input handling.** If the quota snapshot is malformed (missing
-applied value, missing quota code, utilization value not parseable as a
-number, or unit mismatch between utilization and quota), output an ERROR
-block and refuse classification. Do NOT guess the utilization percentage
-from incomplete data — a wrong percentage produces a wrong verdict.
-
-**If the quota snapshot is malformed** (missing applied value, missing
-quota code, utilization value not parseable as a number), output:
+**Malformed input handling.** If the quota snapshot is missing the
+applied value, missing quota code, has a utilization value not
+parseable as a number, or has a unit mismatch between utilization and
+quota, output an ERROR block and refuse classification. Do NOT guess
+the utilization percentage — a wrong percentage produces a wrong
+verdict. Output:
 
 ```text
 QUOTA: <quota-code or name>
@@ -209,10 +203,37 @@ experience. Each changes a verdict if ignored:
   different service. Do NOT suggest `request-service-quota-increase` —
   it returns `ValidationException`.
 
-- **`request-service-quota-increase` requires `--desired-value` > current
-  applied value.** Requesting a value <= current returns
-  `ValidationException`. For large increases (e.g., 10x), AWS may
-  auto-open a support case instead of instant approval.
+- **`AWS/Usage` metrics publish with a 5-15 minute ingestion delay.**
+  A CloudWatch alarm set at exactly 80% of the applied quota may fire
+  AFTER actual usage has already crossed 100% — by the time the alarm
+  triggers and pages on-call, new resource creation is already failing
+  with `LimitExceededException`. Set alarm thresholds at 70-75% of
+  the applied quota to create a real remediation window, not at the
+  same 80% line used for the audit verdict.
+
+- **`list-service-quotas` does NOT return current utilization.** The
+  API returns only quota metadata and the applied value — there is no
+  `CurrentUsage` field. You must separately call `aws cloudwatch
+  get-metric-statistics` on the `AWS/Usage` metric and divide by the
+  applied value to compute utilization. Automation that assumes
+  `list-service-quotas` includes a usage number silently produces 0%
+  for every quota — every verdict comes back OK.
+
+- **The Service Quotas API itself is rate-limited.** The
+  `list-service-quotas` and `list-requested-service-quota-change-history`
+  endpoints share a per-account throttle (approximately 10-20 TPS).
+  Bulk-auditing every quota for every service in a single loop will
+  hit `ThrottlingException`. Implement exponential backoff and batch
+  by service-code with a 0.5s delay between services.
+
+- **Large increase requests auto-route to support cases.** Even for
+  `Adjustable: true` quotas, requests beyond a service-specific
+  multiplier (often 2x-10x the current value) are NOT auto-approved.
+  AWS converts them to a support case (status transitions to
+  CASE_OPENED) that can take 2-5 business days. This means a quota at
+  85% with a freshly-submitted 2x request will NOT be relieved before
+  exhaustion — plan capacity increases when utilization crosses 50%,
+  not 80%.
 
 - **Pending increase requests have their own quota.** There is a limit
   on the number of concurrent PENDING requests per account. If you hit
@@ -289,11 +310,19 @@ The team has not addressed the underlying capacity issue. This is a
 CONFIG_GAP — either restructure usage or open a support case with
 justification.
 
-**(d) At AWS default, `Adjustable: true`, utilization >= 50%, no
-PENDING or APPROVED request in history.** The quota has never been
-increased and no request is in flight, but utilization is high enough
-to warrant proactive action. This is a CONFIG_GAP — a quota increase
-request should have been submitted already.
+**(d) At AWS default, `Adjustable: true`, utilization >= 50%, AND the
+increase request history is completely empty (zero entries of ANY
+status — no PENDING, no APPROVED, no DENIED, no NOT_APPROVED).**
+The quota has never been increased and no request has ever been
+submitted, but utilization is high enough to warrant proactive action.
+
+**Disambiguation (critical for D8):** Step 2d matches ONLY when the
+request history list is truly empty. If there is ANY entry in the
+history — even a PENDING request or a DENIED request — Step 2d does
+NOT apply. A PENDING request means the team is actively seeking an
+increase (skip to Step 3). A DENIED request is handled by Step 2c.
+Only a completely empty history combined with utilization >= 50% at
+the AWS default value triggers this CONFIG_GAP.
 
 If none of (a)-(d) match, proceed to Step 3.
 
@@ -308,8 +337,15 @@ alerting exists — a sudden utilization spike would go undetected until
 operations fail.
 
 Verification: `aws cloudwatch describe-alarms --metric-name <MetricName>
---namespace AWS/Usage --dimensions <dims from UsageMetric>`. If the
-response is empty, no alarm exists.
+--namespace AWS/Usage --dimensions <dims from UsageMetric>`. An alarm
+is considered to exist ONLY when ALL of these conditions are met:
+(1) `MetricName` matches the `UsageMetric.MetricName` value, (2) every
+dimension from the `UsageMetric.Dimensions` list appears in the alarm
+with the same name AND value, and (3) the alarm `Threshold` is at or
+below the applied quota value — an alarm threshold of 999999 for a
+quota of 50 is effectively disabled and should be treated as NO_ALARM.
+An empty `describe-alarms` response or any dimension mismatch means
+NO_ALARM.
 
 Note: this step is only reached if Step 2 did not match. A quota at
 default with 60% utilization is CONFIG_GAP (Step 2d), not NO_ALARM — the
@@ -336,6 +372,14 @@ verdict = max(utilization_severity, config_gap_severity, alarm_severity)
 ```
 
 If no findings (all dimensions clean), the verdict is **OK**.
+
+**Creative audit extensions:** The four verdicts cover the standard
+audit dimensions. You MAY add supplementary FINDINGS lines for
+quota-specific risks the standard steps do not capture (e.g., a
+quota shared across instance types where one type is near exhaustion,
+or a quota whose growth rate has accelerated in the past 30 days).
+Keep the VERDICT to the four standard values — additional context
+goes in FINDINGS, not in new verdict labels.
 
 ## Output format (per quota)
 
@@ -440,10 +484,15 @@ REMEDIATION:
   page). The quota you need may be on page 2. Always iterate
   `--starting-token` to completion.
 
-- NEVER forget that the number of pending increase requests is itself
-  quota-limited. If `request-service-quota-increase` returns
-  `QuotaExceededException`, withdraw stale PENDING requests before
-  submitting new ones.
+- NEVER exceed the concurrent pending-request quota. Each account has
+  a fixed limit on simultaneous PENDING increase requests per region
+  (typically 4 per region per service). When this limit is full,
+  `request-service-quota-increase` fails with `QuotaExceededException`
+  even though the target quota has ample headroom. Before submitting a
+  new request, check for stale PENDING entries via
+  `list-requested-service-quota-change-history --status PENDING` and
+  contact AWS support to withdraw expired ones — there is no public API
+  to programmatically close a pending request.
 
 - NEVER classify a quota with `UsageMetric` present, an alarm configured,
   low utilization, and no structural issues as anything other than OK.
@@ -532,47 +581,21 @@ No remediation required. Recommend:
   applied quota changes.
 - For regional quotas, audit each region where the workload operates.
 
-## Deep reference: Service Quotas + CloudWatch internals
+## Reference: AWS/Usage metric structure
 
-### AWS/Usage metric structure
-
-The `UsageMetric` block in a Service Quota definition maps to a
-CloudWatch metric in the `AWS/Usage` namespace:
+The `UsageMetric` block maps to a CloudWatch metric in `AWS/Usage`:
 
 | Field | Typical value | Notes |
 |---|---|---|
 | `MetricNamespace` | `AWS/Usage` | Always this value. |
 | `MetricName` | `ResourceCount` | Sometimes `ResourceLimit` or service-specific. |
-| `Dimensions` | `Service`, `Resource`, `Type`, optionally `Class` | Exact values are quota-specific. Copy verbatim. |
-| `StatisticType` | `Sum` or `Maximum` | Determines the CloudWatch statistic to use in alarms. `Sum` for cumulative resources; `Maximum` for peak-based quotas. |
+| `Dimensions` | `Service`, `Resource`, `Type`, optionally `Class` | Copy verbatim — wrong values produce a silent alarm. |
+| `StatisticType` | `Sum` or `Maximum` | `Sum` for cumulative resources; `Maximum` for peak-based quotas. |
 
-### Applied vs default quota resolution
-
-`list-service-quotas` and `get-service-quota` return the **applied**
-value — the effective quota after approved increases.
-`get-aws-default-service-quota` returns the **default** — the baseline
-for all new accounts. If applied > default, an increase was approved at
-some point. If applied == default, no increase has ever been requested.
-
-### Request status semantics
-
-| Status | Meaning | Effect on applied quota |
-|---|---|---|
-| `PENDING` | Request submitted, awaiting review. | No change — applied value is still the old number. |
-| `CASE_OPENED` | AWS support is reviewing (large increases). | No change. May take days. |
-| `APPROVED` | Request granted. | Applied value increases to the requested value (may take minutes to propagate). |
-| `DENIED` | Request rejected. | No change. Quota remains at the old value. |
-| `NOT_APPROVED` | Request withdrawn or auto-expired. | No change. |
-| `CASE_CLOSED` | Support case resolved (may be approved or denied). | Depends on outcome. |
-
-### Regional vs global quota scope
-
-`GlobalQuota: true` applies account-wide (e.g., IAM users, S3 buckets).
-`GlobalQuota: false` is per-region (e.g., VPCs, EC2 vCPUs, RDS
-instances). A regional quota must be increased independently in each
-region where the workload operates. The management account in
-Organizations can view member-account quotas but cannot request
-increases on their behalf — each account must submit its own request.
+**Organizations note:** the management account can view member-account
+quotas via `list-service-quotas --account-id <id>` but CANNOT submit
+increase requests on their behalf — each member account must submit
+its own request.
 
 ## Domain
 

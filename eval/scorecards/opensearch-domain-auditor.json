@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill supplies many expert\u2011level nuances that a generic model would not automatically know: immutability of at\u2011rest and node\u2011to\u2011node encryption, the exact dependency chain (HTTPS \u2192 NTN \u2192 FGAC), concrete instance\u2011type recommendations for dedicated masters, a detailed classification of policy conditions (STRONG vs WEAK), and the precise verdict precedence. However, a large portion restates publicly documented AWS behavior without novel insight, so it falls short of a perfect 20."
+      "justification": "Adds several expert\u2011level details not commonly known to a baseline model: immutability of encryption\u2011at\u2011rest and NTN, default\u2011VPC public\u2011subnet trap, aws/es key CloudTrail opacity, blue/green update queuing, and cross\u2011cluster search security inversion. These constitute genuine delta, but a few points (e.g., basic FSBP mapping) are restatements of public docs, so not full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "A clear, AWS\u2011specific step\u2011by\u2011step classification process, pre\u2011flight safety checks, and exact CLI remediation commands are provided. The only shortfall is a few generic procedural hints (e.g., \u201cback up the policy\u201d) that are not uniquely OpenSearch\u2011focused."
+      "justification": "Provides an AWS\u2011specific procedural flow (Step\u202f1\u20115, confirmation gate, immutable vs mutable remediation, exact CLI snippets). The only shortfall is a generic \u201ccheck security\u201d phrasing in the quick\u2011start, which is not a concrete AWS\u2011only step."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "The NEVER list is extensive and explains why each pattern is dangerous, covering encryption, NTN, FGAC, master node sizing, and policy misuse. It loses a point for omitting a few niche pitfalls (e.g., cross\u2011cluster search policy implications) that an experienced auditor would flag."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never enable encryption\u2011at\u2011rest in\u2011place, never treat aws:SourceIp as strong). Missing only a few niche pitfalls (e.g., IAM role trust\u2011policy edge cases), so deduct one point."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete and includes description, keywords, activation triggers, and an invocation schema. However, the skill lacks a concise \u201cwhen\u2011to\u2011invoke\u201d paragraph separate from metadata and does not provide a minimal example invocation, making reliable activation slightly less deterministic."
+      "justification": "Full front\u2011matter, clear description, activation triggers, invocation schema, and verdict shape. Missing only a tiny explicit \"when_to_use\" field redundancy, but otherwise fully compliant."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered into sections, but the opening blocks (critical rule, mindset, quick reference) are dense and front\u2011load many details, which can overwhelm an agent before it knows whether the skill applies. A more staged intro would improve cognitive load."
+      "justification": "Information is organized into sections, but critical rules (confirmation gate, anti\u2011patterns) are buried deep, creating cognitive load for a first\u2011time user. A more layered top\u2011down summary would improve progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly gated with an explicit confirmation prompt, and the skill clearly distinguishes immutable operations (encryption, NTN) from mutable ones. The only minor gap is that the confirmation gate is described but not reiterated for every specific remediation command (e.g., log\u2011publishing updates), leaving a small chance of omission."
+      "justification": "Calibration is spot\u2011on: destructive actions require an explicit CONFIRM prompt, immutable operations are clearly flagged as requiring domain recreation, and mutable updates are distinguished. No over\u2011constraining of creative tasks."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (mindset \u2192 quick reference \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 edge cases \u2192 anti\u2011patterns \u2192 deep reference). It is coherent but not tied to a named industry pattern, so it falls just short of a perfect score."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Process \u2192 Reference \u2192 Anti\u2011Patterns \u2192 Safety). Slight deviation: the \u2018Reference\u2019 section mixes edge\u2011case logic with operational tips, making the pattern less clean than ideal."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete output format, decision tree, and working CLI examples, enabling an agent to execute the audit. Missing are explicit error\u2011handling branches for API failures, malformed access\u2011policy JSON beyond the generic error, and handling of rare edge cases like cross\u2011cluster search policies, which prevents a full score."
+      "justification": "Provides exact output format, decision tree, remediation commands, error handling, and worked examples. Minor gaps: default\u2011VPC route\u2011table check is mentioned only in reference, not in the main process, and some edge\u2011case branching (e.g., handling missing access\u2011policy) could be more explicit."
     }
   ],
-  "total_score": 106,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 44585,
-  "latency_ms": 14480,
+  "grade": "A",
+  "token_count": 34037,
+  "latency_ms": 7927,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds deep AWS\u2011specific knowledge (applied vs default quota, UsageMetric presence, request lifecycle, global vs regional scope, exact CLI commands, inclusive 80% threshold) that a generic model would not automatically provide. Some content merely restates common concepts, preventing a perfect score."
+      "justification": "Adds several expert\u2011level insights not usually known by a generic model: inclusive 80% boundary, 50% CONFIG_GAP trigger, pending vs approved request lifecycle, exact CloudWatch dimension requirements, rate\u2011limit backoff strategy, and the 70\u201175% alarm recommendation. Some of these (e.g., basic quota\u2011utilization formula) are already common knowledge, hence a small deduction."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides concrete AWS\u2011centric procedures: pagination handling, pre\u2011flight metadata gate, confirmation before state\u2011changing CLI calls, exact alarm\u2011creation command, and step\u2011by\u2011step classification logic. A few steps (e.g., \u201ccheck alarm\u201d) are generic, so full marks are not awarded."
+      "justification": "Provides an AWS\u2011specific, step\u2011by\u2011step audit procedure, pagination handling, exponential backoff, confirmation gate before state\u2011changing CLI calls, and precise remediation commands. Lacks an explicit error\u2011recovery flow for malformed input beyond the generic error block, costing one point."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Comprehensive NEVER list with specific reasoning (e.g., never use default quota for utilization, never assume metric exists, never treat pending requests as applied). Missing a brief anti\u2011pattern about the quota on pending increase request count, hence a small deduction."
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., never compute utilization against default, never assume metric exists, never treat PENDING as applied). Only minor omission: does not explicitly warn against using quota names in automation (though mentioned elsewhere), so one point is deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter includes description, activation triggers, invocation schema, and metadata. The \"when to use\" section is present but somewhat verbose, and trigger phrases overlap, making reliable activation slightly less crisp."
+      "justification": "Complete frontmatter, clear description, activation triggers, and invocation schema. Minor vagueness in \"requires_llm: true\" field but overall compliant."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered effectively: one\u2011line takeaway, quick reference table, pre\u2011flight gate, ordered steps, deep reference, and remediation. No cognitive overload; only a minor point could be tighter summarisation of the deep reference."
+      "justification": "Information is layered (mindset \u2192 quick reference \u2192 pre\u2011flight \u2192 stepwise process \u2192 anti\u2011patterns \u2192 remediation). Some sections are dense, causing slight cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (quota\u2011increase requests, alarm creation) are guarded by explicit confirmation and validation checks. Read\u2011only audit steps are permissive. Slight deduction for occasional over\u2011constraining of creative audit extensions."
+      "justification": "Calibrates freedom appropriately: audit is open\u2011ended, but any state\u2011changing CLI action requires explicit CONFIRM prompt. Slight shortfall: does not spell out backoff parameters for throttling, a minor safety gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a clear, repeatable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Steps \u2192 Output \u2192 Anti\u2011patterns \u2192 Remediation \u2192 Deep reference). The structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Remediation). The only inconsistency is the occasional use of ad\u2011hoc tags like [PENDING INCREASE] in examples, which deviates from the core tag set."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a clear decision tree, CLI snippets, and output format, enabling an agent to act. However, the model output mis\u2011classified a pending increase as a CONFIG_GAP, exposing ambiguity in step\u202f2d wording. This indicates the skill could lead to incorrect automation decisions, so 4 points are deducted."
+      "justification": "Model output examples largely conform to the prescribed format and demonstrate correct verdict logic. However, the last example introduces a non\u2011standard finding label ([PENDING INCREASE]) that is not defined in the skill, potentially breaking parsers. This reduces usability."
     }
   ],
-  "total_score": 104,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 35557,
-  "latency_ms": 8926,
+  "grade": "A",
+  "token_count": 36547,
+  "latency_ms": 5561,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0

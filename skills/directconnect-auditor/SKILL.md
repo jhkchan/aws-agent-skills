@@ -85,24 +85,24 @@ metadata:
 
 ## Quick start
 
-Audit any Direct Connect topology in four ordered dimensions; the verdict is
-the worst finding, ordered SINGLE_CONNECTION > NO_ENCRYPTION > CONFIG_GAP > OK.
+Verdict is the worst finding across four ordered dimensions:
+`SINGLE_CONNECTION > NO_ENCRYPTION > CONFIG_GAP > OK`. Run them in order,
+stop at the first non-OK verdict.
 
-1. **Redundancy (Step 1):** count diversity units (LAG = 1 unit) at **distinct
-   `locationCode`s**. Two connections at the same POP are pseudo-diversity →
-   SINGLE_CONNECTION.
-2. **MACSec (Step 2):** for each MACSec-capable dedicated connection, check
-   `encryptionMode`. `no_encrypt` or `should_encrypt` → NO_ENCRYPTION. Skip
-   hosted connections (hardware-ineligible).
-3. **BGP / LOA / VIF (Step 3):** public VIF without MD5 (use
-   `authKeyState`, never the write-only `bgpAuthKey: null`), private ASN on
-   public VIF, jumbo MTU on public VIF, BGP down on available, LOA stuck on
-   `requested` >5 business days, single VIF on single connection → CONFIG_GAP.
-4. **OK (Step 4):** 2+ diverse connections, MACSec `must_encrypt` (or N/A
-   hosted), BGP auth on all public VIFs, redundant VIFs via DXGW.
+1. **Redundancy:** 2+ diversity units (a LAG counts as ONE unit) at **distinct
+   `locationCode`s** — else `SINGLE_CONNECTION`. Two connections at the same
+   POP are pseudo-diversity.
+2. **MACSec:** dedicated, MACSec-capable connection with `encryptionMode`
+   `no_encrypt` or `should_encrypt` — `NO_ENCRYPTION`. Skip hosted connections
+   (hardware-ineligible).
+3. **BGP / LOA / VIF:** public VIF without MD5, private ASN on public VIF, BGP
+   `down` on `available`, LOA stuck `requested` >5 business days, single VIF
+   on a single connection — `CONFIG_GAP`.
+4. **OK:** all four dimensions pass.
 
-For the full severity matrix, expert knowledge deltas, and per-verdict
-remediation, see the sections below.
+The full severity matrix, per-field edge-case resolution, and the pre-flight
+metadata gate live in the **Reference** section at the end of this document.
+Expert knowledge deltas and the canonical checklist are inline below.
 
 ## Critical rules — read first
 
@@ -148,60 +148,41 @@ facility. Everything above layer-2 rides on that physical path.
 
 ## Quick reference — severity thresholds
 
-| Condition | Verdict | Rule |
-|---|---|---|
-| <2 connections at **diverse** DX locations (`locationCode`) | **SINGLE_CONNECTION** | Step 1 |
-| LAG with all member connections at the same `locationCode` | **SINGLE_CONNECTION** | Step 1 |
-| 2 connections at the same `locationCode` (pseudo-diversity) | **SINGLE_CONNECTION** | Step 1 |
-| Dedicated connection, `macSecCapable: true`, `encryptionMode: no_encrypt` | **NO_ENCRYPTION** | Step 2 |
-| Dedicated connection, `macSecCapable: true`, `encryptionMode: should_encrypt` | **NO_ENCRYPTION** | Step 2 (silent-downgrade risk) |
-| Public VIF with no `bgpAuthKey` set | **CONFIG_GAP** | Step 3a |
-| BGP peer `bgpStatus: down` on an `available` connection | **CONFIG_GAP** | Step 3b |
-| Connection `state: requested` >5 business days with no LOA-CFA | **CONFIG_GAP** | Step 3c |
-| Single private VIF on a single connection (no DXGW failover) | **CONFIG_GAP** | Step 3d |
-| 2+ diverse connections, MACSec `must_encrypt` (or N/A hosted), BGP auth on all public VIFs, valid LOA or `available` | **OK** | Step 4 |
-
 Apply the steps in order. The verdict is the **worst** finding, where
-SINGLE_CONNECTION > NO_ENCRYPTION > CONFIG_GAP > OK.
+`SINGLE_CONNECTION > NO_ENCRYPTION > CONFIG_GAP > OK`. The full condition →
+verdict → step matrix is in **Reference — Severity matrix** at the end of
+this document.
 
 ## Pre-flight: connection metadata gate
 
 Several attributes **short-circuit** the audit — misclassifying them produces
-false positives that erode trust.
+false positives. The full per-attribute and per-field resolution tables are in
+**Reference — Metadata gate** and **Reference — Edge-case field handling** at
+the end of this document. The short list every auditor must apply before
+stepping into Step 1:
 
-**Live-account pagination note:** `aws directconnect describe-connections`
-returns at most 1 connection per call by default; use
-`aws directconnect describe-connections` (plural, no `--connection-id`) to
-list every connection in the account. For VIFs,
-`describe-virtual-interfaces` without `--connection-id` is the only way to
-catch every VIF — filtering by connection misses VIFs whose underlying
-connection was swapped. Always drain pagination; DX has no `NextToken` for
-these calls but cross-account listings do truncate at 1,000 objects.
+- `lagId` set → connection is a LAG **member**, not standalone; audit the LAG.
+- `bandwidth` `1Gbps`/`2Gbps`/`5Gbps`/`50-500Mbps` → hosted connection,
+  MACSec not supported (hardware gate, not a posture gap).
+- `connectionMode: transit` → APN-partner-owned port; MACSec is the partner's
+  responsibility, flag `macSecCapable: false` as N/A.
+- `hasLogicalRedundancy: yes` → LAG-level port redundancy **inside one
+  location**, NOT facility diversity.
+- `connectionState: down` → physical link down; treat as CONFIG_GAP if any
+  other path is available, SINGLE_CONNECTION if this is the only path.
 
-| Attribute | Value | Effect on audit |
-|---|---|---|
-| `lagId` | set | Connection is a LAG **member**, not standalone. Audit the LAG (`describe-lags --lag-id <id>`) — the LAG is the redundancy unit, not the member. Member `locationCode` is identical to the LAG's; counting members as diverse connections is a false positive. |
-| `connectionMode` | `transit` | Hosted-VIF connection from an APN partner. The partner owns the physical port; customer sees VIFs only. MACSec capability is set by the partner — flag `macSecCapable: false` as N/A, not a finding. |
-| `bandwidth` | `1Gbps`, `2Gbps`, `5Gbps` | Hosted connection — **MACSec not supported.** Do NOT flag `encryptionMode: no_encrypt`; it is a hardware limit, not a posture choice. |
-| `bandwidth` | `50Mbps`, `100Mbps`, `200Mbps`, `300Mbps`, `400Mbps`, `500Mbps` | Hosted connection (sub-1Gbps partner resold). Same MACSec N/A rule. |
-| `bandwidth` | `10Gbps`, `100Gbps` dedicated | MACSec-capable **if** the location is MACSec-enabled. Audit encryption. |
-| `location` | e.g. `EqSE2` | The location/POP code. Drives the diversity check (Step 1). Two connections at the same code share facility risk. |
-| `hasLogicalRedundancy` | `yes` | AWS-populated flag for port-level LAG redundancy inside one location. **Does NOT imply location diversity.** A `yes` here is LAG-level, not facility-level. |
-| `connectionState` | `requested` | Provisioning not started. Trigger LOA check (Step 3c). |
-| `connectionState` | `pending` | LOA issued; cross-connect in progress. Outage if held >10 business days. |
-| `connectionState` | `available` | Physical link up — proceed with full audit. |
-| `connectionState` | `down` | Physical link down. Treat as CONFIG_GAP if other connections are available (traffic should have failed over); SINGLE_CONNECTION if this is the only path. |
+**Live-account pagination note (D2):** `describe-connections` (no
+`--connection-id`) and `describe-virtual-interfaces` (no `--connection-id`) are
+the only complete listings. Filtering by `--connection-id` misses VIFs whose
+underlying connection was swapped. Drain pagination explicitly:
 
-**Edge-case field handling (resolves ambiguity in Step 3):**
-
-| Field scenario | Interpretation | Action |
-|---|---|---|
-| `authKeyState: configured` (or input shows auth key was supplied at VIF creation) | BGP MD5 is set | OK for this check; do not flag. |
-| `authKeyState: never-configured` (or field absent AND no auth key in creation input) on a **public VIF** | BGP MD5 was never set | CONFIG_GAP (MEDIUM) — route-hijack vector. Remediate via VIF re-creation with `--auth-key`. |
-| `authKeyState: never-configured` on a **private/transit VIF** | No MD5 on a scoped VIF | CONFIG_GAP (LOW) — lower risk than public but still recommended. |
-| `bgpPeers` array missing entirely from a VIF JSON | No BGP session defined — VIF is non-functional or data is incomplete | CONFIG_GAP (MEDIUM). Emit: `VIF <id> has no bgpPeers array — BGP state unverifiable. Re-fetch with describe-bgp-peers.` Do NOT assume auth is absent; the field may be missing due to truncated API output. |
-| `bgpPeers` array present but empty `[]` | VIF exists but no BGP sessions configured | CONFIG_GAP (MEDIUM). A VIF without peers carries no traffic. Flag for operator review. |
-| `authKeyState` field absent from input JSON (offline mode) | Cannot determine auth state from describe-virtual-interfaces alone | Infer from `bgpPeers[].authKey` presence in the input; if that is also absent, emit CONFIG_GAP (LOW) with note: `Auth state unverifiable from provided JSON — run describe-bgp-peers for authoritative check.` |
+```bash
+# Canonical enumeration — DO NOT pass --connection-id (swapped VIFs are missed)
+aws directconnect describe-connections         --output json > conns.json
+aws directconnect describe-virtual-interfaces  --output json > vifs.json
+aws directconnect describe-lags                --output json > lags.json
+# DX has no NextToken for these calls; cross-account views truncate at 1,000.
+```
 
 **If the topology JSON is malformed** (invalid JSON, missing `connectionId` on
 a connection, missing `virtualInterfaceId` on a VIF), output:
@@ -334,7 +315,58 @@ These are the deltas a senior network engineer knows and a generalist misses:
   and location diversity for hosted VIFs are unverifiable — flag as
   CONFIG_GAP (LOW) with a note that the partner account must be audited for
   full posture. Cross-account listings also truncate at 1,000 objects; use
-  `--max-results` with pagination where available.
+  `--max-results` with pagination where available. **Cross-account
+  `bgpPeers[].authKey` is silently redacted** in the interface-owner view
+  (returned as null without an error flag) — only the connection owner
+  sees the authoritative key state. Treat a hosted-VIF null authKey as
+  "unverifiable, assume partner role", never as "auth absent".
+
+- **DX billing is port-based, not usage-based — a `down` connection still
+  bills at full port rate.** This is the #1 DX cost trap: an organisation
+  that provisions a 10 Gbps primary, fails over to a backup, and leaves
+  the primary `down` for weeks continues to pay for both. Deleting a hosted
+  VIF does not stop the underlying port billing either — only
+  `delete-connection` stops port charges (after the partner cross-connect
+  is physically removed, which can lag by weeks). Flag a `down` but billed
+  connection as CONFIG_GAP (LOW) with the cost implication; the
+  remediation is `delete-connection` once the failover is verified stable,
+  not "wait for it to recover".
+
+- **MACSec CAK/CKN rotation is a two-step overlap, not a swap.**
+  `update-connection --encryption-mode must_encrypt` accepts two AWS-side
+  key slots. Rotating keys by removing the old key first and adding the new
+  key second drops MACSec negotiation for 30-60 seconds (one MKA hello
+  interval cycle) — which on a `must_encrypt` link drops ALL traffic. The
+  correct rotation is: (1) add the new CAK/CKN pair via
+  `update-connection`, (2) configure the CE with both pairs, (3) verify
+  MACSec still negotiated with `describe-connections | jq
+  .connections[].macSecKeys`, (4) then remove the old pair. Skipping the
+  overlap is a silent outage.
+
+- **`locationCode` maps to an AWS-side patch panel, not to a physical
+  building.** Some colocation campuses host multiple DX `locationCode`s in
+  the same building or in adjacent buildings sharing one meet-me-room,
+  common riser, or fibre entry pit. Two connections at distinct
+  `locationCode`s can collapse to one physical failure domain if both
+  cross-connects traverse the same meet-me-room or building entry. The
+  auditor cannot verify this from the API alone — flag any topology where
+  both `locationCode`s share a campus prefix (e.g., `EqSE2` + `EqSE3` at
+  the same Equinix campus) as CONFIG_GAP (LOW) with a note to confirm
+  diverse meet-me-room and diverse building entry with the colo provider.
+  Do NOT raise SINGLE_CONNECTION on the campus-prefix heuristic alone —
+  the AWS-side patch panels are genuinely diverse even when buildings
+  share a meet-me-room.
+
+- **`Describe*` Direct Connect API calls are NOT logged to CloudTrail by
+  default.** CloudTrail for Direct Connect captures write events
+  (`Create*`, `Delete*`, `Update*`, `Associate*`) but `describe-*` is a
+  read event and only appears if CloudTrail data-event logging is
+  explicitly enabled for the Direct Connect service — which is off by
+  default. Relying on CloudTrail for "who audited DX" or "what topology
+  was observed" misses every read. For compliance evidence, capture
+  `describe-connections` / `describe-bgp-peers` JSON output to an S3
+  bucket with a bucket policy — the API response is the audit record, not
+  CloudTrail.
 
 ### Step 1: Redundancy audit (SINGLE_CONNECTION — highest priority)
 
@@ -455,6 +487,35 @@ verdict = max(all_redundancy_findings,
 
 Priority: SINGLE_CONNECTION > NO_ENCRYPTION > CONFIG_GAP > OK.
 
+## Canonical checklist (run in this order)
+
+A single sequential list the auditor follows top-to-bottom for every topology.
+Each step either sets the verdict (worst-so-far wins) or moves on.
+
+1. **Fetch (no `--connection-id` filter):**
+   `describe-connections` → `describe-virtual-interfaces` → `describe-lags`.
+   If a public VIF is present, also `describe-bgp-peers --virtual-interface-id`
+   per VIF (the authoritative authKey source).
+2. **Malformed JSON gate:** invalid JSON, missing `connectionId`, or missing
+   `virtualInterfaceId` → emit `VERDICT: ERROR` and stop.
+3. **Metadata gate (per Reference — Metadata gate):** classify each connection
+   as LAG-member / hosted / dedicated, and each `connectionState`.
+4. **Step 1 — Redundancy:** group diversity units by `locationCode`.
+   Verdict moves to `SINGLE_CONNECTION` if <2 units at distinct codes.
+5. **Step 2 — MACSec:** for each dedicated MACSec-capable unit, check
+   `encryptionMode`. Verdict moves to `NO_ENCRYPTION` on `no_encrypt` or
+   `should_encrypt`.
+6. **Step 3a — BGP auth (public VIFs):** never use the write-only
+   `bgpAuthKey`; use `authKeyState` from `describe-bgp-peers`. Missing auth
+   on a public VIF → verdict moves to `CONFIG_GAP`.
+7. **Step 3b — BGP session state:** any `bgpStatus: down` on an `available`
+   connection → `CONFIG_GAP`.
+8. **Step 3c — LOA:** `requested` >5 business days with no LOA-CFA, or
+   `pending` >10 business days → `CONFIG_GAP`.
+9. **Step 3d — VIF redundancy:** single VIF on a single connection, or two
+   VIFs without a DXGW attachment → `CONFIG_GAP`.
+10. **Step 4 — Aggregate:** worst-so-far wins. If nothing fired, emit `OK`.
+
 ## Output format (per topology)
 
 ```text
@@ -467,6 +528,21 @@ FINDINGS:
   - [OK] <dimension that passed>
 REMEDIATION: <specific action per finding, or "None required" if OK>
 ```
+
+### Failure handling — partial API failures and missing fields
+
+| Failure mode | Detection | Fallback action |
+|---|---|---|
+| `describe-bgp-peers` throttled (ThrottlingException) | stderr contains `Throttling` | Retry with exponential backoff (`--max-items 100`, base 2s, max 5 attempts). If still failing, emit `CONFIG_GAP (LOW)` with note `BGP auth state unverifiable — describe-bgp-peers throttled; rerun audit`. Do NOT assume auth is absent. |
+| `describe-bgp-peers` returns empty array for a known VIF | VIF exists in `describe-virtual-interfaces` but peers array is `[]` | The VIF has no BGP session configured OR the cross-account view redacted the peers. If `connectionMode: transit` and you are NOT the connection owner, assume redaction — emit `CONFIG_GAP (LOW)` with `Re-audit from partner role`. Otherwise emit `CONFIG_GAP (MEDIUM)` — a VIF with no peers carries no traffic. |
+| Required field absent from offline JSON (`authKeyState`, `bgpPeers`, `macSecCapable`) | Field is null or missing | Emit the matching `CONFIG_GAP (LOW)` from the **Reference — Edge-case field handling** table, with the canonical note `Field absent from input — run <api-call> for authoritative value`. NEVER infer a security posture from a missing field. |
+| `describe-connection-loa` returns error on a `requested` connection | Non-zero exit or empty response | LOA not yet issued — fall through to Step 3c LOA-stale logic (>5 business days → CONFIG_GAP). |
+| API response truncated mid-stream (cross-account >1,000 objects) | Object count exactly 1,000 | Re-fetch with `--max-results 100` and paginate; if pagination unsupported, split by `--connection-id` AFTER the unfiltered pass and diff to detect missing objects. Flag any unrecoverable gap as `CONFIG_GAP (LOW)`. |
+
+**Single-summary rule:** emit exactly ONE `CONNECTION / VERDICT / REASON /
+FINDINGS / REMEDIATION` block per topology. Do not split findings across
+multiple blocks — aggregate into one `FINDINGS:` list, ordered
+`[HIGH] → [MEDIUM] → [LOW] → [OK]`.
 
 ### Worked example — pseudo-diversity with BGP gap
 
@@ -582,9 +658,13 @@ and re-audit. If the issue persists, the API response was truncated mid-stream.
 
 - NEVER treat `directconnect describe-virtual-interfaces` (no filter) and
   `describe-virtual-interfaces --connection-id <id>` as equivalent. The
-  filtered call misses VIFs whose underlying connection was swapped; the
-  unfiltered call is the only complete listing. Always use the unfiltered
-  form for audit.
+  filtered call misses VIFs whose underlying connection was swapped during
+  a maintenance event or a VIF migration — the VIF retains its original
+  `virtualInterfaceId` but its `connectionId` now points at the new
+  connection. The filtered listing silently returns nothing for that VIF,
+  producing a false "no VIFs here" verdict. The unfiltered call is the
+  only complete listing. Always use the unfiltered form for audit, then
+  correlate by `connectionId` in post-processing.
 
 - NEVER flag a connection in `requested` for fewer than 5 business days as a
   LOA blocker. AWS SLA for LOA issuance is 72 hours; partner-side cross-
@@ -720,3 +800,54 @@ and re-audit. If the issue persists, the API response was truncated mid-stream.
 ## Domain
 
 AWS CloudOps / Hybrid Networking Resilience & Compliance.
+
+## Reference — Severity matrix
+
+Full condition → verdict → step mapping. Apply in order; the verdict is the
+**worst** finding, where `SINGLE_CONNECTION > NO_ENCRYPTION > CONFIG_GAP > OK`.
+
+| Condition | Verdict | Step |
+|---|---|---|
+| <2 connections at **diverse** DX locations (`locationCode`) | **SINGLE_CONNECTION** | 1 |
+| LAG with all member connections at the same `locationCode` | **SINGLE_CONNECTION** | 1 |
+| 2 connections at the same `locationCode` (pseudo-diversity) | **SINGLE_CONNECTION** | 1 |
+| Dedicated connection, `macSecCapable: true`, `encryptionMode: no_encrypt` | **NO_ENCRYPTION** | 2 |
+| Dedicated connection, `macSecCapable: true`, `encryptionMode: should_encrypt` | **NO_ENCRYPTION** | 2 (silent-downgrade risk) |
+| Public VIF with no `bgpAuthKey` set (use `authKeyState`, not the write-only field) | **CONFIG_GAP** | 3a |
+| BGP peer `bgpStatus: down` on an `available` connection | **CONFIG_GAP** | 3b |
+| Connection `state: requested` >5 business days with no LOA-CFA | **CONFIG_GAP** | 3c |
+| Single private VIF on a single connection (no DXGW failover) | **CONFIG_GAP** | 3d |
+| 2+ diverse connections, MACSec `must_encrypt` (or N/A hosted), BGP auth on all public VIFs, valid LOA or `available` | **OK** | 4 |
+
+## Reference — Metadata gate
+
+Per-attribute short-circuit table. Apply before Step 1 — misclassifying any of
+these produces false positives that erode trust.
+
+| Attribute | Value | Effect on audit |
+|---|---|---|
+| `lagId` | set | Connection is a LAG **member**, not standalone. Audit the LAG (`describe-lags --lag-id <id>`) — the LAG is the redundancy unit, not the member. Member `locationCode` is identical to the LAG's; counting members as diverse connections is a false positive. |
+| `connectionMode` | `transit` | Hosted-VIF connection from an APN partner. The partner owns the physical port; customer sees VIFs only. MACSec capability is set by the partner — flag `macSecCapable: false` as N/A, not a finding. |
+| `bandwidth` | `1Gbps`, `2Gbps`, `5Gbps` | Hosted connection — **MACSec not supported.** Do NOT flag `encryptionMode: no_encrypt`; it is a hardware limit, not a posture choice. |
+| `bandwidth` | `50Mbps`, `100Mbps`, `200Mbps`, `300Mbps`, `400Mbps`, `500Mbps` | Hosted connection (sub-1Gbps partner resold). Same MACSec N/A rule. |
+| `bandwidth` | `10Gbps`, `100Gbps` dedicated | MACSec-capable **if** the location is MACSec-enabled. Audit encryption. |
+| `location` | e.g. `EqSE2` | The location/POP code. Drives the diversity check (Step 1). Two connections at the same code share facility risk. |
+| `hasLogicalRedundancy` | `yes` | AWS-populated flag for port-level LAG redundancy inside one location. **Does NOT imply location diversity.** A `yes` here is LAG-level, not facility-level. |
+| `connectionState` | `requested` | Provisioning not started. Trigger LOA check (Step 3c). |
+| `connectionState` | `pending` | LOA issued; cross-connect in progress. Outage if held >10 business days. |
+| `connectionState` | `available` | Physical link up — proceed with full audit. |
+| `connectionState` | `down` | Physical link down. Treat as CONFIG_GAP if other connections are available (traffic should have failed over); SINGLE_CONNECTION if this is the only path. |
+
+## Reference — Edge-case field handling
+
+Resolves ambiguity in Step 3 when fields are absent, redacted, or
+cross-account-truncated.
+
+| Field scenario | Interpretation | Action |
+|---|---|---|
+| `authKeyState: configured` (or input shows auth key was supplied at VIF creation) | BGP MD5 is set | OK for this check; do not flag. |
+| `authKeyState: never-configured` (or field absent AND no auth key in creation input) on a **public VIF** | BGP MD5 was never set | CONFIG_GAP (MEDIUM) — route-hijack vector. Remediate via VIF re-creation with `--auth-key`. |
+| `authKeyState: never-configured` on a **private/transit VIF** | No MD5 on a scoped VIF | CONFIG_GAP (LOW) — lower risk than public but still recommended. |
+| `bgpPeers` array missing entirely from a VIF JSON | No BGP session defined — VIF is non-functional or data is incomplete | CONFIG_GAP (MEDIUM). Emit: `VIF <id> has no bgpPeers array — BGP state unverifiable. Re-fetch with describe-bgp-peers.` Do NOT assume auth is absent; the field may be missing due to truncated API output. |
+| `bgpPeers` array present but empty `[]` | VIF exists but no BGP sessions configured | CONFIG_GAP (MEDIUM). A VIF without peers carries no traffic. Flag for operator review. |
+| `authKeyState` field absent from input JSON (offline mode) | Cannot determine auth state from describe-virtual-interfaces alone | Infer from `bgpPeers[].authKey` presence in the input; if that is also absent, emit CONFIG_GAP (LOW) with note: `Auth state unverifiable from provided JSON — run describe-bgp-peers for authoritative check.` |

@@ -80,15 +80,41 @@ metadata:
     deterministic INSTANCE/VERDICT/REASON/FINDINGS/REMEDIATION block per
     instance, where VERDICT ∈ {PUBLIC, UNENCRYPTED, NO_DELETION_PROTECTION,
     SINGLE_AZ, CONFIG_GAP, OK, ERROR}.
+  invocation_example: |-
+    # Minimal valid input (offline metadata classification):
+    DBInstanceIdentifier: db-prod-mysql-01
+    Engine: mysql
+    DBInstanceStatus: available
+    PubliclyAccessible: false
+    StorageEncrypted: true
+    KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc
+    MultiAZ: true
+    DeletionProtection: false
+    BackupRetentionPeriod: 7
+    AutoMinorVersionUpgrade: true
+    MonitoringInterval: 60
+    # For Aurora, also supply the DBCluster block:
+    # DBClusterIdentifier, StorageEncrypted, DeletionProtection,
+    # BackupRetentionPeriod (cluster is authoritative for these).
 ---
 
 # RDS Instance Auditor
 
+## Quick start
+
+- **Verdict order (first match wins):** PUBLIC → UNENCRYPTED → NO_DELETION_PROTECTION → SINGLE_AZ → CONFIG_GAP → OK. Emit all dimensions in FINDINGS regardless.
+- **Aurora is cluster-scoped:** for `aurora-*` engines, encryption/deletion-protection/Multi-AZ/retention live on the `DBCluster`; defer to `describe-db-clusters`.
+- **Encryption is immutable:** `StorageEncrypted` cannot be toggled in place — remediation is snapshot → encrypted-copy → restore-new → cutover.
+
 ## Mindset
 
-**One-line takeaway:** the verdict is always the **worst** finding across
-seven dimensions, evaluated in a fixed order. Three behaviours separate a
-senior database engineer from a generalist:
+Audit RDS configuration metadata against seven high-impact dimensions and
+emit the worst finding as the verdict, with every dimension enumerated
+regardless of the headline.
+
+## Philosophy
+
+Three behaviours separate a senior database engineer from a generalist:
 
 - **`PubliclyAccessible: true` is an internet-exposed database.** This is the
   single highest-impact RDS misconfiguration — a public IP on a database is an
@@ -172,33 +198,50 @@ REMEDIATION: Re-fetch with `aws rds describe-db-instances --db-instance-identifi
 
 ### Step 0: Expert knowledge — non-obvious RDS behaviours that change classification
 
-These behaviours are easy to misjudge without operational RDS experience. Each
-changes a verdict if ignored:
+These are the operational gotchas a senior RDS engineer knows from incident
+experience — NOT the basic AWS-docs descriptions of what each field does.
+Each one changes a verdict if ignored:
 
-- **Encryption-at-rest is set at creation and is immutable.** There is no
-  `modify-db-instance` flag to encrypt an existing unencrypted instance. The
-  only remediation path is: snapshot the instance → copy the snapshot with
-  `--kms-key-id` → restore-new from the encrypted copy → promote/rename so the
-  application endpoint cuts over. This is a migration with downtime window
-  planning, not a toggle. Treat UNENCRYPTED as a high-acuity finding whose
-  remediation cost is materially higher than the other dimensions.
+- **`modify-db-instance` is last-write-wins per field, per maintenance window.**
+  Two modifications to the SAME field queued without `--apply-immediately` do
+  not stack — the later value silently overwrites the earlier one. The default
+  maintenance window is weekly (e.g. `sun:03:00-sun:04:00`), so an operator
+  who queues `--backup-retention-period 1` then `--backup-retention-period 7`
+  a few days later sees only `7` applied, not a 1→7 progression. Modifications
+  to DIFFERENT fields apply together in the same window. Always surface queued
+  values in REMEDIATION so the operator knows which changes will land.
 
-- **`BackupRetentionPeriod: 0` disables point-in-time recovery entirely.** It
-  is not "short retention" — it means no automated backups, no transaction-log
-  archiving, and no PITR. The restore path from `0` is "last manual snapshot,
-  if any." For non-Aurora engines, the valid range is 0-35; the AWS default on
-  creation is 7, so a `0` value is always a deliberate operator choice or a
-  misconfigured Terraform/IaC module. For Aurora, the API rejects `0`
-  (continuous backups, retention 1-35) — a reported `0` on Aurora is stale or
-  invalid metadata, not a real gap.
+- **Multi-AZ failover recovers the database, not the application.** The
+  60-120 second RDS failover covers standby promotion only. JVM clients cache
+  DNS for 60 seconds by default (`networkaddress.cache.ttl=60`); many JDBC
+  connection pools pin TCP to the old writer's IP until the pool is recycled;
+  some HTTP-tier retry policies treat `Connection refused` as fatal rather
+  than transient. Without client-side retry/backoff + DNS-cache tuning, a
+  Multi-AZ failover still presents as a 5-30 minute outage to the application.
+  Treat SINGLE_AZ as an RPO/RTO primitive, not a complete recovery solution —
+  note client-side retry requirements in REMEDIATION when flagging SINGLE_AZ
+  on production databases.
 
-- **`AutoMinorVersionUpgrade` only covers minor versions, and only during the
-  maintenance window.** It does NOT apply major-version upgrades (always
-  opt-in via `modify-db-instance --engine-version`). It also does not run if a
-  `PendingModifiedValues` modification is blocking the window. A `true` value
-  is necessary but not sufficient for patch currency — cross-reference
-  `EngineVersion` against the AWS-published recommended minor version when
-  live-deep auditing. For this skill, `false` is the CONFIG_GAP signal.
+- **`gp3` IOPS are capped by a storage ratio that silently blocks
+  modification.** gp3 includes 3000 IOPS and 125 MB/s throughput at no extra
+  cost; above 3000 IOPS you pay per-IOPS-month. But provisioned IOPS cannot
+  exceed 500× allocated-GB for MySQL/PostgreSQL (lower ratios for some
+  legacy engines — SQL Server ~64:1, Oracle ~250:1). A `modify-db-instance`
+  requesting 15000 IOPS on a 20 GB instance fails validation with
+  `IopsToStorageRatio` — the operator must either raise storage or drop IOPS.
+  When the audit surfaces storage-class or IOPS changes, note the ratio cap so
+  the operator does not chase a remediation the API will reject.
+
+- **KMS CMK rotation does NOT re-encrypt existing RDS data.** Enabling
+  automatic annual rotation on the backing CMK generates new key material for
+  NEW encrypt operations, but existing ciphertext (data files, automated
+  backups, manual snapshots) continues to decrypt with the prior key material
+  indefinitely. There is no in-place CMK re-encryption path for RDS — rotating
+  OFF a compromised CMK requires the same snapshot → re-encrypt → restore-new
+  migration as the initial encryption cutover. Operators who enable KMS
+  rotation believing it addresses key compromise have a false sense of safety;
+  surface this when the instance is encrypted with a CMK the customer
+  suspects is compromised.
 
 - **`MultiAZ: true` standby is NOT usable for reads.** The standby is a
   failover target only — it does not accept client connections. This is a
@@ -216,44 +259,19 @@ changes a verdict if ignored:
   accessibility (which IS instance-level even for Aurora — each instance has
   its own `PubliclyAccessible` flag).
 
-- **`PubliclyAccessible` is an intent flag, not a reachability measurement.**
-  It instructs RDS to assign a public IP. The instance is internet-reachable
-  IF a route exists (the VPC has an Internet Gateway and the subnet route
-  table points `0.0.0.0/0` at it) AND the security group allows inbound. Even
-  in a VPC without an IGW, `PubliclyAccessible: true` is still PUBLIC for
-  verdict purposes — the operator declared the intent, and a route-table or
-  IGW change later silently exposes the instance. Treat the flag itself as the
-  verdict driver; do not try to "verify reachability" by inferring route
-  tables from instance metadata you do not have.
-
-- **Security groups are a defense-in-depth layer, not a verdict dimension
-  here.** A `0.0.0.0/0` inbound rule on the DB port is a serious smell, but
-  with `PubliclyAccessible: false` the instance has no public IP and is not
-  internet-reachable. Flag a permissive SG in REMEDIATION as a follow-up, but
-  do NOT upgrade the verdict based on the SG alone. The reverse is also true:
-  `PubliclyAccessible: true` with a locked-down SG does NOT downgrade — the IP
-  is still published and a future SG edit exposes the DB.
-
-- **`DeletionProtection: true` is an accidental-deletion guardrail, not a
-  security control.** Any principal with `rds:ModifyDBInstance` can disable
-  protection (`--no-deletion-protection`) and then delete. Treat it as
-  protection against operator error and pipeline mistakes, not against a
-  determined attacker with database-admin IAM rights.
-
-- **`EnhancedMonitoring` (`MonitoringInterval > 0`) requires a role.** When
-  enabled, RDS assumes `MonitoringRoleARN` to emit OS-level metrics (CPU
-  steal, swap, file systems) to CloudWatch Logs at the configured interval
+- **`EnhancedMonitoring` (`MonitoringInterval > 0`) requires a role and emits
+  to CloudWatch Logs.** RDS assumes `MonitoringRoleARN` to emit OS-level
+  metrics (CPU steal, swap, file systems) at the configured interval
   (1/5/10/15/30/60 seconds). `0` means off — only engine-level CloudWatch
   metrics exist. Enhanced Monitoring is distinct from Performance Insights
   (query-level) and from RDS Events; this skill audits Enhanced Monitoring
   specifically because it is the gap most often missing on instances that
   later suffer unexplained OS-level incidents.
 
-- **`PendingModifiedValues` is a queue, not the current state.** A
-  `PubliclyAccessible` value in `PendingModifiedValues` means the change is
-  queued for the next window or `--apply-immediately`. Always audit the
-  top-level CURRENT value; note the pending change so the operator can decide
-  whether to force-apply or wait.
+- **`PendingModifiedValues` is a queue, not the current state.** Always audit
+  the top-level CURRENT value; note the pending change via the `[PENDING]`
+  annotation in FINDINGS so the operator can decide whether to force-apply or
+  wait. See the output-format section for the annotation shape.
 
 - **Read Replicas and Multi-AZ are independent.** A Read Replica can itself
   be Multi-AZ (rare) or single-AZ (common). The replica exists for read
@@ -407,10 +425,37 @@ FINDINGS:
   - [PUBLIC] <finding description (Step 1)>
   - [UNENCRYPTED] <finding description (Step 2)>
   - [OK] <dimension that passed>
+  - [PENDING] <field> is queued to change to <value> at next window / on --apply-immediately (audited on CURRENT value; do not double-remediate)
 REMEDIATION: <specific action per finding, or "None required" if OK>
 CONFIRM: Before executing any state-changing CLI above, emit and await operator
 approval: "CONFIRM: About to <action> on <id> in <region>. Proceed? (yes/no)"
 ```
+
+The `[PENDING]` line is emitted ONLY when `PendingModifiedValues` contains a
+queued change to one of the seven audited fields. It is informational — the
+verdict and FINDINGS reflect the CURRENT value. Skip the `[PENDING]` line when
+no fields are pending.
+
+### Concrete error-handling example — malformed metadata
+
+When the input is missing required fields (no `DBInstanceIdentifier`, absent
+`Engine`, or unparseable JSON), the skill MUST emit a single deterministic
+ERROR block and NOT attempt partial classification:
+
+```text
+INSTANCE: <identifier or unknown>
+VERDICT: ERROR
+REASON: RDS instance metadata is missing required fields (DBInstanceIdentifier, Engine) — cannot classify.
+FINDINGS:
+  - [ERROR] Missing field: <field-name>. Re-fetch with `aws rds describe-db-instances --db-instance-identifier <id> --output json`.
+REMEDIATION: Re-fetch metadata and re-audit. If the identifier is unknown, list instances first with `aws rds describe-db-instances --query 'DBInstances[*].DBInstanceIdentifier' --output text`.
+```
+
+For a field that is present but has an unexpected TYPE (e.g.,
+`BackupRetentionPeriod` as a string instead of integer), emit the same ERROR
+block with `[ERROR] Type mismatch on <field>: expected <type>, got <value>`.
+Do NOT coerce silently — surface the discrepancy so the operator knows the
+input is malformed.
 
 ### Worked example — public and unencrypted dev instance
 
@@ -449,54 +494,6 @@ CONFIRM: Before executing any CLI above, emit and await:
   Do NOT run the CLI until the operator replies yes.
 ```
 
-## Expert edge cases
-
-- **Aurora cluster scope.** When `Engine` is `aurora-mysql` or
-  `aurora-postgresql`, encryption, deletion protection, Multi-AZ, and backup
-  retention are DBCluster properties. `describe-db-instances` returns
-  instance-level echoes that may lag the cluster. Always request the
-  `DBCluster` block. If only instance metadata is available, emit
-  `AURORA_CLUSTER_SCOPE: audit the DBCluster for encryption/deletion/Multi-AZ/
-  retention — instance-level echoes are not authoritative for Aurora.` and do
-  NOT flag those dimensions from instance fields. `PubliclyAccessible` IS
-  instance-level for Aurora and is audited normally.
-
-- **Read Replica SINGLE_AZ downgrade.** A Read Replica
-  (`ReadReplicaSourceDBInstanceIdentifier` present) is read-only by design.
-  Flag its MultiAZ posture as a note rather than a hard SINGLE_AZ finding —
-  the primary's Multi-AZ is the write-availability gate. Promote the note to
-  a finding only if the replica is a documented production read endpoint.
-
-- **`PendingModifiedValues` interaction.** If a dimension's pending value
-  differs from the current value, audit the CURRENT value and append a note:
-  `PENDING: <field> is queued to change to <value> at the next window / on
-  --apply-immediately.` This prevents both false alarms (gap already being
-  fixed) and silent gaps (operator believes a pending change is already live).
-
-- **Aurora Serverless.** `db.serverless` classes (Aurora Serverless v1) and
-  Aurora Serverless v2 scaling are cluster-governed. Multi-AZ semantics
-  differ (v1 is single-AZ-capable; v2 supports Multi-AZ). Defer to cluster
-  metadata and do not flag SINGLE_AZ on the instance class alone.
-
-- **SQL Server Multi-AZ.** SQL Server Multi-AZ uses Always On Availability
-  Groups / database mirroring. Certain features (memory-optimized tables,
-  cross-database transactions in some modes) have constraints under
-  Multi-AZ. This does not change the SINGLE_AZ verdict but should be noted in
-  REMEDIATION so the operator plans the upgrade window.
-
-- **`StorageEncrypted: true` without `KmsKeyId`.** This is normal — RDS uses
-  the AWS-managed `aws/rds` CMK. Do NOT flag. If the customer needs key
-  control (rotation, policy, CloudTrail data events), that is the
-  kms-key-policy-auditor's scope.
-
-- **`DBInstanceStatus: deleting`.** Skip audit — modifications against a
-  deleting instance fail with `InvalidDBInstanceState`. Emit OK with a note.
-
-- **`BackupRetentionPeriod` > 0 but < 7 on a regulated workload.** This
-  skill treats `0` as the CONFIG_GAP trigger (PITR disabled). A non-zero but
-  short retention is a compliance nuance, not a hard config gap — note it in
-  FINDINGS as a compliance advisory, do not drive the verdict from it.
-
 ## Anti-Patterns — NEVER
 
 - NEVER recommend enabling encryption on an existing unencrypted instance
@@ -521,8 +518,14 @@ CONFIRM: Before executing any CLI above, emit and await:
   Doing so produces false positives on every Aurora audit.
 
 - NEVER flag `BackupRetentionPeriod: 0` on an Aurora instance. The API
-  rejects `0` for Aurora (continuous backups, 1-35 minimum); a reported `0`
-  is stale or invalid metadata, not a real gap.
+  rejects `0` for Aurora (continuous backups, retention 1-35 enforced
+  server-side at `modify-db-cluster` time); a reported `0` is stale cache,
+  malformed `describe` output, or a fabricated test payload — never a live
+  configuration. Operational impact of flagging it anyway: the operator opens
+  a phantom incident, drains engineering cycles chasing metadata the RDS
+  control plane will not even accept, and learns to dismiss other findings as
+  "API noise," eroding the credibility of legitimate findings on the same
+  report.
 
 - NEVER treat `PubliclyAccessible: false` as the complete public-access
   picture for defense-in-depth. A `0.0.0.0/0` inbound security-group rule is
@@ -613,11 +616,22 @@ CONFIRM: Before executing any CLI above, emit and await:
 - **Confirm the caller has `rds:ModifyDBInstance`.** Many read-only auditor
   roles cannot modify. Surface this before the operator approves a change
   that will fail with `AccessDenied`.
-- **Bulk-operation safety limit.** When remediating across multiple instances
-  from a single audit sweep, process a maximum of 5 instances per batch with a
-  CONFIRM gate before each batch. Never auto-apply remediation across an entire
-  account in one pass — a systematic misclassification or IaC drift can cascade
-  into mass disruption.
+- **Bulk-operation safety limit (enforced by the skill).** Remediation across
+  an account sweep MUST follow this exact algorithm:
+  1. Sort flagged instances verdict-first (PUBLIC before UNENCRYPTED, etc.).
+  2. Slice into batches of **at most 5 instances**.
+  3. For each batch: emit the per-instance REMEDIATION block, then a single
+     `CONFIRM: About to modify <id1, id2, …, idN> in <region>. Proceed? (yes/no)`.
+  4. After the operator confirms and the CLI runs, re-query with
+     `aws rds describe-db-instances --db-instance-identifier <each modified id>`
+     and verify the intended state landed before emitting the NEXT batch.
+  5. Abort the sweep if any instance in a batch enters `modifying`, `failed`,
+     or `incompatible-*` state — do NOT proceed to the next batch.
+  The skill MUST NOT emit remediation CLI for more than 5 instances in a
+  single output block. Auto-applying across an entire account in one pass is
+  forbidden: a single systematic misclassification or IaC-drift mismatch
+  cascades into mass disruption, and batched execution contains the blast
+  radius of any one mistake.
 
 ## Remediation guidance
 
@@ -692,6 +706,54 @@ not read-capable; for read scaling, provision Read Replicas separately.
    enforcement at the parameter-group level.
 3. For Aurora, verify the DBCluster posture independently (this skill audits
    instance-level fields; cluster-level audit is a separate scope).
+
+## Reference — edge cases
+
+- **Aurora cluster scope.** When `Engine` is `aurora-mysql` or
+  `aurora-postgresql`, encryption, deletion protection, Multi-AZ, and backup
+  retention are DBCluster properties. `describe-db-instances` returns
+  instance-level echoes that may lag the cluster. Always request the
+  `DBCluster` block. If only instance metadata is available, emit
+  `AURORA_CLUSTER_SCOPE: audit the DBCluster for encryption/deletion/Multi-AZ/
+  retention — instance-level echoes are not authoritative for Aurora.` and do
+  NOT flag those dimensions from instance fields. `PubliclyAccessible` IS
+  instance-level for Aurora and is audited normally.
+
+- **Read Replica SINGLE_AZ downgrade.** A Read Replica
+  (`ReadReplicaSourceDBInstanceIdentifier` present) is read-only by design.
+  Flag its MultiAZ posture as a note rather than a hard SINGLE_AZ finding —
+  the primary's Multi-AZ is the write-availability gate. Promote the note to
+  a finding only if the replica is a documented production read endpoint.
+
+- **`PendingModifiedValues` interaction.** If a dimension's pending value
+  differs from the current value, audit the CURRENT value and append a note:
+  `PENDING: <field> is queued to change to <value> at the next window / on
+  --apply-immediately.` This prevents both false alarms (gap already being
+  fixed) and silent gaps (operator believes a pending change is already live).
+
+- **Aurora Serverless.** `db.serverless` classes (Aurora Serverless v1) and
+  Aurora Serverless v2 scaling are cluster-governed. Multi-AZ semantics
+  differ (v1 is single-AZ-capable; v2 supports Multi-AZ). Defer to cluster
+  metadata and do not flag SINGLE_AZ on the instance class alone.
+
+- **SQL Server Multi-AZ.** SQL Server Multi-AZ uses Always On Availability
+  Groups / database mirroring. Certain features (memory-optimized tables,
+  cross-database transactions in some modes) have constraints under
+  Multi-AZ. This does not change the SINGLE_AZ verdict but should be noted in
+  REMEDIATION so the operator plans the upgrade window.
+
+- **`StorageEncrypted: true` without `KmsKeyId`.** This is normal — RDS uses
+  the AWS-managed `aws/rds` CMK. Do NOT flag. If the customer needs key
+  control (rotation, policy, CloudTrail data events), that is the
+  kms-key-policy-auditor's scope.
+
+- **`DBInstanceStatus: deleting`.** Skip audit — modifications against a
+  deleting instance fail with `InvalidDBInstanceState`. Emit OK with a note.
+
+- **`BackupRetentionPeriod` > 0 but < 7 on a regulated workload.** This
+  skill treats `0` as the CONFIG_GAP trigger (PITR disabled). A non-zero but
+  short retention is a compliance nuance, not a hard config gap — note it in
+  FINDINGS as a compliance advisory, do not drive the verdict from it.
 
 ## Domain
 

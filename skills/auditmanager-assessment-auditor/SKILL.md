@@ -83,46 +83,53 @@ metadata:
     - "compliance report readiness"
     - "Audit Manager config gap"
   invocation_schema: >-
-    Input: either (a) an Audit Manager assessment snapshot (assessment
-    metadata + control statistics + settings + data-source status), OR
-    (b) an assessment id/ARN for live-account audit. Output: deterministic
-    ASSESSMENT/VERDICT/REASON/FINDINGS/REMEDIATION block per assessment,
-    where VERDICT is INCOMPLETE_EVIDENCE, LOW_COMPLIANCE, CONFIG_GAP, or OK.
+    Input: either (a) an assessment snapshot with required fields —
+    assessment.id (str, ARN), assessment.name (str), assessment.status
+    ("ACTIVE"|"INACTIVE"), assessment.creationTime (ISO-8601),
+    assessment.lastUpdated (ISO-8601), scope.awsAccounts (list[accountId]),
+    scope.awsServices (list[serviceName]),
+    controlSets[].controls[].response ("PASS"|"FAIL"|"NOT_ASSESSED"|
+    "MANUAL"|"UNDER_REVIEW"), settings.kmsKey (str|""), settings.snsTopic
+    (str|""), settings.defaultAssessmentReportsDestination (s3Uri|""),
+    settings.defaultProcessOwners (list[roleArn]) — plus optional
+    dataSources.configRecorders (per account × region, recording bool),
+    dataSources.cloudTrails (per region, IncludeManagementEvents bool),
+    delegations[].status ("IN_PROGRESS"|"COMPLETE"|"FAILED") and
+    delegations[].creationTime; OR (b) assessmentId (str) for live-account
+    audit. Output: deterministic block per assessment — ASSESSMENT (id),
+    FRAMEWORK (str), VERDICT ("INCOMPLETE_EVIDENCE"|"LOW_COMPLIANCE"|
+    "CONFIG_GAP"|"OK"), REASON (1-2 sentences citing worst finding + step
+    number), CONTROL BREAKDOWN (total, PASS, FAIL, NOT_ASSESSED, MANUAL,
+    UNDER_REVIEW, compliance%), FINDINGS (list[finding]), REMEDIATION
+    (list[action]).
 ---
 
 # Audit Manager Assessment Auditor
 
-**Bottom line — check in this order, worst finding wins:**
-1. Is evidence collection broken? (`INACTIVE` | `NOT_ASSESSED > 30%` | stalled delegation | scope gap) → **INCOMPLETE_EVIDENCE**
-2. Is compliance low? (`PASS < 60%` | `FAIL > 25%`) → **LOW_COMPLIANCE**
-3. Is a setting missing? (no KMS | no SNS | no reports dest | no process owners) → **CONFIG_GAP**
-4. Otherwise → **OK**
+## Quick start
 
-Exemption: a brand-new assessment (`creationTime < 24h`) is exempt from
-check 1's NOT_ASSESSED rule — the first collection cycle has not finished.
+**Worst finding wins.** Verdict priority: `INCOMPLETE_EVIDENCE` > `LOW_COMPLIANCE` > `CONFIG_GAP` > `OK`.
 
-## Quick reference — verdict thresholds
+1. `INACTIVE` OR `NOT_ASSESSED > 30%` OR delegation stalled > 7d OR scope ⊊ org → **INCOMPLETE_EVIDENCE**
+2. `PASS < 60%` OR `FAIL > 25%` → **LOW_COMPLIANCE**
+3. Missing KMS / SNS / reports-destination / process-owners → **CONFIG_GAP**
+4. Else → **OK**
 
-Apply the steps **in order** — the first matching step produces the verdict.
-Deep Audit Manager behaviours that change classification are in
-[Step 0](#step-0-expert-knowledge-non-obvious-audit-manager-behaviours);
-the *why* behind the verdict priority is in
-[Mindset](#mindset) below.
+**24-hour warm-up:** a new assessment (`creationTime < 24h`) is exempt from Step 1b — skip to Step 3.
+**Critical NEVERs:** see [Quick NEVERs](#critical-nevers-quick-reference) below; full reasoning in [Anti-Patterns](#anti-patterns--never).
+**Full algorithm + thresholds:** see [Process](#process--classification-logic-apply-in-order-aggregate-worst).
+**Expert gotchas:** see [Reference](#reference--operational-gotchas-not-in-aws-docs).
 
-**24-hour warm-up exemption:** if `creationTime` is less than 24 hours
-ago, a high NOT_ASSESSED% is EXPECTED (first collection cycle not
-complete). Do NOT fire Step 1b — skip to Step 3 and emit an advisory.
+## Critical NEVERs (quick reference)
 
-| Condition | Verdict | Step |
-|---|---|---|
-| Assessment `status` = `INACTIVE` (stopped) | **INCOMPLETE_EVIDENCE** | 1a |
-| `NOT_ASSESSED` controls > 30% of total (data-source break) | **INCOMPLETE_EVIDENCE** | 1b |
-| Outstanding delegation `PENDING`/`IN_PROGRESS` > 7 days on ACTIVE assessment | **INCOMPLETE_EVIDENCE** | 1c |
-| Assessment scope covers fewer accounts than the org/member-account estate | **INCOMPLETE_EVIDENCE** | 1d |
-| Evidence complete (NOT_ASSESSED ≤ 30%) AND PASS% < 60% | **LOW_COMPLIANCE** | 2a |
-| Evidence complete AND FAIL% > 25% of total controls | **LOW_COMPLIANCE** | 2b |
-| Evidence complete AND PASS% ≥ 60% AND any setting missing (no KMS / no SNS / no reports dest / no process owners) | **CONFIG_GAP** | 3 |
-| Evidence complete AND PASS% ≥ 60% AND all settings configured AND scope complete | **OK** | 4 |
+Full reasoning in [Anti-Patterns](#anti-patterns--never). One-liners:
+
+- **NEVER** report `LOW_COMPLIANCE` when `NOT_ASSESSED > 30%` — data-source break → `INCOMPLETE_EVIDENCE`.
+- **NEVER** trust an `INACTIVE` assessment's compliance % — frozen → `INCOMPLETE_EVIDENCE` (1a).
+- **NEVER** assume `ACTIVE` means "collecting" — Config/CloudTrail off in any account × region → silent `NOT_ASSESSED`.
+- **NEVER** proceed when only a subset of data-source checks succeed — emit scoped findings, reduce confidence.
+- **NEVER** retry `ThrottlingException` past 4 attempts — backoff + jitter; escalate as Quota increase.
+- **NEVER** delete without a double-CONFIRM gate — evidence removal is irreversible after 90 days.
 
 ## Mindset
 
@@ -188,6 +195,35 @@ null before classifying — a single call truncates large estates and
 under-counts NOT_ASSESSED.
 
 ## Process — Classification logic (apply in order, aggregate worst)
+
+### Verdict thresholds (first match wins)
+
+| Condition | Verdict | Step |
+|---|---|---|
+| `status` = `INACTIVE` | **INCOMPLETE_EVIDENCE** | 1a |
+| `NOT_ASSESSED` > 30% (and not warm-up) | **INCOMPLETE_EVIDENCE** | 1b |
+| Delegation `IN_PROGRESS` > 7d OR `FAILED` | **INCOMPLETE_EVIDENCE** | 1c |
+| Scope ⊊ org members (multi-account org) | **INCOMPLETE_EVIDENCE** | 1d |
+| PASS% < 60% (evidence complete) | **LOW_COMPLIANCE** | 2a |
+| FAIL% > 25% (evidence complete) | **LOW_COMPLIANCE** | 2b |
+| Any setting missing (KMS/SNS/reports/owners) | **CONFIG_GAP** | 3 |
+| All checks pass | **OK** | 4 |
+
+```text
+not_assessed_pct = NOT_ASSESSED / total
+pass_pct         = PASS / total
+fail_pct         = FAIL / total
+is_warm_up       = (now - creationTime) < 24h
+
+if status == "INACTIVE":                            -> INCOMPLETE_EVIDENCE  # 1a
+if not is_warm_up AND not_assessed_pct > 0.30:      -> INCOMPLETE_EVIDENCE  # 1b
+if any delegation IN_PROGRESS > 7d OR == FAILED:    -> INCOMPLETE_EVIDENCE  # 1c
+if scope ⊊ org members (multi-account org):         -> INCOMPLETE_EVIDENCE  # 1d
+if pass_pct < 0.60:                                 -> LOW_COMPLIANCE       # 2a
+if fail_pct > 0.25:                                 -> LOW_COMPLIANCE       # 2b
+if any setting missing (kms/sns/reports/owners):    -> CONFIG_GAP           # 3
+else:                                               -> OK                   # 4
+```
 
 ### Step 0: Expert knowledge — non-obvious Audit Manager behaviours that change classification
 
@@ -325,6 +361,24 @@ experience. Each changes a verdict if ignored.
   alternative). Flag lifecycle as advisory context in REMEDIATION; do NOT
   let it override the data-driven verdict.
 
+### Step 0b: Operational gotchas (summary — full detail in Reference)
+
+The four most load-bearing traps (full operational detail in
+[Reference — operational gotchas](#reference--operational-gotchas)):
+
+- **SLR deletion silently breaks future delegations.**
+  `AWSServiceRoleForAuditManager` auto-creates only at account
+  registration; manual deletion stalls all subsequent delegations with no
+  alarm. Verify before re-sending a delegation.
+- **Insights API `complianceScore` ≠ assessment compliance %.** Different
+  denominators (insights excludes `MANUAL`/`UNDER_REVIEW`); always
+  recompute from the raw `controlSets[].controls[].response` distribution.
+- **Framework version immutability.** Assessments pin to the framework at
+  creation; parent-framework updates do NOT propagate. Re-baselining
+  requires a new assessment.
+- **INACTIVE ≠ free.** Evidence storage charges continue until
+  `delete-assessment`; surface as an OPEX finding in REMEDIATION.
+
 ### Step 1: Evidence-collection integrity (INCOMPLETE_EVIDENCE drivers)
 
 Evaluate first — these conditions invalidate the compliance number. If any
@@ -343,15 +397,22 @@ Cross-reference the data-source status to identify the root:
   controls cannot fire.
 - No CloudTrail trail with `IncludeManagementEvents: true` in an in-scope
   region → API-based controls cannot fire.
-The verification is a per-account × per-region loop, not a single call:
-`for acct in scope.awsAccounts: for region in scope.regions (or the
-administrator home region): aws configservice
-describe-configuration-recorder-status --profile <acct> --region <region>`
-and the equivalent `aws cloudtrail describe-trails` — a recorder that is
-`STOPPED` in only one account/region is enough to depress the compliance %
-silently. Even if you cannot see the data-source status, a > 30%
-NOT_ASSESSED ratio on an assessment that has been ACTIVE long enough to
-collect (> 7 days) is a data-source break by induction.
+The verification is a per-account × per-region loop, not a single call.
+For each `acct` in `scope.awsAccounts` × each `region` in scope (default
+to the assessment's `awsRegion` when scope.regions is absent), run:
+`aws configservice describe-configuration-recorder-status --profile <acct>
+--region <region> --query 'ConfigurationRecorders[*].{name:name,
+recording:recording,lastStatus:lastStatus}'` — check `recording: true`
+AND `lastStatus: SUCCESS` (a recorder with `recording: true` but
+`lastStatus: FAILURE` is silently producing no snapshots). Then
+`aws cloudtrail describe-trails --profile <acct> --region <region>
+--query 'trailList[?IncludeManagementEvents && IsLogging].Name'` —
+empty result means no management-event trail is delivering in that
+perimeter. A recorder that is `STOPPED` in only one account/region is
+enough to depress the compliance % silently. Even if you cannot see the
+data-source status, a > 30% NOT_ASSESSED ratio on an assessment that has
+been ACTIVE long enough to collect (> 7 days) is a data-source break by
+induction.
 
 **1c. Outstanding delegation.**
 If any delegation for the assessment has `status` `IN_PROGRESS` for more
@@ -435,6 +496,24 @@ FINDINGS:
 REMEDIATION: <specific action per finding, or "None required" if OK>
 ```
 
+**JSON-equivalent schema** (for runtimes that prefer structured output):
+
+```json
+{
+  "assessment": "str (id or ARN)",
+  "framework": "str",
+  "verdict": "INCOMPLETE_EVIDENCE | LOW_COMPLIANCE | CONFIG_GAP | OK | ERROR",
+  "reason": "str (worst finding + step number)",
+  "control_breakdown": {
+    "total": "int", "PASS": "int", "FAIL": "int",
+    "NOT_ASSESSED": "int", "MANUAL": "int", "UNDER_REVIEW": "int",
+    "compliance_pct": "float"
+  },
+  "findings": [{"severity": "str", "description": "str", "step": "str"}],
+  "remediation": ["str"]
+}
+```
+
 ### Worked example — stopped assessment with high NOT_ASSESSED
 
 ```text
@@ -510,6 +589,27 @@ REMEDIATION:
   a member account, not the management account; treat as "scope cannot be
   determined" per Step 1d, not as "single-account org".
 
+- **Partial-success API fan-out (Config OK in account A, CloudTrail
+  AccessDenied in account B).** When verifying data sources across the
+  per-account × per-region perimeter, some calls will succeed while
+  others fail with `AccessDeniedException` (cross-account role not
+  assumable in a member), `ThrottlingException` (account-level limiter),
+  or `OperationNotPermittedException`. Handle explicitly:
+  1. Emit one scoped finding per failing call, e.g.:
+     `[UNVERIFIED] Config recorder status for account 333 in eu-west-1
+     could not be retrieved (AccessDeniedException) — treat as suspected
+     collection break (Step 1b).`
+  2. Compute NOT_ASSESSED% on the verified subset ONLY.
+  3. In REASON, append: `verdict confidence reduced — <X/Y> accounts
+     unverified (<Z>%).`
+  4. If unverified scope > 25% of the in-scope perimeter, escalate the
+     VERDICT to `INCOMPLETE_EVIDENCE` regardless of the visible
+     NOT_ASSESSED ratio — the worst account is statistically likely to
+     be in the unverified set.
+  5. NEVER silently drop the failing calls and classify on the visible
+     subset as if it were the full estate — averaging over a partial
+     perimeter hides the worst accounts.
+
 ## Anti-Patterns — NEVER
 
 - NEVER report LOW_COMPLIANCE when the NOT_ASSESSED ratio is > 30%. The
@@ -582,6 +682,28 @@ REMEDIATION:
   FINDINGS even though the VERDICT line collapses to the worst — the
   operator fixes both in one pass.
 
+- NEVER proceed with classification when only a subset of data-source
+  checks succeed. Each unchecked account × region is a Step 1b
+  collection break for that perimeter — emit a scoped finding per
+  unverified scope (`[UNVERIFIED] Config status for account X in region
+  Y not retrievable — treat as suspected collection break`), classify on
+  what you verified, and explicitly note in REASON that the verdict
+  confidence is reduced. If > 25% of the in-scope perimeter is
+  unverified, escalate the verdict to INCOMPLETE_EVIDENCE regardless of
+  the visible NOT_ASSESSED ratio — averaging over a partial perimeter
+  hides the worst accounts.
+
+- NEVER retry a `ThrottlingException` past 4 attempts without
+  exponential backoff + jitter. Audit Manager throttles at the account
+  level via a token-bucket limiter; the AWS SDK default (4 retries with
+  backoff) is the safe ceiling. Blind retries in a tight loop widen the
+  throttle window for every other consumer of the account and can push
+  the limiter into a multi-minute cooldown. If still throttled after the
+  SDK budget is exhausted, escalate as a Service Quota increase
+  (`auditmanager:GetAssessment`, `auditmanager:ListAssessments`,
+  `auditmanager:ListDelegations` per account/region) — re-calling the
+  API is not a fix.
+
 ## Pre-flight safety checks (run before any remediation CLI)
 
 - **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
@@ -599,7 +721,15 @@ REMEDIATION:
   apply to ALL assessments in the account.
 - Before deleting an assessment, verify no active compliance period
   (audit, examination window) depends on its evidence. Deletion is
-  irreversible after 90 days.
+  irreversible after 90 days. **For `delete-assessment` specifically,
+  require a SECOND confirmation** — single CONFIRM is insufficient for
+  an irreversible bulk-evidence-destruction operation. Emit:
+  `CONFIRM (2 of 2): Deleting assessment <id> permanently removes all
+  collected evidence after 90 days. This cannot be undone. Type the
+  assessment id verbatim to proceed:`. Only execute the CLI when the
+  operator echoes the assessment id character-for-character. For
+  `update-assessment-status` (reversible) and `update-settings`
+  (reversible with backup), single CONFIRM is sufficient.
 - Prefer additive changes (set a missing KMS key, add process owners)
   over destructive changes (delete an assessment). Additive changes are
   reversible; destructive changes are not.
@@ -689,6 +819,72 @@ REMEDIATION:
    regressions before they invalidate a compliance period.
 3. Recommend generating an assessment report at the close of each
    compliance period to formalise the evidence.
+
+## Reference — operational gotchas (NOT in AWS docs)
+
+Deep expert detail referenced from [Step 0b](#step-0b-operational-gotchas-summary--full-detail-in-reference).
+These are silent failure modes, API quirks, and cost traps encountered in
+production Audit Manager estates.
+
+- **`AWSServiceRoleForAuditManager` SLR is auto-created ONLY at account
+  registration, never re-created by the service.** If an admin manually
+  deletes the SLR from a member account (e.g., via IAM console cleanup),
+  every subsequent delegation to that member silently stalls at
+  `IN_PROGRESS` — there is no alarm, no event, and the administrator-side
+  API cannot force completion. Verify with
+  `aws iam get-role --role-name AWSServiceRoleForAuditManager --profile
+  <member>` BEFORE re-sending a delegation; absence explains 7-day+
+  stalls. Re-create with
+  `aws iam create-service-linked-role --aws-service-name auditmanager.amazonaws.com`.
+
+- **`complianceScore` from the insights API uses a DIFFERENT denominator
+  than the console's overall compliance %.**
+  `list-assessment-control-insights-by-control-domain` returns a 0-100
+  `complianceScore` that EXCLUDES `MANUAL` and `UNDER_REVIEW` controls
+  from the denominator, while the assessment's overall compliance %
+  (computed from `controlSets[].controls[].response`) INCLUDES them. The
+  two can disagree by 10-20 points on MANUAL-heavy frameworks (ISO 27001,
+  custom GRC). Always recompute compliance% from the raw response
+  distribution; never cross-multiply or substitute the insights score.
+
+- **Framework version immutability — assessments pin at creation time.**
+  An assessment captures the framework's control sets at the moment of
+  creation; subsequent edits to the parent framework do NOT propagate. A
+  compliance program that updated its framework to add new controls will
+  see existing assessments continue to audit the OLD control set. Detect
+  by diffing the assessment's `framework.id` against the current
+  framework revision. Re-baselining requires creating a new assessment
+  and migrating the compliance period — there is no in-place upgrade.
+
+- **Evidence storage cost trap — INACTIVE does not mean free.** Audit
+  Manager stores collected evidence in a service-managed S3 bucket;
+  storage charges accrue per GB-month and continue even when the
+  assessment is `INACTIVE`. Only `delete-assessment` stops the storage
+  charge, and deletion is irreversible after 90 days. A quarterly review
+  of `INACTIVE` assessments older than two compliance periods should flag
+  them as deletion candidates. This is an OPEX finding — surface it in
+  REMEDIATION, not in VERDICT.
+
+- **`assessment.state` is deprecated but still returned by older SDK
+  versions.** Always read `status`. If the snapshot only carries `state`,
+  map `state: ACTIVE → status: ACTIVE` and emit a deprecation note in
+  FINDINGS — never silently trust `state` for irreversible decisions.
+
+- **API quirk — `get-assessment` and the insights API report different
+  control counts.** `get-assessment` returns the authoritative
+  `controlSets[].controls[]` array; the insights API aggregates by domain
+  and may omit controls whose `response` is `NOT_ASSESSED` (they appear
+  as `evidenceCount: 0`). When computing NOT_ASSESSED% for Step 1b,
+  ALWAYS use `get-assessment`'s raw distribution — the insights API
+  understates the denominator and can mask a Step 1b break.
+
+- **Cross-service latency — Config changes take 5-25 minutes to
+  propagate to Audit Manager control evaluation.** After repairing a
+  stopped Config recorder, the affected controls do NOT flip from
+  `NOT_ASSESSED` to `PASS/FAIL` immediately. The next Audit Manager
+  collection cycle runs on its scheduled interval (default ~24h). Wait
+  one full cycle before re-reading compliance% — re-auditing during the
+  propagation window produces a false `INCOMPLETE_EVIDENCE`.
 
 ## Domain
 

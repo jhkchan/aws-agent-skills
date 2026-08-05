@@ -84,6 +84,21 @@ metadata:
 - **Hard stop:** **30 days** before `NotAfter`, any non-renewed certificate is RISK: HIGH or worse. Inside this window a missed renewal is an incident, not a watch-item.
 - **One POSTURE SUMMARY per audit:** emit per-certificate blocks first, then EXACTLY ONE aggregated `POSTURE SUMMARY` at the very end (never one summary per cert).
 
+### Risk mapping — the ONLY valid verdict × risk pairs
+
+| Verdict | Condition | RISK |
+|---|---|---|
+| EXPIRED | always | **CRITICAL** |
+| RENEWAL_FAILED | days_until_expiry ≤ 30 | **CRITICAL** |
+| RENEWAL_FAILED | days_until_expiry > 30 | **HIGH** |
+| EXPIRING_SOON | Type == AMAZON_ISSUED (any days ≤ 60) | **HIGH** |
+| EXPIRING_SOON | Type == IMPORTED + days ≤ 30 | **HIGH** |
+| EXPIRING_SOON | Type == IMPORTED + **30 < days ≤ 60** | **MODERATE** |
+| OK | always | **LOW** |
+| ERROR | always | **N/A** |
+
+**Common misread (D8 defect):** EXPIRING_SOON + IMPORTED + days > 30 is **MODERATE — NOT HIGH**. The re-import window is open but not yet urgent; conflating IMPORTED re-import lead-time with AMAZON_ISSUED managed-renewal urgency over-escalates the wrong cert and steals attention from the CRITICAL queue.
+
 ## Mindset
 
 **One-line takeaway:** an ACM certificate is a **time-bombed dependency**. Every certificate has a hard expiry; the only question is whether the renewal mechanism (ACM-managed for AMAZON_ISSUED, manual re-import for IMPORTED) will complete before `NotAfter`. The audit asks, in order: has it already expired, has renewal failed, is it close enough to expiry to be at risk, or is it healthy?
@@ -134,10 +149,10 @@ If `RenewalSummary.Status: FAILED_AUTORENEWAL` (AMAZON_ISSUED only — IMPORTED 
 If `days_until_expiry <= 60` (and the cert is not EXPIRED or RENEWAL_FAILED):
 
 - VERDICT: **EXPIRING_SOON**.
-- RISK mapping:
+- RISK mapping (authoritative — see Quick start table):
   - **Type == AMAZON_ISSUED → RISK: HIGH.** This rule is mandatory. ACM should have renewed by now (renewal starts at 60 days). A non-renewed AMAZON_ISSUED cert inside the window means the managed-renewal contract is at risk. NEVER downgrade EXPIRING_SOON + AMAZON_ISSUED below HIGH.
-  - **Type == IMPORTED + `days_until_expiry <= 30` → RISK: HIGH.** Re-import is overdue.
-  - **Type == IMPORTED + `30 < days_until_expiry <= 60` → RISK: MODERATE.** Re-import window is open but not yet urgent.
+  - **Type == IMPORTED + `days_until_expiry <= 30` → RISK: HIGH.** Re-import is overdue; the hard-stop has arrived.
+  - **Type == IMPORTED + `30 < days_until_expiry <= 60` → RISK: MODERATE — NOT HIGH.** The re-import window is open but not yet urgent; the hard-stop is still weeks away. Do NOT conflate this with AMAZON_ISSUED urgency (managed renewal has failed there; here the operator simply has not yet acted). If you find yourself writing HIGH for an IMPORTED cert with > 30 days to expiry, STOP — re-check the table.
 
 ### Step 4: Healthy → OK
 
@@ -193,6 +208,24 @@ EventBridge for AWS Certificate Manager Renewal events. If renewal does not comp
 within 7 days, re-request the certificate with DNS validation as a fallback.
 ```
 
+### Worked example — EXPIRING_SOON on IMPORTED, 45 days (MODERATE — NOT HIGH)
+
+```text
+CERTIFICATE: portal.example.com (arn:aws:acm:us-east-1:111111111111:certificate/imp-45d)
+VERDICT: EXPIRING_SOON
+RISK: MODERATE
+REASON: NotAfter 2026-09-18, days_until_expiry=45, Type IMPORTED, Status ISSUED,
+RenewalEligibility INELIGIBLE, KeyAlgorithm RSA_2048. Inside the 60-day re-import
+window but outside the 30-day hard stop — operator-led re-import is open but not
+urgent (Step 3: EXPIRING_SOON + IMPORTED + 30 < days <= 60 => MODERATE). NOT HIGH.
+REMEDIATION: 1. Schedule re-import to the SAME ARN within the next 2 weeks, before
+the 30-day hard stop. 2. Source the renewed cert+key+chain from the external CA;
+diff the SAN list vs the existing cert to avoid silent TLS breaks. 3. In-place
+re-import preserves the ARN: `aws acm import-certificate --certificate-arn <arn>
+--certificate file://new.pem --private-key file://new.key --certificate-chain
+file://chain.pem`. 4. Treat this as planning work, not an incident.
+```
+
 ## Anti-Patterns — NEVER
 
 - NEVER report a certificate as `OK` when `days_until_expiry <= 60` and it has not been renewed. Inside the 60-day window, an unrenewed cert is EXPIRING_SOON at minimum. The 60-day threshold is the renewal START, not a safe distance from expiry.
@@ -218,6 +251,12 @@ within 7 days, re-request the certificate with DNS validation as a fallback.
 - NEVER recommend re-importing an IMPORTED certificate without preserving the ARN. `aws acm import-certificate` to the SAME ARN (via `--certificate-arn`) is an in-place renewal — listeners and distributions keep working. Importing as a NEW cert requires swapping every reference and risks a missed-update outage.
 
 - NEVER ignore CloudFront region placement. A certificate referenced by a CloudFront distribution MUST be in `us-east-1`. A cert in any other region causes CloudFront TLS failures. Flag this in REMEDIATION even when the expiry verdict is OK.
+
+- NEVER treat an ACM certificate as region-portable for ANY consumer, not just CloudFront. ACM certs are pinned to the region of issue — a cert in `us-east-1` cannot be referenced by an ALB/NLB/API Gateway custom domain in `ap-southeast-1`. Multi-region TLS requires requesting the cert in EACH consuming region. Auditing one region's ACM and declaring "all TLS healthy" misses every other region's certs entirely.
+
+- NEVER assume an IMPORTED public certificate has valid Certificate Transparency (CT) coverage just because it was accepted by `import-certificate`. ACM does NOT add SCTs (Signed Certificate Timestamps) to imported certs — it stores what you gave it. Chrome and other CT-enforcing clients require 1-3 embedded SCTs (count depends on validity period: 3 for <180 days, 2 for 181-359 days, 1 for 360+ days). An IMPORTED cert without the right SCT count is silently distrusted by browsers while `Status: ISSUED` reports success. Always verify embedded SCTs on the source cert BEFORE importing.
+
+- NEVER share a single ACM certificate across AWS accounts. Unlike IAM roles or KMS key policies, ACM certificates CANNOT be shared cross-account — each account must request its own cert for the same domain. For shared domains across many accounts, use AWS Private Certificate Authority (PCA) so each account issues its own private cert from the shared CA.
 
 ## Remediation
 
@@ -268,6 +307,20 @@ Continuous certificate health requires monitoring, not point-in-time audits:
 - **External CA pipeline monitoring (IMPORTED certs).** IMPORTED certs have no ACM renewal — the re-import pipeline MUST emit its own alarm when the source cert is within 60 days of expiry. A silent external-CA pipeline is the top cause of IMPORTED-cert outages.
 
 ## Reference — ACM certificate internals
+
+### Non-obvious operational gotchas (senior-engineer knowledge)
+
+These are NOT in the AWS ACM docs; they are operational surprises learned from production incidents. Audit against them explicitly:
+
+- **`InUseBy[]` has a propagation lag.** ACM's resource scanner runs on a best-effort schedule (minutes to low hours). A cert just attached to an ALB can still show `InUseBy: []`. Conversely, a just-detached cert may show stale consumers for a while. When triaging deletion safety, do NOT rely on a single snapshot — re-fetch after ~5 minutes before acting on an empty list.
+- **CAA is re-checked on every renewal attempt, not just at issuance.** Adding a CAA record that locks the domain to a different CA (e.g., `issue "letsencrypt.org"`) AFTER the cert was issued by ACM will silently break the next renewal — you only learn weeks later via `FAILED_AUTORENEWAL` + `CAA_ERROR`. Always re-audit CAA when changing DNS providers or registrars, not just at issuance time.
+- **The 11 renewal retries are front-loaded.** ACM schedules most retry attempts in the first ~30 days of the 60-day window; attempts become sparse near `NotAfter`. A renewal stall discovered at day 35+ has far fewer natural recovery attempts left than the "11 retries" headline implies. Treat day-30-plus stalls as urgent regardless of `days_until_expiry`.
+- **Renewal is all-or-nothing across SANs.** A cert with 5 SANs where 1 fails DNS validation will NOT be renewed, even though the other 4 validate cleanly. The renewal status reflects the worst SAN. When diagnosing a stall, audit EVERY SAN's `DomainValidationOptions[].ValidationStatus`, not just the primary domain.
+- **`RenewalEligibility: INELIGIBLE` on a fresh AMAZON_ISSUED cert is NORMAL.** ACM requires the cert to age (~11 months) before it becomes ELIGIBLE. Newly-issued certs are INELIGIBLE — this is not a defect and does not block renewal when the cert enters its renewal window.
+- **IMPORTED certs carry externally-generated keys; the FIPS/HSM guarantees do NOT apply.** Only AMAZON_ISSUED keys are generated in FIPS 140-2 Level 3 HSMs and are non-exportable. An IMPORTED cert's key is whatever you imported — if the source was a shared PEM on a CI runner, that key is already a blast-radius risk regardless of ACM storage.
+- **Account quota is 2,500 certs per region (soft limit).** Large enterprises with centralized security accounts routinely hit this. A failed `request-certificate` with `LimitExceededException` is a quota hit, not a service outage — request a limit increase via Support or the Service Quotas console before re-trying.
+- **`Status: ISSUED` is a one-shot historical flag, not a health signal.** A cert that was issued 11 months ago and is now 5 days from expiry still shows `ISSUED`. Health is `days_until_expiry` + `RenewalSummary`, never `Status` alone. Treat any "looks fine — `Status: ISSUED`" reasoning as a bug.
+- **ACM events on EventBridge use specific status enums.** `AWS Certificate Manager Renewal` events emit `AWSAccountCertificateRenewal` detail-type with `RenewalStatus` of `SUCCESS`, `FAILED`, or `PENDING`. A common bug is to alarm only on `FAILED` — you also miss the silent "no event at all" failure mode (renewal never scheduled). Alarm on the absence of a `SUCCESS` event within the 60-day window, not just on `FAILED`.
 
 ### Renewal timeline (AMAZON_ISSUED)
 

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 18,
       "max": 20,
-      "justification": "The skill provides many specific thresholds (30% NOT_ASSESSED, PASS<60%, FAIL>25%, 7\u2011day delegation stall, 24\u2011hour warm\u2011up exemption) and nuanced AWS Audit Manager behaviours that are not commonly known. However, most of the content restates documented AWS behavior that a well\u2011trained model could already retrieve, so the genuine expert delta is limited."
+      "justification": "Adds concrete expert thresholds (30% NOT_ASSESSED, 60% PASS, 25% FAIL, 7\u2011day delegation stall) and detailed per\u2011account\u202f\u00d7\u202fregion verification loops that a generic model would not know. Misses a subtle requirement: Config delivery channel must also be enabled, which is a known operational nuance."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedure order (pre\u2011flight account status, pagination loops, per\u2011account/region data\u2011source checks, delegation age check). Some steps are still generic (e.g., \"verify data sources\" without enumerating exact CLI flags for each region) which prevents a full mark."
+      "justification": "Encodes an AWS\u2011specific audit mindset: pre\u2011flight account status, pagination contracts, step\u2011wise worst\u2011verdict aggregation, and exact CLI remediation order. Could be tighter on the exact sequence of API calls (e.g., list\u2011assessments \u2192 get\u2011assessment \u2192 data\u2011source checks) but overall very procedure\u2011driven."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "A thorough NEVER list is present with concrete reasoning (e.g., never treat NOT_ASSESSED as FAIL, never delete an assessment without confirming dependencies). Missing are explicit anti\u2011patterns for throttling or API rate\u2011limit handling, and no explicit warning about proceeding when only a subset of data\u2011source checks succeed."
+      "justification": "Provides an extensive NEVER list with concrete reasoning (e.g., never report LOW_COMPLIANCE when NOT_ASSESSED >30%, never trust INACTIVE scores, never ignore failed delegations) and explains the operational impact of each anti\u2011pattern."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are present and detailed. The schema description is vague about exact input field names and types, which could hinder reliable activation."
+      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and includes a rich keyword list and activation triggers. The only minor gap is the absence of an explicit version\u2011compatibility matrix for different AWS CLI versions."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference, mindset, step\u2011by\u2011step, edge cases, anti\u2011patterns, remediation). Critical NEVER rules are placed after the main flow, requiring a scroll, which adds modest cognitive load."
+      "justification": "Top\u2011level Quick Start gives concise verdict rules; deeper sections (Mindset, Process, Anti\u2011Patterns) are revealed on demand. The Quick Start still packs many thresholds, which could cause slight cognitive overload, but overall layering is effective."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by an explicit CONFIRM prompt and the skill calibrates freedom appropriately for classification vs. remediation. A slight deduction for not tightening constraints around irreversible actions like assessment deletion."
+      "justification": "Destructive actions are gated with single and double CONFIRM prompts, throttling retries are limited, and classification is deterministic. Calibration matches task fragility well; only minor over\u2011constraint is the fixed 24\u2011hour warm\u2011up exemption rule, which may be too rigid for some environments."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Output format \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety checks). Minor inconsistency in ordering of sections (e.g., remediation appears before some edge\u2011case handling) prevents a perfect score."
+      "justification": "Follows a recognizable pattern (Quick Start \u2192 Critical NEVERs \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Anti\u2011Patterns \u2192 Reference). Section headings are consistent, aiding comprehension. Slightly ad\u2011hoc naming of some sections (e.g., \"Step 0b\") prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a decision tree, concrete CLI commands, pagination handling, error handling, and worked examples that enable an agent to execute the audit end\u2011to\u2011end. One point deducted because there is no explicit guidance for partial\u2011success scenarios where some API calls succeed and others fail (e.g., Config OK but CloudTrail missing) \u2013 the agent would need to infer handling."
+      "justification": "Provides a full decision tree, concrete CLI commands, error\u2011handling flows, pagination loops, and output schema. Missing explicit example of handling partial pagination failures or unverified account\u2011region combos in the main flow, but an agent could still execute the skill successfully."
     }
   ],
-  "total_score": 106,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 41075,
-  "latency_ms": 10752,
+  "grade": "A",
+  "token_count": 50433,
+  "latency_ms": 12586,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0
