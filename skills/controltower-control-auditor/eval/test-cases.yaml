@@ -1,0 +1,334 @@
+# Eval test cases for controltower-control-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: controltower-control-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: drifted-preventive-control
+    description: >-
+      Preventive control shows SUCCEEDED in Control Tower but the backing SCP
+      was modified outside Control Tower — Deny on port 22 removed. Silent
+      enforcement break requiring DRIFT verdict.
+    input: |
+      Audit the following Control Tower configuration. Emit the standard
+      VERDICT block (LANDING_ZONE, OU, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Audit target OU: arn:aws:organizations::111111111111:ou/o-abcd/ou-drifted-preventive-control
+
+      Landing zone version: 3.3
+      Landing zone state: ACTIVE
+      Landing zone drift status: NOT_DETECTED
+
+      Enabled controls (list-enabled-controls):
+        1. arn:aws:controltower:us-east-1::control/AWS-GR_RESTRICTED_COMMON_PORTS
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+        2. arn:aws:controltower:us-east-1::control/AWS-GR_ROOT_MFA_ENABLED
+           Type: DETECTIVE | Category: MANDATORY | Status: SUCCEEDED
+
+      SCP verification (organizations list-policies --filter SERVICE_CONTROL_POLICY):
+        AWSControlTowerGuardrailRestrictedCommonPorts:
+          Expected (CT baseline): Deny ec2:AuthorizeSecurityGroupIngress on ports 0, 23, 3389, 22, ...
+          Actual content: Policy was MODIFIED — the Deny statement on port 22 (SSH) was REMOVED
+          Drift type: SCP_CONTENT_MISMATCH (manual edit detected outside Control Tower)
+        AWSControlTowerGuardrailRootMfaEnabled: Content matches baseline
+
+      Config recorder status (all managed accounts): ENABLED, recording: true
+      AWSControlTowerExecutionRole: Present in all managed accounts
+      Account Factory baseline stacks (AWSControlTowerBP): All deployed, no drift
+
+      Emit the standard VERDICT block.
+    expected_verdict: DRIFT
+    assertions:
+      must_contain:
+        - "DRIFT"
+        - "drifted-preventive-control"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "SCP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DISABLED_CONTROL"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: disabled-mandatory-control
+    description: >-
+      Mandatory control AWS-GR_DISABLE_ROOT_ACCESS_KEYS_NO_HSM shows FAILED
+      status — SCP deployment failed, the mandatory control is not enforcing.
+      DISABLED_CONTROL verdict.
+    input: |
+      Audit the following Control Tower configuration. Emit the standard
+      VERDICT block (LANDING_ZONE, OU, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Audit target OU: arn:aws:organizations::111111111111:ou/o-abcd/ou-disabled-mandatory-control
+
+      Landing zone version: 3.3
+      Landing zone state: ACTIVE
+      Landing zone drift status: NOT_DETECTED
+
+      Enabled controls (list-enabled-controls):
+        1. arn:aws:controltower:us-east-1::control/AWS-GR_RESTRICTED_COMMON_PORTS
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+        2. arn:aws:controltower:us-east-1::control/AWS-GR_DISABLE_ROOT_ACCESS_KEYS_NO_HSM
+           Type: PREVENTIVE | Category: MANDATORY | Status: FAILED
+           Last operation: ENABLE | Result: FAILED
+           Status reason: SCP deployment failed — CloudFormation stack rollback
+        3. arn:aws:controltower:us-east-1::control/AWS-GR_ROOT_MFA_ENABLED
+           Type: DETECTIVE | Category: MANDATORY | Status: SUCCEEDED
+        4. arn:aws:controltower:us-east-1::control/AWS-GR_AUDIT_BUCKET_REGION
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+
+      SCP verification:
+        AWSControlTowerGuardrailRestrictedCommonPorts: Content matches baseline
+        AWSControlTowerGuardrailDisableRootAccessKeys: NOT ATTACHED to OU
+          (enable-control operation FAILED — SCP was never deployed)
+        AWSControlTowerGuardrailRootMfaEnabled: Content matches baseline
+
+      Config recorder status (all managed accounts): ENABLED, recording: true
+      AWSControlTowerExecutionRole: Present in all managed accounts
+      Account Factory baseline stacks (AWSControlTowerBP): All deployed, no drift
+
+      Emit the standard VERDICT block.
+    expected_verdict: DISABLED_CONTROL
+    assertions:
+      must_contain:
+        - "DISABLED_CONTROL"
+        - "disabled-mandatory-control"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "mandatory"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DRIFT"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-recorder-disabled-gap
+    description: >-
+      All controls ENABLED and SUCCEEDED, no SCP drift, but Config recorder is
+      disabled in a managed account — detective controls silently cannot
+      evaluate. CONFIG_GAP verdict.
+    input: |
+      Audit the following Control Tower configuration. Emit the standard
+      VERDICT block (LANDING_ZONE, OU, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Audit target OU: arn:aws:organizations::111111111111:ou/o-abcd/ou-config-recorder-disabled-gap
+
+      Landing zone version: 3.3
+      Landing zone state: ACTIVE
+      Landing zone drift status: NOT_DETECTED
+
+      Enabled controls (list-enabled-controls):
+        1. arn:aws:controltower:us-east-1::control/AWS-GR_RESTRICTED_COMMON_PORTS
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+        2. arn:aws:controltower:us-east-1::control/AWS-GR_DISABLE_ROOT_ACCESS_KEYS_NO_HSM
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+        3. arn:aws:controltower:us-east-1::control/AWS-GR_ROOT_MFA_ENABLED
+           Type: DETECTIVE | Category: MANDATORY | Status: SUCCEEDED
+
+      SCP verification:
+        AWSControlTowerGuardrailRestrictedCommonPorts: Content matches baseline
+        AWSControlTowerGuardrailDisableRootAccessKeys: Content matches baseline
+        AWSControlTowerGuardrailRootMfaEnabled: Content matches baseline
+
+      Config recorder status (per account):
+        Account 111111111112: ENABLED, recording: true
+        Account 111111111113: ENABLED, recording: true
+        Account 111111111115: DISABLED, recording: false
+          (configservice describe-config-recorders: status.recording = false)
+
+      Config aggregation (audit account): Aggregator present but account
+      111111111115 is not delivering data (recorder off)
+
+      AWSControlTowerExecutionRole: Present in all managed accounts
+      Account Factory baseline stacks (AWSControlTowerBP): All deployed, no drift
+
+      Emit the standard VERDICT block.
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-recorder-disabled-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Config"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DRIFT"
+        - "VERDICT: DISABLED_CONTROL"
+
+  - id: landing-zone-healthy-ok
+    description: >-
+      All mandatory controls ENABLED and SUCCEEDED, no SCP drift, Config
+      recorder enabled in all accounts, execution role present, baselines
+      deployed — clean posture. OK verdict.
+    input: |
+      Audit the following Control Tower configuration. Emit the standard
+      VERDICT block (LANDING_ZONE, OU, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Audit target OU: arn:aws:organizations::111111111111:ou/o-abcd/ou-landing-zone-healthy-ok
+
+      Landing zone version: 3.3
+      Landing zone state: ACTIVE
+      Landing zone drift status: NOT_DETECTED
+
+      Enabled controls (list-enabled-controls):
+        1. arn:aws:controltower:us-east-1::control/AWS-GR_RESTRICTED_COMMON_PORTS
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+        2. arn:aws:controltower:us-east-1::control/AWS-GR_DISABLE_ROOT_ACCESS_KEYS_NO_HSM
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+        3. arn:aws:controltower:us-east-1::control/AWS-GR_ROOT_MFA_ENABLED
+           Type: DETECTIVE | Category: MANDATORY | Status: SUCCEEDED
+        4. arn:aws:controltower:us-east-1::control/AWS-GR_AUDIT_BUCKET_REGION
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+
+      SCP verification:
+        AWSControlTowerGuardrailRestrictedCommonPorts: Content matches baseline
+        AWSControlTowerGuardrailDisableRootAccessKeys: Content matches baseline
+        AWSControlTowerGuardrailRootMfaEnabled: Content matches baseline
+        AWSControlTowerGuardrailAuditBucketRegion: Content matches baseline
+
+      Config recorder status (all managed accounts): ENABLED, recording: true
+      Config aggregation (audit account): Aggregator healthy, all accounts delivering
+      AWSControlTowerExecutionRole: Present in all managed accounts, trust policy correct
+      Account Factory baseline stacks (AWSControlTowerBP): All deployed, no drift
+
+      Emit the standard VERDICT block.
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "landing-zone-healthy-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: DRIFT"
+        - "VERDICT: DISABLED_CONTROL"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: landing-zone-modified-drift
+    description: >-
+      Landing zone baseline CloudFormation StackSets have been modified
+      outside Control Tower — landing zone drift detected. DRIFT verdict.
+    input: |
+      Audit the following Control Tower configuration. Emit the standard
+      VERDICT block (LANDING_ZONE, OU, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Audit target: Landing zone "production-landing-zone-modified-drift"
+
+      Landing zone version: 3.3
+      Landing zone state: ACTIVE
+      Landing zone drift status: DRIFTED
+
+      Landing zone drift details (CloudFormation detect-stack-set-drift):
+        StackSet: AWSControlTowerBP
+          Drifted stack instances: 3 of 10
+          Drift type: TEMPLATE_MISMATCH — StackSet template was modified outside Control Tower
+          Affected accounts: 111111111115, 111111111116, 111111111117
+
+        StackSet: AWSControlTowerSecurityResources
+          Drifted stack instances: 1 of 10
+          Drift type: PARAMETER_MISMATCH — Lambda function code hash differs from baseline
+
+      Enabled controls (list-enabled-controls) on root OU:
+        1. arn:aws:controltower:us-east-1::control/AWS-GR_RESTRICTED_COMMON_PORTS
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+        2. arn:aws:controltower:us-east-1::control/AWS-GR_DISABLE_ROOT_ACCESS_KEYS_NO_HSM
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+
+      SCP verification: SCPs match baseline content
+      Config recorder status (all managed accounts): ENABLED, recording: true
+      AWSControlTowerExecutionRole: Present in all managed accounts
+
+      Emit the standard VERDICT block.
+    expected_verdict: DRIFT
+    assertions:
+      must_contain:
+        - "DRIFT"
+        - "landing-zone-modified-drift"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "drift"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DISABLED_CONTROL"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: execution-role-missing-gap
+    description: >-
+      All controls ENABLED and SUCCEEDED, no drift, Config healthy, but
+      AWSControlTowerExecutionRole is missing in one managed account —
+      account is stranded. CONFIG_GAP verdict.
+    input: |
+      Audit the following Control Tower configuration. Emit the standard
+      VERDICT block (LANDING_ZONE, OU, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Audit target OU: arn:aws:organizations::111111111111:ou/o-abcd/ou-execution-role-missing-gap
+
+      Landing zone version: 3.3
+      Landing zone state: ACTIVE
+      Landing zone drift status: NOT_DETECTED
+
+      Enabled controls (list-enabled-controls):
+        1. arn:aws:controltower:us-east-1::control/AWS-GR_RESTRICTED_COMMON_PORTS
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+        2. arn:aws:controltower:us-east-1::control/AWS-GR_DISABLE_ROOT_ACCESS_KEYS_NO_HSM
+           Type: PREVENTIVE | Category: MANDATORY | Status: SUCCEEDED
+        3. arn:aws:controltower:us-east-1::control/AWS-GR_ROOT_MFA_ENABLED
+           Type: DETECTIVE | Category: MANDATORY | Status: SUCCEEDED
+
+      SCP verification:
+        AWSControlTowerGuardrailRestrictedCommonPorts: Content matches baseline
+        AWSControlTowerGuardrailDisableRootAccessKeys: Content matches baseline
+        AWSControlTowerGuardrailRootMfaEnabled: Content matches baseline
+
+      Config recorder status (all managed accounts): ENABLED, recording: true
+      Config aggregation (audit account): Aggregator healthy, all accounts delivering
+
+      AWSControlTowerExecutionRole (per account):
+        Account 111111111112: Present, trust policy: controltower.amazonaws.com (correct)
+        Account 111111111113: Present, trust policy: controltower.amazonaws.com (correct)
+        Account 111111111116: MISSING — role was deleted
+          (iam get-role --role-name AWSControlTowerExecutionRole returned NoSuchEntity)
+
+      Account Factory baseline stacks (AWSControlTowerBP): All deployed, no drift
+
+      Emit the standard VERDICT block.
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "execution-role-missing-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "ExecutionRole"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DRIFT"
+        - "VERDICT: DISABLED_CONTROL"

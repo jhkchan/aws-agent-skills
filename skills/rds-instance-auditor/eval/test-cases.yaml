@@ -1,0 +1,222 @@
+# Eval test cases for rds-instance-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Six deterministic cases — one clean case per verdict token. Each
+# DBInstanceIdentifier embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The classification ordering in
+# SKILL.md (PUBLIC > UNENCRYPTED > NO_DELETION_PROTECTION > SINGLE_AZ >
+# CONFIG_GAP > OK) produces exactly the expected verdicts below.
+skill: rds-instance-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-and-unencrypted
+    description: >-
+      Non-Aurora MySQL instance with PubliclyAccessible true AND StorageEncrypted
+      false — internet-exposed plaintext database. Verdict is PUBLIC (worst
+      dimension); UNENCRYPTED and NO_DELETION_PROTECTION appear as secondary
+      findings.
+    input: |
+      DBInstanceIdentifier: db-public-and-unencrypted
+      Engine: mysql
+      DBInstanceStatus: available
+      PubliclyAccessible: true
+      StorageEncrypted: false
+      MultiAZ: true
+      DeletionProtection: false
+      BackupRetentionPeriod: 7
+      AutoMinorVersionUpgrade: true
+      MonitoringInterval: 60
+      Emit the standard VERDICT block (INSTANCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC
+    assertions:
+      must_contain:
+        - "PUBLIC"
+        - "public-and-unencrypted"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "PubliclyAccessible"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNENCRYPTED"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: unencrypted-internal-db
+    description: >-
+      Private (non-public) PostgreSQL instance with StorageEncrypted false but
+      every other dimension clean. Verdict is UNENCRYPTED — data at rest is
+      plaintext and remediation is a snapshot migration, not a toggle.
+    input: |
+      DBInstanceIdentifier: db-unencrypted-internal-db
+      Engine: postgres
+      DBInstanceStatus: available
+      PubliclyAccessible: false
+      StorageEncrypted: false
+      MultiAZ: true
+      DeletionProtection: true
+      BackupRetentionPeriod: 7
+      AutoMinorVersionUpgrade: true
+      MonitoringInterval: 60
+      Emit the standard VERDICT block (INSTANCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: UNENCRYPTED
+    assertions:
+      must_contain:
+        - "UNENCRYPTED"
+        - "unencrypted-internal-db"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "StorageEncrypted"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-deletion-protection-prod
+    description: >-
+      Private encrypted Multi-AZ production MySQL instance with DeletionProtection
+      false and all other dimensions clean. Verdict is NO_DELETION_PROTECTION —
+      a single delete-db-instance call would destroy the instance.
+    input: |
+      DBInstanceIdentifier: db-no-deletion-protection-prod
+      Engine: mysql
+      DBInstanceStatus: available
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/prod-key
+      MultiAZ: true
+      DeletionProtection: false
+      BackupRetentionPeriod: 7
+      AutoMinorVersionUpgrade: true
+      MonitoringInterval: 60
+      Emit the standard VERDICT block (INSTANCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_DELETION_PROTECTION
+    assertions:
+      must_contain:
+        - "NO_DELETION_PROTECTION"
+        - "no-deletion-protection-prod"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DeletionProtection"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC"
+        - "VERDICT: SINGLE_AZ"
+
+  - id: single-az-dev
+    description: >-
+      Private encrypted PostgreSQL primary instance with deletion protection on
+      but MultiAZ false and no ReadReplicaSource — single-AZ primary. Verdict is
+      SINGLE_AZ (availability gap).
+    input: |
+      DBInstanceIdentifier: db-single-az-dev
+      Engine: postgres
+      DBInstanceStatus: available
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/dev-key
+      MultiAZ: false
+      DeletionProtection: true
+      BackupRetentionPeriod: 7
+      AutoMinorVersionUpgrade: true
+      MonitoringInterval: 60
+      Emit the standard VERDICT block (INSTANCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: SINGLE_AZ
+    assertions:
+      must_contain:
+        - "SINGLE_AZ"
+        - "single-az-dev"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: PUBLIC"
+
+  - id: config-gap-stale
+    description: >-
+      Private encrypted Multi-AZ instance with deletion protection on, but
+      BackupRetentionPeriod 0 (PITR disabled), AutoMinorVersionUpgrade false,
+      and MonitoringInterval 0 (Enhanced Monitoring off). Verdict is CONFIG_GAP.
+    input: |
+      DBInstanceIdentifier: db-config-gap-stale
+      Engine: mysql
+      DBInstanceStatus: available
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/stale-key
+      MultiAZ: true
+      DeletionProtection: true
+      BackupRetentionPeriod: 0
+      AutoMinorVersionUpgrade: false
+      MonitoringInterval: 0
+      Emit the standard VERDICT block (INSTANCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-stale"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "BackupRetentionPeriod"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC"
+        - "VERDICT: SINGLE_AZ"
+
+  - id: hardened-multi-az-prod
+    description: >-
+      Private encrypted Multi-AZ production PostgreSQL instance with deletion
+      protection on, 7-day automated backups, auto minor-version upgrade on,
+      and Enhanced Monitoring at 60s. All seven dimensions pass. Verdict is OK.
+    input: |
+      DBInstanceIdentifier: db-hardened-multi-az-prod
+      Engine: postgres
+      DBInstanceStatus: available
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/hardened-key
+      MultiAZ: true
+      DeletionProtection: true
+      BackupRetentionPeriod: 7
+      AutoMinorVersionUpgrade: true
+      MonitoringInterval: 60
+      Emit the standard VERDICT block (INSTANCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "hardened-multi-az-prod"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PUBLIC"
+        - "VERDICT: UNENCRYPTED"
+        - "VERDICT: CONFIG_GAP"

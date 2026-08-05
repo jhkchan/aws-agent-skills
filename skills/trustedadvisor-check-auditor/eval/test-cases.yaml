@@ -1,0 +1,259 @@
+# Eval test cases for trustedadvisor-check-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: trustedadvisor-check-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: security-sg-open-error
+    description: >-
+      Security pillar check with error status — SSH port 22 open to
+      0.0.0.0/0 on a security group. Business support, fresh result, no
+      exclusions. Active security exposure drives CRITICAL_CHECK.
+    input: |
+      Account metadata:
+        Support tier: Business
+        Total checks available: 115
+
+      Check id: security-sg-open-error
+      Check name: Security Groups - Specific Ports Unrestricted
+      Category: Security
+      Status: error
+      Timestamp: 2026-08-05T10:00:00Z (2 hours ago)
+      Excluded resources: none
+
+      Flagged resources:
+        - resourceId: sg-security-sg-open-error
+          region: us-east-1
+          status: error
+          metadata:
+            Protocol: TCP
+            Port: 22
+            Source: 0.0.0.0/0
+            Recommendation: Restrict to known CIDR range
+
+      Emit the standard VERDICT block (CHECK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CRITICAL_CHECK
+    assertions:
+      must_contain:
+        - "CRITICAL_CHECK"
+        - "port 22"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Security"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: WARNING_CHECK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: service-limit-vpc-at-100
+    description: >-
+      Service Limits check at 100% of quota — VPC limit reached, new VPC
+      creation will fail. Business support, fresh result. Graduated severity
+      at 100% is CRITICAL_CHECK.
+    input: |
+      Account metadata:
+        Support tier: Business
+        Total checks available: 115
+
+      Check id: service-limit-vpc-at-100
+      Check name: VPC Limit
+      Category: Service Limits
+      Status: error
+      Timestamp: 2026-08-05T11:00:00Z (1 hour ago)
+      Excluded resources: none
+
+      Flagged resources:
+        - resourceId: vpc-service-limit-vpc-at-100
+          region: us-east-1
+          status: error
+          metadata:
+            Limit: 5
+            Current Usage: 5
+            Service: Amazon VPC
+
+      Emit the standard VERDICT block (CHECK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CRITICAL_CHECK
+    assertions:
+      must_contain:
+        - "CRITICAL_CHECK"
+        - "VPC"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "100"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: WARNING_CHECK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: cost-idle-ec2-error
+    description: >-
+      Cost Optimization check with error status — 3 idle EC2 instances
+      wasting $420/month. Business support, fresh result. Cost waste is
+      WARNING_CHECK, never CRITICAL.
+    input: |
+      Account metadata:
+        Support tier: Business
+        Total checks available: 115
+
+      Check id: cost-idle-ec2-error
+      Check name: Idle EC2 Instances
+      Category: Cost Optimization
+      Status: error
+      Timestamp: 2026-08-05T08:00:00Z (4 hours ago)
+      Excluded resources: none
+
+      Flagged resources:
+        - resourceId: i-cost-idle-ec2-error-01
+          region: us-east-1
+          status: error
+          metadata:
+            Instance Type: m5.large
+            Average CPU: 3%
+            Days Idle: 14
+            Estimated Monthly Savings: $140
+        - resourceId: i-cost-idle-ec2-error-02
+          region: us-east-1
+          status: error
+          metadata:
+            Instance Type: m5.xlarge
+            Average CPU: 2%
+            Days Idle: 21
+            Estimated Monthly Savings: $170
+
+      Emit the standard VERDICT block (CHECK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: WARNING_CHECK
+    assertions:
+      must_contain:
+        - "WARNING_CHECK"
+        - "Idle"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Cost"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CRITICAL_CHECK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: basic-support-limited
+    description: >-
+      Basic support tier account with only 7 of ~115 Trusted Advisor checks
+      accessible. The available check may show ok, but 90%+ of the risk
+      surface is invisible — CONFIG_GAP for limited coverage.
+    input: |
+      Account metadata:
+        Support tier: Basic
+        Total checks available: 7
+
+      Check id: basic-support-limited
+      Check name: IAM Use
+      Category: Security
+      Status: ok
+      Timestamp: 2026-08-05T11:30:00Z (30 minutes ago)
+      Excluded resources: none
+
+      Flagged resources: (none)
+
+      Emit the standard VERDICT block (CHECK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "IAM"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Basic"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CRITICAL_CHECK"
+        - "VERDICT: WARNING_CHECK"
+
+  - id: stale-check-result-72h
+    description: >-
+      Security check with ok status but result timestamp is 72 hours old.
+      The ok status is unreliable because the data is stale — CONFIG_GAP for
+      stale results.
+    input: |
+      Account metadata:
+        Support tier: Business
+        Total checks available: 115
+
+      Check id: stale-check-result-72h
+      Check name: S3 Bucket Permissions
+      Category: Security
+      Status: ok
+      Timestamp: 2026-08-02T12:00:00Z (72 hours ago)
+      Excluded resources: none
+
+      Flagged resources: (none)
+
+      Emit the standard VERDICT block (CHECK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "stale"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CRITICAL_CHECK"
+        - "VERDICT: WARNING_CHECK"
+
+  - id: fault-tolerance-ok
+    description: >-
+      Fault Tolerance check with ok status, Business support, fresh result,
+      no exclusions. All dimensions clean — verdict OK.
+    input: |
+      Account metadata:
+        Support tier: Business
+        Total checks available: 115
+
+      Check id: fault-tolerance-ok
+      Check name: ELB Availability Zone Awareness
+      Category: Fault Tolerance
+      Status: ok
+      Timestamp: 2026-08-05T10:30:00Z (1 hour ago)
+      Excluded resources: none
+
+      Flagged resources: (none)
+
+      Emit the standard VERDICT block (CHECK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ELB"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CRITICAL_CHECK"
+        - "VERDICT: WARNING_CHECK"
+        - "VERDICT: CONFIG_GAP"

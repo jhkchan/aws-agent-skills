@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "auditmanager-assessment-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Audit Manager Assessment Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "stopped-assessment-incomplete",
+      "name": "INACTIVE assessment with high NOT_ASSESSED — stale frozen compliance score",
+      "difficulty": "hard",
+      "prompt_file": "prompts/stopped-assessment-incomplete.md",
+      "baseline_file": "baselines/stopped-assessment-incomplete.md",
+      "expected_verdict": "INCOMPLETE_EVIDENCE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INCOMPLETE_EVIDENCE", "stopped-assessment-incomplete", "VERDICT", "REASON", "REMEDIATION", "INACTIVE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: LOW_COMPLIANCE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "config-recording-off-incomplete",
+      "name": "ACTIVE assessment but Config recorder OFF — silent data-source break",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-recording-off-incomplete.md",
+      "baseline_file": "baselines/config-recording-off-incomplete.md",
+      "expected_verdict": "INCOMPLETE_EVIDENCE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INCOMPLETE_EVIDENCE", "config-recording-off-incomplete", "VERDICT", "REASON", "REMEDIATION", "NOT_ASSESSED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: LOW_COMPLIANCE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "low-compliance-failures",
+      "name": "ACTIVE assessment, evidence complete, but 44% FAIL — real control failures",
+      "difficulty": "medium",
+      "prompt_file": "prompts/low-compliance-failures.md",
+      "baseline_file": "baselines/low-compliance-failures.md",
+      "expected_verdict": "LOW_COMPLIANCE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["LOW_COMPLIANCE", "low-compliance-failures", "VERDICT", "REASON", "REMEDIATION", "FAIL"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: INCOMPLETE_EVIDENCE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "missing-kms-sns-config-gap",
+      "name": "Healthy compliance but no KMS key and no SNS topic — settings gap",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-kms-sns-config-gap.md",
+      "baseline_file": "baselines/missing-kms-sns-config-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "missing-kms-sns-config-gap", "VERDICT", "REASON", "REMEDIATION", "kmsKey"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: INCOMPLETE_EVIDENCE", "VERDICT: LOW_COMPLIANCE"]
+        }
+      ]
+    },
+    {
+      "id": "no-process-owners-config-gap",
+      "name": "Healthy compliance but empty defaultProcessOwners — no review pipeline",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-process-owners-config-gap.md",
+      "baseline_file": "baselines/no-process-owners-config-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "no-process-owners-config-gap", "VERDICT", "REASON", "REMEDIATION", "defaultProcessOwners"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: INCOMPLETE_EVIDENCE", "VERDICT: LOW_COMPLIANCE"]
+        }
+      ]
+    },
+    {
+      "id": "healthy-assessment-ok",
+      "name": "ACTIVE, evidence complete, 94% compliance, all settings configured — clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/healthy-assessment-ok.md",
+      "baseline_file": "baselines/healthy-assessment-ok.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "healthy-assessment-ok", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INCOMPLETE_EVIDENCE", "VERDICT: LOW_COMPLIANCE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

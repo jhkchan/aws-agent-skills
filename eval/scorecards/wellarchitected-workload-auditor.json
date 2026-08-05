@@ -1,0 +1,70 @@
+{
+  "skill": "wellarchitected-workload-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill provides concrete thresholds (180\u2011day staleness, 90\u2011day no\u2011milestone, >50% UNANSWERED, security >0, total HIGH_RISK >5) and a precise effectiveReviewDate formula that most models would not generate on their own. However, large portions restate publicly documented WA Tool behavior without adding novel decision trees or undocumented edge\u2011case handling, so full credit is not earned."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The procedure is AWS\u2011specific: exact order of staleness \u2192 risk \u2192 config checks, pagination handling, exponential backoff, per\u2011pillar answer aggregation, and lens\u2011version comparison. One point is deducted because the throttling\u2011retry pattern is generic and not uniquely tied to the Well\u2011Architected Tool."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "A thorough NEVER list is present with concrete reasons (e.g., never use LastUpdated alone, never classify HIGH_RISK on stale data). A single point is deducted for missing a few deeper pitfalls such as the impact of custom lens ARN mismatches on risk counts."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete, the description clearly states WHAT the skill does, WHEN to invoke, and provides a rich keyword list and trigger regex. No deficiencies found."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill is well\u2011sectioned, but critical priority rules and the effectiveReviewDate definition are buried deep in the Mindset/Process sections, forcing the agent to read large blocks before reaching actionable steps. This creates cognitive overload for quick decisions."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (e.g., updating answers, creating milestones) are gated by explicit CONFIRM prompts and safety checks. One point is deducted because the skill does not explicitly warn against the irreversible delete\u2011workload operation, which could be invoked in a pipeline."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The document follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Process \u2192 Anti\u2011Patterns \u2192 Safety \u2192 Remediation \u2192 Deep reference). However, the ordering mixes procedural and reference material, making the overall structure slightly ad\u2011hoc rather than a clean, canonical template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a decision tree, exact CLI commands, error handling, and output format with worked examples, enabling an agent to act. Deductions for missing handling of pagination failures on list\u2011answers, and the example output omits some optional fields (e.g., missing explicit REASON length guidance), which could cause edge\u2011case failures."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 41739,
+  "latency_ms": 20535,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

@@ -1,0 +1,341 @@
+# Eval test cases for organizations-scp-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: organizations-scp-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: permissive-scp-no-leave-deny
+    description: >-
+      Organization in deny-list mode (FullAWSAccess attached at root) with NO
+      Deny SCP for organizations:LeaveOrganization and NO Deny for security-
+      service disruption actions. Any account admin can leave the org and
+      escape all SCPs; attackers can blind detection services.
+    input: |
+      Organization structure for audit:
+
+      Root (r-permissive-scp-no-leave-deny):
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}
+
+      OU "Production" (ou-prod-permissive-scp-no-leave-deny):
+        Parent: Root
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): inherited from Root
+          - DenyRootKeyCreation (p-permissive-scp-no-leave-deny-rootkeys):
+            {"Version":"2012-10-17","Statement":[{"Sid":"DenyRootKeys","Effect":"Deny","Action":["iam:CreateAccessKey","iam:DeleteAccessKey"],"Resource":"arn:aws:iam::*:root"}]}
+
+      Account 111111111111 "permissive-scp-no-leave-deny-workload":
+        Parent: OU "Production"
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): inherited
+
+      Effective SCP evaluation for account 111111111111:
+        - FullAWSAccess (Allow * on *) — present at root, inherited
+        - DenyRootKeyCreation (Deny iam:*AccessKey on root) — present at OU, inherited
+        - organizations:LeaveOrganization: NOT denied anywhere in chain
+        - guardduty:DeleteDetector / securityhub:DisableSecurityHub / config:DeleteConfigurationRecorder / cloudtrail:DeleteTrail: NOT denied anywhere
+
+      Target being audited: Account 111111111111 (permissive-scp-no-leave-deny-workload)
+      Emit the standard VERDICT block (TARGET, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PERMISSIVE_SCP
+    assertions:
+      must_contain:
+        - "PERMISSIVE_SCP"
+        - "permissive-scp-no-leave-deny"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "LeaveOrganization"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: MISSING_GUARDRAIL"
+
+  - id: permissive-scp-security-service-disable
+    description: >-
+      Organization has organizations:LeaveOrganization denied at root, but does
+      NOT deny security-service disruption actions (guardduty:DeleteDetector,
+      securityhub:DisableSecurityHub). An attacker can blind detection before
+      exfiltrating data.
+    input: |
+      Organization structure for audit:
+
+      Root (r-permissive-scp-security-service-disable):
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}
+          - DenyLeaveOrg (p-permissive-scp-security-service-disable-leave):
+            {"Version":"2012-10-17","Statement":[{"Sid":"DenyLeave","Effect":"Deny","Action":"organizations:LeaveOrganization","Resource":"*"}]}
+
+      OU "Logging" (ou-logs-permissive-scp-security-service-disable):
+        Parent: Root
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): inherited from Root
+          - DenyLeaveOrg: inherited from Root
+
+      Account 222222222222 "permissive-scp-security-service-disable-logs":
+        Parent: OU "Logging"
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): inherited
+          - DenyLeaveOrg: inherited
+
+      Effective SCP evaluation for account 222222222222:
+        - FullAWSAccess (Allow * on *) — present, inherited
+        - DenyLeaveOrg (Deny organizations:LeaveOrganization) — present, inherited
+        - organizations:LeaveOrganization: DENIED
+        - guardduty:DeleteDetector: NOT denied anywhere in chain
+        - securityhub:DisableSecurityHub: NOT denied anywhere in chain
+        - config:DeleteConfigurationRecorder: NOT denied anywhere in chain
+        - cloudtrail:DeleteTrail: NOT denied anywhere in chain
+
+      Target being audited: Account 222222222222 (permissive-scp-security-service-disable-logs)
+      Emit the standard VERDICT block (TARGET, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PERMISSIVE_SCP
+    assertions:
+      must_contain:
+        - "PERMISSIVE_SCP"
+        - "permissive-scp-security-service-disable"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "guardduty"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: MISSING_GUARDRAIL"
+
+  - id: missing-guardrail-no-region-lock
+    description: >-
+      Organization has LeaveOrganization denied, security-service disruption
+      denied, and root credential actions restricted — but NO region-restriction
+      SCP (aws:RequestedRegion). Data can be deployed to any region globally.
+    input: |
+      Organization structure for audit:
+
+      Root (r-missing-guardrail-no-region-lock):
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}
+          - GuardrailDeny (p-missing-guardrail-no-region-lock-guardrails):
+            {"Version":"2012-10-17","Statement":[{"Sid":"DenyLeave","Effect":"Deny","Action":"organizations:LeaveOrganization","Resource":"*"},{"Sid":"DenySecSvc","Effect":"Deny","Action":["guardduty:DeleteDetector","securityhub:DisableSecurityHub","config:DeleteConfigurationRecorder","cloudtrail:DeleteTrail"],"Resource":"*"},{"Sid":"DenyRootKeys","Effect":"Deny","Action":["iam:CreateAccessKey","iam:DeleteAccessKey"],"Resource":"arn:aws:iam::*:root"}]}
+
+      OU "Finance" (ou-fin-missing-guardrail-no-region-lock):
+        Parent: Root
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): inherited
+          - GuardrailDeny: inherited
+
+      Account 333333333333 "missing-guardrail-no-region-lock-prod":
+        Parent: OU "Finance"
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): inherited
+          - GuardrailDeny: inherited
+
+      Effective SCP evaluation for account 333333333333:
+        - FullAWSAccess (Allow * on *) — present, inherited
+        - GuardrailDeny — present, inherited
+          - organizations:LeaveOrganization: DENIED
+          - guardduty:DeleteDetector / securityhub:DisableSecurityHub / config:DeleteConfigurationRecorder / cloudtrail:DeleteTrail: DENIED
+          - iam:CreateAccessKey / iam:DeleteAccessKey on root: DENIED
+        - aws:RequestedRegion region-restriction SCP: NOT present anywhere in chain
+        - No aws:ResourceTag tag-based access control SCP in chain
+        - OU "Finance" handles regulated financial data (in-scope for MISSING_GUARDRAIL region check)
+
+      Target being audited: Account 333333333333 (missing-guardrail-no-region-lock-prod)
+      Emit the standard VERDICT block (TARGET, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: MISSING_GUARDRAIL
+    assertions:
+      must_contain:
+        - "MISSING_GUARDRAIL"
+        - "missing-guardrail-no-region-lock"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "RequestedRegion"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: PERMISSIVE_SCP"
+
+  - id: config-gap-fullawsaccess-detached-no-allow
+    description: >-
+      FullAWSAccess has been detached from the ROOT with no Allow-list
+      replacement SCP. Every member account now has zero effective permissions
+      at the SCP layer — uniform AccessDenied across all services.
+    input: |
+      Organization structure for audit:
+
+      Root (r-config-gap-fullawsaccess-detached-no-allow):
+        Attached SCPs:
+          - (FullAWSAccess DETACHED — not present)
+          - DenyLeaveOrg (p-config-gap-fullawsaccess-detached-no-allow-leave):
+            {"Version":"2012-10-17","Statement":[{"Sid":"DenyLeave","Effect":"Deny","Action":"organizations:LeaveOrganization","Resource":"*"}]}
+
+      OU "Workloads" (ou-wkld-config-gap-fullawsaccess-detached-no-allow):
+        Parent: Root
+        Attached SCPs:
+          - (FullAWSAccess DETACHED — not present at OU level)
+          - DenyLeaveOrg: inherited from Root
+
+      Account 444444444444 "config-gap-fullawsaccess-detached-no-allow-app":
+        Parent: OU "Workloads"
+        Attached SCPs:
+          - (FullAWSAccess DETACHED — not present at account level)
+          - DenyLeaveOrg: inherited
+
+      Effective SCP evaluation for account 444444444444:
+        - FullAWSAccess: NOT PRESENT in entire chain (detached at root, not inherited)
+        - No Allow SCP (Allow * or otherwise) present anywhere in the chain
+        - DenyLeaveOrg (Deny organizations:LeaveOrganization) — present, inherited
+        - Result: NO Allow SCP in effective set. Every action is implicitly denied at SCP layer.
+        - All IAM permissions filtered out -> uniform AccessDenied across all services.
+
+      Target being audited: Account 444444444444 (config-gap-fullawsaccess-detached-no-allow-app)
+      Emit the standard VERDICT block (TARGET, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-fullawsaccess-detached-no-allow"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "FullAWSAccess"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PERMISSIVE_SCP"
+        - "VERDICT: MISSING_GUARDRAIL"
+
+  - id: config-gap-unsupported-condition-key
+    description: >-
+      An SCP Deny statement uses kms:ViaService (a KMS service-specific condition
+      key NOT supported in SCPs) with StringEquals. The condition silently never
+      evaluates — the Deny never applies. The guardrail appears active but
+      provides zero protection.
+    input: |
+      Organization structure for audit:
+
+      Root (r-config-gap-unsupported-condition-key):
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}
+          - GuardrailDeny (p-config-gap-unsupported-condition-key-grd):
+            {"Version":"2012-10-17","Statement":[{"Sid":"DenyLeave","Effect":"Deny","Action":"organizations:LeaveOrganization","Resource":"*"},{"Sid":"DenySecSvc","Effect":"Deny","Action":["guardduty:DeleteDetector","securityhub:DisableSecurityHub","config:DeleteConfigurationRecorder","cloudtrail:DeleteTrail"],"Resource":"*"}]}
+          - DenyKmsOutsideLambda (p-config-gap-unsupported-condition-key-kms):
+            {"Version":"2012-10-17","Statement":[{"Sid":"DenyKmsNonLambda","Effect":"Deny","Action":["kms:Decrypt","kms:GenerateDataKey*"],"Resource":"*","Condition":{"StringEquals":{"kms:ViaService":"lambda.us-east-1.amazonaws.com"}}}]}
+
+      OU "Data" (ou-data-config-gap-unsupported-condition-key):
+        Parent: Root
+        Attached SCPs:
+          - FullAWSAccess: inherited
+          - GuardrailDeny: inherited
+          - DenyKmsOutsideLambda: inherited
+
+      Account 555555555555 "config-gap-unsupported-condition-key-store":
+        Parent: OU "Data"
+        Attached SCPs:
+          - FullAWSAccess: inherited
+          - GuardrailDeny: inherited
+          - DenyKmsOutsideLambda: inherited
+
+      Effective SCP evaluation for account 555555555555:
+        - FullAWSAccess (Allow * on *) — present, inherited
+        - GuardrailDeny — present, inherited
+          - organizations:LeaveOrganization: DENIED
+          - guardduty:DeleteDetector / securityhub:DisableSecurityHub / config:DeleteConfigurationRecorder / cloudtrail:DeleteTrail: DENIED
+        - DenyKmsOutsideLambda — present, inherited
+          - Deny kms:Decrypt + kms:GenerateDataKey* WHERE kms:ViaService StringEquals lambda.us-east-1.amazonaws.com
+          - NOTE: kms:ViaService is a KMS SERVICE-SPECIFIC condition key, NOT supported in SCPs
+          - The condition silently never evaluates -> StringEquals on absent key is always FALSE -> Deny never applies
+
+      Target being audited: Account 555555555555 (config-gap-unsupported-condition-key-store)
+      Emit the standard VERDICT block (TARGET, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-unsupported-condition-key"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "kms:ViaService"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PERMISSIVE_SCP"
+        - "VERDICT: MISSING_GUARDRAIL"
+
+  - id: ok-deny-list-strategy
+    description: >-
+      Organization uses a proper deny-list strategy: FullAWSAccess present at
+      root, LeaveOrganization denied, security-service disruption denied, root
+      credential actions restricted, and region restriction via
+      aws:RequestedRegion (with global services excluded via NotAction). Clean
+      posture.
+    input: |
+      Organization structure for audit:
+
+      Root (r-ok-deny-list-strategy):
+        Attached SCPs:
+          - FullAWSAccess (p-FULLAWSACCESS): {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}
+          - GuardrailDeny (p-ok-deny-list-strategy-guard):
+            {"Version":"2012-10-17","Statement":[{"Sid":"DenyLeave","Effect":"Deny","Action":"organizations:LeaveOrganization","Resource":"*"},{"Sid":"DenySecSvc","Effect":"Deny","Action":["guardduty:DeleteDetector","securityhub:DisableSecurityHub","config:DeleteConfigurationRecorder","cloudtrail:DeleteTrail"],"Resource":"*"},{"Sid":"DenyRootKeys","Effect":"Deny","Action":["iam:CreateAccessKey","iam:DeleteAccessKey"],"Resource":"arn:aws:iam::*:root"}]}
+          - RegionLock (p-ok-deny-list-strategy-region):
+            {"Version":"2012-10-17","Statement":[{"Sid":"DenyNonApprovedRegions","Effect":"Deny","NotAction":["iam:*","organizations:*","route53:*","cloudfront:*","waf:*","support:*"],"Resource":"*","Condition":{"StringNotEquals":{"aws:RequestedRegion":["us-east-1","us-west-2"]}}}]}
+
+      OU "Finance" (ou-fin-ok-deny-list-strategy):
+        Parent: Root
+        Attached SCPs:
+          - FullAWSAccess: inherited
+          - GuardrailDeny: inherited
+          - RegionLock: inherited
+
+      Account 666666666666 "ok-deny-list-strategy-finance":
+        Parent: OU "Finance"
+        Attached SCPs:
+          - FullAWSAccess: inherited
+          - GuardrailDeny: inherited
+          - RegionLock: inherited
+
+      Effective SCP evaluation for account 666666666666:
+        - FullAWSAccess (Allow * on *) — present, inherited
+        - GuardrailDeny — present, inherited
+          - organizations:LeaveOrganization: DENIED
+          - guardduty:DeleteDetector / securityhub:DisableSecurityHub / config:DeleteConfigurationRecorder / cloudtrail:DeleteTrail: DENIED
+          - iam:CreateAccessKey / iam:DeleteAccessKey on root: DENIED
+        - RegionLock — present, inherited
+          - aws:RequestedRegion restriction to us-east-1, us-west-2: ACTIVE
+          - Global services excluded via NotAction (iam, organizations, route53, cloudfront, waf, support)
+
+      Target being audited: Account 666666666666 (ok-deny-list-strategy-finance)
+      Emit the standard VERDICT block (TARGET, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ok-deny-list-strategy"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PERMISSIVE_SCP"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: MISSING_GUARDRAIL"

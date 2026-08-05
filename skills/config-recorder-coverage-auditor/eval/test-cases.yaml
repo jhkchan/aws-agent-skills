@@ -1,0 +1,455 @@
+# Eval test cases for config-recorder-coverage-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: config-recorder-coverage-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: config-gap-no-recorder
+    description: >-
+      Region with no configuration recorder configured at all — no recording,
+      no delivery, no rules. The most fundamental Config coverage gap.
+    input: |
+      Audit reference: config-gap-no-recorder
+      Account: 111111111111
+      Region: us-east-1
+
+      AWS Config API responses for this region:
+
+      describe-configuration-recorders: (empty — no recorders configured)
+
+      describe-configuration-recorder-status: (empty — no recorders)
+
+      describe-delivery-channels: (empty — no delivery channels)
+
+      describe-delivery-channel-status: (empty — no delivery channels)
+
+      describe-config-rules: (empty — no rules)
+
+      describe-conformance-packs: (empty — no conformance packs)
+
+      Emit the standard VERDICT block (AUDIT, REGION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-no-recorder"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DELIVERY_GAP"
+
+  - id: delivery-gap-bucket-deleted
+    description: >-
+      Recorder running and healthy (allSupported, includeGlobalResourceTypes),
+      but the delivery channel status is FAILURE with lastErrorCode
+      NO_SUCH_BUCKET — the S3 bucket was deleted after channel creation.
+    input: |
+      Audit reference: delivery-gap-bucket-deleted
+      Account: 111111111111
+      Region: us-east-1
+
+      AWS Config API responses:
+
+      describe-configuration-recorders:
+        name: default
+        roleARN: arn:aws:iam::111111111111:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig
+        recordingGroup:
+          allSupported: true
+          includeGlobalResourceTypes: true
+          resourceTypes: []
+
+      describe-configuration-recorder-status:
+        name: default
+        recording: true
+        lastStatus: SUCCESS
+        lastStartTime: 2026-07-01T00:00:00Z
+        lastStopTime: null
+        lastErrorMessage: null
+
+      describe-delivery-channels:
+        name: default
+        s3BucketName: config-bucket-deleted-111111111111
+        s3KeyPrefix: config/
+        snsTopicARN: arn:aws:sns:us-east-1:111111111111:config-notifications
+        configSnapshotDeliveryProperties:
+          deliveryFrequency: Six_Hours
+
+      describe-delivery-channel-status:
+        name: default
+        lastStatus: FAILURE
+        lastErrorCode: NO_SUCH_BUCKET
+        lastErrorMessage: "The specified S3 bucket does not exist"
+        lastStatusChangeTime: 2026-08-01T12:00:00Z
+
+      describe-config-rules:
+        ConfigRules:
+          - ConfigRuleName: s3-bucket-public-read-prohibited
+            ConfigRuleState: ACTIVE
+            Source: {Owner: AWS, SourceIdentifier: AWS::S3::Bucket}
+          - ConfigRuleName: iam-no-attached-policies
+            ConfigRuleState: ACTIVE
+            Source: {Owner: AWS, SourceIdentifier: AWS::IAM::User}
+
+      describe-conformance-packs:
+        ConformancePacks:
+          - ConformancePackName: operational-best-practices
+            ConformancePackId: pack-abc123
+            DeploymentStatus: CREATE_COMPLETE
+
+      Emit the standard VERDICT block (AUDIT, REGION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: DELIVERY_GAP
+    assertions:
+      must_contain:
+        - "DELIVERY_GAP"
+        - "delivery-gap-bucket-deleted"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: incomplete-coverage-partial-types
+    description: >-
+      Recorder running and delivery healthy, but allSupported is false with
+      only 3 explicit resource types — critical types like IAM roles and S3
+      buckets are excluded, creating a silent blind spot.
+    input: |
+      Audit reference: incomplete-coverage-partial-types
+      Account: 111111111111
+      Region: us-east-1
+
+      AWS Config API responses:
+
+      describe-configuration-recorders:
+        name: default
+        roleARN: arn:aws:iam::111111111111:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig
+        recordingGroup:
+          allSupported: false
+          includeGlobalResourceTypes: false
+          resourceTypes:
+            - AWS::EC2::Instance
+            - AWS::EC2::SecurityGroup
+            - AWS::EC2::Volume
+
+      describe-configuration-recorder-status:
+        name: default
+        recording: true
+        lastStatus: SUCCESS
+        lastStartTime: 2026-07-01T00:00:00Z
+
+      describe-delivery-channels:
+        name: default
+        s3BucketName: config-bucket-111111111111
+        configSnapshotDeliveryProperties:
+          deliveryFrequency: Six_Hours
+
+      describe-delivery-channel-status:
+        name: default
+        lastStatus: SUCCESS
+        lastErrorCode: null
+
+      describe-config-rules:
+        ConfigRules:
+          - ConfigRuleName: ec2-volume-inuse-check
+            ConfigRuleState: ACTIVE
+            Source: {Owner: AWS, SourceIdentifier: AWS::EC2::Volume}
+
+      describe-conformance-packs:
+        ConformancePacks:
+          - ConformancePackName: ec2-best-practices
+            ConformancePackId: pack-def456
+            DeploymentStatus: CREATE_COMPLETE
+
+      Emit the standard VERDICT block (AUDIT, REGION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INCOMPLETE_COVERAGE
+    assertions:
+      must_contain:
+        - "INCOMPLETE_COVERAGE"
+        - "incomplete-coverage-partial-types"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DELIVERY_GAP"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-rules-clean-recorder
+    description: >-
+      Recorder fully configured (allSupported, includeGlobalResourceTypes),
+      delivery channel healthy (SUCCESS), but zero Config rules and zero
+      conformance packs — configuration history is captured but no compliance
+      evaluation runs.
+    input: |
+      Audit reference: no-rules-clean-recorder
+      Account: 111111111111
+      Region: us-east-1
+
+      AWS Config API responses:
+
+      describe-configuration-recorders:
+        name: default
+        roleARN: arn:aws:iam::111111111111:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig
+        recordingGroup:
+          allSupported: true
+          includeGlobalResourceTypes: true
+          resourceTypes: []
+
+      describe-configuration-recorder-status:
+        name: default
+        recording: true
+        lastStatus: SUCCESS
+        lastStartTime: 2026-07-01T00:00:00Z
+
+      describe-delivery-channels:
+        name: default
+        s3BucketName: config-bucket-111111111111
+        configSnapshotDeliveryProperties:
+          deliveryFrequency: Six_Hours
+
+      describe-delivery-channel-status:
+        name: default
+        lastStatus: SUCCESS
+        lastErrorCode: null
+
+      describe-config-rules: (empty — no rules configured)
+
+      describe-conformance-packs: (empty — no conformance packs)
+
+      Emit the standard VERDICT block (AUDIT, REGION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_RULES
+    assertions:
+      must_contain:
+        - "NO_RULES"
+        - "no-rules-clean-recorder"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INCOMPLETE_COVERAGE"
+
+  - id: full-coverage-ok
+    description: >-
+      All four layers healthy: recorder running with allSupported and
+      includeGlobalResourceTypes, delivery channel SUCCESS, multiple Config
+      rules deployed, conformance pack in CREATE_COMPLETE.
+    input: |
+      Audit reference: full-coverage-ok
+      Account: 111111111111
+      Region: us-east-1
+
+      AWS Config API responses:
+
+      describe-configuration-recorders:
+        name: default
+        roleARN: arn:aws:iam::111111111111:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig
+        recordingGroup:
+          allSupported: true
+          includeGlobalResourceTypes: true
+          resourceTypes: []
+
+      describe-configuration-recorder-status:
+        name: default
+        recording: true
+        lastStatus: SUCCESS
+        lastStartTime: 2026-07-01T00:00:00Z
+
+      describe-delivery-channels:
+        name: default
+        s3BucketName: config-bucket-111111111111
+        snsTopicARN: arn:aws:sns:us-east-1:111111111111:config-notifications
+        configSnapshotDeliveryProperties:
+          deliveryFrequency: One_Hour
+
+      describe-delivery-channel-status:
+        name: default
+        lastStatus: SUCCESS
+        lastErrorCode: null
+
+      describe-config-rules:
+        ConfigRules:
+          - ConfigRuleName: s3-bucket-public-read-prohibited
+            ConfigRuleState: ACTIVE
+            Source: {Owner: AWS, SourceIdentifier: AWS::S3::Bucket}
+          - ConfigRuleName: iam-root-access-key-check
+            ConfigRuleState: ACTIVE
+            Source: {Owner: AWS, SourceIdentifier: AWS::IAM::Root}
+          - ConfigRuleName: multi-region-cloudtrail-enabled
+            ConfigRuleState: ACTIVE
+            Source: {Owner: AWS, SourceIdentifier: AWS::CloudTrail::Trail}
+          - ConfigRuleName: vpc-flow-logs-enabled
+            ConfigRuleState: ACTIVE
+            Source: {Owner: AWS, SourceIdentifier: AWS::EC2::VPC}
+
+      describe-conformance-packs:
+        ConformancePacks:
+          - ConformancePackName: operational-best-practices
+            ConformancePackId: pack-abc123
+            DeploymentStatus: CREATE_COMPLETE
+          - ConformancePackName: security-best-practices
+            ConformancePackId: pack-xyz789
+            DeploymentStatus: UPDATE_COMPLETE
+
+      Emit the standard VERDICT block (AUDIT, REGION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "full-coverage-ok"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: DELIVERY_GAP"
+        - "VERDICT: INCOMPLETE_COVERAGE"
+        - "VERDICT: NO_RULES"
+
+  - id: multi-region-global-types-gap
+    description: >-
+      Multi-region audit where every region has a healthy recorder and
+      delivery channel, but no region has includeGlobalResourceTypes: true —
+      global resources (IAM, CloudFront, Route 53) are never recorded
+      anywhere in the account.
+    input: |
+      Audit reference: multi-region-global-types-gap
+      Account: 111111111111
+      Regions: us-east-1, us-west-2, eu-west-1
+
+      AWS Config API responses per region:
+
+      === us-east-1 ===
+      describe-configuration-recorders:
+        name: default
+        roleARN: arn:aws:iam::111111111111:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig
+        recordingGroup:
+          allSupported: true
+          includeGlobalResourceTypes: false
+          resourceTypes: []
+
+      describe-configuration-recorder-status:
+        name: default
+        recording: true
+        lastStatus: SUCCESS
+
+      describe-delivery-channels:
+        name: default
+        s3BucketName: config-bucket-111111111111
+
+      describe-delivery-channel-status:
+        name: default
+        lastStatus: SUCCESS
+
+      describe-config-rules:
+        ConfigRules:
+          - ConfigRuleName: ec2-volume-inuse-check
+            ConfigRuleState: ACTIVE
+
+      describe-conformance-packs:
+        ConformancePacks:
+          - ConformancePackName: operational-best-practices
+            DeploymentStatus: CREATE_COMPLETE
+
+      === us-west-2 ===
+      describe-configuration-recorders:
+        name: default
+        roleARN: arn:aws:iam::111111111111:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig
+        recordingGroup:
+          allSupported: true
+          includeGlobalResourceTypes: false
+          resourceTypes: []
+
+      describe-configuration-recorder-status:
+        name: default
+        recording: true
+        lastStatus: SUCCESS
+
+      describe-delivery-channels:
+        name: default
+        s3BucketName: config-bucket-111111111111
+
+      describe-delivery-channel-status:
+        name: default
+        lastStatus: SUCCESS
+
+      describe-config-rules:
+        ConfigRules:
+          - ConfigRuleName: s3-bucket-versioning-enabled
+            ConfigRuleState: ACTIVE
+
+      describe-conformance-packs: (empty)
+
+      === eu-west-1 ===
+      describe-configuration-recorders:
+        name: default
+        roleARN: arn:aws:iam::111111111111:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig
+        recordingGroup:
+          allSupported: true
+          includeGlobalResourceTypes: false
+          resourceTypes: []
+
+      describe-configuration-recorder-status:
+        name: default
+        recording: true
+        lastStatus: SUCCESS
+
+      describe-delivery-channels:
+        name: default
+        s3BucketName: config-bucket-111111111111
+
+      describe-delivery-channel-status:
+        name: default
+        lastStatus: SUCCESS
+
+      describe-config-rules:
+        ConfigRules:
+          - ConfigRuleName: ec2-instance-detailed-monitoring
+            ConfigRuleState: ACTIVE
+
+      describe-conformance-packs: (empty)
+
+      Note: None of the three regions has includeGlobalResourceTypes set to true.
+
+      Emit the standard VERDICT block (AUDIT, REGION, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INCOMPLETE_COVERAGE
+    assertions:
+      must_contain:
+        - "INCOMPLETE_COVERAGE"
+        - "multi-region-global-types-gap"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: DELIVERY_GAP"

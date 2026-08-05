@@ -1,0 +1,70 @@
+{
+  "skill": "rds-instance-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides a detailed RDS\u2011specific decision tree, Aurora\u2011cluster scope nuances, immutable encryption migration workflow, and precise remediation CLI sequences that a generic model would not assemble automatically. However, most facts are restatements of AWS documentation (e.g., retention range 0\u201135) and no truly novel thresholds or proprietary heuristics are introduced."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: pagination of describe\u2011db\u2011instances, pre\u2011flight safety checks, explicit confirmation gates, and step\u2011by\u2011step CLI remediation. Some steps (e.g., \u201cverify caller has rds:ModifyDBInstance\u201d) are generic security hygiene rather than AWS\u2011unique process."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "A comprehensive NEVER list is present with concrete reasoning (e.g., never try to enable encryption in\u2011place). A few items lack explicit \"why\" depth (e.g., the NEVER about not flagging BackupRetentionPeriod\u202f0 on Aurora mentions it is rejected but does not explain the operational impact), so the anti\u2011pattern coverage is strong but not flawless."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are well\u2011defined. The only minor gap is the absence of an explicit example of how an agent would parse the activation triggers, leaving a tiny ambiguity for reliable invocation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick reference, then deep sections) allowing on\u2011demand detail, but the initial sections are dense and critical rules are embedded in long paragraphs, causing some cognitive overload before reaching the concise tables."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated with CONFIRM prompts, snapshot prerequisites, and status checks. The only shortfall is the lack of an explicit limit on bulk remediation batch size (the safety limit is mentioned but not enforced by the skill), leaving a small freedom\u2011calibration gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable structure (Mindset \u2192 Process \u2192 Output \u2192 Edge Cases \u2192 Anti\u2011Patterns \u2192 Remediation). It deviates slightly from a canonical template (missing a dedicated \"Philosophy\" header) which makes the pattern almost, but not perfectly, consistent."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "The decision tree, CLI remediation snippets, and output format enable an agent to act. Missing pieces include handling of pending\u2011modification notes in the FINDINGS output and a concrete example of error handling for malformed metadata beyond the generic error block, which could cause execution gaps."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 43259,
+  "latency_ms": 11869,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "organizations-scp-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many non\u2011obvious expert details (FullAWSAccess mode switch, SCP inheritance UNION, quota limits, silent failure of service\u2011specific condition keys, region\u2011restriction nuances, management\u2011account exemption) that a generic model would not enumerate. Minor deduction because some statements (e.g., \"SCPs never grant access\") are already common knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines an AWS\u2011specific workflow: pre\u2011flight permission checks, API calls, pagination, exponential backoff, error\u2011branch table, quota verification, and confirmation gate before state\u2011changing actions. Deducted one point for lacking an explicit step\u2011by\u2011step checklist for assembling the effective SCP set (union of root\u2011OU\u2011account)."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never treat Allow * as grant, never rely on service\u2011specific condition keys, never use NotAction in a Deny as whitelist). One point off because some anti\u2011patterns are described briefly without deeper \"why\" (e.g., NotAction footgun could cite specific blast\u2011radius examples)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Full front\u2011matter, clear description, explicit when\u2011to\u2011use, activation triggers, invocation schema, and verdict shape. All required metadata present and unambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Top\u2011level quick\u2011reference table gives triage, deeper sections (Mindset, Pre\u2011flight, Process, Edge cases, Anti\u2011Patterns, Remediation) are layered. Slight penalty because the initial sections are dense and some critical rules (e.g., condition\u2011key support) are buried in later deep reference rather than highlighted early."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive operations (SCP attach/detach) are tightly constrained with mandatory confirmation, backup, quota checks, and backoff. Classification tasks are given generous freedom. No over\u2011constraining observed."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge cases \u2192 Anti\u2011Patterns \u2192 Remediation \u2192 References. Consistent structure aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, output format, example classifications, and error\u2011branch handling, enabling an agent to execute the audit. Deducted two points for lack of explicit algorithmic pseudo\u2011code for merging multiple SCP statements and for ambiguous handling of overlapping Deny/Allow with differing conditions."
+    }
+  ],
+  "total_score": 110,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 33467,
+  "latency_ms": 12698,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

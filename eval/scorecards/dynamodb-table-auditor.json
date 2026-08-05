@@ -1,0 +1,70 @@
+{
+  "skill": "dynamodb-table-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many expert nuances (e.g., KMS data\u2011key cache timing, GSI throttling cascade, LSI 10\u202fGB per\u2011partition limit, billing\u2011mode cooldown) that go beyond a generic model, but most of these facts are documented in AWS docs and a capable model could already retrieve them, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific stepwise audit flow, exact CLI remediation commands, a mandatory confirmation gate, and pre\u2011flight safety checks. The only shortfall is a few generic suggestions (e.g., \u201cverify region matches ARN\u201d) that are not uniquely DynamoDB\u2011centric."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete pitfalls (e.g., never treat AWS\u2011managed KMS as unencrypted, never rely on TTL for GDPR, never assume on\u2011demand eliminates capacity risk) and clear rationales. Slight deduction because IAM\u2011policy anti\u2011pattern is mentioned only in passing, not enumerated with a dedicated NEVER rule."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The 'entry_point: false' flag is ambiguous and the activation triggers overlap, which could cause unreliable activation in edge cases."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (overview, quick reference, detailed steps, deep reference), but the document is dense; critical thresholds are buried in tables and long paragraphs, which can overload the initial read."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are gated with an explicit confirmation prompt; classification is deterministic; cost and safety warnings are calibrated to the fragility of each operation."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (mindset \u2192 process steps \u2192 anti\u2011patterns \u2192 remediation) that aids comprehension, but the pattern is not explicitly labeled or referenced, making it slightly less obvious."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Model outputs match the defined format and include correct CLI remediation. Minor gaps: handling of global\u2011table replicas in the output is only mentioned in prose, not reflected in the deterministic block; IAM\u2011policy anti\u2011pattern is not integrated into the findings; no explicit handling of billing\u2011mode cooldown enforcement."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 38416,
+  "latency_ms": 12814,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

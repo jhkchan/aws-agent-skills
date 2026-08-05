@@ -1,0 +1,312 @@
+# Eval test cases for dynamodb-table-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: dynamodb-table-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: unencrypted-sse-disabled
+    description: >-
+      DynamoDB table with SSE disabled (SSEType AES256, no KMS) — no customer-
+      controlled encryption. All other dimensions OK. Verdict: UNENCRYPTED.
+    input: |
+      Table name: unencrypted-sse-disabled
+      Table ARN: arn:aws:dynamodb:us-east-1:111111111111:table/unencrypted-sse-disabled
+      Table configuration (describe-table):
+        TableStatus: ACTIVE
+        BillingModeSummary:
+          BillingMode: PAY_PER_REQUEST
+        SSEDescription:
+          Status: DISABLED
+          SSEType: AES256
+        GlobalSecondaryIndexes: []
+        LocalSecondaryIndexes: []
+        DeletionProtectionEnabled: true
+        StreamSpecification:
+          StreamEnabled: true
+          StreamViewType: NEW_AND_OLD_IMAGES
+        TableSizeBytes: 1073741824
+      Continuous backups (describe-continuous-backups):
+        ContinuousBackupsStatus: ENABLED
+        PointInTimeRecoveryDescription:
+          PointInTimeRecoveryStatus: ENABLED
+      TTL (describe-time-to-live):
+        TimeToLiveDescription:
+          TimeToLiveStatus: ENABLED
+          AttributeName: expire_at
+      Emit the standard VERDICT block (TABLE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: UNENCRYPTED
+    assertions:
+      must_contain:
+        - "UNENCRYPTED"
+        - "unencrypted-sse-disabled"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_PITR"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-pitr-recovery-gap
+    description: >-
+      DynamoDB table with customer-managed SSE-KMS, PITR disabled, on-demand
+      billing. Encryption is healthy; the only verdict driver is missing PITR.
+      Verdict: NO_PITR.
+    input: |
+      Table name: no-pitr-recovery-gap
+      Table ARN: arn:aws:dynamodb:us-east-1:111111111111:table/no-pitr-recovery-gap
+      Table configuration (describe-table):
+        TableStatus: ACTIVE
+        BillingModeSummary:
+          BillingMode: PAY_PER_REQUEST
+        SSEDescription:
+          Status: ENABLED
+          SSEType: KMS
+          KMSMasterKeyArn: arn:aws:kms:us-east-1:111111111111:key/customer-cmk-12345
+        GlobalSecondaryIndexes: []
+        LocalSecondaryIndexes: []
+        DeletionProtectionEnabled: true
+        StreamSpecification:
+          StreamEnabled: true
+          StreamViewType: NEW_AND_OLD_IMAGES
+        TableSizeBytes: 536870912
+      Continuous backups (describe-continuous-backups):
+        ContinuousBackupsStatus: DISABLED
+      TTL (describe-time-to-live):
+        TimeToLiveDescription:
+          TimeToLiveStatus: ENABLED
+          AttributeName: expire_at
+      Emit the standard VERDICT block (TABLE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_PITR
+    assertions:
+      must_contain:
+        - "NO_PITR"
+        - "no-pitr-recovery-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNENCRYPTED"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: capacity-mismatch-no-autoscaling
+    description: >-
+      DynamoDB table with customer-managed SSE-KMS, PITR enabled, PROVISIONED
+      billing with fixed throughput and no autoscaling policy. The table is one
+      traffic burst away from throttling. Verdict: CAPACITY_MISMATCH.
+    input: |
+      Table name: capacity-mismatch-no-autoscaling
+      Table ARN: arn:aws:dynamodb:us-east-1:111111111111:table/capacity-mismatch-no-autoscaling
+      Table configuration (describe-table):
+        TableStatus: ACTIVE
+        BillingModeSummary:
+          BillingMode: PROVISIONED
+          LastUpdateToPayPerRequestDateTime: null
+        ProvisionedThroughput:
+          NumberOfDecreasesToday: 0
+          ReadCapacityUnits: 100
+          WriteCapacityUnits: 50
+        SSEDescription:
+          Status: ENABLED
+          SSEType: KMS
+          KMSMasterKeyArn: arn:aws:kms:us-east-1:111111111111:key/customer-cmk-12345
+        GlobalSecondaryIndexes: []
+        LocalSecondaryIndexes: []
+        DeletionProtectionEnabled: true
+        StreamSpecification:
+          StreamEnabled: true
+          StreamViewType: NEW_AND_OLD_IMAGES
+        TableSizeBytes: 2147483648
+      Autoscaling policies (application-autoscaling describe-scaling-policies):
+        ScalingPolicies: []
+      Continuous backups (describe-continuous-backups):
+        ContinuousBackupsStatus: ENABLED
+        PointInTimeRecoveryDescription:
+          PointInTimeRecoveryStatus: ENABLED
+      TTL (describe-time-to-live):
+        TimeToLiveDescription:
+          TimeToLiveStatus: ENABLED
+          AttributeName: expire_at
+      Emit the standard VERDICT block (TABLE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CAPACITY_MISMATCH
+    assertions:
+      must_contain:
+        - "CAPACITY_MISMATCH"
+        - "capacity-mismatch-no-autoscaling"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNENCRYPTED"
+        - "VERDICT: NO_PITR"
+
+  - id: config-gap-aws-managed-key-no-ttl
+    description: >-
+      DynamoDB table with SSE-KMS using AWS-managed key (alias/aws/dynamodb),
+      PITR enabled, on-demand billing, TTL disabled, deletion protection off.
+      No UNENCRYPTED/NO_PITR/CAPACITY_MISMATCH trigger, but multiple config gaps
+      accumulate. Verdict: CONFIG_GAP.
+    input: |
+      Table name: config-gap-aws-managed-key-no-ttl
+      Table ARN: arn:aws:dynamodb:us-east-1:111111111111:table/config-gap-aws-managed-key-no-ttl
+      Table configuration (describe-table):
+        TableStatus: ACTIVE
+        BillingModeSummary:
+          BillingMode: PAY_PER_REQUEST
+        SSEDescription:
+          Status: ENABLED
+          SSEType: KMS
+          KMSMasterKeyArn: arn:aws:kms:us-east-1:111111111111:alias/aws/dynamodb
+        GlobalSecondaryIndexes: []
+        LocalSecondaryIndexes: []
+        DeletionProtectionEnabled: false
+        StreamSpecification:
+          StreamEnabled: true
+          StreamViewType: NEW_IMAGE
+        TableSizeBytes: 134217728
+      Continuous backups (describe-continuous-backups):
+        ContinuousBackupsStatus: ENABLED
+        PointInTimeRecoveryDescription:
+          PointInTimeRecoveryStatus: ENABLED
+      TTL (describe-time-to-live):
+        TimeToLiveDescription:
+          TimeToLiveStatus: DISABLED
+      Emit the standard VERDICT block (TABLE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-aws-managed-key-no-ttl"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNENCRYPTED"
+        - "VERDICT: NO_PITR"
+
+  - id: ok-clean-production
+    description: >-
+      Fully hardened production DynamoDB table — customer-managed CMK, PITR on,
+      on-demand billing, TTL enabled, deletion protection on, streams on, 2 GSIs.
+      All dimensions pass. Verdict: OK.
+    input: |
+      Table name: ok-clean-production
+      Table ARN: arn:aws:dynamodb:us-east-1:111111111111:table/ok-clean-production
+      Table configuration (describe-table):
+        TableStatus: ACTIVE
+        BillingModeSummary:
+          BillingMode: PAY_PER_REQUEST
+        SSEDescription:
+          Status: ENABLED
+          SSEType: KMS
+          KMSMasterKeyArn: arn:aws:kms:us-east-1:111111111111:key/prod-cmk-67890
+        GlobalSecondaryIndexes:
+          - IndexName: gsi-status-index
+            IndexStatus: ACTIVE
+            KeySchema:
+              - AttributeName: status
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: gsi-created-at-index
+            IndexStatus: ACTIVE
+            KeySchema:
+              - AttributeName: created_at
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        LocalSecondaryIndexes: []
+        DeletionProtectionEnabled: true
+        StreamSpecification:
+          StreamEnabled: true
+          StreamViewType: NEW_AND_OLD_IMAGES
+        TableSizeBytes: 5368709120
+      Continuous backups (describe-continuous-backups):
+        ContinuousBackupsStatus: ENABLED
+        PointInTimeRecoveryDescription:
+          PointInTimeRecoveryStatus: ENABLED
+          EarliestRestorableDateTime: "2026-07-01T00:00:00Z"
+          LatestRestorableDateTime: "2026-08-05T12:00:00Z"
+      TTL (describe-time-to-live):
+        TimeToLiveDescription:
+          TimeToLiveStatus: ENABLED
+          AttributeName: expire_at
+      Emit the standard VERDICT block (TABLE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ok-clean-production"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: UNENCRYPTED"
+        - "VERDICT: NO_PITR"
+        - "VERDICT: CAPACITY_MISMATCH"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: unencrypted-and-no-pitr-worst-first
+    description: >-
+      DynamoDB table with BOTH SSE disabled (no KMS) AND PITR disabled. Tests
+      worst-first verdict aggregation: UNENCRYPTED outranks NO_PITR. Verdict:
+      UNENCRYPTED (with NO_PITR as an additional finding).
+    input: |
+      Table name: unencrypted-and-no-pitr-worst-first
+      Table ARN: arn:aws:dynamodb:us-east-1:111111111111:table/unencrypted-and-no-pitr-worst-first
+      Table configuration (describe-table):
+        TableStatus: ACTIVE
+        BillingModeSummary:
+          BillingMode: PAY_PER_REQUEST
+        SSEDescription:
+          Status: DISABLED
+          SSEType: AES256
+        GlobalSecondaryIndexes: []
+        LocalSecondaryIndexes: []
+        DeletionProtectionEnabled: false
+        StreamSpecification:
+          StreamEnabled: false
+        TableSizeBytes: 268435456
+      Continuous backups (describe-continuous-backups):
+        ContinuousBackupsStatus: DISABLED
+      TTL (describe-time-to-live):
+        TimeToLiveDescription:
+          TimeToLiveStatus: DISABLED
+      Emit the standard VERDICT block (TABLE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: UNENCRYPTED
+    assertions:
+      must_contain:
+        - "UNENCRYPTED"
+        - "unencrypted-and-no-pitr-worst-first"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_PITR"
+        - "VERDICT: CONFIG_GAP"

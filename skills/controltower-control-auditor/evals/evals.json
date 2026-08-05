@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "controltower-control-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Control Tower Control Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "drifted-preventive-control",
+      "name": "Preventive control with SCP modified outside Control Tower — silent enforcement break",
+      "difficulty": "hard",
+      "prompt_file": "prompts/drifted-preventive-control.md",
+      "baseline_file": "baselines/drifted-preventive-control.md",
+      "expected_verdict": "DRIFT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["DRIFT", "drifted-preventive-control", "VERDICT", "REASON", "REMEDIATION", "SCP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: DISABLED_CONTROL", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "disabled-mandatory-control",
+      "name": "Mandatory control with FAILED status — SCP deployment failed, not enforcing",
+      "difficulty": "medium",
+      "prompt_file": "prompts/disabled-mandatory-control.md",
+      "baseline_file": "baselines/disabled-mandatory-control.md",
+      "expected_verdict": "DISABLED_CONTROL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["DISABLED_CONTROL", "disabled-mandatory-control", "VERDICT", "REASON", "REMEDIATION", "mandatory"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: DRIFT", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "config-recorder-disabled-gap",
+      "name": "Config recorder disabled in a managed account — detective controls silently dead",
+      "difficulty": "medium",
+      "prompt_file": "prompts/config-recorder-disabled-gap.md",
+      "baseline_file": "baselines/config-recorder-disabled-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-recorder-disabled-gap", "VERDICT", "REASON", "REMEDIATION", "Config"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: DRIFT", "VERDICT: DISABLED_CONTROL"]
+        }
+      ]
+    },
+    {
+      "id": "landing-zone-healthy-ok",
+      "name": "All controls enabled, no drift, Config healthy — clean posture",
+      "difficulty": "easy",
+      "prompt_file": "prompts/landing-zone-healthy-ok.md",
+      "baseline_file": "baselines/landing-zone-healthy-ok.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "landing-zone-healthy-ok", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: DRIFT", "VERDICT: DISABLED_CONTROL", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "landing-zone-modified-drift",
+      "name": "Landing zone baseline StackSets modified — landing zone drift detected",
+      "difficulty": "hard",
+      "prompt_file": "prompts/landing-zone-modified-drift.md",
+      "baseline_file": "baselines/landing-zone-modified-drift.md",
+      "expected_verdict": "DRIFT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["DRIFT", "landing-zone-modified-drift", "VERDICT", "REASON", "REMEDIATION", "drift"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: DISABLED_CONTROL", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "execution-role-missing-gap",
+      "name": "AWSControlTowerExecutionRole missing in a managed account — account stranded",
+      "difficulty": "medium",
+      "prompt_file": "prompts/execution-role-missing-gap.md",
+      "baseline_file": "baselines/execution-role-missing-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "execution-role-missing-gap", "VERDICT", "REASON", "REMEDIATION", "ExecutionRole"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: DRIFT", "VERDICT: DISABLED_CONTROL"]
+        }
+      ]
+    }
+  ]
+}

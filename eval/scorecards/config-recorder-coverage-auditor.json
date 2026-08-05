@@ -1,0 +1,70 @@
+{
+  "skill": "config-recorder-coverage-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Adds multiple expert\u2011level nuances not typically known to a baseline model: cost impact of allSupported, the rule that includeGlobalResourceTypes must be enabled in exactly one region, organization\u2011level conformance pack visibility, pagination & throttling back\u2011off strategy, stale LastEvaluationTime detection, and the overwrite behavior of put\u2011configuration\u2011recorder. These constitute genuine delta, but it omits a few niche edge\u2011cases (e.g., explicit handling of Config rule quota breach beyond a brief note), so not a perfect 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a clear AWS\u2011specific decision flow (Step\u202f0\u20115), pre\u2011flight IAM checks, multi\u2011region iteration, and remediation gates. The procedure is concrete and ordered. A minor deduction because some steps are described in prose rather than a concise checklist, leaving a tiny amount of generic wording."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "A comprehensive NEVER list covers all common pitfalls with specific reasoning (e.g., never trust recorder config without status, never treat includeGlobalResourceTypes=true in many regions as a problem, never assume conformance\u2011pack name means active rules, never ignore missing service\u2011linked role, etc.). No generic warnings are present."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Front\u2011matter is complete and well\u2011structured; description, when_to_use, activation_triggers, and invocation_schema are all present and unambiguous, enabling reliable skill activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "The document layers information (high\u2011level Mindset, then Critical Rules, Quick Reference, deep Process, Anti\u2011Patterns, Remediation). The length and early placement of the extensive anti\u2011pattern section can overload a first read, but overall the hierarchy is logical."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts, backup commands, and cost warnings; creative/diagnostic tasks are left flexible. Calibration matches fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Critical Rules \u2192 Quick Reference \u2192 Process \u2192 Anti\u2011Patterns \u2192 Remediation). The only minor deviation is the intermixing of YAML front\u2011matter with narrative sections, which slightly breaks a pure template pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a full decision tree, output format, pagination/throttling handling, and concrete remediation commands. Missing is explicit support for organization\u2011level conformance packs in the invocation schema and a concrete malformed\u2011input example beyond a generic error block, which could cause false NO_RULES verdicts."
+    }
+  ],
+  "total_score": 113,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 43031,
+  "latency_ms": 35588,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

@@ -1,0 +1,272 @@
+# Eval test cases for cloudtrail-org-trail-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudtrail-org-trail-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: org-trail-ok
+    description: >-
+      Organization trail with all dimensions configured: multi-region, KMS
+      encryption, log file validation, CloudWatch Logs delivery, Insights
+      enabled, 365-day retention, global service events — clean posture.
+    input: |
+      Audit the following CloudTrail trail configuration. Emit the standard
+      VERDICT block (TRAIL, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Trail name: org-trail-ok
+      Trail ARN: arn:aws:cloudtrail:us-east-1:111111111111:trail/org-trail-ok
+      S3BucketName: org-trail-ok-logs-111111111111
+
+      Trail configuration (describe-trails):
+        IsOrganizationTrail: true
+        IsMultiRegionTrail: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/org-trail-ok-kms-key
+        LogFileValidationEnabled: true
+        IncludeGlobalServiceEvents: true
+        CloudWatchLogsLogGroupArn: arn:aws:logs:us-east-1:111111111111:log-group:cloudtrail-org-trail-ok:*
+        CloudWatchLogsRoleArn: arn:aws:iam::111111111111:role/CloudTrail-CW-org-trail-ok
+
+      Trail status (get-trail-status):
+        IsLogging: true
+
+      Insights selectors (get-insight-selectors):
+        - InsightType: ApiCallRateInsight
+        - InsightType: ApiErrorRateInsight
+
+      CloudWatch Logs log-group retention: 365 days
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "org-trail-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ORG_TRAIL"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: no-org-trail
+    description: >-
+      Single-account trail that is NOT an organization trail — no centralized
+      org-wide audit visibility into member-account API activity.
+    input: |
+      Audit the following CloudTrail trail configuration. Emit the standard
+      VERDICT block (TRAIL, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Trail name: no-org-trail
+      Trail ARN: arn:aws:cloudtrail:us-east-1:111111111111:trail/no-org-trail
+      S3BucketName: no-org-trail-logs-111111111111
+
+      Trail configuration (describe-trails):
+        IsOrganizationTrail: false
+        IsMultiRegionTrail: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/no-org-trail-kms
+        LogFileValidationEnabled: true
+        IncludeGlobalServiceEvents: true
+        CloudWatchLogsLogGroupArn: arn:aws:logs:us-east-1:111111111111:log-group:no-org-trail-cw:*
+        CloudWatchLogsRoleArn: arn:aws:iam::111111111111:role/CloudTrail-CW-no-org-trail
+
+      Trail status (get-trail-status):
+        IsLogging: true
+
+      Insights selectors (get-insight-selectors):
+        - InsightType: ApiCallRateInsight
+        - InsightType: ApiErrorRateInsight
+
+      CloudWatch Logs log-group retention: 365 days
+    expected_verdict: NO_ORG_TRAIL
+    assertions:
+      must_contain:
+        - "NO_ORG_TRAIL"
+        - "no-org-trail"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+
+  - id: org-trail-no-encryption
+    description: >-
+      Organization trail that is multi-region with validation and Insights,
+      but KmsKeyId is null — logs delivered to S3 with SSE-S3 (Amazon-managed
+      key), not customer-controlled SSE-KMS.
+    input: |
+      Audit the following CloudTrail trail configuration. Emit the standard
+      VERDICT block (TRAIL, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Trail name: org-trail-no-encryption
+      Trail ARN: arn:aws:cloudtrail:us-east-1:111111111111:trail/org-trail-no-encryption
+      S3BucketName: org-trail-no-encryption-logs-111111111111
+
+      Trail configuration (describe-trails):
+        IsOrganizationTrail: true
+        IsMultiRegionTrail: true
+        KmsKeyId: null
+        LogFileValidationEnabled: true
+        IncludeGlobalServiceEvents: true
+        CloudWatchLogsLogGroupArn: arn:aws:logs:us-east-1:111111111111:log-group:org-trail-no-encryption-cw:*
+        CloudWatchLogsRoleArn: arn:aws:iam::111111111111:role/CloudTrail-CW-no-encryption
+
+      Trail status (get-trail-status):
+        IsLogging: true
+
+      Insights selectors (get-insight-selectors):
+        - InsightType: ApiCallRateInsight
+        - InsightType: ApiErrorRateInsight
+
+      CloudWatch Logs log-group retention: 365 days
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "org-trail-no-encryption"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+
+  - id: org-trail-no-validation
+    description: >-
+      Organization trail with KMS encryption and Insights enabled, but
+      LogFileValidationEnabled is false — no digest files, tampering
+      undetectable.
+    input: |
+      Audit the following CloudTrail trail configuration. Emit the standard
+      VERDICT block (TRAIL, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Trail name: org-trail-no-validation
+      Trail ARN: arn:aws:cloudtrail:us-east-1:111111111111:trail/org-trail-no-validation
+      S3BucketName: org-trail-no-validation-logs-111111111111
+
+      Trail configuration (describe-trails):
+        IsOrganizationTrail: true
+        IsMultiRegionTrail: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/org-trail-no-validation-kms
+        LogFileValidationEnabled: false
+        IncludeGlobalServiceEvents: true
+        CloudWatchLogsLogGroupArn: arn:aws:logs:us-east-1:111111111111:log-group:org-trail-no-validation-cw:*
+        CloudWatchLogsRoleArn: arn:aws:iam::111111111111:role/CloudTrail-CW-no-validation
+
+      Trail status (get-trail-status):
+        IsLogging: true
+
+      Insights selectors (get-insight-selectors):
+        - InsightType: ApiCallRateInsight
+        - InsightType: ApiErrorRateInsight
+
+      CloudWatch Logs log-group retention: 365 days
+    expected_verdict: NO_VALIDATION
+    assertions:
+      must_contain:
+        - "NO_VALIDATION"
+        - "org-trail-no-validation"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+
+  - id: org-trail-no-insights
+    description: >-
+      Organization trail with KMS encryption and log file validation enabled,
+      but no CloudTrail Insights selectors configured — no anomaly detection
+      on API call volume or error rates.
+    input: |
+      Audit the following CloudTrail trail configuration. Emit the standard
+      VERDICT block (TRAIL, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Trail name: org-trail-no-insights
+      Trail ARN: arn:aws:cloudtrail:us-east-1:111111111111:trail/org-trail-no-insights
+      S3BucketName: org-trail-no-insights-logs-111111111111
+
+      Trail configuration (describe-trails):
+        IsOrganizationTrail: true
+        IsMultiRegionTrail: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/org-trail-no-insights-kms
+        LogFileValidationEnabled: true
+        IncludeGlobalServiceEvents: true
+        CloudWatchLogsLogGroupArn: arn:aws:logs:us-east-1:111111111111:log-group:org-trail-no-insights-cw:*
+        CloudWatchLogsRoleArn: arn:aws:iam::111111111111:role/CloudTrail-CW-no-insights
+
+      Trail status (get-trail-status):
+        IsLogging: true
+
+      Insights selectors (get-insight-selectors):
+        (empty — no selectors configured)
+
+      CloudWatch Logs log-group retention: 365 days
+    expected_verdict: NO_INSIGHTS
+    assertions:
+      must_contain:
+        - "NO_INSIGHTS"
+        - "org-trail-no-insights"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+
+  - id: org-trail-config-gap
+    description: >-
+      Organization trail with KMS encryption, validation, and Insights, but
+      single-region only, no CloudWatch Logs delivery, global service events
+      disabled, and no CloudWatch Logs retention — multiple config gaps.
+    input: |
+      Audit the following CloudTrail trail configuration. Emit the standard
+      VERDICT block (TRAIL, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Trail name: org-trail-config-gap
+      Trail ARN: arn:aws:cloudtrail:us-east-1:111111111111:trail/org-trail-config-gap
+      S3BucketName: org-trail-config-gap-logs-111111111111
+
+      Trail configuration (describe-trails):
+        IsOrganizationTrail: true
+        IsMultiRegionTrail: false
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/org-trail-config-gap-kms
+        LogFileValidationEnabled: true
+        IncludeGlobalServiceEvents: false
+        CloudWatchLogsLogGroupArn: null
+        CloudWatchLogsRoleArn: null
+
+      Trail status (get-trail-status):
+        IsLogging: true
+
+      Insights selectors (get-insight-selectors):
+        - InsightType: ApiCallRateInsight
+        - InsightType: ApiErrorRateInsight
+
+      CloudWatch Logs log-group retention: N/A (no log group configured)
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "org-trail-config-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"

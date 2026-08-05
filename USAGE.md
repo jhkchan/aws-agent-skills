@@ -38,6 +38,7 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-ebs-volume` | 2 Audit | Audit EBS volumes and snapshots for unencrypted state, unattached cost waste, legacy gp2/io1/standard volume types (gp3/io2 upgrade), stale snapshots (with FSR cost-dominance check), and public-snapshot block-data exposure — emits UNENCRYPTED/UNATTACHED/LEGACY_TYPE/STALE_SNAPSHOT/PUBLIC_SNAPSHOT/OK per resource (routes to `ebs-volume-auditor`) |
 | `/aws:audit-budgets` | 2 Audit | Audit AWS Budgets for cost-overrun blind spots — zero budgets, decorative budgets (no notifications), SNS topic policies that silently block delivery (missing budgets.amazonaws.com publish), single-threshold/no-forecast alerts, breached or on-track-to-breach spend, and missing zero-spend guardrails for new accounts — emits NO_BUDGET/NO_ALERT/CONFIG_GAP/OK per account (routes to `budgets-auditor`) |
 | `/aws:audit-route53-records` | 2 Audit | Audit Route 53 records for missing health checks on weighted/failover/latency routing, dangling ALIAS targets, DNSSEC gaps, public-zone private-IP exposure, TTL inconsistency — emits NO_HEALTH_CHECK/DNSSEC_GAP/DANGLING/CONFIG_GAP/OK per record (routes to `route53-record-auditor`) |
+| `/aws:audit-auditmanager-assessment` | 2 Audit | Audit Audit Manager assessments for evidence-collection integrity (stopped/INACTIVE, Config/CloudTrail data-source breaks, NOT_ASSESSED burden), compliance rate, delegation wiring, and settings posture (KMS/SNS/reports-destination/process-owners) — emits INCOMPLETE_EVIDENCE/LOW_COMPLIANCE/CONFIG_GAP/OK per assessment (routes to `auditmanager-assessment-auditor`) |
 | `/aws:audit-cur-cost-usage-report` | 2 Audit | Audit Cost and Usage Report (CUR) for coverage, staleness, report version, Athena integration, S3 versioning, and time-horizon health — emits NO_CUR/STALE/CONFIG_GAP/OK per report (routes to `cur-cost-usage-report-auditor`) |
 | `/aws:audit-cost-optimization-hub` | 2 Audit | Audit Cost Optimization Hub for recommendation enablement, member-account coverage, effort-level distribution, and stale high-value unactioned recommendations — emits DISABLED/NO_MEMBER_ACCOUNTS/HIGH_EFFORT/CONFIG_GAP/OK per account (routes to `cost-optimization-hub-recommendations-auditor`) |
 | `/aws:audit-billing-account` | 2 Audit | Audit AWS account billing posture — root MFA and access keys, IAM user/group billing access delegation, Cost Anomaly Detection enablement, billing budgets, and free-tier usage alerts — emits ROOT_BILLING/NO_ANOMALY_DETECTION/CONFIG_GAP/OK per account (routes to `billing-account-auditor`) |
@@ -45,6 +46,14 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-elbv2-load-balancer` | 2 Audit | Audit ALB/NLB for insecure TLS listener policies (TLS 1.0/1.1, weak ciphers), disabled access logs, permissive security groups, idle load balancers (no targets), disabled cross-zone (NLB), and missing deletion protection — emits INSECURE_LISTENER/NO_ACCESS_LOGS/PERMISSIVE_SG/IDLE/CONFIG_GAP/OK per LB (routes to `elbv2-load-balancer-auditor`) |
 | `/aws:audit-networkmanager-core-network` | 2 Audit | Audit Network Manager (Cloud WAN) core networks for detached attachments, permissive resource/segment policies, CIDR overlap, and LATEST-vs-LIVE policy mismatch — emits DETACHED_ATTACHMENT/PERMISSIVE_POLICY/CIDR_OVERLAP/CONFIG_GAP/OK per core network (routes to `networkmanager-core-network-auditor`) |
 | `/aws:audit-directconnect-topology` | 2 Audit | Audit Direct Connect topology for single-path failure risk (same-POP pseudo-diversity), MACSec `should_encrypt`/`no_encrypt` on capable hardware, public-VIF BGP MD5 (route-hijack defence), VIF redundancy via DXGW, and LOA-CFA provisioning state — emits SINGLE_CONNECTION/NO_ENCRYPTION/CONFIG_GAP/OK per topology (routes to `directconnect-auditor`) |
+| `/aws:audit-cloudtrail-org-trail` | 2 Audit | Audit CloudTrail organization trails for org coverage, multi-region logging, KMS encryption (SSE-KMS), log-file validation (digest integrity), CloudWatch Logs delivery, CloudTrail Insights enablement, and log retention — emits NO_ORG_TRAIL/NO_ENCRYPTION/NO_VALIDATION/NO_INSIGHTS/CONFIG_GAP/OK per trail (routes to `cloudtrail-org-trail-auditor`) |
+| `/aws:audit-dynamodb-table` | 2 Audit | Audit DynamoDB tables for encryption (KMS), PITR, capacity mode (on-demand vs provisioned w/ autoscaling), TTL, backup, GSI/LSI quota risk, and deletion protection — emits UNENCRYPTED/NO_PITR/CAPACITY_MISMATCH/CONFIG_GAP/OK per table (routes to `dynamodb-table-auditor`) |
+| `/aws:audit-config-recorder-coverage` | 2 Audit | Audit AWS Config recorder coverage (allSupported, includeGlobalResourceTypes), delivery channel health (FAILURE status, NO_SUCH_BUCKET, ACCESS_DENIED), Config rules deployment, and conformance packs (deployment status) — emits INCOMPLETE_COVERAGE/NO_RULES/DELIVERY_GAP/CONFIG_GAP/OK per region (routes to `config-recorder-coverage-auditor`) |
+| `/aws:audit-trustedadvisor-checks` | 2 Audit | Audit Trusted Advisor check results for security, fault-tolerance, cost-optimization, performance, and service-limits findings — including support-tier gating (Basic/Developer = 7 of ~115 checks), stale results (>24h), excluded-resource blind spots, and `not_available` statuses — emits CRITICAL_CHECK/WARNING_CHECK/CONFIG_GAP/OK per check (routes to `trustedadvisor-check-auditor`) |
+| `/aws:audit-rds-instance` | 2 Audit | Audit RDS DB instances for public accessibility (internet-exposed database), encryption-at-rest (immutable post-creation), deletion protection, Multi-AZ availability, automated backups / PITR, auto minor-version upgrade, and Enhanced Monitoring — emits PUBLIC/UNENCRYPTED/NO_DELETION_PROTECTION/SINGLE_AZ/CONFIG_GAP/OK per instance (routes to `rds-instance-auditor`) |
+| `/aws:audit-controltower-controls` | 2 Audit | Audit Control Tower landing-zone state, enabled controls (preventive/detective/proactive), SCP drift, guardrail enforcement integrity, Config recorder gaps, and account-factory baseline health — emits DRIFT/DISABLED_CONTROL/CONFIG_GAP/OK per OU or landing zone (routes to `controltower-control-auditor`) |
+| `/aws:audit-wellarchitected-workload` | 2 Audit | Audit Well-Architected Tool workloads for review staleness (effectiveReviewDate > 180 days), per-pillar high-risk issue counts (security zero-tolerance + aggregate > 5), milestone tracking gaps, UNANSWERED majority, and remediation plan completeness — emits STALE_REVIEW/HIGH_RISK/CONFIG_GAP/OK per workload (routes to `wellarchitected-workload-auditor`) |
+| `/aws:audit-organizations-scp` | 2 Audit | Audit Organizations SCPs for effective permissions across the OU hierarchy — FullAWSAccess inheritance, deny-list guardrails (LeaveOrganization, security-service disruption, region restriction), account-level overrides, silently ineffective condition keys — emits PERMISSIVE_SCP/MISSING_GUARDRAIL/CONFIG_GAP/OK per target (routes to `organizations-scp-auditor`) |
 
 Every command has a natural-language equivalent — the orchestrator routes
 identically.
@@ -1976,6 +1985,355 @@ for a multi-finding walkthrough (frequency mismatch + threshold
 miscalibration + low coverage) covering the frequency-vs-detection-
 cadence distinction, the coverage-vs-utilization distinction, and the
 additive remediation ordering.
+
+---
+
+### 29. dynamodb-table-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-dynamodb-table`
+
+**What it does:** Audits DynamoDB table configurations for encryption-at-rest
+(KMS — customer-managed CMK vs AWS-managed vs default AES256), point-in-time
+recovery (PITR), capacity mode (on-demand vs provisioned with autoscaling,
+including GSI cascade-throttle detection), TTL configuration, backup posture,
+GSI/LSI quota risk, and deletion protection. Emits a deterministic verdict
+(UNENCRYPTED | NO_PITR | CAPACITY_MISMATCH | CONFIG_GAP | OK) per table with
+enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this DynamoDB table"
+- "is my DynamoDB table encrypted"
+- "check PITR on DynamoDB"
+- "DynamoDB capacity mode"
+- "DynamoDB backup posture"
+- "is deletion protection enabled"
+- "GSI quota DynamoDB"
+- "DynamoDB autoscaling missing"
+- "harden DynamoDB table"
+- "DynamoDB compliance audit"
+- reviewing a DynamoDB table before production deployment or SOC2/PCI review
+
+**Example prompt:**
+
+```
+You: "This DynamoDB table has SSE disabled, PITR off, and no autoscaling.
+     Production cutover is tomorrow — what's the verdict and remediation?"
+```
+
+**Expected behavior:**
+
+1. Applies the ordered classification (encryption → PITR → capacity → config).
+2. Emits VERDICT: UNENCRYPTED (Step 1 — worst finding wins; SSE disabled means
+   no customer-controlled KMS encryption).
+3. Enumerates NO_PITR and any CONFIG_GAP findings as additional line items.
+4. Provides ordered CLI remediation: enable SSE-KMS with customer CMK, enable
+   PITR, set up autoscaling or switch to on-demand, enable deletion protection.
+
+**End-to-end scenario:** see
+[`skills/dynamodb-table-auditor/examples/end-to-end.md`](skills/dynamodb-table-auditor/examples/end-to-end.md)
+for a production-readiness audit walkthrough (SSE disabled + PITR disabled +
+no deletion protection) covering worst-first aggregation, the
+"UNENCRYPTED does not mean plaintext" concept, and the per-finding CLI
+remediation workflow.
+
+---
+
+### 35. trustedadvisor-check-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-trustedadvisor-checks`
+
+**What it does:** Audits AWS Trusted Advisor check results across all five
+pillars (Cost Optimization, Performance, Security, Fault Tolerance, Service
+Limits) for actionable findings, recommended actions, and structural gaps
+that undermine trust in TA data. Checks for support-tier gating
+(Basic/Developer exposes ~7 of ~115 checks — CONFIG_GAP for limited
+coverage), stale check results (timestamp > 24 hours renders an `ok` status
+unreliable), `not_available` status (check could not evaluate — different
+from `ok`), excluded resources (permanently hidden findings that persist
+across refreshes), and graduated service-limits severity (>= 100% =
+CRITICAL, 80-99% = WARNING). Applies a category-severity matrix: Security
+and Fault Tolerance errors are CRITICAL_CHECK, Cost Optimization and
+Performance errors are WARNING_CHECK. Emits a deterministic verdict
+(CRITICAL_CHECK | WARNING_CHECK | CONFIG_GAP | OK) per check with
+enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit Trusted Advisor checks"
+- "review TA findings"
+- "is TA configured correctly"
+- "check support tier coverage"
+- "stale Trusted Advisor results"
+- "excluded TA resources"
+- "not_available TA check"
+- "service limit exceeded"
+- "cost optimization findings"
+- "fault tolerance findings"
+- "Basic support limited checks"
+- "compliance review Trusted Advisor"
+- reviewing TA check results before a compliance or operational review
+
+**Example prompt:**
+
+```
+You: "Review these Trusted Advisor check results before the compliance
+     audit. One of them might be stale — I grabbed the export 3 days ago."
+```
+
+**Expected behavior:**
+
+1. Classifies the security check with `error` status (open RDP port 3389
+   to 0.0.0.0/0) as CRITICAL_CHECK — Step 2, Security pillar errors are
+   always CRITICAL.
+2. Classifies the cost check with `error` status (idle EBS volume) as
+   WARNING_CHECK — Step 2, Cost Optimization errors are WARNING, never
+   CRITICAL (cost waste does not cause breaches).
+3. Catches the stale result (4-day-old timestamp on the CloudTrail check)
+   as CONFIG_GAP — Step 1, an `ok` status from 96 hours ago is not
+   trustworthy for a compliance audit.
+4. Distinguishes between category severities explicitly so the operator
+   triages the security exposure before the cost waste.
+
+**End-to-end scenario:** see
+[`skills/trustedadvisor-check-auditor/examples/end-to-end.md`](skills/trustedadvisor-check-auditor/examples/end-to-end.md)
+for a multi-check walkthrough (security error + cost error + stale ok)
+covering the category-severity matrix, staleness-as-CONFIG_GAP reasoning,
+and per-finding CLI remediation ordering.
+
+---
+
+### 30. rds-instance-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-rds-instance`
+
+**What it does:** Audits AWS RDS DB instances across the seven high-impact
+configuration dimensions that drive data-loss and outage incidents — public
+accessibility (`PubliclyAccessible: true` is an internet-exposed database and
+the worst-impact RDS misconfiguration), encryption-at-rest (immutable after
+creation — remediation is a snapshot migration, not a toggle), deletion
+protection (single API call can destroy the instance), Multi-AZ availability
+(standby failover for AZ resilience), automated-backup / PITR retention
+(`0` disables point-in-time recovery entirely), auto minor-version upgrade
+(patching hygiene during the maintenance window), and Enhanced Monitoring
+(OS-level metrics). Defers Aurora engines to the DBCluster block for
+encryption/deletion/Multi-AZ/retention — those are cluster-level properties.
+Emits a deterministic verdict
+(PUBLIC | UNENCRYPTED | NO_DELETION_PROTECTION | SINGLE_AZ | CONFIG_GAP | OK)
+per instance with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this RDS instance"
+- "is my database public"
+- "check RDS encryption"
+- "is deletion protection enabled"
+- "are automated backups on"
+- "Multi-AZ check"
+- "minor version upgrade"
+- "Enhanced Monitoring off"
+- "harden RDS instance"
+- "PubliclyAccessible true"
+- "BackupRetentionPeriod zero"
+- reviewing an RDS instance before production deployment or a compliance audit
+
+**Example prompt:**
+
+```
+You: "We inherited this MySQL instance from a team that left in a hurry.
+     PubliclyAccessible is true and StorageEncrypted is false. Give me the
+     verdict and the remediation plan before we onboard payments to it."
+```
+
+**Verdict shape:** `PUBLIC | UNENCRYPTED | NO_DELETION_PROTECTION | SINGLE_AZ | CONFIG_GAP | OK`
+
+**End-to-end scenario:** see
+[`skills/rds-instance-auditor/examples/end-to-end.md`](skills/rds-instance-auditor/examples/end-to-end.md)
+for a public-and-unencrypted audit walkthrough covering severity aggregation
+(PUBLIC worst, UNENCRYPTED secondary), the immutability-of-encryption concept
+(snapshot migration, not `modify-db-instance`), and the per-finding CLI
+remediation workflow.
+
+
+### 36. controltower-control-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-controltower-controls` — or route via `/aws:pipeline`.
+
+**What it does:** Audits AWS Control Tower landing-zone state, enabled
+controls (preventive, detective, proactive), guardrail enforcement
+integrity, and account-factory baseline health. Cross-references the
+underlying enforcement mechanism (SCP content, Config Rule existence,
+CloudFormation hook presence, execution role, Config recorder) against the
+Control Tower registry state — because a control showing ENABLED does not
+mean it is enforcing. Emits a deterministic verdict
+(DRIFT | DISABLED_CONTROL | CONFIG_GAP | OK) per OU or landing zone with
+enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit control tower"
+- "check landing zone drift"
+- "control tower guardrails"
+- "enabled controls status"
+- "control drift detection"
+- "account factory baseline"
+- "mandatory controls disabled"
+- "SCP drift control tower"
+- "config recorder gap"
+- "AWSControlTowerExecutionRole missing"
+- "landing zone upgrade check"
+- reviewing Control Tower posture before a governance or compliance review
+
+**Example prompt:**
+
+```
+You: "This preventive control shows SUCCEEDED in Control Tower but the SCP
+     verification shows the Deny on port 22 was removed. What is the real
+     enforcement posture?"
+```
+
+**Expected behavior:**
+
+1. Applies the 7-step classification in dependency order (landing-zone drift
+   -> control-level drift -> mandatory control enforcement -> Config health
+   -> execution role -> account factory baseline -> aggregation).
+2. Emits VERDICT: DRIFT (Step 2 — SCP content mismatch, enforcement broken
+   while control shows SUCCEEDED).
+3. Cites the root cause: SCP was modified outside Control Tower via
+   organizations:UpdatePolicy; the control registry has not detected the
+   drift yet.
+4. Provides specific remediation: disable/re-enable control to re-deploy
+   canonical SCP, audit CloudTrail for the modification event.
+
+**Verdict shape:** `DRIFT | DISABLED_CONTROL | CONFIG_GAP | OK`
+
+**End-to-end scenario:** see
+[`skills/controltower-control-auditor/examples/end-to-end.md`](skills/controltower-control-auditor/examples/end-to-end.md)
+for a multi-finding audit walkthrough (SCP drift + Config recorder gap +
+execution role missing) covering severity aggregation, the silent-
+enforcement-break concept, and the disable/re-enable remediation workflow.
+
+
+---
+
+### 29. auditmanager-assessment-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-auditmanager-assessment`
+
+**What it does:** Audits AWS Audit Manager assessments for evidence-
+collection integrity, control compliance rate, delegation wiring, and
+account-level settings posture. Evaluates assessment lifecycle state
+(ACTIVE vs stopped/INACTIVE), the data-source dependency chain (AWS Config
+recording + CloudTrail management-event logging), NOT_ASSESSED burden,
+FAIL burden, framework scope coverage, KMS-key/SNS-topic/reports-
+destination/process-owner configuration, and outstanding delegations.
+Emits a deterministic verdict (INCOMPLETE_EVIDENCE | LOW_COMPLIANCE |
+CONFIG_GAP | OK) per assessment with enumerated findings and CLI
+remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this Audit Manager assessment"
+- "is my assessment evidence complete"
+- "is the compliance score trustworthy"
+- "stopped assessment — stale evidence"
+- "NOT_ASSESSED controls — data-source problem"
+- "Audit Manager settings gap"
+- "assessment delegation pending"
+- "compliance report readiness"
+- reviewing an Audit Manager assessment before generating a compliance
+  report
+
+**Example prompt:**
+
+```
+You: "This SOC 2 assessment shows 31% compliance and status INACTIVE.
+     Is this number trustworthy enough to put in the compliance report?"
+```
+
+**Expected behavior:**
+
+1. Classifies the assessment as INCOMPLETE_EVIDENCE — status INACTIVE
+   since 2026-02-14 (Step 1a, frozen score), and 42% of controls are
+   NOT_ASSESSED with Config recorder OFF in account 222222222222
+   (Step 1b, data-source break).
+2. Distinguishes evidence-integrity from compliance: the 31% compliance
+   is driven by NOT_ASSESSED (collection gap), not by FAIL (control
+   failure). The correct remediation is to repair Config + reactivate
+   the assessment, not to chase failing controls.
+3. Provides the data-source-repair remediation chain: repair Config,
+   reactivate, wait one collection cycle (~24h), re-baseline the
+   compliance %, then generate the report.
+
+**End-to-end scenario:** see
+[`skills/auditmanager-assessment-auditor/examples/end-to-end.md`](skills/auditmanager-assessment-auditor/examples/end-to-end.md)
+for a stopped-assessment walkthrough covering the evidence-integrity-over-
+compliance-number principle, the frozen-dashboard trap, and the
+data-source-repair remediation workflow.
+
+---
+
+### 37. organizations-scp-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-organizations-scp`
+
+**What it does:** Audits AWS Organizations Service Control Policies (SCPs)
+for effective permission boundaries across the OU hierarchy. Evaluates
+FullAWSAccess inheritance (deny-list vs allow-list mode), deny-list
+guardrails (organizations:LeaveOrganization, security-service disruption,
+region restriction via aws:RequestedRegion), account-level overrides,
+and silently ineffective Deny statements using unsupported service-specific
+condition keys (kms:ViaService, s3:prefix, ec2:ResourceTag). Emits a
+deterministic verdict (PERMISSIVE_SCP | MISSING_GUARDRAIL | CONFIG_GAP |
+OK) per target with enumerated findings and specific remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit these SCPs"
+- "check SCP guardrails"
+- "effective permissions for this OU"
+- "is LeaveOrganization denied?"
+- "FullAWSAccess strategy"
+- "SCP deny-list review"
+- "OU hierarchy security"
+- "organization guardrail audit"
+- reviewing SCPs before attaching to production OUs
+
+**Example prompt:**
+
+```
+You: "We just restructured our OU hierarchy and I'm seeing AccessDenied
+     everywhere. Here are our SCPs — root has FullAWSAccess detached
+     and a region lock. What's wrong?"
+```
+
+**Expected behavior:**
+
+1. Classifies the structural issue (FullAWSAccess detached with no Allow
+   replacement = CONFIG_GAP, Step 1a).
+2. Identifies that the region-restriction SCP uses a supported condition
+   key (aws:RequestedRegion) and would work once the Allow gap is fixed.
+3. Emits VERDICT: CONFIG_GAP with enumerated findings and re-attach
+   remediation (with operator-confirmation gate).
+
+**End-to-end scenario:** see
+[`skills/organizations-scp-auditor/examples/end-to-end.md`](skills/organizations-scp-auditor/examples/end-to-end.md)
+for a full OU-hierarchy audit walkthrough covering FullAWSAccess
+mode-switch mechanics, Deny absolutism across the inheritance chain,
+unsupported condition-key detection, and the additive-Deny-SCP
+remediation workflow.
 
 ---
 

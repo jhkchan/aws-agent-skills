@@ -1,0 +1,339 @@
+# Eval test cases for auditmanager-assessment-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# CRITICAL: the classification logic in SKILL.md (Steps 1-4) MUST match
+# these test cases exactly. Each test-case id slug is embedded in the
+# assessment name and id so the model naturally echoes it.
+skill: auditmanager-assessment-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: stopped-assessment-incomplete
+    description: >-
+      Assessment status INACTIVE (stopped) with NOT_ASSESSED 42% — evidence
+      collection is halted AND the data-source break accumulated before stop.
+      Highest-priority INCOMPLETE_EVIDENCE (Steps 1a + 1b).
+    input: |
+      Audit Manager assessment snapshot — emit the standard VERDICT block
+      (ASSESSMENT, FRAMEWORK, VERDICT, REASON, CONTROL BREAKDOWN, FINDINGS, REMEDIATION).
+
+      Assessment name: SOC2-Q1-2026-stopped-assessment-incomplete
+      Assessment id: arn:aws:auditmanager:us-east-1:111111111111:assessment/a-stopped-assessment-incomplete
+      Framework: SOC 2
+      Status: INACTIVE
+      Creation time: 2025-10-01
+      Last updated: 2026-02-14
+      Scope:
+        awsAccounts: [111111111111, 222222222222]
+        awsServices: [ec2, s3, iam, kms, rds, lambda, cloudtrail, config]
+
+      Control statistics (across all control sets):
+        total: 312
+        PASS: 98
+        FAIL: 41
+        NOT_ASSESSED: 131
+        MANUAL: 30
+        UNDER_REVIEW: 12
+
+      Settings:
+        kmsKey: arn:aws:kms:us-east-1:111111111111:key/audit-encryption
+        snsTopic: arn:aws:sns:us-east-1:111111111111:audit-notify
+        defaultAssessmentReportsDestination: s3://audit-reports/soc2/
+        defaultProcessOwners: [arn:aws:iam::111111111111:role/audit-reviewer]
+
+      Data sources (at last collection):
+        AWS Config recorder: ON (account 111111111111), OFF (account 222222222222)
+        CloudTrail management events: logging
+    expected_verdict: INCOMPLETE_EVIDENCE
+    assertions:
+      must_contain:
+        - "INCOMPLETE_EVIDENCE"
+        - "stopped-assessment-incomplete"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "INACTIVE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: LOW_COMPLIANCE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-recording-off-incomplete
+    description: >-
+      Assessment ACTIVE but AWS Config recorder OFF in an in-scope account —
+      NOT_ASSESSED 45% on an assessment old enough to have collected. Classic
+      silent data-source break (Step 1b).
+    input: |
+      Audit Manager assessment snapshot — emit the standard VERDICT block
+      (ASSESSMENT, FRAMEWORK, VERDICT, REASON, CONTROL BREAKDOWN, FINDINGS, REMEDIATION).
+
+      Assessment name: PCI-DSS-annual-config-recording-off-incomplete
+      Assessment id: arn:aws:auditmanager:us-east-1:111111111111:assessment/a-config-recording-off-incomplete
+      Framework: PCI DSS
+      Status: ACTIVE
+      Creation time: 2026-01-01
+      Last updated: 2026-08-04
+      Scope:
+        awsAccounts: [111111111111, 222222222222, 333333333333]
+        awsServices: [ec2, s3, iam, kms, rds, vpc, config]
+
+      Control statistics:
+        total: 220
+        PASS: 80
+        FAIL: 22
+        NOT_ASSESSED: 99
+        MANUAL: 12
+        UNDER_REVIEW: 7
+
+      Settings:
+        kmsKey: arn:aws:kms:us-east-1:111111111111:key/pci-audit-key
+        snsTopic: arn:aws:sns:us-east-1:111111111111:pci-audit-notify
+        defaultAssessmentReportsDestination: s3://pci-audit-reports/2026/
+        defaultProcessOwners: [arn:aws:iam::111111111111:role/pci-reviewer]
+
+      Data sources:
+        AWS Config recorder: OFF in account 222222222222 (recording: false), ON in others
+        CloudTrail management events: logging in all in-scope accounts
+
+      Delegations: all COMPLETE
+    expected_verdict: INCOMPLETE_EVIDENCE
+    assertions:
+      must_contain:
+        - "INCOMPLETE_EVIDENCE"
+        - "config-recording-off-incomplete"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "NOT_ASSESSED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: LOW_COMPLIANCE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: low-compliance-failures
+    description: >-
+      Assessment ACTIVE with evidence complete (NOT_ASSESSED 8%) but PASS 48%
+      and FAIL 44% — real control failures, not a data-source problem.
+      Steps 2a + 2b both fire.
+    input: |
+      Audit Manager assessment snapshot — emit the standard VERDICT block
+      (ASSESSMENT, FRAMEWORK, VERDICT, REASON, CONTROL BREAKDOWN, FINDINGS, REMEDIATION).
+
+      Assessment name: HIPAA-security-low-compliance-failures
+      Assessment id: arn:aws:auditmanager:us-east-1:111111111111:assessment/a-low-compliance-failures
+      Framework: HIPAA
+      Status: ACTIVE
+      Creation time: 2026-03-01
+      Last updated: 2026-08-04
+      Scope:
+        awsAccounts: [111111111111, 222222222222]
+        awsServices: [ec2, s3, iam, kms, rds, lambda]
+
+      Control statistics:
+        total: 180
+        PASS: 86
+        FAIL: 79
+        NOT_ASSESSED: 15
+        MANUAL: 0
+        UNDER_REVIEW: 0
+
+      Settings:
+        kmsKey: arn:aws:kms:us-east-1:111111111111:key/hipaa-key
+        snsTopic: arn:aws:sns:us-east-1:111111111111:hipaa-notify
+        defaultAssessmentReportsDestination: s3://hipaa-reports/2026/
+        defaultProcessOwners: [arn:aws:iam::111111111111:role/hipaa-reviewer]
+
+      Data sources:
+        AWS Config recorder: ON in all in-scope accounts
+        CloudTrail management events: logging in all in-scope accounts
+
+      Delegations: all COMPLETE
+    expected_verdict: LOW_COMPLIANCE
+    assertions:
+      must_contain:
+        - "LOW_COMPLIANCE"
+        - "low-compliance-failures"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "FAIL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INCOMPLETE_EVIDENCE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: missing-kms-sns-config-gap
+    description: >-
+      Assessment ACTIVE, evidence complete, compliance 88%, but kmsKey and
+      snsTopic are both unset in settings — Step 3 CONFIG_GAP.
+    input: |
+      Audit Manager assessment snapshot — emit the standard VERDICT block
+      (ASSESSMENT, FRAMEWORK, VERDICT, REASON, CONTROL BREAKDOWN, FINDINGS, REMEDIATION).
+
+      Assessment name: SOC2-annual-missing-kms-sns-config-gap
+      Assessment id: arn:aws:auditmanager:us-east-1:111111111111:assessment/a-missing-kms-sns-config-gap
+      Framework: SOC 2
+      Status: ACTIVE
+      Creation time: 2026-01-15
+      Last updated: 2026-08-04
+      Scope:
+        awsAccounts: [111111111111, 222222222222]
+        awsServices: [ec2, s3, iam, kms, rds]
+
+      Control statistics:
+        total: 150
+        PASS: 132
+        FAIL: 10
+        NOT_ASSESSED: 8
+        MANUAL: 0
+        UNDER_REVIEW: 0
+
+      Settings:
+        kmsKey: ""
+        snsTopic: ""
+        defaultAssessmentReportsDestination: s3://audit-reports/soc2-2026/
+        defaultProcessOwners: [arn:aws:iam::111111111111:role/audit-reviewer]
+
+      Data sources:
+        AWS Config recorder: ON in all in-scope accounts
+        CloudTrail management events: logging in all in-scope accounts
+
+      Delegations: all COMPLETE
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "missing-kms-sns-config-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "KMS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INCOMPLETE_EVIDENCE"
+        - "VERDICT: LOW_COMPLIANCE"
+
+  - id: no-process-owners-config-gap
+    description: >-
+      Assessment ACTIVE, evidence complete, compliance 92%, all settings set
+      EXCEPT defaultProcessOwners empty — no review pipeline. Step 3 CONFIG_GAP.
+    input: |
+      Audit Manager assessment snapshot — emit the standard VERDICT block
+      (ASSESSMENT, FRAMEWORK, VERDICT, REASON, CONTROL BREAKDOWN, FINDINGS, REMEDIATION).
+
+      Assessment name: ISO27001-annual-no-process-owners-config-gap
+      Assessment id: arn:aws:auditmanager:us-east-1:111111111111:assessment/a-no-process-owners-config-gap
+      Framework: ISO 27001
+      Status: ACTIVE
+      Creation time: 2026-02-01
+      Last updated: 2026-08-04
+      Scope:
+        awsAccounts: [111111111111, 222222222222]
+        awsServices: [ec2, s3, iam, kms, rds, lambda]
+
+      Control statistics:
+        total: 100
+        PASS: 92
+        FAIL: 3
+        NOT_ASSESSED: 5
+        MANUAL: 0
+        UNDER_REVIEW: 0
+
+      Settings:
+        kmsKey: arn:aws:kms:us-east-1:111111111111:key/iso-audit-key
+        snsTopic: arn:aws:sns:us-east-1:111111111111:iso-audit-notify
+        defaultAssessmentReportsDestination: s3://iso-reports/2026/
+        defaultProcessOwners: []
+
+      Data sources:
+        AWS Config recorder: ON in all in-scope accounts
+        CloudTrail management events: logging in all in-scope accounts
+
+      Delegations: all COMPLETE
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "no-process-owners-config-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "process owners"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: INCOMPLETE_EVIDENCE"
+        - "VERDICT: LOW_COMPLIANCE"
+
+  - id: healthy-assessment-ok
+    description: >-
+      Assessment ACTIVE, evidence complete (NOT_ASSESSED 2%), compliance 94%,
+      all settings configured, scope covers full org — clean posture. OK.
+    input: |
+      Audit Manager assessment snapshot — emit the standard VERDICT block
+      (ASSESSMENT, FRAMEWORK, VERDICT, REASON, CONTROL BREAKDOWN, FINDINGS, REMEDIATION).
+
+      Assessment name: SOC2-2026-healthy-assessment-ok
+      Assessment id: arn:aws:auditmanager:us-east-1:111111111111:assessment/a-healthy-assessment-ok
+      Framework: SOC 2
+      Status: ACTIVE
+      Creation time: 2026-01-01
+      Last updated: 2026-08-04
+      Scope:
+        awsAccounts: [111111111111, 222222222222]
+        awsServices: [ec2, s3, iam, kms, rds, lambda, cloudtrail, config]
+
+      Control statistics:
+        total: 200
+        PASS: 188
+        FAIL: 6
+        NOT_ASSESSED: 4
+        MANUAL: 2
+        UNDER_REVIEW: 0
+
+      Settings:
+        kmsKey: arn:aws:kms:us-east-1:111111111111:key/audit-encryption-key
+        snsTopic: arn:aws:sns:us-east-1:111111111111:audit-alerts
+        defaultAssessmentReportsDestination: s3://audit-reports/soc2-2026/
+        defaultProcessOwners: [arn:aws:iam::111111111111:role/audit-reviewer, arn:aws:iam::111111111111:role/compliance-lead]
+
+      Data sources:
+        AWS Config recorder: ON in all in-scope accounts
+        CloudTrail management events: logging in all in-scope accounts
+
+      Delegations: all COMPLETE
+
+      Org member accounts: [111111111111, 222222222222] (scope matches org — no gap)
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "healthy-assessment-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INCOMPLETE_EVIDENCE"
+        - "VERDICT: LOW_COMPLIANCE"
+        - "VERDICT: CONFIG_GAP"

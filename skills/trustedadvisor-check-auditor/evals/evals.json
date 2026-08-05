@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "trustedadvisor-check-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Trusted Advisor Check Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "security-sg-open-error",
+      "name": "Security check with error status — open SSH port 0.0.0.0/0",
+      "difficulty": "medium",
+      "prompt_file": "prompts/security-sg-open-error.md",
+      "baseline_file": "baselines/security-sg-open-error.md",
+      "expected_verdict": "CRITICAL_CHECK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CRITICAL_CHECK", "security-sg-open-error", "VERDICT", "REASON", "REMEDIATION", "Security"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: WARNING_CHECK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "service-limit-vpc-at-100",
+      "name": "Service Limits check at 100% of quota — VPC limit exhausted",
+      "difficulty": "hard",
+      "prompt_file": "prompts/service-limit-vpc-at-100.md",
+      "baseline_file": "baselines/service-limit-vpc-at-100.md",
+      "expected_verdict": "CRITICAL_CHECK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CRITICAL_CHECK", "service-limit-vpc-at-100", "VERDICT", "REASON", "REMEDIATION", "100"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: WARNING_CHECK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "cost-idle-ec2-error",
+      "name": "Cost Optimization check with error status — idle EC2 instances",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cost-idle-ec2-error.md",
+      "baseline_file": "baselines/cost-idle-ec2-error.md",
+      "expected_verdict": "WARNING_CHECK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["WARNING_CHECK", "cost-idle-ec2-error", "VERDICT", "REASON", "REMEDIATION", "Cost"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CRITICAL_CHECK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "basic-support-limited",
+      "name": "Basic support tier — only 7 of ~115 checks accessible",
+      "difficulty": "hard",
+      "prompt_file": "prompts/basic-support-limited.md",
+      "baseline_file": "baselines/basic-support-limited.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "basic-support-limited", "VERDICT", "REASON", "REMEDIATION", "Basic"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CRITICAL_CHECK", "VERDICT: WARNING_CHECK"]
+        }
+      ]
+    },
+    {
+      "id": "stale-check-result-72h",
+      "name": "Stale check result — ok status from 72 hours ago is unreliable",
+      "difficulty": "hard",
+      "prompt_file": "prompts/stale-check-result-72h.md",
+      "baseline_file": "baselines/stale-check-result-72h.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "stale-check-result-72h", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CRITICAL_CHECK", "VERDICT: WARNING_CHECK"]
+        }
+      ]
+    },
+    {
+      "id": "fault-tolerance-ok",
+      "name": "Fault Tolerance check with ok status, fresh result, Business support — clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/fault-tolerance-ok.md",
+      "baseline_file": "baselines/fault-tolerance-ok.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "fault-tolerance-ok", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: CRITICAL_CHECK", "VERDICT: WARNING_CHECK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

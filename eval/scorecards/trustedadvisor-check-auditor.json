@@ -1,0 +1,70 @@
+{
+  "skill": "trustedadvisor-check-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides concrete expert details not commonly known: exact support\u2011tier check coverage numbers, service\u2011limit percentage calculation rules, field\u2011name variations across API versions, exclusion persistence semantics, and the two\u2011namespace permission split. This goes beyond a generic model's baseline knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines AWS\u2011specific procedures: pre\u2011flight support\u2011tier detection, freshness validation, per\u2011resource status divergence handling, service\u2011limit severity computation, exclusion escalation, two\u2011phase summary\u2011then\u2011detail API pattern, and throttling\u2011aware refresh workflow. Only minor omission of a step\u2011by\u2011step org\u2011wide aggregation checklist."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., never treat security\u2011error as warning, never ignore stale results, never assume check\u2011level status is whole picture). Lacks a few niche pitfalls (e.g., ignoring IAM role limits in multi\u2011account orgs) but overall strong."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, keywords, activation triggers, and invocation schema are present. The \"entry_point: false\" flag is ambiguous and the description could more explicitly state the exact trigger conditions, resulting in a minor deduction."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: high\u2011level mindset, quick\u2011reference table, step\u2011wise process, deep reference, anti\u2011patterns, and remediation. Some users may need to scroll through many sections before reaching the core decision tree, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (refresh, exclusions) are gated by explicit confirmation and backoff guidance; classification tasks are left flexible. Only minor over\u2011constraint: the skill forces a confirmation prompt even for read\u2011only audits, which could be unnecessary in fully automated pipelines."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Quick reference \u2192 Stepwise Process \u2192 Output format \u2192 Anti\u2011patterns \u2192 Deep reference). The pattern is consistent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a deterministic decision tree, concrete CLI commands, worked examples, and error handling for malformed input. Lacks explicit handling of ambiguous timestamp formats and does not show a fallback when required fields are missing beyond a generic error block."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 40241,
+  "latency_ms": 16119,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}
