@@ -1,0 +1,70 @@
+{
+  "skill": "emr-cluster-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds deep EMR\u2011specific expertise not commonly known: double\u2011serialized SecurityConfiguration JSON, TLS certificate storage requirements, exact release\u2011label version constraints for in\u2011transit and local\u2011disk encryption, distinction between LUKS and EBS encryption, region\u2011level Block Public Access semantics, and the immutable nature of SecurityConfiguration on running clusters."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific audit workflow: fetch SecurityConfiguration by name, parse twice, evaluate three encryption planes, then sequentially assess IAM role wildcards, PassRole, debug logging, BPA, Kerberos, HA, and visibility flag. The order and required CLI calls are concrete, not generic \"check security\" advice."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., never trust a config name without fetching the JSON, never treat partial encryption as OK, never modify SecurityConfiguration on a live cluster, never overlook instance\u2011profile permissions, never assume BPA is enabled). Each anti\u2011pattern is tied to a real security impact."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter is complete and includes description, keywords, activation triggers, and an invocation schema. Minor shortcoming: the output schema is described only in prose (VERDICT\u202f\u2208\u202f{\u2026}) and not formally typed, which could hinder strict validation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (Mindset, Quick reference, Pre\u2011flight, Process, Output, Anti\u2011Patterns, Safety, Remediation) but the initial sections are dense, causing some cognitive overload before the core decision tree is reached."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive actions (SecurityConfiguration changes, role modifications) are gated by explicit confirmation prompts and warnings about immutability; audit operations are tightly scoped to required inputs. No over\u2011permissive freedom for fragile changes."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Remediation). The structure is consistent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides decision tree, concrete CLI commands, and worked examples that the model executed correctly. Lacks explicit handling for missing IAM policy data or API call failures, and the error path for incomplete inputs could be more detailed."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 33961,
+  "latency_ms": 12164,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 6
+}

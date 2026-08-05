@@ -1,0 +1,350 @@
+# Eval test cases for msk-cluster-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: msk-cluster-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: plaintext-broker
+    description: >-
+      MSK Provisioned cluster with ClientBroker PLAINTEXT — all client-to-broker
+      traffic is unencrypted. Highest-priority verdict NO_ENCRYPTION.
+    input: |
+      Audit the following Amazon MSK cluster configuration for security exposure.
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: plaintext-broker
+      Cluster ARN: arn:aws:kafka:us-east-1:111111111111:cluster/plaintext-broker
+      Cluster type: PROVISIONED
+      State: ACTIVE
+
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: PLAINTEXT
+          InClusterEncryption: false
+        EncryptionAtRest:
+          DataVolumeKMSKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-plaintext-broker
+
+      ClientAuthentication:
+        Sasl:
+          Iam:
+            Enabled: true
+        Unauthenticated:
+          Enabled: false
+
+      BrokerNodeGroupInfo:
+        ConnectivityInfo:
+          PublicAccess:
+            Type: DISABLED
+
+      LoggingInfo:
+        BrokerLogs:
+          CloudWatchLogs:
+            Enabled: true
+            LogGroup: /aws/kafka/plaintext-broker
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "plaintext-broker"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "PLAINTEXT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNAUTHENTICATED"
+        - "VERDICT: PUBLIC_ACCESS"
+
+  - id: unauthenticated-clients
+    description: >-
+      MSK cluster with TLS encryption enabled but unauthenticated client access
+      also enabled — anyone who can reach the brokers can produce and consume
+      without credentials.
+    input: |
+      Audit the following Amazon MSK cluster configuration for security exposure.
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: unauthenticated-clients
+      Cluster ARN: arn:aws:kafka:us-east-1:111111111111:cluster/unauthenticated-clients
+      Cluster type: PROVISIONED
+      State: ACTIVE
+
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: TLS
+          InClusterEncryption: true
+        EncryptionAtRest:
+          DataVolumeKMSKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-unauth-clients
+
+      ClientAuthentication:
+        Sasl:
+          Iam:
+            Enabled: true
+        Unauthenticated:
+          Enabled: true
+
+      BrokerNodeGroupInfo:
+        ConnectivityInfo:
+          PublicAccess:
+            Type: DISABLED
+
+      LoggingInfo:
+        BrokerLogs:
+          CloudWatchLogs:
+            Enabled: true
+            LogGroup: /aws/kafka/unauthenticated-clients
+    expected_verdict: UNAUTHENTICATED
+    assertions:
+      must_contain:
+        - "UNAUTHENTICATED"
+        - "unauthenticated-clients"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: PUBLIC_ACCESS"
+
+  - id: public-access-brokers
+    description: >-
+      MSK cluster with TLS encryption, SASL/IAM auth, no unauthenticated access,
+      but PublicAccess enabled (SERVICE_PROVIDED_EIPS) — brokers are exposed to
+      the internet via Elastic IPs.
+    input: |
+      Audit the following Amazon MSK cluster configuration for security exposure.
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: public-access-brokers
+      Cluster ARN: arn:aws:kafka:us-east-1:111111111111:cluster/public-access-brokers
+      Cluster type: PROVISIONED
+      State: ACTIVE
+
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: TLS
+          InClusterEncryption: true
+        EncryptionAtRest:
+          DataVolumeKMSKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-public-access
+
+      ClientAuthentication:
+        Sasl:
+          Iam:
+            Enabled: true
+        Unauthenticated:
+          Enabled: false
+
+      BrokerNodeGroupInfo:
+        ConnectivityInfo:
+          PublicAccess:
+            Type: SERVICE_PROVIDED_EIPS
+
+      LoggingInfo:
+        BrokerLogs:
+          S3:
+            Enabled: true
+            Bucket: msk-logs-public-access-brokers
+          CloudWatchLogs:
+            Enabled: true
+            LogGroup: /aws/kafka/public-access-brokers
+    expected_verdict: PUBLIC_ACCESS
+    assertions:
+      must_contain:
+        - "PUBLIC_ACCESS"
+        - "public-access-brokers"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: UNAUTHENTICATED"
+
+  - id: no-broker-logging
+    description: >-
+      MSK cluster with TLS encryption, IAM auth, no unauthenticated access, private
+      subnets, but all broker logging destinations are disabled — no forensic
+      record during an incident.
+    input: |
+      Audit the following Amazon MSK cluster configuration for security exposure.
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: no-broker-logging
+      Cluster ARN: arn:aws:kafka:us-east-1:111111111111:cluster/no-broker-logging
+      Cluster type: PROVISIONED
+      State: ACTIVE
+
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: TLS
+          InClusterEncryption: true
+        EncryptionAtRest:
+          DataVolumeKMSKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-no-logging
+
+      ClientAuthentication:
+        Sasl:
+          Iam:
+            Enabled: true
+        Unauthenticated:
+          Enabled: false
+
+      BrokerNodeGroupInfo:
+        ConnectivityInfo:
+          PublicAccess:
+            Type: DISABLED
+
+      LoggingInfo:
+        BrokerLogs:
+          CloudWatchLogs:
+            Enabled: false
+          S3:
+            Enabled: false
+          Firehose:
+            Enabled: false
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "no-broker-logging"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: tls-plaintext-mixed
+    description: >-
+      MSK cluster with ClientBroker TLS_PLAINTEXT — dual-mode listener publishes
+      both TLS and plaintext ports. Plaintext path breaks the encryption guarantee.
+      NO_ENCRYPTION verdict despite TLS also being available.
+    input: |
+      Audit the following Amazon MSK cluster configuration for security exposure.
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: tls-plaintext-mixed
+      Cluster ARN: arn:aws:kafka:us-east-1:111111111111:cluster/tls-plaintext-mixed
+      Cluster type: PROVISIONED
+      State: ACTIVE
+
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: TLS_PLAINTEXT
+          InClusterEncryption: true
+        EncryptionAtRest:
+          DataVolumeKMSKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-tls-plaintext
+
+      ClientAuthentication:
+        Tls:
+          Enabled: true
+          CertificateAuthorityArnList:
+            - arn:aws:acm-pca:us-east-1:111111111111:certificate-authority/abc-123
+        Sasl:
+          Iam:
+            Enabled: true
+        Unauthenticated:
+          Enabled: false
+
+      BrokerNodeGroupInfo:
+        ConnectivityInfo:
+          PublicAccess:
+            Type: DISABLED
+
+      LoggingInfo:
+        BrokerLogs:
+          S3:
+            Enabled: true
+            Bucket: msk-logs-tls-plaintext-mixed
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "tls-plaintext-mixed"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "TLS_PLAINTEXT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: fully-hardened-cluster
+    description: >-
+      Fully hardened MSK cluster: TLS client-broker + in-cluster encryption, mTLS
+      + SASL/IAM auth, no unauthenticated access, private subnets, CloudWatch + S3
+      logging, customer-managed KMS key. Expected verdict: OK.
+    input: |
+      Audit the following Amazon MSK cluster configuration for security exposure.
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Cluster name: fully-hardened-cluster
+      Cluster ARN: arn:aws:kafka:us-east-1:111111111111:cluster/fully-hardened-cluster
+      Cluster type: PROVISIONED
+      State: ACTIVE
+
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: TLS
+          InClusterEncryption: true
+        EncryptionAtRest:
+          DataVolumeKMSKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-fully-hardened
+
+      ClientAuthentication:
+        Tls:
+          Enabled: true
+          CertificateAuthorityArnList:
+            - arn:aws:acm-pca:us-east-1:111111111111:certificate-authority/def-456
+        Sasl:
+          Iam:
+            Enabled: true
+        Unauthenticated:
+          Enabled: false
+
+      BrokerNodeGroupInfo:
+        ConnectivityInfo:
+          PublicAccess:
+            Type: DISABLED
+
+      LoggingInfo:
+        BrokerLogs:
+          CloudWatchLogs:
+            Enabled: true
+            LogGroup: /aws/kafka/fully-hardened-cluster
+          S3:
+            Enabled: true
+            Bucket: msk-logs-fully-hardened-cluster
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "fully-hardened-cluster"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: UNAUTHENTICATED"
+        - "VERDICT: PUBLIC_ACCESS"
+        - "VERDICT: CONFIG_GAP"

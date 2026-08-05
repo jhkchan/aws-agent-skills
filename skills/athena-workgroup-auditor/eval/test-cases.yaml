@@ -1,0 +1,277 @@
+# Eval test cases for athena-workgroup-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Verdict shape: NO_ENCRYPTION | NO_LIMITS | CONFIG_GAP | OK
+# Priority order applied by SKILL.md: NO_ENCRYPTION > NO_LIMITS > CONFIG_GAP > OK.
+# Test-case identifiers are embedded in the workgroup Name field so the
+# model can echo them in the VERDICT block (assertion surface).
+skill: athena-workgroup-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: primary-no-encryption-no-dsl
+    description: >-
+      The undeletable 'primary' workgroup with EnforceWorkGroupConfiguration
+      false, no EncryptionConfiguration, and no BytesScannedCutoffPerQuery.
+      Worst-case defaults: plaintext results, unbounded scans, advisory
+      controls. Highest-priority category is NO_ENCRYPTION (data exposure
+      outranks cost blast).
+    input: |
+      Workgroup name: primary
+      Workgroup metadata:
+        State: ENABLED
+        Description: Auto-created default Athena workgroup.
+      Configuration:
+        EnforceWorkGroupConfiguration: false
+        ResultConfiguration:
+          OutputLocation: ""
+        BytesScannedCutoffPerQuery: null
+        PublishCloudWatchMetricsEnabled: false
+        EngineVersion:
+          SelectedEngineVersion: Athena engine version 3
+      Named queries: none
+      Emit the standard VERDICT block (WORKGROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "primary"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "EncryptionConfiguration"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_LIMITS"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: sse-kms-no-dsl
+    description: >-
+      SQL workgroup with EnforceWorkGroupConfiguration true and SSE-KMS
+      customer-managed-key encryption on result objects, but
+      BytesScannedCutoffPerQuery is absent. Encryption dimension is clean;
+      the worst (and only) finding is the missing data-scan limit, which
+      drives a NO_LIMITS verdict.
+    input: |
+      Workgroup name: analytics-sse-kms-no-dsl
+      Workgroup metadata:
+        State: ENABLED
+        Description: Analytics workgroup for the BI team.
+      Configuration:
+        EnforceWorkGroupConfiguration: true
+        ResultConfiguration:
+          OutputLocation: s3://athena-results-111111111111-us-east-1/analytics/
+          EncryptionConfiguration:
+            EncryptionOption: SSE_KMS
+            KmsKey: arn:aws:kms:us-east-1:111111111111:key/abc-123
+        BytesScannedCutoffPerQuery: null
+        PublishCloudWatchMetricsEnabled: true
+        EngineVersion:
+          SelectedEngineVersion: Athena engine version 3
+      Named queries: none
+      Emit the standard VERDICT block (WORKGROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_LIMITS
+    assertions:
+      must_contain:
+        - "NO_LIMITS"
+        - "analytics-sse-kms-no-dsl"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "BytesScannedCutoffPerQuery"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: enforce-off-configs-advisory
+    description: >-
+      SQL workgroup where both EncryptionConfiguration (SSE-KMS) and a
+      1 TB BytesScannedCutoffPerQuery are present, but
+      EnforceWorkGroupConfiguration is false. The DSL remains binding
+      (no per-query override API exists), but encryption and
+      OutputLocation are advisory. This is the classic CONFIG_GAP
+      pattern — the workgroup looks secure in GetWorkGroup output but
+      clients can widen exposure at query time.
+    input: |
+      Workgroup name: etl-enforce-off-configs-advisory
+      Workgroup metadata:
+        State: ENABLED
+        Description: ETL workgroup — controls present but not enforced.
+      Configuration:
+        EnforceWorkGroupConfiguration: false
+        ResultConfiguration:
+          OutputLocation: s3://athena-results-111111111111-us-east-1/etl/
+          EncryptionConfiguration:
+            EncryptionOption: SSE_KMS
+            KmsKey: arn:aws:kms:us-east-1:111111111111:key/def-456
+        BytesScannedCutoffPerQuery: 1099511627776
+        PublishCloudWatchMetricsEnabled: true
+        EngineVersion:
+          SelectedEngineVersion: Athena engine version 3
+      Named queries: none
+      Emit the standard VERDICT block (WORKGROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "etl-enforce-off-configs-advisory"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "EnforceWorkGroupConfiguration"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: NO_LIMITS"
+
+  - id: no-cloudtrail-data-events
+    description: >-
+      SQL workgroup with EnforceWorkGroupConfiguration true, SSE-KMS
+      customer-managed-key encryption, and a 5 TB
+      BytesScannedCutoffPerQuery. All workgroup controls are clean.
+      However, no CloudTrail trail in the region has Athena data events
+      enabled — query history falls off Athena's fixed 45-day API
+      window with no long-term audit trail. Worst (and only) finding is
+      CONFIG_GAP (history retention gap).
+    input: |
+      Workgroup name: bi-no-cloudtrail-data-events
+      Workgroup metadata:
+        State: ENABLED
+        Description: BI workgroup for regulated workloads.
+      Configuration:
+        EnforceWorkGroupConfiguration: true
+        ResultConfiguration:
+          OutputLocation: s3://athena-results-111111111111-us-east-1/bi/
+          EncryptionConfiguration:
+            EncryptionOption: SSE_KMS
+            KmsKey: arn:aws:kms:us-east-1:111111111111:key/bi-key
+        BytesScannedCutoffPerQuery: 5497558138880
+        PublishCloudWatchMetricsEnabled: true
+        EngineVersion:
+          SelectedEngineVersion: Athena engine version 3
+      Named queries: none
+      CloudTrail context: No trail in us-east-1 has AWS::Athena data events
+        enabled. Management events are captured (StartQueryExecution etc.)
+        but data events (GetQueryResults, GetQueryExecution reads) are absent.
+      Emit the standard VERDICT block (WORKGROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "bi-no-cloudtrail-data-events"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "CloudTrail"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: NO_LIMITS"
+
+  - id: all-clean-ok
+    description: >-
+      SQL workgroup with every control in a healthy state:
+      EnforceWorkGroupConfiguration true, SSE-KMS with a CMK, a 1 TB
+      BytesScannedCutoffPerQuery, CloudTrail Athena data events enabled
+      in-region, and named-query IAM scoped to a specific same-account
+      role. All dimensions pass — verdict is OK.
+    input: |
+      Workgroup name: lakehouse-all-clean-ok
+      Workgroup metadata:
+        State: ENABLED
+        Description: Production lakehouse workgroup — fully governed.
+      Configuration:
+        EnforceWorkGroupConfiguration: true
+        ResultConfiguration:
+          OutputLocation: s3://athena-results-111111111111-us-east-1/lakehouse/
+          EncryptionConfiguration:
+            EncryptionOption: SSE_KMS
+            KmsKey: arn:aws:kms:us-east-1:111111111111:key/lakehouse-cmk
+        BytesScannedCutoffPerQuery: 1099511627776
+        PublishCloudWatchMetricsEnabled: true
+        EngineVersion:
+          SelectedEngineVersion: Athena engine version 3
+      Named queries:
+        - NamedQueryId: nq-aaa
+          Name: top_customers_by_revenue
+          WorkGroup: lakehouse-all-clean-ok
+          Database: analytics
+          QueryString: SELECT customer_id, SUM(revenue) FROM orders GROUP BY customer_id ORDER BY 2 DESC LIMIT 100
+      Named query IAM: athena:GetNamedQuery and athena:StartNamedQuery are
+        granted only to arn:aws:iam::111111111111:role/bi-reader-role on
+        arn:aws:athena:us-east-1:111111111111:workgroup/lakehouse-all-clean-ok.
+        No Principal:"*" grants. No cross-account grants.
+      CloudTrail context: A trail in us-east-1 has Athena data events
+        enabled for arn:aws:athena:us-east-1:111111111111:workgroup/lakehouse-all-clean-ok.
+      Emit the standard VERDICT block (WORKGROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "lakehouse-all-clean-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: NO_LIMITS"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-encryption-dsl-set
+    description: >-
+      SQL workgroup with EnforceWorkGroupConfiguration true, a 1 TB
+      BytesScannedCutoffPerQuery, but no EncryptionConfiguration on
+      ResultConfiguration. The DSL is binding and reasonable; the
+      worst finding is plaintext result objects in S3, which drives a
+      NO_ENCRYPTION verdict (data exposure outranks the cost-control
+      dimension that is passing).
+    input: |
+      Workgroup name: adhoc-no-encryption-dsl-set
+      Workgroup metadata:
+        State: ENABLED
+        Description: Ad-hoc querying workgroup for data scientists.
+      Configuration:
+        EnforceWorkGroupConfiguration: true
+        ResultConfiguration:
+          OutputLocation: s3://athena-results-111111111111-us-east-1/adhoc/
+        BytesScannedCutoffPerQuery: 1099511627776
+        PublishCloudWatchMetricsEnabled: true
+        EngineVersion:
+          SelectedEngineVersion: Athena engine version 3
+      Named queries: none
+      Emit the standard VERDICT block (WORKGROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "adhoc-no-encryption-dsl-set"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_LIMITS"
+        - "VERDICT: CONFIG_GAP"

@@ -1,0 +1,351 @@
+# Eval test cases for emr-cluster-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: emr-cluster-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-encryption-no-security-config
+    description: >-
+      EMR cluster with no SecurityConfiguration attached — all three encryption
+      layers (S3, local-disk, in-transit) are absent. Data is plaintext at every
+      plane.
+    input: |
+      Cluster id: j-NOENCNOSEC01
+      Cluster name: no-encryption-no-security-config
+      Cluster metadata (describe-cluster):
+        ReleaseLabel: emr-6.10.0
+        AutoTerminate: false
+        SecurityConfiguration: (none)
+        ServiceRole: EMR_DefaultRole
+        Ec2InstanceAttributes.IamInstanceProfile: EMR_EC2_DefaultRole
+        AutoScalingRole: EMR_AutoScaling_DefaultRole
+        LogUri: s3://emr-logs/no-encryption-no-security-config/
+        KerberosAttributes: (none)
+        VisibleToAllUsers: true
+        InstanceGroups:
+          - InstanceGroupType: MASTER, InstanceType: m5.xlarge, RequestedInstanceCount: 1
+          - InstanceGroupType: CORE, InstanceType: m5.xlarge, RequestedInstanceCount: 2
+      SecurityConfiguration contents: NOT PROVIDED (no SecurityConfiguration field on cluster)
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "no-encryption-no-security-config"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-encryption-intransit-disabled
+    description: >-
+      SecurityConfiguration has S3 SSE-KMS and LocalDiskEncryption enabled, but
+      InTransitEncryptionConfiguration is absent — inter-node traffic (Spark
+      shuffle, Hadoop RPC) is plaintext.
+    input: |
+      Cluster id: j-NOENCINTRANS01
+      Cluster name: no-encryption-intransit-disabled
+      Cluster metadata (describe-cluster):
+        ReleaseLabel: emr-6.10.0
+        AutoTerminate: false
+        SecurityConfiguration: partial-encryption-config
+        ServiceRole: EMR_DefaultRole
+        Ec2InstanceAttributes.IamInstanceProfile: EMR_EC2_DefaultRole
+        AutoScalingRole: EMR_AutoScaling_DefaultRole
+        LogUri: s3://emr-logs/no-encryption-intransit-disabled/
+        KerberosAttributes: (none)
+        VisibleToAllUsers: false
+        InstanceGroups:
+          - InstanceGroupType: MASTER, InstanceType: m5.xlarge, RequestedInstanceCount: 1
+          - InstanceGroupType: CORE, InstanceType: m5.xlarge, RequestedInstanceCount: 3
+      SecurityConfiguration contents (describe-security-configuration):
+        EncryptionConfiguration:
+          AtRestEncryptionConfiguration:
+            S3EncryptionConfiguration:
+              EncryptionMode: SSE-KMS
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/abc-123
+            LocalDiskEncryptionConfiguration:
+              EncryptionKeyProviderType: AwsKms
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/def-456
+          InTransitEncryptionConfiguration: (absent)
+      IAM role summaries:
+        ServiceRole (EMR_DefaultRole): AmazonElasticMapReduceRole (AWS managed)
+        EC2 instance profile (EMR_EC2_DefaultRole): AmazonElasticMapReduceforEC2Role (AWS managed)
+        AutoScalingRole (EMR_AutoScaling_DefaultRole): AmazonElasticMapReduceAutoScalingRole (AWS managed)
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "no-encryption-intransit-disabled"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: overpermissive-ec2-role
+    description: >-
+      All three encryption layers enabled, but the EC2 instance profile role has
+      a custom inline policy granting s3:* on Resource "*" — the data-processing
+      identity has unrestricted S3 access across every bucket in the account.
+    input: |
+      Cluster id: j-OVERPERMEC2R01
+      Cluster name: overpermissive-ec2-role
+      Cluster metadata (describe-cluster):
+        ReleaseLabel: emr-6.10.0
+        AutoTerminate: false
+        SecurityConfiguration: full-encryption-config
+        ServiceRole: EMR_DefaultRole
+        Ec2InstanceAttributes.IamInstanceProfile: EMR_EC2_CustomRole
+        AutoScalingRole: EMR_AutoScaling_DefaultRole
+        LogUri: s3://emr-logs/overpermissive-ec2-role/
+        KerberosAttributes: (none)
+        VisibleToAllUsers: false
+        InstanceGroups:
+          - InstanceGroupType: MASTER, InstanceType: m5.xlarge, RequestedInstanceCount: 1
+          - InstanceGroupType: CORE, InstanceType: m5.xlarge, RequestedInstanceCount: 3
+      SecurityConfiguration contents (describe-security-configuration):
+        EncryptionConfiguration:
+          AtRestEncryptionConfiguration:
+            S3EncryptionConfiguration:
+              EncryptionMode: SSE-KMS
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/abc-123
+            LocalDiskEncryptionConfiguration:
+              EncryptionKeyProviderType: AwsKms
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/def-456
+          InTransitEncryptionConfiguration:
+            TLSCertificateConfiguration:
+              CertificateProviderType: PEM
+              S3Object: s3://emr-certs/overpermissive-ec2-role/certchain.pem
+      IAM role summaries:
+        ServiceRole (EMR_DefaultRole): AmazonElasticMapReduceRole (AWS managed)
+        EC2 instance profile (EMR_EC2_CustomRole):
+          Managed policies: AmazonElasticMapReduceforEC2Role
+          Inline policy "S3FullAccess":
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: "s3:*"
+                Resource: "*"
+        AutoScalingRole (EMR_AutoScaling_DefaultRole): AmazonElasticMapReduceAutoScalingRole (AWS managed)
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE_ROLE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE_ROLE"
+        - "overpermissive-ec2-role"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: config-gap-debug-and-bpa
+    description: >-
+      All three encryption layers enabled, IAM roles scoped (no wildcards), but
+      debug logging is disabled and Block Public Access is not configured for
+      the region.
+    input: |
+      Cluster id: j-CONFIGGAPDBG01
+      Cluster name: config-gap-debug-and-bpa
+      Cluster metadata (describe-cluster):
+        ReleaseLabel: emr-6.10.0
+        AutoTerminate: false
+        SecurityConfiguration: full-encryption-config
+        ServiceRole: EMR_DefaultRole
+        Ec2InstanceAttributes.IamInstanceProfile: EMR_EC2_ScopedRole
+        AutoScalingRole: EMR_AutoScaling_DefaultRole
+        LogUri: (none — debug logging disabled)
+        KerberosAttributes: (none)
+        VisibleToAllUsers: false
+        InstanceGroups:
+          - InstanceGroupType: MASTER, InstanceType: m5.xlarge, RequestedInstanceCount: 1
+          - InstanceGroupType: CORE, InstanceType: m5.xlarge, RequestedInstanceCount: 3
+      SecurityConfiguration contents (describe-security-configuration):
+        EncryptionConfiguration:
+          AtRestEncryptionConfiguration:
+            S3EncryptionConfiguration:
+              EncryptionMode: SSE-KMS
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/abc-123
+            LocalDiskEncryptionConfiguration:
+              EncryptionKeyProviderType: AwsKms
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/def-456
+          InTransitEncryptionConfiguration:
+            TLSCertificateConfiguration:
+              CertificateProviderType: PEM
+              S3Object: s3://emr-certs/config-gap-debug-and-bpa/certchain.pem
+      Block Public Access configuration (get-block-public-access-configuration):
+        BlockPublicSecurityGroupRules: false
+      IAM role summaries:
+        ServiceRole (EMR_DefaultRole): AmazonElasticMapReduceRole (AWS managed)
+        EC2 instance profile (EMR_EC2_ScopedRole):
+          Inline policy "ScopedS3":
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ["s3:GetObject", "s3:ListBucket"]
+                Resource: ["arn:aws:s3:::emr-input", "arn:aws:s3:::emr-input/*"]
+        AutoScalingRole (EMR_AutoScaling_DefaultRole): AmazonElasticMapReduceAutoScalingRole (AWS managed)
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-debug-and-bpa"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: config-gap-no-kerberos
+    description: >-
+      All encryption enabled, IAM roles scoped, debug logging on, Block Public
+      Access enabled, but Kerberos authentication is not configured and
+      VisibleToAllUsers is true.
+    input: |
+      Cluster id: j-CONFIGGAPKERB01
+      Cluster name: config-gap-no-kerberos
+      Cluster metadata (describe-cluster):
+        ReleaseLabel: emr-6.10.0
+        AutoTerminate: false
+        SecurityConfiguration: full-encryption-config
+        ServiceRole: EMR_DefaultRole
+        Ec2InstanceAttributes.IamInstanceProfile: EMR_EC2_ScopedRole
+        AutoScalingRole: EMR_AutoScaling_DefaultRole
+        LogUri: s3://emr-logs/config-gap-no-kerberos/
+        KerberosAttributes: (none)
+        VisibleToAllUsers: true
+        InstanceGroups:
+          - InstanceGroupType: MASTER, InstanceType: m5.xlarge, RequestedInstanceCount: 1
+          - InstanceGroupType: CORE, InstanceType: m5.xlarge, RequestedInstanceCount: 3
+      SecurityConfiguration contents (describe-security-configuration):
+        EncryptionConfiguration:
+          AtRestEncryptionConfiguration:
+            S3EncryptionConfiguration:
+              EncryptionMode: SSE-KMS
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/abc-123
+            LocalDiskEncryptionConfiguration:
+              EncryptionKeyProviderType: AwsKms
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/def-456
+          InTransitEncryptionConfiguration:
+            TLSCertificateConfiguration:
+              CertificateProviderType: PEM
+              S3Object: s3://emr-certs/config-gap-no-kerberos/certchain.pem
+      Block Public Access configuration:
+        BlockPublicSecurityGroupRules: true
+      IAM role summaries:
+        ServiceRole (EMR_DefaultRole): AmazonElasticMapReduceRole (AWS managed)
+        EC2 instance profile (EMR_EC2_ScopedRole):
+          Inline policy "ScopedS3":
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ["s3:GetObject", "s3:ListBucket"]
+                Resource: ["arn:aws:s3:::emr-input", "arn:aws:s3:::emr-input/*"]
+        AutoScalingRole (EMR_AutoScaling_DefaultRole): AmazonElasticMapReduceAutoScalingRole (AWS managed)
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-no-kerberos"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: ok-hardened-cluster
+    description: >-
+      Fully hardened EMR cluster: all three encryption layers (SSE-KMS, LUKS
+      local disk, in-transit TLS), scoped EC2 instance profile, Kerberos auth
+      enabled, debug logging to encrypted S3, Block Public Access on.
+    input: |
+      Cluster id: j-OKHARDENED001
+      Cluster name: ok-hardened-cluster
+      Cluster metadata (describe-cluster):
+        ReleaseLabel: emr-6.10.0
+        AutoTerminate: false
+        SecurityConfiguration: hardened-config
+        ServiceRole: EMR_DefaultRole
+        Ec2InstanceAttributes.IamInstanceProfile: EMR_EC2_ScopedRole
+        AutoScalingRole: EMR_AutoScaling_DefaultRole
+        LogUri: s3://emr-logs-ok/ok-hardened-cluster/
+        KerberosAttributes:
+          Provider: ClusterDedicatedKdc
+          Realm: PROD.INTERNAL
+          KdcAdminPassword: (redacted)
+        VisibleToAllUsers: false
+        InstanceGroups:
+          - InstanceGroupType: MASTER, InstanceType: m5.xlarge, RequestedInstanceCount: 3
+          - InstanceGroupType: CORE, InstanceType: m5.xlarge, RequestedInstanceCount: 5
+      SecurityConfiguration contents (describe-security-configuration):
+        EncryptionConfiguration:
+          AtRestEncryptionConfiguration:
+            S3EncryptionConfiguration:
+              EncryptionMode: SSE-KMS
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/abc-123
+            LocalDiskEncryptionConfiguration:
+              EncryptionKeyProviderType: AwsKms
+              AwsKmsKey: arn:aws:kms:us-east-1:111111111111:key/def-456
+          InTransitEncryptionConfiguration:
+            TLSCertificateConfiguration:
+              CertificateProviderType: PEM
+              S3Object: s3://emr-certs/ok-hardened-cluster/certchain.pem
+      Block Public Access configuration:
+        BlockPublicSecurityGroupRules: true
+      IAM role summaries:
+        ServiceRole (EMR_DefaultRole): AmazonElasticMapReduceRole (AWS managed)
+        EC2 instance profile (EMR_EC2_ScopedRole):
+          Inline policy "ScopedS3":
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
+                Resource: ["arn:aws:s3:::emr-input", "arn:aws:s3:::emr-input/*", "arn:aws:s3:::emr-output", "arn:aws:s3:::emr-output/*"]
+        AutoScalingRole (EMR_AutoScaling_DefaultRole): AmazonElasticMapReduceAutoScalingRole (AWS managed)
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ok-hardened-cluster"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+        - "VERDICT: CONFIG_GAP"

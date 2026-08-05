@@ -1,0 +1,70 @@
+{
+  "skill": "athena-workgroup-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many expert\u2011level Athena nuances (e.g., EnforceWorkGroupConfiguration binding semantics, BytesScannedCutoffPerQuery compression behavior, zero vs absent DSL, Spark workgroup DSL irrelevance, primary workgroup defaults, KMS key policy requirements, CloudTrail data\u2011event capture) that go beyond a generic model's knowledge. Deduces 2 points because the opening sections restate basic concepts that a capable model already knows."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Implements a clear AWS\u2011specific audit flow: pre\u2011flight gating, ordered stepwise classification, explicit CLI commands, snapshot before updates, and confirmation gates. Loses 1 point for not spelling out a concrete procedure for handling pagination errors or retries in live\u2011account sweeps."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Contains a comprehensive NEVER list with concrete reasoning for each pitfall (e.g., never treat SSE_S3 as no\u2011encryption, never assume BytesScannedCutoffPerQuery=0 means no limit, never delete primary workgroup, never rely on CloudTrail retention, etc.). No missing anti\u2011patterns."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, metadata, when_to_use, activation_triggers, invocation_schema). Description clearly states WHAT the skill does, WHEN to invoke, and KEYWORDS for activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (Mindset \u2192 Quick reference \u2192 Detailed steps \u2192 Deep reference), but the quick\u2011reference table and extensive pre\u2011flight notes appear early and can overload the reader before the core audit flow is reached. Two points deducted for sub\u2011optimal front\u2011loading."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are guarded by explicit confirmation prompts, snapshot backups, and ordering guidance; creative tasks (e.g., classification) are left unconstrained. Calibration matches task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Stepwise Process \u2192 Edge\u2011case handling \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation. Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a deterministic output format, decision tree, concrete CLI remediation commands, and example model outputs that align with the specification. Deduct 1 point because handling of partially malformed Configuration JSON could be more explicit (e.g., how to continue audit for the remaining valid sections)."
+    }
+  ],
+  "total_score": 114,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 49642,
+  "latency_ms": 8586,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "msk-cluster-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many MSK\u2011specific nuances that a generic model would not know (TLS_PLAINTEXT dual\u2011mode, InClusterEncryption semantics, Serverless defaults, KMS key governance, SCRAM secret tagging, mTLS requiring ACM PCA, logging destination rules, immutability of encryption settings, etc.)."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers a clear, AWS\u2011specific step\u2011by\u2011step audit flow, priority matrix, and remediation commands. A small deduction for a few generic actions (e.g., \"enable logging\") that are not tied to the exact MSK CLI/API call."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete reasons (e.g., never treat TLS_PLAINTEXT as OK, never assume missing CMK is NO_ENCRYPTION, never change ClientBroker in\u2011place). Fully meets the requirement."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete frontmatter, clear description, precise activation triggers, invocation schema, and well\u2011defined output format. Agent can reliably know when to invoke."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Layers information logically (quick reference \u2192 pre\u2011flight \u2192 stepwise logic \u2192 anti\u2011patterns \u2192 remediation). Some density in the anti\u2011pattern section could overload the top level, costing 2 points."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom well: destructive actions require a confirmation gate and notes immutability of encryption settings. Deducted one point because the confirmation step is described but not enforced programmatically in the procedure."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable structure (Mindset, Quick reference, Pre\u2011flight, Steps, Output, Anti\u2011patterns, Remediation)."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Model output examples match the specification and demonstrate correct verdict logic. One deduction for an inaccurate CLI snippet (using `aws kafka update-broker-storage` to enable logging, which is not the correct command)."
+    }
+  ],
+  "total_score": 113,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 36499,
+  "latency_ms": 12237,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

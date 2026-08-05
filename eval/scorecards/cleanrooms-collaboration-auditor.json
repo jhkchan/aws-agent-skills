@@ -1,0 +1,70 @@
+{
+  "skill": "cleanrooms-collaboration-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "The skill provides many Clean Rooms nuances (e.g., per\u2011member epsilon, perspective\u2011relative membership, 80% spend threshold) that a generic model would not know, but a large portion restates publicly documented behavior rather than delivering brand\u2011new expert insight. The 80% heuristic, while useful, is not an official AWS rule, so the knowledge is not fully novel."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The procedure flow (pre\u2011flight, step\u2011wise classification, confirmation gates) is AWS\u2011specific and well\u2011ordered, yet a few steps are generic (e.g., \u201cverify permissions\u201d) and not tied to Clean Rooms API nuances, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER list is extensive and explains why each pitfall is dangerous, but it omits some common anti\u2011patterns such as cross\u2011account S3 bucket policy leakage for query results and over\u2011permissive IAM roles for Clean Rooms, leaving a gap in the anti\u2011pattern coverage."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers and an invocation_schema are present. However, the schema is described in prose rather than a formal JSON schema, and the output format lacks a machine\u2011readable definition, which reduces reliability of automatic activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill is organized into sections and provides a quick\u2011reference table, but critical rules and many details are interleaved early (e.g., Critical rules block appears before the high\u2011level Process), causing some cognitive overload before the agent reaches the step\u2011by\u2011step flow."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (DeleteMembership, DeleteCollaboration) are guarded by confirmation prompts, yet the skill still permits those commands without an explicit \u201cread\u2011only audit mode\u201d flag, so the calibration is strong but not perfectly tight for fragile operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation). The placement of Anti\u2011patterns before Safety checks is a minor deviation from a strictly linear pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides actionable CLI commands, decision\u2011tree style steps, and concrete output format with examples. Lacks explicit error\u2011handling for malformed JSON inputs beyond a generic ERROR block and does not show how to handle pagination failures or multi\u2011collaboration batch output, which could hinder fully automated use."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 48378,
+  "latency_ms": 19643,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "redshift-cluster-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many Redshift\u2011specific edge cases (immutable encryption, default parameter\u2011group trap, HSM legacy handling, snapshot\u2011retention immediate expiry, enhanced VPC routing impact, etc.) that go beyond a generic model's knowledge, but some sections merely restate well\u2011known AWS documentation without adding new decision thresholds or novel heuristics."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers a clear, AWS\u2011specific audit flow and concrete CLI remediation steps, but the procedure for enumerating and validating multiple security groups attached to a cluster is only mentioned in passing and lacks a step\u2011by\u2011step guide."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never treat PubliclyAccessible as non\u2011public, never assume encryption can be toggled), yet it omits a common pitfall: failing to verify the S3 bucket policy/object\u2011lock for audit\u2011log destinations."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Front\u2011matter, description, activation triggers and invocation schema are present, but the output format is described only in free\u2011form text rather than a strict schema (JSON/YAML) and some activation triggers are phrased loosely, which could lead to unreliable skill invocation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (Mindset, Quick reference, Pre\u2011flight, Process, Edge\u2011cases, Anti\u2011patterns, Safety, Remediation). However, the initial Mindset and Quick reference sections are dense, potentially overloading the agent before it knows the trigger conditions."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit confirmation prompts, reboot warnings, and migration workflows; creative tasks (classification) are left unconstrained. Calibration matches task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Output \u2192 Remediation \u2192 Related skills) that aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a deterministic decision tree, concrete CLI commands, example outputs, and handling of many edge cases, but lacks explicit guidance for API pagination, throttling, or retry logic that an agent would need for robust live\u2011account audits."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 45953,
+  "latency_ms": 9784,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

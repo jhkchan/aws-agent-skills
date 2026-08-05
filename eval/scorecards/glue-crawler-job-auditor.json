@@ -1,0 +1,70 @@
+{
+  "skill": "glue-crawler-job-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Adds deep, expert\u2011level Glue knowledge not commonly known: independent EncryptionAtRest vs ConnectionPasswordEncryption, pass\u2011role vector via glue:CreateJob/glue:CreateCrawler, S3Encryptions array only first element is used, regional catalog encryption, EOL Glue versions, Lake Formation interaction, KMS key\u2011policy implications, and client\u2011side vs server\u2011side bookmark encryption. This is concrete decision\u2011tree material a senior CloudOps engineer would learn."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, ordered procedure: pre\u2011flight IAM checks, existence validation of SecurityConfiguration, step\u2011wise classification (catalog, source bucket, role, config gaps), explicit CLI commands for remediation, and a worst\u2011finding aggregation rule. Only minor generic phrasing (e.g., \"check security\") but overall highly specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning for each pitfall (e.g., never treat SecurityConfiguration as source encryption, never conflate EncryptionAtRest with ConnectionPasswordEncryption, never overlook glue:CreateJob/pass\u2011role escalation, etc.)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata). Description clearly states WHAT the skill does, WHEN to invoke, and includes a rich keyword list and activation triggers. Invocation schema is explicitly defined."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (high\u2011level Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output format \u2192 Worked example \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation). However, the document is dense; some critical rules (e.g., the worst\u2011finding aggregation) are buried in the middle rather than highlighted up front, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom precisely: destructive actions require explicit CONFIRM prompts, permission verification before emitting remediation CLI, backup steps, and safe sequencing (add config before tightening role). Non\u2011destructive audit steps are left open for flexible input (JSON or live name)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output format \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation \u2192 Deep reference. This coherent structure aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a usable decision tree, exact CLI remediation commands, error handling for malformed input, and examples for each verdict. Slight deduction because handling of multiple S3 sources is described but not given a concrete extraction algorithm, which could cause ambiguity for an autonomous agent."
+    }
+  ],
+  "total_score": 113,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 48227,
+  "latency_ms": 34971,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

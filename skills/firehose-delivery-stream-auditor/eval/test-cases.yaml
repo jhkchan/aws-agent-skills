@@ -1,0 +1,306 @@
+# Eval test cases for firehose-delivery-stream-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Verdict mapping (must match SKILL.md first-fail-wins logic exactly):
+#   Step 1a (explicit NoEncryption)          -> NO_ENCRYPTION
+#   Step 1c (absent EncryptionConfiguration) -> CONFIG_GAP
+#   Step 1d (cross-region / non-ARN CMK)     -> CONFIG_GAP
+#   Step 2  (BufferingHints out of range)    -> CONFIG_GAP
+#   Step 3  (Lambda + S3BackupMode Disabled) -> CONFIG_GAP
+#   Step 4  (LoggingConfig disabled/absent)  -> CONFIG_GAP
+#   Step 5a (DP + no source backup)          -> CONFIG_GAP
+#   Step 5b (DP + RetryDuration 0)           -> CONFIG_GAP
+#   Step 6  (all dimensions clean)           -> OK
+#
+# must_contain uses CONCEPT tokens (verdict + output structure + domain
+# concept). The test-case identifier is embedded in the stream name only —
+# assertions do not depend on string-matching the identifier.
+skill: firehose-delivery-stream-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-encryption-explicit-disable
+    description: >-
+      ExtendedS3 delivery stream with EncryptionConfiguration.NoEncryption
+      explicitly set — the only API path to plaintext Firehose delivery.
+      Step 1a fires NO_ENCRYPTION (highest precedence, short-circuits).
+    input: |
+      Delivery stream name: firehose-no-encryption-explicit-disable
+      ARN: arn:aws:firehose:us-east-1:111111111111:deliverystream/firehose-no-encryption-explicit-disable
+      DeliveryStreamStatus: ACTIVE
+      DeliveryStreamType: DirectPut
+      CreatedAt: 2024-03-12
+      LoggingConfig: {Enabled: true, LogGroupName: /aws/kinesisfirehose/firehose-no-encryption-explicit-disable}
+
+      ExtendedS3DestinationConfiguration:
+        RoleARN: arn:aws:iam::111111111111:role/firehose-role
+        BucketARN: arn:aws:s3:::firehose-delivery-prod
+        Prefix: events/
+        BufferingHints: {SizeInMBs: 5, IntervalInSeconds: 300}
+        CompressionFormat: UNCOMPRESSED
+        EncryptionConfiguration:
+          NoEncryption: {}
+        S3BackupMode: Disabled
+
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "plaintext"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: missing-cmk-default-sse-s3
+    description: >-
+      ExtendedS3 delivery stream with the EncryptionConfiguration block
+      entirely absent. Firehose inherits the S3 bucket default (typically
+      SSE-S3 AES256), but the Firehose layer has no declarative encryption
+      posture. Step 1c fires CONFIG_GAP — NOT NO_ENCRYPTION, because the
+      bucket default still encrypts at rest in the common case.
+    input: |
+      Delivery stream name: firehose-missing-cmk-default-sse-s3
+      ARN: arn:aws:firehose:us-east-1:111111111111:deliverystream/firehose-missing-cmk-default-sse-s3
+      DeliveryStreamStatus: ACTIVE
+      DeliveryStreamType: DirectPut
+      LoggingConfig: {Enabled: true, LogGroupName: /aws/kinesisfirehose/firehose-missing-cmk-default-sse-s3}
+
+      ExtendedS3DestinationConfiguration:
+        RoleARN: arn:aws:iam::111111111111:role/firehose-role
+        BucketARN: arn:aws:s3:::firehose-delivery-prod
+        Prefix: events/
+        BufferingHints: {SizeInMBs: 5, IntervalInSeconds: 300}
+        CompressionFormat: UNCOMPRESSED
+        S3BackupMode: Disabled
+
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "encryption"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: buffering-hints-out-of-range
+    description: >-
+      ExtendedS3 delivery stream with CMK encryption set and LoggingConfig
+      enabled, but BufferingHints.SizeInMBs (256) and IntervalInSeconds (30)
+      are both outside the valid API ranges [1,128] and [60,900]. Step 2
+      fires CONFIG_GAP. Encryption and logging dimensions pass.
+    input: |
+      Delivery stream name: firehose-buffering-hints-out-of-range
+      ARN: arn:aws:firehose:us-east-1:111111111111:deliverystream/firehose-buffering-hints-out-of-range
+      DeliveryStreamStatus: ACTIVE
+      DeliveryStreamType: DirectPut
+      LoggingConfig: {Enabled: true, LogGroupName: /aws/kinesisfirehose/firehose-buffering-hints-out-of-range}
+
+      ExtendedS3DestinationConfiguration:
+        RoleARN: arn:aws:iam::111111111111:role/firehose-role
+        BucketARN: arn:aws:s3:::firehose-delivery-prod
+        Prefix: events/
+        BufferingHints: {SizeInMBs: 256, IntervalInSeconds: 30}
+        CompressionFormat: UNCOMPRESSED
+        EncryptionConfiguration:
+          KMSEncryptionConfig:
+            AWSKMSKeyArn: arn:aws:kms:us-east-1:111111111111:key/cmk-firehose-prod
+        S3BackupMode: Disabled
+
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "buffering"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: cw-logging-disabled-with-lambda
+    description: >-
+      ExtendedS3 delivery stream with CMK encryption, valid buffering, and
+      a Lambda transformation processor enabled — but LoggingConfig.Enabled
+      is false. Step 4 fires CONFIG_GAP: transformation failures are silent.
+      Encryption (Step 1) and buffering (Step 2) pass.
+    input: |
+      Delivery stream name: firehose-cw-logging-disabled-with-lambda
+      ARN: arn:aws:firehose:us-east-1:111111111111:deliverystream/firehose-cw-logging-disabled-with-lambda
+      DeliveryStreamStatus: ACTIVE
+      DeliveryStreamType: DirectPut
+      LoggingConfig: {Enabled: false, LogGroupName: /aws/kinesisfirehose/firehose-cw-logging-disabled-with-lambda}
+
+      ExtendedS3DestinationConfiguration:
+        RoleARN: arn:aws:iam::111111111111:role/firehose-role
+        BucketARN: arn:aws:s3:::firehose-delivery-prod
+        Prefix: events/
+        BufferingHints: {SizeInMBs: 5, IntervalInSeconds: 300}
+        CompressionFormat: UNCOMPRESSED
+        EncryptionConfiguration:
+          KMSEncryptionConfig:
+            AWSKMSKeyArn: arn:aws:kms:us-east-1:111111111111:key/cmk-firehose-prod
+        S3BackupMode: Enabled
+        S3BackupConfiguration:
+          RoleARN: arn:aws:iam::111111111111:role/firehose-role
+          BucketARN: arn:aws:s3:::firehose-backup-prod
+          Prefix: lambda-source/
+          BufferingHints: {SizeInMBs: 5, IntervalInSeconds: 300}
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: Lambda
+              Parameters:
+                - {ParameterName: LambdaArn, ParameterValue: arn:aws:lambda:us-east-1:111111111111:function:firehose-transform}
+                - {ParameterName: BufferSizeInMBs, ParameterValue: 1}
+                - {ParameterName: BufferIntervalInSeconds, ParameterValue: 60}
+
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "logging"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: dp-missing-source-backup
+    description: >-
+      ExtendedS3 delivery stream with CMK encryption, valid buffering,
+      LoggingConfig enabled, and dynamic partitioning ENABLED — but no
+      S3BackupConfiguration. Step 5a fires CONFIG_GAP: any JQ extraction
+      failure silently discards records. RetryDuration is also 0 (Step 5b
+      compounds). DP extraction processor is wired (Step 5c passes).
+    input: |
+      Delivery stream name: firehose-dp-missing-source-backup
+      ARN: arn:aws:firehose:us-east-1:111111111111:deliverystream/firehose-dp-missing-source-backup
+      DeliveryStreamStatus: ACTIVE
+      DeliveryStreamType: DirectPut
+      LoggingConfig: {Enabled: true, LogGroupName: /aws/kinesisfirehose/firehose-dp-missing-source-backup}
+
+      ExtendedS3DestinationConfiguration:
+        RoleARN: arn:aws:iam::111111111111:role/firehose-role
+        BucketARN: arn:aws:s3:::firehose-delivery-prod
+        Prefix: events/!{partitionKeyFromQuery:tenant}/
+        ErrorOutputPrefix: errors/!{firehose:errorType}/!{timestamp:yyyy-MM-dd}/
+        BufferingHints: {SizeInMBs: 64, IntervalInSeconds: 300}
+        CompressionFormat: UNCOMPRESSED
+        EncryptionConfiguration:
+          KMSEncryptionConfig:
+            AWSKMSKeyArn: arn:aws:kms:us-east-1:111111111111:key/cmk-firehose-prod
+        S3BackupMode: Disabled
+        DynamicPartitioningConfiguration:
+          Enabled: true
+          RetryDuration: 0
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: MetadataExtraction
+              Parameters:
+                - {ParameterName: JsonParsingEngine, ParameterValue: JQ-1.6}
+                - {ParameterName:MetaDataExtractionQuery, ParameterValue: .tenant}
+
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "backup"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: ok-cmk-lambda-dp-backup
+    description: >-
+      ExtendedS3 delivery stream with every dimension clean: CMK encryption
+      (Step 1 passes — same-region ARN), valid BufferingHints (Step 2
+      passes), Lambda transformation with S3BackupMode Enabled (Step 3
+      passes), LoggingConfig.Enabled true (Step 4 passes), dynamic
+      partitioning with S3BackupConfiguration present and RetryDuration 300
+      (Step 5 passes). All dimensions pass — Step 6 emits OK.
+    input: |
+      Delivery stream name: firehose-ok-cmk-lambda-dp-backup
+      ARN: arn:aws:firehose:us-east-1:111111111111:deliverystream/firehose-ok-cmk-lambda-dp-backup
+      DeliveryStreamStatus: ACTIVE
+      DeliveryStreamType: DirectPut
+      LoggingConfig: {Enabled: true, LogGroupName: /aws/kinesisfirehose/firehose-ok-cmk-lambda-dp-backup}
+
+      ExtendedS3DestinationConfiguration:
+        RoleARN: arn:aws:iam::111111111111:role/firehose-role
+        BucketARN: arn:aws:s3:::firehose-delivery-prod
+        Prefix: events/!{partitionKeyFromQuery:tenant}/
+        ErrorOutputPrefix: errors/!{firehose:errorType}/!{timestamp:yyyy-MM-dd}/
+        BufferingHints: {SizeInMBs: 64, IntervalInSeconds: 300}
+        CompressionFormat: UNCOMPRESSED
+        EncryptionConfiguration:
+          KMSEncryptionConfig:
+            AWSKMSKeyArn: arn:aws:kms:us-east-1:111111111111:key/cmk-firehose-prod
+        S3BackupMode: Enabled
+        S3BackupConfiguration:
+          RoleARN: arn:aws:iam::111111111111:role/firehose-role
+          BucketARN: arn:aws:s3:::firehose-backup-prod
+          Prefix: dp-source/
+          BufferingHints: {SizeInMBs: 5, IntervalInSeconds: 300}
+          EncryptionConfiguration:
+            KMSEncryptionConfig:
+              AWSKMSKeyArn: arn:aws:kms:us-east-1:111111111111:key/cmk-firehose-prod
+        DynamicPartitioningConfiguration:
+          Enabled: true
+          RetryDuration: 300
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: MetadataExtraction
+              Parameters:
+                - {ParameterName: JsonParsingEngine, ParameterValue: JQ-1.6}
+                - {ParameterName: MetaDataExtractionQuery, ParameterValue: .tenant}
+
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"

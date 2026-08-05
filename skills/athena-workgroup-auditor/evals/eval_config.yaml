@@ -1,0 +1,48 @@
+# Eval configuration for athena-workgroup-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: athena-workgroup-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: primary-no-encryption-no-dsl
+    difficulty: hard
+    prompt_file: prompts/primary-no-encryption-no-dsl.md
+    baseline_file: baselines/primary-no-encryption-no-dsl.md
+    expected_verdict: NO_ENCRYPTION
+  - id: sse-kms-no-dsl
+    difficulty: medium
+    prompt_file: prompts/sse-kms-no-dsl.md
+    baseline_file: baselines/sse-kms-no-dsl.md
+    expected_verdict: NO_LIMITS
+  - id: enforce-off-configs-advisory
+    difficulty: hard
+    prompt_file: prompts/enforce-off-configs-advisory.md
+    baseline_file: baselines/enforce-off-configs-advisory.md
+    expected_verdict: CONFIG_GAP
+  - id: no-cloudtrail-data-events
+    difficulty: medium
+    prompt_file: prompts/no-cloudtrail-data-events.md
+    baseline_file: baselines/no-cloudtrail-data-events.md
+    expected_verdict: CONFIG_GAP
+  - id: all-clean-ok
+    difficulty: easy
+    prompt_file: prompts/all-clean-ok.md
+    baseline_file: baselines/all-clean-ok.md
+    expected_verdict: OK
+  - id: no-encryption-dsl-set
+    difficulty: medium
+    prompt_file: prompts/no-encryption-dsl-set.md
+    baseline_file: baselines/no-encryption-dsl-set.md
+    expected_verdict: NO_ENCRYPTION

@@ -1,0 +1,446 @@
+# Eval test cases for glue-crawler-job-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+# Test-case identifiers are embedded in resource names so the model echoes
+# them in the RESOURCE line and assertions can anchor on them.
+skill: glue-crawler-job-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-encryption-catalog-disabled
+    description: >-
+      Glue job reading an S3 source where the Data Catalog EncryptionAtRest is
+      DISABLED (catalog metadata in plaintext) and the execution role grants
+      s3:* on Resource "*" — worst finding is catalog metadata exposure.
+    input: |
+      Audit the following AWS Glue job configuration for security exposure.
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Resource: job no-encryption-catalog-disabled
+      GlueVersion: 3.0
+      Role: arn:aws:iam::111111111111:role/glue-etl-no-encryption-catalog-disabled
+      SecurityConfiguration: prod-glue-sec
+      Connections: none
+
+      DataCatalogEncryptionSettings:
+        EncryptionAtRest:
+          EncryptionMode: DISABLED
+        ConnectionPasswordEncryption:
+          ReturnConnectionPasswordEncrypted: true
+          AwsKmsKeyId: alias/glue-catalog
+
+      SecurityConfiguration (prod-glue-sec):
+        EncryptionConfiguration:
+          CloudWatchEncryption: {CloudWatchEncryptionMode: SSE-KMS}
+          S3Encryptions: [{EncryptionMode: SSE-KMS}]
+          JobBookmarksEncryption: {JobBookmarksEncryptionMode: CSE-KMS}
+
+      S3 source bucket (etl-source-no-encryption-catalog-disabled):
+        server-side-encryption-configuration:
+          Rules:
+            - ApplyServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+
+      Execution role policy (glue-etl-no-encryption-catalog-disabled):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "S3Wildcard",
+              "Effect": "Allow",
+              "Action": "s3:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "GlueCatalog",
+              "Effect": "Allow",
+              "Action": [
+                "glue:BatchCreatePartition",
+                "glue:GetTable",
+                "glue:GetDatabase"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "no-encryption-catalog-disabled"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DISABLED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+
+  - id: overpermissive-role-admin-wildcard
+    description: >-
+      Glue job with catalog encryption enabled and S3 source encrypted, but the
+      execution role grants admin wildcard (Action "*" Resource "*") plus
+      iam:PassRole on "*" — worst finding is IAM blast radius.
+    input: |
+      Audit the following AWS Glue job configuration for security exposure.
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Resource: job overpermissive-role-admin-wildcard
+      GlueVersion: 4.0
+      Role: arn:aws:iam::111111111111:role/glue-etl-overpermissive-role-admin-wildcard
+      SecurityConfiguration: prod-glue-sec
+
+      DataCatalogEncryptionSettings:
+        EncryptionAtRest:
+          EncryptionMode: SSE-KMS
+          SseAwsKmsKeyId: alias/glue-catalog
+        ConnectionPasswordEncryption:
+          ReturnConnectionPasswordEncrypted: true
+          AwsKmsKeyId: alias/glue-catalog
+
+      SecurityConfiguration (prod-glue-sec):
+        EncryptionConfiguration:
+          CloudWatchEncryption: {CloudWatchEncryptionMode: SSE-KMS}
+          S3Encryptions: [{EncryptionMode: SSE-KMS}]
+          JobBookmarksEncryption: {JobBookmarksEncryptionMode: CSE-KMS}
+
+      S3 source bucket (etl-source-overpermissive-role-admin-wildcard):
+        server-side-encryption-configuration:
+          Rules:
+            - ApplyServerSideEncryptionByDefault: {SSEAlgorithm: aws:kms, KMSMasterKeyID: alias/s3-cmk}
+
+      Execution role policy (glue-etl-overpermissive-role-admin-wildcard):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AdminWildcard",
+              "Effect": "Allow",
+              "Action": "*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "PassRoleAny",
+              "Effect": "Allow",
+              "Action": "iam:PassRole",
+              "Resource": "*"
+            }
+          ]
+        }
+    expected_verdict: OVERPERMISSIVE_ROLE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE_ROLE"
+        - "overpermissive-role-admin-wildcard"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "PassRole"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-jdbc-no-ssl
+    description: >-
+      Glue job with encrypted catalog, encrypted S3 source, and least-privilege
+      role, but the JDBC connection lacks JDBC_ENFORCE_SSL and the job has no
+      SecurityConfiguration — worst finding is configuration gap.
+    input: |
+      Audit the following AWS Glue job configuration for security exposure.
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Resource: job config-gap-jdbc-no-ssl
+      GlueVersion: 3.0
+      Role: arn:aws:iam::111111111111:role/glue-etl-config-gap-jdbc-no-ssl
+      SecurityConfiguration: (none)
+      Connections: {Connections: ["rds-pg-config-gap-jdbc-no-ssl"]}
+
+      DataCatalogEncryptionSettings:
+        EncryptionAtRest:
+          EncryptionMode: SSE-KMS
+          SseAwsKmsKeyId: alias/glue-catalog
+        ConnectionPasswordEncryption:
+          ReturnConnectionPasswordEncrypted: true
+
+      S3 source bucket (etl-source-config-gap-jdbc-no-ssl):
+        server-side-encryption-configuration:
+          Rules:
+            - ApplyServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+
+      JDBC Connection (rds-pg-config-gap-jdbc-no-ssl):
+        ConnectionType: JDBC
+        ConnectionProperties:
+          JDBC_CONNECTION_URL: jdbc:postgresql://db.x.us-east-1.rds.amazonaws.com:5432/app
+          USERNAME: etl_reader
+          JDBC_ENFORCE_SSL: "false"
+
+      Execution role policy (glue-etl-config-gap-jdbc-no-ssl):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "S3Read",
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:ListBucket"],
+              "Resource": [
+                "arn:aws:s3:::etl-source-config-gap-jdbc-no-ssl",
+                "arn:aws:s3:::etl-source-config-gap-jdbc-no-ssl/*"
+              ]
+            },
+            {
+              "Sid": "GlueCatalogRW",
+              "Effect": "Allow",
+              "Action": ["glue:BatchCreatePartition", "glue:GetTable", "glue:GetDatabase"],
+              "Resource": "arn:aws:glue:us-east-1:111111111111:catalog"
+            }
+          ]
+        }
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-jdbc-no-ssl"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+
+  - id: ok-clean-posture
+    description: >-
+      Glue job with SSE-KMS catalog encryption, SSE-KMS S3 source, JDBC SSL
+      enforced, SecurityConfiguration present, least-privilege role, and
+      current GlueVersion — clean posture, verdict OK.
+    input: |
+      Audit the following AWS Glue job configuration for security exposure.
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Resource: job ok-clean-posture
+      GlueVersion: 4.0
+      Role: arn:aws:iam::111111111111:role/glue-etl-ok-clean-posture
+      SecurityConfiguration: prod-glue-sec
+      Connections: {Connections: ["rds-pg-ok-clean-posture"]}
+
+      DataCatalogEncryptionSettings:
+        EncryptionAtRest:
+          EncryptionMode: SSE-KMS
+          SseAwsKmsKeyId: alias/glue-catalog
+        ConnectionPasswordEncryption:
+          ReturnConnectionPasswordEncrypted: true
+          AwsKmsKeyId: alias/glue-catalog
+
+      SecurityConfiguration (prod-glue-sec):
+        EncryptionConfiguration:
+          CloudWatchEncryption: {CloudWatchEncryptionMode: SSE-KMS}
+          S3Encryptions: [{EncryptionMode: SSE-KMS}]
+          JobBookmarksEncryption: {JobBookmarksEncryptionMode: CSE-KMS}
+
+      S3 source bucket (etl-source-ok-clean-posture):
+        server-side-encryption-configuration:
+          Rules:
+            - ApplyServerSideEncryptionByDefault: {SSEAlgorithm: aws:kms, KMSMasterKeyID: alias/s3-cmk}
+
+      JDBC Connection (rds-pg-ok-clean-posture):
+        ConnectionType: JDBC
+        ConnectionProperties:
+          JDBC_CONNECTION_URL: jdbc:postgresql://db.x.us-east-1.rds.amazonaws.com:5432/app
+          USERNAME: etl_reader
+          JDBC_ENFORCE_SSL: "true"
+
+      Execution role policy (glue-etl-ok-clean-posture):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "S3Read",
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:ListBucket"],
+              "Resource": [
+                "arn:aws:s3:::etl-source-ok-clean-posture",
+                "arn:aws:s3:::etl-source-ok-clean-posture/*"
+              ]
+            },
+            {
+              "Sid": "GlueCatalogRW",
+              "Effect": "Allow",
+              "Action": ["glue:BatchCreatePartition", "glue:GetTable", "glue:GetDatabase"],
+              "Resource": [
+                "arn:aws:glue:us-east-1:111111111111:catalog",
+                "arn:aws:glue:us-east-1:111111111111:database/default",
+                "arn:aws:glue:us-east-1:111111111111:table/default/*"
+              ]
+            },
+            {
+              "Sid": "KMSDecrypt",
+              "Effect": "Allow",
+              "Action": "kms:Decrypt",
+              "Resource": "arn:aws:kms:us-east-1:111111111111:key/abc-123"
+            }
+          ]
+        }
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ok-clean-posture"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-encryption-s3-source-unencrypted
+    description: >-
+      Glue job with SSE-KMS catalog encryption and a least-privilege role, but
+      the S3 source bucket has NO server-side encryption — processed data is
+      plaintext at rest. Worst finding is source data exposure.
+    input: |
+      Audit the following AWS Glue job configuration for security exposure.
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Resource: job no-encryption-s3-source-unencrypted
+      GlueVersion: 3.0
+      Role: arn:aws:iam::111111111111:role/glue-etl-no-encryption-s3-source-unencrypted
+      SecurityConfiguration: prod-glue-sec
+
+      DataCatalogEncryptionSettings:
+        EncryptionAtRest:
+          EncryptionMode: SSE-KMS
+          SseAwsKmsKeyId: alias/glue-catalog
+        ConnectionPasswordEncryption:
+          ReturnConnectionPasswordEncrypted: true
+
+      SecurityConfiguration (prod-glue-sec):
+        EncryptionConfiguration:
+          CloudWatchEncryption: {CloudWatchEncryptionMode: SSE-KMS}
+          S3Encryptions: [{EncryptionMode: SSE-KMS}]
+          JobBookmarksEncryption: {JobBookmarksEncryptionMode: CSE-KMS}
+
+      S3 source bucket (etl-source-no-encryption-s3-source-unencrypted):
+        server-side-encryption-configuration: (none — no SSE configured)
+
+      Execution role policy (glue-etl-no-encryption-s3-source-unencrypted):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "S3Read",
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:ListBucket"],
+              "Resource": [
+                "arn:aws:s3:::etl-source-no-encryption-s3-source-unencrypted",
+                "arn:aws:s3:::etl-source-no-encryption-s3-source-unencrypted/*"
+              ]
+            },
+            {
+              "Sid": "GlueCatalogRW",
+              "Effect": "Allow",
+              "Action": ["glue:BatchCreatePartition", "glue:GetTable", "glue:GetDatabase"],
+              "Resource": "arn:aws:glue:us-east-1:111111111111:catalog"
+            }
+          ]
+        }
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "no-encryption-s3-source-unencrypted"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: OVERPERMISSIVE_ROLE"
+
+  - id: config-gap-bookmarks-eol
+    description: >-
+      Glue job with encrypted catalog, encrypted S3 source, least-privilege
+      role, and a SecurityConfiguration, but bookmarks encryption is DISABLED
+      and the job runs GlueVersion 0.9 (EOL). Worst finding is configuration gap.
+    input: |
+      Audit the following AWS Glue job configuration for security exposure.
+      Emit the standard VERDICT block (RESOURCE, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      Resource: job config-gap-bookmarks-eol
+      GlueVersion: "0.9"
+      Role: arn:aws:iam::111111111111:role/glue-etl-config-gap-bookmarks-eol
+      SecurityConfiguration: legacy-glue-sec
+
+      DataCatalogEncryptionSettings:
+        EncryptionAtRest:
+          EncryptionMode: SSE-KMS
+          SseAwsKmsKeyId: alias/glue-catalog
+        ConnectionPasswordEncryption:
+          ReturnConnectionPasswordEncrypted: true
+
+      SecurityConfiguration (legacy-glue-sec):
+        EncryptionConfiguration:
+          CloudWatchEncryption: {CloudWatchEncryptionMode: SSE-KMS}
+          S3Encryptions: [{EncryptionMode: SSE-KMS}]
+          JobBookmarksEncryption: {JobBookmarksEncryptionMode: DISABLED}
+
+      S3 source bucket (etl-source-config-gap-bookmarks-eol):
+        server-side-encryption-configuration:
+          Rules:
+            - ApplyServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+
+      Execution role policy (glue-etl-config-gap-bookmarks-eol):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "S3Read",
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:ListBucket"],
+              "Resource": [
+                "arn:aws:s3:::etl-source-config-gap-bookmarks-eol",
+                "arn:aws:s3:::etl-source-config-gap-bookmarks-eol/*"
+              ]
+            },
+            {
+              "Sid": "GlueCatalogRW",
+              "Effect": "Allow",
+              "Action": ["glue:BatchCreatePartition", "glue:GetTable", "glue:GetDatabase"],
+              "Resource": "arn:aws:glue:us-east-1:111111111111:catalog"
+            }
+          ]
+        }
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-bookmarks-eol"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: OVERPERMISSIVE_ROLE"

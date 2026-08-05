@@ -1,0 +1,290 @@
+# Eval test cases for lakeformation-data-lake-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# CRITICAL: SKILL.md classification logic (Steps 1-10) MUST match these test
+# cases exactly. Each test-case id is embedded in the Catalog/account line so
+# the model output's LAKE block carries the audit target identifier.
+# must_contain uses CONCEPT tokens (verdict names, security concepts) — never
+# raw API field names or test-case ids — per the eval-assertion contract.
+skill: lakeformation-data-lake-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: catalog-all-to-role
+    description: >-
+      Lake Formation grant of Permissions ["ALL"] with WithGrantablePermissions
+      ["ALL"] on the entire Catalog resource to a non-admin internal role —
+      data-lake admin escalation via grant.
+    input: |
+      Audit target (catalog): 111111111111 (catalog-all-to-role)
+      Lake Formation enabled: true (describe-organization)
+      Data lake settings (get-data-lake-settings):
+        DataLakeAdmins:
+          - arn:aws:iam::111111111111:role/lf-break-glass
+      Registered locations (list-resources):
+        - ResourceArn: arn:aws:s3:::prod-datalake/catalog/
+          RoleArn: arn:aws:iam::111111111111:role/aws-service-role/lakeformation/ApplicationRole
+      Data cells filters (list-data-cells-filter): []
+      Permissions (list-permissions):
+        {
+          "Principal": {"DataLakePrincipalIdentifier": "arn:aws:iam::111111111111:role/data-engineer"},
+          "Resource": {"Catalog": {}},
+          "Permissions": ["ALL"],
+          "PermissionsWithGrantOptions": ["ALL"]
+        }
+      Emit the standard VERDICT block (LAKE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE_GRANT
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE_GRANT"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "ALL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: EXTERNAL_ACCOUNT"
+
+  - id: cross-account-database-share
+    description: >-
+      Lake Formation grants to a principal whose 12-digit account ID differs
+      from the catalog owner — explicit cross-account data sharing. Verdict
+      must surface EXTERNAL_ACCOUNT so the operator confirms intent.
+    input: |
+      Audit target (catalog): 111111111111 (cross-account-database-share)
+      Lake Formation enabled: true (describe-organization)
+      Data lake settings (get-data-lake-settings):
+        DataLakeAdmins:
+          - arn:aws:iam::111111111111:role/lf-break-glass
+      Registered locations (list-resources):
+        - ResourceArn: arn:aws:s3:::prod-datalake/finance/
+          RoleArn: arn:aws:iam::111111111111:role/aws-service-role/lakeformation/ApplicationRole
+      Data cells filters (list-data-cells-filter): []
+      Permissions (list-permissions):
+        [
+          {
+            "Principal": {"DataLakePrincipalIdentifier": "arn:aws:iam::222222222222:root"},
+            "Resource": {"Database": {"Name": "finance", "CatalogId": "111111111111"}},
+            "Permissions": ["DESCRIBE"],
+            "PermissionsWithGrantOptions": []
+          },
+          {
+            "Principal": {"DataLakePrincipalIdentifier": "arn:aws:iam::222222222222:role/partner-analyst"},
+            "Resource": {"TableWithColumns": {"DatabaseName": "finance", "Name": "transactions", "CatalogId": "111111111111", "ColumnNames": ["txn_id", "amount", "currency"]}},
+            "Permissions": ["DESCRIBE", "SELECT"],
+            "PermissionsWithGrantOptions": []
+          }
+        ]
+      Emit the standard VERDICT block (LAKE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: EXTERNAL_ACCOUNT
+    assertions:
+      must_contain:
+        - "EXTERNAL_ACCOUNT"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "cross-account"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: OVERPERMISSIVE_GRANT"
+
+  - id: column-wildcard-select-no-filter
+    description: >-
+      SELECT with ColumnWildcard on a TableWithColumns resource on a PII-tagged
+      table, with no DataCellsFilter wired — full-column read with no row
+      scoping on sensitive data. Step 3 OVERPERMISSIVE_GRANT plus Step 7
+      additive CONFIG_GAP finding.
+    input: |
+      Audit target (catalog): 111111111111 (column-wildcard-select-no-filter)
+      Lake Formation enabled: true (describe-organization)
+      Data lake settings (get-data-lake-settings):
+        DataLakeAdmins:
+          - arn:aws:iam::111111111111:role/lf-break-glass
+      Registered locations (list-resources):
+        - ResourceArn: arn:aws:s3:::prod-datalake/customer/
+          RoleArn: arn:aws:iam::111111111111:role/aws-service-role/lakeformation/ApplicationRole
+      Data cells filters (list-data-cells-filter): []
+      LF-tags on table customers_pii:
+        - data_classification=PII
+      Table storage descriptor:
+        - customers_pii location: s3://prod-datalake/customer/customers_pii/  (under registered location)
+      Permissions (list-permissions):
+        {
+          "Principal": {"DataLakePrincipalIdentifier": "arn:aws:iam::111111111111:role/analyst"},
+          "Resource": {"TableWithColumns": {"DatabaseName": "customers", "Name": "customers_pii", "CatalogId": "111111111111", "ColumnWildcard": {}}},
+          "Permissions": ["SELECT"],
+          "PermissionsWithGrantOptions": []
+        }
+      Emit the standard VERDICT block (LAKE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE_GRANT
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE_GRANT"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "wildcard"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: EXTERNAL_ACCOUNT"
+
+  - id: grant-on-unregistered-path
+    description: >-
+      Column-scoped SELECT on a named table looks least-privilege, but the
+      table's S3 backing path is NOT under any Lake Formation registered
+      location — the grant is ineffective and LF cannot enforce. Step 5
+      CONFIG_GAP.
+    input: |
+      Audit target (catalog): 111111111111 (grant-on-unregistered-path)
+      Lake Formation enabled: true (describe-organization)
+      Data lake settings (get-data-lake-settings):
+        DataLakeAdmins:
+          - arn:aws:iam::111111111111:role/lf-break-glass
+      Registered locations (list-resources):
+        - ResourceArn: arn:aws:s3:::prod-datalake/operations/
+          RoleArn: arn:aws:iam::111111111111:role/aws-service-role/lakeformation/ApplicationRole
+      Data cells filters (list-data-cells-filter): []
+      Table storage descriptor:
+        - campaigns location: s3://separate-unregistered-bucket/marketing/campaigns/  (NOT under any registered location)
+      Permissions (list-permissions):
+        {
+          "Principal": {"DataLakePrincipalIdentifier": "arn:aws:iam::111111111111:role/analyst"},
+          "Resource": {"TableWithColumns": {"DatabaseName": "marketing", "Name": "campaigns", "CatalogId": "111111111111", "ColumnNames": ["clicks", "impressions", "spend"]}},
+          "Permissions": ["SELECT"],
+          "PermissionsWithGrantOptions": []
+        }
+      Emit the standard VERDICT block (LAKE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "unregistered"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: OVERPERMISSIVE_GRANT"
+        - "VERDICT: EXTERNAL_ACCOUNT"
+
+  - id: clean-column-scoped-with-filter
+    description: >-
+      Least-privilege grant — named permissions on a named TableWithColumns
+      with explicit ColumnNames, same-account role principal, no
+      WithGrantablePermissions, table under a registered location, and a
+      wired DataCellsFilter. Step 9 OK verdict.
+    input: |
+      Audit target (catalog): 111111111111 (clean-column-scoped-with-filter)
+      Lake Formation enabled: true (describe-organization)
+      Data lake settings (get-data-lake-settings):
+        DataLakeAdmins:
+          - arn:aws:iam::111111111111:role/lf-break-glass
+      Registered locations (list-resources):
+        - ResourceArn: arn:aws:s3:::prod-datalake/sales/
+          RoleArn: arn:aws:iam::111111111111:role/aws-service-role/lakeformation/ApplicationRole
+      Data cells filters (list-data-cells-filter):
+        - TableName: orders
+          DatabaseName: sales
+          Name: region-us-filter
+          RowFilter: {"FilterExpression": "region = 'US'"}
+      LF-tags on table orders:
+        - data_classification=internal
+      Table storage descriptor:
+        - orders location: s3://prod-datalake/sales/orders/  (under registered location)
+      Data cells filter grant wiring:
+        - The SELECT grant below is scoped by the region-us-filter DataCellsFilter.
+      Permissions (list-permissions):
+        {
+          "Principal": {"DataLakePrincipalIdentifier": "arn:aws:iam::111111111111:role/sales-analyst"},
+          "Resource": {"TableWithColumns": {"DatabaseName": "sales", "Name": "orders", "CatalogId": "111111111111", "ColumnNames": ["order_id", "total", "region"]}},
+          "Permissions": ["SELECT"],
+          "PermissionsWithGrantOptions": []
+        }
+      Emit the standard VERDICT block (LAKE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OVERPERMISSIVE_GRANT"
+        - "VERDICT: EXTERNAL_ACCOUNT"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: empty-admins-and-iam-mixed-mode
+    description: >-
+      DataLakeAdmins list is empty (no break-glass admin) and a database has
+      both an IAMAllowedPrincipals grant and explicit LF grants on its tables
+      (mixed-mode). Both Step 6 and Step 8 produce CONFIG_GAP. No
+      OVERPERMISSIVE_GRANT trigger — the analyst grant is column-scoped.
+    input: |
+      Audit target (catalog): 111111111111 (empty-admins-and-iam-mixed-mode)
+      Lake Formation enabled: true (describe-organization)
+      Data lake settings (get-data-lake-settings):
+        DataLakeAdmins: []
+      Registered locations (list-resources):
+        - ResourceArn: arn:aws:s3:::prod-datalake/legacy/
+          RoleArn: arn:aws:iam::111111111111:role/aws-service-role/lakeformation/ApplicationRole
+      Data cells filters (list-data-cells-filter): []
+      Table storage descriptor:
+        - legacy_table location: s3://prod-datalake/legacy/legacy_table/  (under registered location)
+      Permissions (list-permissions):
+        [
+          {
+            "Principal": {"DataLakePrincipalIdentifier": "IAMAllowedPrincipals"},
+            "Resource": {"Database": {"Name": "legacy_db", "CatalogId": "111111111111"}},
+            "Permissions": ["ALL"],
+            "PermissionsWithGrantOptions": []
+          },
+          {
+            "Principal": {"DataLakePrincipalIdentifier": "arn:aws:iam::111111111111:role/legacy-analyst"},
+            "Resource": {"TableWithColumns": {"DatabaseName": "legacy_db", "Name": "legacy_table", "CatalogId": "111111111111", "ColumnNames": ["col1", "col2"]}},
+            "Permissions": ["DESCRIBE", "SELECT"],
+            "PermissionsWithGrantOptions": []
+          }
+        ]
+      Emit the standard VERDICT block (LAKE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "admin"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: OVERPERMISSIVE_GRANT"
+        - "VERDICT: EXTERNAL_ACCOUNT"

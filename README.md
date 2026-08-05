@@ -29,6 +29,7 @@ incomplete, and CI runs the assertion layer on every PR.
 | accessanalyzer-finding-triage | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.9s | 58002 |
 | acm-certificate-expiry-auditor | amazon.nova-pro-v1:0 | 102/120 | B | 5/6 | 13.1s | 31009 |
 | apigateway-resource-policy-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 36.4s | 36506 |
+| athena-workgroup-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 8.6s | 49642 |
 | auditmanager-assessment-auditor | amazon.nova-pro-v1:0 | 106/120 | B | 6/6 | 10.8s | 41075 |
 | autoscaling-group-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 18.9s | 39803 |
 | backup-plan-auditor | amazon.nova-pro-v1:0 | 115/120 | A | 6/6 | 8.5s | 30595 |
@@ -37,6 +38,7 @@ incomplete, and CI runs the assertion layer on every PR.
 | billing-account-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 13.4s | 37235 |
 | budgets-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.2s | 37761 |
 | ce-cost-anomaly-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 30.5s | 36151 |
+| cleanrooms-collaboration-auditor | amazon.nova-pro-v1:0 | 107/120 | B | 6/6 | 19.6s | 48378 |
 | cloudfront-distribution-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 13.3s | 39728 |
 | cloudtrail-org-trail-auditor | amazon.nova-pro-v1:0 | 105/120 | B | 6/6 | 5.4s | 40383 |
 | cloudwatch-alarm-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 39.2s | 36433 |
@@ -62,16 +64,24 @@ incomplete, and CI runs the assertion layer on every PR.
 | efs-filesystem-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 38429 |
 | eks-cluster-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.7s | 34838 |
 | elbv2-load-balancer-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 8.6s | 47542 |
+| emr-cluster-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 0/6 | 12.2s | 33961 |
 | eventbridge-bus-policy-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 12.9s | 40249 |
+| firehose-delivery-stream-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 5.2s | 43387 |
+| glue-crawler-job-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 35.0s | 48227 |
 | guardduty-finding-severity-triage | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.3s | 55940 |
 | health-event-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 12.4s | 42780 |
 | iam-least-privilege-advisor | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 7.8s | 33835 |
 | inspector2-coverage-finding-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.3s | 52550 |
+| kinesis-stream-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 27.1s | 42232 |
 | kms-key-policy-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.2s | 49516 |
+| lakeformation-data-lake-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 13.1s | 43103 |
 | lambda-runtime-deprecation-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.6s | 44874 |
+| msk-cluster-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 12.2s | 36499 |
 | networkmanager-core-network-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.3s | 34956 |
+| opensearch-domain-auditor | amazon.nova-pro-v1:0 | 106/120 | B | 6/6 | 14.5s | 44585 |
 | organizations-scp-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.7s | 33467 |
 | rds-instance-auditor | amazon.nova-pro-v1:0 | 107/120 | B | 6/6 | 11.9s | 43259 |
+| redshift-cluster-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 9.8s | 45953 |
 | resiliencehub-app-assessment-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.7s | 48588 |
 | route53-record-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.8s | 37358 |
 | s3-public-access-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 5/5 | 14.7s | 40044 |
@@ -107,8 +117,8 @@ skills/*/eval/*.yaml  ->  eval/run_eval.py
   accounts — see `features/aws-cloudops-skills-oss/spec.md` (S-E03).
 - **CI:** assertion-only on every PR (no AWS credentials). The maintainer
   runs the LLM-judge locally and commits scorecard artifacts.
-- **Eval-backed standard: Grade A (>=108/120)** — 52 of 61 shipped skills meet
-  it; 9 ship at honest Grade B (scores 102–107, marked in the table below) as
+- **Eval-backed standard: Grade A (>=108/120)** — 60 of 71 shipped skills meet
+  it; 11 ship at honest Grade B (scores 102–107, marked in the table below) as
   documented exceptions. The eval is truthful about each skill's measured quality
   (median-of-3 judge); every shipped skill is measured, none assert quality
   without evidence.

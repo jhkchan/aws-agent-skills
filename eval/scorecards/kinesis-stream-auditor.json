@@ -1,0 +1,70 @@
+{
+  "skill": "kinesis-stream-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many concrete, expert\u2011level details not typically known by a baseline model: exact retention\u2011cost formula, on\u2011demand vs provisioned crossover math, shard\u2011quota accounting, classic\u2011consumer shared\u2011throughput, encryption\u2011key switch quirks, enhanced\u2011fan\u2011out limits, and precise cost thresholds (e.g., 200\u202fMB/day). This is genuine delta, though a few of these facts could be inferred by a well\u2011trained model, so not a perfect 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific audit workflow: pre\u2011flight permission checks, pagination handling, ordered stepwise classification, mandatory confirmation before state\u2011changing CLI calls, and precise remediation commands. Missing only a fully explicit procedure for detecting classic (non\u2011registered) consumers beyond the high\u2011level description, which leaves a small ambiguity."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never treat EncryptionType NONE as OK, never flag on\u2011demand shard count against provisioned quota, never assume ConsumerCount 0 is always a problem). One minor shortfall: it does not explicitly warn about the hidden cost of enabling *all* shard\u2011level metrics on large streams, though it mentions it in a note."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter includes description, keywords, activation triggers, invocation schema, and when\u2011to\u2011use guidance, enabling reliable activation. The invocation schema is informal text rather than a strict JSON schema, which could cause ambiguous parsing for an agent."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: high\u2011level Mindset, quick\u2011reference table, then detailed pre\u2011flight, stepwise process, output format, edge\u2011case handling, anti\u2011patterns, safety checks, remediation, and deep reference. However, the initial sections are dense, potentially overloading the agent before it knows which part to use."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and prerequisite checks (KMS key state, retention decrease impact, quota increase). Non\u2011destructive audit steps are left flexible, matching task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation \u2192 Deep reference) that aligns with established skill templates."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a clear decision tree, deterministic output format, concrete CLI remediation examples, and worked examples that the model output matches. Slight deduction for reliance on an estimated daily ingest volume without a defined method to obtain it, which could leave an agent guessing."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 42232,
+  "latency_ms": 27086,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

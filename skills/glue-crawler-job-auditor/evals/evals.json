@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "glue-crawler-job-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Glue Crawler & Job Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-encryption-catalog-disabled",
+      "name": "Data Catalog EncryptionAtRest DISABLED with s3:* wildcard role — metadata exposure",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-encryption-catalog-disabled.md",
+      "baseline_file": "baselines/no-encryption-catalog-disabled.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "no-encryption-catalog-disabled", "VERDICT", "REASON", "REMEDIATION", "DISABLED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "overpermissive-role-admin-wildcard",
+      "name": "Admin wildcard plus PassRole on star — full IAM blast radius",
+      "difficulty": "medium",
+      "prompt_file": "prompts/overpermissive-role-admin-wildcard.md",
+      "baseline_file": "baselines/overpermissive-role-admin-wildcard.md",
+      "expected_verdict": "OVERPERMISSIVE_ROLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OVERPERMISSIVE_ROLE", "overpermissive-role-admin-wildcard", "VERDICT", "REASON", "REMEDIATION", "PassRole"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-jdbc-no-ssl",
+      "name": "JDBC connection without SSL enforcement and missing SecurityConfiguration — config gap",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-jdbc-no-ssl.md",
+      "baseline_file": "baselines/config-gap-jdbc-no-ssl.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-jdbc-no-ssl", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "ok-clean-posture",
+      "name": "Fully hardened Glue job — catalog SSE-KMS, SSL enforced, least-privilege role, sec config present",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-clean-posture.md",
+      "baseline_file": "baselines/ok-clean-posture.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "ok-clean-posture", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_ENCRYPTION", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-encryption-s3-source-unencrypted",
+      "name": "S3 source bucket with no SSE — processed data plaintext at rest",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-encryption-s3-source-unencrypted.md",
+      "baseline_file": "baselines/no-encryption-s3-source-unencrypted.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "no-encryption-s3-source-unencrypted", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-bookmarks-eol",
+      "name": "Bookmarks encryption DISABLED plus Glue 0.9 EOL runtime — config gap",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-bookmarks-eol.md",
+      "baseline_file": "baselines/config-gap-bookmarks-eol.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-bookmarks-eol", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    }
+  ]
+}

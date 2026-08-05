@@ -1,0 +1,54 @@
+# Eval configuration for redshift-cluster-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: redshift-cluster-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: public-cluster-no-encryption
+    difficulty: easy
+    prompt_file: prompts/public-cluster-no-encryption.md
+    baseline_file: baselines/public-cluster-no-encryption.md
+    expected_verdict: PUBLIC
+    expected_risk: CRITICAL
+  - id: private-unencrypted
+    difficulty: medium
+    prompt_file: prompts/private-unencrypted.md
+    baseline_file: baselines/private-unencrypted.md
+    expected_verdict: NO_ENCRYPTION
+    expected_risk: HIGH
+  - id: no-ssl-default-param-group
+    difficulty: medium
+    prompt_file: prompts/no-ssl-default-param-group.md
+    baseline_file: baselines/no-ssl-default-param-group.md
+    expected_verdict: NO_SSL
+    expected_risk: HIGH
+  - id: audit-logging-disabled-clean
+    difficulty: medium
+    prompt_file: prompts/audit-logging-disabled-clean.md
+    baseline_file: baselines/audit-logging-disabled-clean.md
+    expected_verdict: NO_AUDIT_LOG
+    expected_risk: MEDIUM
+  - id: config-gap-no-snapshots-no-evr
+    difficulty: hard
+    prompt_file: prompts/config-gap-no-snapshots-no-evr.md
+    baseline_file: baselines/config-gap-no-snapshots-no-evr.md
+    expected_verdict: CONFIG_GAP
+    expected_risk: MEDIUM
+  - id: fully-hardened-ok
+    difficulty: easy
+    prompt_file: prompts/fully-hardened-ok.md
+    baseline_file: baselines/fully-hardened-ok.md
+    expected_verdict: OK
+    expected_risk: LOW

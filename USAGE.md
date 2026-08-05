@@ -52,6 +52,8 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-config-recorder-coverage` | 2 Audit | Audit AWS Config recorder coverage (allSupported, includeGlobalResourceTypes), delivery channel health (FAILURE status, NO_SUCH_BUCKET, ACCESS_DENIED), Config rules deployment, and conformance packs (deployment status) — emits INCOMPLETE_COVERAGE/NO_RULES/DELIVERY_GAP/CONFIG_GAP/OK per region (routes to `config-recorder-coverage-auditor`) |
 | `/aws:audit-trustedadvisor-checks` | 2 Audit | Audit Trusted Advisor check results for security, fault-tolerance, cost-optimization, performance, and service-limits findings — including support-tier gating (Basic/Developer = 7 of ~115 checks), stale results (>24h), excluded-resource blind spots, and `not_available` statuses — emits CRITICAL_CHECK/WARNING_CHECK/CONFIG_GAP/OK per check (routes to `trustedadvisor-check-auditor`) |
 | `/aws:audit-rds-instance` | 2 Audit | Audit RDS DB instances for public accessibility (internet-exposed database), encryption-at-rest (immutable post-creation), deletion protection, Multi-AZ availability, automated backups / PITR, auto minor-version upgrade, and Enhanced Monitoring — emits PUBLIC/UNENCRYPTED/NO_DELETION_PROTECTION/SINGLE_AZ/CONFIG_GAP/OK per instance (routes to `rds-instance-auditor`) |
+| `/aws:audit-redshift-cluster` | 2 Audit | Audit Amazon Redshift provisioned clusters for public accessibility (internet-exposed petabyte-scale data warehouse), KMS encryption-at-rest (immutable post-creation), require_ssl parameter-group enforcement, S3 audit logging (CloudTrail covers control-plane only — not SQL), automated-snapshot retention (PITR), enhanced VPC routing (COPY/UNLOAD data-path privacy), and VPC security-group ingress on the cluster port — emits PUBLIC/NO_ENCRYPTION/NO_SSL/NO_AUDIT_LOG/CONFIG_GAP/OK per cluster (routes to `redshift-cluster-auditor`) |
+| `/aws:audit-opensearch-domain` | 2 Audit | Audit Amazon OpenSearch Service (provisioned, not Serverless) domains for encryption-at-rest (KMS CMK vs AWS-managed aws/es), node-to-node encryption, fine-grained access control (FGAC / Advanced Security), public access via resource-policy Principal `*` with `es:ESHttp*` data-plane grants, dedicated master node type/count (t2/t3.small.search below AWS recommendation, single master = no HA quorum), and slow-log publishing to CloudWatch Logs — emits NO_ENCRYPTION/PUBLIC_ACCESS/NO_FGAC/CONFIG_GAP/OK per domain (routes to `opensearch-domain-auditor`) |
 | `/aws:audit-controltower-controls` | 2 Audit | Audit Control Tower landing-zone state, enabled controls (preventive/detective/proactive), SCP drift, guardrail enforcement integrity, Config recorder gaps, and account-factory baseline health — emits DRIFT/DISABLED_CONTROL/CONFIG_GAP/OK per OU or landing zone (routes to `controltower-control-auditor`) |
 | `/aws:audit-wellarchitected-workload` | 2 Audit | Audit Well-Architected Tool workloads for review staleness (effectiveReviewDate > 180 days), per-pillar high-risk issue counts (security zero-tolerance + aggregate > 5), milestone tracking gaps, UNANSWERED majority, and remediation plan completeness — emits STALE_REVIEW/HIGH_RISK/CONFIG_GAP/OK per workload (routes to `wellarchitected-workload-auditor`) |
 | `/aws:audit-organizations-scp` | 2 Audit | Audit Organizations SCPs for effective permissions across the OU hierarchy — FullAWSAccess inheritance, deny-list guardrails (LeaveOrganization, security-service disruption, region restriction), account-level overrides, silently ineffective condition keys — emits PERMISSIVE_SCP/MISSING_GUARDRAIL/CONFIG_GAP/OK per target (routes to `organizations-scp-auditor`) |
@@ -74,6 +76,15 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-cloudwatch-alarm` | 2 Audit | Audit CloudWatch alarms for missing alarm actions (SNS/Lambda/AutoScaling), insufficient-data handling (TreatMissingData defaults to "missing" — not "notBreaching"), anomaly-detection coverage vs static thresholds on high-variance metrics, composite alarm integrity (Rule expression, child alarm references, escalation actions), structural config errors (DatapointsToAlarm > EvaluationPeriods), and alarm state history — emits NO_ANOMALY/NO_ACTION/INSUFFICIENT_DATA/CONFIG_GAP/OK per alarm (routes to `cloudwatch-alarm-auditor`) |
 | `/aws:audit-bedrock-guardrail-coverage` | 2 Audit | Audit Bedrock Guardrails for model coverage gaps (guardrails are per-request, not per-model), DRAFT-vs-READY enforcement status (DRAFT = zero enforcement), content-filter strength (hate/insult/sexual/violence outputStrength NONE), contextual grounding threshold (0.0 = silently disabled), denied topics, word filters, and per-application bypass risk — emits NO_GUARDRAIL/INCOMPLETE_COVERAGE/WEAK_FILTER/CONFIG_GAP/OK per guardrail or deployment (routes to `bedrock-guardrail-coverage-auditor`) |
 | `/aws:audit-resiliencehub-app-assessment` | 2 Audit | Audit Resilience Hub app assessments for assessment staleness (>90 days), resiliency policy binding and tier-to-RTO/RPO calibration, per-tier compliance breaches (MissionCritical/Critical NonCompliant triggers HIGH_RISK), aggregate compliance score (<80 = LOW_COMPLIANCE), app-version drift, failed/pending assessment status (no data = CONFIG_GAP not zero compliance), and unimplemented alarm/SDD/test recommendations — emits STALE_ASSESSMENT/HIGH_RISK/LOW_COMPLIANCE/CONFIG_GAP/OK per app (routes to `resiliencehub-app-assessment-auditor`) |
+| `/aws:audit-kinesis-stream` | 2 Audit | Audit Kinesis Data Streams for encryption-at-rest gaps (EncryptionType NONE), extended-retention cost exposure (retention > 168h incurs per-GB charges separate from shard-hour fee), shard-count quota-exhaustion risk (approaching 500 default quota), enhanced-monitoring blind spots (missing per-shard IteratorAgeMilliseconds and WriteProvisionedThroughputExceeded), consumer checkpointing posture (classic consumers share 2 MB/s vs enhanced fan-out dedicated), and on-demand vs provisioned mode fit (per-stream-hour floor dominates at low volume) — emits NO_ENCRYPTION/COST_RISK/CONFIG_GAP/OK per stream (routes to `kinesis-stream-auditor`) |
+| `/aws:audit-firehose-delivery-stream` | 2 Audit | Audit Kinesis Data Firehose delivery streams for encryption-at-rest gaps (explicit NoEncryption opt-out vs absent EncryptionConfiguration relying on bucket default SSE-S3 vs SSE-KMS CMK), BufferingHints quota violations (SizeInMBs 1-128, IntervalInSeconds 60-900), Lambda transformation backup posture (S3BackupMode Disabled = silent corruption vector), CloudWatch error-logging silence (LoggingConfig.Enabled false = transformation failures invisible), source-backup absence under dynamic partitioning (silent data-loss on JQ extraction failure), and dynamic-partitioning structural integrity (MetadataExtraction wiring, ExtendedS3 requirement, RetryDuration=0 immediate-fail trap) — emits NO_ENCRYPTION/CONFIG_GAP/OK per delivery stream (routes to `firehose-delivery-stream-auditor`) |
+| `/aws:audit-msk-cluster` | 2 Audit | Audit Amazon MSK (Managed Kafka) clusters for encryption in-transit (ClientBroker PLAINTEXT/TLS_PLAINTEXT = NO_ENCRYPTION — plaintext path breaks guarantee), client authentication (unauthenticated enabled = open data plane), public access (SERVICE_PROVIDED_EIPS = internet-reachable brokers), broker logging (all destinations disabled), and encryption at-rest KMS key governance (AWS-managed vs customer-managed CMK) — emits NO_ENCRYPTION/UNAUTHENTICATED/PUBLIC_ACCESS/CONFIG_GAP/OK per cluster (routes to `msk-cluster-auditor`) |
+
+| `/aws:audit-emr-cluster` | 2 Audit | Audit EMR clusters for encryption gaps (S3, local-disk, in-transit), over-permissive IAM roles, Kerberos auth, block public access, debug logging — emits NO_ENCRYPTION/OVERPERMISSIVE_ROLE/CONFIG_GAP/OK per cluster (routes to `emr-cluster-auditor`) |
+| `/aws:audit-glue-crawler-job` | 2 Audit | Audit Glue crawlers/jobs for data-catalog encryption (EncryptionAtRest / ConnectionPasswordEncryption), JDBC connection SSL (JDBC_ENFORCE_SSL), IAM execution-role blast radius (glue:* / s3:* / iam:PassRole on star — glue:CreateJob pass-role vector), SecurityConfiguration coverage (CloudWatch logs / S3 spills / bookmarks), job-bookmark encryption, EOL Glue version (0.9/1.0), and S3 source bucket encryption (independent of catalog) — emits NO_ENCRYPTION/OVERPERMISSIVE_ROLE/CONFIG_GAP/OK per resource (routes to `glue-crawler-job-auditor`) |
+| `/aws:audit-cleanrooms-collaboration` | 2 Audit | Audit AWS Clean Rooms collaborations for membership-status gaps (INVITED/REMOVED/LEFT members — perspective-relative status), privacy-budget risks (differential privacy disabled at collaboration level vs additionalAnalyses=0 per-query enforcement gap, epsilon near-exhaustion >=80% of per-member cap with no reset, aggregate constraints absent = no structural privacy floor), analysis-template SQL-validation defects (dangling configured-table aliases, unresolved ${param} tokens, columns outside allowedColumns), protected-query output S3 widening, and configured-audience activation gaps (cleanroomsml model in CREATE_FAILED/CREATE_IN_PROGRESS, missing destinationConfig) — emits MEMBERSHIP_GAP/PRIVACY_RISK/CONFIG_GAP/OK per collaboration (routes to `cleanrooms-collaboration-auditor`) |
+| `/aws:audit-athena-workgroup` | 2 Audit | Audit Athena workgroups for query-result encryption (SSE-S3/SSE-KMS on ResultConfiguration), BytesScannedCutoffPerQuery data-scan limit, EnforceWorkGroupConfiguration enforcement posture (false = encryption/OutputLocation advisory; only the DSL is binding), query-history retention via CloudTrail Athena data events (GetQueryExecution has a fixed 45-day window), and named-query IAM exposure (Principal:* + athena:GetNamedQuery = SQL exfiltration) — emits NO_ENCRYPTION/NO_LIMITS/CONFIG_GAP/OK per workgroup (routes to `athena-workgroup-auditor`) |
+| `/aws:audit-lakeformation-data-lake` | 2 Audit | Audit Lake Formation data lakes for catalog-level super-grants (Permissions ALL on Catalog), cross-account DataLakePrincipalIdentifier principals, ColumnWildcard SELECT without a wired DataCellsFilter, WithGrantablePermissions unbounded delegation chains, grants on tables whose S3 path is not under any registered location, DataLakeAdmins composition (empty / external / over-delegated), and IAMAllowedPrincipals mixed-mode databases — emits OVERPERMISSIVE_GRANT/EXTERNAL_ACCOUNT/CONFIG_GAP/OK per data lake (routes to `lakeformation-data-lake-auditor`) |
 
 Every command has a natural-language equivalent — the orchestrator routes
 identically.
@@ -3096,6 +3107,542 @@ for a multi-finding audit walkthrough (stale assessment with good score,
 appVersion drift, and pending alarm recommendations) covering the
 staleness-first precedence, version-drift detection, and the
 re-assessment remediation workflow.
+
+---
+
+### emr-cluster-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-emr-cluster` — or route via `/aws:pipeline`.
+
+**What it does:** Audits AWS EMR clusters for security configuration across
+three encryption layers (S3 at-rest SSE-KMS/CSE-KMS, local-disk at-rest LUKS
+via KMS, in-transit TLS), IAM roles (service role, EC2 instance profile,
+AutoScaling role), Kerberos authentication, block public access, debug logging,
+and instance-group posture. Emits a deterministic verdict
+(NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK) per cluster with
+enumerated findings and specific remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this EMR cluster"
+- "is my EMR cluster encrypted"
+- "check EMR security configuration"
+- "EMR IAM role too permissive"
+- "EMR in-transit encryption"
+- "EMR local disk encryption"
+- "Kerberos EMR"
+- "block public access EMR"
+- "harden EMR cluster"
+- reviewing an EMR cluster before production deployment
+
+**Example prompt:**
+
+```
+You: "This EMR cluster has SSE-KMS and local-disk encryption but no
+     in-transit encryption. The EC2 role has s3:* on *. Audit it before
+     production."
+```
+
+**Expected behavior:**
+
+1. Applies the ordered classification (encryption gate -> IAM roles ->
+   config completeness -> aggregation).
+2. Emits VERDICT: NO_ENCRYPTION (Step 1b — InTransit absent). Even though
+   the EC2 role is also over-permissive, NO_ENCRYPTION takes precedence.
+3. Lists the over-permissive role as an additional finding that would
+   produce OVERPERMISSIVE_ROLE if encryption were fixed.
+4. Provides remediation: create a new SecurityConfiguration with all three
+   layers, scope the EC2 role to specific bucket ARNs, terminate and
+   recreate the cluster.
+
+**End-to-end scenario:** see
+[`skills/emr-cluster-auditor/examples/end-to-end.md`](skills/emr-cluster-auditor/examples/end-to-end.md)
+for a production Spark pipeline walkthrough (full encryption but
+over-permissive EC2 instance profile) covering the SecurityConfiguration-as-
+separate-API concept, the data-processing-identity insight, and the
+credential-refresh-delay remediation caveat.
+
+---
+
+### redshift-cluster-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-redshift-cluster` — or route via `/aws:pipeline`.
+
+**What it does:** Audits Amazon Redshift provisioned clusters for security
+posture and configuration gaps across six ordered dimensions — public
+accessibility (`PubliclyAccessible: true` is a direct internet endpoint on
+TCP 5439/5440), encryption-at-rest (immutable per cluster — the only
+remediation is a new-cluster + UNLOAD/COPY migration, not a CLI toggle),
+`require_ssl` parameter-group enforcement (the default PG is read-only and
+the engine default is `false`), S3 audit logging (CloudTrail covers only
+control-plane events, not SQL queries — `enable-logging` is required for
+data-plane forensics), automated-snapshot retention (0 disables PITR and
+expires existing snapshots within hours), enhanced VPC routing (when off,
+COPY/UNLOAD bypasses VPC SGs/NACLs/endpoints), and SG ingress on the
+cluster port. Emits a deterministic categorical verdict
+(PUBLIC | NO_ENCRYPTION | NO_SSL | NO_AUDIT_LOG | CONFIG_GAP | OK) per
+cluster with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this Redshift cluster"
+- "is my Redshift cluster public"
+- "is encryption enabled on Redshift"
+- "is require_ssl on"
+- "is Redshift audit logging configured"
+- "are automated snapshots enabled"
+- "enhanced VPC routing Redshift"
+- "Redshift security group audit"
+- "harden this data warehouse"
+- "data warehouse compliance audit"
+- reviewing a Redshift cluster before production deployment or a
+  compliance review
+
+**Example prompt:**
+
+```
+You: "This Redshift cluster has PubliclyAccessible true, Encrypted false,
+     default.redshift-1.0 parameter group with require_ssl engine-default
+     false, LoggingEnabled false, EnhancedVPCRouting false, and the SG
+     has 0.0.0.0/0 on TCP 5439. PCI review next week — what's the verdict
+     and remediation?"
+```
+
+**Expected behavior:**
+
+1. Applies the ordered classification in priority order
+   (PUBLIC > NO_ENCRYPTION > NO_SSL > NO_AUDIT_LOG > CONFIG_GAP > OK).
+2. Emits VERDICT: PUBLIC (Step 1 — internet-exposed data warehouse).
+3. Lists every other dimension failure (NO_ENCRYPTION, NO_SSL,
+   NO_AUDIT_LOG, CONFIG_GAP sub-findings) in the FINDINGS list, even
+   though PUBLIC is the verdict.
+4. Provides specific remediation that reflects Redshift-specific
+   behaviours: encryption requires a new-cluster + UNLOAD/COPY migration
+   (not a toggle); require_ssl needs a custom PG because the default PG
+   is read-only; enable-logging is the API for S3 audit export (distinct
+   from the enable_user_activity_logging parameter); EnhancedVPCRouting
+   requires a reboot and an S3 Gateway VPC endpoint to function.
+
+**End-to-end scenario:** see
+[`skills/redshift-cluster-auditor/examples/end-to-end.md`](skills/redshift-cluster-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (public + Elastic IP + unencrypted +
+default-PG no-SSL + no-audit-log + no-EVR + open SG) covering verdict
+aggregation, the encryption-is-immutable migration workflow, the
+CloudTrail-doesn't-cover-SQL insight, and the default-PG-read-only
+remediation ordering.
+
+
+### opensearch-domain-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-opensearch-domain`
+
+**What it does:** Audits Amazon OpenSearch Service (provisioned, not Serverless)
+domains for encryption-at-rest (KMS — customer-managed CMK vs AWS-managed
+`aws/es`), node-to-node encryption, fine-grained access control (FGAC /
+Advanced Security), public access via resource-policy `Principal: "*"` with
+`es:ESHttp*` data-plane grants, dedicated master node type and count
+(`t2/t3.small.search` is below AWS recommendation; single master = no HA
+quorum), and slow-log publishing to CloudWatch Logs (SEARCH_SLOW_LOGS /
+INDEX_SLOW_LOGS). Emits a deterministic verdict
+(NO_ENCRYPTION | PUBLIC_ACCESS | NO_FGAC | CONFIG_GAP | OK) per domain with
+enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this OpenSearch domain"
+- "is my OpenSearch domain public"
+- "check OpenSearch encryption at rest"
+- "OpenSearch node-to-node encryption off"
+- "OpenSearch FGAC disabled"
+- "is Advanced Security enabled"
+- "OpenSearch Principal star"
+- "es:ESHttp* public access"
+- "dedicated master node too small"
+- "t3.small.search dedicated master"
+- "OpenSearch slow logs not published"
+- "harden OpenSearch domain"
+- reviewing an OpenSearch domain before production deployment or compliance audit
+
+**Example prompt:**
+
+```
+You: "This internet-facing OpenSearch domain grants es:ESHttp* to
+     Principal '*' with no condition. FGAC is off. What's the verdict
+     and remediation before we onboard payments traffic?"
+```
+
+**Expected behavior:**
+
+1. Applies the ordered classification (encryption → public access → FGAC →
+   config gaps → OK).
+2. Emits VERDICT: PUBLIC_ACCESS (Step 2a — Principal "*" + es:ESHttp* with
+   no STRONG condition is the data-plane blast-radius multiplier).
+3. Enumerates NO_FGAC and any CONFIG_GAP findings as additional line items.
+4. Provides ordered CLI remediation: remove the wildcard principal, audit
+   CloudTrail for `es:ESHttp*` events (assume breach), enable FGAC, plan a
+   CMK migration for the AWS-managed key.
+
+**Key distinctions the skill makes:**
+
+- Encryption-at-rest and node-to-node encryption are **immutable** post-
+  creation — domain recreation is the only remediation, never a config flip.
+- `aws:SourceIp` is NOT a STRONG condition for an OpenSearch public domain
+  (bypassable by VPN/NAT). Only `aws:SourceArn` / `aws:SourceAccount` are
+  STRONG.
+- A VPC-backed domain is never classified PUBLIC_ACCESS regardless of
+  access policy — the VPC is the network boundary; FGAC downgrades to
+  CONFIG_GAP on VPC domains.
+- AWS-managed `aws/es` KMS key is a CONFIG_GAP finding (encrypted but
+  operationally opaque — no audit trail, no rotation control, no customer
+  key policy), not OK.
+
+**End-to-end scenario:** see
+[`skills/opensearch-domain-auditor/examples/end-to-end.md`](skills/opensearch-domain-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (public wildcard + FGAC off + AWS-managed
+key) covering worst-finding aggregation, the immutability reasoning for
+encryption layers, and the assume-breach remediation workflow.
+
+---
+
+### firehose-delivery-stream-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-firehose-delivery-stream`
+
+**What it does:** Audits Amazon Kinesis Data Firehose delivery streams
+for encryption-at-rest gaps (explicit `NoEncryption` opt-out, absent
+`EncryptionConfiguration` relying on the S3 bucket default, or valid
+SSE-KMS CMK), `BufferingHints` quota violations (`SizeInMBs` 1-128,
+`IntervalInSeconds` 60-900), Lambda transformation resilience
+(processor buffer parameters, `S3BackupMode: Disabled` silent-corruption
+vector), CloudWatch error-logging silence (`LoggingConfig.Enabled: false`
+while processing is enabled), source-backup absence under dynamic
+partitioning (silent data-loss on JQ extraction failure), and
+dynamic-partitioning structural integrity (`MetadataExtraction` wiring,
+`ExtendedS3DestinationConfiguration` requirement, `RetryDuration: 0`
+immediate-fail trap). Emits a deterministic first-fail-wins verdict
+(NO_ENCRYPTION | CONFIG_GAP | OK) per delivery stream with enumerated
+findings and CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this Firehose delivery stream"
+- "is my Firehose stream encrypted"
+- "check Firehose Lambda transformation"
+- "is dynamic partitioning configured correctly"
+- "Firehose source backup missing"
+- "CloudWatch error logging disabled Firehose"
+- "BufferingHints out of range"
+- "firehose data loss vector"
+- "firehose NoEncryption destination"
+- "firehose silent failure"
+- reviewing a delivery stream before production deployment
+- validating SSE-KMS CMK coverage on S3 destinations
+
+**Example prompt:**
+
+```
+You: "This ExtendedS3 delivery stream has NoEncryption set explicitly,
+     DP enabled with RetryDuration 0, and LoggingConfig disabled.
+     Audit the data-loss surface."
+```
+
+**Expected behavior:**
+
+1. Evaluates encryption first (Step 1) — explicit `NoEncryption: {}`
+   fires **NO_ENCRYPTION** and short-circuits all other dimensions.
+2. If encryption passes (CMK set), evaluates `BufferingHints` range
+   (Step 2) — out-of-range values fire **CONFIG_GAP**.
+3. If Lambda processing is enabled, evaluates processor buffer
+   parameters and `S3BackupMode` (Step 3) — missing/invalid params or
+   `Disabled` mode fires **CONFIG_GAP**.
+4. If any processing is enabled, evaluates `LoggingConfig` (Step 4) —
+   `Enabled: false` or absent fires **CONFIG_GAP** (silent failure).
+5. If dynamic partitioning is enabled, evaluates source backup,
+   `RetryDuration`, `MetadataExtraction` wiring, and ExtendedS3
+   requirement (Step 5) — any failure fires **CONFIG_GAP**.
+6. Aggregates first-fail-wins: NO_ENCRYPTION strictly dominates
+   CONFIG_GAP; for CONFIG_GAP, lists all fired findings (multiple gaps
+   compound).
+7. Emits VERDICT + REASON + FINDINGS + REMEDIATION with specific CLI
+   per finding (`update-destination` snippets, CMK policy grants,
+   S3BackupConfiguration templates).
+
+**Key expert knowledge deltas (D1):**
+
+1. `NoEncryption: {}` is an explicit, deliberate opt-out — there is no
+   "explicit SSE-S3" literal in the API; absence of the block means
+   the stream inherits the bucket default (still encrypted in the
+   common case).
+2. `LoggingConfig` is the in-process error log, NOT delivery metrics —
+   `AWS/Firehose` CloudWatch metrics show `DeliveryToS3.Success` as
+   green even when records are silently dropped by Lambda.
+3. `S3BackupMode: FailedDataOnly` (default) captures only Firehose-
+   detected failures; Lambda functions returning 200 with malformed
+   output are treated as success and corrupted output is delivered
+   without backup.
+4. Dynamic partitioning with no `S3BackupConfiguration` is a silent
+   data-loss vector — JQ extraction failures on retry exhaustion are
+   discarded with no recovery path.
+5. `RetryDuration: 0` disables retry entirely; a single extraction
+   failure is immediately fatal.
+6. `list-delivery-streams` paginates at 10 per page (`--limit` max 10,
+   NOT the AWS-typical 50 or 100) — silently truncating the list is
+   the most common missed-stream bug.
+7. `AWSKMSKeyArn` requires a fully-qualified ARN; aliases are silently
+   accepted at creation and fail at first delivery.
+8. `update-destination` is not reversible — always capture
+   `describe-delivery-stream` output before any update for forensic
+   reconstruction.
+9. `S3DestinationConfiguration` (legacy) is frozen — no dynamic
+   partitioning, no Lambda-aware backup, no `ErrorOutputPrefix`; DP
+   enabled on legacy is structurally impossible (API rejects it).
+10. Non-S3 destinations (Redshift, Splunk, OpenSearch) stage data in
+    S3 first — evaluate the staging `S3BackupConfiguration` for
+    encryption and backup even though the user-facing destination is
+    the index.
+
+**End-to-end scenario:** see
+[`skills/firehose-delivery-stream-auditor/examples/end-to-end.md`](skills/firehose-delivery-stream-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (NO_ENCRYPTION short-circuit +
+DP-without-source-backup + LoggingConfig-disabled + RetryDuration=0)
+covering first-fail-wins ordering, the NO_ENCRYPTION dominance rule,
+the silent data-loss reasoning, and the `update-destination`
+remediation workflow.
+
+---
+
+### msk-cluster-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-msk-cluster` — or route via `/aws:pipeline`.
+
+**What it does:** Audits Amazon MSK (Managed Streaming for Kafka) clusters
+for encryption in-transit (ClientBroker PLAINTEXT/TLS/TLS_PLAINTEXT +
+InClusterEncryption), client authentication (TLS/mTLS via ACM PCA,
+SASL/IAM, SASL/SCRAM, unauthenticated), public access
+(SERVICE_PROVIDED_EIPS Elastic IPs), broker logging (CloudWatch/S3/
+Firehose), and encryption at-rest KMS key governance (customer-managed
+CMK vs AWS-managed). Emits a deterministic first-match-wins verdict
+(NO_ENCRYPTION | UNAUTHENTICATED | PUBLIC_ACCESS | CONFIG_GAP | OK) per
+cluster with enumerated findings and immutability-aware remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this MSK cluster"
+- "is my Kafka cluster encrypted"
+- "check MSK authentication"
+- "MSK unauthenticated access"
+- "is my MSK cluster public"
+- "check MSK broker logging"
+- "Kafka plaintext broker"
+- "TLS_PLAINTEXT Kafka"
+- "harden MSK cluster"
+- reviewing an MSK cluster before production deployment
+- validating Kafka encryption and authentication posture
+
+**Key expert knowledge deltas (D1):**
+
+1. `TLS_PLAINTEXT` is a dual-mode listener publishing both TLS and
+   plaintext ports — clients can bypass TLS entirely. Classified as
+   NO_ENCRYPTION, not CONFIG_GAP.
+2. MSK encryption settings (ClientBroker, InClusterEncryption,
+   authentication modes) are immutable post-creation — remediation
+   requires cluster recreation + topic migration, not an in-place CLI fix.
+3. MSK always encrypts data volumes at rest — the audit question is key
+   governance (customer-managed CMK vs AWS-managed), not encryption
+   presence. Missing CMK is CONFIG_GAP, not NO_ENCRYPTION.
+4. MSK Serverless enforces TLS + IAM auth and cannot be public —
+   applying Provisioned audit logic produces false positives.
+5. `InClusterEncryption` is independent from `ClientBroker` — a cluster
+   with client TLS but inter-broker plaintext is CONFIG_GAP, not
+   NO_ENCRYPTION.
+6. SASL/SCRAM secrets must be tagged `AmazonMSK_20181101` in Secrets
+   Manager — an untagged secret is invisible to MSK.
+7. mTLS requires an ACM Private Certificate Authority (PCA), not a
+   self-managed CA upload.
+8. Broker logging destinations (CloudWatch, S3, Firehose) are
+   independently toggleable — at least ONE must be enabled; Enhanced
+   Monitoring and Open Monitoring (Prometheus) are NOT log delivery.
+
+**End-to-end scenario:** see
+[`skills/msk-cluster-auditor/examples/end-to-end.md`](skills/msk-cluster-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (TLS_PLAINTEXT NO_ENCRYPTION short-circuit
++ all broker logging disabled) covering first-match-wins priority, the
+TLS_PLAINTEXT-vs-TLS distinction, and the immutability-aware migration
+remediation workflow.
+
+---
+
+### cleanrooms-collaboration-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-cleanrooms-collaboration` — or route via
+`/aws:pipeline`.
+
+**What it does:** Audits AWS Clean Rooms collaborations across four
+orthogonal dimensions — membership activation (INVITED/REMOVED/LEFT
+members, solo collaborations, no CAN_QUERY member), privacy-budget
+posture (differential privacy disabled, per-member epsilon near-
+exhaustion >=80% of cap, aggregate constraints absent), analysis-
+template SQL validity (dangling configured-table aliases, unresolved
+`${param}` tokens, columns outside allowedColumns), and configured-
+audience readiness (cleanroomsml model not READY, stale training data,
+missing destinationConfig). Emits a deterministic verdict
+(MEMBERSHIP_GAP | PRIVACY_RISK | CONFIG_GAP | OK) per collaboration
+with enumerated findings and per-rule CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this Clean Rooms collaboration"
+- "check Clean Rooms member status"
+- "is differential privacy enabled"
+- "epsilon budget exhausted"
+- "validate analysis template SQL"
+- "is my audience model trained"
+- "Clean Rooms membership gap"
+- "configured audience ready"
+- "privacy budget audit"
+- "protected query failed"
+- "Clean Rooms collaboration posture"
+- reviewing a collaboration before opening production query traffic
+- validating membership activation across multi-party collaborators
+
+**Inputs:** A Clean Rooms collaboration snapshot — collaboration
+metadata (status, creatorDisplayName, queryLogStatus, analyticsEngine,
+configuredAudienceModelArn), member list with status and abilities,
+differential privacy config (enabled, epsilonBudgetPerMember),
+per-member epsilon spend (summed from ListProtectedQueries), configured
+tables with allowedColumns and aggregateConstraints, analysis-template
+bodies with parameters, and configured-audience-model state from
+`cleanroomsml get-configured-audience-model`. For live-account audits:
+a collaboration ARN or ID — the skill emits the AWS CLI commands to
+retrieve the full configuration.
+
+**Outputs:** One VERDICT block per collaboration with enumerated
+FINDINGS citing rule numbers (M1-M4, P1-P4, A1-A4, Q1-Q2, C1-C3) and
+CLI remediation per finding. The worst finding determines the verdict
+by precedence (MEMBERSHIP_GAP > PRIVACY_RISK > CONFIG_GAP > OK);
+additive findings (privacy gaps, template defects, audience gaps) are
+retained for parallel remediation even when a higher-precedence
+verdict applies.
+
+**Key expert knowledge deltas (D1):**
+
+1. Membership status is perspective-relative — `ListMembers` returns
+   the collaboration's view; `GetMembership` returns the caller's own
+   view. A member can be ACTIVE from the creator's perspective but
+   LEFT from their own — a silent MEMBERSHIP_GAP that surfaces only
+   when queries fail with AccessDeniedException.
+2. Epsilon is per-member, not per-collaboration — each member has
+   their OWN budget. One member at 95% spend and another at 5% is not
+   uniformly healthy; the high-spend member is the bottleneck. Report
+   per-member, not aggregate.
+3. `differentialPrivacyConfig.enabled: true` is the capability gate,
+   not enforcement. The per-query `additionalAnalyses` epsilon is the
+   enforcement — a query with `additionalAnalyses: 0` runs without DP
+   noise even on a DP-enabled collaboration.
+4. Aggregate constraints (MIN/MAX) are the structural privacy floor;
+   DP is the noise layer on top. A collaboration with DP enabled but
+   no aggregate constraints can still return singleton rows when noise
+   rounds a 1-row group up to threshold. Both layers must be present.
+5. Analysis templates are immutable per-creation, but the configured
+   tables they reference ARE mutable — a member removing their table
+   after the template was created produces a runtime-only failure
+   (ResourceNotFoundException) with no live validator.
+6. Configured audiences live in `cleanroomsml`, not `cleanrooms` — the
+   collaboration references the ARN; the state lives in a separate
+   service. A collaboration can show a valid ARN while the model is in
+   CREATE_FAILED. Always fetch the model state separately.
+7. Epsilon budget does NOT reset at any calendar boundary — it is
+   monotonic per member per collaboration. Increasing it requires
+   recreating the collaboration.
+8. Protected queries return S3 Parquet prefixes, not rows — a
+   `SUCCEEDED` query plus a bucket policy that blocks member reads
+   produces a silent empty result. Cross-reference the S3 destination.
+9. `queryLogStatus` is a one-way, set-at-creation flag — enabling it
+   post-hoc requires deleting and recreating the collaboration. Treat
+   DISABLED as a CONFIG_GAP note, not a privacy verdict driver.
+
+**End-to-end scenario:** see
+[`skills/cleanrooms-collaboration-auditor/examples/end-to-end.md`](skills/cleanrooms-collaboration-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (INVITED member MEMBERSHIP_GAP + DP
+disabled PRIVACY_RISK + missing aggregate constraints) covering
+precedence aggregation, the per-member epsilon reasoning, the
+"enabled ≠ enforced" DP distinction, and the privacy-controls-before-
+activation remediation ordering.
+
+---
+
+## /aws:audit-lakeformation-data-lake
+
+**Slash command:** `/aws:audit-lakeformation-data-lake`
+**Skill:** `lakeformation-data-lake-auditor` (family: Analytics, phase: 2 Audit)
+**Verdict shape:** `OVERPERMISSIVE_GRANT | EXTERNAL_ACCOUNT | CONFIG_GAP | OK`
+
+Audit a Lake Formation data lake for grant-level exposure and configuration
+gaps. Reads `list-permissions` output paired with `get-data-lake-settings`,
+`list-resources`, and `list-data-cells-filter` metadata, and applies ordered
+classification logic across 10 steps to emit a deterministic verdict per data
+lake.
+
+**Inputs:** `list-permissions` (grants), `get-data-lake-settings`
+(`DataLakeAdmins`, `CreateDatabaseDefaultPermissions`,
+`CreateTableDefaultPermissions`), `list-resources` (registered S3 locations
+and their `RoleArn`), `list-data-cells-filter` (existing row-level filters),
+optionally `get-resource-lf-tags` and `describe-organization`.
+
+**Outputs:** One VERDICT block per data lake with enumerated FINDINGS (citing
+the step and rule) and CLI remediation per finding. The worst finding
+determines the verdict; additive findings (cell-filter gap, empty admins) are
+retained even when a higher-precedence verdict applies.
+
+**Key expert knowledge deltas (D1):**
+
+1. Lake Formation has NO Deny — permissions are purely additive. The only
+   way to block access is to refrain from granting or call
+   `RevokePermissions`. You cannot layer a Deny on an over-broad Allow.
+2. `IAMAllowedPrincipals` is a SPECIAL PRINCIPAL that opts the resource OUT
+   of LF enforcement (IAM policy becomes the sole authority) — it does NOT
+   mean "all IAM principals". A database with `IAMAllowedPrincipals` AND
+   explicit LF grants on its tables is in mixed mode (both layers evaluate;
+   EITHER allowing grants access).
+3. `WithGrantablePermissions` chains UNBOUNDED — unlike KMS grants (capped
+   at 2 levels), an LF grantee can re-delegate indefinitely.
+4. `ColumnWildcard: {}` is the real column wildcard; `ColumnNames: ["*"]`
+   is a literal column named `*` (silently empty — broken automation).
+5. `Table` and `TableWithColumns` are SEPARATE resource types — SELECT on
+   `Table` is implicit all-columns-all-rows; only `TableWithColumns`
+   supports column scoping.
+6. `DataCellsFilter` must be CREATED and WIRED via grant — a filter that
+   exists but is not referenced by any SELECT grant is a silent gap.
+7. Cross-account sharing uses RAM; the recipient sees nothing until an admin
+   creates a Resource Link AND grants on it. Source revoke does NOT delete
+   recipient resource links.
+8. `Permission: ALL` on `Catalog` is functionally data-lake administrator
+   (the grantee can grant anything to anyone, including themselves).
+9. Quota: 50,000 LF grants per account (soft cap) — remediations that ADD
+   grants can hit the cap and fail silently.
+10. Registered-location `RoleArn` is the service role LF uses to read S3;
+    if the role is deleted, every grant on tables under that location is
+    dead (queries fail with S3 `AccessDenied`, not LF).
+
+**End-to-end scenario:** see
+[`skills/lakeformation-data-lake-auditor/examples/end-to-end.md`](skills/lakeformation-data-lake-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (ColumnWildcard SELECT on a PII table +
+WithGrantablePermissions delegation + empty DataLakeAdmins) covering
+OVERPERMISSIVE_GRANT aggregation, the no-Deny / revoke-after-replace
+remediation ordering, the unbounded-delegation forensics extension, and the
+DataCellsFilter wiring gap.
 
 ---
 

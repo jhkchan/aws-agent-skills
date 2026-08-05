@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "emr-cluster-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EMR Cluster Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-encryption-no-security-config",
+      "name": "No SecurityConfiguration attached — all three encryption layers absent",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-encryption-no-security-config.md",
+      "baseline_file": "baselines/no-encryption-no-security-config.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "no-encryption-no-security-config", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: OVERPERMISSIVE_ROLE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-encryption-intransit-disabled",
+      "name": "S3 + local-disk encryption on but in-transit absent — inter-node traffic plaintext",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-encryption-intransit-disabled.md",
+      "baseline_file": "baselines/no-encryption-intransit-disabled.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "no-encryption-intransit-disabled", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: OVERPERMISSIVE_ROLE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "overpermissive-ec2-role",
+      "name": "Full encryption but EC2 instance profile grants s3:* on Resource *",
+      "difficulty": "medium",
+      "prompt_file": "prompts/overpermissive-ec2-role.md",
+      "baseline_file": "baselines/overpermissive-ec2-role.md",
+      "expected_verdict": "OVERPERMISSIVE_ROLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OVERPERMISSIVE_ROLE", "overpermissive-ec2-role", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-debug-and-bpa",
+      "name": "Encryption + scoped roles pass but debug logging off and Block Public Access not configured",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-debug-and-bpa.md",
+      "baseline_file": "baselines/config-gap-debug-and-bpa.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-debug-and-bpa", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-no-kerberos",
+      "name": "Encryption + roles + BPA pass but Kerberos absent and VisibleToAllUsers true",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-no-kerberos.md",
+      "baseline_file": "baselines/config-gap-no-kerberos.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-no-kerberos", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "ok-hardened-cluster",
+      "name": "Fully hardened cluster — all encryption, scoped roles, Kerberos, BPA, debug logging, multi-master",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-hardened-cluster.md",
+      "baseline_file": "baselines/ok-hardened-cluster.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "ok-hardened-cluster", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_ENCRYPTION", "VERDICT: OVERPERMISSIVE_ROLE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

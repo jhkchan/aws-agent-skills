@@ -1,0 +1,363 @@
+# Eval test cases for cleanrooms-collaboration-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# The must_contain tokens use natural output artifacts the SKILL.md
+# output format mandates: the verdict label, the test-case id embedded
+# in the collaboration ARN, the structural fields (VERDICT/REASON/
+# REMEDIATION), the Rule citation, and distinctive input values that
+# prove the model classified the RIGHT dimension.
+skill: cleanrooms-collaboration-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: membership-gap-invited-not-active
+    description: >-
+      Clean Rooms collaboration with three members where one (the analyst
+      account) is in INVITED state — has not accepted. The collaboration
+      is operationally partial; that member cannot run protected queries
+      or contribute data.
+    input: |
+      Collaboration id: arn:aws:cleanrooms:us-east-1:111111111111:collaboration/membership-gap-invited-not-active
+      Collaboration metadata:
+        name: membership-gap-invited-not-active
+        status: ACTIVE
+        creatorDisplayName: 111-creator
+        creatorMemberAbilities: [CAN_QUERY, CAN_CONFIGURE_COLLABORATION]
+        queryLogStatus: ENABLED
+        analyticsEngine: CLEAN_ROOMS_SQL
+      Members (list-members):
+        - accountId: "111111111111"
+          status: ACTIVE
+          displayName: 111-creator
+          abilities: [CAN_QUERY, CAN_CONFIGURE_COLLABORATION]
+        - accountId: "222222222222"
+          status: ACTIVE
+          displayName: 222-marketing
+          abilities: [CAN_QUERY]
+        - accountId: "333333333333"
+          status: INVITED
+          displayName: 333-analyst
+          abilities: [CAN_QUERY]
+      Differential privacy config:
+        enabled: true
+        epsilonBudgetPerMember: 10.0
+      Most recent protected query:
+        status: SUCCEEDED
+        additionalAnalyses: 0.5
+      Emit the standard VERDICT block (COLLABORATION, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: MEMBERSHIP_GAP
+    assertions:
+      must_contain:
+        - "MEMBERSHIP_GAP"
+        - "membership-gap-invited-not-active"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "INVITED"
+        - "Rule M1"
+        - "333333333333"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PRIVACY_RISK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: privacy-risk-no-differential-privacy
+    description: >-
+      All members ACTIVE but the collaboration has differential privacy
+      disabled. Protected queries run against raw rows with no DP noise,
+      and aggregate constraints are absent.
+    input: |
+      Collaboration id: arn:aws:cleanrooms:us-east-1:111111111111:collaboration/privacy-risk-no-differential-privacy
+      Collaboration metadata:
+        name: privacy-risk-no-differential-privacy
+        status: ACTIVE
+        creatorDisplayName: 111-creator
+        creatorMemberAbilities: [CAN_QUERY, CAN_CONFIGURE_COLLABORATION]
+        queryLogStatus: ENABLED
+        analyticsEngine: CLEAN_ROOMS_SQL
+      Members (list-members):
+        - accountId: "111111111111"
+          status: ACTIVE
+          displayName: 111-creator
+          abilities: [CAN_QUERY, CAN_CONFIGURE_COLLABORATION]
+        - accountId: "222222222222"
+          status: ACTIVE
+          displayName: 222-marketing
+          abilities: [CAN_QUERY]
+      Differential privacy config:
+        enabled: false
+      Configured table cr-events:
+        allowedColumns: [user_id, event_type, ts]
+        analysisRuleType: AGGREGATION
+        aggregateConstraints: []
+      Most recent protected query:
+        status: SUCCEEDED
+        additionalAnalyses: 0
+      Emit the standard VERDICT block (COLLABORATION, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: PRIVACY_RISK
+    assertions:
+      must_contain:
+        - "PRIVACY_RISK"
+        - "privacy-risk-no-differential-privacy"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Rule P1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: MEMBERSHIP_GAP"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: privacy-risk-depleted-epsilon-budget
+    description: >-
+      Differential privacy enabled but the high-spend member has consumed
+      >= 80% of their per-member epsilon budget (8.7 of 10.0). Near-
+      exhaustion; future queries will be rejected.
+    input: |
+      Collaboration id: arn:aws:cleanrooms:us-east-1:111111111111:collaboration/privacy-risk-depleted-epsilon-budget
+      Collaboration metadata:
+        name: privacy-risk-depleted-epsilon-budget
+        status: ACTIVE
+        creatorDisplayName: 111-creator
+        queryLogStatus: ENABLED
+        analyticsEngine: CLEAN_ROOMS_SQL
+      Members (list-members):
+        - accountId: "111111111111"
+          status: ACTIVE
+          displayName: 111-creator
+          abilities: [CAN_QUERY, CAN_CONFIGURE_COLLABORATION]
+        - accountId: "222222222222"
+          status: ACTIVE
+          displayName: 222-marketing
+          abilities: [CAN_QUERY]
+      Differential privacy config:
+        enabled: true
+        epsilonBudgetPerMember: 10.0
+      Per-member epsilon spend (sum across ListProtectedQueries):
+        - accountId: "111111111111"
+          epsilonSpent: 1.2
+        - accountId: "222222222222"
+          epsilonSpent: 8.7
+      Configured table cr-events:
+        allowedColumns: [user_id, event_type, ts]
+        analysisRuleType: AGGREGATION
+        aggregateConstraints: [{column: user_id, min: 10}]
+      Most recent protected query:
+        status: SUCCEEDED
+        additionalAnalyses: 0.5
+      Emit the standard VERDICT block (COLLABORATION, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: PRIVACY_RISK
+    assertions:
+      must_contain:
+        - "PRIVACY_RISK"
+        - "privacy-risk-depleted-epsilon-budget"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Rule P2"
+        - "8.7"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: MEMBERSHIP_GAP"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-invalid-analysis-template-sql
+    description: >-
+      All members ACTIVE, DP enabled with healthy budget, but the analysis
+      template references a configured-table alias (cr_legacy_events) that
+      does not exist in the collaboration's configuredTables list — a
+      dangling alias from a removed member's table.
+    input: |
+      Collaboration id: arn:aws:cleanrooms:us-east-1:111111111111:collaboration/config-gap-invalid-analysis-template-sql
+      Collaboration metadata:
+        name: config-gap-invalid-analysis-template-sql
+        status: ACTIVE
+        creatorDisplayName: 111-creator
+        queryLogStatus: ENABLED
+        analyticsEngine: CLEAN_ROOMS_SQL
+      Members (list-members):
+        - accountId: "111111111111"
+          status: ACTIVE
+          displayName: 111-creator
+          abilities: [CAN_QUERY, CAN_CONFIGURE_COLLABORATION]
+        - accountId: "222222222222"
+          status: ACTIVE
+          displayName: 222-marketing
+          abilities: [CAN_QUERY]
+      Differential privacy config:
+        enabled: true
+        epsilonBudgetPerMember: 10.0
+      Per-member epsilon spend:
+        - accountId: "111111111111"
+          epsilonSpent: 1.2
+        - accountId: "222222222222"
+          epsilonSpent: 1.5
+      Configured tables:
+        - id: cr-events
+          allowedColumns: [user_id, event_type, ts]
+          analysisRuleType: AGGREGATION
+          aggregateConstraints: [{column: user_id, min: 10}]
+      Analysis template tmpl-events-summary (owned by 111111111111):
+        body: |
+          SELECT region, COUNT(DISTINCT user_id) AS uniq
+          FROM cr_legacy_events
+          GROUP BY region
+        parameters: []
+      Emit the standard VERDICT block (COLLABORATION, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-invalid-analysis-template-sql"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Rule A2"
+        - "cr_legacy_events"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: MEMBERSHIP_GAP"
+        - "VERDICT: PRIVACY_RISK"
+
+  - id: config-gap-untrained-configured-audience
+    description: >-
+      All members ACTIVE, DP healthy, templates valid, but the
+      collaboration references a configuredAudienceModelArn whose model
+      is in CREATE_FAILED state. Audience activation queries will fail.
+    input: |
+      Collaboration id: arn:aws:cleanrooms:us-east-1:111111111111:collaboration/config-gap-untrained-configured-audience
+      Collaboration metadata:
+        name: config-gap-untrained-configured-audience
+        status: ACTIVE
+        creatorDisplayName: 111-creator
+        queryLogStatus: ENABLED
+        analyticsEngine: CLEAN_ROOMS_SQL
+        configuredAudienceModelArn: arn:aws:cleanroomsml:us-east-1:111111111111:configured-audience-model/cam-123
+      Members (list-members):
+        - accountId: "111111111111"
+          status: ACTIVE
+          displayName: 111-creator
+          abilities: [CAN_QUERY, CAN_CONFIGURE_COLLABORATION]
+        - accountId: "222222222222"
+          status: ACTIVE
+          displayName: 222-marketing
+          abilities: [CAN_QUERY]
+      Differential privacy config:
+        enabled: true
+        epsilonBudgetPerMember: 10.0
+      Per-member epsilon spend:
+        - accountId: "111111111111"
+          epsilonSpent: 1.2
+        - accountId: "222222222222"
+          epsilonSpent: 1.5
+      Configured tables:
+        - id: cr-events
+          allowedColumns: [user_id, event_type, ts]
+          analysisRuleType: AGGREGATION
+          aggregateConstraints: [{column: user_id, min: 10}]
+      Analysis templates: (none defined — audience activation only)
+      Configured audience model state (cleanroomsml get-configured-audience-model):
+        status: CREATE_FAILED
+        trainingContainerExecutionStatus: FAILED
+      Emit the standard VERDICT block (COLLABORATION, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-untrained-configured-audience"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Rule C1"
+        - "CREATE_FAILED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: MEMBERSHIP_GAP"
+        - "VERDICT: PRIVACY_RISK"
+
+  - id: ok-fully-configured-clean-collaboration
+    description: >-
+      All members ACTIVE, DP enabled with healthy epsilon, aggregate
+      constraints set, templates valid, audience model READY. Clean
+      posture across all four dimensions.
+    input: |
+      Collaboration id: arn:aws:cleanrooms:us-east-1:111111111111:collaboration/ok-fully-configured-clean-collaboration
+      Collaboration metadata:
+        name: ok-fully-configured-clean-collaboration
+        status: ACTIVE
+        creatorDisplayName: 111-creator
+        queryLogStatus: ENABLED
+        analyticsEngine: CLEAN_ROOMS_SQL
+        configuredAudienceModelArn: arn:aws:cleanroomsml:us-east-1:111111111111:configured-audience-model/cam-456
+      Members (list-members):
+        - accountId: "111111111111"
+          status: ACTIVE
+          displayName: 111-creator
+          abilities: [CAN_QUERY, CAN_CONFIGURE_COLLABORATION]
+        - accountId: "222222222222"
+          status: ACTIVE
+          displayName: 222-marketing
+          abilities: [CAN_QUERY]
+      Differential privacy config:
+        enabled: true
+        epsilonBudgetPerMember: 10.0
+      Per-member epsilon spend:
+        - accountId: "111111111111"
+          epsilonSpent: 1.2
+        - accountId: "222222222222"
+          epsilonSpent: 1.5
+      Configured tables:
+        - id: cr-events
+          allowedColumns: [user_id, event_type, ts]
+          analysisRuleType: AGGREGATION
+          aggregateConstraints: [{column: user_id, min: 10}]
+      Analysis template tmpl-events-summary (owned by 111111111111):
+        body: |
+          SELECT event_type, COUNT(DISTINCT user_id) AS uniq
+          FROM cr-events
+          GROUP BY event_type
+        parameters: []
+      Configured audience model state:
+        status: READY
+        trainingContainerExecutionStatus: SUCCEEDED
+      Emit the standard VERDICT block (COLLABORATION, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ok-fully-configured-clean-collaboration"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MEMBERSHIP_GAP"
+        - "VERDICT: PRIVACY_RISK"
+        - "VERDICT: CONFIG_GAP"

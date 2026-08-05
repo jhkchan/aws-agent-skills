@@ -1,0 +1,218 @@
+# Eval test cases for kinesis-stream-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: kinesis-stream-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-encryption-none
+    description: >-
+      Provisioned Kinesis stream with EncryptionType NONE — data at rest is
+      plaintext. Highest-priority finding regardless of other config quality.
+    input: |
+      Stream name: no-encryption-none
+      Stream configuration (describe-stream-summary):
+        StreamName: no-encryption-none
+        StreamStatus: ACTIVE
+        StreamMode: PROVISIONED
+        OpenShardCount: 4
+        RetentionPeriodHours: 24
+        EncryptionType: NONE
+        EnhancedMonitoring:
+          - ShardLevelMetrics: [IncomingBytes, OutgoingBytes, IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded]
+        ConsumerCount: 2
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "no-encryption-none"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "encryption"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: COST_RISK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: cost-risk-extended-retention
+    description: >-
+      KMS-encrypted provisioned stream with 720-hour (30-day) retention and 8
+      shards — extended-retention storage charges far exceed the shard-hour fee.
+    input: |
+      Stream name: cost-risk-extended-retention
+      Stream configuration (describe-stream-summary):
+        StreamName: cost-risk-extended-retention
+        StreamStatus: ACTIVE
+        StreamMode: PROVISIONED
+        OpenShardCount: 8
+        RetentionPeriodHours: 720
+        EncryptionType: KMS
+        KeyId: arn:aws:kms:us-east-1:111111111111:key/abcd-1234-cmk
+        EnhancedMonitoring:
+          - ShardLevelMetrics: [IncomingBytes, OutgoingBytes, IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded]
+        ConsumerCount: 3
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: COST_RISK
+    assertions:
+      must_contain:
+        - "COST_RISK"
+        - "cost-risk-extended-retention"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "retention"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: cost-risk-on-demand-low-volume
+    description: >-
+      On-demand KMS-encrypted stream ingesting under 200 MB/day — the
+      per-stream-hour fee dominates, making provisioned mode significantly
+      cheaper.
+    input: |
+      Stream name: cost-risk-on-demand-low-volume
+      Stream configuration (describe-stream-summary):
+        StreamName: cost-risk-on-demand-low-volume
+        StreamStatus: ACTIVE
+        StreamMode: ON_DEMAND
+        OpenShardCount: 4
+        RetentionPeriodHours: 24
+        EncryptionType: KMS
+        KeyId: arn:aws:kms:us-east-1:111111111111:key/efgh-5678-cmk
+        EnhancedMonitoring:
+          - ShardLevelMetrics: [IncomingBytes, OutgoingBytes, IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded]
+        ConsumerCount: 1
+      Estimated daily ingest volume: 80 MB/day
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: COST_RISK
+    assertions:
+      must_contain:
+        - "COST_RISK"
+        - "cost-risk-on-demand-low-volume"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: config-gap-no-enhanced-monitoring
+    description: >-
+      KMS-encrypted provisioned stream with reasonable retention but
+      EnhancedMonitoring missing IteratorAgeMilliseconds and
+      WriteProvisionedThroughputExceeded — cannot identify per-shard consumer
+      lag or write throttling.
+    input: |
+      Stream name: config-gap-no-enhanced-monitoring
+      Stream configuration (describe-stream-summary):
+        StreamName: config-gap-no-enhanced-monitoring
+        StreamStatus: ACTIVE
+        StreamMode: PROVISIONED
+        OpenShardCount: 3
+        RetentionPeriodHours: 24
+        EncryptionType: KMS
+        KeyId: arn:aws:kms:us-east-1:111111111111:key/ijkl-9012-cmk
+        EnhancedMonitoring:
+          - ShardLevelMetrics: [IncomingBytes, OutgoingBytes]
+        ConsumerCount: 1
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-no-enhanced-monitoring"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "monitoring"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: COST_RISK"
+
+  - id: ok-well-configured-stream
+    description: >-
+      KMS-encrypted (customer-managed CMK) provisioned stream with 24-hour
+      retention, full enhanced monitoring including IteratorAgeMilliseconds
+      and WriteProvisionedThroughputExceeded, and 2 enhanced fan-out consumers.
+      Clean posture across all dimensions.
+    input: |
+      Stream name: ok-well-configured-stream
+      Stream configuration (describe-stream-summary):
+        StreamName: ok-well-configured-stream
+        StreamStatus: ACTIVE
+        StreamMode: PROVISIONED
+        OpenShardCount: 4
+        RetentionPeriodHours: 24
+        EncryptionType: KMS
+        KeyId: arn:aws:kms:us-east-1:111111111111:key/mnop-3456-cmk
+        EnhancedMonitoring:
+          - ShardLevelMetrics: [IncomingBytes, IncomingRecords, OutgoingBytes, OutgoingRecords, IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded, ReadProvisionedThroughputExceeded]
+        ConsumerCount: 2
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "ok-well-configured-stream"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: COST_RISK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-encryption-max-retention-high-shards
+    description: >-
+      Unencrypted provisioned stream with 8760-hour (365-day max) retention
+      and 50 shards. Multiple severe findings but NO_ENCRYPTION is the worst
+      verdict — data at rest is plaintext.
+    input: |
+      Stream name: no-encryption-max-retention-high-shards
+      Stream configuration (describe-stream-summary):
+        StreamName: no-encryption-max-retention-high-shards
+        StreamStatus: ACTIVE
+        StreamMode: PROVISIONED
+        OpenShardCount: 50
+        RetentionPeriodHours: 8760
+        EncryptionType: NONE
+        EnhancedMonitoring:
+          - ShardLevelMetrics: [IncomingBytes, IncomingRecords, OutgoingBytes, OutgoingRecords, IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded]
+        ConsumerCount: 1
+      Emit the standard VERDICT block (STREAM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "no-encryption-max-retention-high-shards"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
