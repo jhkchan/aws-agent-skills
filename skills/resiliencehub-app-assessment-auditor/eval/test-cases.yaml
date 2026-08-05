@@ -1,0 +1,361 @@
+# Eval test cases for resiliencehub-app-assessment-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# CONCEPT tokens (verdicts, structural fields, domain concepts) are used in
+# must_contain — never raw test-case IDs or API field names. Test-case
+# identifiers are embedded in the resource ARNs/names in the input so the
+# model echoes them back, but assertions verify the CONCEPT, not the echo.
+skill: resiliencehub-app-assessment-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: stale-95-days
+    description: >-
+      App with a successful assessment 95 days ago. Despite a decent compliance
+      score (85) and only one NonCompliant component, staleness takes
+      precedence — the compliance data no longer reflects current infrastructure.
+    input: |
+      Today's date: 2026-08-05
+
+      Audit this Resilience Hub application assessment for resiliency posture.
+      Emit the standard VERDICT block (APP, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      App ARN: arn:aws:resiliencehub:us-east-1:111111111111:app/stale-95-days
+      App name: stale-95-days
+      Current app version: 3
+      App policyArn (attached): arn:aws:resiliencehub:us-east-1:111111111111:resiliency-policy/prod-mc-policy
+
+      Latest assessment:
+        assessmentArn: arn:aws:resiliencehub:us-east-1:111111111111:app-assessment/assess-001
+        assessmentStatus: Success
+        appVersion: 3
+        startTime: 2026-05-01T08:00:00Z
+        endTime: 2026-05-02T10:00:00Z
+        complianceScore: 85
+        driftStatus: NotChecked
+
+      Resiliency policy (prod-mc-policy):
+        MissionCritical: {RTO: 5 min, RPO: 5 min}
+        Standard: {RTO: 24 hr, RPO: 24 hr}
+
+      Compliance map (application components):
+        payment-api:        tier=MissionCritical, complianceStatus=PolicyCompliant
+        auth-service:       tier=MissionCritical, complianceStatus=PolicyCompliant
+        order-processor:    tier=MissionCritical, complianceStatus=PolicyCompliant
+        reporting-job:      tier=Standard,          complianceStatus=PolicyNotCompliant
+        notifications-svc:  tier=Standard,          complianceStatus=PolicyCompliant
+        data-sync-lambda:   tier=Standard,          complianceStatus=PolicyCompliant
+        audit-logger:       tier=Standard,          complianceStatus=PolicyCompliant
+        health-check:       tier=Standard,          complianceStatus=PolicyCompliant
+
+      Recommendations:
+        Alarm: 2 total, 2 implemented
+        SDD:   1 total, 1 implemented
+        Test:  1 total, 0 implemented
+    expected_verdict: STALE_ASSESSMENT
+    assertions:
+      must_contain:
+        - "STALE_ASSESSMENT"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "freshness"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: HIGH_RISK"
+        - "VERDICT: LOW_COMPLIANCE"
+
+  - id: mission-critical-breach
+    description: >-
+      Fresh assessment (5 days old) with a MissionCritical-tier component that
+      is NonCompliant against RTO 5 min / RPO 5 min. HIGH_RISK via Step 5a
+      takes precedence over the LOW_COMPLIANCE-range score of 75.
+    input: |
+      Today's date: 2026-08-05
+
+      Audit this Resilience Hub application assessment for resiliency posture.
+      Emit the standard VERDICT block (APP, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      App ARN: arn:aws:resiliencehub:us-east-1:111111111111:app/mission-critical-breach
+      App name: mission-critical-breach
+      Current app version: 2
+      App policyArn (attached): arn:aws:resiliencehub:us-east-1:111111111111:resiliency-policy/strict-mc-policy
+
+      Latest assessment:
+        assessmentArn: arn:aws:resiliencehub:us-east-1:111111111111:app-assessment/assess-002
+        assessmentStatus: Success
+        appVersion: 2
+        startTime: 2026-07-30T08:00:00Z
+        endTime: 2026-07-31T10:00:00Z
+        complianceScore: 75
+        driftStatus: NotDrifted
+
+      Resiliency policy (strict-mc-policy):
+        MissionCritical: {RTO: 5 min, RPO: 5 min}
+        Critical: {RTO: 1 hr, RPO: 15 min}
+        Standard: {RTO: 24 hr, RPO: 24 hr}
+
+      Compliance map (application components):
+        checkout-api:       tier=MissionCritical, complianceStatus=PolicyNotCompliant
+        inventory-svc:      tier=MissionCritical, complianceStatus=PolicyCompliant
+        fraud-detection:    tier=Critical,         complianceStatus=PolicyCompliant
+        payment-gateway:    tier=Critical,         complianceStatus=PolicyCompliant
+        email-dispatcher:   tier=Standard,          complianceStatus=PolicyCompliant
+        report-generator:   tier=Standard,          complianceStatus=PolicyNotCompliant
+        batch-loader:       tier=Standard,          complianceStatus=PolicyCompliant
+        cleanup-cron:       tier=Standard,          complianceStatus=PolicyCompliant
+
+      Recommendations:
+        Alarm: 3 total, 1 implemented
+        SDD:   2 total, 1 implemented
+        Test:  1 total, 0 implemented
+    expected_verdict: HIGH_RISK
+    assertions:
+      must_contain:
+        - "HIGH_RISK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "MissionCritical"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: LOW_COMPLIANCE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: low-score-standard-tier
+    description: >-
+      Fresh assessment (10 days old), complianceScore 70, but all NonCompliant
+      components are in Standard tier (no MissionCritical or Critical breach).
+      Step 5 does not trigger; Step 6 triggers LOW_COMPLIANCE.
+    input: |
+      Today's date: 2026-08-05
+
+      Audit this Resilience Hub application assessment for resiliency posture.
+      Emit the standard VERDICT block (APP, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      App ARN: arn:aws:resiliencehub:us-east-1:111111111111:app/low-score-standard-tier
+      App name: low-score-standard-tier
+      Current app version: 1
+      App policyArn (attached): arn:aws:resiliencehub:us-east-1:111111111111:resiliency-policy/standard-tier-policy
+
+      Latest assessment:
+        assessmentArn: arn:aws:resiliencehub:us-east-1:111111111111:app-assessment/assess-003
+        assessmentStatus: Success
+        appVersion: 1
+        startTime: 2026-07-25T08:00:00Z
+        endTime: 2026-07-26T10:00:00Z
+        complianceScore: 70
+        driftStatus: NotDrifted
+
+      Resiliency policy (standard-tier-policy):
+        Standard: {RTO: 24 hr, RPO: 24 hr}
+        NonCritical: {RTO: 72 hr, RPO: 72 hr}
+
+      Compliance map (application components):
+        batch-job-a:        tier=Standard,     complianceStatus=PolicyNotCompliant
+        batch-job-b:        tier=Standard,     complianceStatus=PolicyNotCompliant
+        batch-job-c:        tier=Standard,     complianceStatus=PolicyNotCompliant
+        etl-pipeline:       tier=Standard,     complianceStatus=PolicyCompliant
+        report-scheduler:   tier=Standard,     complianceStatus=PolicyCompliant
+        cache-warmer:       tier=Standard,     complianceStatus=PolicyCompliant
+        log-rotator:        tier=NonCritical,  complianceStatus=PolicyCompliant
+        data-archiver:      tier=NonCritical,  complianceStatus=PolicyCompliant
+        cleanup-task:       tier=NonCritical,  complianceStatus=PolicyCompliant
+        sync-worker:        tier=NonCritical,  complianceStatus=PolicyCompliant
+
+      Recommendations:
+        Alarm: 4 total, 2 implemented
+        SDD:   1 total, 1 implemented
+        Test:  0 total, 0 implemented
+    expected_verdict: LOW_COMPLIANCE
+    assertions:
+      must_contain:
+        - "LOW_COMPLIANCE"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "compliance"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: HIGH_RISK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: missing-policy-no-alarms
+    description: >-
+      Fresh assessment (6 days old) with a decent score (88), but the app has
+      no resiliency policy attached (policyArn is null) and 3 alarm
+      recommendations are unimplemented. CONFIG_GAP from missing policy and
+      unimplemented alarms.
+    input: |
+      Today's date: 2026-08-05
+
+      Audit this Resilience Hub application assessment for resiliency posture.
+      Emit the standard VERDICT block (APP, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      App ARN: arn:aws:resiliencehub:us-east-1:111111111111:app/missing-policy-no-alarms
+      App name: missing-policy-no-alarms
+      Current app version: 1
+      App policyArn (attached): null (no policy bound to this app)
+
+      Latest assessment:
+        assessmentArn: arn:aws:resiliencehub:us-east-1:111111111111:app-assessment/assess-004
+        assessmentStatus: Success
+        appVersion: 1
+        startTime: 2026-07-29T08:00:00Z
+        endTime: 2026-07-30T10:00:00Z
+        complianceScore: 88
+        driftStatus: NotDrifted
+        policy.policyArn (ad-hoc policy used for this assessment): arn:aws:resiliencehub:us-east-1:111111111111:resiliency-policy/adhoc-assessment-policy
+
+      Ad-hoc policy used for this assessment:
+        Important: {RTO: 4 hr, RPO: 1 hr}
+        Standard: {RTO: 24 hr, RPO: 24 hr}
+
+      Compliance map (application components):
+        content-api:        tier=Important,  complianceStatus=PolicyCompliant
+        media-processor:    tier=Important,  complianceStatus=PolicyCompliant
+        thumbnail-svc:      tier=Standard,   complianceStatus=PolicyCompliant
+        search-indexer:     tier=Standard,   complianceStatus=PolicyCompliant
+        upload-handler:     tier=Standard,   complianceStatus=PolicyCompliant
+        metadata-cleanup:   tier=Standard,   complianceStatus=PolicyCompliant
+        transcode-worker:   tier=Standard,   complianceStatus=PolicyCompliant
+        delivery-cache:     tier=Standard,   complianceStatus=PolicyCompliant
+
+      Recommendations:
+        Alarm: 3 total, 0 implemented
+        SDD:   1 total, 1 implemented
+        Test:  0 total, 0 implemented
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "policy"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: HIGH_RISK"
+        - "VERDICT: LOW_COMPLIANCE"
+
+  - id: failed-assessment-no-data
+    description: >-
+      Latest assessment has assessmentStatus Failed — no compliance data is
+      available. The auditor must NOT treat this as zero compliance; it emits
+      CONFIG_GAP because there is no data to classify against.
+    input: |
+      Today's date: 2026-08-05
+
+      Audit this Resilience Hub application assessment for resiliency posture.
+      Emit the standard VERDICT block (APP, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      App ARN: arn:aws:resiliencehub:us-east-1:111111111111:app/failed-assessment-no-data
+      App name: failed-assessment-no-data
+      Current app version: 2
+      App policyArn (attached): arn:aws:resiliencehub:us-east-1:111111111111:resiliency-policy/prod-policy
+
+      Latest assessment:
+        assessmentArn: arn:aws:resiliencehub:us-east-1:111111111111:app-assessment/assess-005
+        assessmentStatus: Failed
+        appVersion: 2
+        startTime: 2026-07-29T08:00:00Z
+        endTime: 2026-07-30T10:00:00Z
+        complianceScore: null (no data — assessment failed)
+        compliance map: empty (no components assessed)
+        driftStatus: NotChecked
+
+      Resiliency policy (prod-policy):
+        MissionCritical: {RTO: 5 min, RPO: 5 min}
+        Standard: {RTO: 24 hr, RPO: 24 hr}
+
+      No compliance map or recommendation data is available because the
+      assessment did not complete successfully.
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Failed"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: HIGH_RISK"
+        - "VERDICT: LOW_COMPLIANCE"
+
+  - id: healthy-app
+    description: >-
+      Fresh assessment (15 days old), complianceScore 95, all components
+      PolicyCompliant, policy attached with valid tier mapping, appVersion
+      matches, all alarm/SDD recommendations implemented. Clean posture — OK.
+    input: |
+      Today's date: 2026-08-05
+
+      Audit this Resilience Hub application assessment for resiliency posture.
+      Emit the standard VERDICT block (APP, VERDICT, REASON, FINDINGS, REMEDIATION).
+
+      App ARN: arn:aws:resiliencehub:us-east-1:111111111111:app/healthy-app
+      App name: healthy-app
+      Current app version: 2
+      App policyArn (attached): arn:aws:resiliencehub:us-east-1:111111111111:resiliency-policy/well-calibrated-policy
+
+      Latest assessment:
+        assessmentArn: arn:aws:resiliencehub:us-east-1:111111111111:app-assessment/assess-006
+        assessmentStatus: Success
+        appVersion: 2
+        startTime: 2026-07-20T08:00:00Z
+        endTime: 2026-07-21T10:00:00Z
+        complianceScore: 95
+        driftStatus: NotDrifted
+
+      Resiliency policy (well-calibrated-policy):
+        Critical: {RTO: 1 hr, RPO: 15 min}
+        Important: {RTO: 4 hr, RPO: 1 hr}
+        Standard: {RTO: 24 hr, RPO: 24 hr}
+
+      Compliance map (application components):
+        api-gateway:        tier=Critical,    complianceStatus=PolicyCompliant
+        auth-service:       tier=Critical,    complianceStatus=PolicyCompliant
+        user-profile-svc:   tier=Important,   complianceStatus=PolicyCompliant
+        notification-svc:   tier=Important,   complianceStatus=PolicyCompliant
+        analytics-job:      tier=Standard,    complianceStatus=PolicyCompliant
+        report-exporter:    tier=Standard,    complianceStatus=PolicyCompliant
+
+      Recommendations:
+        Alarm: 3 total, 3 implemented
+        SDD:   2 total, 2 implemented
+        Test:  1 total, 0 implemented
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "VERDICT: OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: STALE_ASSESSMENT"
+        - "VERDICT: HIGH_RISK"
+        - "VERDICT: LOW_COMPLIANCE"
+        - "VERDICT: CONFIG_GAP"

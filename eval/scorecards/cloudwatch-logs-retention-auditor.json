@@ -1,0 +1,70 @@
+{
+  "skill": "cloudwatch-logs-retention-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many non\u2011obvious CloudWatch Logs behaviours (e.g., retention\u2011absence semantics, KMS request cost, subscription\u2011filter quota, anomaly\u2011detector training period) and concrete cost\u2011risk thresholds. However ~2 points are deducted because a large portion restates publicly documented AWS limits without adding a novel decision\u2011tree or unique expert heuristic."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines a clear AWS\u2011specific first\u2011fail\u2011wins procedure, pagination handling, confirmation gates, and rate\u2011limit back\u2011off advice. One point deducted for the pagination guidance lacking explicit exponential back\u2011off details for token iteration."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete reasons (e.g., never treat missing retention as default, never assume service\u2011managed SSE is CMK). One point deducted because it omits a specific anti\u2011pattern warning about silently using the default service\u2011managed key without accounting for its hidden KMS request cost."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present and clear. The only shortfall is that the \"when to invoke\" cue is split between the description and a separate metadata field, making the trigger slightly less explicit. Deduct 1 point."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered: high\u2011level mindset, quick reference matrix, step\u2011by\u2011step process, then deep anti\u2011patterns and remediation guidance. One point deducted because the initial sections are dense and may overload the agent before it knows which layer to consult."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by a mandatory confirmation step, backup instructions, and rate\u2011limit warnings. Creative tasks (e.g., generating remediation scripts) are given ample freedom. One point is deducted because bulk remediation concurrency limits are mentioned only in passing, not as a calibrated constraint."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Process \u2192 Output format \u2192 Worked examples \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation), making it easy to navigate."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 10,
+      "max": 15,
+      "justification": "The skill is largely usable, but the model output shows several violations: mixed YAML and plain\u2011text blocks, non\u2011standard FINDINGS tags (e.g., [CONFIG_GAP] instead of [HIGH]/[CRITICAL]/[OK]), omission of required \"VERDICT: ERROR\" handling for malformed input in some examples, and inconsistent ordering of findings. These defects would cause an agent to produce incorrect or non\u2011compliant output, so five points are deducted."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 42221,
+  "latency_ms": 29702,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

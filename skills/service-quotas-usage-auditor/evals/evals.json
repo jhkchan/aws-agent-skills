@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "service-quotas-usage-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Service Quotas Usage Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "approaching-limit-eighty-pct",
+      "name": "VPCs at 80% utilization with alarm — threshold boundary APPROACHING_LIMIT",
+      "difficulty": "medium",
+      "prompt_file": "prompts/approaching-limit-eighty-pct.md",
+      "baseline_file": "baselines/approaching-limit-eighty-pct.md",
+      "expected_verdict": "APPROACHING_LIMIT",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["APPROACHING_LIMIT", "VERDICT", "REASON", "REMEDIATION", "80"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ALARM", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "trackable-missing-alarm",
+      "name": "Lambda at 40% with UsageMetric but no CloudWatch alarm — NO_ALARM",
+      "difficulty": "medium",
+      "prompt_file": "prompts/trackable-missing-alarm.md",
+      "baseline_file": "baselines/trackable-missing-alarm.md",
+      "expected_verdict": "NO_ALARM",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ALARM", "VERDICT", "REASON", "REMEDIATION", "alarm"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: APPROACHING_LIMIT", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-metric-cannot-track",
+      "name": "IAM Roles with no UsageMetric — structural CONFIG_GAP at any utilization",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-metric-cannot-track.md",
+      "baseline_file": "baselines/no-metric-cannot-track.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "monitor"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: APPROACHING_LIMIT", "VERDICT: NO_ALARM"]
+        }
+      ]
+    },
+    {
+      "id": "healthy-monitored-ok",
+      "name": "S3 buckets at 2.5% with alarm and approved increase — clean OK",
+      "difficulty": "easy",
+      "prompt_file": "prompts/healthy-monitored-ok.md",
+      "baseline_file": "baselines/healthy-monitored-ok.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: APPROACHING_LIMIT", "VERDICT: NO_ALARM", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "denied-increase-config-gap",
+      "name": "EC2 vCPUs at 60% with DENIED increase request — CONFIG_GAP (Step 2c)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/denied-increase-config-gap.md",
+      "baseline_file": "baselines/denied-increase-config-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "DENIED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: APPROACHING_LIMIT", "VERDICT: NO_ALARM"]
+        }
+      ]
+    },
+    {
+      "id": "pending-increase-still-high",
+      "name": "EC2 vCPUs at 85% with PENDING request — APPROACHING_LIMIT dominates",
+      "difficulty": "medium",
+      "prompt_file": "prompts/pending-increase-still-high.md",
+      "baseline_file": "baselines/pending-increase-still-high.md",
+      "expected_verdict": "APPROACHING_LIMIT",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["APPROACHING_LIMIT", "VERDICT", "REASON", "REMEDIATION", "PENDING"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ALARM", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

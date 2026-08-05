@@ -1,0 +1,288 @@
+# Eval test cases for health-event-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_run.py via skills/*/eval/*.yaml glob.
+#
+# CONCEPT tokens only in must_contain (no test-case IDs, no raw API field
+# names). Test-case identifiers are embedded in resource names/IDs so they
+# surface naturally in the model output and prove the case was classified.
+skill: health-event-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: open-issue-ec2-degraded
+    description: >-
+      Active (status=open) AWS Health issue event of category `issue`
+      affecting two EC2 instances whose entity-level statusCode is IMPAIRED.
+      Business support, single account. Open issue + still-impaired entities
+      must classify as UNRESOLVED_EVENT.
+    input: |
+      Account posture:
+        Support plan: Business
+        AWS Region (API endpoint): us-east-1
+        Health Organizational View: enabled
+        EventBridge rule for aws.health: present
+
+      Event id: arn:aws:health:us-east-1::event/AWS_EC2_INSTANCE/AWS_EC2_INSTANCE_DEGRADED_PERFORMANCE/open-issue-ec2-degraded
+      Event metadata:
+        eventTypeCategory: issue
+        eventStatus: open
+        service: EC2
+        eventTypeCode: AWS_EC2_INSTANCE_DEGRADED_PERFORMANCE
+        region: us-east-1
+        startTime: 2026-08-04T09:00:00Z
+        lastUpdatedTime: 2026-08-05T03:30:00Z
+        eventScopeCode: ACCOUNT_SPECIFIC
+
+      Affected entities:
+        - entityArn: arn:aws:ec2:us-east-1:111111111111:instance/i-open-issue-ec2-degraded-1
+          entityValue: i-open-issue-ec2-degraded-1
+          statusCode: IMPAIRED
+          region: us-east-1
+        - entityArn: arn:aws:ec2:us-east-1:111111111111:instance/i-open-issue-ec2-degraded-2
+          entityValue: i-open-issue-ec2-degraded-2
+          statusCode: IMPAIRED
+          region: us-east-1
+
+      Emit the standard VERDICT block (EVENT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: UNRESOLVED_EVENT
+    assertions:
+      must_contain:
+        - "UNRESOLVED_EVENT"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "open"
+        - "IMPAIRED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: SCHEDULED_CHANGE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: scheduled-change-ec2-retirement
+    description: >-
+      Upcoming scheduledChange for EC2 instance retirement (hardware
+      degradation on the underlying host). Status=upcoming, deadline 6 days
+      out. Must classify as SCHEDULED_CHANGE with the stop/start action and
+      the deadline called out.
+    input: |
+      Account posture:
+        Support plan: Enterprise
+        AWS Region (API endpoint): us-east-1
+        Health Organizational View: enabled
+        EventBridge rule for aws.health: present
+
+      Event id: arn:aws:health:us-east-1::event/AWS_EC2_INSTANCE/AWS_EC2_INSTANCE_RETIREMENT_SCHEDULED/scheduled-change-ec2-retirement
+      Event metadata:
+        eventTypeCategory: scheduledChange
+        eventStatus: upcoming
+        service: EC2
+        eventTypeCode: AWS_EC2_INSTANCE_RETIREMENT_SCHEDULED
+        region: us-east-1
+        startTime: 2026-08-11T00:00:00Z   # scheduled execution window
+        lastUpdatedTime: 2026-08-01T12:00:00Z
+        eventScopeCode: ACCOUNT_SPECIFIC
+
+      Affected entities:
+        - entityArn: arn:aws:ec2:us-east-1:111111111111:instance/i-scheduled-change-ec2-retirement
+          entityValue: i-scheduled-change-ec2-retirement
+          statusCode: UNIMPAIRED
+          region: us-east-1
+
+      Event description (en_US):
+        Your instance i-scheduled-change-ec2-retirement is scheduled for
+        retirement on 2026-08-11. The underlying host will be decommissioned.
+        Action required: stop and start the instance to migrate it to a new
+        host before the retirement window.
+
+      Emit the standard VERDICT block (EVENT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: SCHEDULED_CHANGE
+    assertions:
+      must_contain:
+        - "SCHEDULED_CHANGE"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "deadline"
+        - "stop and start"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNRESOLVED_EVENT"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-no-org-view
+    description: >-
+      Organization with 12 member accounts, but Health Organizational View
+      has never been enabled from the management account. Support tier is
+      Business (eligible). The audit must classify CONFIG_GAP and call out
+      the org-view gap and the management-account enablement command.
+    input: |
+      Account posture:
+        Support plan: Business
+        AWS Region (API endpoint): us-east-1
+        AWS Organization: present (management account 111111111111,
+          12 member accounts)
+        Health Organizational View:
+          healthServiceAccessStatusForOrganization: disabled
+        EventBridge rule for aws.health: present (default-rule-Health-...)
+
+      No specific event provided; the auditor is reviewing overall Health
+      posture across the organization.
+
+      Emit the standard VERDICT block (ACCOUNT/SCOPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Organizational View"
+        - "disabled"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNRESOLVED_EVENT"
+        - "VERDICT: SCHEDULED_CHANGE"
+
+  - id: config-gap-no-eventbridge-rule
+    description: >-
+      Business-support single account with no EventBridge rule on the
+      aws.health source. Health Organizational View is enabled. Events are
+      being delivered to the default event bus but no rule consumes them,
+      so Health notifications are silently dropped. Must classify CONFIG_GAP.
+    input: |
+      Account posture:
+        Support plan: Business
+        AWS Region (API endpoint): us-east-1
+        Health Organizational View: enabled
+        EventBridge rules matching source aws.health: NONE
+        Default event bus policy authorizes health.amazonaws.com: true
+
+      Active events (status=open, upcoming): none in the last 24h.
+
+      Emit the standard VERDICT block (ACCOUNT/SCOPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "EventBridge"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNRESOLVED_EVENT"
+        - "VERDICT: SCHEDULED_CHANGE"
+
+  - id: ok-closed-event
+    description: >-
+      Closed (status=closed) issue event where every affected entity has
+      statusCode RESOLVED. Business support, healthy posture. Must classify
+      as OK with no action required.
+    input: |
+      Account posture:
+        Support plan: Business
+        AWS Region (API endpoint): us-east-1
+        Health Organizational View: enabled
+        EventBridge rule for aws.health: present
+
+      Event id: arn:aws:health:us-east-1::event/AWS_EC2/AWS_EC2_OPERATIONAL_ISSUE/ok-closed-event
+      Event metadata:
+        eventTypeCategory: issue
+        eventStatus: closed
+        service: EC2
+        eventTypeCode: AWS_EC2_OPERATIONAL_ISSUE
+        region: us-east-1
+        startTime: 2026-07-20T08:00:00Z
+        lastUpdatedTime: 2026-07-20T11:30:00Z
+        endTime: 2026-07-20T11:30:00Z
+        eventScopeCode: ACCOUNT_SPECIFIC
+
+      Affected entities:
+        - entityArn: arn:aws:ec2:us-east-1:111111111111:instance/i-ok-closed-event
+          entityValue: i-ok-closed-event
+          statusCode: RESOLVED
+          region: us-east-1
+
+      Emit the standard VERDICT block (EVENT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "closed"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: UNRESOLVED_EVENT"
+        - "VERDICT: SCHEDULED_CHANGE"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: open-issue-partial-resolution
+    description: >-
+      Aggregation case: open issue event where two of three affected entities
+      are RESOLVED but one is still IMPAIRED. The worst entity-level status
+      drives UNRESOLVED_EVENT — the event cannot be OK while any entity is
+      still impaired.
+    input: |
+      Account posture:
+        Support plan: Enterprise
+        AWS Region (API endpoint): us-east-1
+        Health Organizational View: enabled
+        EventBridge rule for aws.health: present
+
+      Event id: arn:aws:health:us-east-1::event/AWS_RDS/AWS_RDS_OPERATIONAL_EVENT/open-issue-partial-resolution
+      Event metadata:
+        eventTypeCategory: issue
+        eventStatus: open
+        service: RDS
+        eventTypeCode: AWS_RDS_OPERATIONAL_EVENT
+        region: us-east-1
+        startTime: 2026-08-04T22:00:00Z
+        lastUpdatedTime: 2026-08-05T02:45:00Z
+        eventScopeCode: ACCOUNT_SPECIFIC
+
+      Affected entities:
+        - entityValue: db-open-issue-partial-resolution-a
+          statusCode: RESOLVED
+          region: us-east-1
+        - entityValue: db-open-issue-partial-resolution-b
+          statusCode: RESOLVED
+          region: us-east-1
+        - entityValue: db-open-issue-partial-resolution-c
+          statusCode: IMPAIRED
+          region: us-east-1
+
+      Emit the standard VERDICT block (EVENT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: UNRESOLVED_EVENT
+    assertions:
+      must_contain:
+        - "UNRESOLVED_EVENT"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "IMPAIRED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: SCHEDULED_CHANGE"

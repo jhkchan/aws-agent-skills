@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "dms-replication-task-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DMS Replication Task Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-tls-plaintext-cdc",
+      "name": "Source endpoint SslMode none — plaintext data pipe on CDC task",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-tls-plaintext-cdc.md",
+      "baseline_file": "baselines/no-tls-plaintext-cdc.md",
+      "expected_verdict": "NO_TLS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_TLS", "VERDICT", "REASON", "FINDINGS", "REMEDIATION", "plaintext"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_LOGGING", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-logging-cdc-silent",
+      "name": "EnableLogging false on full-load-and-cdc task — silent failures",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-logging-cdc-silent.md",
+      "baseline_file": "baselines/no-logging-cdc-silent.md",
+      "expected_verdict": "NO_LOGGING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_LOGGING", "VERDICT", "REASON", "FINDINGS", "REMEDIATION", "logging"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_TLS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-tls-missing-ssl-mode",
+      "name": "Source endpoint missing SslMode field — defaults to plaintext",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-tls-missing-ssl-mode.md",
+      "baseline_file": "baselines/no-tls-missing-ssl-mode.md",
+      "expected_verdict": "NO_TLS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_TLS", "VERDICT", "REASON", "FINDINGS", "REMEDIATION", "plaintext"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_LOGGING", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-ssl-require-public",
+      "name": "SslMode require on source and PubliclyAccessible instance — config gaps",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-ssl-require-public.md",
+      "baseline_file": "baselines/config-gap-ssl-require-public.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "FINDINGS", "REMEDIATION", "public"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_TLS", "VERDICT: NO_LOGGING"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-no-validation-no-kms",
+      "name": "Clean TLS and logging but missing KMS, validation, deletion protection",
+      "difficulty": "medium",
+      "prompt_file": "prompts/config-gap-no-validation-no-kms.md",
+      "baseline_file": "baselines/config-gap-no-validation-no-kms.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_TLS", "VERDICT: NO_LOGGING"]
+        }
+      ]
+    },
+    {
+      "id": "ok-hardened-full-load-cdc",
+      "name": "All dimensions clean — verify-full TLS, logging, private Multi-AZ, validation, deletion protection",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-hardened-full-load-cdc.md",
+      "baseline_file": "baselines/ok-hardened-full-load-cdc.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_TLS", "VERDICT: NO_LOGGING", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

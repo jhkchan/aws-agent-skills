@@ -1,0 +1,56 @@
+# Eval configuration for cloudwatch-logs-retention-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the
+# same case can run with-skill (SKILL.md loaded) vs without-skill
+# (baseline only) for delta comparison. This is the canonical structured-
+# eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer
+# shim discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This
+# file does not replace it — it adds the structured with-skill-vs-
+# baseline dimension.
+skill_name: cloudwatch-logs-retention-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-retention-never-expire
+    difficulty: easy
+    prompt_file: prompts/no-retention-never-expire.md
+    baseline_file: baselines/no-retention-never-expire.md
+    expected_verdict: NO_RETENTION
+    expected_risk: CRITICAL
+  - id: no-retention-trumps-encryption
+    difficulty: hard
+    prompt_file: prompts/no-retention-trumps-encryption.md
+    baseline_file: baselines/no-retention-trumps-encryption.md
+    expected_verdict: NO_RETENTION
+    expected_risk: CRITICAL
+  - id: retention-set-no-kms-cmk
+    difficulty: easy
+    prompt_file: prompts/retention-set-no-kms-cmk.md
+    baseline_file: baselines/retention-set-no-kms-cmk.md
+    expected_verdict: NO_ENCRYPTION
+    expected_risk: HIGH
+  - id: long-retention-cost-risk
+    difficulty: medium
+    prompt_file: prompts/long-retention-cost-risk.md
+    baseline_file: baselines/long-retention-cost-risk.md
+    expected_verdict: COST_RISK
+    expected_risk: HIGH
+  - id: missing-anomaly-detector-config-gap
+    difficulty: hard
+    prompt_file: prompts/missing-anomaly-detector-config-gap.md
+    baseline_file: baselines/missing-anomaly-detector-config-gap.md
+    expected_verdict: CONFIG_GAP
+    expected_risk: MEDIUM
+  - id: fully-secured-ok
+    difficulty: easy
+    prompt_file: prompts/fully-secured-ok.md
+    baseline_file: baselines/fully-secured-ok.md
+    expected_verdict: OK
+    expected_risk: LOW

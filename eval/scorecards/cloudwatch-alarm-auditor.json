@@ -1,0 +1,70 @@
+{
+  "skill": "cloudwatch-alarm-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds substantial expert knowledge not typically recalled by a generic model: obscure CloudWatch quirks such as DatapointsToAlarm > EvaluationPeriods being silently accepted, default TreatMissingData behavior, anomaly\u2011detection warm\u2011up period, MetricMath FILL pitfalls, action\u2011list limits, high\u2011resolution alarm cost, composite rule size limits, and cross\u2011account metric dimension quirks. However, many of these points are already known to senior CloudOps engineers, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific ordered classification procedure, pagination handling for describe\u2011alarms/history, pre\u2011flight metadata gate, explicit confirmation before any PutMetricAlarm, and concrete CLI remediation commands. Missing a dedicated step to verify that ARNs referenced in AlarmActions actually exist before adding them."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., why ActionsEnabled:false is a kill switch, why missing TreatMissingData creates blind spots, limits on action ARNs, high\u2011resolution cost trap). Only minor omission: it could explicitly warn about duplicate SNS ARNs across child and composite alarms, which is already mentioned but not emphasized as a NEVER rule."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and includes rich keywords, activation triggers, and an invocation schema. No missing fields."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered: quick reference table, then step\u2011by\u2011step process, then deep edge\u2011case section, then anti\u2011patterns, then remediation. Some deep edge\u2011case details (e.g., MetricMath FILL) could be considered overload for a first read, but overall the layering is effective."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom precisely: destructive actions require explicit CONFIRM prompts, snapshotting, and validation of ARNs; audit\u2011only paths are unrestricted. No over\u2011 or under\u2011constraining observed."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Edge cases \u2192 Anti\u2011Patterns \u2192 Safety checks \u2192 Remediation), making the skill easy to parse and reuse."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a clear output format, concrete CLI remediation commands, and a decision\u2011tree style classification that an agent can execute. Missing: a concrete method for determining a metric's native resolution (required for Step 1c) and an offline strategy for validating composite alarm rule references, which could cause execution gaps."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 36433,
+  "latency_ms": 39240,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

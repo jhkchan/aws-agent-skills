@@ -1,0 +1,288 @@
+# Eval test cases for bedrock-guardrail-coverage-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: bedrock-guardrail-coverage-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-guardrail-models-unprotected
+    description: >-
+      Bedrock account with models, agents, and knowledge bases deployed but
+      zero guardrails created — every invocation is completely unguarded.
+    input: |
+      Bedrock deployment summary for account 111111111111 (us-east-1):
+
+      Models available:
+        - anthropic.claude-3-5-sonnet-20241022-v2:0
+        - amazon.nova-pro-v1:0
+        - amazon.titan-text-express-v1:0
+
+      Agents:
+        - customer-support-agent (agentId: agent-aaa, status: PREPARED)
+          guardrailConfiguration: NONE
+        - content-writer-agent (agentId: agent-bbb, status: PREPARED)
+          guardrailConfiguration: NONE
+
+      Knowledge Bases:
+        - product-docs-kb (kbId: kb-ccc)
+          guardrailConfiguration: NONE
+
+      Guardrails in account: 0
+
+      Application callers: 3 applications invoke models via converse without
+      guardrailIdentifier.
+
+      Emit the standard VERDICT block (GUARDRAIL, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_GUARDRAIL
+    assertions:
+      must_contain:
+        - "NO_GUARDRAIL"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: WEAK_FILTER"
+
+  - id: draft-guardrail-not-ready
+    description: >-
+      Guardrail exists with strong filters across all four content categories
+      and solid grounding thresholds, but status is DRAFT — never promoted to
+      READY, providing zero enforcement.
+    input: |
+      Guardrail configuration:
+        name: prod-content-guard
+        guardrailId: grn-draft001
+        guardrailArn: arn:aws:bedrock:us-east-1:111111111111:guardrail/grn-draft001
+        status: DRAFT
+        version: DRAFT
+
+        contentPolicy:
+          filtersConfig:
+            - type: SEXUAL, inputStrength: HIGH, outputStrength: HIGH
+            - type: VIOLENCE, inputStrength: HIGH, outputStrength: HIGH
+            - type: HATE, inputStrength: HIGH, outputStrength: HIGH
+            - type: INSULT, inputStrength: HIGH, outputStrength: HIGH
+
+        contextualGroundingPolicy:
+          filtersConfig:
+            - type: GROUNDING, threshold: 0.55
+            - type: RELEVANCE, threshold: 0.55
+
+        blockedInputMessaging: "Your request was blocked."
+        blockedOutputsMessaging: "The response was blocked."
+
+      Emit the standard VERDICT block (GUARDRAIL, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_GUARDRAIL
+    assertions:
+      must_contain:
+        - "NO_GUARDRAIL"
+        - "DRAFT"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: WEAK_FILTER"
+
+  - id: partial-model-coverage
+    description: >-
+      Guardrail is READY with strong filters and proper grounding, but 3 of 5
+      Bedrock resources (2 agents and 1 application caller) omit the guardrail
+      identifier — those resources are completely unguarded.
+    input: |
+      Guardrail configuration:
+        name: prod-content-guard
+        guardrailId: grn-coverage002
+        status: READY
+        version: 1
+
+        contentPolicy:
+          filtersConfig:
+            - type: SEXUAL, inputStrength: HIGH, outputStrength: HIGH
+            - type: VIOLENCE, inputStrength: HIGH, outputStrength: HIGH
+            - type: HATE, inputStrength: MEDIUM, outputStrength: HIGH
+            - type: INSULT, inputStrength: MEDIUM, outputStrength: MEDIUM
+
+        contextualGroundingPolicy:
+          filtersConfig:
+            - type: GROUNDING, threshold: 0.55
+            - type: RELEVANCE, threshold: 0.55
+
+        blockedInputMessaging: "Your request was blocked by the content policy."
+        blockedOutputsMessaging: "The response was blocked by the content policy."
+
+      Bedrock resource coverage manifest:
+        1. Agent: customer-support-agent (agentId: agent-aaa)
+           guardrailConfiguration: {guardrailIdentifier: "grn-coverage002", guardrailVersion: "1"}
+        2. Agent: content-writer-agent (agentId: agent-bbb)
+           guardrailConfiguration: NONE
+        3. Knowledge Base: product-docs-kb (kbId: kb-ccc)
+           guardrailConfiguration: {guardrailIdentifier: "grn-coverage002", guardrailVersion: "1"}
+        4. Application: chat-app (calls converse with anthropic.claude-3-5-sonnet)
+           guardrailIdentifier in converse: NONE
+        5. Application: summarizer-app (calls converse with amazon.nova-pro)
+           guardrailIdentifier in converse: NONE
+
+      Emit the standard VERDICT block (GUARDRAIL, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INCOMPLETE_COVERAGE
+    assertions:
+      must_contain:
+        - "INCOMPLETE_COVERAGE"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_GUARDRAIL"
+
+  - id: content-filters-all-none
+    description: >-
+      Guardrail is READY and all 5 resources reference it, but all four core
+      content categories have outputStrength NONE — the content policy is
+      effectively disabled.
+    input: |
+      Guardrail configuration:
+        name: baseline-guard
+        guardrailId: grn-weak003
+        status: READY
+        version: 1
+
+        contentPolicy:
+          filtersConfig:
+            - type: SEXUAL, inputStrength: NONE, outputStrength: NONE
+            - type: VIOLENCE, inputStrength: NONE, outputStrength: NONE
+            - type: HATE, inputStrength: NONE, outputStrength: NONE
+            - type: INSULT, inputStrength: NONE, outputStrength: NONE
+
+        contextualGroundingPolicy:
+          filtersConfig:
+            - type: GROUNDING, threshold: 0.55
+            - type: RELEVANCE, threshold: 0.55
+
+        blockedInputMessaging: "Blocked."
+        blockedOutputsMessaging: "Blocked."
+
+      Bedrock resource coverage: All 3 agents and 2 knowledge bases reference
+      this guardrail (version 1).
+
+      Emit the standard VERDICT block (GUARDRAIL, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: WEAK_FILTER
+    assertions:
+      must_contain:
+        - "WEAK_FILTER"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_GUARDRAIL"
+
+  - id: grounding-threshold-zero
+    description: >-
+      Guardrail is READY, all resources covered, content filters at HIGH, but
+      contextual grounding GROUNDING and RELEVANCE thresholds are 0.0 — the
+      filter is configured but functionally disabled (no hallucination detection).
+    input: |
+      Guardrail configuration:
+        name: weak-grounding-guard
+        guardrailId: grn-grounding004
+        status: READY
+        version: 1
+
+        contentPolicy:
+          filtersConfig:
+            - type: SEXUAL, inputStrength: HIGH, outputStrength: HIGH
+            - type: VIOLENCE, inputStrength: HIGH, outputStrength: HIGH
+            - type: HATE, inputStrength: HIGH, outputStrength: HIGH
+            - type: INSULT, inputStrength: HIGH, outputStrength: HIGH
+
+        contextualGroundingPolicy:
+          filtersConfig:
+            - type: GROUNDING, threshold: 0.0
+            - type: RELEVANCE, threshold: 0.0
+
+        blockedInputMessaging: "Your request was blocked."
+        blockedOutputsMessaging: "The response was blocked."
+
+      Bedrock resource coverage: All 3 agents and 2 knowledge bases reference
+      this guardrail (version 1).
+
+      Emit the standard VERDICT block (GUARDRAIL, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: WEAK_FILTER
+    assertions:
+      must_contain:
+        - "WEAK_FILTER"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_GUARDRAIL"
+
+  - id: strong-guardrail-full-coverage
+    description: >-
+      Guardrail READY (version 3), all resources covered, all four content
+      categories at HIGH/MEDIUM with proper outputStrength, grounding
+      thresholds at 0.55, managed word lists enabled, clear blocked messaging.
+      Clean posture across all dimensions.
+    input: |
+      Guardrail configuration:
+        name: prod-content-guard
+        guardrailId: grn-strong005
+        status: READY
+        version: 3
+
+        contentPolicy:
+          filtersConfig:
+            - type: SEXUAL, inputStrength: HIGH, outputStrength: HIGH
+            - type: VIOLENCE, inputStrength: HIGH, outputStrength: HIGH
+            - type: HATE, inputStrength: MEDIUM, outputStrength: HIGH
+            - type: INSULT, inputStrength: MEDIUM, outputStrength: MEDIUM
+
+        contextualGroundingPolicy:
+          filtersConfig:
+            - type: GROUNDING, threshold: 0.55
+            - type: RELEVANCE, threshold: 0.55
+
+        wordPolicy:
+          managedWordListsEnabled: true
+
+        blockedInputMessaging: "Your request was blocked by the content policy. Please rephrase."
+        blockedOutputsMessaging: "The response was blocked by the content policy."
+
+      Bedrock resource coverage: All 3 agents, 2 knowledge bases, and all
+      application callers reference this guardrail (version 3).
+
+      Emit the standard VERDICT block (GUARDRAIL, VERDICT, RISK, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_GUARDRAIL"
+        - "VERDICT: WEAK_FILTER"

@@ -1,0 +1,70 @@
+{
+  "skill": "resiliencehub-app-assessment-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides genuine expert knowledge: the mandatory `--reverse-order` flag for latest assessment, 90\u2011day staleness threshold, exact tier\u2011to\u2011RTO/RPO ranges, policy\u2011miscalibration detection, and the distinction between `Alarm`, `SDD`, and `Test` recommendation impacts. However, the 90\u2011day rule and tier ranges are documented elsewhere, so the delta is not completely novel."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: pagination of `list-apps`/`list-app-assessments`, required CLI flags, pre\u2011flight IAM checks, and step\u2011wise audit flow. Missing a concrete loop example for handling multi\u2011page results (e.g., while\u2011next\u2011token) leads to a small deduction."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasoning for each pitfall (e.g., never treat a Failed assessment as zero compliance, never omit `--reverse-order`, never trust a policy\u2011compliant result without validating the policy). No gaps identified."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete frontmatter (name, description, version, author, license, compatibility, keywords, tags, metadata). Clear `when_to_use`, `activation_triggers`, and `invocation_schema`. The description precisely states WHAT the skill does, WHEN to invoke, and provides KEYWORDS for activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (Mindset \u2192 Quick reference \u2192 Step\u2011by\u2011step \u2192 Deep reference), but the initial Mindset and Quick reference sections are dense and contain many details that could overload the agent before the core process is reached."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive actions (e.g., re\u2011assessment, publishing new version) are gated by confirmation prompts; creative outputs (remediation suggestions) are bounded by concrete CLI commands. One minor omission: no explicit prohibition against deleting historic assessments, though it is implied in safety checks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable audit\u2011skill pattern: Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process steps \u2192 Output format \u2192 Examples \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation \u2192 Deep reference. Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a deterministic decision tree, concrete CLI commands, error\u2011handling branches, and worked examples that an agent can execute end\u2011to\u2011end. Minor omission: no explicit example for handling pagination token errors or batch\u2011processing multiple apps in a single run, leading to a small deduction."
+    }
+  ],
+  "total_score": 113,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 48588,
+  "latency_ms": 17716,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

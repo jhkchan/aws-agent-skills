@@ -1,0 +1,331 @@
+# Eval test cases for dms-replication-task-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# CRITICAL: SKILL.md classification logic MUST match these test cases.
+# Verdict priority: NO_TLS > NO_LOGGING > CONFIG_GAP > OK (first match wins).
+skill: dms-replication-task-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-tls-plaintext-cdc
+    description: >-
+      MySQL-to-PostgreSQL CDC replication task where the source endpoint has
+      SslMode none — all replicated data flows in plaintext despite the target
+      endpoint being properly configured with verify-full.
+    input: |
+      Audit the following DMS replication task configuration for security
+      exposure. Emit the standard VERDICT block (TASK, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Task ARN: arn:aws:dms:us-east-1:111111111111:task:no-tls-plaintext-cdc
+      MigrationType: cdc
+      Status: running
+
+      Source endpoint (MySQL):
+        EngineName: mysql
+        ServerName: prod-mysql.internal.example.com
+        Port: 3306
+        SslMode: none
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/src-key-1
+
+      Target endpoint (PostgreSQL):
+        EngineName: postgres
+        ServerName: target-pg.internal.example.com
+        Port: 5432
+        SslMode: verify-full
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/tgt-key-1
+
+      Replication instance:
+        ReplicationInstanceClass: dms.r5.large
+        MultiAZ: true
+        PubliclyAccessible: false
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/inst-key-1
+
+      TaskSettings (JSON string):
+        {"Logging":{"EnableLogging":true,"LogLevel":"info","LogComponents":[{"Id":"DATA_STRUCTURE","Severity":"LOGGER_SEVERITY_ONLY_INFO"}]},"ValidationSettings":{"EnableValidation":true,"ValidationMode":"ROW_LEVEL"}}
+    expected_verdict: NO_TLS
+    assertions:
+      must_contain:
+        - "NO_TLS"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "plaintext"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_LOGGING"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-logging-cdc-silent
+    description: >-
+      Oracle-to-PostgreSQL full-load-and-cdc task with both endpoints
+      properly configured for TLS (verify-full) but EnableLogging is false —
+      task failures are invisible because CloudWatch Logs are not emitted.
+    input: |
+      Audit the following DMS replication task configuration for security
+      exposure. Emit the standard VERDICT block (TASK, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Task ARN: arn:aws:dms:us-east-1:111111111111:task:no-logging-cdc-silent
+      MigrationType: full-load-and-cdc
+      Status: running
+
+      Source endpoint (Oracle):
+        EngineName: oracle
+        ServerName: prod-oracle.internal.example.com
+        Port: 1521
+        SslMode: verify-full
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/src-key-2
+
+      Target endpoint (PostgreSQL):
+        EngineName: postgres
+        ServerName: target-pg.internal.example.com
+        Port: 5432
+        SslMode: verify-full
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/tgt-key-2
+
+      Replication instance:
+        ReplicationInstanceClass: dms.r5.large
+        MultiAZ: true
+        PubliclyAccessible: false
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/inst-key-2
+
+      TaskSettings (JSON string):
+        {"Logging":{"EnableLogging":false,"LogLevel":"info"},"ValidationSettings":{"EnableValidation":true,"ValidationMode":"ROW_LEVEL"}}
+    expected_verdict: NO_LOGGING
+    assertions:
+      must_contain:
+        - "NO_LOGGING"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "logging"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_TLS"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-tls-missing-ssl-mode
+    description: >-
+      PostgreSQL-to-S3 full-load task where the source endpoint is missing
+      the SslMode field entirely — it defaults to none, meaning plaintext.
+      The S3 target correctly has no SslMode (not applicable for S3).
+    input: |
+      Audit the following DMS replication task configuration for security
+      exposure. Emit the standard VERDICT block (TASK, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Task ARN: arn:aws:dms:us-east-1:111111111111:task:no-tls-missing-ssl-mode
+      MigrationType: full-load
+      Status: running
+
+      Source endpoint (PostgreSQL):
+        EngineName: postgres
+        ServerName: prod-pg.internal.example.com
+        Port: 5432
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/src-key-3
+        (Note: no SslMode field present on this endpoint)
+
+      Target endpoint (S3):
+        EngineName: s3
+        ServiceAccessRoleArn: arn:aws:iam::111111111111:role/dms-s3-role
+        S3Settings:
+          BucketName: dms-export-bucket
+          ServiceAccessRoleArn: arn:aws:iam::111111111111:role/dms-s3-role
+
+      Replication instance:
+        ReplicationInstanceClass: dms.r5.large
+        MultiAZ: true
+        PubliclyAccessible: false
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/inst-key-3
+
+      TaskSettings (JSON string):
+        {"Logging":{"EnableLogging":true,"LogLevel":"info","LogComponents":[{"Id":"DATA_STRUCTURE","Severity":"LOGGER_SEVERITY_ONLY_INFO"}]},"ValidationSettings":{"EnableValidation":true}}
+    expected_verdict: NO_TLS
+    assertions:
+      must_contain:
+        - "NO_TLS"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "plaintext"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_LOGGING"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-ssl-require-public
+    description: >-
+      MySQL-to-MySQL CDC task where the source endpoint uses SslMode require
+      (encrypts but no certificate verification) and the replication instance
+      is PubliclyAccessible true with single-AZ — multiple config gaps but
+      no plaintext and no missing logging.
+    input: |
+      Audit the following DMS replication task configuration for security
+      exposure. Emit the standard VERDICT block (TASK, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Task ARN: arn:aws:dms:us-east-1:111111111111:task:config-gap-ssl-require-public
+      MigrationType: cdc
+      Status: running
+
+      Source endpoint (MySQL):
+        EngineName: mysql
+        ServerName: prod-mysql.internal.example.com
+        Port: 3306
+        SslMode: require
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/src-key-4
+
+      Target endpoint (MySQL):
+        EngineName: mysql
+        ServerName: replica-mysql.internal.example.com
+        Port: 3306
+        SslMode: verify-full
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/tgt-key-4
+
+      Replication instance:
+        ReplicationInstanceClass: dms.r5.large
+        MultiAZ: false
+        PubliclyAccessible: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/inst-key-4
+
+      TaskSettings (JSON string):
+        {"Logging":{"EnableLogging":true,"LogLevel":"warning","LogComponents":[{"Id":"DATA_STRUCTURE","Severity":"LOGGER_SEVERITY_ONLY_WARNING"}]},"ValidationSettings":{"EnableValidation":true,"ValidationMode":"ROW_LEVEL"}}
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "public"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_TLS"
+        - "VERDICT: NO_LOGGING"
+
+  - id: config-gap-no-validation-no-kms
+    description: >-
+      SQL Server-to-PostgreSQL full-load-and-cdc task with proper TLS
+      (verify-full on both endpoints) and logging enabled, but endpoints
+      missing KmsKeyId, no validation settings, and no deletion protection —
+      multiple config gaps.
+    input: |
+      Audit the following DMS replication task configuration for security
+      exposure. Emit the standard VERDICT block (TASK, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Task ARN: arn:aws:dms:us-east-1:111111111111:task:config-gap-no-validation-no-kms
+      MigrationType: full-load-and-cdc
+      Status: running
+
+      Source endpoint (SQL Server):
+        EngineName: sqlserver
+        ServerName: prod-sqlsrv.internal.example.com
+        Port: 1433
+        SslMode: verify-full
+        (Note: no KmsKeyId on this endpoint)
+
+      Target endpoint (PostgreSQL):
+        EngineName: postgres
+        ServerName: target-pg.internal.example.com
+        Port: 5432
+        SslMode: verify-full
+        (Note: no KmsKeyId on this endpoint)
+
+      Replication instance:
+        ReplicationInstanceClass: dms.r5.2xlarge
+        MultiAZ: true
+        PubliclyAccessible: false
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/inst-key-5
+
+      TaskSettings (JSON string):
+        {"Logging":{"EnableLogging":true,"LogLevel":"info","LogComponents":[{"Id":"DATA_STRUCTURE","Severity":"LOGGER_SEVERITY_ONLY_INFO"},{"Id":"COMMON_AGENT","Severity":"LOGGER_SEVERITY_ONLY_INFO"}]},"ValidationSettings":{"EnableValidation":false},"DeletionProtection":false}
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_TLS"
+        - "VERDICT: NO_LOGGING"
+
+  - id: ok-hardened-full-load-cdc
+    description: >-
+      PostgreSQL-to-PostgreSQL full-load-and-cdc task with all dimensions
+      clean — verify-full TLS on both endpoints, logging enabled at info
+      level with full component coverage, private Multi-AZ instance with KMS,
+      validation enabled, deletion protection on.
+    input: |
+      Audit the following DMS replication task configuration for security
+      exposure. Emit the standard VERDICT block (TASK, VERDICT, REASON,
+      FINDINGS, REMEDIATION).
+
+      Task ARN: arn:aws:dms:us-east-1:111111111111:task:ok-hardened-full-load-cdc
+      MigrationType: full-load-and-cdc
+      Status: running
+
+      Source endpoint (PostgreSQL):
+        EngineName: postgres
+        ServerName: prod-pg.internal.example.com
+        Port: 5432
+        SslMode: verify-full
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/src-key-6
+
+      Target endpoint (PostgreSQL):
+        EngineName: postgres
+        ServerName: target-pg.internal.example.com
+        Port: 5432
+        SslMode: verify-full
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/tgt-key-6
+
+      Replication instance:
+        ReplicationInstanceClass: dms.r5.2xlarge
+        MultiAZ: true
+        PubliclyAccessible: false
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/inst-key-6
+
+      TaskSettings (JSON string):
+        {"Logging":{"EnableLogging":true,"LogLevel":"info","LogComponents":[{"Id":"DATA_STRUCTURE","Severity":"LOGGER_SEVERITY_ONLY_INFO"},{"Id":"COMMON_AGENT","Severity":"LOGGER_SEVERITY_ONLY_INFO"},{"Id":"SOURCE_UNLOAD","Severity":"LOGGER_SEVERITY_ONLY_INFO"},{"Id":"TARGET_LOAD","Severity":"LOGGER_SEVERITY_ONLY_INFO"}]},"ValidationSettings":{"EnableValidation":true,"ValidationMode":"ROW_LEVEL"},"RecoveryTable":{"EnableRecovery":true},"DeletionProtection":true}
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_TLS"
+        - "VERDICT: NO_LOGGING"
+        - "VERDICT: CONFIG_GAP"

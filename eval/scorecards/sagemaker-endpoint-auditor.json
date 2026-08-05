@@ -1,0 +1,70 @@
+{
+  "skill": "sagemaker-endpoint-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides expert-level nuances such as VpcConfig living on the Model, inter\u2011container encryption only for inference pipelines, async output bucket encryption, distinction between InitialInstanceCount and CurrentInstanceCount, serverless HA handling, and the immutable nature of Models/EndpointConfigs\u2014details a generic model would not enumerate."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill outlines an AWS\u2011specific, ordered procedure (pre\u2011flight, VPC check, encryption, role audit, monitoring, HA) and includes exact CLI remediation steps. The only shortfall is the lack of a concrete, step\u2011by\u2011step procedure for locating and parsing the MonitoringSchedule (e.g., pagination handling), which remains a generic \"check\"."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "A thorough NEVER list covers the most common pitfalls with clear reasoning (checking wrong object for VPC, flagging single\u2011container encryption, ignoring async S3 bucket encryption, etc.). Missing are anti\u2011patterns around forgetting to update the IAM trust policy when swapping models and the need for VPC endpoints for S3/ECR when using VpcConfig."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes a full description, when_to_use, activation_triggers, invocation_schema, keywords, and metadata; the description clearly states WHAT the skill does, WHEN to invoke it, and the KEYWORDS that trigger activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: high\u2011level Mindset and quick\u2011reference table first, then step\u2011by\u2011step classification, followed by deep anti\u2011pattern and safety\u2011check sections, and finally remediation. Critical rules are presented early, avoiding cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are guarded by a mandatory confirmation gate, backup instructions, and notes about immutability, showing strong calibration. The only deduction is that the skill does not explicitly loosen constraints for purely informational queries (e.g., a read\u2011only audit could be performed without any confirmation), slightly over\u2011constraining harmless operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a consistent, recognizable pattern (Mindset \u2192 Quick reference \u2192 Process steps \u2192 Output format \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation), aiding comprehension and reuse."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Defines a deterministic output format, decision tree, and concrete CLI remediation steps, enabling an agent to execute the audit and apply fixes. Minor gap: the additive async S3\u2011bucket encryption finding is mentioned in the narrative but not reflected in the output schema, reducing completeness."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 37189,
+  "latency_ms": 5485,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

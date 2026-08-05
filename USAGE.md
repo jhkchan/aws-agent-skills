@@ -47,6 +47,7 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-networkmanager-core-network` | 2 Audit | Audit Network Manager (Cloud WAN) core networks for detached attachments, permissive resource/segment policies, CIDR overlap, and LATEST-vs-LIVE policy mismatch — emits DETACHED_ATTACHMENT/PERMISSIVE_POLICY/CIDR_OVERLAP/CONFIG_GAP/OK per core network (routes to `networkmanager-core-network-auditor`) |
 | `/aws:audit-directconnect-topology` | 2 Audit | Audit Direct Connect topology for single-path failure risk (same-POP pseudo-diversity), MACSec `should_encrypt`/`no_encrypt` on capable hardware, public-VIF BGP MD5 (route-hijack defence), VIF redundancy via DXGW, and LOA-CFA provisioning state — emits SINGLE_CONNECTION/NO_ENCRYPTION/CONFIG_GAP/OK per topology (routes to `directconnect-auditor`) |
 | `/aws:audit-cloudtrail-org-trail` | 2 Audit | Audit CloudTrail organization trails for org coverage, multi-region logging, KMS encryption (SSE-KMS), log-file validation (digest integrity), CloudWatch Logs delivery, CloudTrail Insights enablement, and log retention — emits NO_ORG_TRAIL/NO_ENCRYPTION/NO_VALIDATION/NO_INSIGHTS/CONFIG_GAP/OK per trail (routes to `cloudtrail-org-trail-auditor`) |
+| `/aws:audit-cloudwatch-logs-retention` | 2 Audit | Audit CloudWatch Logs log groups for Never-expire retention (silent infinite-cost accumulation), missing SSE-KMS customer-managed-key (CMK) encryption, retention × volume cost risk, subscription filter fan-out (Lambda/Kinesis/cross-account destination), missing metric filters, and absent CloudWatch Logs Anomaly Detectors — emits NO_RETENTION/NO_ENCRYPTION/COST_RISK/CONFIG_GAP/OK per log group (routes to `cloudwatch-logs-retention-auditor`) |
 | `/aws:audit-dynamodb-table` | 2 Audit | Audit DynamoDB tables for encryption (KMS), PITR, capacity mode (on-demand vs provisioned w/ autoscaling), TTL, backup, GSI/LSI quota risk, and deletion protection — emits UNENCRYPTED/NO_PITR/CAPACITY_MISMATCH/CONFIG_GAP/OK per table (routes to `dynamodb-table-auditor`) |
 | `/aws:audit-config-recorder-coverage` | 2 Audit | Audit AWS Config recorder coverage (allSupported, includeGlobalResourceTypes), delivery channel health (FAILURE status, NO_SUCH_BUCKET, ACCESS_DENIED), Config rules deployment, and conformance packs (deployment status) — emits INCOMPLETE_COVERAGE/NO_RULES/DELIVERY_GAP/CONFIG_GAP/OK per region (routes to `config-recorder-coverage-auditor`) |
 | `/aws:audit-trustedadvisor-checks` | 2 Audit | Audit Trusted Advisor check results for security, fault-tolerance, cost-optimization, performance, and service-limits findings — including support-tier gating (Basic/Developer = 7 of ~115 checks), stale results (>24h), excluded-resource blind spots, and `not_available` statuses — emits CRITICAL_CHECK/WARNING_CHECK/CONFIG_GAP/OK per check (routes to `trustedadvisor-check-auditor`) |
@@ -58,11 +59,21 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-codebuild-project` | 2 Audit | Audit CodeBuild projects for privileged mode (Docker-in-Docker host access without Docker justification), plaintext secrets in environmentVariables, unencrypted S3 logs and build artifacts (encryptionDisabled=true / no kmsKeyArn), over-permissive service-role blast radius (admin wildcard, PassRole on `*`, unscoped `codebuild.amazonaws.com` trust policy), VPC config (missing or public-subnet isolation), and public build-status badge leakage — emits PRIVILEGED/SECRET_LEAK/NO_ENCRYPTION/OVERPERMISSIVE_ROLE/CONFIG_GAP/OK per project (routes to `codebuild-project-auditor`) |
 | `/aws:audit-apigateway-resource-policy` | 2 Audit | Audit API Gateway REST/HTTP APIs for unauthenticated public methods (authorizationType NONE), API-key-as-auth misuse, cross-account resource policy grants, missing usage plans and rate limiting, and absent WAF Web ACL associations — emits PUBLIC_NO_AUTH/NO_RATE_LIMIT/CONFIG_GAP/OK per API (routes to `apigateway-resource-policy-auditor`) |
 | `/aws:audit-codedeploy-deployment-group` | 2 Audit | Audit CodeDeploy deployment groups for auto-rollback enablement (DEPLOYMENT_FAILURE trigger), CloudWatch alarm monitoring (enabled + populated, ignorePollAlarmFailure), deployment-config risk (AllAtATime, zero minimum-healthy-hosts), and blue/green termination posture (immediate termination, no traffic control) — emits NO_ROLLBACK/NO_ALARMS/CONFIG_GAP/OK per deployment group (routes to `codedeploy-deployment-group-auditor`) |
+| `/aws:audit-service-quotas-usage` | 2 Audit | Audit AWS Service Quotas for utilization per service, approaching limits (>=80%), CloudWatch alarm coverage on AWS/Usage metrics, applied vs default quota drift, denied/stale quota increase requests, and non-trackable quotas lacking UsageMetric — emits APPROACHING_LIMIT/NO_ALARM/CONFIG_GAP/OK per quota (routes to `service-quotas-usage-auditor`) |
 | `/aws:audit-sqs-dlq-policy` | 2 Audit | Audit SQS queues for missing or misconfigured dead-letter queue (DLQ), public access via Principal:* queue policies, encryption-at-rest gaps (SSE-SQS / SSE-KMS), maxReceiveCount tuning, DLQ retention periods, and cross-account DLQ accessibility — emits NO_DLQ/PUBLIC_ACCESS/NO_ENCRYPTION/CONFIG_GAP/OK per queue (routes to `sqs-dlq-policy-auditor`) |
 | `/aws:audit-eventbridge-bus-policy` | 2 Audit | Audit EventBridge event buses for public event-injection (Principal:* + PutEvents), missing per-target DLQs, absent customer-managed KMS key, and archive gaps — emits PUBLIC_BUS/NO_DLQ/NO_ENCRYPTION/CONFIG_GAP/OK per bus (routes to `eventbridge-bus-policy-auditor`) |
 | `/aws:audit-sns-topic-public-subscription` | 2 Audit | Audit SNS topics for public subscription exposure (Principal:* with sns:Subscribe/Publish in topic policy), missing KMS encryption, delivery-status logging gaps, FIFO deduplication misconfiguration, and cross-account subscriptions — emits PUBLIC_SUBSCRIPTION/NO_ENCRYPTION/CONFIG_GAP/OK per topic (routes to `sns-topic-public-subscription-auditor`) |
 | `/aws:audit-codepipeline-pipeline` | 2 Audit | Audit CodePipeline pipelines for artifact-store encryption (KMS CMK), cross-account deploy roles, disabled stage transitions, deprecated source credentials (GitHub v1 OAuth), and manual-approval gate coverage — emits NO_ENCRYPTION/OVERPERMISSIVE_ROLE/DISABLED_STAGE/CONFIG_GAP/OK per pipeline (routes to `codepipeline-pipeline-auditor`) |
 | `/aws:audit-stepfunctions-statemachine` | 2 Audit | Audit Step Functions state machines for execution logging coverage (level ALL + includeExecutionData), X-Ray tracing enablement (including the Express-workflow no-op trap), execution-role blast radius (wildcard actions, states:StartExecution chaining, iam:PassRole), and ASL definition validation (missing Catch/Retry on fallible Tasks, missing TimeoutSeconds, unreachable states, cyclic references without exit) — emits NO_LOGGING/NO_TRACING/OVERPERMISSIVE_ROLE/CONFIG_GAP/OK per state machine (routes to `stepfunctions-statemachine-auditor`) |
+| `/aws:audit-health-event` | 2 Audit | Audit AWS Health for open issue events with IMPAIRED affected entities, upcoming scheduled changes (deadline = startTime), closed-event resolution, Health Organizational View enablement (healthServiceAccessStatusForOrganization), and EventBridge `aws.health` rule wiring on the default bus — emits UNRESOLVED_EVENT/SCHEDULED_CHANGE/CONFIG_GAP/OK per event or account/org scope (routes to `health-event-auditor`) |
+| `/aws:audit-sagemaker-endpoint` | 2 Audit | Audit SageMaker endpoints for encryption (KMS at rest + inter-container traffic on inference pipelines), execution-role blast radius (wildcard actions, sagemaker:*, iam:PassRole), VPC configuration (VpcConfig-on-Model knowledge delta — internet-facing vs private), data capture + model monitoring schedule coverage, and instance count for high availability — emits NO_ENCRYPTION/OVERPERMISSIVE_ROLE/NO_MONITORING/PUBLIC_ENDPOINT/CONFIG_GAP/OK per endpoint (routes to `sagemaker-endpoint-auditor`) |
+| `/aws:audit-ssm-managed-instance` | 2 Audit | Audit SSM managed instances for coverage (SSM Agent reachable + IAM profile attached), association compliance, patch baseline adherence, Session Manager vs SSH exposure, inventory collection, and Run Command posture — emits UNMANAGED/NONCOMPLIANT/NO_SESSION_MANAGER/CONFIG_GAP/OK per instance (routes to `ssm-managed-instance-auditor`) |
+
+| `/aws:audit-dms-replication-task` | 2 Audit | Audit DMS replication tasks for SSL/TLS gaps on source/target endpoints (SslMode none/missing = plaintext), missing CDC/task logging (EnableLogging false — metrics-vs-logs trap), replication instance exposure (PubliclyAccessible, single-AZ CDC position loss), endpoint encryption (KmsKeyId), and task settings integrity (validation, deletion protection) — emits NO_TLS/NO_LOGGING/CONFIG_GAP/OK per task (routes to `dms-replication-task-auditor`) |
+| `/aws:audit-bedrock-model-access` | 2 Audit | Audit Amazon Bedrock model access posture — invocation logging coverage (S3/CloudWatch/DataFirehose + per-modality delivery flags), customer-managed KMS encryption vs AWS-managed default, Anthropic Claude geo-block risk in APAC jurisdictions (models list as enabled but fail at invocation with ValidationException), provisioned throughput commitment state, and guardrail coverage on enabled models — emits NO_LOGGING/NO_ENCRYPTION/GEO_BLOCK_RISK/CONFIG_GAP/OK per inventory (routes to `bedrock-model-access-inventory`) |
+| `/aws:audit-cloudwatch-alarm` | 2 Audit | Audit CloudWatch alarms for missing alarm actions (SNS/Lambda/AutoScaling), insufficient-data handling (TreatMissingData defaults to "missing" — not "notBreaching"), anomaly-detection coverage vs static thresholds on high-variance metrics, composite alarm integrity (Rule expression, child alarm references, escalation actions), structural config errors (DatapointsToAlarm > EvaluationPeriods), and alarm state history — emits NO_ANOMALY/NO_ACTION/INSUFFICIENT_DATA/CONFIG_GAP/OK per alarm (routes to `cloudwatch-alarm-auditor`) |
+| `/aws:audit-bedrock-guardrail-coverage` | 2 Audit | Audit Bedrock Guardrails for model coverage gaps (guardrails are per-request, not per-model), DRAFT-vs-READY enforcement status (DRAFT = zero enforcement), content-filter strength (hate/insult/sexual/violence outputStrength NONE), contextual grounding threshold (0.0 = silently disabled), denied topics, word filters, and per-application bypass risk — emits NO_GUARDRAIL/INCOMPLETE_COVERAGE/WEAK_FILTER/CONFIG_GAP/OK per guardrail or deployment (routes to `bedrock-guardrail-coverage-auditor`) |
+| `/aws:audit-resiliencehub-app-assessment` | 2 Audit | Audit Resilience Hub app assessments for assessment staleness (>90 days), resiliency policy binding and tier-to-RTO/RPO calibration, per-tier compliance breaches (MissionCritical/Critical NonCompliant triggers HIGH_RISK), aggregate compliance score (<80 = LOW_COMPLIANCE), app-version drift, failed/pending assessment status (no data = CONFIG_GAP not zero compliance), and unimplemented alarm/SDD/test recommendations — emits STALE_ASSESSMENT/HIGH_RISK/LOW_COMPLIANCE/CONFIG_GAP/OK per app (routes to `resiliencehub-app-assessment-auditor`) |
 
 Every command has a natural-language equivalent — the orchestrator routes
 identically.
@@ -2670,6 +2681,421 @@ for a multi-finding audit walkthrough (over-permissive role +
 includeExecutionData trap on an order pipeline) covering precedence
 aggregation, the fan-out blast-radius concept, and the role-scoping +
 logging-fix remediation workflow.
+
+---
+
+### sagemaker-endpoint-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-sagemaker-endpoint`
+
+**What it does:** Audits SageMaker real-time and async endpoints across six
+orthogonal dimensions — VPC configuration (the VpcConfig-on-Model knowledge
+delta — the most common audit mistake is checking the EndpointConfig instead
+of the Model), KMS encryption at rest and inter-container traffic encryption
+(only relevant for multi-container inference pipelines), execution-role
+blast radius (`Action "*"` on `Resource "*"`, service wildcards, PassRole
+on `"*"`), data capture and model monitoring schedule coverage (both must
+be present — capture alone provides no alerts, a schedule alone has no
+data), and instance count for high availability (`InitialInstanceCount < 2`
+= no HA). Emits a deterministic verdict
+(`NO_ENCRYPTION | OVERPERMISSIVE_ROLE | NO_MONITORING | PUBLIC_ENDPOINT |
+CONFIG_GAP | OK`) per endpoint with enumerated findings and CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this SageMaker endpoint"
+- "is my endpoint encrypted?"
+- "is the endpoint in a VPC?"
+- "is the execution role too broad?"
+- "is model monitoring enabled?"
+- "is this endpoint production-ready?"
+- "inter-container encryption"
+- reviewing a SageMaker endpoint before production deployment
+
+**Example prompt:**
+
+```
+You: "This SageMaker endpoint has no VpcConfig on the Model, the execution
+     role grants sagemaker:* on *, and there's no monitoring schedule.
+     Is it production-ready?"
+```
+
+**Expected behavior:**
+
+1. Classifies the Model as PUBLIC_ENDPOINT (no VpcConfig — endpoint is
+   internet-facing; VpcConfig lives on the Model, NOT the EndpointConfig).
+2. Identifies the execution role as OVERPERMISSIVE_ROLE (`sagemaker:*` on
+   `"*"` — the container only needs InvokeEndpoint, not model management).
+3. Flags the absent monitoring as NO_MONITORING (no DataCaptureConfig AND
+   no MonitoringSchedule — drift undetectable).
+4. Aggregates by precedence: PUBLIC_ENDPOINT > OVERPERMISSIVE_ROLE >
+   NO_MONITORING, so the verdict is PUBLIC_ENDPOINT with all three findings
+   in FINDINGS.
+5. Emits the blue/green remediation workflow: create-model with VpcConfig,
+   new EndpointConfig with DataCaptureConfig, update-endpoint, scope the
+   execution role to named actions on specific ARNs.
+
+**End-to-end scenario:** see
+[`skills/sagemaker-endpoint-auditor/examples/end-to-end.md`](skills/sagemaker-endpoint-auditor/examples/end-to-end.md)
+for a multi-finding audit walkthrough (public endpoint + no monitoring on a
+fraud-detection model) covering precedence aggregation, the VpcConfig-on-Model
+knowledge delta, and the immutable-resource blue/green remediation workflow.
+
+---
+
+### dms-replication-task-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-dms-replication-task`
+
+**What it does:** Audits DMS replication tasks across five dimensions —
+TLS/SSL on source and target endpoints (`SslMode: none` or missing = NO_TLS;
+`require` = CONFIG_GAP with no cert verification; `verify-ca`/`verify-full`
+= OK), task logging (`EnableLogging: false` or absent = NO_LOGGING — the
+metrics-vs-logs trap where CloudWatch metrics stay green while data is
+silently lost), replication instance config (`PubliclyAccessible: true`,
+single-AZ on CDC tasks, burstable instance class), endpoint encryption
+(missing `KmsKeyId`), and task settings integrity (validation, recovery
+table, deletion protection). Emits a deterministic verdict
+(`NO_TLS | NO_LOGGING | CONFIG_GAP | OK`) per task with priority-based
+aggregation (first failing dimension wins) and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this DMS replication task"
+- "check DMS endpoint SSL"
+- "is my DMS migration encrypted"
+- "DMS CDC logging"
+- "replication instance public"
+- "hardening DMS migration"
+- reviewing a replication task before production cutover
+
+**Example prompt:**
+
+```
+You: "This CDC task has source SslMode none and the replication
+     instance is PubliclyAccessible true. Is this production-ready?"
+```
+
+**Expected behavior:**
+
+1. Classifies the source endpoint as NO_TLS — plaintext data pipe between
+   source and target databases.
+2. Flags the replication instance PubliclyAccessible as CONFIG_GAP —
+   internet-reachable credential store.
+3. Aggregates by priority: NO_TLS > CONFIG_GAP, so the verdict is NO_TLS
+   with the instance exposure in FINDINGS.
+4. Emits specific CLI remediation: stop the task, modify endpoint SslMode
+   to verify-full, make the instance private.
+
+**End-to-end scenario:** see
+[`skills/dms-replication-task-auditor/examples/end-to-end.md`](skills/dms-replication-task-auditor/examples/end-to-end.md)
+for a multi-finding audit walkthrough (plaintext endpoint + public instance
++ disabled logging on a production MySQL-to-PostgreSQL migration) covering
+priority aggregation, the metrics-vs-logs trap, and the stop-modify-restart
+remediation workflow.
+
+---
+
+### ssm-managed-instance-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-ssm-managed-instance`
+
+**What it does:** Audits AWS Systems Manager (SSM) managed instances
+across six dimensions — instance coverage (SSM Agent reachable + IAM
+profile attached), association compliance, patch baseline adherence,
+Session Manager vs SSH exposure, inventory collection, and Run Command
+posture. Emits a deterministic verdict
+(UNMANAGED | NONCOMPLIANT | NO_SESSION_MANAGER | CONFIG_GAP | OK) per
+instance with enumerated findings and CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit my SSM managed instances"
+- "why is this instance ConnectionLost"
+- "is Session Manager enabled?"
+- "patch compliance status"
+- "is inventory collection enabled?"
+- "AWS-ApplyPatchBaseline failed"
+- "open SSH instead of Session Manager"
+- "audit hybrid activation instances"
+- "mi- instance coverage"
+- "AmazonSSMManagedInstanceCore"
+
+**Example prompt:**
+
+```
+You: "My EC2 instance i-0abc123 has no IAM profile — describe-instance-information
+     returns nothing. Patch state and Session Manager data are absent. What's
+     the verdict?"
+```
+
+**Expected behavior:**
+
+1. Classifies the instance as UNMANAGED (Rule C-1 — no IAM instance
+   profile, SSM Agent cannot authenticate).
+2. Stops at the coverage finding — does NOT evaluate patch/session/
+   inventory on a non-reporting instance (downstream data is noise).
+3. Provides specific remediation: attach a role with
+   `AmazonSSMManagedInstanceCore`, wait 5-10 min for agent registration,
+   re-audit.
+
+**End-to-end scenario:** see
+[`skills/ssm-managed-instance-auditor/examples/end-to-end.md`](skills/ssm-managed-instance-auditor/examples/end-to-end.md)
+for a four-instance fleet walkthrough (UNMANAGED + NONCOMPLIANT +
+NO_SESSION_MANAGER + OK) covering the silent coverage gap (EC2 with no
+profile, invisible to describe-instance-information), the
+Success-vs-NON_COMPLIANT patch distinction, and the SSH-as-parallel-
+weaker-control framing.
+
+---
+
+### cloudwatch-logs-retention-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-cloudwatch-logs-retention`
+
+**What it does:** Audits CloudWatch Logs log groups for Never-expire
+retention (silent infinite-cost accumulation), missing SSE-KMS
+customer-managed-key (CMK) encryption, retention × volume cost risk,
+subscription filter fan-out (Lambda/Kinesis/cross-account destination),
+missing metric filters, and absent CloudWatch Logs Anomaly Detectors.
+Emits a deterministic first-fail-wins verdict
+(NO_RETENTION | NO_ENCRYPTION | COST_RISK | CONFIG_GAP | OK) per log
+group with enumerated findings and CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this CloudWatch Logs group"
+- "is my log group retention set"
+- "Never expire log group"
+- "check CloudWatch Logs cost"
+- "is CloudWatch Logs encrypted with KMS"
+- "are metric filters configured"
+- "is anomaly detection enabled"
+- "subscription filter audit"
+- "CloudWatch Logs compliance check"
+- "log group cost risk"
+- reviewing a log group before compliance review
+
+**Example prompt:**
+
+```
+You: "This log group has retentionInDays absent, kmsKeyId set, and a
+     Lambda subscription filter with empty pattern. storedBytes is 500 GB.
+     What's the risk and the fix?"
+```
+
+**Expected behavior:**
+
+1. Validates retention field absence (Never expire) — Step 1 fires
+   NO_RETENTION (CRITICAL) via first-fail-wins.
+2. If retention is set, validates CMK presence — Step 2 may fire
+   NO_ENCRYPTION (HIGH).
+3. If both pass, evaluates retention × storedBytes against cost
+   thresholds — Step 3 may fire COST_RISK (HIGH).
+4. If all prior dimensions pass, checks metric filter + anomaly
+   detector coverage — Step 4 may fire CONFIG_GAP (MEDIUM).
+5. Emits VERDICT + REASON + FINDINGS + REMEDIATION with specific CLI
+   per finding (PutRetentionPolicy, AssociateKmsKey with key-policy
+   snippet, PutMetricFilter, PutAnomalyDetector).
+
+**End-to-end scenario:** see
+[`skills/cloudwatch-logs-retention-auditor/examples/end-to-end.md`](skills/cloudwatch-logs-retention-auditor/examples/end-to-end.md)
+for a `/prod/checkout-api` walkthrough (3650-day retention × 512 GB
+with CMK + Lambda subscription filter) covering first-fail-wins
+ordering, the `storedBytes` vs current-storage distinction, the
+Lambda-fan-out cost multiplier, and the legacy-events retention caveat.
+
+---
+
+## /aws:audit-service-quotas-usage
+
+**Slash command:** `/aws:audit-service-quotas-usage` — or route via `/aws:pipeline`.
+
+Audit AWS Service Quotas for utilization risk, alarm coverage, and
+quota-increase-request health. Reads a Service Quotas snapshot (applied
+value, default value, UsageMetric, utilization, increase request history,
+CloudWatch alarm state) and applies ordered classification:
+
+1. **APPROACHING_LIMIT** — utilization >= 80% of applied quota. The
+   operational risk of imminent exhaustion dominates all other findings.
+   A PENDING increase request has NOT taken effect — the applied value
+   is still the old number until APPROVED.
+2. **CONFIG_GAP** — structural issues: no UsageMetric (cannot auto-monitor
+   via CloudWatch), Adjustable: false at high utilization, DENIED increase
+   request with utilization >= 50%, or adjustable quota stuck at default
+   with >= 50% utilization and no increase request.
+3. **NO_ALARM** — quota has UsageMetric, utilization < 80%, but no
+   CloudWatch alarm configured on the AWS/Usage metric.
+4. **OK** — utilization low, alarm in place (or N/A), no structural issues.
+
+Key expert distinctions: `list-service-quotas` returns the APPLIED value
+(not the AWS default — use `get-aws-default-service-quota` for that);
+only quotas with a `UsageMetric` block emit `AWS/Usage` CloudWatch metrics;
+regional quotas (GlobalQuota: false) must be increased per-region; and
+`QuotaCode` (e.g., L-1212C26A) is the stable identifier (not QuotaName).
+
+**Expected behavior:**
+
+1. Classifies utilization >= 80% as APPROACHING_LIMIT regardless of alarm
+   state or pending requests — the applied quota has not changed yet.
+2. Flags quotas without UsageMetric as CONFIG_GAP — there is no CloudWatch
+   metric to alarm on, so the quota cannot be auto-monitored.
+3. Flags DENIED increase requests at >= 50% utilization as CONFIG_GAP — the
+   increase path was blocked and no alternative plan exists.
+4. Emits VERDICT + REASON + UTILIZATION + FINDINGS + REMEDIATION with
+   specific CLI (request-service-quota-increase, put-metric-alarm with
+   exact dimensions from UsageMetric, support case for denied requests).
+
+**End-to-end scenario:** see
+[`skills/service-quotas-usage-auditor/examples/end-to-end.md`](skills/service-quotas-usage-auditor/examples/end-to-end.md)
+for an EC2 On-Demand vCPU walkthrough (85% utilization with denied +
+pending increase requests) covering first-fail-wins ordering, the
+PENDING-vs-applied distinction, Spot-instance redistribution, and
+per-region quota independence.
+
+---
+
+### bedrock-guardrail-coverage-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-bedrock-guardrail-coverage`
+
+**What it does:** Audits Amazon Bedrock Guardrails configurations and model
+coverage across five dimensions — guardrail existence and status (DRAFT =
+zero enforcement, the #1 false sense of security), model/resource coverage
+(guardrails are per-request via `guardrailIdentifier`, not per-model — an
+application omitting the ID bypasses every filter), content filter strength
+(all four core categories: HATE/INSULT/SEXUAL/VIOLENCE, with
+outputStrength being the generative-AI-critical axis), contextual grounding
+threshold (0.0 = silently disabled — functionally identical to no grounding),
+and configuration gaps (empty blocked messaging, DRAFT version in production,
+missing PII policy, missing word filters).
+
+**When to invoke (trigger phrases):**
+
+- "audit this Bedrock guardrail"
+- "are my Bedrock models protected"
+- "check guardrail coverage"
+- "content filter too weak"
+- "grounding threshold too low"
+- "is this guardrail in DRAFT"
+- "which models have guardrails"
+- "Bedrock agent unguarded"
+- "knowledge base guardrail missing"
+- "LLM safety audit"
+
+**Example prompt:**
+
+```
+You: "This guardrail has HIGH on all filters but 3 of 5 agents don't
+     reference it. Is this production-ready?"
+```
+
+**Expected behavior:**
+
+1. Classifies the guardrail status (READY passes Step 1; DRAFT →
+   NO_GUARDRAIL — zero enforcement).
+2. Evaluates model/resource coverage — any resource omitting
+   `guardrailIdentifier` is INCOMPLETE_COVERAGE (unguarded despite the
+   guardrail existing).
+3. Checks all four content categories for `outputStrength: NONE` →
+   WEAK_FILTER (output path unprotected).
+4. Validates grounding threshold — below 0.2 is WEAK_FILTER (effectively
+   disabled despite being configured).
+5. Aggregates by precedence: NO_GUARDRAIL > INCOMPLETE_COVERAGE >
+   WEAK_FILTER > CONFIG_GAP > OK.
+6. Emits VERDICT + RISK + REASON + FINDINGS + REMEDIATION with specific
+   CLI per finding (update-agent, update-guardrail,
+   create-guardrail-version).
+
+**End-to-end scenario:** see
+[`skills/bedrock-guardrail-coverage-auditor/examples/end-to-end.md`](skills/bedrock-guardrail-coverage-auditor/examples/end-to-end.md)
+for a multi-finding audit walkthrough (strong guardrail but 3 of 5 resources
+unguarded) covering the per-request guardrail model, the outputStrength
+asymmetry concept, coverage-percentage reporting, and the
+coverage-remediation workflow.
+
+---
+
+### resiliencehub-app-assessment-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-resiliencehub-app-assessment`
+
+**What it does:** Audits AWS Resilience Hub application assessments across
+seven dimensions — assessment status (Failed/Pending/InProgress = no data =
+CONFIG_GAP, not zero compliance), assessment staleness (>90 days =
+STALE_ASSESSMENT, invalidating all downstream compliance data), app-version
+drift (assessment references an older appVersion than current), resiliency
+policy binding and tier-to-RTO/RPO calibration (MissionCritical with 24h
+RTO = miscalibrated), per-tier RTO/RPO compliance (MissionCritical/Critical
+NonCompliant = HIGH_RISK; score <50 = systemic HIGH_RISK), aggregate
+compliance score (<80 = LOW_COMPLIANCE), and recommendation coverage
+(unimplemented Alarm = CONFIG_GAP; unimplemented SDD/Test = informational).
+The verdict precedence is STALE_ASSESSMENT > HIGH_RISK > LOW_COMPLIANCE >
+CONFIG_GAP > OK, because staleness invalidates every downstream signal and
+a MissionCritical-tier breach is qualitatively worse than the same breach
+on a Standard-tier component.
+
+**When to invoke (trigger phrases):**
+
+- "audit this resilience hub assessment"
+- "is my app assessment stale"
+- "check RTO RPO compliance"
+- "resiliency policy coverage"
+- "assessment freshness check"
+- "app version drift resilience hub"
+- "compliance score too low"
+- "MissionCritical tier non compliant"
+- "resilience hub recommendations"
+- "resiliency policy not attached"
+- "failed assessment no data"
+- "resiliency posture check"
+
+**Inputs:** A Resilience Hub app-assessment snapshot — assessment status,
+endTime, appVersion, complianceScore, compliance map (per-component tier +
+complianceStatus), resiliency policy (tiers with RTO/RPO), and
+recommendation inventory (Alarm/SDD/Test counts + implemented counts). For
+live-account audits: an app-ARN — the skill emits the AWS CLI commands to
+retrieve the full configuration.
+
+**Outputs:** One VERDICT block per app with enumerated FINDINGS (citing the
+step and rule) and CLI remediation per finding. The worst finding
+determines the verdict; additive findings (version drift, alarm gaps,
+policy issues) are retained for context even when a higher-precedence
+verdict applies.
+
+**Key expert knowledge deltas (D1):**
+
+1. `list-app-assessments` returns oldest-first by default —
+   `--reverse-order --max-results 1` is mandatory to get the latest.
+2. A Failed assessment has NO compliance data — classifying it as score 0
+   is a false positive (should be CONFIG_GAP, not HIGH_RISK).
+3. `PolicyCompliant` proves alignment with the policy, NOT actual resilience
+   — a miscalibrated policy (MissionCritical with 7-day RTO) produces a
+   perfect score on a broken yardstick.
+4. appVersion drift is silent — the assessment shows Success but covers a
+   stale published version.
+5. Unimplemented Alarm recommendations are operational gaps (detection
+   blind spots); unimplemented SDD/Test recommendations are improvement
+   opportunities — only the former is verdict-impacting.
+
+**End-to-end scenario:** see
+[`skills/resiliencehub-app-assessment-auditor/examples/end-to-end.md`](skills/resiliencehub-app-assessment-auditor/examples/end-to-end.md)
+for a multi-finding audit walkthrough (stale assessment with good score,
+appVersion drift, and pending alarm recommendations) covering the
+staleness-first precedence, version-drift detection, and the
+re-assessment remediation workflow.
 
 ---
 

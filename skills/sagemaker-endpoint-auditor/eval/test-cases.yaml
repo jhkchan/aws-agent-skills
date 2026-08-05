@@ -1,0 +1,457 @@
+# Eval test cases for sagemaker-endpoint-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Each test case embeds its identifier in the endpoint name so the
+# classification logic can be traced to a specific input. The assertions use
+# CONCEPT tokens (verdict categories, output field names) — never test-case
+# IDs or raw API field names.
+skill: sagemaker-endpoint-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-endpoint-no-vpc
+    description: >-
+      SageMaker real-time endpoint where the Model has no VpcConfig — the
+      InvokeEndpoint API is internet-facing. All other dimensions (KMS, role,
+      monitoring, instance count) are clean, isolating the PUBLIC_ENDPOINT
+      verdict.
+    input: |
+      Endpoint name: public-endpoint-no-vpc
+      Endpoint metadata:
+        EndpointStatus: InService
+        EndpointType: real-time
+
+      Model (describe-model):
+        ModelName: public-endpoint-no-vpc-model
+        ExecutionRoleArn: arn:aws:iam::111111111111:role/sagemaker-scoped-invoke-role
+        EnableNetworkIsolation: false
+        VpcConfig: (absent)
+        PrimaryContainer:
+          Image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1-cpu
+          ModelDataUrl: s3://model-artifacts-111111111111/public-endpoint-no-vpc/model.tar.gz
+
+      EndpointConfig (describe-endpoint-config):
+        EndpointConfigName: public-endpoint-no-vpc-config
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc-encrypted-key
+        EnableInterContainerTrafficEncryption: true
+        ProductionVariants:
+          - InstanceType: ml.m5.xlarge
+            InitialInstanceCount: 2
+        DataCaptureConfig:
+          EnableCapture: true
+          InitialSamplingPercentage: 100
+          DestinationS3Uri: s3://capture-bucket-111111111111/public-endpoint-no-vpc/
+          CaptureOptions:
+            - CaptureMode: Input
+            - CaptureMode: Output
+
+      MonitoringSchedule:
+        MonitoringScheduleName: public-endpoint-no-vpc-dq
+        EndpointName: public-endpoint-no-vpc
+        MonitoringType: DataQuality
+        Status: Scheduled
+
+      Execution role policy (attached to sagemaker-scoped-invoke-role):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["sagemaker:InvokeEndpoint"],
+              "Resource": "arn:aws:sagemaker:us-east-1:111111111111:endpoint/public-endpoint-no-vpc"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject"],
+              "Resource": "arn:aws:s3:::model-artifacts-111111111111/*"
+            }
+          ]
+        }
+
+      Emit the standard VERDICT block (ENDPOINT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_ENDPOINT
+    assertions:
+      must_contain:
+        - "PUBLIC_ENDPOINT"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: no-kms-encryption
+    description: >-
+      SageMaker real-time endpoint with VpcConfig on the Model (not public) but
+      the EndpointConfig has no KmsKeyId and inter-container encryption is
+      disabled on a multi-container inference pipeline — isolating the
+      NO_ENCRYPTION verdict.
+    input: |
+      Endpoint name: no-kms-encryption
+      Endpoint metadata:
+        EndpointStatus: InService
+        EndpointType: real-time
+
+      Model (describe-model):
+        ModelName: no-kms-encryption-model
+        ExecutionRoleArn: arn:aws:iam::111111111111:role/sagemaker-scoped-invoke-role
+        EnableNetworkIsolation: true
+        VpcConfig:
+          Subnets: [subnet-abc123, subnet-def456]
+          SecurityGroupIds: [sg-locked-down-001]
+        Containers:
+          - Image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/sklearn-inference:1.3-cpu
+            ModelDataUrl: s3://model-artifacts-111111111111/no-kms-encryption/preprocess.tar.gz
+          - Image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/xgboost-inference:1.7-cpu
+            ModelDataUrl: s3://model-artifacts-111111111111/no-kms-encryption/model.tar.gz
+
+      EndpointConfig (describe-endpoint-config):
+        EndpointConfigName: no-kms-encryption-config
+        KmsKeyId: (absent)
+        EnableInterContainerTrafficEncryption: false
+        ProductionVariants:
+          - InstanceType: ml.c5.xlarge
+            InitialInstanceCount: 2
+        DataCaptureConfig:
+          EnableCapture: true
+          InitialSamplingPercentage: 50
+          DestinationS3Uri: s3://capture-bucket-111111111111/no-kms-encryption/
+
+      MonitoringSchedule:
+        MonitoringScheduleName: no-kms-encryption-dq
+        EndpointName: no-kms-encryption
+        MonitoringType: DataQuality
+        Status: Scheduled
+
+      Execution role policy (attached to sagemaker-scoped-invoke-role):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["sagemaker:InvokeEndpoint"],
+              "Resource": "arn:aws:sagemaker:us-east-1:111111111111:endpoint/no-kms-encryption"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject"],
+              "Resource": "arn:aws:s3:::model-artifacts-111111111111/*"
+            }
+          ]
+        }
+
+      Emit the standard VERDICT block (ENDPOINT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ENDPOINT"
+
+  - id: overpermissive-execution-role
+    description: >-
+      SageMaker real-time endpoint with VpcConfig and KMS encryption in place,
+      but the Model execution role grants Action "*" on Resource "*" — admin
+      blast radius. Isolating the OVERPERMISSIVE_ROLE verdict.
+    input: |
+      Endpoint name: overpermissive-execution-role
+      Endpoint metadata:
+        EndpointStatus: InService
+        EndpointType: real-time
+
+      Model (describe-model):
+        ModelName: overpermissive-execution-role-model
+        ExecutionRoleArn: arn:aws:iam::111111111111:role/sagemaker-admin-role
+        EnableNetworkIsolation: true
+        VpcConfig:
+          Subnets: [subnet-abc123, subnet-def456]
+          SecurityGroupIds: [sg-locked-down-001]
+        PrimaryContainer:
+          Image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1-cpu
+          ModelDataUrl: s3://model-artifacts-111111111111/overpermissive-execution-role/model.tar.gz
+
+      EndpointConfig (describe-endpoint-config):
+        EndpointConfigName: overpermissive-execution-role-config
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/sec-key-999
+        EnableInterContainerTrafficEncryption: true
+        ProductionVariants:
+          - InstanceType: ml.m5.xlarge
+            InitialInstanceCount: 2
+        DataCaptureConfig:
+          EnableCapture: true
+          InitialSamplingPercentage: 100
+          DestinationS3Uri: s3://capture-bucket-111111111111/overpermissive-execution-role/
+
+      MonitoringSchedule:
+        MonitoringScheduleName: overpermissive-execution-role-dq
+        EndpointName: overpermissive-execution-role
+        MonitoringType: DataQuality
+        Status: Scheduled
+
+      Execution role policy (attached to sagemaker-admin-role):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "*",
+              "Resource": "*"
+            }
+          ]
+        }
+
+      Emit the standard VERDICT block (ENDPOINT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE_ROLE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE_ROLE"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ENDPOINT"
+
+  - id: no-monitoring-no-capture
+    description: >-
+      SageMaker real-time endpoint with VpcConfig, KMS encryption, and a scoped
+      execution role — but no DataCaptureConfig and no MonitoringSchedule.
+      Isolating the NO_MONITORING verdict.
+    input: |
+      Endpoint name: no-monitoring-no-capture
+      Endpoint metadata:
+        EndpointStatus: InService
+        EndpointType: real-time
+
+      Model (describe-model):
+        ModelName: no-monitoring-no-capture-model
+        ExecutionRoleArn: arn:aws:iam::111111111111:role/sagemaker-scoped-invoke-role
+        EnableNetworkIsolation: true
+        VpcConfig:
+          Subnets: [subnet-abc123, subnet-def456]
+          SecurityGroupIds: [sg-locked-down-001]
+        PrimaryContainer:
+          Image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1-cpu
+          ModelDataUrl: s3://model-artifacts-111111111111/no-monitoring-no-capture/model.tar.gz
+
+      EndpointConfig (describe-endpoint-config):
+        EndpointConfigName: no-monitoring-no-capture-config
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/mon-key-555
+        EnableInterContainerTrafficEncryption: true
+        ProductionVariants:
+          - InstanceType: ml.m5.xlarge
+            InitialInstanceCount: 2
+        DataCaptureConfig: (absent)
+
+      MonitoringSchedule: (none — aws sagemaker list-monitoring-schedules returns empty for this endpoint)
+
+      Execution role policy (attached to sagemaker-scoped-invoke-role):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["sagemaker:InvokeEndpoint"],
+              "Resource": "arn:aws:sagemaker:us-east-1:111111111111:endpoint/no-monitoring-no-capture"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject"],
+              "Resource": "arn:aws:s3:::model-artifacts-111111111111/*"
+            }
+          ]
+        }
+
+      Emit the standard VERDICT block (ENDPOINT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_MONITORING
+    assertions:
+      must_contain:
+        - "NO_MONITORING"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ENDPOINT"
+
+  - id: config-gap-single-instance
+    description: >-
+      SageMaker real-time endpoint with VpcConfig, KMS, scoped role, data
+      capture and monitoring — but only a single instance (no high
+      availability). Isolating the CONFIG_GAP verdict.
+    input: |
+      Endpoint name: config-gap-single-instance
+      Endpoint metadata:
+        EndpointStatus: InService
+        EndpointType: real-time
+
+      Model (describe-model):
+        ModelName: config-gap-single-instance-model
+        ExecutionRoleArn: arn:aws:iam::111111111111:role/sagemaker-scoped-invoke-role
+        EnableNetworkIsolation: true
+        VpcConfig:
+          Subnets: [subnet-abc123, subnet-def456]
+          SecurityGroupIds: [sg-locked-down-001]
+        PrimaryContainer:
+          Image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1-cpu
+          ModelDataUrl: s3://model-artifacts-111111111111/config-gap-single-instance/model.tar.gz
+
+      EndpointConfig (describe-endpoint-config):
+        EndpointConfigName: config-gap-single-instance-config
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/ha-key-777
+        EnableInterContainerTrafficEncryption: true
+        ProductionVariants:
+          - InstanceType: ml.m5.xlarge
+            InitialInstanceCount: 1
+        DataCaptureConfig:
+          EnableCapture: true
+          InitialSamplingPercentage: 100
+          DestinationS3Uri: s3://capture-bucket-111111111111/config-gap-single-instance/
+          CaptureOptions:
+            - CaptureMode: Input
+            - CaptureMode: Output
+
+      MonitoringSchedule:
+        MonitoringScheduleName: config-gap-single-instance-dq
+        EndpointName: config-gap-single-instance
+        MonitoringType: DataQuality
+        Status: Scheduled
+
+      Execution role policy (attached to sagemaker-scoped-invoke-role):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["sagemaker:InvokeEndpoint"],
+              "Resource": "arn:aws:sagemaker:us-east-1:111111111111:endpoint/config-gap-single-instance"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject"],
+              "Resource": "arn:aws:s3:::model-artifacts-111111111111/*"
+            }
+          ]
+        }
+
+      Emit the standard VERDICT block (ENDPOINT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_ENDPOINT"
+
+  - id: ok-hardened-endpoint
+    description: >-
+      Fully hardened SageMaker real-time endpoint — VpcConfig with restrictive
+      security groups, KMS encryption, inter-container encryption enabled,
+      scoped execution role, data capture at 100% sampling, active monitoring
+      schedule, and multi-instance HA. Isolating the OK verdict.
+    input: |
+      Endpoint name: ok-hardened-endpoint
+      Endpoint metadata:
+        EndpointStatus: InService
+        EndpointType: real-time
+
+      Model (describe-model):
+        ModelName: ok-hardened-endpoint-model
+        ExecutionRoleArn: arn:aws:iam::111111111111:role/sagemaker-scoped-invoke-role
+        EnableNetworkIsolation: true
+        VpcConfig:
+          Subnets: [subnet-abc123, subnet-def456]
+          SecurityGroupIds: [sg-locked-down-001]
+        PrimaryContainer:
+          Image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1-cpu
+          ModelDataUrl: s3://model-artifacts-111111111111/ok-hardened-endpoint/model.tar.gz
+
+      EndpointConfig (describe-endpoint-config):
+        EndpointConfigName: ok-hardened-endpoint-config
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/hardened-key-ok
+        EnableInterContainerTrafficEncryption: true
+        ProductionVariants:
+          - InstanceType: ml.m5.xlarge
+            InitialInstanceCount: 2
+        DataCaptureConfig:
+          EnableCapture: true
+          InitialSamplingPercentage: 100
+          DestinationS3Uri: s3://capture-bucket-111111111111/ok-hardened-endpoint/
+          CaptureOptions:
+            - CaptureMode: Input
+            - CaptureMode: Output
+
+      MonitoringSchedule:
+        MonitoringScheduleName: ok-hardened-endpoint-dq
+        EndpointName: ok-hardened-endpoint
+        MonitoringType: DataQuality
+        Status: Scheduled
+
+      Execution role policy (attached to sagemaker-scoped-invoke-role):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["sagemaker:InvokeEndpoint"],
+              "Resource": "arn:aws:sagemaker:us-east-1:111111111111:endpoint/ok-hardened-endpoint"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject"],
+              "Resource": "arn:aws:s3:::model-artifacts-111111111111/*"
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["kms:Decrypt"],
+              "Resource": "arn:aws:kms:us-east-1:111111111111:key/hardened-key-ok"
+            }
+          ]
+        }
+
+      Emit the standard VERDICT block (ENDPOINT, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PUBLIC_ENDPOINT"
+        - "VERDICT: NO_ENCRYPTION"

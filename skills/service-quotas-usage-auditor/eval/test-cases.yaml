@@ -1,0 +1,287 @@
+# Eval test cases for service-quotas-usage-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: service-quotas-usage-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: approaching-limit-eighty-pct
+    description: >-
+      VPCs per Region at exactly 80% utilization (40/50) with a CloudWatch
+      alarm already configured at 80%. Tests the threshold boundary —
+      utilization >= 80% is APPROACHING_LIMIT regardless of alarm coverage.
+    input: |
+      Audit the following Service Quotas snapshot. Emit the standard
+      VERDICT block (QUOTA, SERVICE, VERDICT, REASON, UTILIZATION,
+      FINDINGS, REMEDIATION).
+
+      Audit tag: approaching-limit-eighty-pct
+      Service code: vpc
+      Quota code: L-F678F1CE
+      Quota name: VPCs per Region [approaching-limit-eighty-pct]
+      Applied quota value: 50
+      AWS default quota value: 50
+      Unit: Count
+      Adjustable: true
+      GlobalQuota: false
+      UsageMetric:
+        MetricNamespace: AWS/Usage
+        MetricName: ResourceCount
+        Dimensions:
+          - {Name: Service, Value: EC2}
+          - {Name: Resource, Value: vCPU}
+          - {Name: Type, Value: Resource}
+        StatisticType: Sum
+      Current utilization: 40 (applied quota: 50, utilization rate: exactly 80%)
+      CloudWatch alarm configured: true (threshold: 80%, SNS topic: quota-alerts)
+      Quota increase request history: (none)
+    expected_verdict: APPROACHING_LIMIT
+    assertions:
+      must_contain:
+        - "APPROACHING_LIMIT"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "80"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ALARM"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: trackable-missing-alarm
+    description: >-
+      Lambda concurrent executions at 40% utilization (400/1000) with a
+      UsageMetric defined but NO CloudWatch alarm configured. Utilization is
+      below 80% and below the 50% CONFIG_GAP threshold, but the quota is
+      trackable and has no alerting — NO_ALARM.
+    input: |
+      Audit the following Service Quotas snapshot. Emit the standard
+      VERDICT block (QUOTA, SERVICE, VERDICT, REASON, UTILIZATION,
+      FINDINGS, REMEDIATION).
+
+      Audit tag: trackable-missing-alarm
+      Service code: lambda
+      Quota code: L-B99A9384
+      Quota name: Concurrent executions [trackable-missing-alarm]
+      Applied quota value: 1000
+      AWS default quota value: 1000
+      Unit: Count
+      Adjustable: true
+      GlobalQuota: false
+      UsageMetric:
+        MetricNamespace: AWS/Usage
+        MetricName: ResourceCount
+        Dimensions:
+          - {Name: Service, Value: Lambda}
+          - {Name: Resource, Value: Function}
+          - {Name: Type, Value: Resource}
+        StatisticType: Maximum
+      Current utilization: 400
+      CloudWatch alarm configured: false
+      Quota increase request history: (none)
+    expected_verdict: NO_ALARM
+    assertions:
+      must_contain:
+        - "NO_ALARM"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "alarm"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: APPROACHING_LIMIT"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-metric-cannot-track
+    description: >-
+      IAM Roles per account with NO UsageMetric defined. Utilization is low
+      (200/1000, 20%) but the quota cannot be auto-monitored via CloudWatch
+      — there is no AWS/Usage metric to alarm on. This is a structural
+      CONFIG_GAP regardless of utilization.
+    input: |
+      Audit the following Service Quotas snapshot. Emit the standard
+      VERDICT block (QUOTA, SERVICE, VERDICT, REASON, UTILIZATION,
+      FINDINGS, REMEDIATION).
+
+      Audit tag: no-metric-cannot-track
+      Service code: iam
+      Quota code: L-FE9D6E3A
+      Quota name: Roles per account [no-metric-cannot-track]
+      Applied quota value: 1000
+      AWS default quota value: 1000
+      Unit: Count
+      Adjustable: false
+      GlobalQuota: true
+      UsageMetric: (none — this quota does not emit an AWS/Usage metric)
+      Current utilization: 200
+      CloudWatch alarm configured: false
+      Quota increase request history: (none)
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "monitor"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: APPROACHING_LIMIT"
+        - "VERDICT: NO_ALARM"
+
+  - id: healthy-monitored-ok
+    description: >-
+      S3 buckets per account at 2.5% utilization (50/2000). The applied
+      quota (2000) is above the AWS default (1000) — an increase was
+      previously APPROVED, showing active capacity management. A CloudWatch
+      alarm is configured at 80%. Clean posture across all dimensions — OK.
+    input: |
+      Audit the following Service Quotas snapshot. Emit the standard
+      VERDICT block (QUOTA, SERVICE, VERDICT, REASON, UTILIZATION,
+      FINDINGS, REMEDIATION).
+
+      Audit tag: healthy-monitored-ok
+      Service code: s3
+      Quota code: L-DC2B2D4D
+      Quota name: Buckets per account [healthy-monitored-ok]
+      Applied quota value: 2000
+      AWS default quota value: 1000
+      Unit: Count
+      Adjustable: true
+      GlobalQuota: true
+      UsageMetric:
+        MetricNamespace: AWS/Usage
+        MetricName: ResourceCount
+        Dimensions:
+          - {Name: Service, Value: S3}
+          - {Name: Resource, Value: Bucket}
+          - {Name: Type, Value: Resource}
+        StatisticType: Average
+      Current utilization: 50
+      CloudWatch alarm configured: true (threshold: 80%, SNS topic: quota-alerts)
+      Quota increase request history:
+        - Status: APPROVED, RequestedValue: 2000, Created: 2025-01-10, Applied: 2025-01-12
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: APPROACHING_LIMIT"
+        - "VERDICT: NO_ALARM"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: denied-increase-config-gap
+    description: >-
+      EC2 On-Demand Standard vCPUs at 60% utilization (600/1000). A CloudWatch
+      alarm IS configured, but a prior quota increase request to 2000 vCPUs was
+      DENIED. The quota is at default, adjustable, utilization >= 50%, and the
+      increase path was blocked — CONFIG_GAP (denied increase, Step 2c).
+    input: |
+      Audit the following Service Quotas snapshot. Emit the standard
+      VERDICT block (QUOTA, SERVICE, VERDICT, REASON, UTILIZATION,
+      FINDINGS, REMEDIATION).
+
+      Audit tag: denied-increase-config-gap
+      Service code: ec2
+      Quota code: L-1212C26A
+      Quota name: Running On-Demand Standard instances [denied-increase-config-gap]
+      Applied quota value: 1000
+      AWS default quota value: 1000
+      Unit: vCPUs
+      Adjustable: true
+      GlobalQuota: false
+      UsageMetric:
+        MetricNamespace: AWS/Usage
+        MetricName: ResourceCount
+        Dimensions:
+          - {Name: Service, Value: EC2}
+          - {Name: Resource, Value: vCPU}
+          - {Name: Type, Value: Resource}
+          - {Name: Class, Value: Standard/OnDemand}
+        StatisticType: Sum
+      Current utilization: 600
+      CloudWatch alarm configured: true (threshold: 80%, SNS topic: quota-alerts)
+      Quota increase request history:
+        - Status: DENIED, RequestedValue: 2000, Created: 2025-06-15
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DENIED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: APPROACHING_LIMIT"
+        - "VERDICT: NO_ALARM"
+
+  - id: pending-increase-still-high
+    description: >-
+      EC2 On-Demand Standard vCPUs at 85% utilization (850/1000). A quota
+      increase request to 2000 vCPUs is PENDING but has not taken effect —
+      the applied quota is still 1000. Utilization >= 80% takes precedence
+      over the pending request — APPROACHING_LIMIT (Step 1).
+    input: |
+      Audit the following Service Quotas snapshot. Emit the standard
+      VERDICT block (QUOTA, SERVICE, VERDICT, REASON, UTILIZATION,
+      FINDINGS, REMEDIATION).
+
+      Audit tag: pending-increase-still-high
+      Service code: ec2
+      Quota code: L-1212C26A
+      Quota name: Running On-Demand Standard instances [pending-increase-still-high]
+      Applied quota value: 1000
+      AWS default quota value: 1000
+      Unit: vCPUs
+      Adjustable: true
+      GlobalQuota: false
+      UsageMetric:
+        MetricNamespace: AWS/Usage
+        MetricName: ResourceCount
+        Dimensions:
+          - {Name: Service, Value: EC2}
+          - {Name: Resource, Value: vCPU}
+          - {Name: Type, Value: Resource}
+          - {Name: Class, Value: Standard/OnDemand}
+        StatisticType: Sum
+      Current utilization: 850
+      CloudWatch alarm configured: true (threshold: 80%, SNS topic: quota-alerts)
+      Quota increase request history:
+        - Status: PENDING, RequestedValue: 2000, Created: 2026-07-28
+    expected_verdict: APPROACHING_LIMIT
+    assertions:
+      must_contain:
+        - "APPROACHING_LIMIT"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "PENDING"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ALARM"
+        - "VERDICT: CONFIG_GAP"

@@ -1,0 +1,261 @@
+# Eval test cases for cloudwatch-alarm-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-alarm-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-action-static-threshold
+    description: >-
+      Metric alarm with a valid static threshold and correct evaluation
+      parameters, but AlarmActions, OKActions, and InsufficientDataActions are
+      all empty — the alarm fires into the void.
+    input: |
+      Alarm name: no-action-static-threshold
+      Alarm type: MetricAlarm
+      State: OK
+
+      Configuration:
+        Namespace: AWS/EC2
+        MetricName: CPUUtilization
+        Dimensions: [{Name: InstanceId, Value: i-0123456789abcdef0}]
+        Statistic: Average
+        Period: 300
+        EvaluationPeriods: 3
+        DatapointsToAlarm: 2
+        ComparisonOperator: GreaterThanThreshold
+        Threshold: 80
+        TreatMissingData: notBreaching
+        ActionsEnabled: true
+        AlarmActions: []
+        OKActions: []
+        InsufficientDataActions: []
+
+      Emit the standard VERDICT block (ALARM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ACTION
+    assertions:
+      must_contain:
+        - "NO_ACTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "ALARM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: missing-data-default-treatmissing
+    description: >-
+      Metric alarm on a custom error-count metric that goes missing when no
+      errors occur. TreatMissingData is not set (defaults to "missing") and
+      InsufficientDataActions is empty — a silent blind spot when the metric
+      stops reporting.
+    input: |
+      Alarm name: missing-data-default-treatmissing
+      Alarm type: MetricAlarm
+      State: OK
+
+      Configuration:
+        Namespace: App/CheckoutService
+        MetricName: ErrorCount
+        Dimensions: [{Name: Environment, Value: prod}]
+        Statistic: Sum
+        Period: 60
+        EvaluationPeriods: 5
+        DatapointsToAlarm: 1
+        ComparisonOperator: GreaterThanThreshold
+        Threshold: 10
+        TreatMissingData: (not set — defaults to missing)
+        ActionsEnabled: true
+        AlarmActions: [arn:aws:sns:us-east-1:111111111111:on-call-critical]
+        OKActions: []
+        InsufficientDataActions: []
+
+      Emit the standard VERDICT block (ALARM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INSUFFICIENT_DATA
+    assertions:
+      must_contain:
+        - "INSUFFICIENT_DATA"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ACTION"
+
+  - id: static-threshold-variable-traffic
+    description: >-
+      Metric alarm using a static floor threshold on a high-variance traffic
+      metric (API request count). The metric varies by time of day, so a fixed
+      threshold triggers false alarms during off-peak hours or misses anomalies
+      during peak hours. AnomalyDetection would adapt to the normal pattern.
+    input: |
+      Alarm name: static-threshold-variable-traffic
+      Alarm type: MetricAlarm
+      State: OK
+
+      Configuration:
+        Namespace: AWS/ApiGateway
+        MetricName: Count
+        Dimensions: [{Name: ApiName, Value: prod-checkout-api}]
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        DatapointsToAlarm: 1
+        ComparisonOperator: LessThanThreshold
+        Threshold: 100
+        TreatMissingData: breaching
+        ActionsEnabled: true
+        AlarmActions: [arn:aws:sns:us-east-1:111111111111:traffic-alerts]
+        OKActions: []
+        InsufficientDataActions: [arn:aws:sns:us-east-1:111111111111:monitoring-alerts]
+
+      Emit the standard VERDICT block (ALARM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ANOMALY
+    assertions:
+      must_contain:
+        - "NO_ANOMALY"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: composite-alarm-no-actions
+    description: >-
+      Composite alarm aggregating two child alarms via a Rule expression. The
+      composite alarm has no AlarmActions of its own — it relies entirely on
+      child alarm actions, which is a common anti-pattern.
+    input: |
+      Alarm name: composite-alarm-no-actions
+      Alarm type: CompositeAlarm
+      State: OK
+
+      Configuration:
+        Rule: ALARM(high-cpu-prod) OR ALARM(high-memory-prod)
+        ActionsEnabled: true
+        AlarmActions: []
+        OKActions: []
+        InsufficientDataActions: []
+
+      Child alarms referenced:
+        - high-cpu-prod (exists, has AlarmActions configured)
+        - high-memory-prod (exists, has AlarmActions configured)
+
+      Emit the standard VERDICT block (ALARM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ACTION
+    assertions:
+      must_contain:
+        - "NO_ACTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: well-configured-anomaly-ok
+    description: >-
+      Metric alarm using AnomalyDetection with stdev 2, proper SNS action in
+      AlarmActions, TreatMissingData set to breaching, valid evaluation
+      parameters — clean posture across all dimensions.
+    input: |
+      Alarm name: well-configured-anomaly-ok
+      Alarm type: MetricAlarm
+      State: OK
+
+      Configuration:
+        Metrics:
+          - Id: e1
+            Expression: ANOMALY_DETECTION_BAND(m1, 2)
+            Label: Latency anomaly band (stdev=2)
+          - Id: m1
+            MetricStat:
+              Metric:
+                Namespace: AWS/ApplicationELB
+                MetricName: TargetResponseTime
+                Dimensions: [{Name: LoadBalancer, Value: app/prod-alb/1234567890}]
+              Period: 300
+              Stat: Average
+            ReturnData: true
+        EvaluationPeriods: 3
+        DatapointsToAlarm: 2
+        ComparisonOperator: GreaterThanUpperThreshold
+        Threshold: 0
+        TreatMissingData: breaching
+        ActionsEnabled: true
+        AlarmActions: [arn:aws:sns:us-east-1:111111111111:latency-anomaly-alerts]
+        OKActions: [arn:aws:sns:us-east-1:111111111111:latency-anomaly-cleared]
+        InsufficientDataActions: [arn:aws:sns:us-east-1:111111111111:monitoring-alerts]
+
+      Emit the standard VERDICT block (ALARM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ACTION"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: datapoints-exceeds-evaluation
+    description: >-
+      Metric alarm where DatapointsToAlarm (5) exceeds EvaluationPeriods (3) —
+      the alarm condition can never be satisfied because it is impossible to
+      have 5 breaching datapoints within 3 evaluation periods.
+    input: |
+      Alarm name: datapoints-exceeds-evaluation
+      Alarm type: MetricAlarm
+      State: OK
+
+      Configuration:
+        Namespace: AWS/RDS
+        MetricName: CPUUtilization
+        Dimensions: [{Name: DBInstanceIdentifier, Value: prod-db-001}]
+        Statistic: Average
+        Period: 300
+        EvaluationPeriods: 3
+        DatapointsToAlarm: 5
+        ComparisonOperator: GreaterThanThreshold
+        Threshold: 90
+        TreatMissingData: breaching
+        ActionsEnabled: true
+        AlarmActions: [arn:aws:sns:us-east-1:111111111111:database-critical]
+        OKActions: []
+        InsufficientDataActions: [arn:aws:sns:us-east-1:111111111111:monitoring-alerts]
+
+      Emit the standard VERDICT block (ALARM, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_ACTION"

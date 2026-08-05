@@ -1,0 +1,48 @@
+# Eval configuration for bedrock-model-access-inventory.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: bedrock-model-access-inventory
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-invocation-logging
+    difficulty: medium
+    prompt_file: prompts/no-invocation-logging.md
+    baseline_file: baselines/no-invocation-logging.md
+    expected_verdict: NO_LOGGING
+  - id: no-kms-customer-key
+    difficulty: medium
+    prompt_file: prompts/no-kms-customer-key.md
+    baseline_file: baselines/no-kms-customer-key.md
+    expected_verdict: NO_ENCRYPTION
+  - id: anthropic-claude-apac-geoblock
+    difficulty: hard
+    prompt_file: prompts/anthropic-claude-apac-geoblock.md
+    baseline_file: baselines/anthropic-claude-apac-geoblock.md
+    expected_verdict: GEO_BLOCK_RISK
+  - id: single-destination-logging
+    difficulty: medium
+    prompt_file: prompts/single-destination-logging.md
+    baseline_file: baselines/single-destination-logging.md
+    expected_verdict: CONFIG_GAP
+  - id: provisioned-throughput-expired
+    difficulty: hard
+    prompt_file: prompts/provisioned-throughput-expired.md
+    baseline_file: baselines/provisioned-throughput-expired.md
+    expected_verdict: CONFIG_GAP
+  - id: fully-configured-healthy
+    difficulty: easy
+    prompt_file: prompts/fully-configured-healthy.md
+    baseline_file: baselines/fully-configured-healthy.md
+    expected_verdict: OK

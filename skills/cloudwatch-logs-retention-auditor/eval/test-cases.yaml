@@ -1,0 +1,218 @@
+# Eval test cases for cloudwatch-logs-retention-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Each case embeds its test-case identifier in the log-group name and
+# exercises a single first-fail-wins dimension of the verdict matrix.
+# The SKILL.md classification logic MUST match these expected verdicts.
+skill: cloudwatch-logs-retention-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-retention-never-expire
+    description: >-
+      CloudWatch Logs log group with retentionInDays absent (Never expire),
+      KMS CMK associated, and a metric filter present. First-fail-wins
+      terminates at Step 1 regardless of downstream dimensions.
+    input: |
+      Log group name: /aws/lambda/no-retention-never-expire
+      Log group ARN: arn:aws:logs:us-east-1:111111111111:log-group:/aws/lambda/no-retention-never-expire:*
+      describe-log-groups output (excerpt):
+        logGroupName: /aws/lambda/no-retention-never-expire
+        creationTime: 1700000000000
+        retentionInDays: (field absent)
+        kmsKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-123
+        storedBytes: 524288000
+      Metric filters: 1 (filterName: ErrorCount, filterPattern: "ERROR")
+      Subscription filters: 0
+      Anomaly detectors: 0
+      Emit the standard VERDICT block (LOG_GROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_RETENTION
+    assertions:
+      must_contain:
+        - "NO_RETENTION"
+        - "no-retention-never-expire"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: COST_RISK"
+        - "VERDICT: OK"
+
+  - id: no-retention-trumps-encryption
+    description: >-
+      Never-expire log group that ALSO has no kmsKeyId. Confirms first-
+      fail-wins: the verdict must be NO_RETENTION even though the
+      encryption dimension would also fail.
+    input: |
+      Log group name: /aws/ecs/no-retention-trumps-encryption
+      Log group ARN: arn:aws:logs:us-east-1:111111111111:log-group:/aws/ecs/no-retention-trumps-encryption:*
+      describe-log-groups output (excerpt):
+        logGroupName: /aws/ecs/no-retention-trumps-encryption
+        creationTime: 1690000000000
+        retentionInDays: (field absent)
+        kmsKeyId: (field absent)
+        storedBytes: 52428800
+      Metric filters: 0
+      Subscription filters: 0
+      Anomaly detectors: 0
+      Emit the standard VERDICT block (LOG_GROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_RETENTION
+    assertions:
+      must_contain:
+        - "NO_RETENTION"
+        - "no-retention-trumps-encryption"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: OK"
+
+  - id: retention-set-no-kms-cmk
+    description: >-
+      Log group with a sane 90-day retention and a metric filter, but no
+      kmsKeyId. First-fail-wins terminates at Step 2 with NO_ENCRYPTION.
+    input: |
+      Log group name: /app/retention-set-no-kms-cmk
+      Log group ARN: arn:aws:logs:us-east-1:111111111111:log-group:/app/retention-set-no-kms-cmk:*
+      describe-log-groups output (excerpt):
+        logGroupName: /app/retention-set-no-kms-cmk
+        creationTime: 1710000000000
+        retentionInDays: 90
+        kmsKeyId: (field absent)
+        storedBytes: 1073741824
+      Metric filters: 1 (filterName: ApiErrors, filterPattern: "ERROR")
+      Subscription filters: 0
+      Anomaly detectors: 0
+      Emit the standard VERDICT block (LOG_GROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "retention-set-no-kms-cmk"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_RETENTION"
+        - "VERDICT: COST_RISK"
+        - "VERDICT: OK"
+
+  - id: long-retention-cost-risk
+    description: >-
+      Log group with a CMK associated and a metric filter, but
+      retentionInDays=3650 (10-year cap minus a leap-corrected day) on a
+      group with storedBytes over 100 GB. Retention x volume triggers
+      COST_RISK at Step 3.
+    input: |
+      Log group name: /prod/long-retention-cost-risk
+      Log group ARN: arn:aws:logs:us-east-1:111111111111:log-group:/prod/long-retention-cost-risk:*
+      describe-log-groups output (excerpt):
+        logGroupName: /prod/long-retention-cost-risk
+        creationTime: 1600000000000
+        retentionInDays: 3650
+        kmsKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-456
+        storedBytes: 268435456000
+      Metric filters: 1 (filterName: WarnCount, filterPattern: "WARN")
+      Subscription filters: 0
+      Anomaly detectors: 0
+      Emit the standard VERDICT block (LOG_GROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: COST_RISK
+    assertions:
+      must_contain:
+        - "COST_RISK"
+        - "long-retention-cost-risk"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_RETENTION"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: OK"
+
+  - id: missing-anomaly-detector-config-gap
+    description: >-
+      Log group with sane retention, CMK associated, low storedBytes, and
+      a metric filter present — but no CloudWatch Logs Anomaly Detector.
+      First-fail-wins terminates at Step 4 with CONFIG_GAP.
+    input: |
+      Log group name: /svc/missing-anomaly-detector-config-gap
+      Log group ARN: arn:aws:logs:us-east-1:111111111111:log-group:/svc/missing-anomaly-detector-config-gap:*
+      describe-log-groups output (excerpt):
+        logGroupName: /svc/missing-anomaly-detector-config-gap
+        creationTime: 1715000000000
+        retentionInDays: 90
+        kmsKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-789
+        storedBytes: 2147483648
+      Metric filters: 1 (filterName: ErrorCount, filterPattern: "ERROR")
+      Subscription filters: 0
+      Anomaly detectors: 0
+      Emit the standard VERDICT block (LOG_GROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "missing-anomaly-detector-config-gap"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_RETENTION"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: COST_RISK"
+        - "VERDICT: OK"
+
+  - id: fully-secured-ok
+    description: >-
+      Log group with all dimensions passing: 90-day retention, in-region
+      CMK, low storedBytes, a metric filter for errors, and a CloudWatch
+      Logs Anomaly Detector in ACTIVE status. Verdict is OK.
+    input: |
+      Log group name: /prod/fully-secured-ok
+      Log group ARN: arn:aws:logs:us-east-1:111111111111:log-group:/prod/fully-secured-ok:*
+      describe-log-groups output (excerpt):
+        logGroupName: /prod/fully-secured-ok
+        creationTime: 1700000000000
+        retentionInDays: 90
+        kmsKeyId: arn:aws:kms:us-east-1:111111111111:key/cmk-aaa
+        storedBytes: 524288000
+      Metric filters: 1 (filterName: ErrorCount, filterPattern: "ERROR")
+      Subscription filters: 0
+      Anomaly detectors: 1 (detectorName: prod-anomaly, status: ACTIVE, evalFrequency: ONE_MIN)
+      Emit the standard VERDICT block (LOG_GROUP, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "fully-secured-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_RETENTION"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: COST_RISK"
+        - "VERDICT: CONFIG_GAP"

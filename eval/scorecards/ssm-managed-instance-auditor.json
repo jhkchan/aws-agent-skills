@@ -1,0 +1,70 @@
+{
+  "skill": "ssm-managed-instance-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many concrete, expert\u2011level thresholds (e.g., LastPingDateTime > 1\u202fhour = UNMANAGED, CRITICAL missing patches = NONCOMPLIANT, specific IAM policy names, required VPC endpoints) that a generic model would not know. However it omits some nuanced guidance such as exact patch\u2011severity handling for HIGH on internal vs external instances and does not spell out regional default baseline precedence, leaving a small knowledge gap."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific audit mindset (worst\u2011finding precedence, pre\u2011flight IAM/VPC checks, ordered dimension evaluation) and detailed remediation CLI steps. A few procedures are phrased generically (e.g., \"check security groups\") rather than naming exact AWS CLI filters, which prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never treat Success association as patch proof, never classify UNMANAGED solely from missing API data). Missing a couple of common pitfalls such as ignoring SSM rate\u2011limit errors and over\u2011relying on default security\u2011group rules, so one point is deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, metadata, activation triggers, invocation schema). Description clearly states WHAT the skill does, WHEN to invoke, and provides reliable activation triggers."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Layers information: one\u2011line takeaway, quick matrix, pre\u2011flight, ordered steps, edge\u2011case handling, anti\u2011patterns, safety checks, remediation, deep reference. However, the early quick\u2011reference matrix and extensive deep reference may overload a first read, causing some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom precisely: destructive actions require explicit CONFIRM prompts, single\u2011instance targeting, rate\u2011control guidance, and clear separation between audit (read\u2011only) and remediation (state\u2011changing). No over\u2011 or under\u2011constraining observed."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Aggregation \u2192 Output \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation \u2192 Deep reference) that aligns with the reference skill architecture."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a deterministic output format, decision tree, concrete remediation CLI snippets, handling of malformed input, and worked examples that an agent can execute. Slight gap: no ready\u2011to\u2011run script for pagination loops, requiring the agent to synthesize that logic."
+    }
+  ],
+  "total_score": 113,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 46060,
+  "latency_ms": 30717,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

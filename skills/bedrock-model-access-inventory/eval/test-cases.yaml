@@ -1,0 +1,304 @@
+# Eval test cases for bedrock-model-access-inventory
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: bedrock-model-access-inventory
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-invocation-logging
+    description: >-
+      Bedrock account with multiple models enabled (Claude, Nova, Titan) but
+      no invocation logging destinations configured at all and no
+      customer-managed KMS key — zero forensic audit trail.
+    input: |
+      Audit the following Bedrock Model Access inventory for security and
+      compliance posture. Emit the standard VERDICT block (INVENTORY, VERDICT,
+      REASON, FINDINGS, REMEDIATION).
+
+      Bedrock Model Access Inventory:
+      Region: us-east-1
+      Account: 111111111111
+
+      Enabled models:
+        - anthropic.claude-3-5-sonnet-20241022-v2:0 (Anthropic)
+        - amazon.nova-pro-v1:0 (Amazon)
+        - amazon.titan-text-express-v1 (Amazon)
+
+      Invocation logging configuration:
+        s3Config: (none)
+        cloudwatchConfig: (none)
+        kinesisConfig: (none)
+        textDataDeliveryEnabled: false
+        imageDataDeliveryEnabled: false
+        embeddingDataDeliveryEnabled: false
+
+      KMS encryption:
+        customerManagedKey: (none — AWS-managed)
+
+      Provisioned throughput: (none)
+
+      Guardrails: (none)
+    expected_verdict: NO_LOGGING
+    assertions:
+      must_contain:
+        - "NO_LOGGING"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: no-kms-customer-key
+    description: >-
+      Bedrock account with invocation logging configured to S3 + CloudWatch
+      with text delivery enabled, but no customer-managed KMS key —
+      AWS-managed encryption only, lacking key-control for compliance.
+    input: |
+      Audit the following Bedrock Model Access inventory for security and
+      compliance posture. Emit the standard VERDICT block (INVENTORY, VERDICT,
+      REASON, FINDINGS, REMEDIATION).
+
+      Bedrock Model Access Inventory:
+      Region: us-east-1
+      Account: 111111111111
+
+      Enabled models:
+        - amazon.nova-pro-v1:0 (Amazon)
+        - amazon.nova-lite-v1:0 (Amazon)
+        - amazon.titan-text-express-v1 (Amazon)
+
+      Invocation logging configuration:
+        s3Config: { bucketName: "bedrock-logs-no-kms-customer-key", keyPrefix: "invocations/" }
+        cloudwatchConfig: { logGroupName: "/aws/bedrock/invocations" }
+        kinesisConfig: (none)
+        textDataDeliveryEnabled: true
+        imageDataDeliveryEnabled: true
+        embeddingDataDeliveryEnabled: false
+
+      KMS encryption:
+        customerManagedKey: (none — AWS-managed)
+
+      Provisioned throughput: (none)
+
+      Guardrails: (none)
+    expected_verdict: NO_ENCRYPTION
+    assertions:
+      must_contain:
+        - "NO_ENCRYPTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: NO_LOGGING"
+
+  - id: anthropic-claude-apac-geoblock
+    description: >-
+      Bedrock account in APAC region (ap-southeast-1) with Anthropic Claude
+      models enabled, invocation logging to S3 + CloudWatch, and a
+      customer-managed KMS key. Claude models are listed and enabled but will
+      fail at invocation due to APAC jurisdictional geo-block.
+    input: |
+      Audit the following Bedrock Model Access inventory for security and
+      compliance posture. Emit the standard VERDICT block (INVENTORY, VERDICT,
+      REASON, FINDINGS, REMEDIATION).
+
+      Bedrock Model Access Inventory:
+      Region: ap-southeast-1
+      Account: 111111111111
+
+      Enabled models:
+        - anthropic.claude-3-5-sonnet-20241022-v2:0 (Anthropic)
+        - anthropic.claude-3-haiku-20240307-v1:0 (Anthropic)
+        - amazon.nova-pro-v1:0 (Amazon)
+
+      Invocation logging configuration:
+        s3Config: { bucketName: "bedrock-logs-anthropic-claude-apac-geoblock", keyPrefix: "invocations/" }
+        cloudwatchConfig: { logGroupName: "/aws/bedrock/invocations" }
+        kinesisConfig: (none)
+        textDataDeliveryEnabled: true
+        imageDataDeliveryEnabled: true
+        embeddingDataDeliveryEnabled: true
+
+      KMS encryption:
+        customerManagedKey: arn:aws:kms:ap-southeast-1:111111111111:key/anthropic-claude-apac-geoblock
+
+      Provisioned throughput: (none)
+
+      Guardrails:
+        - guardrail-anthropic-claude-apac-geoblock: appliedTo=[anthropic.claude-3-5-sonnet-20241022-v2:0]
+    expected_verdict: GEO_BLOCK_RISK
+    assertions:
+      must_contain:
+        - "GEO_BLOCK_RISK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: single-destination-logging
+    description: >-
+      Bedrock account with invocation logging to S3 only (no CloudWatch, no
+      Firehose), text delivery enabled, customer-managed KMS key present.
+      Single logging destination creates a redundancy gap — if the bucket is
+      deleted, invocations are silently unlogged.
+    input: |
+      Audit the following Bedrock Model Access inventory for security and
+      compliance posture. Emit the standard VERDICT block (INVENTORY, VERDICT,
+      REASON, FINDINGS, REMEDIATION).
+
+      Bedrock Model Access Inventory:
+      Region: us-east-1
+      Account: 111111111111
+
+      Enabled models:
+        - amazon.nova-pro-v1:0 (Amazon)
+        - amazon.titan-text-express-v1 (Amazon)
+
+      Invocation logging configuration:
+        s3Config: { bucketName: "bedrock-logs-single-destination-logging", keyPrefix: "invocations/" }
+        cloudwatchConfig: (none)
+        kinesisConfig: (none)
+        textDataDeliveryEnabled: true
+        imageDataDeliveryEnabled: false
+        embeddingDataDeliveryEnabled: false
+
+      KMS encryption:
+        customerManagedKey: arn:aws:kms:us-east-1:111111111111:key/single-destination-logging
+
+      Provisioned throughput: (none)
+
+      Guardrails: (none)
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_LOGGING"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: provisioned-throughput-expired
+    description: >-
+      Bedrock account with full logging (S3 + CloudWatch + Firehose), CMK
+      present, guardrails attached, but a provisioned throughput commitment
+      has expired — model falls back to on-demand billing at higher cost.
+    input: |
+      Audit the following Bedrock Model Access inventory for security and
+      compliance posture. Emit the standard VERDICT block (INVENTORY, VERDICT,
+      REASON, FINDINGS, REMEDIATION).
+
+      Bedrock Model Access Inventory:
+      Region: us-east-1
+      Account: 111111111111
+
+      Enabled models:
+        - anthropic.claude-3-5-sonnet-20241022-v2:0 (Anthropic)
+        - amazon.nova-pro-v1:0 (Amazon)
+
+      Invocation logging configuration:
+        s3Config: { bucketName: "bedrock-logs-provisioned-throughput-expired", keyPrefix: "invocations/" }
+        cloudwatchConfig: { logGroupName: "/aws/bedrock/invocations" }
+        kinesisConfig: { streamArn: "arn:aws:firehose:us-east-1:111111111111:deliverystream/bedrock-firehose-provisioned-throughput-expired" }
+        textDataDeliveryEnabled: true
+        imageDataDeliveryEnabled: true
+        embeddingDataDeliveryEnabled: true
+
+      KMS encryption:
+        customerManagedKey: arn:aws:kms:us-east-1:111111111111:key/provisioned-throughput-expired
+
+      Provisioned throughput:
+        - pt-provisioned-throughput-expired: model=anthropic.claude-3-5-sonnet-20241022-v2:0, status=expired, commitmentEnd=2026-03-15
+
+      Guardrails:
+        - guardrail-provisioned-throughput-expired: appliedTo=[anthropic.claude-3-5-sonnet-20241022-v2:0, amazon.nova-pro-v1:0]
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_LOGGING"
+        - "VERDICT: NO_ENCRYPTION"
+
+  - id: fully-configured-healthy
+    description: >-
+      Bedrock account with multi-destination logging (S3 + CloudWatch +
+      Firehose), all modality delivery flags enabled, customer-managed KMS key,
+      active provisioned throughput, guardrails on all models, no APAC
+      geo-block risk — fully healthy posture.
+    input: |
+      Audit the following Bedrock Model Access inventory for security and
+      compliance posture. Emit the standard VERDICT block (INVENTORY, VERDICT,
+      REASON, FINDINGS, REMEDIATION).
+
+      Bedrock Model Access Inventory:
+      Region: us-east-1
+      Account: 111111111111
+
+      Enabled models:
+        - amazon.nova-pro-v1:0 (Amazon)
+        - amazon.nova-lite-v1:0 (Amazon)
+        - amazon.titan-text-express-v1 (Amazon)
+
+      Invocation logging configuration:
+        s3Config: { bucketName: "bedrock-logs-fully-configured-healthy", keyPrefix: "invocations/" }
+        cloudwatchConfig: { logGroupName: "/aws/bedrock/invocations" }
+        kinesisConfig: { streamArn: "arn:aws:firehose:us-east-1:111111111111:deliverystream/bedrock-firehose-fully-configured-healthy" }
+        textDataDeliveryEnabled: true
+        imageDataDeliveryEnabled: true
+        embeddingDataDeliveryEnabled: true
+
+      KMS encryption:
+        customerManagedKey: arn:aws:kms:us-east-1:111111111111:key/fully-configured-healthy
+
+      Provisioned throughput:
+        - pt-fully-configured-healthy: model=amazon.nova-pro-v1:0, status=active, commitmentEnd=2026-12-31
+
+      Guardrails:
+        - guardrail-fully-configured-healthy: appliedTo=[amazon.nova-pro-v1:0, amazon.nova-lite-v1:0, amazon.titan-text-express-v1]
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_LOGGING"
+        - "VERDICT: NO_ENCRYPTION"
+        - "VERDICT: GEO_BLOCK_RISK"
+        - "VERDICT: CONFIG_GAP"

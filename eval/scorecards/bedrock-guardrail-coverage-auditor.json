@@ -1,0 +1,70 @@
+{
+  "skill": "bedrock-guardrail-coverage-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides expert\u2011level specifics not commonly known: exact DRAFT vs READY enforcement semantics, outputStrength vs inputStrength asymmetry, concrete grounding\u2011threshold breakpoints (<=0.2 weak, 0.55\u20110.70 recommended), quota limits (10 guardrails, 30 topics, 10,000 words), regional isolation rules, and the exact filter evaluation order. These details constitute genuine delta, but a few points (e.g., basic content\u2011policy categories) are already in the public model knowledge, hence a modest deduction."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides AWS\u2011specific audit procedure: pagination with --next-token, CLI commands for listing agents/KBs, step\u2011by\u2011step audit flow (status check, coverage verification, filter strength evaluation, grounding assessment, config gaps), pre\u2011flight safety checks, and remediation commands. Only minor omission is an explicit cross\u2011region sync checklist, hence a small deduction."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasoning (e.g., never treat DRAFT as protective, never ignore outputStrength). Deduct 1 point because it does not call out the pitfall of over\u2011blocking false positives in content filters."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description explains WHAT and WHEN, keywords and activation_triggers are exhaustive, and invocation_schema outlines required input and deterministic output. Lacks a formal JSON schema for the output block, which prevents a perfect score."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: quick reference table first, then pre\u2011flight, detailed process steps, output format, worked example, edge\u2011case handling, anti\u2011patterns, safety checks, and deep reference. Some sections (e.g., full anti\u2011pattern list) are dense, but critical rules are not buried, so only a modest deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (update\u2011guardrail, delete\u2011guardrail) are tightly constrained with mandatory confirmation, backup, and version\u2011pinning. Auditing (non\u2011destructive) is left open enough for flexible use. Calibration matches task fragility well; only a small deduction for lack of explicit rate\u2011limit handling."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Example \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation \u2192 Deep reference). Consistency aids comprehension; no major deviation."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a decision tree, concrete CLI snippets, example verdict blocks, and handling of common edge cases (multiple guardrails, cross\u2011region, missing grounding support). Missing explicit guidance for handling API rate\u2011limit errors and for reporting model\u2011level grounding lack as an informational note reduces completeness."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 31762,
+  "latency_ms": 5116,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

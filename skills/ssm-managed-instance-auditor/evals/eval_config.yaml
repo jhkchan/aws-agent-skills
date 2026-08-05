@@ -1,0 +1,48 @@
+# Eval configuration for ssm-managed-instance-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ssm-managed-instance-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: ec2-no-iam-profile-unmanaged
+    difficulty: medium
+    prompt_file: prompts/ec2-no-iam-profile-unmanaged.md
+    baseline_file: baselines/ec2-no-iam-profile-unmanaged.md
+    expected_verdict: UNMANAGED
+  - id: hybrid-mi-connection-lost-unmanaged
+    difficulty: hard
+    prompt_file: prompts/hybrid-mi-connection-lost-unmanaged.md
+    baseline_file: baselines/hybrid-mi-connection-lost-unmanaged.md
+    expected_verdict: UNMANAGED
+  - id: noncompliant-critical-patches-missing
+    difficulty: hard
+    prompt_file: prompts/noncompliant-critical-patches-missing.md
+    baseline_file: baselines/noncompliant-critical-patches-missing.md
+    expected_verdict: NONCOMPLIANT
+  - id: no-session-manager-ssh-open
+    difficulty: medium
+    prompt_file: prompts/no-session-manager-ssh-open.md
+    baseline_file: baselines/no-session-manager-ssh-open.md
+    expected_verdict: NO_SESSION_MANAGER
+  - id: config-gap-stale-agent-no-inventory
+    difficulty: medium
+    prompt_file: prompts/config-gap-stale-agent-no-inventory.md
+    baseline_file: baselines/config-gap-stale-agent-no-inventory.md
+    expected_verdict: CONFIG_GAP
+  - id: ok-fully-managed-session-manager
+    difficulty: easy
+    prompt_file: prompts/ok-fully-managed-session-manager.md
+    baseline_file: baselines/ok-fully-managed-session-manager.md
+    expected_verdict: OK
