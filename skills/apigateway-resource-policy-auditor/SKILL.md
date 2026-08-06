@@ -585,12 +585,12 @@ REMEDIATION:
      --patch-operations op=replace,path=/accessLogSettings/destinationArn,value=<log-group-arn>
    ```
 
-## Recent AWS features (2024-2026)
-
-- **HTTP API mutual TLS (mTLS):** HTTP APIs now support mutual TLS authentication via API Gateway custom domain names. Auditors should check whether APIs handling sensitive data have mTLS enabled at the custom domain level.
-- **API Gateway VPC Lattice integration (2024-2025):** API Gateway HTTP APIs can now integrate with VPC Lattice as a private integration type. This changes the network-exposure audit surface — a Lattice-backed API may not appear in standard VPC security group auditing.
-- **OpenAPI 3.1 support (2024):** REST and HTTP APIs now support OpenAPI 3.1 import. This does not change the audit logic but may affect how resource policies and auth configurations are imported from external specs.
-
 ## Domain
 
 AWS CloudOps / API Gateway Security & Compliance.
+
+## Recent AWS features (2024-2026)
+
+- **HTTP API mTLS:** HTTP APIs support mutual TLS via custom domain names — verify mTLS on APIs handling sensitive data.
+- **VPC Lattice integration:** HTTP APIs can integrate with VPC Lattice as a private integration — a Lattice-backed API may not appear in standard VPC security group audits.
+- **OpenAPI 3.1:** REST and HTTP APIs support OpenAPI 3.1 import — does not change audit logic but may affect how auth configs import from external specs.

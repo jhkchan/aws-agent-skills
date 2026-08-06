@@ -27,8 +27,8 @@ incomplete, and CI runs the assertion layer on every PR.
 | Skill | Model | Score | Grade | Verdicts | Latency | Tokens |
 |---|---|---|---|---|---|---|
 | accessanalyzer-finding-triage | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.4s | 56729 |
-| acm-certificate-expiry-auditor | amazon.nova-pro-v1:0 | 107/120 | B | 6/6 | 8.1s | 36362 |
-| apigateway-resource-policy-auditor | amazon.nova-pro-v1:0 | 106/120 | B | 6/6 | 23.1s | 34618 |
+| acm-certificate-expiry-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.0s | 37462 |
+| apigateway-resource-policy-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 9.6s | 35471 |
 | athena-workgroup-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 8.6s | 49642 |
 | auditmanager-assessment-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.6s | 50433 |
 | autoscaling-group-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 18.9s | 39803 |
