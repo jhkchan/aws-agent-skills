@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "cloudwatch-logs-retention-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Logs Retention & Cost Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-retention-never-expire",
+      "name": "retentionInDays absent on a CMK-encrypted group — first-fail-wins fires NO_RETENTION",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-retention-never-expire.md",
+      "baseline_file": "baselines/no-retention-never-expire.md",
+      "expected_verdict": "NO_RETENTION",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_RETENTION", "no-retention-never-expire", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_ENCRYPTION", "VERDICT: COST_RISK", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "no-retention-trumps-encryption",
+      "name": "Never-expire AND no CMK — first-fail-wins still emits NO_RETENTION",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-retention-trumps-encryption.md",
+      "baseline_file": "baselines/no-retention-trumps-encryption.md",
+      "expected_verdict": "NO_RETENTION",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_RETENTION", "no-retention-trumps-encryption", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_ENCRYPTION", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "retention-set-no-kms-cmk",
+      "name": "Sane retention but no kmsKeyId — NO_ENCRYPTION",
+      "difficulty": "easy",
+      "prompt_file": "prompts/retention-set-no-kms-cmk.md",
+      "baseline_file": "baselines/retention-set-no-kms-cmk.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "retention-set-no-kms-cmk", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_RETENTION", "VERDICT: COST_RISK", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "long-retention-cost-risk",
+      "name": "3650-day retention on a 250 GB group with CMK — COST_RISK",
+      "difficulty": "medium",
+      "prompt_file": "prompts/long-retention-cost-risk.md",
+      "baseline_file": "baselines/long-retention-cost-risk.md",
+      "expected_verdict": "COST_RISK",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COST_RISK", "long-retention-cost-risk", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_RETENTION", "VERDICT: NO_ENCRYPTION", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "missing-anomaly-detector-config-gap",
+      "name": "Sane retention + CMK + metric filter but no anomaly detector — CONFIG_GAP",
+      "difficulty": "hard",
+      "prompt_file": "prompts/missing-anomaly-detector-config-gap.md",
+      "baseline_file": "baselines/missing-anomaly-detector-config-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "missing-anomaly-detector-config-gap", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_RETENTION", "VERDICT: NO_ENCRYPTION", "VERDICT: COST_RISK", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "fully-secured-ok",
+      "name": "All dimensions pass — OK",
+      "difficulty": "easy",
+      "prompt_file": "prompts/fully-secured-ok.md",
+      "baseline_file": "baselines/fully-secured-ok.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "fully-secured-ok", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_RETENTION", "VERDICT: NO_ENCRYPTION", "VERDICT: COST_RISK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

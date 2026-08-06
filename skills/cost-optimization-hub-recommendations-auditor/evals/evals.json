@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "cost-optimization-hub-recommendations-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Cost Optimization Hub Recommendations Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "disabled-coh",
+      "name": "Cost Optimization Hub not enrolled — zero optimization signal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/disabled-coh.md",
+      "baseline_file": "baselines/disabled-coh.md",
+      "expected_verdict": "DISABLED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["DISABLED", "disabled-coh", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP", "VERDICT: HIGH_EFFORT"]
+        }
+      ]
+    },
+    {
+      "id": "org-no-members",
+      "name": "COH enrolled but zero member accounts visible in an Organization context",
+      "difficulty": "medium",
+      "prompt_file": "prompts/org-no-members.md",
+      "baseline_file": "baselines/org-no-members.md",
+      "expected_verdict": "NO_MEMBER_ACCOUNTS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_MEMBER_ACCOUNTS", "org-no-members", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: DISABLED", "VERDICT: HIGH_EFFORT"]
+        }
+      ]
+    },
+    {
+      "id": "high-effort-only",
+      "name": "All outstanding recommendations are High effort — no quick wins remain",
+      "difficulty": "medium",
+      "prompt_file": "prompts/high-effort-only.md",
+      "baseline_file": "baselines/high-effort-only.md",
+      "expected_verdict": "HIGH_EFFORT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["HIGH_EFFORT", "high-effort-only", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: DISABLED", "VERDICT: NO_MEMBER_ACCOUNTS"]
+        }
+      ]
+    },
+    {
+      "id": "stale-high-value-unactioned",
+      "name": "Recommendations worth >=$500/mo sitting unactioned for >90 days",
+      "difficulty": "hard",
+      "prompt_file": "prompts/stale-high-value-unactioned.md",
+      "baseline_file": "baselines/stale-high-value-unactioned.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "stale-high-value-unactioned", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: DISABLED", "VERDICT: NO_MEMBER_ACCOUNTS", "VERDICT: HIGH_EFFORT"]
+        }
+      ]
+    },
+    {
+      "id": "before-discounts-savings-mode",
+      "name": "savingsEstimationMode BEFORE_DISCOUNTS overstates actual savings",
+      "difficulty": "medium",
+      "prompt_file": "prompts/before-discounts-savings-mode.md",
+      "baseline_file": "baselines/before-discounts-savings-mode.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "before-discounts-savings-mode", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: DISABLED", "VERDICT: HIGH_EFFORT"]
+        }
+      ]
+    },
+    {
+      "id": "clean-production-config",
+      "name": "Clean COH configuration — enrolled, all members, mixed effort, AFTER_DISCOUNTS, no stale recs",
+      "difficulty": "easy",
+      "prompt_file": "prompts/clean-production-config.md",
+      "baseline_file": "baselines/clean-production-config.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "clean-production-config", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: DISABLED", "VERDICT: NO_MEMBER_ACCOUNTS", "VERDICT: HIGH_EFFORT", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

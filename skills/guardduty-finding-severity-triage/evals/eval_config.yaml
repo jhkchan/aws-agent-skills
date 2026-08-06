@@ -1,0 +1,54 @@
+# Eval configuration for guardduty-finding-severity-triage.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: guardduty-finding-severity-triage
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: crypto-mining-critical
+    difficulty: medium
+    prompt_file: prompts/crypto-mining-critical.md
+    baseline_file: baselines/crypto-mining-critical.md
+    expected_verdict: CRITICAL
+    expected_risk: CRITICAL
+  - id: port-sweep-from-scanner
+    difficulty: hard
+    prompt_file: prompts/port-sweep-from-scanner.md
+    baseline_file: baselines/port-sweep-from-scanner.md
+    expected_verdict: LIKELY_FALSE_POSITIVE
+    expected_risk: LOW
+  - id: ssh-brute-force-high
+    difficulty: medium
+    prompt_file: prompts/ssh-brute-force-high.md
+    baseline_file: baselines/ssh-brute-force-high.md
+    expected_verdict: HIGH
+    expected_risk: HIGH
+  - id: port-probe-low
+    difficulty: easy
+    prompt_file: prompts/port-probe-low.md
+    baseline_file: baselines/port-probe-low.md
+    expected_verdict: LOW
+    expected_risk: LOW
+  - id: tor-on-public-alb
+    difficulty: hard
+    prompt_file: prompts/tor-on-public-alb.md
+    baseline_file: baselines/tor-on-public-alb.md
+    expected_verdict: LIKELY_FALSE_POSITIVE
+    expected_risk: LOW
+  - id: console-login-anomalous
+    difficulty: easy
+    prompt_file: prompts/console-login-anomalous.md
+    baseline_file: baselines/console-login-anomalous.md
+    expected_verdict: MEDIUM
+    expected_risk: MEDIUM

@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "cloudhsm-cluster-posture-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudHSM Cluster Posture Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "single-az-single-hsm",
+      "name": "Single HSM in a single AZ with backup retention disabled — no HA, no recovery",
+      "difficulty": "easy",
+      "prompt_file": "prompts/single-az-single-hsm.md",
+      "baseline_file": "baselines/single-az-single-hsm.md",
+      "expected_verdict": "SINGLE_AZ",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["SINGLE_AZ", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_BACKUP", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "same-az-three-hsm",
+      "name": "Three HSMs co-located in one AZ — HSM-level redundancy but zero AZ-level redundancy",
+      "difficulty": "hard",
+      "prompt_file": "prompts/same-az-three-hsm.md",
+      "baseline_file": "baselines/same-az-three-hsm.md",
+      "expected_verdict": "SINGLE_AZ",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["SINGLE_AZ", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_BACKUP", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "multi-az-no-backup",
+      "name": "Three HSMs across three AZs but backup retention disabled and zero backups",
+      "difficulty": "medium",
+      "prompt_file": "prompts/multi-az-no-backup.md",
+      "baseline_file": "baselines/multi-az-no-backup.md",
+      "expected_verdict": "NO_BACKUP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_BACKUP", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: SINGLE_AZ", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "multi-az-uninitialized",
+      "name": "Three HSMs across three AZs with recent backups but cluster State is UNINITIALIZED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/multi-az-uninitialized.md",
+      "baseline_file": "baselines/multi-az-uninitialized.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: SINGLE_AZ", "VERDICT: NO_BACKUP"]
+        }
+      ]
+    },
+    {
+      "id": "multi-az-default-co-password",
+      "name": "Three AZs with backups and cluster initialized but default CO password unchanged",
+      "difficulty": "medium",
+      "prompt_file": "prompts/multi-az-default-co-password.md",
+      "baseline_file": "baselines/multi-az-default-co-password.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: SINGLE_AZ", "VERDICT: NO_BACKUP"]
+        }
+      ]
+    },
+    {
+      "id": "multi-az-backup-ok",
+      "name": "Three AZs, recent backups, cluster initialized, CO password changed, scoped SG — clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/multi-az-backup-ok.md",
+      "baseline_file": "baselines/multi-az-backup-ok.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: SINGLE_AZ", "VERDICT: NO_BACKUP", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

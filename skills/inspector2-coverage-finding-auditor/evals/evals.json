@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "inspector2-coverage-finding-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Inspector2 Coverage + Finding Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "inspector2-disabled-prod-ec2",
+      "name": "Inspector2 EC2 disabled — blanket coverage gap on production instances",
+      "difficulty": "medium",
+      "prompt_file": "prompts/inspector2-disabled-prod-ec2.md",
+      "baseline_file": "baselines/inspector2-disabled-prod-ec2.md",
+      "expected_verdict": "CRITICAL",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CRITICAL", "inspector2-disabled-prod-ec2", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: COVERED", "VERDICT: LOW"]
+        }
+      ]
+    },
+    {
+      "id": "ec2-critical-cve-internet-reachable",
+      "name": "EC2 with CRITICAL CVE confirmed internet-reachable — exploitable attack path",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ec2-critical-cve-internet-reachable.md",
+      "baseline_file": "baselines/ec2-critical-cve-internet-reachable.md",
+      "expected_verdict": "CRITICAL",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CRITICAL", "ec2-critical-cve-internet-reachable", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: COVERED", "VERDICT: MEDIUM"]
+        }
+      ]
+    },
+    {
+      "id": "ec2-high-cve-isolated",
+      "name": "EC2 with HIGH CVE, not internet-reachable — high without exploitable path",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ec2-high-cve-isolated.md",
+      "baseline_file": "baselines/ec2-high-cve-isolated.md",
+      "expected_verdict": "HIGH",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["HIGH", "ec2-high-cve-isolated", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: COVERED", "VERDICT: CRITICAL"]
+        }
+      ]
+    },
+    {
+      "id": "ecr-prod-stale-scan",
+      "name": "ECR production repo with 45-day-stale scan — coverage degradation",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ecr-prod-stale-scan.md",
+      "baseline_file": "baselines/ecr-prod-stale-scan.md",
+      "expected_verdict": "MEDIUM",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MEDIUM", "ecr-prod-stale-scan", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: COVERED", "VERDICT: CRITICAL"]
+        }
+      ]
+    },
+    {
+      "id": "ec2-low-cve-only",
+      "name": "EC2 with single LOW CVE, active coverage — backlog item",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ec2-low-cve-only.md",
+      "baseline_file": "baselines/ec2-low-cve-only.md",
+      "expected_verdict": "LOW",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["LOW", "ec2-low-cve-only", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: COVERED", "VERDICT: HIGH"]
+        }
+      ]
+    },
+    {
+      "id": "ecr-scanonpush-clean",
+      "name": "ECR with scanOnPush, recently scanned, zero open findings — fully covered",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ecr-scanonpush-clean.md",
+      "baseline_file": "baselines/ecr-scanonpush-clean.md",
+      "expected_verdict": "COVERED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COVERED", "ecr-scanonpush-clean", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: CRITICAL", "VERDICT: HIGH"]
+        }
+      ]
+    }
+  ]
+}

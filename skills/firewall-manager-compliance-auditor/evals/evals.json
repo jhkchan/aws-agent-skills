@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "firewall-manager-compliance-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Firewall Manager Compliance Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "policy-not-ready",
+      "name": "WAFV2 policy stuck in PolicyState NOT_READY — silent non-enforcement",
+      "difficulty": "easy",
+      "prompt_file": "prompts/policy-not-ready.md",
+      "baseline_file": "baselines/policy-not-ready.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "policy-not-ready", "VERDICT", "REASON", "FINDINGS", "REMEDIATION", "NOT_READY"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NONCOMPLIANT", "VERDICT: INCOMPLETE_COVERAGE"]
+        }
+      ]
+    },
+    {
+      "id": "waf-noncompliant-remediation",
+      "name": "READY WAFV2 policy with 14 live non-compliant resources across three member accounts",
+      "difficulty": "medium",
+      "prompt_file": "prompts/waf-noncompliant-remediation.md",
+      "baseline_file": "baselines/waf-noncompliant-remediation.md",
+      "expected_verdict": "NONCOMPLIANT",
+      "expected_risk": "NONCOMPLIANT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NONCOMPLIANT", "waf-noncompliant-remediation", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP", "VERDICT: INCOMPLETE_COVERAGE"]
+        }
+      ]
+    },
+    {
+      "id": "shield-tag-scope-incomplete",
+      "name": "READY Shield Advanced policy with ResourceTags-only scope — untagged resources silently unprotected",
+      "difficulty": "hard",
+      "prompt_file": "prompts/shield-tag-scope-incomplete.md",
+      "baseline_file": "baselines/shield-tag-scope-incomplete.md",
+      "expected_verdict": "INCOMPLETE_COVERAGE",
+      "expected_risk": "INCOMPLETE_COVERAGE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INCOMPLETE_COVERAGE", "shield-tag-scope-incomplete", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NONCOMPLIANT", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "remediation-disabled-config-gap",
+      "name": "READY SECURITY_GROUPS_CONTENT_AUDIT policy with RemediationEnabled=false — detect-only posture in steady state",
+      "difficulty": "medium",
+      "prompt_file": "prompts/remediation-disabled-config-gap.md",
+      "baseline_file": "baselines/remediation-disabled-config-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "remediation-disabled-config-gap", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NONCOMPLIANT", "VERDICT: INCOMPLETE_COVERAGE"]
+        }
+      ]
+    },
+    {
+      "id": "sg-common-full-coverage-ok",
+      "name": "READY SECURITY_GROUPS_COMMON policy org-wide with full coverage and zero violations — clean posture",
+      "difficulty": "easy",
+      "prompt_file": "prompts/sg-common-full-coverage-ok.md",
+      "baseline_file": "baselines/sg-common-full-coverage-ok.md",
+      "expected_verdict": "OK",
+      "expected_risk": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "sg-common-full-coverage-ok", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NONCOMPLIANT", "VERDICT: CONFIG_GAP", "VERDICT: INCOMPLETE_COVERAGE"]
+        }
+      ]
+    },
+    {
+      "id": "waf-legacy-policy-type",
+      "name": "READY FMS policy using PolicyType WAF (WAF Classic) — legacy migration gap",
+      "difficulty": "hard",
+      "prompt_file": "prompts/waf-legacy-policy-type.md",
+      "baseline_file": "baselines/waf-legacy-policy-type.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "waf-legacy-policy-type", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NONCOMPLIANT", "VERDICT: INCOMPLETE_COVERAGE"]
+        }
+      ]
+    }
+  ]
+}

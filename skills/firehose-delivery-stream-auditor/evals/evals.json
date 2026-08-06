@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "firehose-delivery-stream-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Kinesis Data Firehose Delivery Stream Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-encryption-explicit-disable",
+      "name": "Explicit NoEncryption — plaintext Firehose delivery",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-encryption-explicit-disable.md",
+      "baseline_file": "baselines/no-encryption-explicit-disable.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "VERDICT", "REASON", "REMEDIATION", "plaintext"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "missing-cmk-default-sse-s3",
+      "name": "Absent EncryptionConfiguration on ExtendedS3 — relies on bucket default SSE-S3",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-cmk-default-sse-s3.md",
+      "baseline_file": "baselines/missing-cmk-default-sse-s3.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "encryption"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "buffering-hints-out-of-range",
+      "name": "BufferingHints SizeInMBs and IntervalInSeconds outside valid ranges",
+      "difficulty": "medium",
+      "prompt_file": "prompts/buffering-hints-out-of-range.md",
+      "baseline_file": "baselines/buffering-hints-out-of-range.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "buffering"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "cw-logging-disabled-with-lambda",
+      "name": "Lambda transformation enabled but LoggingConfig disabled — silent failure mode",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cw-logging-disabled-with-lambda.md",
+      "baseline_file": "baselines/cw-logging-disabled-with-lambda.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "logging"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "dp-missing-source-backup",
+      "name": "Dynamic partitioning enabled with no S3BackupConfiguration — silent data-loss vector",
+      "difficulty": "hard",
+      "prompt_file": "prompts/dp-missing-source-backup.md",
+      "baseline_file": "baselines/dp-missing-source-backup.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "backup"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "ok-cmk-lambda-dp-backup",
+      "name": "All dimensions clean — CMK + valid buffering + Lambda+backup + LoggingConfig + DP+source backup",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-cmk-lambda-dp-backup.md",
+      "baseline_file": "baselines/ok-cmk-lambda-dp-backup.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_ENCRYPTION", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

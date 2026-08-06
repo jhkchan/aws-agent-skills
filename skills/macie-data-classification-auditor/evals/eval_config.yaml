@@ -1,0 +1,44 @@
+# Eval configuration for macie-data-classification-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+skill_name: macie-data-classification-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-jobs-asdd-disabled
+    difficulty: easy
+    prompt_file: prompts/no-jobs-asdd-disabled.md
+    baseline_file: baselines/no-jobs-asdd-disabled.md
+    expected_verdict: NO_CLASSIFICATION
+  - id: job-failed-no-coverage
+    difficulty: medium
+    prompt_file: prompts/job-failed-no-coverage.md
+    baseline_file: baselines/job-failed-no-coverage.md
+    expected_verdict: NO_CLASSIFICATION
+  - id: untriaged-high-pii-findings
+    difficulty: hard
+    prompt_file: prompts/untriaged-high-pii-findings.md
+    baseline_file: baselines/untriaged-high-pii-findings.md
+    expected_verdict: UNTRIAGED_FINDINGS
+  - id: security-hub-export-disabled
+    difficulty: medium
+    prompt_file: prompts/security-hub-export-disabled.md
+    baseline_file: baselines/security-hub-export-disabled.md
+    expected_verdict: CONFIG_GAP
+  - id: broad-allow-list-masking
+    difficulty: hard
+    prompt_file: prompts/broad-allow-list-masking.md
+    baseline_file: baselines/broad-allow-list-masking.md
+    expected_verdict: CONFIG_GAP
+  - id: healthy-macie-posture
+    difficulty: easy
+    prompt_file: prompts/healthy-macie-posture.md
+    baseline_file: baselines/healthy-macie-posture.md
+    expected_verdict: OK

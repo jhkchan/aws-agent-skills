@@ -1,0 +1,48 @@
+# Eval configuration for efs-filesystem-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: efs-filesystem-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: unencrypted-fs
+    difficulty: easy
+    prompt_file: prompts/unencrypted-fs.md
+    baseline_file: baselines/unencrypted-fs.md
+    expected_verdict: UNENCRYPTED
+  - id: public-policy-wildcard
+    difficulty: medium
+    prompt_file: prompts/public-policy-wildcard.md
+    baseline_file: baselines/public-policy-wildcard.md
+    expected_verdict: PUBLIC_POLICY
+  - id: config-gap-no-lifecycle
+    difficulty: medium
+    prompt_file: prompts/config-gap-no-lifecycle.md
+    baseline_file: baselines/config-gap-no-lifecycle.md
+    expected_verdict: CONFIG_GAP
+  - id: config-gap-no-tls
+    difficulty: hard
+    prompt_file: prompts/config-gap-no-tls.md
+    baseline_file: baselines/config-gap-no-tls.md
+    expected_verdict: CONFIG_GAP
+  - id: fully-hardened
+    difficulty: easy
+    prompt_file: prompts/fully-hardened.md
+    baseline_file: baselines/fully-hardened.md
+    expected_verdict: OK
+  - id: public-scoped-by-access-point
+    difficulty: hard
+    prompt_file: prompts/public-scoped-by-access-point.md
+    baseline_file: baselines/public-scoped-by-access-point.md
+    expected_verdict: OK

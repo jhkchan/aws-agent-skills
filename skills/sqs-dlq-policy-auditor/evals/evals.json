@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "sqs-dlq-policy-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SQS DLQ Policy Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "public-access-no-condition",
+      "name": "Principal:* with sqs:SendMessage and no condition — public message injection",
+      "difficulty": "easy",
+      "prompt_file": "prompts/public-access-no-condition.md",
+      "baseline_file": "baselines/public-access-no-condition.md",
+      "expected_verdict": "PUBLIC_ACCESS",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PUBLIC_ACCESS", "public-access-no-condition", "VERDICT", "REASON", "REMEDIATION", "CRITICAL"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_DLQ"]
+        }
+      ]
+    },
+    {
+      "id": "no-dlq-configured",
+      "name": "No RedrivePolicy attribute — poison-pill messages retry indefinitely",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-dlq-configured.md",
+      "baseline_file": "baselines/no-dlq-configured.md",
+      "expected_verdict": "NO_DLQ",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_DLQ", "no-dlq-configured", "VERDICT", "REASON", "REMEDIATION", "HIGH"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_ACCESS"]
+        }
+      ]
+    },
+    {
+      "id": "no-encryption-queue",
+      "name": "Neither SqsManagedSseEnabled nor KmsMasterKeyId — plaintext at rest",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-encryption-queue.md",
+      "baseline_file": "baselines/no-encryption-queue.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "no-encryption-queue", "VERDICT", "REASON", "REMEDIATION", "HIGH"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_ACCESS"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-maxreceive-one",
+      "name": "maxReceiveCount=1 and DLQ retention 1 day — transient failures go straight to DLQ",
+      "difficulty": "medium",
+      "prompt_file": "prompts/config-gap-maxreceive-one.md",
+      "baseline_file": "baselines/config-gap-maxreceive-one.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-maxreceive-one", "VERDICT", "REASON", "REMEDIATION", "MEDIUM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_ACCESS", "VERDICT: NO_DLQ"]
+        }
+      ]
+    },
+    {
+      "id": "ok-clean-config",
+      "name": "Named principal, DLQ with maxReceiveCount=5, SSE-SQS, 14-day DLQ retention — clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-clean-config.md",
+      "baseline_file": "baselines/ok-clean-config.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "ok-clean-config", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PUBLIC_ACCESS", "VERDICT: NO_DLQ", "VERDICT: NO_ENCRYPTION", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "public-source-arn-still-ok",
+      "name": "Principal:* with aws:SourceArn condition (S3 notification pattern) — NOT public, OK",
+      "difficulty": "hard",
+      "prompt_file": "prompts/public-source-arn-still-ok.md",
+      "baseline_file": "baselines/public-source-arn-still-ok.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "public-source-arn-still-ok", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PUBLIC_ACCESS", "VERDICT: NO_DLQ", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

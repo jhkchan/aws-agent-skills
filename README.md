@@ -240,6 +240,17 @@ skills/*/eval/test-cases.yaml  ->  eval/run_eval.py
 - **CI:** assertion-only on every PR (no AWS credentials). The maintainer runs the LLM-judge locally and commits scorecard artifacts.
 - **Grade floor:** Grade A (>=108/120). Every shipped skill clears this.
 
+### Eval structure (per skill)
+
+Each skill has TWO eval surfaces:
+
+| Directory | Purpose | Contents |
+|---|---|---|
+| `eval/` | **Assertion layer** (CI-runnable, deterministic, no AWS creds) | `test-cases.yaml` -- objective test cases with `must_contain` / `must_not_contain` verdict tokens |
+| `evals/` | **Structured eval surface** (the full eval definition) | `evals.json` (case metadata + difficulty + assertions), `prompts/` (the eval prompts sent to the model), `baselines/` (the **without-skill** baseline response -- proving the skill adds value via the delta) |
+
+The `evals/` structure follows the [OpenAI eval-skills guidance](https://developers.openai.com/blog/eval-skills) and [Anthropic's "Demystifying evals for AI agents"](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents) -- structured eval cases, baselines for the with-skill-vs-without-skill **delta comparison**, and per-case difficulty/metadata. The `eval/` assertion layer is the CI-runnable subset (deterministic verdict checks on every PR without AWS credentials).
+
 ### Run the eval yourself
 
 ```bash

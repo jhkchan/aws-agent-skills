@@ -1,0 +1,48 @@
+# Eval configuration for autoscaling-group-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: autoscaling-group-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: elb-healthcheck-no-targetgroup
+    difficulty: hard
+    prompt_file: prompts/elb-healthcheck-no-targetgroup.md
+    baseline_file: baselines/elb-healthcheck-no-targetgroup.md
+    expected_verdict: MISCONFIGURED
+  - id: legacy-launch-config-desired-over-max
+    difficulty: medium
+    prompt_file: prompts/legacy-launch-config-desired-over-max.md
+    baseline_file: baselines/legacy-launch-config-desired-over-max.md
+    expected_verdict: MISCONFIGURED
+  - id: spot-single-instance-type
+    difficulty: hard
+    prompt_file: prompts/spot-single-instance-type.md
+    baseline_file: baselines/spot-single-instance-type.md
+    expected_verdict: MISCONFIGURED
+  - id: imdsv2-gap-short-grace
+    difficulty: medium
+    prompt_file: prompts/imdsv2-gap-short-grace.md
+    baseline_file: baselines/imdsv2-gap-short-grace.md
+    expected_verdict: CONFIG_GAP
+  - id: ec2-check-elb-attached
+    difficulty: medium
+    prompt_file: prompts/ec2-check-elb-attached.md
+    baseline_file: baselines/ec2-check-elb-attached.md
+    expected_verdict: CONFIG_GAP
+  - id: well-configured-production-asg
+    difficulty: easy
+    prompt_file: prompts/well-configured-production-asg.md
+    baseline_file: baselines/well-configured-production-asg.md
+    expected_verdict: OK

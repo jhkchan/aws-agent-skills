@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "cur-cost-usage-report-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CUR Cost and Usage Report Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-cur-account",
+      "name": "Payer account with zero CUR definitions — no line-item cost visibility",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-cur-account.md",
+      "baseline_file": "baselines/no-cur-account.md",
+      "expected_verdict": "NO_CUR",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_CUR", "VERDICT", "REASON", "REMEDIATION", "payer"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: STALE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "stale-hourly-not-refreshing",
+      "name": "Hourly CUR with stale manifest (9 days old) — delivery pipeline stopped",
+      "difficulty": "medium",
+      "prompt_file": "prompts/stale-hourly-not-refreshing.md",
+      "baseline_file": "baselines/stale-hourly-not-refreshing.md",
+      "expected_verdict": "STALE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["STALE", "stale-hourly-not-refreshing", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_CUR", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-gzip-no-athena",
+      "name": "Hourly CUR with CSV/GZIP format, no Athena, versioning suspended — multiple gaps",
+      "difficulty": "medium",
+      "prompt_file": "prompts/config-gap-gzip-no-athena.md",
+      "baseline_file": "baselines/config-gap-gzip-no-athena.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-gzip-no-athena", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_CUR", "VERDICT: STALE"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-legacy-no-resources",
+      "name": "Daily CUR with legacy version, no Resources schema, RefreshClosedReports false",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-legacy-no-resources.md",
+      "baseline_file": "baselines/config-gap-legacy-no-resources.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-legacy-no-resources", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_CUR", "VERDICT: STALE"]
+        }
+      ]
+    },
+    {
+      "id": "ok-full-config",
+      "name": "Fully configured hourly CUR with cur-1.0, Parquet, Athena, versioning — healthy",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-full-config.md",
+      "baseline_file": "baselines/ok-full-config.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "ok-full-config", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_CUR", "VERDICT: STALE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-no-versioning-refresh-false",
+      "name": "Hourly CUR with Athena but versioning disabled and RefreshClosedReports false",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-no-versioning-refresh-false.md",
+      "baseline_file": "baselines/config-gap-no-versioning-refresh-false.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-no-versioning-refresh-false", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_CUR", "VERDICT: STALE"]
+        }
+      ]
+    }
+  ]
+}

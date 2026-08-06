@@ -1,0 +1,48 @@
+# Eval configuration for dms-replication-task-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: dms-replication-task-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-tls-plaintext-cdc
+    difficulty: medium
+    prompt_file: prompts/no-tls-plaintext-cdc.md
+    baseline_file: baselines/no-tls-plaintext-cdc.md
+    expected_verdict: NO_TLS
+  - id: no-logging-cdc-silent
+    difficulty: medium
+    prompt_file: prompts/no-logging-cdc-silent.md
+    baseline_file: baselines/no-logging-cdc-silent.md
+    expected_verdict: NO_LOGGING
+  - id: no-tls-missing-ssl-mode
+    difficulty: hard
+    prompt_file: prompts/no-tls-missing-ssl-mode.md
+    baseline_file: baselines/no-tls-missing-ssl-mode.md
+    expected_verdict: NO_TLS
+  - id: config-gap-ssl-require-public
+    difficulty: hard
+    prompt_file: prompts/config-gap-ssl-require-public.md
+    baseline_file: baselines/config-gap-ssl-require-public.md
+    expected_verdict: CONFIG_GAP
+  - id: config-gap-no-validation-no-kms
+    difficulty: medium
+    prompt_file: prompts/config-gap-no-validation-no-kms.md
+    baseline_file: baselines/config-gap-no-validation-no-kms.md
+    expected_verdict: CONFIG_GAP
+  - id: ok-hardened-full-load-cdc
+    difficulty: easy
+    prompt_file: prompts/ok-hardened-full-load-cdc.md
+    baseline_file: baselines/ok-hardened-full-load-cdc.md
+    expected_verdict: OK

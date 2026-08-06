@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "kinesis-stream-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Kinesis Stream Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-encryption-none",
+      "name": "Unencrypted provisioned stream — data at rest is plaintext",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-encryption-none.md",
+      "baseline_file": "baselines/no-encryption-none.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "no-encryption-none", "VERDICT", "REASON", "REMEDIATION", "encryption"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: COST_RISK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "cost-risk-extended-retention",
+      "name": "KMS-encrypted provisioned stream with 720-hour retention — extended-retention cost exposure",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cost-risk-extended-retention.md",
+      "baseline_file": "baselines/cost-risk-extended-retention.md",
+      "expected_verdict": "COST_RISK",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COST_RISK", "cost-risk-extended-retention", "VERDICT", "REASON", "REMEDIATION", "retention"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "cost-risk-on-demand-low-volume",
+      "name": "On-demand stream under 200 MB/day — per-stream-hour fee dominates over provisioned",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cost-risk-on-demand-low-volume.md",
+      "baseline_file": "baselines/cost-risk-on-demand-low-volume.md",
+      "expected_verdict": "COST_RISK",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COST_RISK", "cost-risk-on-demand-low-volume", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-no-enhanced-monitoring",
+      "name": "Encrypted stream missing key enhanced-monitoring metrics — per-shard blind spot",
+      "difficulty": "medium",
+      "prompt_file": "prompts/config-gap-no-enhanced-monitoring.md",
+      "baseline_file": "baselines/config-gap-no-enhanced-monitoring.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-no-enhanced-monitoring", "VERDICT", "REASON", "REMEDIATION", "monitoring"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION", "VERDICT: COST_RISK"]
+        }
+      ]
+    },
+    {
+      "id": "ok-well-configured-stream",
+      "name": "KMS-encrypted (CMK) provisioned stream with full monitoring and consumers — clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-well-configured-stream.md",
+      "baseline_file": "baselines/ok-well-configured-stream.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "ok-well-configured-stream", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_ENCRYPTION", "VERDICT: COST_RISK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-encryption-max-retention-high-shards",
+      "name": "Unencrypted stream with 365-day retention and 50 shards — NO_ENCRYPTION wins over cost risks",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-encryption-max-retention-high-shards.md",
+      "baseline_file": "baselines/no-encryption-max-retention-high-shards.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "no-encryption-max-retention-high-shards", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

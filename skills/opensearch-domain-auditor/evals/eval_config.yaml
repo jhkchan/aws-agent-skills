@@ -1,0 +1,48 @@
+# Eval configuration for opensearch-domain-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: opensearch-domain-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-encryption-at-rest
+    difficulty: easy
+    prompt_file: prompts/no-encryption-at-rest.md
+    baseline_file: baselines/no-encryption-at-rest.md
+    expected_verdict: NO_ENCRYPTION
+  - id: public-access-wildcard-http
+    difficulty: medium
+    prompt_file: prompts/public-access-wildcard-http.md
+    baseline_file: baselines/public-access-wildcard-http.md
+    expected_verdict: PUBLIC_ACCESS
+  - id: no-fgac-internet-exposed
+    difficulty: hard
+    prompt_file: prompts/no-fgac-internet-exposed.md
+    baseline_file: baselines/no-fgac-internet-exposed.md
+    expected_verdict: NO_FGAC
+  - id: config-gap-no-ntn-weak-master-no-slowlogs
+    difficulty: hard
+    prompt_file: prompts/config-gap-no-ntn-weak-master-no-slowlogs.md
+    baseline_file: baselines/config-gap-no-ntn-weak-master-no-slowlogs.md
+    expected_verdict: CONFIG_GAP
+  - id: ok-clean-production
+    difficulty: easy
+    prompt_file: prompts/ok-clean-production.md
+    baseline_file: baselines/ok-clean-production.md
+    expected_verdict: OK
+  - id: no-encryption-and-public-worst-first
+    difficulty: hard
+    prompt_file: prompts/no-encryption-and-public-worst-first.md
+    baseline_file: baselines/no-encryption-and-public-worst-first.md
+    expected_verdict: NO_ENCRYPTION

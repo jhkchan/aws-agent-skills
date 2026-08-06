@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "wellarchitected-workload-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Well-Architected Workload Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "stale-review-200-days",
+      "name": "Stale review — effectiveReviewDate 207 days old with compounding security HIGH_RISK",
+      "difficulty": "hard",
+      "prompt_file": "prompts/stale-review-200-days.md",
+      "baseline_file": "baselines/stale-review-200-days.md",
+      "expected_verdict": "STALE_REVIEW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["STALE_REVIEW", "stale-review-200-days", "VERDICT", "REASON", "REMEDIATION", "207"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "high-risk-security-pillar",
+      "name": "Fresh review with 5 HIGH_RISK in security pillar — zero-tolerance rule 2a",
+      "difficulty": "medium",
+      "prompt_file": "prompts/high-risk-security-pillar.md",
+      "baseline_file": "baselines/high-risk-security-pillar.md",
+      "expected_verdict": "HIGH_RISK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["HIGH_RISK", "high-risk-security-pillar", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-no-milestones",
+      "name": "Fresh review, zero HIGH_RISK, but no milestones, only default lens, Environment unset",
+      "difficulty": "easy",
+      "prompt_file": "prompts/config-gap-no-milestones.md",
+      "baseline_file": "baselines/config-gap-no-milestones.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-no-milestones", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: HIGH_RISK"]
+        }
+      ]
+    },
+    {
+      "id": "ok-fresh-clean",
+      "name": "Healthy workload — fresh, zero HIGH_RISK, milestones tracked, lenses applied",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-fresh-clean.md",
+      "baseline_file": "baselines/ok-fresh-clean.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "ok-fresh-clean", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: STALE_REVIEW", "VERDICT: HIGH_RISK"]
+        }
+      ]
+    },
+    {
+      "id": "high-risk-multi-pillar-total",
+      "name": "Security clean but total HIGH_RISK = 6 across non-security pillars (> 5 threshold)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/high-risk-multi-pillar-total.md",
+      "baseline_file": "baselines/high-risk-multi-pillar-total.md",
+      "expected_verdict": "HIGH_RISK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["HIGH_RISK", "high-risk-multi-pillar-total", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "stale-review-unanswered-majority",
+      "name": "Review updated 8 days ago but 54.5% UNANSWERED — abandoned review",
+      "difficulty": "medium",
+      "prompt_file": "prompts/stale-review-unanswered-majority.md",
+      "baseline_file": "baselines/stale-review-unanswered-majority.md",
+      "expected_verdict": "STALE_REVIEW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["STALE_REVIEW", "stale-review-unanswered-majority", "VERDICT", "REASON", "REMEDIATION", "UNANSWERED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

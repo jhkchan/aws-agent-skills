@@ -1,0 +1,48 @@
+# Eval configuration for eventbridge-bus-policy-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: eventbridge-bus-policy-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: public-bus-wildcard-putevents
+    difficulty: easy
+    prompt_file: prompts/public-bus-wildcard-putevents.md
+    baseline_file: baselines/public-bus-wildcard-putevents.md
+    expected_verdict: PUBLIC_BUS
+  - id: no-dlq-silent-drop
+    difficulty: medium
+    prompt_file: prompts/no-dlq-silent-drop.md
+    baseline_file: baselines/no-dlq-silent-drop.md
+    expected_verdict: NO_DLQ
+  - id: no-encryption-aws-managed
+    difficulty: medium
+    prompt_file: prompts/no-encryption-aws-managed.md
+    baseline_file: baselines/no-encryption-aws-managed.md
+    expected_verdict: NO_ENCRYPTION
+  - id: config-gap-no-archive
+    difficulty: easy
+    prompt_file: prompts/config-gap-no-archive.md
+    baseline_file: baselines/config-gap-no-archive.md
+    expected_verdict: CONFIG_GAP
+  - id: ok-org-scoped-bus
+    difficulty: hard
+    prompt_file: prompts/ok-org-scoped-bus.md
+    baseline_file: baselines/ok-org-scoped-bus.md
+    expected_verdict: OK
+  - id: public-bus-weak-source-ip
+    difficulty: hard
+    prompt_file: prompts/public-bus-weak-source-ip.md
+    baseline_file: baselines/public-bus-weak-source-ip.md
+    expected_verdict: PUBLIC_BUS

@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "directconnect-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Direct Connect Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "single-connection-no-redundancy",
+      "name": "Single Direct Connect connection — entire hybrid network on one fibre path",
+      "difficulty": "easy",
+      "prompt_file": "prompts/single-connection-no-redundancy.md",
+      "baseline_file": "baselines/single-connection-no-redundancy.md",
+      "expected_verdict": "SINGLE_CONNECTION",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["SINGLE_CONNECTION", "single-connection-no-redundancy", "VERDICT", "REASON", "REMEDIATION", "EqSE2"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "same-location-pseudo-diversity",
+      "name": "Two connections at the same DX location — pseudo-diversity, shared facility risk",
+      "difficulty": "hard",
+      "prompt_file": "prompts/same-location-pseudo-diversity.md",
+      "baseline_file": "baselines/same-location-pseudo-diversity.md",
+      "expected_verdict": "SINGLE_CONNECTION",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["SINGLE_CONNECTION", "same-location-pseudo-diversity", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "macsec-disabled-dedicated",
+      "name": "Two diverse connections with MACSec disabled on capable dedicated hardware",
+      "difficulty": "medium",
+      "prompt_file": "prompts/macsec-disabled-dedicated.md",
+      "baseline_file": "baselines/macsec-disabled-dedicated.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "macsec-disabled-dedicated", "VERDICT", "REASON", "REMEDIATION", "no_encrypt"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: SINGLE_CONNECTION"]
+        }
+      ]
+    },
+    {
+      "id": "bgp-public-vif-no-auth",
+      "name": "Public VIF without BGP MD5 auth — route-hijack vector",
+      "difficulty": "hard",
+      "prompt_file": "prompts/bgp-public-vif-no-auth.md",
+      "baseline_file": "baselines/bgp-public-vif-no-auth.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "bgp-public-vif-no-auth", "VERDICT", "REASON", "REMEDIATION", "public"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: SINGLE_CONNECTION", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "loa-stale-requested",
+      "name": "Connection stuck in requested state with no LOA-CFA issued",
+      "difficulty": "medium",
+      "prompt_file": "prompts/loa-stale-requested.md",
+      "baseline_file": "baselines/loa-stale-requested.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "loa-stale-requested", "VERDICT", "REASON", "REMEDIATION", "requested"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: SINGLE_CONNECTION", "VERDICT: NO_ENCRYPTION"]
+        }
+      ]
+    },
+    {
+      "id": "all-clean-macsec-must-encrypt",
+      "name": "Diverse connections with MACSec must_encrypt and DXGW-attached redundant VIFs — clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/all-clean-macsec-must-encrypt.md",
+      "baseline_file": "baselines/all-clean-macsec-must-encrypt.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "all-clean-macsec-must-encrypt", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: SINGLE_CONNECTION", "VERDICT: NO_ENCRYPTION", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

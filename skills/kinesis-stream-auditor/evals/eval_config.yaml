@@ -1,0 +1,54 @@
+# Eval configuration for kinesis-stream-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: kinesis-stream-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-encryption-none
+    difficulty: easy
+    prompt_file: prompts/no-encryption-none.md
+    baseline_file: baselines/no-encryption-none.md
+    expected_verdict: NO_ENCRYPTION
+    expected_risk: CRITICAL
+  - id: cost-risk-extended-retention
+    difficulty: medium
+    prompt_file: prompts/cost-risk-extended-retention.md
+    baseline_file: baselines/cost-risk-extended-retention.md
+    expected_verdict: COST_RISK
+    expected_risk: HIGH
+  - id: cost-risk-on-demand-low-volume
+    difficulty: hard
+    prompt_file: prompts/cost-risk-on-demand-low-volume.md
+    baseline_file: baselines/cost-risk-on-demand-low-volume.md
+    expected_verdict: COST_RISK
+    expected_risk: HIGH
+  - id: config-gap-no-enhanced-monitoring
+    difficulty: medium
+    prompt_file: prompts/config-gap-no-enhanced-monitoring.md
+    baseline_file: baselines/config-gap-no-enhanced-monitoring.md
+    expected_verdict: CONFIG_GAP
+    expected_risk: MEDIUM
+  - id: ok-well-configured-stream
+    difficulty: easy
+    prompt_file: prompts/ok-well-configured-stream.md
+    baseline_file: baselines/ok-well-configured-stream.md
+    expected_verdict: OK
+    expected_risk: LOW
+  - id: no-encryption-max-retention-high-shards
+    difficulty: hard
+    prompt_file: prompts/no-encryption-max-retention-high-shards.md
+    baseline_file: baselines/no-encryption-max-retention-high-shards.md
+    expected_verdict: NO_ENCRYPTION
+    expected_risk: CRITICAL

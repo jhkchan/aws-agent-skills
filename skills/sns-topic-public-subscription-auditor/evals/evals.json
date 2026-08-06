@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "sns-topic-public-subscription-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SNS Topic Public Subscription Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "public-subscribe-no-condition",
+      "name": "Wildcard Principal with sns:Subscribe and sns:Publish — push-based data exfiltration",
+      "difficulty": "easy",
+      "prompt_file": "prompts/public-subscribe-no-condition.md",
+      "baseline_file": "baselines/public-subscribe-no-condition.md",
+      "expected_verdict": "PUBLIC_SUBSCRIPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PUBLIC_SUBSCRIPTION", "VERDICT", "REASON", "REMEDIATION", "Principal"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "wildcard-sns-all-no-encryption",
+      "name": "Wildcard sns:* to Principal * with no KMS encryption and no delivery logging",
+      "difficulty": "medium",
+      "prompt_file": "prompts/wildcard-sns-all-no-encryption.md",
+      "baseline_file": "baselines/wildcard-sns-all-no-encryption.md",
+      "expected_verdict": "PUBLIC_SUBSCRIPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PUBLIC_SUBSCRIPTION", "VERDICT", "REASON", "REMEDIATION", "encryption"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-encryption-same-account",
+      "name": "Same-account-only topic with plaintext messages — no KMS encryption",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-encryption-same-account.md",
+      "baseline_file": "baselines/no-encryption-same-account.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_SUBSCRIPTION"]
+        }
+      ]
+    },
+    {
+      "id": "fifo-no-dedup-config-gap",
+      "name": "FIFO topic with ContentBasedDeduplication false — exactly-once silently broken",
+      "difficulty": "hard",
+      "prompt_file": "prompts/fifo-no-dedup-config-gap.md",
+      "baseline_file": "baselines/fifo-no-dedup-config-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "deduplication"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_SUBSCRIPTION"]
+        }
+      ]
+    },
+    {
+      "id": "source-owner-scoped-config-gap",
+      "name": "Wildcard Publish restricted by aws:SourceOwner plus missing delivery logging",
+      "difficulty": "hard",
+      "prompt_file": "prompts/source-owner-scoped-config-gap.md",
+      "baseline_file": "baselines/source-owner-scoped-config-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PUBLIC_SUBSCRIPTION", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "clean-cmk-logging-ok",
+      "name": "Same-account topic with CMK encryption and full delivery logging — clean posture",
+      "difficulty": "easy",
+      "prompt_file": "prompts/clean-cmk-logging-ok.md",
+      "baseline_file": "baselines/clean-cmk-logging-ok.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PUBLIC_SUBSCRIPTION", "VERDICT: NO_ENCRYPTION", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

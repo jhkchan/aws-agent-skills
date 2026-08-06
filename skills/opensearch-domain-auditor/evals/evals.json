@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "opensearch-domain-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the OpenSearch Domain Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-encryption-at-rest",
+      "name": "Encryption-at-rest disabled — NO_ENCRYPTION (compliance stop)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-encryption-at-rest.md",
+      "baseline_file": "baselines/no-encryption-at-rest.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_ACCESS", "VERDICT: NO_FGAC", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "public-access-wildcard-http",
+      "name": "Principal * + es:ESHttp* no condition — PUBLIC_ACCESS (data-plane blast)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/public-access-wildcard-http.md",
+      "baseline_file": "baselines/public-access-wildcard-http.md",
+      "expected_verdict": "PUBLIC_ACCESS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PUBLIC_ACCESS", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION", "VERDICT: NO_FGAC", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-fgac-internet-exposed",
+      "name": "FGAC off on internet-facing domain with scoped policy — NO_FGAC",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-fgac-internet-exposed.md",
+      "baseline_file": "baselines/no-fgac-internet-exposed.md",
+      "expected_verdict": "NO_FGAC",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_FGAC", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION", "VERDICT: PUBLIC_ACCESS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-no-ntn-weak-master-no-slowlogs",
+      "name": "CMK + FGAC + scoped policy, but NTN off, weak master, no slow logs — CONFIG_GAP",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-no-ntn-weak-master-no-slowlogs.md",
+      "baseline_file": "baselines/config-gap-no-ntn-weak-master-no-slowlogs.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION", "VERDICT: PUBLIC_ACCESS", "VERDICT: NO_FGAC"]
+        }
+      ]
+    },
+    {
+      "id": "ok-clean-production",
+      "name": "Fully hardened VPC domain with CMK, NTN, FGAC, sized masters, slow logs — OK",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-clean-production.md",
+      "baseline_file": "baselines/ok-clean-production.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_ENCRYPTION", "VERDICT: PUBLIC_ACCESS", "VERDICT: NO_FGAC", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-encryption-and-public-worst-first",
+      "name": "Both at-rest off and wildcard es:ESHttp* — worst-first aggregation test",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-encryption-and-public-worst-first.md",
+      "baseline_file": "baselines/no-encryption-and-public-worst-first.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PUBLIC_ACCESS", "VERDICT: NO_FGAC", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

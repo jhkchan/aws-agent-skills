@@ -263,7 +263,7 @@ function cmdValidate() {
     if (!s.version || s.version === "unknown")
       issues.push("WARN: missing 'version'");
     if (!s.hasEval && !s.hasEvals)
-      issues.push("WARN: no eval/ directory");
+      issues.push("WARN: no eval/ or evals/ directory");
 
     if (issues.length === 0) {
       console.log(`  ${s.name}: OK`);

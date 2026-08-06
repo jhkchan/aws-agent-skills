@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "elbv2-load-balancer-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ELBv2 Load Balancer Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "insecure-listener-tls10",
+      "name": "HTTPS listener with TLS 1.0/1.1 security policy — protocol-downgrade vulnerability",
+      "difficulty": "medium",
+      "prompt_file": "prompts/insecure-listener-tls10.md",
+      "baseline_file": "baselines/insecure-listener-tls10.md",
+      "expected_verdict": "INSECURE_LISTENER",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INSECURE_LISTENER", "insecure-listener-tls10", "VERDICT", "REASON", "REMEDIATION", "TLS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: PERMISSIVE_SG"]
+        }
+      ]
+    },
+    {
+      "id": "permissive-sg-all-ports",
+      "name": "Security group open on all ports to 0.0.0.0/0 — full network exposure",
+      "difficulty": "easy",
+      "prompt_file": "prompts/permissive-sg-all-ports.md",
+      "baseline_file": "baselines/permissive-sg-all-ports.md",
+      "expected_verdict": "PERMISSIVE_SG",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PERMISSIVE_SG", "permissive-sg-all-ports", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: INSECURE_LISTENER"]
+        }
+      ]
+    },
+    {
+      "id": "no-access-logs-internal",
+      "name": "Internal ALB with access logs disabled — no forensic trail",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-access-logs-internal.md",
+      "baseline_file": "baselines/no-access-logs-internal.md",
+      "expected_verdict": "NO_ACCESS_LOGS",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ACCESS_LOGS", "no-access-logs-internal", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: INSECURE_LISTENER"]
+        }
+      ]
+    },
+    {
+      "id": "idle-no-targets",
+      "name": "ALB with zero registered targets — accepting traffic but returning 502",
+      "difficulty": "easy",
+      "prompt_file": "prompts/idle-no-targets.md",
+      "baseline_file": "baselines/idle-no-targets.md",
+      "expected_verdict": "IDLE",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["IDLE", "idle-no-targets", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: INSECURE_LISTENER"]
+        }
+      ]
+    },
+    {
+      "id": "nlb-config-gap",
+      "name": "NLB with cross-zone off and deletion protection off — config gaps",
+      "difficulty": "hard",
+      "prompt_file": "prompts/nlb-config-gap.md",
+      "baseline_file": "baselines/nlb-config-gap.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "nlb-config-gap", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: INSECURE_LISTENER"]
+        }
+      ]
+    },
+    {
+      "id": "clean-ok",
+      "name": "Production ALB with TLS 1.2+, redirect, access logs, scoped SG, healthy targets — clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/clean-ok.md",
+      "baseline_file": "baselines/clean-ok.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "clean-ok", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSECURE_LISTENER", "VERDICT: PERMISSIVE_SG"]
+        }
+      ]
+    }
+  ]
+}

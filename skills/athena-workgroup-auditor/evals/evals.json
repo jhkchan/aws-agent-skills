@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "athena-workgroup-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Athena Workgroup Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "primary-no-encryption-no-dsl",
+      "name": "Undeletable primary workgroup — no enforcement, no encryption, no DSL",
+      "difficulty": "hard",
+      "prompt_file": "prompts/primary-no-encryption-no-dsl.md",
+      "baseline_file": "baselines/primary-no-encryption-no-dsl.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "primary", "VERDICT", "REASON", "REMEDIATION", "EncryptionConfiguration"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_LIMITS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "sse-kms-no-dsl",
+      "name": "Enforced SSE-KMS workgroup with no BytesScannedCutoffPerQuery — unbounded scans",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sse-kms-no-dsl.md",
+      "baseline_file": "baselines/sse-kms-no-dsl.md",
+      "expected_verdict": "NO_LIMITS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_LIMITS", "analytics-sse-kms-no-dsl", "VERDICT", "REASON", "REMEDIATION", "BytesScannedCutoffPerQuery"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "enforce-off-configs-advisory",
+      "name": "Controls present but EnforceWorkGroupConfiguration false — decorative posture",
+      "difficulty": "hard",
+      "prompt_file": "prompts/enforce-off-configs-advisory.md",
+      "baseline_file": "baselines/enforce-off-configs-advisory.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "etl-enforce-off-configs-advisory", "VERDICT", "REASON", "REMEDIATION", "EnforceWorkGroupConfiguration"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION", "VERDICT: NO_LIMITS"]
+        }
+      ]
+    },
+    {
+      "id": "no-cloudtrail-data-events",
+      "name": "Controls clean but no CloudTrail Athena data events — 45-day history cliff",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-cloudtrail-data-events.md",
+      "baseline_file": "baselines/no-cloudtrail-data-events.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "bi-no-cloudtrail-data-events", "VERDICT", "REASON", "REMEDIATION", "CloudTrail"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_ENCRYPTION", "VERDICT: NO_LIMITS"]
+        }
+      ]
+    },
+    {
+      "id": "all-clean-ok",
+      "name": "Fully governed SQL workgroup — enforced, encrypted, DSL set, history captured, scoped IAM",
+      "difficulty": "easy",
+      "prompt_file": "prompts/all-clean-ok.md",
+      "baseline_file": "baselines/all-clean-ok.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "lakehouse-all-clean-ok", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_ENCRYPTION", "VERDICT: NO_LIMITS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-encryption-dsl-set",
+      "name": "Enforced workgroup with binding DSL but no EncryptionConfiguration — plaintext results",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-encryption-dsl-set.md",
+      "baseline_file": "baselines/no-encryption-dsl-set.md",
+      "expected_verdict": "NO_ENCRYPTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_ENCRYPTION", "adhoc-no-encryption-dsl-set", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_LIMITS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

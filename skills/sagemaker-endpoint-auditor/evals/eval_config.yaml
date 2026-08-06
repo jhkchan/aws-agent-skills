@@ -1,0 +1,48 @@
+# Eval configuration for sagemaker-endpoint-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: sagemaker-endpoint-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: public-endpoint-no-vpc
+    difficulty: medium
+    prompt_file: prompts/public-endpoint-no-vpc.md
+    baseline_file: baselines/public-endpoint-no-vpc.md
+    expected_verdict: PUBLIC_ENDPOINT
+  - id: no-kms-encryption
+    difficulty: medium
+    prompt_file: prompts/no-kms-encryption.md
+    baseline_file: baselines/no-kms-encryption.md
+    expected_verdict: NO_ENCRYPTION
+  - id: overpermissive-execution-role
+    difficulty: medium
+    prompt_file: prompts/overpermissive-execution-role.md
+    baseline_file: baselines/overpermissive-execution-role.md
+    expected_verdict: OVERPERMISSIVE_ROLE
+  - id: no-monitoring-no-capture
+    difficulty: hard
+    prompt_file: prompts/no-monitoring-no-capture.md
+    baseline_file: baselines/no-monitoring-no-capture.md
+    expected_verdict: NO_MONITORING
+  - id: config-gap-single-instance
+    difficulty: easy
+    prompt_file: prompts/config-gap-single-instance.md
+    baseline_file: baselines/config-gap-single-instance.md
+    expected_verdict: CONFIG_GAP
+  - id: ok-hardened-endpoint
+    difficulty: easy
+    prompt_file: prompts/ok-hardened-endpoint.md
+    baseline_file: baselines/ok-hardened-endpoint.md
+    expected_verdict: OK

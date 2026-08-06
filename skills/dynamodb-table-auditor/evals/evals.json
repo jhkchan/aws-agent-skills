@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "dynamodb-table-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DynamoDB Table Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "unencrypted-sse-disabled",
+      "name": "SSE disabled (AES256) — no customer-controlled KMS encryption",
+      "difficulty": "easy",
+      "prompt_file": "prompts/unencrypted-sse-disabled.md",
+      "baseline_file": "baselines/unencrypted-sse-disabled.md",
+      "expected_verdict": "UNENCRYPTED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["UNENCRYPTED", "unencrypted-sse-disabled", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_PITR", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-pitr-recovery-gap",
+      "name": "Customer-managed SSE-KMS but PITR disabled — recovery gap",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-pitr-recovery-gap.md",
+      "baseline_file": "baselines/no-pitr-recovery-gap.md",
+      "expected_verdict": "NO_PITR",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_PITR", "no-pitr-recovery-gap", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: UNENCRYPTED", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "capacity-mismatch-no-autoscaling",
+      "name": "PROVISIONED with fixed throughput and no autoscaling — throttle risk",
+      "difficulty": "medium",
+      "prompt_file": "prompts/capacity-mismatch-no-autoscaling.md",
+      "baseline_file": "baselines/capacity-mismatch-no-autoscaling.md",
+      "expected_verdict": "CAPACITY_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CAPACITY_MISMATCH", "capacity-mismatch-no-autoscaling", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: UNENCRYPTED", "VERDICT: NO_PITR"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-aws-managed-key-no-ttl",
+      "name": "AWS-managed KMS key, TTL disabled, no deletion protection — config gaps",
+      "difficulty": "hard",
+      "prompt_file": "prompts/config-gap-aws-managed-key-no-ttl.md",
+      "baseline_file": "baselines/config-gap-aws-managed-key-no-ttl.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-aws-managed-key-no-ttl", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: UNENCRYPTED", "VERDICT: NO_PITR"]
+        }
+      ]
+    },
+    {
+      "id": "ok-clean-production",
+      "name": "Fully hardened production table — customer CMK, PITR, on-demand, TTL, protection",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-clean-production.md",
+      "baseline_file": "baselines/ok-clean-production.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "ok-clean-production", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: UNENCRYPTED", "VERDICT: NO_PITR", "VERDICT: CAPACITY_MISMATCH", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "unencrypted-and-no-pitr-worst-first",
+      "name": "Both SSE disabled AND PITR disabled — worst-first aggregation test",
+      "difficulty": "hard",
+      "prompt_file": "prompts/unencrypted-and-no-pitr-worst-first.md",
+      "baseline_file": "baselines/unencrypted-and-no-pitr-worst-first.md",
+      "expected_verdict": "UNENCRYPTED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["UNENCRYPTED", "unencrypted-and-no-pitr-worst-first", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_PITR", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

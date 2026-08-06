@@ -1,0 +1,48 @@
+# Eval configuration for eks-cluster-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: eks-cluster-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: public-endpoint-open
+    difficulty: easy
+    prompt_file: prompts/public-endpoint-open.md
+    baseline_file: baselines/public-endpoint-open.md
+    expected_verdict: PUBLIC_ENDPOINT
+  - id: logging-all-disabled
+    difficulty: medium
+    prompt_file: prompts/logging-all-disabled.md
+    baseline_file: baselines/logging-all-disabled.md
+    expected_verdict: LOGGING_DISABLED
+  - id: system-masters-node-role
+    difficulty: hard
+    prompt_file: prompts/system-masters-node-role.md
+    baseline_file: baselines/system-masters-node-role.md
+    expected_verdict: CONFIG_GAP
+  - id: open-security-group
+    difficulty: medium
+    prompt_file: prompts/open-security-group.md
+    baseline_file: baselines/open-security-group.md
+    expected_verdict: CONFIG_GAP
+  - id: outdated-version
+    difficulty: medium
+    prompt_file: prompts/outdated-version.md
+    baseline_file: baselines/outdated-version.md
+    expected_verdict: OUTDATED
+  - id: clean-hardened-cluster
+    difficulty: easy
+    prompt_file: prompts/clean-hardened-cluster.md
+    baseline_file: baselines/clean-hardened-cluster.md
+    expected_verdict: OK

@@ -1,0 +1,54 @@
+# Eval configuration for ce-cost-anomaly-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ce-cost-anomaly-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: no-cad-monitors-at-all
+    difficulty: easy
+    prompt_file: prompts/no-cad-monitors-at-all.md
+    baseline_file: baselines/no-cad-monitors-at-all.md
+    expected_verdict: NO_ANOMALY_SUB
+    expected_risk: HIGH
+  - id: monitors-no-subscriptions
+    difficulty: medium
+    prompt_file: prompts/monitors-no-subscriptions.md
+    baseline_file: baselines/monitors-no-subscriptions.md
+    expected_verdict: NO_ANOMALY_SUB
+    expected_risk: HIGH
+  - id: low-ri-coverage-steady-state
+    difficulty: medium
+    prompt_file: prompts/low-ri-coverage-steady-state.md
+    baseline_file: baselines/low-ri-coverage-steady-state.md
+    expected_verdict: LOW_RI_COVERAGE
+    expected_risk: MEDIUM
+  - id: immediate-monitor-weekly-subscription
+    difficulty: hard
+    prompt_file: prompts/immediate-monitor-weekly-subscription.md
+    baseline_file: baselines/immediate-monitor-weekly-subscription.md
+    expected_verdict: CONFIG_GAP
+    expected_risk: MEDIUM
+  - id: daily-only-no-cur
+    difficulty: hard
+    prompt_file: prompts/daily-only-no-cur.md
+    baseline_file: baselines/daily-only-no-cur.md
+    expected_verdict: CONFIG_GAP
+    expected_risk: MEDIUM
+  - id: well-configured-production
+    difficulty: easy
+    prompt_file: prompts/well-configured-production.md
+    baseline_file: baselines/well-configured-production.md
+    expected_verdict: OK
+    expected_risk: LOW

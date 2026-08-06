@@ -1,0 +1,136 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "cognito-idp-user-pool-auditor",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-04",
+  "description": "Structured eval definitions for the Cognito User Pool Auditor. Six-pool proven set exercising every branch of the classification logic (INSECURE via no-MFA+weak-password, INSECURE via implicit OAuth, WEAK via optional MFA, WEAK via admin auth flow, ADEQUATE via ASF-audit+SMS-only, OK fully hardened). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "insecure-no-mfa-weak-password",
+      "name": "No MFA + weak password policy + public client + user enumeration",
+      "difficulty": "easy",
+      "branch": "Rule 1a + 1c + 1d — multiple critical deficiencies",
+      "prompt_file": "prompts/insecure-no-mfa-weak-password.md",
+      "baseline_file": "baselines/insecure-no-mfa-weak-password.md",
+      "expected_verdict": "INSECURE",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INSECURE", "insecure-demo-pool", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: WEAK", "VERDICT: ADEQUATE", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "insecure-implicit-oauth",
+      "name": "Hardened pool with OAuth implicit flow — token leakage",
+      "difficulty": "medium",
+      "branch": "Rule 1b — implicit OAuth overrides otherwise strong controls",
+      "prompt_file": "prompts/insecure-implicit-oauth.md",
+      "baseline_file": "baselines/insecure-implicit-oauth.md",
+      "expected_verdict": "INSECURE",
+      "expected_risk": "CRITICAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INSECURE", "spa-app-pool", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: WEAK", "VERDICT: ADEQUATE", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "weak-optional-mfa",
+      "name": "Optional MFA + adequate password + long refresh token + ASF audit",
+      "difficulty": "medium",
+      "branch": "Rule 2a + 2e — MFA optional, long-lived tokens",
+      "prompt_file": "prompts/weak-optional-mfa.md",
+      "baseline_file": "baselines/weak-optional-mfa.md",
+      "expected_verdict": "WEAK",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["WEAK", "consumer-app-pool", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSECURE", "VERDICT: ADEQUATE", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "weak-admin-auth-flow",
+      "name": "MFA optional + ASF OFF + insecure OAuth redirect URLs",
+      "difficulty": "medium",
+      "branch": "Rule 2a + 2f + 2h — optional MFA, no ASF, HTTP+wildcard redirects",
+      "prompt_file": "prompts/weak-admin-auth-flow.md",
+      "baseline_file": "baselines/weak-admin-auth-flow.md",
+      "expected_verdict": "WEAK",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["WEAK", "enterprise-b2b-pool", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSECURE", "VERDICT: ADEQUATE", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "adequate-enforced-mfa-minor-gaps",
+      "name": "MFA ON with SMS-only + ASF audit mode — adequate with gaps",
+      "difficulty": "hard",
+      "branch": "Rule 3a + 3e — ASF not enforced, SMS-only MFA",
+      "prompt_file": "prompts/adequate-enforced-mfa-minor-gaps.md",
+      "baseline_file": "baselines/adequate-enforced-mfa-minor-gaps.md",
+      "expected_verdict": "ADEQUATE",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ADEQUATE", "saas-platform-pool", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSECURE", "VERDICT: WEAK", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "ok-hardened-pool",
+      "name": "Fully hardened pool — all controls met",
+      "difficulty": "easy",
+      "branch": "Rule 4 — all controls met (MFA ON TOTP, 14-char password, ASF ENFORCED, SRP-only, code+PKCE, revocation, deletion protection)",
+      "prompt_file": "prompts/ok-hardened-pool.md",
+      "baseline_file": "baselines/ok-hardened-pool.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "hardened-prod-pool", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSECURE", "VERDICT: WEAK", "VERDICT: ADEQUATE"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+# Eval configuration for secretsmanager-rotation-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: secretsmanager-rotation-auditor
+snapshot_date: "2026-08-04"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: unrotated-rds-secret
+    difficulty: easy
+    prompt_file: prompts/unrotated-rds-secret.md
+    baseline_file: baselines/unrotated-rds-secret.md
+    expected_verdict: UNROTATED
+    expected_risk: CRITICAL
+  - id: ok-healthy-rotation
+    difficulty: easy
+    prompt_file: prompts/ok-healthy-rotation.md
+    baseline_file: baselines/ok-healthy-rotation.md
+    expected_verdict: OK
+    expected_risk: LOW
+  - id: broken-lambda-deleted
+    difficulty: medium
+    prompt_file: prompts/broken-lambda-deleted.md
+    baseline_file: baselines/broken-lambda-deleted.md
+    expected_verdict: ROTATION_BROKEN
+    expected_risk: CRITICAL
+  - id: stale-overdue-rotation
+    difficulty: medium
+    prompt_file: prompts/stale-overdue-rotation.md
+    baseline_file: baselines/stale-overdue-rotation.md
+    expected_verdict: STALE
+    expected_risk: HIGH
+  - id: broken-never-rotated
+    difficulty: hard
+    prompt_file: prompts/broken-never-rotated.md
+    baseline_file: baselines/broken-never-rotated.md
+    expected_verdict: ROTATION_BROKEN
+    expected_risk: HIGH
+  - id: recovery-window-flagged
+    difficulty: hard
+    prompt_file: prompts/recovery-window-flagged.md
+    baseline_file: baselines/recovery-window-flagged.md
+    expected_verdict: UNROTATED
+    expected_risk: HIGH
