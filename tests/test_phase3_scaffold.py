@@ -225,9 +225,9 @@ def test_orchestrator_has_references() -> None:
 
 
 def test_shared_infra_exists() -> None:
-    """_aws_shared/ must exist with shared reference docs."""
-    shared = REPO_ROOT / "_aws_shared"
-    assert shared.is_dir(), "_aws_shared/ directory missing"
+    """schema/ must exist with shared reference docs."""
+    shared = REPO_ROOT / "schema"
+    assert shared.is_dir(), "schema/ directory missing"
     md_files = list(shared.glob("*.md"))
     assert len(md_files) >= 2, f"Expected >=2 shared refs, got {len(md_files)}"
 
