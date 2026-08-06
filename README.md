@@ -1,27 +1,139 @@
 # aws-agent-skills
 
-> Repository: **[jhkchan/aws-agent-skills](https://github.com/jhkchan/aws-agent-skills)**
-> · License: **Apache-2.0** · Maintainer: **Jacky Chan, AWS Community Builder**
-> (a solo, community-driven project).
+> **Repository:** [jhkchan/aws-agent-skills](https://github.com/jhkchan/aws-agent-skills)
+> · License: **Apache-2.0** · Maintainer: **Jacky Chan, AWS Community Builder (ML & GenAI)**
+> · A solo, community-driven project.
 
-Eval-backed AWS CloudOps agent skills. Every shipped skill carries a
-co-located eval specification (`skills/<name>/eval/test-cases.yaml`) that
-produces a per-dimension, 120-point scorecard when run through the shared
-Python harness — measured, not asserted. Each committed scorecard renders
-into the README table below with the per-skill columns mandated by S-007:
-**skill**, **model**, **total** score, **grade**, **verdict** (assertion
-correctness), **latency**, and **tokens**.
+**79 eval-backed AWS CloudOps agent skills** — every skill is a deterministic detective auditor with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric and the softaworks agent-toolkit evaluated-skill pattern.
+
+---
 
 ## Why eval-backed?
 
-Existing AWS agent-skill repos ship `SKILL.md` + `references/` and claim
-"thorough evals" with zero artifacts. This repo makes the eval-backed
-contract **structural**: a skill directory without `eval/` is visibly
-incomplete, and CI runs the assertion layer on every PR.
+Every existing AWS agent-skill repo — `aws/agent-toolkit-for-aws` (140 skills), `itsmostafa/aws-agent-skills` (18), `softaworks/agent-toolkit` — ships `SKILL.md` + references and **claims** "thorough evals" with **zero published artifacts**. This repo makes the eval-backed contract **structural**: every skill carries a co-located `eval/test-cases.yaml` that produces a per-dimension scorecard when run through the shared Python harness. The scorecard is committed. The grade is real.
+
+---
+
+## Installation
+
+### Method 1 — Agent runtime (Claude Code, Cursor, Windsurf)
+
+```bash
+git clone https://github.com/jhkchan/aws-agent-skills.git
+
+# Copy the skills you want into your agent's skills directory.
+# For Claude Code:
+cp -r aws-agent-skills/skills/s3-public-access-auditor ~/.claude/skills/
+
+# Or install ALL 79 skills at once:
+cp -r aws-agent-skills/skills/* ~/.claude/skills/
+```
+
+### Method 2 — Marketplace / plugin manifest
+
+The repo includes `.claude-plugin/marketplace.json` for agent runtimes that support plugin manifests. Point your runtime at this repo's root.
+
+### Method 3 — Use the CLI to discover and route
+
+```bash
+git clone https://github.com/jhkchan/aws-agent-skills.git
+cd aws-agent-skills
+node cli/bin/cli.js list          # list all 79 skills + the orchestrator
+node cli/bin/cli.js route "audit my S3 buckets for public access"  # route a prompt
+```
+
+---
+
+## Quickstart
+
+### Audit something right now
+
+Once a skill is installed in your agent runtime, just describe the task:
+
+```
+Audit my S3 buckets for public access.
+```
+
+The skill activates, asks for the bucket configs (or fetches them via `aws s3api`), and produces structured verdicts:
+
+```text
+BUCKET: app-data-prod
+VERDICT: SAFE
+REASON: S3 Block Public Access is fully enabled (all 4 settings).
+REMEDIATION: None required.
+
+BUCKET: public-assets-cdn
+VERDICT: PUBLIC
+REASON: BPA is OFF. Bucket policy grants s3:GetObject to Principal "*" with no condition.
+REMEDIATION: Enable BPA (all 4 settings). Use CloudFront + OAC if public CDN is intended.
+```
+
+### Use the orchestrator for a full CloudOps audit
+
+```
+Run a full CloudOps security audit across my AWS account.
+```
+
+The `aws-orchestrator` skill routes the request across relevant auditors (S3, IAM, EC2, GuardDuty, KMS, etc.) in a 4-phase pipeline: **Assess > Audit > Prioritize > Remediate**.
+
+### Slash commands
+
+Each skill has a slash command (in `commands/aws/`):
+
+```
+/aws:audit-s3-public-access
+/aws:audit-iam-least-privilege
+/aws:audit-ec2-security-group
+/aws:audit-guardduty-findings
+... (79 commands total)
+```
+
+---
+
+## Usage examples
+
+### Example 1 — IAM policy review
+
+**Prompt:** `Review this IAM policy for least-privilege violations.`
+
+```text
+POLICY: app-backend-role-policy
+VERDICT: OVERPERMISSIVE
+RISK: CRITICAL
+REASON: Statement 1 grants iam:PassRole on Resource "*" — privilege escalation vector.
+REMEDIATION: Scope iam:PassRole to specific service-linked roles. Remove wildcard Resource.
+```
+
+### Example 2 — Lambda runtime deprecation
+
+**Prompt:** `Check if any of my Lambda functions use deprecated runtimes.`
+
+```text
+FUNCTION: data-processor
+VERDICT: DEPRECATED_RUNTIME
+RISK: HIGH
+REASON: Runtime python3.9 reaches end-of-support 2025-10. AWS will block updates after 2026-01.
+REMEDIATION: Upgrade to python3.13. Test with sam build && sam local invoke.
+```
+
+### Example 3 — Bedrock guardrail coverage
+
+**Prompt:** `Audit my Bedrock guardrails for coverage gaps.`
+
+```text
+MODEL: anthropic.claude-sonnet-5
+VERDICT: INCOMPLETE_COVERAGE
+REASON: Guardrail gr-abc123 exists but does not cover this model.
+REMEDIATION: Associate the guardrail with this model via update-guardrail.
+```
+
+See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
+
+---
 
 ## Skills
 
-<!-- Auto-generated by eval/generate_readme_table.py — do not edit by hand. -->
+<!-- Auto-generated by eval/generate_readme_table.py -- do not edit by hand. -->
 <!-- To update: python3 eval/generate_readme_table.py -->
 <!-- BEGIN EVAL SCORECARD TABLE -->
 | Skill | Model | Score | Grade | Verdicts | Latency | Tokens |
@@ -107,70 +219,129 @@ incomplete, and CI runs the assertion layer on every PR.
 | wellarchitected-workload-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 20.5s | 41739 |
 <!-- END EVAL SCORECARD TABLE -->
 
-> Scorecard rows appear once eval runs commit JSON artifacts to
-> `eval/scorecards/`. Run `python3 eval/generate_readme_table.py` to refresh.
+> Scorecard rows appear once eval runs commit JSON artifacts to `eval/scorecards/`. Run `python3 eval/generate_readme_table.py` to refresh.
+
+**Eval-backed standard: ALL 79 shipped skills are Grade A (>=108/120)** -- zero exceptions. Every skill is measured by the median-of-3 judge (reproducible); none assert quality without evidence.
+
+---
 
 ## Eval pipeline
 
 ```text
-skills/*/eval/*.yaml  ->  eval/run_eval.py
-                         ->  aws bedrock-runtime converse  (target model)
-                         ->  assertion layer  (must_contain / must_not_contain)
-                         ->  LLM judge         (8-dimension rubric)
-                         ->  JSON scorecard    (committed artifact)
+skills/*/eval/test-cases.yaml  ->  eval/run_eval.py
+                                  ->  aws bedrock-runtime converse  (Nova Pro target)
+                                  ->  assertion layer  (must_contain / must_not_contain)
+                                  ->  LLM judge  (gpt-oss-120b, 8-dim rubric, median-of-3)
+                                  ->  JSON scorecard  (committed artifact)
 ```
 
-- **Target models:** Amazon Nova Pro (`amazon.nova-pro-v1:0`) and
-  gpt-oss-20b.  at the Bedrock API layer on APAC
-  accounts — see `features/aws-cloudops-skills-oss/spec.md` (S-E03).
-- **CI:** assertion-only on every PR (no AWS credentials). The maintainer
-  runs the LLM-judge locally and commits scorecard artifacts.
-- **Eval-backed standard: ALL 71 shipped skills are Grade A (>=108/120)** — zero
-  exceptions. Every skill is measured by the median-of-3 judge (reproducible);
-  none assert quality without evidence.
+- **Target models:** Amazon Nova Pro (`amazon.nova-pro-v1:0`) and `openai.gpt-oss-20b`.
+- **Judge:** `openai.gpt-oss-120b-1:0` via the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension / 120-point rubric. The **median of 3 runs** gives stable, reproducible scores.
+- **CI:** assertion-only on every PR (no AWS credentials). The maintainer runs the LLM-judge locally and commits scorecard artifacts.
+- **Grade floor:** Grade A (>=108/120). Every shipped skill clears this.
 
-## Quickstart
+### Run the eval yourself
 
 ```bash
-# Run the assertion layer only (no AWS credentials needed)
+# Assertion layer only (no AWS credentials needed)
 python3 eval/run_eval.py --assertion-only
 
-# Run the full eval (target model + LLM judge) — requires AWS SSO
+# Full eval (target model + LLM judge) -- requires AWS SSO
 aws sso login --profile default
-python3 eval/run_eval.py
+python3 eval/run_eval.py                 # all skills
+python3 eval/run_eval.py --skill s3-public-access-auditor  # one skill
 ```
 
-## Repository layout
+---
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the directory structure and how
-to add a skill.
+## FAQ
 
-## Coverage Roadmap
+### Why not ride on `aws/agent-toolkit-for-aws`?
 
-This repo's wedge is **eval-rigor, not breadth** — three eval-backed skills
-beat 200 unevaluated ones (that is the "measured, not vibes" thesis). The path
-from these seeds to broad AWS coverage is staged:
+We investigated this thoroughly. `aws/agent-toolkit-for-aws` (the official AWS repo, 140 skills, 2,200+ stars) has a **dual block on external contributions**:
 
-1. **Now (Phase 2):** 3 deep seeds across 3 service families (S3 / IAM / EC2),
-   each clearing the Grade-A eval-backed floor via the 8-dimension judge. Proves
-   the harness + floor + CI + governance end-to-end.
-2. **Category depth:** saturate one family (e.g. *security*: +KMS, GuardDuty,
-   Config, Security Hub) to prove the pattern repeats and the contributor docs work.
-3. **Breadth across families:** expand to networking, storage, compute, databases
-   — prioritized by CloudOps demand.
-4. **Contributor-driven growth:** the awslabs amplification path
-   (`awslabs/agent-plugins` accepts external PRs) and a future dedicated org
-   unlock external contributors.
-5. **Steady state:** broad AWS coverage maintained by a community, not one person.
+1. `CONTRIBUTING.md` states verbatim: *"This project is not accepting external code contributions at this time."*
+2. GitHub enforces `pull_request_creation_policy: collaborators_only` -- public forks **cannot even open PRs**.
 
-A solo maintainer realistically holds ~10–30 eval-backed skills; beyond that,
-breadth requires the contributor model. "Cover all ~200 AWS services" is a
-community-scale goal — the seed set plus this roadmap are the on-ramp.
+Of the last 100 PRs, 97 are from AWS staff; there is **no documented pathway** for a new external contributor to get collaborator status. We cannot contribute to it.
+
+The adjacent `awslabs/agent-plugins` (848 stars) **does** accept external PRs (7+ merged from external authors in 60 days) -- and we keep that door open as a **future amplification path** (contribute the best-of Grade-A auditors upstream once organic reach demands it). But for now, the independent repo is the fastest path to shipping eval-backed skills.
+
+**The real wedge:** this repo ships **committed eval scorecards** (median-of-3 judge, Grade A) -- zero existing AWS skill repo does. That is the differentiator: *measured, not vibes.*
+
+### How does the eval actually work?
+
+1. **Nova Pro** executes the skill (runs the audit on the test-case input).
+2. An **assertion layer** checks the model output for required verdict tokens (deterministic, CI-runnable).
+3. **gpt-oss-120b** judges the skill definition against the softaworks 8-dimension rubric (adversarial, default-deduct, per-dimension justification).
+4. The **median of 3 judge runs** gives a stable score (the judge has +/-5 run-to-run variance; the median removes it).
+5. The result is a committed JSON scorecard + a Grade (A/B/C/D/F).
+
+### What models does this repo use?
+
+- **Target** (executes the skill): Amazon Nova Pro, gpt-oss-20b.
+- **Judge** (scores the skill): gpt-oss-120b.
+
+
+### What does Grade A mean?
+
+>=108/120 (90%) on the softaworks 8-dimension rubric. Every shipped skill clears this floor.
+
+### How do I contribute a skill?
+
+1. Create `skills/<your-skill>/SKILL.md` (follow `schema/SKILL.schema.json`).
+2. Add `eval/test-cases.yaml` with 5-6 objective, deterministic test cases.
+3. Run `python3 eval/run_eval.py --skill <your-skill>` and confirm Grade A.
+4. Run `python3 eval/generate_readme_table.py` to update the README.
+5. Open a PR. CI runs the assertion layer; the maintainer reviews + commits the judge scorecard.
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full structured-eval pattern.
+
+### How is this different from `itsmostafa/aws-agent-skills`?
+
+`itsmostafa/aws-agent-skills` (18 skills) ships **service-overview docs** (what a service *is*) with **zero evals**. This repo ships **detective auditors** (what to *check* + the measured eval proving the check works). Different artifact, different quality bar.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide on adding a skill (the directory structure, the eval contract, the schema, and the slash-command pattern).
+
+Every contribution must ship with:
+- `SKILL.md` (schema-valid frontmatter + the audit classification logic)
+- `eval/test-cases.yaml` (5-6 deterministic test cases with concept-token assertions)
+- A committed scorecard at Grade A
+
+---
+
+## Coverage
+
+**79 eval-backed skills across all 12 CloudOps families** (all Grade A):
+
+| Family | Count | Examples |
+|---|---|---|
+| Security | 21 | S3, IAM, EC2, GuardDuty, KMS, WAFv2, Secrets Manager, Inspector2, ACM, STS, Cognito, Access Analyzer, Security Hub, Macie, Firewall Manager, Detective, Shield, Network Firewall, Verified Permissions, VPC Lattice, CloudHSM |
+| Compute | 6 | Lambda, ECS, ECR, EKS, Auto Scaling, Compute Optimizer |
+| Storage | 4 | EBS, EFS, Backup, DLM |
+| Networking | 5 | CloudFront, ELBv2, Route53, DirectConnect, Network Manager |
+| FinOps | 5 | Billing, Budgets, Cost Explorer, Cost Optimization Hub, CUR |
+| Governance | 7 | CloudTrail, Config, Organizations, Control Tower, Well-Architected, Trusted Advisor, Audit Manager |
+| Databases | 2 | RDS, DynamoDB |
+| App Integration | 5 | SQS, SNS, EventBridge, Step Functions, API Gateway |
+| Developer Tools | 4 | CodeBuild, CodeCommit, CodeDeploy, CodePipeline |
+| AI/ML | 3 | Bedrock Guardrails, Bedrock Model Access, SageMaker |
+| Management | 6 | CloudWatch Alarms, CloudWatch Logs, SSM, Service Quotas, Health, Resilience Hub |
+| Analytics | 10 | Athena, Glue, Kinesis, OpenSearch, LakeFormation, Redshift, Firehose, MSK, EMR, CleanRooms |
+| Migration | 1 | DMS |
+
+See [MAINTENANCE.md](./MAINTENANCE.md) for the quarterly freshness re-audit cadence.
+
+---
 
 ## License
 
-[Apache License 2.0](./LICENSE).
+[Apache License 2.0](./LICENSE) -- See [NOTICE](./NOTICE) for AWS trademark attribution.
 
 ## Author
 
-Jacky Chan — AWS Community Builder (ML & GenAI).
+**Jacky Chan** -- AWS Community Builder (ML & GenAI). Personal project, not affiliated with any employer.

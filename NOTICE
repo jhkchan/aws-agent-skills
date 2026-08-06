@@ -1,0 +1,17 @@
+AWS CloudOps Agent Skills
+Copyright 2026 Jacky Chan
+
+This project is licensed under the Apache License, Version 2.0.
+
+AWS, Amazon Web Services, and all AWS service names (including but not limited to
+S3, IAM, EC2, Lambda, ECS, EKS, RDS, DynamoDB, CloudFront, CloudTrail, GuardDuty,
+Security Hub, KMS, Bedrock, SageMaker, and all other AWS service names referenced
+in this repository) are trademarks of Amazon Web Services, Inc. or its affiliates.
+
+This project is an independent, community-driven open-source project. It is NOT
+affiliated with, endorsed by, sponsored by, or supported by Amazon Web Services,
+Inc. or its affiliates. AWS service names are referenced solely for
+interoperability and educational purposes.
+
+The "Agent Skills" referenced by Claude Code, Cursor, and other agent runtimes are
+a generic capability pattern; this project's skills are independent artifacts.
