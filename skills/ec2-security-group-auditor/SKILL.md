@@ -694,3 +694,11 @@ structure is machine-recognizable and aids comprehension:
 ## Domain
 
 AWS CloudOps / EC2 Network Security & Compliance.
+
+## AWS documentation
+
+- **Amazon EC2 User Guide (Security Groups)** — https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security-groups.html
+- **EC2 Security** — https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security.html
+- **EC2 API Reference** — https://docs.aws.amazon.com/AWSEC2/latest/APIReference/
+- **AWS CLI — ec2 command reference** — https://docs.aws.amazon.com/cli/latest/reference/ec2/
+- **VPC security groups** — https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html

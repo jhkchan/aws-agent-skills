@@ -555,3 +555,10 @@ FinOps benchmark, not arbitrary:
 ## Domain
 
 AWS CloudOps / FinOps Cost Visibility & Commitment Strategy.
+
+## AWS documentation
+
+- **AWS Cost Anomaly Detection User Guide** — https://docs.aws.amazon.com/cost-management/latest/userguide/anomaly-detection.html
+- **AWS Cost Management Security** — https://docs.aws.amazon.com/cost-management/latest/userguide/security.html
+- **Cost Explorer API Reference** — https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_cost-explorer.html
+- **AWS CLI Command Reference (ce)** — https://docs.aws.amazon.com/cli/latest/reference/ce/

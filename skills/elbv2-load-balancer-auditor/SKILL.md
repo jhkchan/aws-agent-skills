@@ -723,3 +723,11 @@ post-remediation validation, but do not change the verdict classification:
 ## Domain
 
 AWS CloudOps / ELBv2 Load Balancer Security & Compliance.
+
+## AWS documentation
+
+- **Elastic Load Balancing User Guide** — https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html
+- **ELB Security** — https://docs.aws.amazon.com/elasticloadbalancing/latest/application/security.html
+- **ELB API Reference (v2)** — https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/
+- **AWS CLI Command Reference (elbv2)** — https://docs.aws.amazon.com/cli/latest/reference/elbv2/
+- **mTLS on NLB** — https://docs.aws.amazon.com/elasticloadbalancing/latest/network/mutual-authentication.html

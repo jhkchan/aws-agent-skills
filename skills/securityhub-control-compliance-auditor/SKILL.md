@@ -968,3 +968,11 @@ applying any fix in bulk, run an audit-only pass:
 ## Domain
 
 AWS CloudOps / Security Hub Compliance & Posture Management.
+
+## AWS documentation
+
+- **AWS Security Hub User Guide** — https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html
+- **Security Hub Security** — https://docs.aws.amazon.com/securityhub/latest/userguide/security.html
+- **Security Hub API Reference** — https://docs.aws.amazon.com/securityhub/1.0/APIReference/
+- **Security Hub CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/securityhub/
+- **Central configuration** — https://docs.aws.amazon.com/securityhub/latest/userguide/central-configuration.html

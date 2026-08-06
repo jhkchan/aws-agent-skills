@@ -716,3 +716,11 @@ lifecycle rules, the bucket grows without bound.
 ## Domain
 
 AWS CloudOps / CodePipeline CI/CD Security & Compliance.
+
+## AWS documentation
+
+- **AWS CodePipeline User Guide** — https://docs.aws.amazon.com/codepipeline/latest/userguide/welcome.html
+- **CodePipeline API Reference (v2)** — https://docs.aws.amazon.com/codepipeline/latest/APIReference/
+- **CodePipeline V2 type** — https://docs.aws.amazon.com/codepipeline/latest/userguide/pipeline-types.html
+- **CodePipeline Security** — https://docs.aws.amazon.com/codepipeline/latest/userguide/security.html
+- **AWS CLI CodePipeline reference** — https://docs.aws.amazon.com/cli/latest/reference/codepipeline/

@@ -689,3 +689,10 @@ un-billed spend.
 ## Domain
 
 AWS CloudOps / FinOps Cost Control & Spend Visibility.
+
+## AWS documentation
+
+- **AWS Budgets User Guide** — https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html
+- **Security in AWS Cost Management** — https://docs.aws.amazon.com/cost-management/latest/userguide/security.html
+- **AWS Budgets API Reference** — https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_Operations_AWS_Budgets.html
+- **AWS Budgets CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/budgets/

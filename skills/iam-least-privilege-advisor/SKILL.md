@@ -660,3 +660,11 @@ remediation tool reference.
 ## Domain
 
 AWS CloudOps / IAM Security & Compliance.
+
+## AWS documentation
+
+- **AWS IAM User Guide** — https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
+- **IAM Security Best Practices** — https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+- **IAM API Reference** — https://docs.aws.amazon.com/IAM/latest/APIReference/
+- **IAM CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/iam/
+- **IAM Access Analyzer policy validation** — https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-policy-validation.html

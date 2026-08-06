@@ -528,3 +528,12 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / Bedrock AI-ML Security & Compliance.
+
+## AWS documentation
+
+- **Amazon Bedrock User Guide** — https://docs.aws.amazon.com/bedrock/latest/userguide/what-is-bedrock.html
+- **Bedrock model access management** — https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html
+- **Security in Amazon Bedrock** — https://docs.aws.amazon.com/bedrock/latest/userguide/security.html
+- **Bedrock API Reference** — https://docs.aws.amazon.com/bedrock/latest/APIReference/
+- **AWS CLI Bedrock command reference** — https://docs.aws.amazon.com/cli/latest/reference/bedrock/
+- **Cross-region inference profiles** — https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html

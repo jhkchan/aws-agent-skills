@@ -769,3 +769,10 @@ in seconds only, not MiB).
 ## Domain
 
 AWS CloudOps / Kinesis Data Firehose Analytics & Data-Protection.
+
+## AWS documentation
+
+- **Amazon Kinesis Data Firehose Developer Guide** — https://docs.aws.amazon.com/firehose/latest/dev/what-is-this-service.html
+- **Firehose Security** — https://docs.aws.amazon.com/firehose/latest/dev/security.html
+- **Firehose API Reference** — https://docs.aws.amazon.com/firehose/latest/APIReference/
+- **Firehose CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/firehose/

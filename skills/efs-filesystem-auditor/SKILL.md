@@ -680,3 +680,11 @@ An access point:
 ## Domain
 
 AWS CloudOps / EFS Storage Security & Compliance.
+
+## AWS documentation
+
+- **Service documentation** — Amazon EFS User Guide — https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html
+- **Security** — https://docs.aws.amazon.com/efs/latest/ug/security-efs.html
+- **API reference** — https://docs.aws.amazon.com/efs/latest/ug/API_Reference.html
+- **CLI reference** — https://docs.aws.amazon.com/cli/latest/reference/efs/
+- **Intelligent Tiering** — https://docs.aws.amazon.com/efs/latest/ug/storage-classes.html

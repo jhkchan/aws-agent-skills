@@ -630,3 +630,11 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / MSK Analytics Security & Compliance.
+
+## AWS documentation
+
+- **Amazon Managed Streaming for Kafka Developer Guide** — https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.html
+- **MSK API Reference** — https://docs.aws.amazon.com/msk/latest/APIReference/
+- **MSK Security** — https://docs.aws.amazon.com/msk/latest/developerguide/security.html
+- **MSK CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/kafka/
+- **MSK Serverless** — https://docs.aws.amazon.com/msk/latest/developerguide/serverless.html

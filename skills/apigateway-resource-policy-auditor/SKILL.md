@@ -594,3 +594,13 @@ AWS CloudOps / API Gateway Security & Compliance.
 - **HTTP API mTLS:** HTTP APIs support mutual TLS via custom domain names — verify mTLS on APIs handling sensitive data.
 - **VPC Lattice integration:** HTTP APIs can integrate with VPC Lattice as a private integration — a Lattice-backed API may not appear in standard VPC security group audits.
 - **OpenAPI 3.1:** REST and HTTP APIs support OpenAPI 3.1 import — does not change audit logic but may affect how auth configs import from external specs.
+
+## AWS documentation
+
+- **API Gateway Developer Guide** — https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html
+- **API Gateway API Reference (v2)** — https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/
+- **API Gateway API Reference (v1)** — https://docs.aws.amazon.com/apigateway/latest/api/
+- **API Gateway Security** — https://docs.aws.amazon.com/apigateway/latest/developerguide/security.html
+- **API Gateway CLI Reference (v1)** — https://docs.aws.amazon.com/cli/latest/reference/apigateway/
+- **API Gateway CLI Reference (v2)** — https://docs.aws.amazon.com/cli/latest/reference/apigatewayv2/
+- **Blog: HTTP API mTLS** — https://aws.amazon.com/blogs/compute/introducing-mutual-tls-authentication-for-amazon-api-gateway-http-apis/

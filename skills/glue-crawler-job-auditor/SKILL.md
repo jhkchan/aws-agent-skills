@@ -787,3 +787,11 @@ bookmark read — an operational break, not a security finding.
 ## Domain
 
 AWS CloudOps / Glue Analytics Security & Compliance.
+
+## AWS documentation
+
+- **AWS Glue Developer Guide** — https://docs.aws.amazon.com/glue/latest/dg/what-is-glue.html
+- **Glue Security** — https://docs.aws.amazon.com/glue/latest/dg/security.html
+- **Glue API Reference** — https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api.html
+- **Glue CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/glue/
+- **Glue Data Quality** — https://docs.aws.amazon.com/glue/latest/dg/data-quality.html

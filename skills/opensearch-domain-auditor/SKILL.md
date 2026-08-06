@@ -436,3 +436,11 @@ the access policy.
 ## Domain
 
 AWS CloudOps / OpenSearch Analytics Security & Compliance.
+
+## AWS documentation
+
+- **Amazon OpenSearch Service Developer Guide** — https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-is.html
+- **OpenSearch API Reference** — https://docs.aws.amazon.com/opensearch-service/latest/APIReference/
+- **OpenSearch Security** — https://docs.aws.amazon.com/opensearch-service/latest/developerguide/security.html
+- **Fine-grained access control** — https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html
+- **OpenSearch CLI reference** — https://docs.aws.amazon.com/cli/latest/reference/opensearch/

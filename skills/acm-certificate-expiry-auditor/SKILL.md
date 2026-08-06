@@ -374,3 +374,11 @@ AWS CloudOps / ACM TLS Certificate Lifecycle & Compliance.
 
 - **ECDSA P-256 public certs (2024):** ACM issues ECDSA P-256 via Amazon Trust Services — smaller keys, faster TLS handshakes than RSA. Note the `KeyAlgorithm` field when auditing.
 - Core audit surface (managed renewal, DNS/Email validation, PCA integration) is otherwise unchanged — no new fields or settings alter the decision tree above.
+
+## AWS documentation
+
+- **AWS Certificate Manager User Guide** — https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html
+- **ACM Security** — https://docs.aws.amazon.com/acm/latest/userguide/security.html
+- **ACM API Reference** — https://docs.aws.amazon.com/acm/latest/APIReference/
+- **ACM CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/acm/
+- **Managed renewal for ACM certificates** — https://docs.aws.amazon.com/acm/latest/userguide/acm-renewal.html

@@ -1170,3 +1170,12 @@ disclosure entry point:
 ## Domain
 
 AWS CloudOps / Security Operations & Threat Detection.
+
+## AWS documentation
+
+- **Amazon GuardDuty User Guide** — https://docs.aws.amazon.com/guardduty/latest/ug/what-is-guardduty.html
+- **GuardDuty Security** — https://docs.aws.amazon.com/guardduty/latest/ug/security.html
+- **GuardDuty API Reference** — https://docs.aws.amazon.com/guardduty/latest/APIReference/
+- **GuardDuty CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/guardduty/
+- **Runtime Monitoring for ECS/EKS** — https://docs.aws.amazon.com/guardduty/latest/ug/runtime-monitoring.html
+- **GuardDuty finding types** — https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html

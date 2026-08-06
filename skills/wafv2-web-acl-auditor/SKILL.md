@@ -775,3 +775,12 @@ this canonical order:
 ## Domain
 
 AWS CloudOps / WAF Security & Compliance.
+
+## AWS documentation
+
+- **AWS WAF Developer Guide** — https://docs.aws.amazon.com/waf/latest/developerguide/waf-chapter.html
+- **WAF Security** — https://docs.aws.amazon.com/waf/latest/developerguide/security.html
+- **WAF API Reference (v2)** — https://docs.aws.amazon.com/waf/latest/APIReference/
+- **AWS CLI — wafv2** — https://docs.aws.amazon.com/cli/latest/reference/wafv2/
+- **Bot Control** — https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-bot.html
+- **ATP managed rule group** — https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-atp.html

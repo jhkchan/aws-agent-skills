@@ -698,3 +698,10 @@ The BEFORE_DISCOUNTS number is 5x the real incremental savings.
 ## Domain
 
 AWS FinOps / Cost Optimization Hub Configuration & Governance.
+
+## AWS documentation
+
+- **AWS Cost Optimization Hub User Guide** — https://docs.aws.amazon.com/cost-optimization-hub/latest/userguide/what-is.html
+- **AWS Cost Management Security** — https://docs.aws.amazon.com/cost-management/latest/userguide/security.html
+- **Cost Optimization Hub API Reference** — https://docs.aws.amazon.com/cost-optimization-hub/latest/APIReference/
+- **AWS CLI Command Reference — cost-optimization-hub** — https://docs.aws.amazon.com/cli/latest/reference/cost-optimization-hub/

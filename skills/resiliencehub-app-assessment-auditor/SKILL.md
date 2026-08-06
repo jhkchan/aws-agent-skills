@@ -836,3 +836,10 @@ different detection paths.
 ## Domain
 
 AWS CloudOps / Resilience Hub Application Resiliency & Compliance.
+
+## AWS documentation
+
+- **AWS Resilience Hub User Guide** — https://docs.aws.amazon.com/resilience-hub/latest/userguide/what-is.html
+- **Resilience Hub Security** — https://docs.aws.amazon.com/resilience-hub/latest/userguide/security.html
+- **Resilience Hub API Reference** — https://docs.aws.amazon.com/resilience-hub/latest/APIReference/
+- **Resilience Hub CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/resiliencehub/

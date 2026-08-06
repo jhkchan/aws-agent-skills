@@ -914,3 +914,11 @@ skipped in favor of Spark sizing checks).
 ## Domain
 
 AWS CloudOps / Athena Analytics Security, Cost Control & Compliance.
+
+## AWS documentation
+
+- **Amazon Athena User Guide** — https://docs.aws.amazon.com/athena/latest/ug/what-is.html
+- **Athena security** — https://docs.aws.amazon.com/athena/latest/ug/security.html
+- **Athena API Reference** — https://docs.aws.amazon.com/athena/latest/APIReference/
+- **Athena CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/athena/
+- **Athena workgroups** — https://docs.aws.amazon.com/athena/latest/ug/workgroups.html

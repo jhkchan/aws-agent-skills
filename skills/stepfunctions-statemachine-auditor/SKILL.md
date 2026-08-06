@@ -819,3 +819,11 @@ definition's `Resource` ARNs, on the specific resource ARNs (not `*`).
 ## Domain
 
 AWS CloudOps / Step Functions Observability, Security & ASL Correctness.
+
+## AWS documentation
+
+- **AWS Step Functions Developer Guide** — https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html
+- **Step Functions Security** — https://docs.aws.amazon.com/step-functions/latest/dg/security.html
+- **Step Functions API Reference** — https://docs.aws.amazon.com/step-functions/latest/apireference/
+- **Step Functions CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/stepfunctions/
+- **Distributed Map** — https://docs.aws.amazon.com/step-functions/latest/dg/concepts-asl-use-map-state-distributed.html

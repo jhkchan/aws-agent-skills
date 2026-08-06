@@ -733,3 +733,10 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / Config Governance & Compliance Coverage.
+
+## AWS documentation
+
+- **AWS Config Developer Guide** — https://docs.aws.amazon.com/config/latest/developerguide/WhatIsConfig.html
+- **AWS Config Security** — https://docs.aws.amazon.com/config/latest/developerguide/security.html
+- **AWS Config API Reference** — https://docs.aws.amazon.com/config/latest/APIReference/
+- **AWS Config CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/configservice/

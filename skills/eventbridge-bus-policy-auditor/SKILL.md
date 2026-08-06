@@ -654,3 +654,11 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / EventBridge Security & App Integration.
+
+## AWS documentation
+
+- **Amazon EventBridge User Guide** — https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html
+- **EventBridge Security** — https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-security.html
+- **EventBridge API Reference** — https://docs.aws.amazon.com/eventbridge/latest/api-reference/
+- **EventBridge CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/events/
+- **EventBridge Scheduler** — https://docs.aws.amazon.com/scheduler/latest/UserGuide/what-is-scheduler.html

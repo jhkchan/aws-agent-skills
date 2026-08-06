@@ -736,3 +736,11 @@ Step 1 (NO_RETENTION) once the data is confirmed.
 
 AWS CloudOps / Management & Governance — CloudWatch Logs cost, security,
 and observability posture.
+
+## AWS documentation
+
+- **Amazon CloudWatch Logs User Guide** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
+- **CloudWatch Logs Security** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/security.html
+- **CloudWatch Logs API Reference** — https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/
+- **AWS CLI Command Reference (logs)** — https://docs.aws.amazon.com/cli/latest/reference/logs/
+- **Log class (Standard vs Infrequent Access)** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_LogClasses.html

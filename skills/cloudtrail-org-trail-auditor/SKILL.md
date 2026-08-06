@@ -633,3 +633,11 @@ or Security Hub. Insights detects "unusual volume," not "malicious activity."
 ## Domain
 
 AWS CloudOps / CloudTrail Governance, Compliance & Forensic Readiness.
+
+## AWS documentation
+
+- **AWS CloudTrail User Guide** — https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html
+- **CloudTrail Security** — https://docs.aws.amazon.com/awscloudtrail/latest/userguide/security.html
+- **CloudTrail API Reference** — https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/
+- **CloudTrail CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/cloudtrail/
+- **CloudTrail Lake** — https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-lake.html

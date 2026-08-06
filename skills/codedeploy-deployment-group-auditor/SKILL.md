@@ -731,3 +731,10 @@ deployment config determines how quickly traffic shifts from old to new.
 ## Domain
 
 AWS CloudOps / CodeDeploy Deployment Safety & Compliance.
+
+## AWS documentation
+
+- **AWS CodeDeploy User Guide** — https://docs.aws.amazon.com/codedeploy/latest/userguide/welcome.html
+- **CodeDeploy Security** — https://docs.aws.amazon.com/codedeploy/latest/userguide/security.html
+- **CodeDeploy API Reference** — https://docs.aws.amazon.com/codedeploy/latest/APIReference/
+- **AWS CLI — codedeploy (deploy) commands** — https://docs.aws.amazon.com/cli/latest/reference/deploy/

@@ -600,3 +600,12 @@ collaboration is intended.
 ## Domain
 
 AWS CloudOps / Well-Architected Governance & Review Compliance.
+
+## AWS documentation
+
+- **AWS Well-Architected Tool User Guide** — https://docs.aws.amazon.com/wellarchitected/latest/userguide/intro.html
+- **Security pillar (Well-Architected Framework)** — https://docs.aws.amazon.com/wellarchitected/latest/framework/security.html
+- **Well-Architected Tool API Reference** — https://docs.aws.amazon.com/wellarchitected/latest/APIReference/
+- **AWS CLI Command Reference — wellarchitected** — https://docs.aws.amazon.com/cli/latest/reference/wellarchitected/
+- **Well-Architected Framework** — https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html
+- **Custom lenses** — https://docs.aws.amazon.com/wellarchitected/latest/userguide/custom-lenses.html

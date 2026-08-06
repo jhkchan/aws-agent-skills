@@ -503,3 +503,11 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / Backup, Recovery & Resilience Compliance.
+
+## AWS documentation
+
+- **AWS Backup Developer Guide** — https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html
+- **AWS Backup Security** — https://docs.aws.amazon.com/aws-backup/latest/devguide/security.html
+- **AWS Backup API Reference** — https://docs.aws.amazon.com/aws-backup/latest/APIReference/
+- **AWS Backup CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/backup/
+- **Logically air-gapped vaults** — https://docs.aws.amazon.com/aws-backup/latest/devguide/logically-air-gapped-backups.html

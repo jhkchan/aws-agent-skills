@@ -884,3 +884,11 @@ queryable via `describe-task-definition` until deregistered. This means:
 ## Domain
 
 AWS CloudOps / ECS Compute Security & Container Hardening.
+
+## AWS documentation
+
+- **Amazon Elastic Container Service Developer Guide** — https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html
+- **ECS Security** — https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security.html
+- **ECS API Reference** — https://docs.aws.amazon.com/AmazonECS/latest/APIReference/
+- **ECS CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/ecs/
+- **Deployment circuit breaker** — https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-circuit-breaker.html

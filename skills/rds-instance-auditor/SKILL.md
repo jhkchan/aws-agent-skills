@@ -766,3 +766,11 @@ not read-capable; for read scaling, provision Read Replicas separately.
 ## Domain
 
 AWS CloudOps / RDS Database Security, Availability & Operational Posture.
+
+## AWS documentation
+
+- **Amazon RDS User Guide** — https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Welcome.html
+- **Security in Amazon RDS** — https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.html
+- **Amazon RDS API Reference** — https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/
+- **AWS CLI RDS reference** — https://docs.aws.amazon.com/cli/latest/reference/rds/
+- **Blue/Green deployments** — https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/blue-green-deployments.html

@@ -1066,3 +1066,12 @@ this canonical order:
 ## Domain
 
 AWS CloudOps / STS & IAM Trust-Policy Security.
+
+## AWS documentation
+
+- **AWS STS User Guide (temporary security credentials)** — https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html
+- **IAM Security Best Practices** — https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+- **STS API Reference** — https://docs.aws.amazon.com/STS/latest/APIReference/
+- **AWS CLI STS Command Reference** — https://docs.aws.amazon.com/cli/latest/reference/sts/
+- **Confused deputy problem** — https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html
+- **Session tags** — https://docs.aws.amazon.com/IAM/latest/UserGuide/id_session-tags.html

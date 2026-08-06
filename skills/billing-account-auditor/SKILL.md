@@ -640,3 +640,12 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / FinOps Billing Governance & Account Security.
+
+## AWS documentation
+
+- **Service documentation** — [AWS Billing User Guide](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/billing-what-is.html)
+- **Security** — [Security in AWS Billing](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/security.html)
+- **API reference** — [AWS Cost Management API Reference](https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/) (covers Cost Explorer, Budgets, and Cost Anomaly Detection APIs)
+- **CLI reference** — [AWS Cost Explorer (`ce`) CLI](https://docs.aws.amazon.com/cli/latest/reference/ce/) · [AWS Budgets (`budgets`) CLI](https://docs.aws.amazon.com/cli/latest/reference/budgets/)
+- **AWS Billing Conductor** — [Billing Conductor User Guide](https://docs.aws.amazon.com/billingconductor/latest/userguide/what-is-billingconductor.html)
+- **FOCUS-aligned billing** — [Announcing FOCUS-aligned cost and usage data](https://aws.amazon.com/blogs/aws-cloud-financial-management/announcing-focus-aligned-cost-and-usage-data/)

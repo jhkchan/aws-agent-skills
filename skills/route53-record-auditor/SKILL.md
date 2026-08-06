@@ -600,3 +600,11 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / Route 53 DNS Security & Reliability.
+
+## AWS documentation
+
+- **Amazon Route 53 Developer Guide** — https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/Welcome.html
+- **Route 53 Security** — https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/security.html
+- **Route 53 API Reference** — https://docs.aws.amazon.com/Route53/latest/APIReference/
+- **Route 53 CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/route53/
+- **DNSSEC signing** — https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html

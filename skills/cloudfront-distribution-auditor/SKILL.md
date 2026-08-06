@@ -666,3 +666,12 @@ prioritizes by immediate exploitability.
 ## Domain
 
 AWS CloudOps / CloudFront Edge Security & Compliance.
+
+## AWS documentation
+
+- **Amazon CloudFront Developer Guide** — https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html
+- **CloudFront Security** — https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/security.html
+- **CloudFront API Reference** — https://docs.aws.amazon.com/cloudfront/latest/APIReference/
+- **CloudFront CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/cloudfront/
+- **Origin Access Control** — https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html
+- **Blog: VPC origins** — https://aws.amazon.com/blogs/networking-and-content-delivery/introducing-amazon-cloudfront-vpc-origins/

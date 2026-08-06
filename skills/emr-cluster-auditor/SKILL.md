@@ -509,3 +509,11 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / EMR Analytics Security & Compliance.
+
+## AWS documentation
+
+- **Amazon EMR Management Guide** — https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-what-is-emr.html
+- **EMR Security** — https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-security.html
+- **EMR API Reference** — https://docs.aws.amazon.com/emr/latest/APIReference/
+- **AWS CLI Reference for EMR** — https://docs.aws.amazon.com/cli/latest/reference/emr/
+- **EMR Serverless** — https://docs.aws.amazon.com/emr/latest/Serverless.html

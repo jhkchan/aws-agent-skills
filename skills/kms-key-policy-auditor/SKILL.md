@@ -880,3 +880,12 @@ apply per-replica. KMS does NOT sync key policies across replicas.
 ## Domain
 
 AWS CloudOps / KMS Encryption Security & Compliance.
+
+## AWS documentation
+
+- **AWS KMS Developer Guide** — https://docs.aws.amazon.com/kms/latest/developerguide/overview.html
+- **KMS API Reference** — https://docs.aws.amazon.com/kms/latest/APIReference/
+- **AWS CLI Command Reference (KMS)** — https://docs.aws.amazon.com/cli/latest/reference/kms/
+- **KMS Security** — https://docs.aws.amazon.com/kms/latest/developerguide/security.html
+- **KMS key policies** — https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html
+- **On-demand key rotation** — https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html

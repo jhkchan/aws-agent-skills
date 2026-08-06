@@ -850,3 +850,12 @@ requests without a backend).
 ## Domain
 
 AWS CloudOps / Lambda Compute Security & Runtime Compliance.
+
+## AWS documentation
+
+- **AWS Lambda Developer Guide** — https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
+- **Lambda Security** — https://docs.aws.amazon.com/lambda/latest/dg/lambda-security.html
+- **Lambda API Reference** — https://docs.aws.amazon.com/lambda/latest/APIReference/
+- **AWS CLI Lambda Command Reference** — https://docs.aws.amazon.com/cli/latest/reference/lambda/
+- **Lambda runtime deprecation policy** — https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
+- **SnapStart** — https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html

@@ -1012,3 +1012,12 @@ AWS CloudOps / IAM Access Analyzer Security & Compliance.
 - **`s3-public-access-auditor`** — audits S3 bucket configurations for public
   access. Complements this skill's S3 external-access finding triage with
   BPA/ACL-level analysis.
+
+## AWS documentation
+
+- **IAM Access Analyzer User Guide** — https://docs.aws.amazon.com/IAM/latest/UserGuide/what-is-access-analyzer.html
+- **IAM Access Analyzer API Reference** — https://docs.aws.amazon.com/access-analyzer/latest/APIReference/
+- **AWS CLI accessanalyzer command reference** — https://docs.aws.amazon.com/cli/latest/reference/accessanalyzer/
+- **AWS IAM Security Best Practices** — https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+- **Unused access analysis** — https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-unused-access.html
+- **Blog: Identify unused IAM roles with IAM Access Analyzer** — https://aws.amazon.com/blogs/security/identify-unused-iam-roles-with-iam-access-analyzer-unused-access-analysis/

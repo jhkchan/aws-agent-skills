@@ -520,3 +520,11 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / Control Tower Governance & Compliance.
+
+## AWS documentation
+
+- **AWS Control Tower User Guide** — https://docs.aws.amazon.com/controltower/latest/userguide/what-is-control-tower.html
+- **Control Tower API Reference** — https://docs.aws.amazon.com/controltower/latest/APIReference/
+- **Control Tower Security** — https://docs.aws.amazon.com/controltower/latest/userguide/security.html
+- **Control Tower CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/controltower/
+- **Extensible controls** — https://docs.aws.amazon.com/controltower/latest/userguide/extensible-controls.html

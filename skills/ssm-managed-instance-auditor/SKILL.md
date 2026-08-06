@@ -847,3 +847,12 @@ IAM — flag as CONFIG_GAP even if `PingStatus: Active`.
 ## Domain
 
 AWS CloudOps / Systems Manager Operational Posture & Compliance.
+
+## AWS documentation
+
+- **AWS Systems Manager User Guide** — https://docs.aws.amazon.com/systems-manager/latest/userguide/what-is-systems-manager.html
+- **Security** — https://docs.aws.amazon.com/systems-manager/latest/userguide/security.html
+- **API Reference** — https://docs.aws.amazon.com/systems-manager/latest/APIReference/
+- **CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/ssm/
+- **Session Manager** — https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html
+- **Hybrid Activator** — https://docs.aws.amazon.com/systems-manager/latest/userguide/managed-instances.html

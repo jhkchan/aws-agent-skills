@@ -547,3 +547,11 @@ inherits through. The 5-SCP quota includes FullAWSAccess.
 ## Domain
 
 AWS CloudOps / Organizations Governance & Compliance.
+
+## AWS documentation
+
+- **Service documentation (AWS Organizations User Guide)** — https://docs.aws.amazon.com/organizations/latest/userguide/orgs_introduction.html
+- **Security** — https://docs.aws.amazon.com/organizations/latest/userguide/orgs_security.html
+- **API reference** — https://docs.aws.amazon.com/organizations/latest/APIReference/
+- **CLI reference** — https://docs.aws.amazon.com/cli/latest/reference/organizations/
+- **Service control policies** — https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html

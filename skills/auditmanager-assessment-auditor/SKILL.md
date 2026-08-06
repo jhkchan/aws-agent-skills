@@ -893,3 +893,10 @@ No significant recent feature launches affecting the audit surface as of 2026-08
 ## Domain
 
 AWS CloudOps / Audit Manager Governance & Compliance Evidence Integrity.
+
+## AWS documentation
+
+- **AWS Audit Manager User Guide** — https://docs.aws.amazon.com/audit-manager/latest/userguide/what-is.html
+- **Audit Manager Security** — https://docs.aws.amazon.com/audit-manager/latest/userguide/security.html
+- **Audit Manager API Reference** — https://docs.aws.amazon.com/audit-manager/latest/APIReference/
+- **Audit Manager CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/auditmanager/

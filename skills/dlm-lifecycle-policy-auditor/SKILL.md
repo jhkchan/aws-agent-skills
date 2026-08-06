@@ -761,3 +761,10 @@ This is a common side-effect of IAM hygiene campaigns.
 ## Domain
 
 AWS CloudOps / Storage & Backup Resilience (DLM EBS Snapshot Lifecycle).
+
+## AWS documentation
+
+- **Amazon Data Lifecycle Manager User Guide** — https://docs.aws.amazon.com/dlm/latest/ug/what-is-dlm.html
+- **DLM Security** — https://docs.aws.amazon.com/dlm/latest/ug/security.html
+- **DLM API Reference** — https://docs.aws.amazon.com/dlm/latest/APIReference/
+- **DLM CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/dlm/

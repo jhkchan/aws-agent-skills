@@ -1038,3 +1038,11 @@ contract):
 ## Domain
 
 AWS CloudOps / Secrets Manager Security & Compliance.
+
+## AWS documentation
+
+- **AWS Secrets Manager User Guide** — https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html
+- **Secrets Manager Security** — https://docs.aws.amazon.com/secretsmanager/latest/userguide/security.html
+- **Secrets Manager API Reference** — https://docs.aws.amazon.com/secretsmanager/latest/apireference/
+- **Secrets Manager CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/secretsmanager/
+- **Rotating secrets** — https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html

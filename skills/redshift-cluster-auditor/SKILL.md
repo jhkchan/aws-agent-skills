@@ -819,3 +819,12 @@ in the custom parameter group (same workflow as require_ssl).
 ## Domain
 
 AWS CloudOps / Redshift Analytics Security & Compliance.
+
+## AWS documentation
+
+- **Amazon Redshift documentation** — https://docs.aws.amazon.com/redshift/latest/dg/welcome.html
+- **Security in Amazon Redshift** — https://docs.aws.amazon.com/redshift/latest/dg/security.html
+- **Amazon Redshift API Reference** — https://docs.aws.amazon.com/redshift/latest/APIReference/
+- **AWS CLI Redshift reference** — https://docs.aws.amazon.com/cli/latest/reference/redshift/
+- **Amazon Redshift Management Guide** — https://docs.aws.amazon.com/redshift/latest/mgmt/welcome.html
+- **Redshift Serverless** — https://docs.aws.amazon.com/redshift/latest/mgmt/serverless-whatis.html

@@ -754,3 +754,13 @@ in this canonical order:
 ## Domain
 
 AWS CloudOps / S3 Security & Compliance.
+
+## AWS documentation
+
+- **Amazon S3 User Guide** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
+- **S3 Security Best Practices** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html
+- **S3 API Reference** — https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html
+- **S3 CLI Reference (s3api)** — https://docs.aws.amazon.com/cli/latest/reference/s3api/index.html
+- **S3 CLI Reference (high-level s3)** — https://docs.aws.amazon.com/cli/latest/reference/s3/index.html
+- **Block Public Access** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html
+- **S3 Access Grants** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-grants.html

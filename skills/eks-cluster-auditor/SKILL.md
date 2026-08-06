@@ -641,3 +641,12 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / EKS Compute Security & Compliance.
+
+## AWS documentation
+
+- **Amazon EKS User Guide** — https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html
+- **EKS Security** — https://docs.aws.amazon.com/eks/latest/userguide/security.html
+- **EKS API Reference** — https://docs.aws.amazon.com/eks/latest/APIReference/
+- **EKS CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/eks/
+- **EKS Access Entries** — https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html
+- **EKS Pod Identity** — https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html

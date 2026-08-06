@@ -712,3 +712,11 @@ subset of linked accounts).
 ## Domain
 
 AWS CloudOps / FinOps — Cost Visibility and Data Pipeline Health.
+
+## AWS documentation
+
+- **Service documentation** — [AWS Cost and Usage Report User Guide](https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html)
+- **Security** — [CUR IAM actions, resources, and condition keys (Service Authorization Reference)](https://docs.aws.amazon.com/service-authorization/latest/reference/list_awscostandusagereport.html)
+- **API reference** — [AWS Cost and Usage Report API Reference](https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_cur.html)
+- **CLI reference** — [AWS CLI `cur` command reference](https://docs.aws.amazon.com/cli/latest/reference/cur/)
+- **CUR 2.0 with FOCUS** — [CUR data format](https://docs.aws.amazon.com/cur/latest/userguide/cur-data-format.html)

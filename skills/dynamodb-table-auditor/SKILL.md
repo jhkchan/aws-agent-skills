@@ -694,3 +694,11 @@ again. This means:
 ## Domain
 
 AWS CloudOps / DynamoDB Table Hardening & Compliance.
+
+## AWS documentation
+
+- **Amazon DynamoDB Developer Guide** — https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html
+- **DynamoDB Security** — https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/security.html
+- **DynamoDB API Reference** — https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/
+- **DynamoDB AWS CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/dynamodb/
+- **DynamoDB table classes** — https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ddn-table-classes.html

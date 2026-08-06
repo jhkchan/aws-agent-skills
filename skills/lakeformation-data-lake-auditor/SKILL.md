@@ -749,3 +749,11 @@ Treat every grant modification as irreversible.
 ## Domain
 
 AWS CloudOps / Lake Formation Data Lake Security & Compliance.
+
+## AWS documentation
+
+- **AWS Lake Formation Developer Guide** — https://docs.aws.amazon.com/lake-formation/latest/dg/what-is-lake-formation.html
+- **Lake Formation Security** — https://docs.aws.amazon.com/lake-formation/latest/dg/security.html
+- **Lake Formation API Reference** — https://docs.aws.amazon.com/lake-formation/latest/dg/aws-lake-formation-api-ref.html
+- **Lake Formation CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/lakeformation/
+- **LF-tag-based access control** — https://docs.aws.amazon.com/lake-formation/latest/dg/security-lf-tags.html

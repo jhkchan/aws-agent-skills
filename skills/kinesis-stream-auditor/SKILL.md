@@ -760,3 +760,10 @@ This gives a 20% buffer before data loss begins.
 ## Domain
 
 AWS CloudOps / Kinesis Data Streams Security, Cost, and Operational Auditing.
+
+## AWS documentation
+
+- **Amazon Kinesis Data Streams Developer Guide** — https://docs.aws.amazon.com/streams/latest/dev/introduction.html
+- **Kinesis Security** — https://docs.aws.amazon.com/streams/latest/dev/security.html
+- **Kinesis API Reference** — https://docs.aws.amazon.com/kinesis/latest/APIReference/
+- **Kinesis CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/kinesis/

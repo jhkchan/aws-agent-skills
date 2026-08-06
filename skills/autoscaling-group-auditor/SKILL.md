@@ -642,3 +642,11 @@ uneven until manual intervention.
 ## Domain
 
 AWS CloudOps / Compute Elasticity & Auto Scaling Health.
+
+## AWS documentation
+
+- **Amazon EC2 Auto Scaling User Guide** — https://docs.aws.amazon.com/autoscaling/ec2/userguide/what-is-amazon-ec2-auto-scaling.html
+- **Auto Scaling API Reference** — https://docs.aws.amazon.com/autoscaling/ec2/APIReference/
+- **Auto Scaling Security** — https://docs.aws.amazon.com/autoscaling/ec2/userguide/security.html
+- **Auto Scaling CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/autoscaling/
+- **Blog: Instance maintenance policies** — https://aws.amazon.com/blogs/compute/proactively-manage-instance-maintenance-with-amazon-ec2-auto-scaling-instance-maintenance-policy/

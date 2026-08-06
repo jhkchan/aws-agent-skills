@@ -780,3 +780,11 @@ See the AWS Cognito Identity Provider documentation for:
 ## Domain
 
 AWS CloudOps / Cognito Identity Security & Compliance.
+
+## AWS documentation
+
+- **Service documentation** — [Amazon Cognito Developer Guide](https://docs.aws.amazon.com/cognito/latest/developerguide/what-is-amazon-cognito.html)
+- **Security** — [Security in Amazon Cognito](https://docs.aws.amazon.com/cognito/latest/developerguide/security.html)
+- **API reference** — [Amazon Cognito Identity Provider API Reference](https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/)
+- **CLI reference** — [AWS CLI Command Reference: cognito-idp](https://docs.aws.amazon.com/cli/latest/reference/cognito-idp/)
+- **Blog: Passwordless auth with WebAuthn** — https://aws.amazon.com/blogs/security/introducing-passwordless-authentication-with-webauthn-for-amazon-cognito/

@@ -685,3 +685,11 @@ aws sqs set-queue-attributes --queue-url <dlq-url> \
 ## Domain
 
 AWS CloudOps / App Integration — SQS Messaging Security & Reliability.
+
+## AWS documentation
+
+- **Amazon SQS Developer Guide** — https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html
+- **SQS Security** — https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-security-best-practices.html
+- **SQS API Reference** — https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/
+- **SQS CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/sqs/
+- **Dead-letter queue redrive** — https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-configure-dead-letter-queue-redrive.html

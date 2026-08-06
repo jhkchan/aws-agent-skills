@@ -668,3 +668,11 @@ same Act step as metric alarms.
 ## Domain
 
 AWS CloudOps / CloudWatch Observability & Alarm Reliability.
+
+## AWS documentation
+
+- **Amazon CloudWatch User Guide** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html
+- **CloudWatch Security** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/security.html
+- **CloudWatch API Reference** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/
+- **CloudWatch CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/cloudwatch/
+- **CloudWatch Alarms** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html

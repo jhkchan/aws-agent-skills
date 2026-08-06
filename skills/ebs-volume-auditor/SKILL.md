@@ -316,3 +316,11 @@ REMEDIATION: None required. Recommend enabling account-level encryption-by-defau
 ## Domain
 
 AWS CloudOps / EBS Storage Security & Cost Optimisation.
+
+## AWS documentation
+
+- **Amazon EBS User Guide** — https://docs.aws.amazon.com/ebs/latest/userguide/what-is-ebs.html
+- **Security in Amazon EBS** — https://docs.aws.amazon.com/ebs/latest/userguide/security.html
+- **Amazon EC2 API Reference** (covers EBS API) — https://docs.aws.amazon.com/AWSEC2/latest/APIReference/
+- **AWS CLI Command Reference: ec2** (covers EBS CLI) — https://docs.aws.amazon.com/cli/latest/reference/ec2/
+- **Archive Amazon EBS snapshots** — https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/snapshot-archive.html

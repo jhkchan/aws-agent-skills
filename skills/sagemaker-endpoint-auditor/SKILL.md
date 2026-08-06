@@ -602,3 +602,11 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / SageMaker AI/ML Security & Production Readiness.
+
+## AWS documentation
+
+- **Amazon SageMaker Developer Guide** — https://docs.aws.amazon.com/sagemaker/latest/dg/whatis.html
+- **Security** — https://docs.aws.amazon.com/sagemaker/latest/dg/security.html
+- **SageMaker API Reference** — https://docs.aws.amazon.com/sagemaker/latest/APIReference/
+- **AWS CLI reference (sagemaker)** — https://docs.aws.amazon.com/cli/latest/reference/sagemaker/
+- **Inference Components** — https://docs.aws.amazon.com/sagemaker/latest/dg/inference-components.html

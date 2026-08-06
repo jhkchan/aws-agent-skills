@@ -658,3 +658,11 @@ aggregate rate limit still applies.
 ## Domain
 
 AWS CloudOps / App Integration Security & Compliance.
+
+## AWS documentation
+
+- **Amazon SNS Developer Guide** — https://docs.aws.amazon.com/sns/latest/dg/welcome.html
+- **SNS Security** — https://docs.aws.amazon.com/sns/latest/dg/sns-security.html
+- **SNS API Reference** — https://docs.aws.amazon.com/sns/latest/api/welcome.html
+- **AWS CLI SNS Command Reference** — https://docs.aws.amazon.com/cli/latest/reference/sns/
+- **Message data protection** — https://docs.aws.amazon.com/sns/latest/dg/sns-message-data-protection.html

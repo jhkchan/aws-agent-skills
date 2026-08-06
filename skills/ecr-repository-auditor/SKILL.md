@@ -836,3 +836,11 @@ updated on the next replication cycle. Audit replicas independently.
 ## Domain
 
 AWS CloudOps / ECR Container Registry Security & Supply-Chain Compliance.
+
+## AWS documentation
+
+- **Amazon ECR User Guide** — https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html
+- **ECR Security** — https://docs.aws.amazon.com/AmazonECR/latest/userguide/security.html
+- **ECR API Reference** — https://docs.aws.amazon.com/AmazonECR/latest/APIReference/
+- **ECR CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/ecr/
+- **Enhanced scanning with Amazon Inspector** — https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-enhanced.html

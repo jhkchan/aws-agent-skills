@@ -513,3 +513,11 @@ region, not the model's home region.
 ## Domain
 
 AWS CloudOps / Bedrock Generative AI Safety & Compliance.
+
+## AWS documentation
+
+- **Amazon Bedrock User Guide** — https://docs.aws.amazon.com/bedrock/latest/userguide/what-is-bedrock.html
+- **Bedrock Guardrails** — https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails.html
+- **Bedrock API Reference** — https://docs.aws.amazon.com/bedrock/latest/APIReference/
+- **Bedrock Security** — https://docs.aws.amazon.com/bedrock/latest/userguide/security.html
+- **Bedrock CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/bedrock/

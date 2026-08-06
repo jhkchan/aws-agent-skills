@@ -929,3 +929,11 @@ separately via `cleanroomsml get-configured-audience-model`.
 ## Domain
 
 AWS CloudOps / Clean Rooms Collaboration Privacy & Compliance.
+
+## AWS documentation
+
+- **Service documentation** — AWS Clean Rooms User Guide: https://docs.aws.amazon.com/clean-rooms/latest/userguide/what-is.html
+- **Security** — Clean Rooms Security: https://docs.aws.amazon.com/clean-rooms/latest/userguide/security.html
+- **API reference** — Clean Rooms API Reference: https://docs.aws.amazon.com/clean-rooms/latest/APIReference/
+- **CLI reference** — Clean Rooms CLI Reference: https://docs.aws.amazon.com/cli/latest/reference/cleanrooms/
+- **Differential privacy in Clean Rooms** — https://docs.aws.amazon.com/clean-rooms/latest/userguide/differential-privacy.html

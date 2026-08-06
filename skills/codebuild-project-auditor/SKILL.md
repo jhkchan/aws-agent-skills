@@ -850,3 +850,10 @@ breaks any embedded references.
 ## Domain
 
 AWS CloudOps / Developer Tools (CodeBuild) Security & Compliance.
+
+## AWS documentation
+
+- **AWS CodeBuild User Guide** — https://docs.aws.amazon.com/codebuild/latest/userguide/welcome.html
+- **CodeBuild Security** — https://docs.aws.amazon.com/codebuild/latest/userguide/security.html
+- **CodeBuild API Reference** — https://docs.aws.amazon.com/codebuild/latest/APIReference/
+- **CodeBuild CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/codebuild/

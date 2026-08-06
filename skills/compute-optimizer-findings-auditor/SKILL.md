@@ -636,3 +636,10 @@ post-change.
 ## Domain
 
 AWS CloudOps / Compute Cost Optimization & Right-Sizing.
+
+## AWS documentation
+
+- **AWS Compute Optimizer User Guide** — https://docs.aws.amazon.com/compute-optimizer/latest/ug/what-is.html
+- **Compute Optimizer Security** — https://docs.aws.amazon.com/compute-optimizer/latest/ug/security.html
+- **Compute Optimizer API Reference** — https://docs.aws.amazon.com/compute-optimizer/latest/APIReference/
+- **Compute Optimizer CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/compute-optimizer/

@@ -528,3 +528,11 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / DMS Migration Security & Data Integrity.
+
+## AWS documentation
+
+- **AWS Database Migration Service User Guide** — https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html
+- **DMS Security** — https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Security.html
+- **DMS API Reference** — https://docs.aws.amazon.com/dms/latest/APIReference/
+- **DMS CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/dms/
+- **DMS Serverless** — https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Serverless.html

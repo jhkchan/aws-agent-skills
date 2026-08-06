@@ -1057,3 +1057,12 @@ this canonical order:
 ## Domain
 
 AWS CloudOps / Vulnerability Management & Security Posture.
+
+## AWS documentation
+
+- **Amazon Inspector User Guide** — https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html
+- **Inspector API Reference (v2)** — https://docs.aws.amazon.com/inspector/v2/APIReference/
+- **Inspector Security** — https://docs.aws.amazon.com/inspector/latest/user/security.html
+- **Inspector CLI Reference (v2)** — https://docs.aws.amazon.com/cli/latest/reference/inspector2/
+- **Lambda function code scanning** — https://docs.aws.amazon.com/inspector/latest/user/scanning-lambda-functions.html
+- **SBOM export** — https://docs.aws.amazon.com/inspector/latest/user/sbom-export.html

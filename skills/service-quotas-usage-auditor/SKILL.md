@@ -606,3 +606,10 @@ its own request.
 ## Domain
 
 AWS CloudOps / Service Quotas Capacity Management & Monitoring.
+
+## AWS documentation
+
+- **Service documentation** — https://docs.aws.amazon.com/servicequotas/latest/userguide/intro.html
+- **Security** — https://docs.aws.amazon.com/servicequotas/latest/userguide/security.html
+- **API reference** — https://docs.aws.amazon.com/servicequotas/2019-06-24/apireference/
+- **CLI reference** — https://docs.aws.amazon.com/cli/latest/reference/service-quotas/

@@ -807,3 +807,11 @@ EventBridge-driven automations work even on Basic-tier accounts.
 ## Domain
 
 AWS CloudOps / AWS Health Operational Event Management.
+
+## AWS documentation
+
+- **AWS Health User Guide** — https://docs.aws.amazon.com/health/latest/ug/what-is-aws-health.html
+- **AWS Health Security** — https://docs.aws.amazon.com/health/latest/ug/security.html
+- **AWS Health API Reference** — https://docs.aws.amazon.com/health/latest/APIReference/
+- **AWS Health CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/health/
+- **Health Aware notifications** — https://aws.amazon.com/blogs/aws/build-aws-health-aware-custom-notifications-with-amazon-eventbridge-and-aws-lambda/

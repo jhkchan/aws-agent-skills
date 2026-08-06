@@ -857,3 +857,11 @@ cross-account-truncated.
 | `bgpPeers` array missing entirely from a VIF JSON | No BGP session defined — VIF is non-functional or data is incomplete | CONFIG_GAP (MEDIUM). Emit: `VIF <id> has no bgpPeers array — BGP state unverifiable. Re-fetch with describe-bgp-peers.` Do NOT assume auth is absent; the field may be missing due to truncated API output. |
 | `bgpPeers` array present but empty `[]` | VIF exists but no BGP sessions configured | CONFIG_GAP (MEDIUM). A VIF without peers carries no traffic. Flag for operator review. |
 | `authKeyState` field absent from input JSON (offline mode) | Cannot determine auth state from describe-virtual-interfaces alone | Infer from `bgpPeers[].authKey` presence in the input; if that is also absent, emit CONFIG_GAP (LOW) with note: `Auth state unverifiable from provided JSON — run describe-bgp-peers for authoritative check.` |
+
+## AWS documentation
+
+- **AWS Direct Connect User Guide** — https://docs.aws.amazon.com/directconnect/latest/UserGuide/Welcome.html
+- **Direct Connect Security** — https://docs.aws.amazon.com/directconnect/latest/UserGuide/security.html
+- **Direct Connect API Reference** — https://docs.aws.amazon.com/directconnect/latest/APIReference/
+- **AWS CLI Command Reference (directconnect)** — https://docs.aws.amazon.com/cli/latest/reference/directconnect/
+- **MACsec for Direct Connect** — https://docs.aws.amazon.com/directconnect/latest/UserGuide/direct-connect-macsec.html

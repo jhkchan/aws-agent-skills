@@ -819,3 +819,12 @@ setup before relying on the management account's TA data.
 ## Domain
 
 AWS CloudOps / Trusted Advisor Governance & Operational Excellence.
+
+## AWS documentation
+
+- **AWS Trusted Advisor User Guide** — https://docs.aws.amazon.com/awssupport/latest/user/trusted-advisor.html
+- **Trusted Advisor Security** — https://docs.aws.amazon.com/awssupport/latest/user/security-trusted-advisor.html
+- **Trusted Advisor API Reference (AWS Support API)** — https://docs.aws.amazon.com/awssupport/latest/APIReference/
+- **AWS CLI Reference — `trustedadvisor` commands** — https://docs.aws.amazon.com/cli/latest/reference/trustedadvisor/
+- **AWS CLI Reference — `support` commands (legacy `describe-trusted-advisor-*`)** — https://docs.aws.amazon.com/cli/latest/reference/support/
+- **Blog: Trusted Advisor recommendations API** — https://aws.amazon.com/blogs/aws/amazon-trusted-advisor-recommendations-api-now-available-to-all-customers/

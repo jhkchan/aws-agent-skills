@@ -513,3 +513,10 @@ principal with `codecommit:ApprovePullRequest` can approve.
 ## Domain
 
 AWS CloudOps / Developer Tools Security & CodeCommit Migration Assessment.
+
+## AWS documentation
+
+- **AWS CodeCommit User Guide** — https://docs.aws.amazon.com/codecommit/latest/userguide/welcome.html
+- **CodeCommit Security** — https://docs.aws.amazon.com/codecommit/latest/userguide/security.html
+- **CodeCommit API Reference** — https://docs.aws.amazon.com/codecommit/latest/APIReference/
+- **CodeCommit CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/codecommit/

@@ -609,3 +609,11 @@ REMEDIATION:
 ## Domain
 
 AWS CloudOps / Network Manager (Cloud WAN) Core Network Security and Compliance.
+
+## AWS documentation
+
+- **AWS Network Manager User Guide** — https://docs.aws.amazon.com/network-manager/latest/cloudwan-guide/what-is-cloudwan.html
+- **Cloud WAN Security** — https://docs.aws.amazon.com/network-manager/latest/cloudwan-guide/security-cloudwan.html
+- **Network Manager API Reference** — https://docs.aws.amazon.com/networkmanager/latest/APIReference/
+- **AWS CLI Command Reference (networkmanager)** — https://docs.aws.amazon.com/cli/latest/reference/networkmanager/
+- **Core network policies** — https://docs.aws.amazon.com/network-manager/latest/cloudwan-guide/cloudwan-policies.html
