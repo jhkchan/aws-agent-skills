@@ -1,0 +1,291 @@
+# Eval test cases for shield-advanced-coverage-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: shield-advanced-coverage-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: fully-configured-ok
+    description: >-
+      Active Shield Advanced subscription with an explicitly protected ALB
+      (health check + WAF), auto-protected CloudFront distribution, full DRT
+      access (role + log bucket), and proactive engagement enabled with
+      emergency contacts — clean posture.
+    input: |
+      Account: 111111111111 (us-east-1)
+      SubscriptionState: ACTIVE
+
+      Internet-facing resource inventory:
+        - CloudFront distribution d-abc123 (app-cf-fully-configured-ok)
+        - ALB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-fully-configured-ok/xyz
+
+      Protections (from ListProtections):
+        - ProtectionId: p-001
+          Name: alb-protection-fully-configured-ok
+          ResourceArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-fully-configured-ok/xyz
+          HealthCheckIds: [arn:aws:route53:::healthcheck/hc-alb-fully-configured-ok]
+
+      DRT access (from DescribeDRTAccess):
+        RoleArn: arn:aws:iam::111111111111:role/AWSShieldDRTAccessRole
+        LogBuckets: [shield-drt-alb-logs]
+
+      ProactiveEngagement: ENABLED
+      EmergencyContactList:
+        - EmailAddress: oncall@example.com
+          PhoneNumber: "+15551234567"
+          ContactNotes: "24/7 NOC"
+
+      WAF Web ACL associations:
+        - ALB arn:...:loadbalancer/app/alb-fully-configured-ok/xyz -> WebACLArn arn:aws:wafv2:us-east-1:111111111111:regional/webacl/shield-alb-waf/def
+
+      Emit the standard VERDICT block (SCOPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "auto"
+        - "DRT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: UNPROTECTED"
+        - "VERDICT: NO_DRT_ACCESS"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: unprotected-elastic-ip
+    description: >-
+      Active subscription with an EIP-backed EC2 instance that is NOT in the
+      Protections list — the instance has only Shield Standard (L3/L4).
+      DRT access and proactive engagement are otherwise configured.
+    input: |
+      Account: 111111111111 (us-east-1)
+      SubscriptionState: ACTIVE
+
+      Internet-facing resource inventory:
+        - Elastic IP eipalloc-abc222 (eip-unprotected-elastic-ip) associated with EC2 i-2222
+
+      Protections (from ListProtections):
+        []
+
+      DRT access (from DescribeDRTAccess):
+        RoleArn: arn:aws:iam::111111111111:role/AWSShieldDRTAccessRole
+        LogBuckets: [shield-drt-logs]
+
+      ProactiveEngagement: ENABLED
+      EmergencyContactList:
+        - EmailAddress: oncall@example.com
+          PhoneNumber: "+15551234567"
+
+      WAF Web ACL associations: []
+
+      Emit the standard VERDICT block (SCOPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: UNPROTECTED
+    assertions:
+      must_contain:
+        - "UNPROTECTED"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "Elastic IP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_DRT_ACCESS"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-drt-role
+    description: >-
+      Active subscription with a protected ALB (health check + WAF), but the
+      DRT has no associated role and no log bucket — the DRT cannot create
+      custom WAF mitigations during a live attack.
+    input: |
+      Account: 111111111111 (us-east-1)
+      SubscriptionState: ACTIVE
+
+      Internet-facing resource inventory:
+        - ALB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-no-drt-role/abc
+
+      Protections (from ListProtections):
+        - ProtectionId: p-003
+          Name: alb-protection-no-drt-role
+          ResourceArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-no-drt-role/abc
+          HealthCheckIds: [arn:aws:route53:::healthcheck/hc-alb-no-drt-role]
+
+      DRT access (from DescribeDRTAccess):
+        RoleArn: null
+        LogBuckets: []
+
+      ProactiveEngagement: ENABLED
+      EmergencyContactList:
+        - EmailAddress: oncall@example.com
+          PhoneNumber: "+15551234567"
+
+      WAF Web ACL associations:
+        - ALB arn:...:loadbalancer/app/alb-no-drt-role/abc -> WebACLArn arn:aws:wafv2:us-east-1:111111111111:regional/webacl/shield-waf/abc
+
+      Emit the standard VERDICT block (SCOPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_DRT_ACCESS
+    assertions:
+      must_contain:
+        - "NO_DRT_ACCESS"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "DRT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNPROTECTED"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: no-health-based-detection
+    description: >-
+      Active subscription, protected ALB with WAF, full DRT access, proactive
+      engagement enabled — but the protection has no associated Route 53 health
+      check, degrading L7 detection and disqualifying cost-protection credits.
+    input: |
+      Account: 111111111111 (us-east-1)
+      SubscriptionState: ACTIVE
+
+      Internet-facing resource inventory:
+        - ALB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-no-health-based-detection/abc
+
+      Protections (from ListProtections):
+        - ProtectionId: p-004
+          Name: alb-protection-no-health-based-detection
+          ResourceArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-no-health-based-detection/abc
+          HealthCheckIds: []
+
+      DRT access (from DescribeDRTAccess):
+        RoleArn: arn:aws:iam::111111111111:role/AWSShieldDRTAccessRole
+        LogBuckets: [shield-drt-logs]
+
+      ProactiveEngagement: ENABLED
+      EmergencyContactList:
+        - EmailAddress: oncall@example.com
+          PhoneNumber: "+15551234567"
+
+      WAF Web ACL associations:
+        - ALB arn:...:loadbalancer/app/alb-no-health-based-detection/abc -> WebACLArn arn:aws:wafv2:us-east-1:111111111111:regional/webacl/shield-waf/abc
+
+      Emit the standard VERDICT block (SCOPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "health"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNPROTECTED"
+        - "VERDICT: NO_DRT_ACCESS"
+
+  - id: proactive-engagement-disabled
+    description: >-
+      Active subscription, protected ALB with health check + WAF, full DRT
+      access — but proactive engagement is DISABLED and the emergency contact
+      list is empty. The DRT will not proactively contact the customer during
+      a suspected event.
+    input: |
+      Account: 111111111111 (us-east-1)
+      SubscriptionState: ACTIVE
+
+      Internet-facing resource inventory:
+        - ALB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-proactive-engagement-disabled/abc
+
+      Protections (from ListProtections):
+        - ProtectionId: p-005
+          Name: alb-protection-proactive-engagement-disabled
+          ResourceArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-proactive-engagement-disabled/abc
+          HealthCheckIds: [arn:aws:route53:::healthcheck/hc-alb-proactive-engagement-disabled]
+
+      DRT access (from DescribeDRTAccess):
+        RoleArn: arn:aws:iam::111111111111:role/AWSShieldDRTAccessRole
+        LogBuckets: [shield-drt-logs]
+
+      ProactiveEngagement: DISABLED
+      EmergencyContactList: []
+
+      WAF Web ACL associations:
+        - ALB arn:...:loadbalancer/app/alb-proactive-engagement-disabled/abc -> WebACLArn arn:aws:wafv2:us-east-1:111111111111:regional/webacl/shield-waf/abc
+
+      Emit the standard VERDICT block (SCOPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "proactive"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNPROTECTED"
+        - "VERDICT: NO_DRT_ACCESS"
+
+  - id: drt-role-no-log-bucket
+    description: >-
+      Active subscription, protected ALB with health check + WAF, proactive
+      engagement enabled — but the DRT has a role with NO log bucket
+      associated. The DRT can act but is blind to attack patterns in access
+      logs (partial DRT access).
+    input: |
+      Account: 111111111111 (us-east-1)
+      SubscriptionState: ACTIVE
+
+      Internet-facing resource inventory:
+        - ALB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-drt-role-no-log-bucket/abc
+
+      Protections (from ListProtections):
+        - ProtectionId: p-006
+          Name: alb-protection-drt-role-no-log-bucket
+          ResourceArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/alb-drt-role-no-log-bucket/abc
+          HealthCheckIds: [arn:aws:route53:::healthcheck/hc-alb-drt-role-no-log-bucket]
+
+      DRT access (from DescribeDRTAccess):
+        RoleArn: arn:aws:iam::111111111111:role/AWSShieldDRTAccessRole
+        LogBuckets: []
+
+      ProactiveEngagement: ENABLED
+      EmergencyContactList:
+        - EmailAddress: oncall@example.com
+          PhoneNumber: "+15551234567"
+
+      WAF Web ACL associations:
+        - ALB arn:...:loadbalancer/app/alb-drt-role-no-log-bucket/abc -> WebACLArn arn:aws:wafv2:us-east-1:111111111111:regional/webacl/shield-waf/abc
+
+      Emit the standard VERDICT block (SCOPE, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "log"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: UNPROTECTED"
+        - "VERDICT: NO_DRT_ACCESS"

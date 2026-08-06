@@ -1,0 +1,70 @@
+{
+  "skill": "verified-permissions-policy-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many specific, non\u2011obvious thresholds (e.g., >10 low\u2011condition permits, hierarchy depth >5, >100 linked policies) and obscure Cedar quirks (missing entity data yields DENY, forbid+when double\u2011negative, PutSchema atomic replacement). However, a large portion restates standard AVP/Cedar concepts that a competent model already knows, so it does not achieve full novelty."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, step\u2011by\u2011step audit procedure (Step\u202f0\u20115), pre\u2011flight metadata checks, mandatory confirmation gate before state\u2011changing CLI calls, and remediation commands. The only shortfall is a few generic safety reminders (e.g., \"capture backup before modify\") that are not uniquely AVP\u2011specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never treat bare permit as anything other than OVERPERMISSIVE, never rely on OFF validation). Some entries lack deeper justification (e.g., why a low forbid/permit ratio is dangerous beyond a rule\u2011of\u2011thumb) and could include more experience\u2011driven anecdotes."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata, activation triggers, invocation schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides KEYWORDS for activation. No missing fields."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: quick reference table, then quantitative thresholds, then decision\u2011tree heuristics, then pre\u2011flight checks, then detailed process steps, and finally deep reference. However, the deep reference section is large and could overload the top\u2011level reader, so a slight deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (UpdatePolicy, PutSchema) are tightly constrained with confirmation prompts and backup steps; creative tasks (policy design) are left open. One minor gap: the skill does not explicitly limit the number of policies to audit in a single run, which could be risky for very large stores."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick reference \u2192 Thresholds \u2192 Process \u2192 Deep reference \u2192 Anti\u2011patterns \u2192 Remediation. The sections are not explicitly labeled with the canonical names (e.g., \"Mindset\" is present but later sections blend philosophy and process), so a small deduction."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, output format, and worked examples that an agent can execute. Missing explicit handling of pagination errors for list\u2011policies, and no example of live\u2011store error recovery, which could cause failures in edge cases."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 40262,
+  "latency_ms": 10644,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

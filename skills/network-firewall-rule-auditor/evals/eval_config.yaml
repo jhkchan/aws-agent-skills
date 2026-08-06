@@ -1,0 +1,48 @@
+# Eval configuration for network-firewall-rule-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: network-firewall-rule-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: permissive-wildcard-stateful-pass
+    difficulty: medium
+    prompt_file: prompts/permissive-wildcard-stateful-pass.md
+    baseline_file: baselines/permissive-wildcard-stateful-pass.md
+    expected_verdict: PERMISSIVE_RULE
+  - id: routing-gap-app-subnet-bypass
+    difficulty: hard
+    prompt_file: prompts/routing-gap-app-subnet-bypass.md
+    baseline_file: baselines/routing-gap-app-subnet-bypass.md
+    expected_verdict: ROUTING_GAP
+  - id: no-tls-inspection-missing-config
+    difficulty: medium
+    prompt_file: prompts/no-tls-inspection-missing-config.md
+    baseline_file: baselines/no-tls-inspection-missing-config.md
+    expected_verdict: NO_TLS_INSPECTION
+  - id: config-gap-no-logging
+    difficulty: easy
+    prompt_file: prompts/config-gap-no-logging.md
+    baseline_file: baselines/config-gap-no-logging.md
+    expected_verdict: CONFIG_GAP
+  - id: permissive-fragment-default-pass
+    difficulty: hard
+    prompt_file: prompts/permissive-fragment-default-pass.md
+    baseline_file: baselines/permissive-fragment-default-pass.md
+    expected_verdict: PERMISSIVE_RULE
+  - id: ok-clean-firewall
+    difficulty: easy
+    prompt_file: prompts/ok-clean-firewall.md
+    baseline_file: baselines/ok-clean-firewall.md
+    expected_verdict: OK

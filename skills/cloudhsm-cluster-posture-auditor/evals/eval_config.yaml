@@ -1,0 +1,44 @@
+# Eval configuration for cloudhsm-cluster-posture-auditor.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison.
+skill_name: cloudhsm-cluster-posture-auditor
+snapshot_date: "2026-08-05"
+baseline_model: amazon.nova-pro-v1:0
+judge_model: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: single-az-single-hsm
+    difficulty: easy
+    prompt_file: prompts/single-az-single-hsm.md
+    baseline_file: baselines/single-az-single-hsm.md
+    expected_verdict: SINGLE_AZ
+  - id: same-az-three-hsm
+    difficulty: hard
+    prompt_file: prompts/same-az-three-hsm.md
+    baseline_file: baselines/same-az-three-hsm.md
+    expected_verdict: SINGLE_AZ
+  - id: multi-az-no-backup
+    difficulty: medium
+    prompt_file: prompts/multi-az-no-backup.md
+    baseline_file: baselines/multi-az-no-backup.md
+    expected_verdict: NO_BACKUP
+  - id: multi-az-uninitialized
+    difficulty: medium
+    prompt_file: prompts/multi-az-uninitialized.md
+    baseline_file: baselines/multi-az-uninitialized.md
+    expected_verdict: CONFIG_GAP
+  - id: multi-az-default-co-password
+    difficulty: medium
+    prompt_file: prompts/multi-az-default-co-password.md
+    baseline_file: baselines/multi-az-default-co-password.md
+    expected_verdict: CONFIG_GAP
+  - id: multi-az-backup-ok
+    difficulty: easy
+    prompt_file: prompts/multi-az-backup-ok.md
+    baseline_file: baselines/multi-az-backup-ok.md
+    expected_verdict: OK

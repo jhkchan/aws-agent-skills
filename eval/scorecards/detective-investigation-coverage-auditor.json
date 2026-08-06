@@ -1,0 +1,70 @@
+{
+  "skill": "detective-investigation-coverage-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many expert nuggets (50\u2011day invitation expiry, 24\u2011hour freshness threshold, STARTING \u2192 STOPPED rule, pricing notes) that are not obvious from generic docs, but a large portion restates publicly documented behavior; the core decision matrix could be derived from existing AWS documentation, so the delta is solid but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill outlines an AWS\u2011specific order of checks (graph existence \u2192 member state \u2192 data\u2011source \u2192 freshness \u2192 GuardDuty \u2192 org admin) and supplies exact CLI commands. However, the pre\u2011flight \u201cverify caller's identity\u201d step is vague (no IAM policy details), which is a generic security checklist rather than a precise AWS procedure."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasoning (e.g., never trust INVITED members, never assume ENABLED means ingesting, never delete a graph without warning). Minor omission: the rationale for treating DETECTIVE_CORE STOPPED as a critical ingestion failure could be more explicit."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and invocation schema are present. The activation trigger list is exhaustive but the schema description is informal (plain text) rather than a strict JSON schema, leaving a small ambiguity for automated parsing."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick\u2011reference matrix, then detailed steps, then anti\u2011patterns, then remediation). Yet the initial matrix is dense and may overload the agent before it knows which path to follow, slightly violating progressive disclosure principles."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom precisely: destructive actions require mandatory confirmation, explicit warnings about irreversible graph deletion, and guidance to prefer additive changes. No over\u2011 or under\u2011constraining observed."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable pattern (Mindset \u2192 Quick reference \u2192 Process \u2192 Output format \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation \u2192 Recent features), aiding comprehension and reuse."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a clear decision tree, concrete CLI remediation commands, and multiple worked examples. Model output shows a minor inconsistency (includes GuardDuty finding in a NO_GRAPH verdict despite the skill stating downstream checks are moot) and lacks pagination/error\u2011handling guidance, leading to a modest deduction."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 34135,
+  "latency_ms": 13515,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

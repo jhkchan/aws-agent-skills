@@ -20,8 +20,10 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:triage-accessanalyzer-findings` | 2 Audit | Triage IAM Access Analyzer findings (external access + unused access) into risk verdicts — emits VERDICT per finding |
 | `/aws:audit-secretsmanager-rotation` | 2 Audit | Audit Secrets Manager secrets for rotation health, Lambda wiring, staleness, and recovery-window state |
 | `/aws:triage-guardduty-findings` | 3 Prioritize | Triage GuardDuty findings into context-aware severity (CRITICAL/HIGH/MEDIUM/LOW/LIKELY_FALSE_POSITIVE) with false-positive detection |
+| `/aws:audit-detective-investigation-coverage` | 2 Audit | Audit Amazon Detective behavior graph coverage, member-account ingestion (INVITED/ACCEPTED_BUT_DISABLED/DETECTIVE_CORE STOPPED), data freshness lag (>24h), GuardDuty integration dependency, and Organizations delegated-admin auto-enrollment — emits NO_GRAPH/INCOMPLETE_INGESTION/STALE_DATA/CONFIG_GAP/OK per behavior graph or region (routes to `detective-investigation-coverage-auditor`) |
 | `/aws:audit-kms-key-policy` | 2 Audit | Audit KMS key policies for cross-account decrypt, wildcard kms:*, rotation gaps, deletion-window exposure (routes to `kms-key-policy-auditor`) |
 | `/aws:audit-sts-cross-account-role` | 2 Audit | Audit IAM role trust policies for cross-account/external trust, wildcard Principal, and confused-deputy risk (routes to `sts-cross-account-role-auditor`) |
+| `/aws:audit-verified-permissions-policy` | 2 Audit | Audit Amazon Verified Permissions Cedar policies for bare-permit overexposure, schema-to-policy mismatches, validation-mode gaps, and template-linked scope — emits INVALID_POLICY/SCHEMA_MISMATCH/OVERPERMISSIVE/CONFIG_GAP/OK per policy (routes to `verified-permissions-policy-auditor`) |
 | `/aws:audit-inspector2-coverage-findings` | 2 Audit | Audit Inspector2 coverage gaps + finding severity — CRITICAL/HIGH/MEDIUM/LOW/COVERED per resource (routes to `inspector2-coverage-finding-auditor`) |
 | `/aws:audit-cognito-user-pool` | 2 Audit | Audit Cognito user pools for MFA, password policy, auth-flow safety, OAuth exposure, ASF mode — emits INSECURE/WEAK/ADEQUATE/OK per pool (routes to `cognito-idp-user-pool-auditor`) |
 | `/aws:audit-acm-certificate-expiry` | 2 Audit | Audit ACM certificates for expiry, renewal status, and key-algorithm compliance — emits VERDICT per certificate (routes to `acm-certificate-expiry-auditor`) |
@@ -85,6 +87,12 @@ pipeline walkthrough. For install instructions, see the
 | `/aws:audit-cleanrooms-collaboration` | 2 Audit | Audit AWS Clean Rooms collaborations for membership-status gaps (INVITED/REMOVED/LEFT members — perspective-relative status), privacy-budget risks (differential privacy disabled at collaboration level vs additionalAnalyses=0 per-query enforcement gap, epsilon near-exhaustion >=80% of per-member cap with no reset, aggregate constraints absent = no structural privacy floor), analysis-template SQL-validation defects (dangling configured-table aliases, unresolved ${param} tokens, columns outside allowedColumns), protected-query output S3 widening, and configured-audience activation gaps (cleanroomsml model in CREATE_FAILED/CREATE_IN_PROGRESS, missing destinationConfig) — emits MEMBERSHIP_GAP/PRIVACY_RISK/CONFIG_GAP/OK per collaboration (routes to `cleanrooms-collaboration-auditor`) |
 | `/aws:audit-athena-workgroup` | 2 Audit | Audit Athena workgroups for query-result encryption (SSE-S3/SSE-KMS on ResultConfiguration), BytesScannedCutoffPerQuery data-scan limit, EnforceWorkGroupConfiguration enforcement posture (false = encryption/OutputLocation advisory; only the DSL is binding), query-history retention via CloudTrail Athena data events (GetQueryExecution has a fixed 45-day window), and named-query IAM exposure (Principal:* + athena:GetNamedQuery = SQL exfiltration) — emits NO_ENCRYPTION/NO_LIMITS/CONFIG_GAP/OK per workgroup (routes to `athena-workgroup-auditor`) |
 | `/aws:audit-lakeformation-data-lake` | 2 Audit | Audit Lake Formation data lakes for catalog-level super-grants (Permissions ALL on Catalog), cross-account DataLakePrincipalIdentifier principals, ColumnWildcard SELECT without a wired DataCellsFilter, WithGrantablePermissions unbounded delegation chains, grants on tables whose S3 path is not under any registered location, DataLakeAdmins composition (empty / external / over-delegated), and IAMAllowedPrincipals mixed-mode databases — emits OVERPERMISSIVE_GRANT/EXTERNAL_ACCOUNT/CONFIG_GAP/OK per data lake (routes to `lakeformation-data-lake-auditor`) |
+| `/aws:audit-macie-data-classification` | 2 Audit | Audit Amazon Macie data-classification posture — classification job coverage and status (FAILED/CANCELLED = false sense of coverage), ASDD enablement (probabilistic sampling vs full-scan), sensitive data finding triage state (PII/credentials/financial HIGH findings archived-vs-remediated distinction), bucket_allow_list wildcard-prefix masking, auto-archive findings filters, Security Hub export integration (non-retroactive), and ASDD staleness (>48h) — emits NO_CLASSIFICATION/UNTRIAGED_FINDINGS/CONFIG_GAP/OK per account scope (routes to `macie-data-classification-auditor`) |
+| `/aws:audit-shield-advanced-coverage` | 2 Audit | Audit AWS Shield Advanced DDoS coverage posture — protected-resource coverage (CloudFront/Route 53 auto-protection, ALB/NLB/CLB/EIP/EC2 explicit protection), DRT role and log-bucket access, health-based detection per protection, proactive engagement and emergency contacts, WAF Web ACL L7 integration — emits UNPROTECTED/NO_DRT_ACCESS/CONFIG_GAP/OK per account (routes to `shield-advanced-coverage-auditor`) |
+| `/aws:audit-firewall-manager-compliance` | 2 Audit | Audit AWS Firewall Manager (FMS) policies for PolicyState NOT_READY silent non-enforcement, ResourceTags-only scope coverage gaps (untagged resources silently unprotected), RemediationEnabled detect-only posture, PolicyType currency (WAFV2 vs legacy WAF Classic), IncludeMap/ExcludeMap OU coverage, ResourceTypeLists completeness per policy type, and live NonCompliantResourceCount across WAF, Shield Advanced, VPC Security Groups, Network Firewall, DNS Firewall, and third-party firewalls — emits NONCOMPLIANT/INCOMPLETE_COVERAGE/CONFIG_GAP/OK per policy (routes to `firewall-manager-compliance-auditor`) |
+| `/aws:audit-vpc-lattice-auth` | 2 Audit | Audit VPC Lattice service networks for auth-policy absence (default-open within associated VPCs), public Principal:"*" vpc-lattice:Invoke grants, NotAction inverse-wildcard traps, cross-account principal exposure without strong conditions, IP target groups routing outside VPC CIDR, cross-account RAM share coverage, and service-level auth-policy overrides that silently bypass network guards — emits NO_AUTH_POLICY/PUBLIC_SERVICE_NETWORK/CONFIG_GAP/OK per service network (routes to `vpc-lattice-auth-auditor`) |
+| `/aws:audit-network-firewall-rule` | 2 Audit | Audit AWS Network Firewall for permissive stateful/stateless rules, wildcard Suricata pass, fragment-bypass default, missing TLS inspection (blind to HTTPS payloads), rule-group evaluation-order shadowing (STRICT_ORDER pass-before-drop), firewall-subnet routing gaps, and logging blind spots — emits PERMISSIVE_RULE/NO_TLS_INSPECTION/ROUTING_GAP/CONFIG_GAP/OK per firewall (routes to `network-firewall-rule-auditor`) |
+| `/aws:audit-cloudhsm-cluster` | 2 Audit | Audit AWS CloudHSM clusters for HA posture (cross-AZ HSM distribution — HSM count is NOT HA), backup readiness (retention DAYS=0 disables backups, zero/stale backups), PKCS#11 user hygiene (default CO password, quorum), cluster initialization (UNINITIALIZED = cryptographically unreachable), and security group exposure on ports 2223-2225 — emits SINGLE_AZ/NO_BACKUP/CONFIG_GAP/OK per cluster (routes to `cloudhsm-cluster-posture-auditor`) |
 
 Every command has a natural-language equivalent — the orchestrator routes
 identically.
@@ -415,6 +423,55 @@ Both surfaces should be audited for every role.
 
 ---
 
+### Verified Permissions policy auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-verified-permissions-policy`
+
+**What it does:** Audits Amazon Verified Permissions policy stores for Cedar
+policy validation, schema-to-policy consistency, principal/resource
+authorization scope, policy template usage, and validation-mode configuration
+gaps. Emits a deterministic verdict (INVALID_POLICY | SCHEMA_MISMATCH |
+OVERPERMISSIVE | CONFIG_GAP | OK) per policy with enumerated findings and CLI
+remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this Cedar policy"
+- "is my permit too broad?"
+- "bare permit Cedar"
+- "schema mismatch Cedar"
+- "validation mode off AVP"
+- "policy template audit"
+- "IsAuthorized policy review"
+- reviewing a Cedar policy before production deployment
+
+**Example prompt:**
+
+```
+You: "This Verified Permissions store has permit(principal, action, resource)
+     with no conditions and validation mode is OFF. What's the risk?"
+```
+
+**Expected behavior:**
+
+1. Classifies the policy as OVERPERMISSIVE (bare permit — matches every
+   request, Rule 2a).
+2. Flags validation mode OFF as CONFIG_GAP (Config 3a — schema validation
+   disabled).
+3. Aggregates to OVERPERMISSIVE (worst finding wins).
+4. Provides scoped remediation: replace bare permit with typed scope +
+   conditions, enable STRICT validation, back up policies (non-versioned).
+
+**End-to-end scenario:** see
+[`skills/verified-permissions-policy-auditor/examples/end-to-end.md`](skills/verified-permissions-policy-auditor/examples/end-to-end.md)
+for a policy-store walkthrough (bare permit + forbid clause + validation OFF)
+covering verdict aggregation, the forbid-does-not-compensate principle, and
+the validation-enablement remediation workflow.
+
+---
+
 ### 7. inspector2-coverage-finding-auditor
 
 **Pipeline phase:** Phase 2 — Audit.
@@ -521,7 +578,69 @@ remediation ordering.
 
 ---
 
-### 9. cognito-idp-user-pool-auditor
+### 9. detective-investigation-coverage-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-detective-investigation-coverage`
+
+**What it does:** Audits Amazon Detective behavior graph investigation
+readiness across five dimensions — graph existence (NO_GRAPH), member
+account ingestion health (INCOMPLETE_INGESTION from INVITED /
+ACCEPTED_BUT_DISABLED / DETECTIVE_CORE STOPPED), data freshness lag
+(STALE_DATA when lastDataReceived > 24h), configuration gaps (CONFIG_GAP
+from disabled GuardDuty detector or missing Organizations delegated admin),
+and full health (OK). Validates that all member accounts are actively
+COLLECTING with fresh data, GuardDuty is enabled in-region, and org
+auto-enrollment is configured.
+
+**When to invoke (trigger phrases):**
+
+- "audit Detective behavior graph"
+- "is Detective enabled"
+- "Detective member accounts not ingesting"
+- "Detective data freshness check"
+- "GuardDuty Detective integration"
+- "Detective investigation readiness"
+- "check Detective Organizations admin"
+- "Detective DETECTIVE_CORE stopped"
+
+**Example prompt:**
+
+```
+You: /aws:audit-detective-investigation-coverage
+
+     "Check Detective coverage for us-east-1 — we have 5 org accounts and
+     need to make sure all are ingesting before our incident-response
+     exercise."
+```
+
+**Expected behavior:**
+
+1. Checks graph existence first — no behavior graph = NO_GRAPH (zero
+   investigation capability).
+2. Classifies each member account state: ENABLED is healthy; INVITED is
+   a blind spot (50-day expiry window); ACCEPTED_BUT_DISABLED is a silent
+   failure.
+3. Checks DETECTIVE_CORE data-source package per member — STOPPED on an
+   ENABLED member is an ingestion failure, not a config issue.
+4. Evaluates data freshness — lastDataReceived > 24h = STALE_DATA
+   (graph does not reflect current state).
+5. Checks GuardDuty detector status (DISABLED = CONFIG_GAP — no security
+   findings feed) and Organizations delegated admin.
+6. Emits VERDICT with per-member FINDINGS and CLI remediation
+   (re-invitations, data-source re-enablement).
+
+**End-to-end scenario:** see
+[`skills/detective-investigation-coverage-auditor/examples/end-to-end.md`](skills/detective-investigation-coverage-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (2 INVITED members + 1 expired invitation)
+covering INCOMPLETE_INGESTION classification, the 50-day invitation
+expiry threshold, and the re-invitation + data-source verification
+remediation workflow.
+
+---
+
+### 10. cognito-idp-user-pool-auditor
 
 **Pipeline phase:** Phase 2 — Audit.
 
@@ -3646,7 +3765,322 @@ DataCellsFilter wiring gap.
 
 ---
 
+### 38. shield-advanced-coverage-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-shield-advanced-coverage`
+
+**What it does:** Audits AWS Shield Advanced DDoS coverage posture across
+five dimensions — protected-resource coverage (CloudFront/Route 53
+auto-protection vs ALB/NLB/CLB/EIP explicit protection), DRT role and
+log-bucket access for incident response, health-based detection per
+protection (Route 53 health check association), proactive engagement and
+emergency contact list, and WAF Web ACL integration for L7 mitigation.
+Emits a deterministic verdict (UNPROTECTED | NO_DRT_ACCESS | CONFIG_GAP |
+OK) with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit Shield Advanced coverage"
+- "is my ALB protected by Shield Advanced"
+- "check DRT access"
+- "is proactive engagement enabled"
+- "Shield Advanced health-based detection"
+- "which resources are DDoS protected"
+- "harden DDoS posture"
+- reviewing Shield Advanced before a public launch
+
+**Example prompt:**
+
+```
+You: "We have an ALB and a CloudFront distribution. Shield Advanced is
+     active. Can you check if everything is properly covered?"
+```
+
+**Expected behavior:**
+
+1. Classifies CloudFront as auto-protected (no Protections entry needed)
+   and the ALB as requiring an explicit Protection.
+2. Emits VERDICT: OK if the ALB is in Protections with a health check, DRT
+   has role + log bucket, proactive engagement is enabled with contacts,
+   and a WAF Web ACL is associated.
+3. Emits VERDICT: UNPROTECTED if an ALB/NLB/CLB/EIP is missing from the
+   Protections list (Shield Standard only — L3/L4, no DRT, no L7).
+4. Emits VERDICT: NO_DRT_ACCESS if the DRT role is absent — the DRT cannot
+   create custom WAF rules during a live attack.
+5. Emits VERDICT: CONFIG_GAP for missing health checks, disabled proactive
+   engagement, partial DRT (role but no log bucket), or missing WAF on an
+   ALB protection.
+
+**Key expert knowledge deltas (D1):**
+
+1. CloudFront and Route 53 are AUTO-PROTECTED by Shield Advanced (re:Invent
+   2023) — flagging their absence from Protections is the most common
+   false positive. Only ALB/NLB/CLB/EIP need explicit `CreateProtection`.
+2. DRT needs BOTH a role (`AssociateDRTRole`) AND a log bucket
+   (`AssociateDRTLogBucket`) for full incident response. Missing role =
+   NO_DRT_ACCESS; missing only log bucket = CONFIG_GAP (DRT blind to logs).
+3. Proactive engagement requires BOTH `EnableProactiveEngagement` AND a
+   populated `EmergencyContactList`. Enabled without contacts = CONFIG_GAP.
+4. Health-based detection is PER-PROTECTION (not per-account) via
+   `AssociateHealthCheck`. Missing health checks degrade L7 detection and
+   disqualify cost-protection credits.
+5. WAF Web ACL is REQUIRED for L7 mitigation — the DRT injects rate-based
+   rules into the Web ACL. ALB with Shield but no WAF = L3/L4 only.
+6. EIP protection covers the associated EC2 instance; EC2 without an EIP
+   is not internet-facing and should NOT be flagged.
+7. Shield Advanced subscription is a 1-year, non-cancellable commitment
+   (`CreateSubscription`). Without it, no protections are in effect.
+
+**End-to-end scenario:** see
+[`skills/shield-advanced-coverage-auditor/examples/end-to-end.md`](skills/shield-advanced-coverage-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (unprotected EIP + missing DRT role + no
+health check on ALB) covering UNPROTECTED aggregation, the CloudFront
+auto-protection exception, and the DRT role + log-bucket remediation
+workflow.
+
+---
+
+### 39. vpc-lattice-auth-auditor
+
+**Slash command:** `/aws:audit-vpc-lattice-auth`
+
+Audits VPC Lattice service networks for the auth-policy security posture
+across seven dimensions: auth-policy presence (absent = default-open, not
+locked down), principal scope (wildcard vs cross-account vs same-account),
+action danger (vpc-lattice:Invoke blast-radius action, NotAction inverse
+wildcard), condition strength (aws:SourceVpc/aws:SourceAccount STRONG vs
+aws:SourceIp WEAK), target group security (IP targets outside VPC CIDR),
+cross-account RAM share coverage, and service-level auth-policy overrides.
+
+**Key D1 knowledge delta:** auth-policy absence is the DEFAULT state on a
+newly created service network — it means "any resource in an associated VPC
+can invoke services," not "no access." This is the opposite of every other
+AWS resource-based policy model (KMS, S3, Secrets Manager) where policy
+absence means "locked down." Operators routinely deploy VPC Lattice
+service networks without auth policies, assuming the absence is a security
+default. It is an open posture.
+
+The verdict shape is `NO_AUTH_POLICY | PUBLIC_SERVICE_NETWORK | CONFIG_GAP |
+OK`, determined by ordered classification:
+
+1. **Auth-policy presence** — NOT_SET means NO_AUTH_POLICY (highest concern).
+2. **Principal scope** — WILDCARD (Principal:"*") vs CROSS_ACCOUNT vs
+   SAME_ACCOUNT.
+3. **Action danger** — INVOKE_ACCESS (vpc-lattice:Invoke, vpc-lattice:*,
+   NotAction inverse wildcard) vs CONTROL_ACCESS vs METADATA.
+4. **Condition strength** — aws:SourceVpc/aws:SourceAccount STRONG;
+   aws:SourceIp 0.0.0.0/0 WEAK (bypassable).
+5. **Verdict matrix** — wildcard + invoke + no condition =
+   PUBLIC_SERVICE_NETWORK; cross-account + invoke = CONFIG_GAP (even with
+   strong condition — external trust dependency is inherently fragile).
+6. **Target group security** — IP targets outside VPC CIDR = CONFIG_GAP.
+7. **Cross-account RAM share** — verify auth policy covers consumer account.
+8. **Service-level auth-policy override** — service's own policy overrides
+   the network's; evaluate independently.
+9. **Aggregation** — worst finding wins.
+
+**Non-obvious VPC Lattice behaviors the skill encodes:**
+
+1. Auth-policy absence is NOT_SET by default — open within associated VPCs,
+   not locked down. This is unique to Lattice (KMS/S3 default to locked).
+2. `vpc-lattice:Invoke` is the only auth-policy action that controls service
+   invocation — management actions are IAM-gated, not auth-policy-gated.
+3. Service-level auth policy overrides network-level — a secure network
+   policy is silently bypassed by a permissive service override.
+4. VPC association is ROUTING, not AUTH — any resource in an associated VPC
+   can invoke without an auth policy.
+5. RAM sharing grants VISIBILITY, not invocation — but without an auth
+   policy, the RAM share + VPC association is enough to invoke.
+6. NotAction in an Allow auth policy is an inverse wildcard — grants Invoke
+   unless explicitly listed.
+7. Cross-account auth-policy evaluation is INTERSECTION-based (both resource
+   and identity must Allow) — same as S3 cross-account.
+8. IP target groups route to arbitrary IPs — targets outside VPC CIDR are a
+   potential exfiltration path.
+9. Auth policies are NOT versioned — PutAuthPolicy replaces atomically, no
+   rollback without a backup file.
+10. Service DNS names resolve in ALL associated VPCs including cross-account
+    consumer VPCs — DNS visibility is not scoped by account.
+
+**End-to-end scenario:** see
+[`skills/vpc-lattice-auth-auditor/examples/end-to-end.md`](skills/vpc-lattice-auth-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (Principal:"*" vpc-lattice:* + IP targets
+outside VPC CIDR) covering PUBLIC_SERVICE_NETWORK aggregation, the
+default-open-vs-present distinction, and the assume-breach remediation
+workflow.
+
+---
+
+### firewall-manager-compliance-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-firewall-manager-compliance`
+
+**What it does:** Audits AWS Firewall Manager (FMS) policies across WAF,
+Shield Advanced, VPC Security Groups, Network Firewall, DNS Firewall, and
+third-party firewalls — evaluates PolicyState (READY vs NOT_READY silent
+non-enforcement trap), ResourceTags-only scope coverage gaps (untagged
+resources silently excluded), RemediationEnabled posture (enforce vs
+detect-only), PolicyType currency (WAFV2 vs legacy WAF Classic),
+IncludeMap/ExcludeMap account/OU coverage, ResourceTypeLists completeness
+per policy type, and live NonCompliantResourceCount. Emits a deterministic
+verdict (NONCOMPLIANT | INCOMPLETE_COVERAGE | CONFIG_GAP | OK) per policy
+with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this Firewall Manager policy"
+- "is this FMS policy enforced"
+- "FMS coverage gap"
+- "FMS PolicyState NOT_READY"
+- "FMS RemediationEnabled false"
+- "FMS ResourceTags scope"
+- "legacy WAF FMS policy"
+- "FMS non-compliant resources"
+- "NonCompliantResourceCount"
+- "FMS IncludeMap coverage"
+- "audit FMS deployment"
+- reviewing an FMS policy before a compliance review or org-wide rollout
+
+**Example prompt:**
+
+```
+You: "This WAFV2 Firewall Manager policy has been running detect-only for
+     60 days. NonCompliantResourceCount is 9. ResourceTags is
+     workload=customer-facing only. What's the verdict?"
+```
+
+**Expected behavior:**
+
+1. Classifies the live violations (NONCOMPLIANT, Step 5 — highest
+   precedence).
+2. Flags RemediationEnabled=false as a steady-state CONFIG_GAP (Step 4).
+3. Flags ResourceTags-only scope as INCOMPLETE_COVERAGE — without an SCP
+   enforcing the tag, untagged resources are silently unprotected
+   (Step 3a).
+4. Drills per-member-account, calling out the dominant violator.
+5. Stages remediation: per-account drill first, then re-enable
+   remediation, then add SCP tag enforcement.
+
+**End-to-end scenario:** see
+[`skills/firewall-manager-compliance-auditor/examples/end-to-end.md`](skills/firewall-manager-compliance-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (NONCOMPLIANT + CONFIG_GAP +
+INCOMPLETE_COVERAGE on a single WAFV2 policy) covering verdict aggregation,
+per-account drill-down, the detect-only-vs-enforce distinction, the
+tag-scope silent-hole reasoning, and the staged remediation ordering
+(detect-first, then enforce).
+
+---
+
+### 39. network-firewall-rule-auditor
+
+**Pipeline phase:** Phase 2 — Audit.
+
+**Slash command:** `/aws:audit-network-firewall-rule`
+
+**What it does:** Audits AWS Network Firewall configurations across seven
+dimensions — firewall-subnet routing topology (traffic bypass),
+stateless default actions (`forward_to_sfe` vs `pass`), stateful default
+actions (`drop_strict` vs `alert_strict` IDS-only), permissive rule
+detection (wildcard Suricata pass, all-wildcard stateless pass),
+rule-group evaluation-order shadowing (STRICT_ORDER pass-before-drop),
+TLS inspection coverage (absent TLS config + payload rules = blind to
+HTTPS), and logging/observability. Emits a deterministic verdict
+(PERMISSIVE_RULE | NO_TLS_INSPECTION | ROUTING_GAP | CONFIG_GAP | OK)
+with enumerated findings and specific CLI remediation.
+
+**When to invoke (trigger phrases):**
+
+- "audit this network firewall"
+- "check firewall rules"
+- "permissive firewall policy"
+- "is TLS inspection enabled"
+- "firewall routing gap"
+- "rule group evaluation order"
+- "stateless default actions"
+- "fragment bypass firewall"
+- "shadowed Suricata rules"
+- reviewing Network Firewall before a production launch
+
+**Example prompt:**
+
+```
+You: "We have a Network Firewall inspecting egress from our payment VPC.
+     Can you check if the rules are permissive and if TLS inspection is
+     working?"
+```
+
+**Expected behavior:**
+
+1. Verifies route tables for workload subnets point through firewall ENIs
+   (ROUTING_GAP if bypassed or asymmetric).
+2. Flags `StatelessDefaultActions: [aws:pass]` as PERMISSIVE_RULE — the
+   stateful engine never sees traffic.
+3. Flags `StatelessFragmentDefaultActions: [aws:pass]` as PERMISSIVE_RULE
+   — fragments bypass both engines.
+4. Flags `StatefulDefaultActions: [aws:alert_strict]` as PERMISSIVE_RULE
+   for enforcement postures — IDS-only, never blocks.
+5. Detects wildcard Suricata pass rules and strict-order pass-before-drop
+   shadowing (PERMISSIVE_RULE).
+6. Flags missing `TLSInspectionConfigurationArn` with payload-matching
+   rules as NO_TLS_INSPECTION.
+7. Flags missing logging config as CONFIG_GAP.
+8. Aggregates worst finding by priority (PERMISSIVE_RULE > ROUTING_GAP >
+   NO_TLS_INSPECTION > CONFIG_GAP > OK).
+
+**Key expert knowledge deltas (D1):**
+
+1. `HOME_NET` is set automatically to the VPC CIDR and is NOT
+   API-editable — peered VPCs are `$EXTERNAL_NET`.
+2. `aws:forward_to_sfe` is the only stateless action that reaches the
+   stateful engine; `aws:pass` and `aws:drop` are terminal.
+3. Fragments cannot be statefully inspected — `StatelessFragmentDefaultActions:
+   [aws:pass]` is a PERMISSIVE_RULE (fragmentation evasion).
+4. Suricata `alert` does NOT block even under `drop_strict` — only
+   `drop`/`reject` block.
+5. Domain-list (SNI) rules work without TLS decryption; only
+   `content`/payload rules require it.
+6. `STRICT_ORDER` shadows rules (first match wins); `DEFAULT_ACTION_ORDER`
+   evaluates all rules and applies the most severe action.
+7. `drop_established` grandfatheres existing flows — new drop rules don't
+   take effect on active connections during incident response.
+
+**End-to-end scenario:** see
+[`skills/network-firewall-rule-auditor/examples/end-to-end.md`](skills/network-firewall-rule-auditor/examples/end-to-end.md)
+for a multi-finding walkthrough (wildcard subnet pass + missing TLS
+inspection) covering PERMISSIVE_RULE aggregation, strict-order shadowing,
+the SNI-vs-payload distinction, and the additive remediation workflow.
+
+---
+
 ## Eval Status
+
+### 40. cloudhsm-cluster-posture-auditor
+
+Audit AWS CloudHSM clusters for high-availability posture, backup readiness,
+PKCS#11 user hygiene, cluster initialization, and network exposure.
+
+```bash
+/aws:audit-cloudhsm-cluster
+```
+
+**Verdict shape:** `SINGLE_AZ | NO_BACKUP | CONFIG_GAP | OK`
+
+**Key knowledge delta:** HSM count is NOT a proxy for HA — three HSMs in one
+AZ is still SINGLE_AZ. BackupRetentionPolicy DAYS=0 silently disables backups
+(looks configured but deletes immediately). An UNINITIALIZED cluster is
+cryptographically unreachable even with ACTIVE HSMs. The default CO password
+is a documented credential. KMS Custom Key Store coupling makes single-AZ
+clusters cause intermittent KMSInternalException during AZ events.
+
+[# Phase: Audit | Skills routed: cloudhsm-cluster-posture-auditor]
+
+[`skills/cloudhsm-cluster-posture-auditor/examples/end-to-end.md`](skills/cloudhsm-cluster-posture-auditor/examples/end-to-end.md)
+
+---
 
 Each skill carries a co-located eval specification (`eval/test-cases.yaml`)
 and a committed LLM-judge scorecard (`eval/scorecards/<skill>.json`). Run the

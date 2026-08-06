@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "verified-permissions-policy-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Verified Permissions Policy Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "invalid-policy-type-error",
+      "name": "Cedar policy with Long-vs-String type comparison — fails type validation",
+      "difficulty": "medium",
+      "prompt_file": "prompts/invalid-policy-type-error.md",
+      "baseline_file": "baselines/invalid-policy-type-error.md",
+      "expected_verdict": "INVALID_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INVALID_POLICY", "VERDICT", "REASON", "FINDINGS", "REMEDIATION", "type"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: SCHEMA_MISMATCH", "VERDICT: OVERPERMISSIVE", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "schema-mismatch-action-not-declared",
+      "name": "Policy references action removed from schema — schema-to-policy mismatch",
+      "difficulty": "hard",
+      "prompt_file": "prompts/schema-mismatch-action-not-declared.md",
+      "baseline_file": "baselines/schema-mismatch-action-not-declared.md",
+      "expected_verdict": "SCHEMA_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["SCHEMA_MISMATCH", "VERDICT", "REASON", "FINDINGS", "REMEDIATION", "DeletePhoto"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INVALID_POLICY", "VERDICT: OVERPERMISSIVE", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "overpermissive-bare-permit",
+      "name": "Bare permit(principal, action, resource) — authorizes every request",
+      "difficulty": "easy",
+      "prompt_file": "prompts/overpermissive-bare-permit.md",
+      "baseline_file": "baselines/overpermissive-bare-permit.md",
+      "expected_verdict": "OVERPERMISSIVE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OVERPERMISSIVE", "VERDICT", "REASON", "FINDINGS", "REMEDIATION", "bare"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INVALID_POLICY", "VERDICT: SCHEMA_MISMATCH", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "overpermissive-weak-condition",
+      "name": "Unscoped action/resource with trivially satisfiable condition — broad access",
+      "difficulty": "medium",
+      "prompt_file": "prompts/overpermissive-weak-condition.md",
+      "baseline_file": "baselines/overpermissive-weak-condition.md",
+      "expected_verdict": "OVERPERMISSIVE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OVERPERMISSIVE", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INVALID_POLICY", "VERDICT: SCHEMA_MISMATCH", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-validation-off",
+      "name": "Policy store with validationSettings.mode OFF — no schema enforcement",
+      "difficulty": "medium",
+      "prompt_file": "prompts/config-gap-validation-off.md",
+      "baseline_file": "baselines/config-gap-validation-off.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "FINDINGS", "REMEDIATION", "validation"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INVALID_POLICY", "VERDICT: SCHEMA_MISMATCH", "VERDICT: OVERPERMISSIVE", "VERDICT: OK"]
+        }
+      ]
+    },
+    {
+      "id": "ok-scoped-permit-with-forbid",
+      "name": "Scoped permit with forbid clause, validation ON — clean posture",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ok-scoped-permit-with-forbid.md",
+      "baseline_file": "baselines/ok-scoped-permit-with-forbid.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "VERDICT", "REASON", "FINDINGS", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INVALID_POLICY", "VERDICT: SCHEMA_MISMATCH", "VERDICT: OVERPERMISSIVE", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "cloudhsm-cluster-posture-auditor",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Adds multiple expert\u2011level CloudHSM nuances not commonly known to a baseline model: BackupRetentionPolicy DAYS=0 disables backups, 7\u2011day backup recency threshold, KMS custom\u2011key\u2011store risk, quorum M\u2011of\u2011N authentication, full CA chain requirement, restore creates a new cluster ID, immutable HSM type, cross\u2011region backup copy feature, COUNT vs DAYS retention semantics, and recent 2024\u20112026 feature updates. These constitute genuine delta knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a concrete AWS\u2011specific audit workflow: pre\u2011flight metadata gate, ordered steps (HA check, backup check, config check), precise CLI commands, handling of degraded HSMs, and explicit decision\u2011tree aggregation. Procedures are detailed and AWS\u2011centric, only a minor lack of a few generic checks prevents full credit."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never treat HSM count as HA, never assume DAYS=0 keeps backups, never leave default CO password). Missing a few additional pitfalls such as never using the default VPC security group, so not a perfect score."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS, activation triggers and invocation schema are well defined. Minor vagueness in the 'when_to_use' narrative (mixes multiple scenarios) prevents a full 15."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (quick reference, then detailed steps, then edge\u2011cases, then anti\u2011patterns, then remediation). However the initial sections are dense, which can overload the reader before they know the high\u2011level purpose."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and safety checks; audit (non\u2011destructive) is left open. Calibration is well matched to task fragility, only a slight over\u2011prescription in some remediation steps reduces the score."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Remediation)."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a decision tree, concrete CLI commands, output format, and worked examples that an agent can execute. Deduction for reliance on operator\u2011provided metadata to detect default CO password changes, which may be ambiguous in fully automated contexts."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 35489,
+  "latency_ms": 5892,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
+}

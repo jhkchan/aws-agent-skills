@@ -1,0 +1,333 @@
+# Eval test cases for network-firewall-rule-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Each case embeds the test-case identifier in the firewall resource name
+# so the model naturally echoes it. must_contain assertions use CONCEPT
+# tokens (verdict labels, structural fields, domain concepts) — not
+# test-case IDs or raw API field names — so the assertion validates that
+# the model understood the concept, not just parroted a string.
+skill: network-firewall-rule-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: permissive-wildcard-stateful-pass
+    description: >-
+      Firewall policy with a stateful rule group containing a Suricata
+      wildcard pass rule (`pass ip any any -> any any`) that passes all IP
+      traffic, overriding every drop rule. All other dimensions (routing,
+      defaults, TLS, logging) are clean — the wildcard pass is the sole
+      finding.
+    input: |
+      Firewall name: fw-permissive-wildcard-stateful-pass
+      Firewall ARN: arn:aws:network-firewall:us-east-1:111111111111:firewall/fw-permissive-wildcard-stateful-pass
+
+      Firewall policy:
+        StatelessDefaultActions: ["aws:forward_to_sfe"]
+        StatelessFragmentDefaultActions: ["aws:forward_to_sfe"]
+        StatefulDefaultActions: ["aws:drop_strict"]
+        TLSInspectionConfigurationArn: arn:aws:network-firewall:us-east-1:111111111111:tls-inspection-config/tls-prod
+        StatefulRuleGroupReferences:
+          - ResourceArn: arn:aws:network-firewall:us-east-1:111111111111:stateful-rulegroup/allow-baseline
+            Priority: 1
+        StatelessRuleGroupReferences: []
+
+      Stateful rule group "allow-baseline" (STRICT_ORDER):
+        RulesSource:
+          RulesString: |
+            pass ip any any -> any any
+            drop ip 10.0.0.0/8 any -> any 22
+
+      Route table for app-subnet (rtb-aaa):
+        10.0.0.0/16  -> local
+        0.0.0.0/0    -> eni-firewall-az1  (firewall ENI in AZ1)
+
+      Logging configuration:
+        AlertLogs: enabled (CloudWatchLogs fw-alerts)
+        FlowLogs: enabled (CloudWatchLogs fw-flow)
+
+      Emit the standard VERDICT block (FIREWALL, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PERMISSIVE_RULE
+    assertions:
+      must_contain:
+        - "PERMISSIVE_RULE"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "wildcard"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: ROUTING_GAP"
+        - "VERDICT: NO_TLS_INSPECTION"
+
+  - id: routing-gap-app-subnet-bypass
+    description: >-
+      App subnet route table has its default route (0.0.0.0/0) pointing
+      directly to the internet gateway instead of the firewall ENI. Traffic
+      egresses without inspection. All firewall policy dimensions are clean
+      — the route table is the sole finding.
+    input: |
+      Firewall name: fw-routing-gap-app-subnet-bypass
+      Firewall ARN: arn:aws:network-firewall:us-east-1:111111111111:firewall/fw-routing-gap-app-subnet-bypass
+
+      Firewall policy:
+        StatelessDefaultActions: ["aws:forward_to_sfe"]
+        StatelessFragmentDefaultActions: ["aws:forward_to_sfe"]
+        StatefulDefaultActions: ["aws:drop_strict"]
+        TLSInspectionConfigurationArn: arn:aws:network-firewall:us-east-1:111111111111:tls-inspection-config/tls-prod
+        StatefulRuleGroupReferences:
+          - ResourceArn: arn:aws:network-firewall:us-east-1:111111111111:stateful-rulegroup/block-c2
+            Priority: 1
+        StatelessRuleGroupReferences: []
+
+      Stateful rule group "block-c2" (STRICT_ORDER):
+        RulesSource:
+          RulesString: |
+            drop ip any any -> [198.51.100.0/24, 203.0.113.0/24] any
+
+      Route table for app-subnet (rtb-bbb):
+        10.0.0.0/16  -> local
+        0.0.0.0/0    -> igw-0abc123def456  (INTERNET GATEWAY — direct, bypasses firewall)
+
+      Route table for fw-subnet (rtb-ccc):
+        10.0.0.0/16  -> local
+        0.0.0.0/0    -> igw-0abc123def456
+
+      Logging configuration:
+        AlertLogs: enabled (CloudWatchLogs fw-alerts)
+        FlowLogs: enabled (CloudWatchLogs fw-flow)
+
+      Emit the standard VERDICT block (FIREWALL, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: ROUTING_GAP
+    assertions:
+      must_contain:
+        - "ROUTING_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "route"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PERMISSIVE_RULE"
+
+  - id: no-tls-inspection-missing-config
+    description: >-
+      Firewall policy has no TLSInspectionConfigurationArn, but stateful rule
+      groups include Suricata content-matching (payload inspection) rules
+      that cannot match TLS traffic. Routing, defaults, and logging are clean
+      — the missing TLS config is the sole finding.
+    input: |
+      Firewall name: fw-no-tls-inspection-missing-config
+      Firewall ARN: arn:aws:network-firewall:us-east-1:111111111111:firewall/fw-no-tls-inspection-missing-config
+
+      Firewall policy:
+        StatelessDefaultActions: ["aws:forward_to_sfe"]
+        StatelessFragmentDefaultActions: ["aws:forward_to_sfe"]
+        StatefulDefaultActions: ["aws:drop_strict"]
+        TLSInspectionConfigurationArn: null
+        StatefulRuleGroupReferences:
+          - ResourceArn: arn:aws:network-firewall:us-east-1:111111111111:stateful-rulegroup/payload-signatures
+            Priority: 1
+        StatelessRuleGroupReferences: []
+
+      Stateful rule group "payload-signatures" (STRICT_ORDER):
+        RulesSource:
+          RulesString: |
+            drop http any any -> any $HTTP_PORTS (msg:"known malware beacon"; content:"/c2/checkin"; nocase; sid:1001; rev:1;)
+            drop http any any -> any $HTTP_PORTS (msg:"suspicious user-agent"; content:"BadAgent"; http_header; sid:1002; rev:1;)
+
+      Route table for app-subnet (rtb-ddd):
+        10.0.0.0/16  -> local
+        0.0.0.0/0    -> eni-firewall-az1  (firewall ENI in AZ1)
+
+      Logging configuration:
+        AlertLogs: enabled (CloudWatchLogs fw-alerts)
+        FlowLogs: enabled (CloudWatchLogs fw-flow)
+
+      Emit the standard VERDICT block (FIREWALL, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_TLS_INSPECTION
+    assertions:
+      must_contain:
+        - "NO_TLS_INSPECTION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "TLS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: config-gap-no-logging
+    description: >-
+      Firewall with a clean policy (scoped rules, correct defaults, TLS
+      inspection enabled, valid routing) but no logging configuration at
+      all — firewall decisions are invisible, making incident response and
+      tuning impossible.
+    input: |
+      Firewall name: fw-config-gap-no-logging
+      Firewall ARN: arn:aws:network-firewall:us-east-1:111111111111:firewall/fw-config-gap-no-logging
+
+      Firewall policy:
+        StatelessDefaultActions: ["aws:forward_to_sfe"]
+        StatelessFragmentDefaultActions: ["aws:forward_to_sfe"]
+        StatefulDefaultActions: ["aws:drop_strict"]
+        TLSInspectionConfigurationArn: arn:aws:network-firewall:us-east-1:111111111111:tls-inspection-config/tls-prod
+        StatefulRuleGroupReferences:
+          - ResourceArn: arn:aws:network-firewall:us-east-1:111111111111:stateful-rulegroup/scoped-blocks
+            Priority: 1
+        StatelessRuleGroupReferences: []
+
+      Stateful rule group "scoped-blocks" (STRICT_ORDER):
+        RulesSource:
+          RulesString: |
+            drop ip any any -> [198.51.100.0/24, 203.0.113.0/24] any
+
+      Route table for app-subnet (rtb-eee):
+        10.0.0.0/16  -> local
+        0.0.0.0/0    -> eni-firewall-az1  (firewall ENI in AZ1)
+
+      Logging configuration: (empty — no destinations configured)
+        AlertLogs: disabled
+        FlowLogs: disabled
+
+      Emit the standard VERDICT block (FIREWALL, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "log"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PERMISSIVE_RULE"
+
+  - id: permissive-fragment-default-pass
+    description: >-
+      Firewall policy with StatelessFragmentDefaultActions set to aws:pass,
+      allowing all IP fragments to bypass both the stateless and stateful
+      engines. Fragmentation evades every stateful rule. All other dimensions
+      are clean — the fragment default is the sole finding.
+    input: |
+      Firewall name: fw-permissive-fragment-default-pass
+      Firewall ARN: arn:aws:network-firewall:us-east-1:111111111111:firewall/fw-permissive-fragment-default-pass
+
+      Firewall policy:
+        StatelessDefaultActions: ["aws:forward_to_sfe"]
+        StatelessFragmentDefaultActions: ["aws:pass"]
+        StatefulDefaultActions: ["aws:drop_strict"]
+        TLSInspectionConfigurationArn: arn:aws:network-firewall:us-east-1:111111111111:tls-inspection-config/tls-prod
+        StatefulRuleGroupReferences:
+          - ResourceArn: arn:aws:network-firewall:us-east-1:111111111111:stateful-rulegroup/scoped-blocks
+            Priority: 1
+        StatelessRuleGroupReferences: []
+
+      Stateful rule group "scoped-blocks" (STRICT_ORDER):
+        RulesSource:
+          RulesString: |
+            drop ip any any -> [198.51.100.0/24, 203.0.113.0/24] any
+
+      Route table for app-subnet (rtb-fff):
+        10.0.0.0/16  -> local
+        0.0.0.0/0    -> eni-firewall-az1  (firewall ENI in AZ1)
+
+      Logging configuration:
+        AlertLogs: enabled (CloudWatchLogs fw-alerts)
+        FlowLogs: enabled (CloudWatchLogs fw-flow)
+
+      Emit the standard VERDICT block (FIREWALL, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PERMISSIVE_RULE
+    assertions:
+      must_contain:
+        - "PERMISSIVE_RULE"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "fragment"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: ok-clean-firewall
+    description: >-
+      A well-configured firewall with scoped stateful rules, correct default
+      actions (forward_to_sfe for traffic and fragments, drop_strict for
+      stateful), TLS inspection enabled, valid routing through the firewall
+      ENI, and both alert and flow logging enabled. Clean posture across all
+      dimensions.
+    input: |
+      Firewall name: fw-ok-clean-firewall
+      Firewall ARN: arn:aws:network-firewall:us-east-1:111111111111:firewall/fw-ok-clean-firewall
+
+      Firewall policy:
+        StatelessDefaultActions: ["aws:forward_to_sfe"]
+        StatelessFragmentDefaultActions: ["aws:forward_to_sfe"]
+        StatefulDefaultActions: ["aws:drop_strict"]
+        TLSInspectionConfigurationArn: arn:aws:network-firewall:us-east-1:111111111111:tls-inspection-config/tls-prod
+        StatefulRuleGroupReferences:
+          - ResourceArn: arn:aws:network-firewall:us-east-1:111111111111:stateful-rulegroup/threat-blocks
+            Priority: 1
+        StatelessRuleGroupReferences:
+          - ResourceArn: arn:aws:network-firewall:us-east-1:111111111111:stateless-rulegroup/known-bad-ips
+            Priority: 1
+
+      Stateful rule group "threat-blocks" (STRICT_ORDER):
+        RulesSource:
+          RulesString: |
+            drop ip any any -> [198.51.100.0/24, 203.0.113.0/24] any
+
+      Stateless rule group "known-bad-ips" (capacity 100, consumed 5):
+        RulesSource:
+          StatelessRulesAndStructs:
+            - Priority: 1
+              RuleDefinition:
+                Actions: ["aws:drop"]
+                MatchAttributes:
+                  Sources: [{AddressDefinition: "192.0.2.0/24"}]
+                  Destinations: [{AddressDefinition: "0.0.0.0/0"}]
+
+      Route table for app-subnet (rtb-ggg):
+        10.0.0.0/16  -> local
+        0.0.0.0/0    -> eni-firewall-az1  (firewall ENI in AZ1)
+
+      Route table for fw-subnet (rtb-hhh):
+        10.0.0.0/16  -> local
+        0.0.0.0/0    -> igw-0abc123def456
+
+      Logging configuration:
+        AlertLogs: enabled (CloudWatchLogs fw-alerts)
+        FlowLogs: enabled (CloudWatchLogs fw-flow)
+
+      Emit the standard VERDICT block (FIREWALL, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PERMISSIVE_RULE"
+        - "VERDICT: ROUTING_GAP"

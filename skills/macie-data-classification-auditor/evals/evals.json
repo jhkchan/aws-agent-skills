@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "macie-data-classification-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Macie Data Classification Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-jobs-asdd-disabled",
+      "name": "No classification jobs and ASDD disabled — zero sensitive-data visibility",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-jobs-asdd-disabled.md",
+      "baseline_file": "baselines/no-jobs-asdd-disabled.md",
+      "expected_verdict": "NO_CLASSIFICATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_CLASSIFICATION", "no-jobs-asdd-disabled", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: UNTRIAGED_FINDINGS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "job-failed-no-coverage",
+      "name": "Classification job FAILED and ASDD disabled — false sense of coverage",
+      "difficulty": "medium",
+      "prompt_file": "prompts/job-failed-no-coverage.md",
+      "baseline_file": "baselines/job-failed-no-coverage.md",
+      "expected_verdict": "NO_CLASSIFICATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_CLASSIFICATION", "job-failed-no-coverage", "VERDICT", "REASON", "REMEDIATION", "FAILED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: UNTRIAGED_FINDINGS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "untriaged-high-pii-findings",
+      "name": "Active coverage but open HIGH-severity findings (SSN, credit card, credentials) untriaged",
+      "difficulty": "hard",
+      "prompt_file": "prompts/untriaged-high-pii-findings.md",
+      "baseline_file": "baselines/untriaged-high-pii-findings.md",
+      "expected_verdict": "UNTRIAGED_FINDINGS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["UNTRIAGED_FINDINGS", "untriaged-high-pii-findings", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_CLASSIFICATION", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "security-hub-export-disabled",
+      "name": "Findings triaged but Security Hub export disabled — SOC has no visibility",
+      "difficulty": "medium",
+      "prompt_file": "prompts/security-hub-export-disabled.md",
+      "baseline_file": "baselines/security-hub-export-disabled.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "security-hub-export-disabled", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_CLASSIFICATION", "VERDICT: UNTRIAGED_FINDINGS"]
+        }
+      ]
+    },
+    {
+      "id": "broad-allow-list-masking",
+      "name": "Wildcard allow-list masking entire bucket — potential hidden sensitive data",
+      "difficulty": "hard",
+      "prompt_file": "prompts/broad-allow-list-masking.md",
+      "baseline_file": "baselines/broad-allow-list-masking.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "broad-allow-list-masking", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_CLASSIFICATION", "VERDICT: UNTRIAGED_FINDINGS"]
+        }
+      ]
+    },
+    {
+      "id": "healthy-macie-posture",
+      "name": "Full coverage, findings triaged, Security Hub enabled, scoped allow-list — clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/healthy-macie-posture.md",
+      "baseline_file": "baselines/healthy-macie-posture.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "healthy-macie-posture", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_CLASSIFICATION", "VERDICT: UNTRIAGED_FINDINGS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}

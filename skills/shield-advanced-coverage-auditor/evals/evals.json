@@ -1,0 +1,129 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "shield-advanced-coverage-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Shield Advanced Coverage Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "fully-configured-ok",
+      "name": "Fully configured Shield Advanced — auto-protected CloudFront + explicit ALB + DRT + health check + proactive + WAF",
+      "difficulty": "easy",
+      "prompt_file": "prompts/fully-configured-ok.md",
+      "baseline_file": "baselines/fully-configured-ok.md",
+      "expected_verdict": "OK",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "VERDICT", "REASON", "REMEDIATION", "auto", "DRT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: UNPROTECTED", "VERDICT: NO_DRT_ACCESS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "unprotected-elastic-ip",
+      "name": "EIP-backed EC2 instance not in Protections list — Shield Standard only",
+      "difficulty": "easy",
+      "prompt_file": "prompts/unprotected-elastic-ip.md",
+      "baseline_file": "baselines/unprotected-elastic-ip.md",
+      "expected_verdict": "UNPROTECTED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["UNPROTECTED", "VERDICT", "REASON", "REMEDIATION", "Elastic IP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_DRT_ACCESS", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-drt-role",
+      "name": "Protected ALB but DRT has no role and no log bucket — no manual mitigation path",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-drt-role.md",
+      "baseline_file": "baselines/no-drt-role.md",
+      "expected_verdict": "NO_DRT_ACCESS",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_DRT_ACCESS", "VERDICT", "REASON", "REMEDIATION", "DRT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: UNPROTECTED", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "no-health-based-detection",
+      "name": "Protected ALB + DRT + WAF + proactive but no Route 53 health check — L7 detection degraded",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-health-based-detection.md",
+      "baseline_file": "baselines/no-health-based-detection.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "health"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: UNPROTECTED", "VERDICT: NO_DRT_ACCESS"]
+        }
+      ]
+    },
+    {
+      "id": "proactive-engagement-disabled",
+      "name": "All protections configured but proactive engagement DISABLED and empty contacts",
+      "difficulty": "medium",
+      "prompt_file": "prompts/proactive-engagement-disabled.md",
+      "baseline_file": "baselines/proactive-engagement-disabled.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "proactive"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: UNPROTECTED", "VERDICT: NO_DRT_ACCESS"]
+        }
+      ]
+    },
+    {
+      "id": "drt-role-no-log-bucket",
+      "name": "DRT has role but no log bucket — partial DRT (blind to log-level attack patterns)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/drt-role-no-log-bucket.md",
+      "baseline_file": "baselines/drt-role-no-log-bucket.md",
+      "expected_verdict": "CONFIG_GAP",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "VERDICT", "REASON", "REMEDIATION", "log"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: UNPROTECTED", "VERDICT: NO_DRT_ACCESS"]
+        }
+      ]
+    }
+  ]
+}

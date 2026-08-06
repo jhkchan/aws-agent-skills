@@ -1,0 +1,363 @@
+# Eval test cases for vpc-lattice-auth-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: vpc-lattice-auth-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-auth-policy-default-open
+    description: >-
+      VPC Lattice service network with NO auth policy attached. Two VPCs
+      associated, services routable, target groups in-VPC. Default-open
+      posture — any resource in an associated VPC can invoke services.
+    input: |
+      Service network id: sn-0a1b2c3d4e5f67890
+      Service network name: no-auth-policy-default-open
+      Service network ARN: arn:aws:vpc-lattice:us-east-1:111111111111:servicenetwork/sn-0a1b2c3d4e5f67890
+      Owning account: 111111111111
+
+      Auth policy state: NOT_SET
+
+      VPC associations:
+        - vpc-0aaa1111bbbb (cidr: 10.0.0.0/16, security-group: sg-0aaa)
+        - vpc-0ccc2222dddd (cidr: 10.1.0.0/16, security-group: sg-0ccc)
+
+      Services:
+        - svc-api (protocol HTTPS, port 443) — no service-level auth policy
+        - svc-orders (protocol HTTPS, port 443) — no service-level auth policy
+
+      Target groups:
+        - tg-api: type INSTANCE, targets [i-0aaa, i-0bbb] in vpc-0aaa1111bbbb
+        - tg-orders: type INSTANCE, targets [i-0ccc] in vpc-0aaa1111bbbb
+
+      RAM resource shares: none
+
+      Emit the standard VERDICT block (SERVICE NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_AUTH_POLICY
+    assertions:
+      must_contain:
+        - "NO_AUTH_POLICY"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: PUBLIC_SERVICE_NETWORK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: public-service-network-wildcard
+    description: >-
+      Service network auth policy grants vpc-lattice:* to Principal "*"
+      with no restrictive condition — any AWS principal can invoke every
+      service in the network.
+    input: |
+      Service network id: sn-0b2c3d4e5f6789012
+      Service network name: public-service-network-wildcard
+      Service network ARN: arn:aws:vpc-lattice:us-east-1:111111111111:servicenetwork/sn-0b2c3d4e5f6789012
+      Owning account: 111111111111
+
+      Auth policy state: ACTIVE
+
+      Auth policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "OpenInvoke",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "vpc-lattice:*",
+              "Resource": "*"
+            }
+          ]
+        }
+
+      VPC associations:
+        - vpc-0bbb3333eeee (cidr: 10.2.0.0/16, security-group: sg-0bbb)
+
+      Services:
+        - svc-payments (protocol HTTPS, port 443) — no service-level auth policy
+
+      Target groups:
+        - tg-payments: type INSTANCE, targets [i-0ddd, i-0eee] in vpc-0bbb3333eeee
+
+      RAM resource shares: none
+
+      Emit the standard VERDICT block (SERVICE NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_SERVICE_NETWORK
+    assertions:
+      must_contain:
+        - "PUBLIC_SERVICE_NETWORK"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: NO_AUTH_POLICY"
+
+  - id: cross-account-invoke-no-condition
+    description: >-
+      Auth policy grants vpc-lattice:Invoke to a cross-account principal
+      (222222222222) with no restrictive condition — external account can
+      invoke services without scope restriction.
+    input: |
+      Service network id: sn-0c3d4e5f678901234
+      Service network name: cross-account-invoke-no-condition
+      Service network ARN: arn:aws:vpc-lattice:us-east-1:111111111111:servicenetwork/sn-0c3d4e5f678901234
+      Owning account: 111111111111
+
+      Auth policy state: ACTIVE
+
+      Auth policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "SameAccountAdmin",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:role/lattice-admin"},
+              "Action": "vpc-lattice:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "ExternalInvoke",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::222222222222:role/consumer-app"},
+              "Action": "vpc-lattice:Invoke",
+              "Resource": "*"
+            }
+          ]
+        }
+
+      VPC associations:
+        - vpc-0ccc4444ffff (cidr: 10.3.0.0/16, security-group: sg-0ccc)
+
+      Services:
+        - svc-catalog (protocol HTTPS, port 443) — no service-level auth policy
+
+      Target groups:
+        - tg-catalog: type INSTANCE, targets [i-0fff] in vpc-0ccc4444ffff
+
+      RAM resource shares:
+        - rs-0ccc: shared with account 222222222222
+
+      Emit the standard VERDICT block (SERVICE NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_AUTH_POLICY"
+        - "VERDICT: PUBLIC_SERVICE_NETWORK"
+
+  - id: cross-account-invoke-source-account
+    description: >-
+      Cross-account vpc-lattice:Invoke grant restricted by aws:SourceAccount
+      condition — currently scoped to the external account but fragile
+      (a policy edit or compromised role widens exposure).
+    input: |
+      Service network id: sn-0d4e5f6789012345
+      Service network name: cross-account-invoke-source-account
+      Service network ARN: arn:aws:vpc-lattice:us-east-1:111111111111:servicenetwork/sn-0d4e5f6789012345
+      Owning account: 111111111111
+
+      Auth policy state: ACTIVE
+
+      Auth policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "SameAccountAdmin",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:role/lattice-admin"},
+              "Action": "vpc-lattice:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "ScopedExternalInvoke",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::222222222222:role/log-consumer"},
+              "Action": "vpc-lattice:Invoke",
+              "Resource": "*",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": "222222222222"
+                }
+              }
+            }
+          ]
+        }
+
+      VPC associations:
+        - vpc-0ddd5555aaaa (cidr: 10.4.0.0/16, security-group: sg-0ddd)
+
+      Services:
+        - svc-logs (protocol HTTPS, port 443) — no service-level auth policy
+
+      Target groups:
+        - tg-logs: type INSTANCE, targets [i-0ggg, i-0hhh] in vpc-0ddd5555aaaa
+
+      RAM resource shares:
+        - rs-0ddd: shared with account 222222222222
+
+      Emit the standard VERDICT block (SERVICE NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_AUTH_POLICY"
+        - "VERDICT: PUBLIC_SERVICE_NETWORK"
+
+  - id: same-account-source-vpc-ok
+    description: >-
+      Auth policy grants vpc-lattice:Invoke to a same-account role restricted
+      by aws:SourceVpc condition. Target groups are INSTANCE type within the
+      same VPC. No cross-account RAM shares. Clean posture.
+    input: |
+      Service network id: sn-0e5f6789012345678
+      Service network name: same-account-source-vpc-ok
+      Service network ARN: arn:aws:vpc-lattice:us-east-1:111111111111:servicenetwork/sn-0e5f6789012345678
+      Owning account: 111111111111
+
+      Auth policy state: ACTIVE
+
+      Auth policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "SameAccountAdmin",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:role/lattice-admin"},
+              "Action": "vpc-lattice:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "ScopedInvoke",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-service-role"},
+              "Action": "vpc-lattice:Invoke",
+              "Resource": "*",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceVpc": "vpc-0eee6666bbbb"
+                }
+              }
+            }
+          ]
+        }
+
+      VPC associations:
+        - vpc-0eee6666bbbb (cidr: 10.5.0.0/16, security-group: sg-0eee)
+
+      Services:
+        - svc-billing (protocol HTTPS, port 443) — no service-level auth policy
+
+      Target groups:
+        - tg-billing: type INSTANCE, targets [i-0iii, i-0jjj] in vpc-0eee6666bbbb
+
+      RAM resource shares: none
+
+      Emit the standard VERDICT block (SERVICE NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_AUTH_POLICY"
+        - "VERDICT: PUBLIC_SERVICE_NETWORK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: public-notaction-inverse-wildcard
+    description: >-
+      Auth policy grants Principal "*" with NotAction listing only read-only
+      operations. NotAction is an inverse wildcard — the caller can Invoke
+      and perform every action EXCEPT the listed Gets. Silent Invoke exposure.
+    input: |
+      Service network id: sn-0f6789012345678901
+      Service network name: public-notaction-inverse-wildcard
+      Service network ARN: arn:aws:vpc-lattice:us-east-1:111111111111:servicenetwork/sn-0f6789012345678901
+      Owning account: 111111111111
+
+      Auth policy state: ACTIVE
+
+      Auth policy:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "InverseWildcard",
+              "Effect": "Allow",
+              "Principal": "*",
+              "NotAction": [
+                "vpc-lattice:GetService",
+                "vpc-lattice:ListServiceNetworks"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+
+      VPC associations:
+        - vpc-0fff7777cccc (cidr: 10.6.0.0/16, security-group: sg-0fff)
+
+      Services:
+        - svc-search (protocol HTTPS, port 443) — no service-level auth policy
+
+      Target groups:
+        - tg-search: type INSTANCE, targets [i-0kkk] in vpc-0fff7777cccc
+
+      RAM resource shares: none
+
+      Emit the standard VERDICT block (SERVICE NETWORK, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: PUBLIC_SERVICE_NETWORK
+    assertions:
+      must_contain:
+        - "PUBLIC_SERVICE_NETWORK"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+        - "VERDICT: NO_AUTH_POLICY"

@@ -1,0 +1,298 @@
+# Eval test cases for detective-investigation-coverage-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: detective-investigation-coverage-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-graph-no-detector
+    description: >-
+      No Detective behavior graph exists in the target region and no GuardDuty
+      detector is enabled — zero investigation capability.
+    input: |
+      Audit scope: no-graph-no-detector
+      Region: us-east-1
+      Account: 111111111111 (standalone, not in an Organization)
+
+      Detective graph state:
+        list-graphs: [] (empty — no behavior graph in this region)
+
+      GuardDuty detector status:
+        list-detectors: [] (no detector in this region)
+
+      Organization configuration:
+        N/A (standalone account)
+
+      Emit the standard VERDICT block (GRAPH, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_GRAPH
+    assertions:
+      must_contain:
+        - "NO_GRAPH"
+        - "no-graph-no-detector"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: invitation-pending-incomplete
+    description: >-
+      Behavior graph exists with 3 ENABLED members and 2 INVITED members who have
+      not accepted — 40% of the org has no investigation coverage.
+    input: |
+      Region: us-east-1
+      Account: 111111111111 (Organization admin, 5 total accounts)
+
+      Detective graph state:
+        GraphArn: arn:aws:detective:us-east-1:111111111111:graph:invitation-pending-incomplete
+        CreatedTime: 2025-06-15T10:00:00Z
+
+      Member accounts (list-members):
+        - AccountId: 111111111111, Status: ENABLED
+        - AccountId: 222222222222, Status: ENABLED, DETECTIVE_CORE: COLLECTING
+        - AccountId: 333333333333, Status: ENABLED, DETECTIVE_CORE: COLLECTING
+        - AccountId: 444444444444, Status: INVITED, InvitedTime: 2026-07-15T10:00:00Z (21 days ago)
+        - AccountId: 555555555555, Status: INVITED, InvitedTime: 2026-05-20T10:00:00Z (77 days ago — likely expired)
+
+      Data-source package states (batch-get-graph-member-datasources):
+        222222222222: DETECTIVE_CORE: COLLECTING
+        333333333333: DETECTIVE_CORE: COLLECTING
+
+      GuardDuty detector status:
+        DetectorId: 12abc34d567e, Status: ENABLED
+
+      Organization configuration:
+        DelegatedAdminAccountId: 111111111111
+        AutoEnable: true
+
+      Emit the standard VERDICT block (GRAPH, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INCOMPLETE_INGESTION
+    assertions:
+      must_contain:
+        - "INCOMPLETE_INGESTION"
+        - "invitation-pending-incomplete"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "INVITED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_GRAPH"
+
+  - id: datasource-stopped-incomplete
+    description: >-
+      Behavior graph exists, all 3 members are ENABLED at the graph level, but one
+      member's DETECTIVE_CORE data-source package is in STOPPED state — silent
+      ingestion failure.
+    input: |
+      Region: us-east-1
+      Account: 111111111111 (Organization admin, 3 total accounts)
+
+      Detective graph state:
+        GraphArn: arn:aws:detective:us-east-1:111111111111:graph:datasource-stopped-incomplete
+        CreatedTime: 2025-03-10T08:00:00Z
+
+      Member accounts (list-members):
+        - AccountId: 111111111111, Status: ENABLED
+        - AccountId: 222222222222, Status: ENABLED
+        - AccountId: 333333333333, Status: ENABLED
+
+      Data-source package states (batch-get-graph-member-datasources):
+        111111111111: DETECTIVE_CORE: COLLECTING
+        222222222222: DETECTIVE_CORE: COLLECTING
+        333333333333: DETECTIVE_CORE: STOPPED
+
+      Data freshness:
+        111111111111: lastDataReceived: 2026-08-05T06:00:00Z (2 hours ago)
+        222222222222: lastDataReceived: 2026-08-05T05:30:00Z (2.5 hours ago)
+        333333333333: lastDataReceived: 2026-07-28T12:00:00Z (8 days ago)
+
+      GuardDuty detector status:
+        DetectorId: ab12cd34, Status: ENABLED
+
+      Organization configuration:
+        DelegatedAdminAccountId: 111111111111
+        AutoEnable: true
+
+      Emit the standard VERDICT block (GRAPH, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INCOMPLETE_INGESTION
+    assertions:
+      must_contain:
+        - "INCOMPLETE_INGESTION"
+        - "datasource-stopped-incomplete"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "STOPPED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_GRAPH"
+
+  - id: stale-data-48h-lag
+    description: >-
+      Behavior graph exists, all members ENABLED with DETECTIVE_CORE COLLECTING,
+      but lastDataReceived is 48+ hours ago — stale investigation data that does
+      not reflect current state.
+    input: |
+      Region: us-east-1
+      Account: 111111111111 (Organization admin, 3 total accounts)
+
+      Detective graph state:
+        GraphArn: arn:aws:detective:us-east-1:111111111111:graph:stale-data-48h-lag
+        CreatedTime: 2024-11-01T10:00:00Z
+
+      Member accounts (list-members):
+        - AccountId: 111111111111, Status: ENABLED
+        - AccountId: 222222222222, Status: ENABLED
+        - AccountId: 333333333333, Status: ENABLED
+
+      Data-source package states (batch-get-graph-member-datasources):
+        111111111111: DETECTIVE_CORE: COLLECTING
+        222222222222: DETECTIVE_CORE: COLLECTING
+        333333333333: DETECTIVE_CORE: COLLECTING
+
+      Data freshness:
+        111111111111: lastDataReceived: 2026-08-05T04:00:00Z (4 hours ago)
+        222222222222: lastDataReceived: 2026-08-03T08:00:00Z (2 days ago)
+        333333333333: lastDataReceived: 2026-08-05T05:00:00Z (3 hours ago)
+
+      GuardDuty detector status:
+        DetectorId: cd34ef56, Status: ENABLED
+
+      Organization configuration:
+        DelegatedAdminAccountId: 111111111111
+        AutoEnable: true
+
+      Emit the standard VERDICT block (GRAPH, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: STALE_DATA
+    assertions:
+      must_contain:
+        - "STALE_DATA"
+        - "stale-data-48h-lag"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_GRAPH"
+
+  - id: config-gap-guardduty-disabled
+    description: >-
+      Behavior graph exists, all members ENABLED and COLLECTING, data fresh, but
+      GuardDuty detector is disabled in the region — no security findings feed the
+      investigation graph.
+    input: |
+      Region: us-east-1
+      Account: 111111111111 (Organization admin, 2 total accounts)
+
+      Detective graph state:
+        GraphArn: arn:aws:detective:us-east-1:111111111111:graph:config-gap-guardduty-disabled
+        CreatedTime: 2025-01-15T10:00:00Z
+
+      Member accounts (list-members):
+        - AccountId: 111111111111, Status: ENABLED
+        - AccountId: 222222222222, Status: ENABLED
+
+      Data-source package states (batch-get-graph-member-datasources):
+        111111111111: DETECTIVE_CORE: COLLECTING
+        222222222222: DETECTIVE_CORE: COLLECTING
+
+      Data freshness:
+        111111111111: lastDataReceived: 2026-08-05T06:00:00Z (2 hours ago)
+        222222222222: lastDataReceived: 2026-08-05T05:00:00Z (3 hours ago)
+
+      GuardDuty detector status:
+        DetectorId: ef56gh78, Status: DISABLED
+
+      Organization configuration:
+        DelegatedAdminAccountId: 111111111111
+        AutoEnable: true
+
+      Emit the standard VERDICT block (GRAPH, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "config-gap-guardduty-disabled"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "GuardDuty"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_GRAPH"
+
+  - id: healthy-org-admin-ok
+    description: >-
+      Behavior graph exists, all members ENABLED with DETECTIVE_CORE COLLECTING,
+      data fresh, GuardDuty enabled, Organizations delegated admin configured
+      with auto-enable — full investigation readiness.
+    input: |
+      Region: us-east-1
+      Account: 111111111111 (Organization admin, 4 total accounts)
+
+      Detective graph state:
+        GraphArn: arn:aws:detective:us-east-1:111111111111:graph:healthy-org-admin-ok
+        CreatedTime: 2024-09-01T10:00:00Z
+
+      Member accounts (list-members):
+        - AccountId: 111111111111, Status: ENABLED
+        - AccountId: 222222222222, Status: ENABLED
+        - AccountId: 333333333333, Status: ENABLED
+        - AccountId: 444444444444, Status: ENABLED
+
+      Data-source package states (batch-get-graph-member-datasources):
+        111111111111: DETECTIVE_CORE: COLLECTING
+        222222222222: DETECTIVE_CORE: COLLECTING, EKS_AUDIT: COLLECTING
+        333333333333: DETECTIVE_CORE: COLLECTING
+        444444444444: DETECTIVE_CORE: COLLECTING
+
+      Data freshness:
+        111111111111: lastDataReceived: 2026-08-05T06:00:00Z (2 hours ago)
+        222222222222: lastDataReceived: 2026-08-05T05:30:00Z (2.5 hours ago)
+        333333333333: lastDataReceived: 2026-08-05T04:00:00Z (4 hours ago)
+        444444444444: lastDataReceived: 2026-08-05T05:00:00Z (3 hours ago)
+
+      GuardDuty detector status:
+        DetectorId: 12ab34cd56ef, Status: ENABLED
+
+      Organization configuration:
+        DelegatedAdminAccountId: 111111111111
+        AutoEnable: true
+
+      Emit the standard VERDICT block (GRAPH, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "healthy-org-admin-ok"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NO_GRAPH"
+        - "VERDICT: INCOMPLETE_INGESTION"
+        - "VERDICT: STALE_DATA"
+        - "VERDICT: CONFIG_GAP"

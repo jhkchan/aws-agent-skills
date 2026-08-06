@@ -1,0 +1,361 @@
+# Eval test cases for macie-data-classification-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# CONCEPT tokens only in must_contain (per spec): verdict values + structural
+# field names the model emits in ALL CAPS + account numbers as data anchors.
+# Test-case IDs are NOT used as assertion tokens.
+skill: macie-data-classification-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-jobs-asdd-disabled
+    description: >-
+      Macie enabled but no classification jobs configured and automated
+      sensitive data discovery disabled — zero sensitive-data visibility.
+    input: |
+      Account scope: no-jobs-asdd-disabled
+      Account: 111111111111, Region: us-east-1
+
+      Macie session:
+        status: ENABLED
+        createdAt: 2026-01-15T00:00:00Z
+
+      Automated discovery (ASDD):
+        status: DISABLED
+        lastRunTime: null
+
+      Classification jobs: (none)
+
+      Findings: (none)
+
+      Allow lists: (none)
+
+      Security Hub export: disabled
+
+      S3 buckets in account: customer-data, app-uploads, backups (3 buckets, ~500 GB total)
+
+      Analyze the Macie posture above and emit a structured audit verdict.
+      Use this exact format with ALL CAPS field names:
+      ACCOUNT / VERDICT / REASON / FINDINGS / REMEDIATION.
+      The VERDICT must be exactly one of: NO_CLASSIFICATION, UNTRIAGED_FINDINGS, CONFIG_GAP, OK.
+    expected_verdict: NO_CLASSIFICATION
+    assertions:
+      must_contain:
+        - "NO_CLASSIFICATION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "111111111111"
+      must_not_contain:
+        - "VERDICT: OK"
+        - "VERDICT: UNTRIAGED_FINDINGS"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: job-failed-no-coverage
+    description: >-
+      One classification job exists but FAILED, ASDD disabled — effectively
+      no active scanning coverage. Operators may believe coverage exists.
+    input: |
+      Account scope: job-failed-no-coverage
+      Account: 222222222222, Region: us-east-1
+
+      Macie session:
+        status: ENABLED
+
+      Automated discovery (ASDD):
+        status: DISABLED
+
+      Classification jobs:
+        - jobId: job-failed-no-coverage
+          name: pii-scan-prod
+          jobStatus: FAILED
+          jobType: SCHEDULED
+          lastRunTime: 2026-07-01T10:00:00Z
+          samplingPercentage: 100
+          buckets: [prod-data-lake]
+
+      Findings: (none — job never completed successfully)
+
+      Allow lists: (none)
+
+      Security Hub export: disabled
+
+      S3 buckets in account: prod-data-lake, analytics-export (2 buckets)
+
+      Analyze the Macie posture above and emit a structured audit verdict.
+      Use this exact format with ALL CAPS field names:
+      ACCOUNT / VERDICT / REASON / FINDINGS / REMEDIATION.
+      The VERDICT must be exactly one of: NO_CLASSIFICATION, UNTRIAGED_FINDINGS, CONFIG_GAP, OK.
+    expected_verdict: NO_CLASSIFICATION
+    assertions:
+      must_contain:
+        - "NO_CLASSIFICATION"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "FAILED"
+      must_not_contain:
+        - "VERDICT: OK"
+        - "VERDICT: UNTRIAGED_FINDINGS"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: untriaged-high-pii-findings
+    description: >-
+      Macie enabled, ASDD enabled, classification job COMPLETE — but 3 open
+      HIGH-severity findings (SSN, credit card, AWS credentials) have not
+      been triaged.
+    input: |
+      Account scope: untriaged-high-pii-findings
+      Account: 333333333333, Region: us-east-1
+
+      Macie session:
+        status: ENABLED
+
+      Automated discovery (ASDD):
+        status: ENABLED
+        lastRunTime: 2026-08-04T14:00:00Z
+
+      Classification jobs:
+        - jobId: untriaged-high-pii-findings
+          name: full-pii-scan
+          jobStatus: COMPLETE
+          jobType: ONE_TIME
+          lastRunTime: 2026-08-04T12:00:00Z
+          samplingPercentage: 100
+          buckets: [customer-data, app-config]
+
+      Findings (open, archived: false):
+        - findingId: f-001
+          severity: HIGH
+          type: SensitiveData:S3Object/Credentials
+          category: CLASSIFICATION
+          archived: false
+          resourceName: s3://customer-data/exports/q3-customers.csv
+          classificationDetails:
+            sensitiveData:
+              - category: CREDENTIALS
+                detectedDataType: AWS_CREDENTIALS
+                count: 1
+        - findingId: f-002
+          severity: HIGH
+          type: SensitiveData:S3Object/Personal
+          category: CLASSIFICATION
+          archived: false
+          resourceName: s3://customer-data/exports/q3-customers.csv
+          classificationDetails:
+            sensitiveData:
+              - category: PERSONAL_INFORMATION
+                detectedDataType: US_SOCIAL_SECURITY_NUMBER
+                count: 45000
+        - findingId: f-003
+          severity: HIGH
+          type: SensitiveData:S3Object/Financial
+          category: CLASSIFICATION
+          archived: false
+          resourceName: s3://customer-data/exports/payment-history.csv
+          classificationDetails:
+            sensitiveData:
+              - category: FINANCIAL_INFORMATION
+                detectedDataType: CREDIT_CARD_NUMBER
+                count: 12000
+
+      Allow lists: (none)
+
+      Security Hub export: enabled
+
+      Analyze the Macie posture above and emit a structured audit verdict.
+      Use this exact format with ALL CAPS field names:
+      ACCOUNT / VERDICT / REASON / FINDINGS / REMEDIATION.
+      The VERDICT must be exactly one of: NO_CLASSIFICATION, UNTRIAGED_FINDINGS, CONFIG_GAP, OK.
+    expected_verdict: UNTRIAGED_FINDINGS
+    assertions:
+      must_contain:
+        - "UNTRIAGED_FINDINGS"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "333333333333"
+      must_not_contain:
+        - "VERDICT: OK"
+        - "VERDICT: NO_CLASSIFICATION"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: security-hub-export-disabled
+    description: >-
+      Macie enabled, ASDD enabled, jobs COMPLETE, all findings archived
+      (triaged) — but Security Hub export is disabled, so the SOC has no
+      visibility into future sensitive data discoveries.
+    input: |
+      Account scope: security-hub-export-disabled
+      Account: 444444444444, Region: us-east-1
+
+      Macie session:
+        status: ENABLED
+
+      Automated discovery (ASDD):
+        status: ENABLED
+        lastRunTime: 2026-08-04T14:00:00Z
+
+      Classification jobs:
+        - jobId: security-hub-export-disabled
+          name: weekly-pii-scan
+          jobStatus: COMPLETE
+          jobType: SCHEDULED
+          lastRunTime: 2026-08-04T02:00:00Z
+          samplingPercentage: 100
+          buckets: [finance-reports]
+
+      Findings:
+        - findingId: f-101
+          severity: HIGH
+          type: SensitiveData:S3Object/Financial
+          archived: true
+          resourceName: s3://finance-reports/q2-statement.csv
+
+      Allow lists: (none)
+
+      Security Hub export: disabled
+
+      Analyze the Macie posture above and emit a structured audit verdict.
+      Use this exact format with ALL CAPS field names:
+      ACCOUNT / VERDICT / REASON / FINDINGS / REMEDIATION.
+      The VERDICT must be exactly one of: NO_CLASSIFICATION, UNTRIAGED_FINDINGS, CONFIG_GAP, OK.
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "444444444444"
+      must_not_contain:
+        - "VERDICT: OK"
+        - "VERDICT: NO_CLASSIFICATION"
+        - "VERDICT: UNTRIAGED_FINDINGS"
+
+  - id: broad-allow-list-masking
+    description: >-
+      Macie enabled, ASDD enabled, jobs running, findings archived — but the
+      bucket_allow_list uses wildcard prefixes that mask entire paths,
+      potentially hiding sensitive data.
+    input: |
+      Account scope: broad-allow-list-masking
+      Account: 555555555555, Region: us-east-1
+
+      Macie session:
+        status: ENABLED
+
+      Automated discovery (ASDD):
+        status: ENABLED
+        lastRunTime: 2026-08-04T14:00:00Z
+
+      Classification jobs:
+        - jobId: broad-allow-list-masking
+          name: data-lake-scan
+          jobStatus: RUNNING
+          jobType: SCHEDULED
+          lastRunTime: 2026-08-04T06:00:00Z
+          samplingPercentage: 100
+          buckets: [data-lake]
+
+      Findings:
+        - findingId: f-201
+          severity: MEDIUM
+          type: SensitiveData:S3Object/Personal
+          archived: true
+          resourceName: s3://data-lake/uploads/contacts.csv
+
+      Allow lists:
+        - id: al-001
+          name: suppress-data-lake-logs
+          criteria:
+            s3Bucket: data-lake
+            s3Prefix: "*"
+          description: Suppress all findings in data-lake bucket
+
+      Security Hub export: enabled
+
+      Analyze the Macie posture above and emit a structured audit verdict.
+      Use this exact format with ALL CAPS field names:
+      ACCOUNT / VERDICT / REASON / FINDINGS / REMEDIATION.
+      The VERDICT must be exactly one of: NO_CLASSIFICATION, UNTRIAGED_FINDINGS, CONFIG_GAP, OK.
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "555555555555"
+      must_not_contain:
+        - "VERDICT: OK"
+        - "VERDICT: NO_CLASSIFICATION"
+        - "VERDICT: UNTRIAGED_FINDINGS"
+
+  - id: healthy-macie-posture
+    description: >-
+      Macie enabled, ASDD enabled and fresh, classification job COMPLETE,
+      all findings archived (triaged), Security Hub export enabled,
+      allow-list properly scoped — clean posture.
+    input: |
+      Account scope: healthy-macie-posture
+      Account: 666666666666, Region: us-east-1
+
+      Macie session:
+        status: ENABLED
+
+      Automated discovery (ASDD):
+        status: ENABLED
+        lastRunTime: 2026-08-04T14:00:00Z
+
+      Classification jobs:
+        - jobId: healthy-macie-posture
+          name: compliance-full-scan
+          jobStatus: COMPLETE
+          jobType: SCHEDULED
+          lastRunTime: 2026-08-04T02:00:00Z
+          samplingPercentage: 100
+          buckets: [prod-app-data, prod-user-uploads]
+
+      Findings:
+        - findingId: f-301
+          severity: HIGH
+          type: SensitiveData:S3Object/Personal
+          archived: true
+          resourceName: s3://prod-user-uploads/2026/q3/backup-contacts.csv
+          classificationDetails:
+            sensitiveData:
+              - category: PERSONAL_INFORMATION
+                detectedDataType: US_SOCIAL_SECURITY_NUMBER
+                count: 500
+
+      Allow lists:
+        - id: al-002
+          name: suppress-known-test-data
+          criteria:
+            s3Bucket: prod-app-data
+            s3Prefix: test-fixtures/sample-users.json
+          description: Suppress known test fixture that contains synthetic SSNs
+
+      Security Hub export: enabled
+
+      Analyze the Macie posture above and emit a structured audit verdict.
+      Use this exact format with ALL CAPS field names:
+      ACCOUNT / VERDICT / REASON / FINDINGS / REMEDIATION.
+      The VERDICT must be exactly one of: NO_CLASSIFICATION, UNTRIAGED_FINDINGS, CONFIG_GAP, OK.
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "VERDICT: OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+        - "666666666666"
+      must_not_contain:
+        - "VERDICT: NO_CLASSIFICATION"
+        - "VERDICT: UNTRIAGED_FINDINGS"
+        - "VERDICT: CONFIG_GAP"

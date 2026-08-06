@@ -1,0 +1,468 @@
+# Eval test cases for verified-permissions-policy-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: verified-permissions-policy-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: invalid-policy-type-error
+    description: >-
+      Cedar policy with a type error — compares a Long attribute (age) with a
+      String literal using >= operator. Policy cannot pass type validation.
+    input: |
+      Policy store ID: ps-invalid-policy-type-error
+      Policy store description: Cedar policy with Long-vs-String type error
+      Validation settings: { mode: STRICT }
+
+      Schema (JSON):
+      {
+        "PhotoApp": {
+          "entityTypes": {
+            "User": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "userId": { "type": "String" },
+                  "role": { "type": "String" },
+                  "age": { "type": "Long" },
+                  "accountStatus": { "type": "String" }
+                }
+              },
+              "memberOfTypes": ["UserGroup"]
+            },
+            "UserGroup": {
+              "shape": { "type": "Record", "attributes": { "name": { "type": "String" } } }
+            },
+            "Photo": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "photoId": { "type": "String" },
+                  "owner": { "type": "String" },
+                  "isPrivate": { "type": "Boolean" }
+                }
+              }
+            }
+          },
+          "actions": {
+            "ViewPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "UploadPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "DeletePhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } }
+          }
+        }
+      }
+
+      Policy ID: pol-invalid-policy-type-error
+      Policy type: STATIC
+      Policy text:
+      permit (
+        principal: PhotoApp::User,
+        action: PhotoApp::Action::"ViewPhoto",
+        resource: PhotoApp::Photo
+      )
+      when { principal.age >= "eighteen" };
+
+      Emit the standard VERDICT block (POLICY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: INVALID_POLICY
+    assertions:
+      must_contain:
+        - "INVALID_POLICY"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "type"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: SCHEMA_MISMATCH"
+        - "VERDICT: OVERPERMISSIVE"
+        - "VERDICT: OK"
+
+  - id: schema-mismatch-action-not-declared
+    description: >-
+      Cedar policy is syntactically valid and type-consistent but references an
+      action (DeletePhoto) that was removed from the schema after policy
+      creation. Schema now only declares ViewPhoto and UploadPhoto.
+    input: |
+      Policy store ID: ps-schema-mismatch-action-not-declared
+      Policy store description: Policy references action removed from schema
+      Validation settings: { mode: STRICT }
+
+      Schema (JSON):
+      {
+        "PhotoApp": {
+          "entityTypes": {
+            "User": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "userId": { "type": "String" },
+                  "role": { "type": "String" },
+                  "age": { "type": "Long" },
+                  "accountStatus": { "type": "String" }
+                }
+              },
+              "memberOfTypes": ["UserGroup"]
+            },
+            "UserGroup": {
+              "shape": { "type": "Record", "attributes": { "name": { "type": "String" } } }
+            },
+            "Photo": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "photoId": { "type": "String" },
+                  "owner": { "type": "String" },
+                  "isPrivate": { "type": "Boolean" }
+                }
+              }
+            }
+          },
+          "actions": {
+            "ViewPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "UploadPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } }
+          }
+        }
+      }
+
+      Note: The schema declares only ViewPhoto and UploadPhoto. DeletePhoto was
+      removed in a prior schema update but the policy referencing it still exists.
+
+      Policy ID: pol-schema-mismatch-action-not-declared
+      Policy type: STATIC
+      Policy text:
+      permit (
+        principal: PhotoApp::User,
+        action: PhotoApp::Action::"DeletePhoto",
+        resource: PhotoApp::Photo
+      )
+      when { principal.role == "admin" };
+
+      Emit the standard VERDICT block (POLICY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: SCHEMA_MISMATCH
+    assertions:
+      must_contain:
+        - "SCHEMA_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "DeletePhoto"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INVALID_POLICY"
+        - "VERDICT: OVERPERMISSIVE"
+        - "VERDICT: OK"
+
+  - id: overpermissive-bare-permit
+    description: >-
+      Bare Cedar permit with no scope type annotations and no conditions —
+      matches every authorization request. The most dangerous Cedar pattern.
+    input: |
+      Policy store ID: ps-overpermissive-bare-permit
+      Policy store description: Bare permit authorizes all requests
+      Validation settings: { mode: STRICT }
+
+      Schema (JSON):
+      {
+        "PhotoApp": {
+          "entityTypes": {
+            "User": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "userId": { "type": "String" },
+                  "role": { "type": "String" },
+                  "age": { "type": "Long" },
+                  "accountStatus": { "type": "String" }
+                }
+              },
+              "memberOfTypes": ["UserGroup"]
+            },
+            "UserGroup": {
+              "shape": { "type": "Record", "attributes": { "name": { "type": "String" } } }
+            },
+            "Photo": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "photoId": { "type": "String" },
+                  "owner": { "type": "String" },
+                  "isPrivate": { "type": "Boolean" }
+                }
+              }
+            }
+          },
+          "actions": {
+            "ViewPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "UploadPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "DeletePhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } }
+          }
+        }
+      }
+
+      Policy ID: pol-overpermissive-bare-permit
+      Policy type: STATIC
+      Policy text:
+      permit (principal, action, resource);
+
+      Emit the standard VERDICT block (POLICY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "bare"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INVALID_POLICY"
+        - "VERDICT: SCHEMA_MISMATCH"
+        - "VERDICT: OK"
+
+  - id: overpermissive-weak-condition
+    description: >-
+      Cedar permit with principal typed but action and resource unscoped. The
+      when condition (accountStatus == active) is trivially satisfiable by
+      virtually all users. Grants all actions on all resources to active users.
+    input: |
+      Policy store ID: ps-overpermissive-weak-condition
+      Policy store description: Broad scope with weak condition
+      Validation settings: { mode: STRICT }
+
+      Schema (JSON):
+      {
+        "PhotoApp": {
+          "entityTypes": {
+            "User": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "userId": { "type": "String" },
+                  "role": { "type": "String" },
+                  "age": { "type": "Long" },
+                  "accountStatus": { "type": "String" }
+                }
+              },
+              "memberOfTypes": ["UserGroup"]
+            },
+            "UserGroup": {
+              "shape": { "type": "Record", "attributes": { "name": { "type": "String" } } }
+            },
+            "Photo": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "photoId": { "type": "String" },
+                  "owner": { "type": "String" },
+                  "isPrivate": { "type": "Boolean" }
+                }
+              }
+            }
+          },
+          "actions": {
+            "ViewPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "UploadPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "DeletePhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } }
+          }
+        }
+      }
+
+      Policy ID: pol-overpermissive-weak-condition
+      Policy type: STATIC
+      Policy text:
+      permit (
+        principal: PhotoApp::User,
+        action,
+        resource
+      )
+      when { principal.accountStatus == "active" };
+
+      Emit the standard VERDICT block (POLICY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OVERPERMISSIVE
+    assertions:
+      must_contain:
+        - "OVERPERMISSIVE"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INVALID_POLICY"
+        - "VERDICT: SCHEMA_MISMATCH"
+        - "VERDICT: OK"
+
+  - id: config-gap-validation-off
+    description: >-
+      Cedar policy is syntactically valid and scoped, but the policy store has
+      validationSettings.mode OFF — no schema validation at policy creation,
+      allowing non-existent entities to slip through silently.
+    input: |
+      Policy store ID: ps-config-gap-validation-off
+      Policy store description: Validation disabled on policy store
+      Validation settings: { mode: OFF }
+
+      Schema (JSON):
+      {
+        "PhotoApp": {
+          "entityTypes": {
+            "User": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "userId": { "type": "String" },
+                  "role": { "type": "String" },
+                  "age": { "type": "Long" },
+                  "accountStatus": { "type": "String" }
+                }
+              },
+              "memberOfTypes": ["UserGroup"]
+            },
+            "UserGroup": {
+              "shape": { "type": "Record", "attributes": { "name": { "type": "String" } } }
+            },
+            "Photo": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "photoId": { "type": "String" },
+                  "owner": { "type": "String" },
+                  "isPrivate": { "type": "Boolean" }
+                }
+              }
+            }
+          },
+          "actions": {
+            "ViewPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "UploadPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "DeletePhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } }
+          }
+        }
+      }
+
+      Policy ID: pol-config-gap-validation-off
+      Policy type: STATIC
+      Policy text:
+      permit (
+        principal: PhotoApp::User,
+        action: PhotoApp::Action::"ViewPhoto",
+        resource: PhotoApp::Photo
+      )
+      when { principal.userId == resource.owner };
+
+      Emit the standard VERDICT block (POLICY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+        - "validation"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INVALID_POLICY"
+        - "VERDICT: SCHEMA_MISMATCH"
+        - "VERDICT: OVERPERMISSIVE"
+        - "VERDICT: OK"
+
+  - id: ok-scoped-permit-with-forbid
+    description: >-
+      Well-scoped Cedar permit with typed scope, meaningful conditions (owner
+      check), forbid clause for sensitive action (delete restricted to admin),
+      validation STRICT, schema present and consistent. Clean posture.
+    input: |
+      Policy store ID: ps-ok-scoped-permit-with-forbid
+      Policy store description: Properly scoped Cedar policies with validation ON
+      Validation settings: { mode: STRICT }
+
+      Schema (JSON):
+      {
+        "PhotoApp": {
+          "entityTypes": {
+            "User": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "userId": { "type": "String" },
+                  "role": { "type": "String" },
+                  "age": { "type": "Long" },
+                  "accountStatus": { "type": "String" }
+                }
+              },
+              "memberOfTypes": ["UserGroup"]
+            },
+            "UserGroup": {
+              "shape": { "type": "Record", "attributes": { "name": { "type": "String" } } }
+            },
+            "Photo": {
+              "shape": {
+                "type": "Record",
+                "attributes": {
+                  "photoId": { "type": "String" },
+                  "owner": { "type": "String" },
+                  "isPrivate": { "type": "Boolean" }
+                }
+              }
+            }
+          },
+          "actions": {
+            "ViewPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "UploadPhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } },
+            "DeletePhoto": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Photo"] } }
+          }
+        }
+      }
+
+      Policy ID: pol-ok-scoped-permit-with-forbid
+      Policy type: STATIC
+      Policy text:
+      permit (
+        principal: PhotoApp::User,
+        action: PhotoApp::Action::"ViewPhoto",
+        resource: PhotoApp::Photo
+      )
+      when { principal.userId == resource.owner }
+      when { principal.accountStatus == "active" };
+
+      forbid (
+        principal: PhotoApp::User,
+        action: PhotoApp::Action::"DeletePhoto",
+        resource: PhotoApp::Photo
+      )
+      unless { principal.role == "admin" };
+
+      Emit the standard VERDICT block (POLICY, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "FINDINGS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INVALID_POLICY"
+        - "VERDICT: SCHEMA_MISMATCH"
+        - "VERDICT: OVERPERMISSIVE"
+        - "VERDICT: CONFIG_GAP"

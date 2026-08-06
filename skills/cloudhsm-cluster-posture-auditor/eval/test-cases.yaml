@@ -1,0 +1,377 @@
+# Eval test cases for cloudhsm-cluster-posture-auditor
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudhsm-cluster-posture-auditor
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: single-az-single-hsm
+    description: >-
+      CloudHSM cluster with a single HSM in a single AZ and backup retention
+      disabled — no AZ-level redundancy and no recovery path.
+    input: |
+      Cluster id: cluster-single-az-single-hsm
+      Cluster metadata:
+        State: INITIALIZED
+        HsmType: hsm1m.medium
+        VpcId: vpc-0abc123
+        CreateDate: 2026-06-01T10:00:00Z
+        BackupRetentionPolicy:
+          Type: DAYS
+          Value: "0"
+        SubnetMapping:
+          us-east-1a: subnet-aaa111
+        SecurityGroup:
+          - sg-hsm001
+      HSMs:
+        - HsmId: hsm-001
+          AvailabilityZone: us-east-1a
+          SubnetId: subnet-aaa111
+          EniId: eni-001
+          State: ACTIVE
+      Backups: []
+      PKCS#11 management:
+        co_password_changed: true
+      Security group rules (sg-hsm001):
+        inbound:
+          - source: 10.0.1.0/24
+            ports: 2223-2225
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: SINGLE_AZ
+    assertions:
+      must_contain:
+        - "SINGLE_AZ"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_BACKUP"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: same-az-three-hsm
+    description: >-
+      CloudHSM cluster with three HSMs all co-located in the same AZ — HSM-level
+      redundancy but zero AZ-level redundancy despite the HSM count.
+    input: |
+      Cluster id: cluster-same-az-three-hsm
+      Cluster metadata:
+        State: INITIALIZED
+        HsmType: hsm1m.medium
+        VpcId: vpc-0def456
+        CreateDate: 2026-05-15T08:00:00Z
+        BackupRetentionPolicy:
+          Type: DAYS
+          Value: "90"
+        SubnetMapping:
+          us-east-1a: subnet-aaa222
+        SecurityGroup:
+          - sg-hsm002
+      HSMs:
+        - HsmId: hsm-010
+          AvailabilityZone: us-east-1a
+          SubnetId: subnet-aaa222
+          EniId: eni-010
+          State: ACTIVE
+        - HsmId: hsm-011
+          AvailabilityZone: us-east-1a
+          SubnetId: subnet-aaa222
+          EniId: eni-011
+          State: ACTIVE
+        - HsmId: hsm-012
+          AvailabilityZone: us-east-1a
+          SubnetId: subnet-aaa222
+          EniId: eni-012
+          State: ACTIVE
+      Backups:
+        - BackupId: backup-101
+          CreateDate: 2026-08-04T12:00:00Z
+          State: READY
+        - BackupId: backup-102
+          CreateDate: 2026-08-03T12:00:00Z
+          State: READY
+      PKCS#11 management:
+        co_password_changed: true
+      Security group rules (sg-hsm002):
+        inbound:
+          - source: 10.0.2.0/24
+            ports: 2223-2225
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: SINGLE_AZ
+    assertions:
+      must_contain:
+        - "SINGLE_AZ"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: NO_BACKUP"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: multi-az-no-backup
+    description: >-
+      CloudHSM cluster with three HSMs across three AZs (good HA) but backup
+      retention disabled and zero backups — no recovery path if all HSMs fail.
+    input: |
+      Cluster id: cluster-multi-az-no-backup
+      Cluster metadata:
+        State: INITIALIZED
+        HsmType: hsm1m.medium
+        VpcId: vpc-0ghi789
+        CreateDate: 2026-06-10T10:00:00Z
+        BackupRetentionPolicy:
+          Type: DAYS
+          Value: "0"
+        SubnetMapping:
+          us-east-1a: subnet-aaa333
+          us-east-1b: subnet-bbb333
+          us-east-1c: subnet-ccc333
+        SecurityGroup:
+          - sg-hsm003
+      HSMs:
+        - HsmId: hsm-020
+          AvailabilityZone: us-east-1a
+          SubnetId: subnet-aaa333
+          EniId: eni-020
+          State: ACTIVE
+        - HsmId: hsm-021
+          AvailabilityZone: us-east-1b
+          SubnetId: subnet-bbb333
+          EniId: eni-021
+          State: ACTIVE
+        - HsmId: hsm-022
+          AvailabilityZone: us-east-1c
+          SubnetId: subnet-ccc333
+          EniId: eni-022
+          State: ACTIVE
+      Backups: []
+      PKCS#11 management:
+        co_password_changed: true
+      Security group rules (sg-hsm003):
+        inbound:
+          - source: 10.0.3.0/24
+            ports: 2223-2225
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: NO_BACKUP
+    assertions:
+      must_contain:
+        - "NO_BACKUP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: SINGLE_AZ"
+        - "VERDICT: CONFIG_GAP"
+
+  - id: multi-az-uninitialized
+    description: >-
+      CloudHSM cluster with three HSMs across three AZs and recent backups, but
+      cluster State is UNINITIALIZED — no signed certificate uploaded, clients
+      cannot connect.
+    input: |
+      Cluster id: cluster-multi-az-uninitialized
+      Cluster metadata:
+        State: UNINITIALIZED
+        HsmType: hsm1m.medium
+        VpcId: vpc-0jkl012
+        CreateDate: 2026-08-01T10:00:00Z
+        BackupRetentionPolicy:
+          Type: DAYS
+          Value: "90"
+        SubnetMapping:
+          us-east-1a: subnet-aaa444
+          us-east-1b: subnet-bbb444
+          us-east-1c: subnet-ccc444
+        SecurityGroup:
+          - sg-hsm004
+      HSMs:
+        - HsmId: hsm-030
+          AvailabilityZone: us-east-1a
+          SubnetId: subnet-aaa444
+          EniId: eni-030
+          State: ACTIVE
+        - HsmId: hsm-031
+          AvailabilityZone: us-east-1b
+          SubnetId: subnet-bbb444
+          EniId: eni-031
+          State: ACTIVE
+        - HsmId: hsm-032
+          AvailabilityZone: us-east-1c
+          SubnetId: subnet-ccc444
+          EniId: eni-032
+          State: ACTIVE
+      Backups:
+        - BackupId: backup-301
+          CreateDate: 2026-08-04T14:00:00Z
+          State: READY
+      PKCS#11 management:
+        co_password_changed: false
+      Security group rules (sg-hsm004):
+        inbound:
+          - source: 10.0.4.0/24
+            ports: 2223-2225
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: SINGLE_AZ"
+        - "VERDICT: NO_BACKUP"
+
+  - id: multi-az-default-co-password
+    description: >-
+      CloudHSM cluster with three HSMs across three AZs, recent backups, and
+      cluster initialized — but the default Crypto Officer password has not been
+      changed, leaving a well-known credential active.
+    input: |
+      Cluster id: cluster-multi-az-default-co-password
+      Cluster metadata:
+        State: INITIALIZED
+        HsmType: hsm1m.medium
+        VpcId: vpc-0mno345
+        CreateDate: 2026-07-01T10:00:00Z
+        BackupRetentionPolicy:
+          Type: DAYS
+          Value: "90"
+        SubnetMapping:
+          us-east-1a: subnet-aaa555
+          us-east-1b: subnet-bbb555
+          us-east-1c: subnet-ccc555
+        SecurityGroup:
+          - sg-hsm005
+      HSMs:
+        - HsmId: hsm-040
+          AvailabilityZone: us-east-1a
+          SubnetId: subnet-aaa555
+          EniId: eni-040
+          State: ACTIVE
+        - HsmId: hsm-041
+          AvailabilityZone: us-east-1b
+          SubnetId: subnet-bbb555
+          EniId: eni-041
+          State: ACTIVE
+        - HsmId: hsm-042
+          AvailabilityZone: us-east-1c
+          SubnetId: subnet-ccc555
+          EniId: eni-042
+          State: ACTIVE
+      Backups:
+        - BackupId: backup-401
+          CreateDate: 2026-08-04T16:00:00Z
+          State: READY
+        - BackupId: backup-402
+          CreateDate: 2026-08-03T16:00:00Z
+          State: READY
+      PKCS#11 management:
+        co_password_changed: false
+      Security group rules (sg-hsm005):
+        inbound:
+          - source: 10.0.5.0/24
+            ports: 2223-2225
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: CONFIG_GAP
+    assertions:
+      must_contain:
+        - "CONFIG_GAP"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OK"
+        - "VERDICT: SINGLE_AZ"
+        - "VERDICT: NO_BACKUP"
+
+  - id: multi-az-backup-ok
+    description: >-
+      CloudHSM cluster with three HSMs across three AZs, recent backups with
+      proper retention, cluster initialized, CO password changed, and scoped
+      security group — clean posture.
+    input: |
+      Cluster id: cluster-multi-az-backup-ok
+      Cluster metadata:
+        State: INITIALIZED
+        HsmType: hsm2m.medium
+        VpcId: vpc-0pqr678
+        CreateDate: 2026-03-15T10:00:00Z
+        BackupRetentionPolicy:
+          Type: DAYS
+          Value: "90"
+        SubnetMapping:
+          us-east-1a: subnet-aaa666
+          us-east-1b: subnet-bbb666
+          us-east-1c: subnet-ccc666
+        SecurityGroup:
+          - sg-hsm006
+      HSMs:
+        - HsmId: hsm-050
+          AvailabilityZone: us-east-1a
+          SubnetId: subnet-aaa666
+          EniId: eni-050
+          State: ACTIVE
+        - HsmId: hsm-051
+          AvailabilityZone: us-east-1b
+          SubnetId: subnet-bbb666
+          EniId: eni-051
+          State: ACTIVE
+        - HsmId: hsm-052
+          AvailabilityZone: us-east-1c
+          SubnetId: subnet-ccc666
+          EniId: eni-052
+          State: ACTIVE
+      Backups:
+        - BackupId: backup-501
+          CreateDate: 2026-08-05T06:00:00Z
+          State: READY
+        - BackupId: backup-502
+          CreateDate: 2026-08-04T06:00:00Z
+          State: READY
+        - BackupId: backup-503
+          CreateDate: 2026-08-03T06:00:00Z
+          State: READY
+      PKCS#11 management:
+        co_password_changed: true
+        quorum_enabled: true
+      Security group rules (sg-hsm006):
+        inbound:
+          - source: 10.0.6.0/24
+            ports: 2223-2225
+      Emit the standard VERDICT block (CLUSTER, VERDICT, REASON, FINDINGS, REMEDIATION).
+    expected_verdict: OK
+    assertions:
+      must_contain:
+        - "OK"
+        - "VERDICT"
+        - "REASON"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: SINGLE_AZ"
+        - "VERDICT: NO_BACKUP"
+        - "VERDICT: CONFIG_GAP"

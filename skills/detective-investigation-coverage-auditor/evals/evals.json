@@ -1,0 +1,123 @@
+{
+  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "skill": "detective-investigation-coverage-auditor",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Detective Investigation Coverage Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-graph-no-detector",
+      "name": "No behavior graph and no GuardDuty detector — zero investigation capability",
+      "difficulty": "easy",
+      "prompt_file": "prompts/no-graph-no-detector.md",
+      "baseline_file": "baselines/no-graph-no-detector.md",
+      "expected_verdict": "NO_GRAPH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NO_GRAPH", "no-graph-no-detector", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    },
+    {
+      "id": "invitation-pending-incomplete",
+      "name": "Graph exists but 2 of 5 members INVITED — incomplete org coverage",
+      "difficulty": "medium",
+      "prompt_file": "prompts/invitation-pending-incomplete.md",
+      "baseline_file": "baselines/invitation-pending-incomplete.md",
+      "expected_verdict": "INCOMPLETE_INGESTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INCOMPLETE_INGESTION", "invitation-pending-incomplete", "VERDICT", "REASON", "REMEDIATION", "INVITED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_GRAPH"]
+        }
+      ]
+    },
+    {
+      "id": "datasource-stopped-incomplete",
+      "name": "All members ENABLED but one DETECTIVE_CORE STOPPED — silent ingestion failure",
+      "difficulty": "hard",
+      "prompt_file": "prompts/datasource-stopped-incomplete.md",
+      "baseline_file": "baselines/datasource-stopped-incomplete.md",
+      "expected_verdict": "INCOMPLETE_INGESTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INCOMPLETE_INGESTION", "datasource-stopped-incomplete", "VERDICT", "REASON", "REMEDIATION", "STOPPED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_GRAPH"]
+        }
+      ]
+    },
+    {
+      "id": "stale-data-48h-lag",
+      "name": "All members COLLECTING but one lastDataReceived > 24h — stale investigation data",
+      "difficulty": "medium",
+      "prompt_file": "prompts/stale-data-48h-lag.md",
+      "baseline_file": "baselines/stale-data-48h-lag.md",
+      "expected_verdict": "STALE_DATA",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["STALE_DATA", "stale-data-48h-lag", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_GRAPH"]
+        }
+      ]
+    },
+    {
+      "id": "config-gap-guardduty-disabled",
+      "name": "Graph and members healthy but GuardDuty detector DISABLED — no security findings feed",
+      "difficulty": "medium",
+      "prompt_file": "prompts/config-gap-guardduty-disabled.md",
+      "baseline_file": "baselines/config-gap-guardduty-disabled.md",
+      "expected_verdict": "CONFIG_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["CONFIG_GAP", "config-gap-guardduty-disabled", "VERDICT", "REASON", "REMEDIATION", "GuardDuty"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OK", "VERDICT: NO_GRAPH"]
+        }
+      ]
+    },
+    {
+      "id": "healthy-org-admin-ok",
+      "name": "Full coverage: graph, all members COLLECTING, data fresh, GuardDuty on, org admin set",
+      "difficulty": "easy",
+      "prompt_file": "prompts/healthy-org-admin-ok.md",
+      "baseline_file": "baselines/healthy-org-admin-ok.md",
+      "expected_verdict": "OK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OK", "healthy-org-admin-ok", "VERDICT", "REASON", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NO_GRAPH", "VERDICT: INCOMPLETE_INGESTION", "VERDICT: STALE_DATA", "VERDICT: CONFIG_GAP"]
+        }
+      ]
+    }
+  ]
+}
