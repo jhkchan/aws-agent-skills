@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill introduces several non\u2011obvious expert insights (e.g., the exact isPublic computation, the distinction between StringEquals and StringLike on aws:SourceArn, the kms:CreateGrant escalation chain, configurable unused\u2011access periods, analyzedAt staleness thresholds, deprecated aws:PrincipalAccount handling, and the organization\u2011scoped analyzer delegation model). These details go beyond what a generic model would know, but some sections merely restate AWS documentation (e.g., basic resource\u2011type matrices), preventing a perfect score."
+      "justification": "The skill introduces several non\u2011obvious expert deltas (e.g., the exact isPublic computation, kms:CreateGrant escalation chain, configurable unused\u2011access analysis period, analyzedAt freshness thresholds, deprecated aws:PrincipalAccount handling, and organization\u2011scoped analyzer admin model). These details go beyond what a generic LLM would know, but a portion of the content merely restates AWS documentation, preventing a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides a concrete AWS\u2011specific decision flow (quick triage, step\u2011by\u2011step classification, condition\u2011strength matrix, principal evaluation, resource\u2011type severity matrix, pre\u2011flight safety gate). The only shortfall is that a few early steps (e.g., generic input validation) are generic rather than uniquely AWS\u2011centric."
+      "justification": "The step\u2011by\u2011step classification flow, condition\u2011strength matrix, resource\u2011type severity matrix, and pre\u2011flight safety gate are all AWS\u2011specific procedures. One minor deduction for a generic step (\"check status\") that is not uniquely AWS\u2011centric."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never treat Principal \"*\" as safe, never rely on isPublic=false alone, never delete service\u2011linked roles). One minor gap: it does not explicitly warn about ignoring cross\u2011region SourceArn wildcards, which would be a useful anti\u2011pattern."
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never treat Principal \"*\" as safe, never rely on isPublic=false alone, never archive without documentation). The only minor gap is the absence of a warning about ignoring IAM policy versioning or stale policy revisions."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter is complete and the description explains WHAT, WHEN, and KEYWORDS. The activation signal is described but could be more formally structured (e.g., a regex pattern). The 'entry_point' flag is set to false without explanation, which could cause ambiguity for an agent runtime."
+      "justification": "Frontmatter is complete and the description explains WHAT, WHEN, and KEYWORDS. The activation signal is described in prose but lacks a precise, machine\u2011readable trigger (e.g., regex or explicit field list), making reliable invocation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information well (quick triage first, deeper process, matrices, anti\u2011patterns, remediation). However, the document is long and some critical rules (e.g., the three misclassification rules) are embedded in the quick\u2011triage section, risking cognitive overload for a first\u2011time reader."
+      "justification": "The skill layers Quick Triage at the top, but a large amount of detailed expert deltas, matrices, and anti\u2011patterns are presented early, which can cause cognitive overload before a user knows they need the deeper sections."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly gated by a pre\u2011flight safety gate, confirmation prompts, and backup commands. The only shortfall is that the examples of the confirmation prompt are described in prose but not shown as concrete output, leaving a tiny ambiguity for automated pipelines."
+      "justification": "Destructive operations are tightly gated by a hard pre\u2011flight safety gate, confirmation prompts, and backup commands, matching the fragility of policy changes. Classification steps are appropriately permissive, so calibration is well balanced."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 10,
       "max": 10,
-      "justification": "Follows the declared structural pattern (Mindset \u2192 Quick Triage \u2192 Expert Deltas \u2192 Process \u2192 Matrices \u2192 Anti\u2011Patterns \u2192 Pre\u2011flight Gate \u2192 Remediation) consistently throughout the document."
+      "justification": "The skill follows a clear, named pattern (Mindset \u2192 Quick Triage \u2192 Expert Deltas \u2192 Process \u2192 Matrices \u2192 Anti\u2011Patterns \u2192 Pre\u2011flight Gate \u2192 Remediation) that is consistent throughout."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI commands, error handling for malformed JSON, and end\u2011to\u2011end examples that an agent could execute. Missing are explicit handling of unknown analyzer scopes (account vs organization) in the decision flow and a concrete example of the confirmation prompt, which could cause minor execution gaps."
+      "justification": "The decision tree, output format, and CLI snippets enable an agent to act. Minor gaps: the resource\u2011type severity matrix does not explicitly cover newly added resource types (e.g., S3 Express, VPC endpoints) and malformed condition objects are only handled generically, which could cause edge\u2011case failures."
     }
   ],
   "total_score": 108,
   "max_score": 120,
   "grade": "A",
-  "token_count": 58002,
-  "latency_ms": 9939,
+  "token_count": 56729,
+  "latency_ms": 9399,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0

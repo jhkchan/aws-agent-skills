@@ -26,9 +26,9 @@ incomplete, and CI runs the assertion layer on every PR.
 <!-- BEGIN EVAL SCORECARD TABLE -->
 | Skill | Model | Score | Grade | Verdicts | Latency | Tokens |
 |---|---|---|---|---|---|---|
-| accessanalyzer-finding-triage | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.9s | 58002 |
-| acm-certificate-expiry-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.9s | 36743 |
-| apigateway-resource-policy-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 36.4s | 36506 |
+| accessanalyzer-finding-triage | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.4s | 56729 |
+| acm-certificate-expiry-auditor | amazon.nova-pro-v1:0 | 107/120 | B | 6/6 | 8.1s | 36362 |
+| apigateway-resource-policy-auditor | amazon.nova-pro-v1:0 | 106/120 | B | 6/6 | 23.1s | 34618 |
 | athena-workgroup-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 8.6s | 49642 |
 | auditmanager-assessment-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.6s | 50433 |
 | autoscaling-group-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 18.9s | 39803 |
@@ -75,7 +75,7 @@ incomplete, and CI runs the assertion layer on every PR.
 | kinesis-stream-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 27.1s | 42232 |
 | kms-key-policy-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.2s | 49516 |
 | lakeformation-data-lake-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 13.1s | 43103 |
-| lambda-runtime-deprecation-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.6s | 44874 |
+| lambda-runtime-deprecation-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 15.4s | 45863 |
 | msk-cluster-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 12.2s | 36499 |
 | networkmanager-core-network-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.3s | 34956 |
 | opensearch-domain-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 7.9s | 34037 |
