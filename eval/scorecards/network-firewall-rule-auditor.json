@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill provides many niche insights (e.g., HOME_NET auto\u2011assignment, StreamExceptionPolicy, TGW routing, capacity limits, UpdateToken concurrency, TLS inspection cert\u2011chain concerns, Suricata\u202f6 changes) that go beyond a generic model's baseline. However, a portion of the content merely restates well\u2011known AWS documentation (e.g., default actions, basic rule\u2011group concepts), so the delta is not absolute."
+      "justification": "The skill provides many deep, AWS\u2011specific insights (e.g., HOME_NET auto\u2011set, fragment bypass, forward_to_sfe requirement, strict vs default rule order, TLS inspection scope, StreamExceptionPolicy) that go beyond a generic model. However, several items are restatements of official docs (e.g., basic description of StatelessDefaultActions) and it omits some expert nuances such as capacity\u2011exhaustion decision trees, so it falls short of a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "The skill outlines an AWS\u2011specific, step\u2011by\u2011step audit process with concrete CLI commands, pagination handling, and pre\u2011flight safety gates. A small deduction is for a few generic statements (e.g., \u201cverify symmetric routing\u201d) that lack explicit command syntax, leaving the agent to infer the exact procedure."
+      "justification": "The procedure is AWS\u2011specific and ordered (routing check \u2192 stateless defaults \u2192 stateful defaults \u2192 rule analysis \u2192 TLS \u2192 logging \u2192 aggregation) with concrete CLI commands and confirmation gates. The only shortfall is that the exact sequence for enumerating rule groups across MANAGED and CUSTOMER scopes is described but not codified as a step\u2011by\u2011step algorithm, leaving a minor procedural gap."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "A thorough NEVER list enumerates many pitfalls with clear reasoning (e.g., fragment bypass, pass default actions, strict\u2011order shadowing). Missing are warnings about relying on managed rule\u2011group versions without pinning and about overly permissive egress defaults, which would strengthen the anti\u2011pattern coverage."
+      "justification": "A comprehensive NEVER list is present with concrete reasoning (e.g., never use StatelessDefaultActions:aws:pass, never rely on alert\u2011only defaults). The list could be expanded to include more edge\u2011cases like managed rule\u2011group version drift and capacity\u2011exhaustion warnings, so it is not absolutely exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, activation triggers and invocation schema are well defined, and the description explains WHAT, WHEN, and KEYWORDS. The only shortfall is the absence of an explicit \u201cwhen NOT to invoke\u201d clause, which could cause accidental misuse."
+      "justification": "All required front\u2011matter fields are present, the description clearly states WHAT the skill does, WHEN to invoke, and provides a rich keyword list and activation triggers. The invocation schema is explicit, making activation reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill is organized into sections (Mindset, Quick reference, Process, Edge cases, etc.) allowing layered reading, but the initial document front\u2011loads a large amount of detail (anti\u2011patterns, edge cases) before the core decision tree, which may overwhelm an agent seeking a quick answer."
+      "justification": "The skill layers information (TL;DR, mindset, quick reference, stepwise process, edge cases, anti\u2011patterns, remediation). However, the initial sections are dense and contain many detailed tables and warnings before the core audit flow, which can overload the reader and bury some critical rules deeper than ideal."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are guarded by confirmation prompts, backup steps, token refresh, and blast\u2011radius checks, showing strong calibration. A minor deduction for not encoding constraints in the invocation schema (e.g., flagging required confirmation for state\u2011changing commands)."
+      "justification": "Destructive actions (policy updates, route changes) are gated by explicit confirmation prompts, backup steps, and back\u2011off logic. Non\u2011destructive audit steps are left flexible, matching the fragility of the task perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable audit\u2011skill pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Remediation \u2192 Error handling). The only issue is a slight inconsistency in the ordering of \u201cRecent features\u201d after error handling, which breaks the otherwise clean pattern."
+      "justification": "The skill follows a recognizable pattern (Quick\u2011start, Mindset, Process steps, Output format, Edge cases, Anti\u2011patterns, Remediation). The ordering is mostly logical, though the mix of narrative and tabular sections feels slightly ad\u2011hoc rather than a single canonical template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill supplies a clear output format, decision tree, CLI remediation examples, and error\u2011handling table, enabling an agent to act. It lacks guidance for handling multiple firewalls in a single input and does not detail retry/back\u2011off logic for pagination failures, which could cause execution gaps."
+      "justification": "An agent can follow the decision tree, run the exact CLI commands, and produce the required output format. The only gap is the lack of explicit guidance on programmatically detecting \"content\u2011matching\" stateful rules and handling rule\u2011group capacity exhaustion beyond a generic note, which could cause a runtime ambiguity."
     }
   ],
-  "total_score": 107,
+  "total_score": 111,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 41265,
-  "latency_ms": 12991,
+  "grade": "A",
+  "token_count": 44421,
+  "latency_ms": 11815,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0

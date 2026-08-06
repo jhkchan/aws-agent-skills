@@ -78,6 +78,40 @@ metadata:
 
 # Network Firewall Rule Auditor
 
+## Quick-start (TL;DR)
+
+**Use this skill when** auditing an AWS Network Firewall — the managed VPC-level
+stateful/stateless inspection service (Suricata + 5-tuple engines in dedicated
+firewall subnets). **Do NOT use it for** security groups, NACLs, WAF web ACLs,
+Route 53 Resolver Firewall, or non-AWS firewalls — those have different
+evaluation models and verdict labels.
+
+**Five possible verdicts** (worst finding wins on aggregation):
+- **PERMISSIVE_RULE** — a rule or default action actively allows/bypasses
+  traffic that should be inspected or blocked. Highest urgency.
+- **ROUTING_GAP** — VPC or TGW route tables steer traffic around the firewall;
+  rules are irrelevant.
+- **NO_TLS_INSPECTION** — payload-matching stateful rules cannot match HTTPS
+  without a decryption config.
+- **CONFIG_GAP** — functional defect (dead pass rule, missing logging,
+  alert-only default, missing `forward_to_sfe`).
+- **OK** — all dimensions clean.
+
+**Three highest-signal checks** (cover ~80% of real misconfigurations):
+1. `StatelessDefaultActions` includes `aws:forward_to_sfe` — else every
+   stateful rule group is dead code.
+2. App-subnet route table points `0.0.0.0/0` at a firewall ENI, not the IGW.
+3. No `pass ip any any -> any any` (Suricata) or all-wildcard 5-tuple +
+   `aws:pass` (stateless) rule.
+
+**Output contract:** emit one `FIREWALL / VERDICT / REASON / FINDINGS /
+REMEDIATION` block per firewall. For multi-firewall inputs, emit one block per
+firewall — do NOT merge findings across firewalls.
+
+The full verdict matrix is in `Quick reference — verdict thresholds` below;
+deep Suricata, routing, and API internals are in the **Reference** section at
+the end.
+
 ## Mindset
 
 **One-line takeaway:** a perfectly authored rule group is worthless if the
@@ -248,6 +282,45 @@ These behaviors change a verdict if ignored:
   tables. A ROUTING_GAP at the TGW level is invisible if the auditor only
   checks VPC route tables.
 
+- **`describe-firewall` does NOT return the policy body.** The response
+  carries `FirewallPolicyArn` (a reference) and `SubnetMappings`, but NOT the
+  ruleset. An auditor who calls only `describe-firewall` and treats the
+  response as the audit surface will silently produce an empty audit. Always
+  follow with `describe-firewall-policy --firewall-policy-arn <arn>` and
+  `describe-rule-group` per attached group; this is the #1 script bug in
+  community Network Firewall tooling.
+
+- **A Suricata `pass` rule is absolute, even under `drop_strict`.** The
+  stateful default only governs traffic that NO rule matched. A matching
+  `pass` rule short-circuits evaluation for that flow — the default never
+  runs. Operators frequently tighten the default to `drop_strict` and assume
+  it overrides a stale `pass`; it does not. Remove or scope the `pass` rule;
+  the default is not a safety net.
+
+- **TLS inspection scope (`ServerCertificateConfiguration.Scopes`) controls
+  WHICH TLS flows are decrypted, not just whether.** An over-narrow scope
+  (e.g., a single spoke subnet CIDR) silently leaves most HTTPS traffic
+  uninspected — the TLS config exists and the policy references it, but the
+  bulk of flows bypass decryption. Verify the scope covers EVERY workload
+  subnet the firewall is supposed to protect, not just that the ARN is
+  attached.
+
+- **`StatefulEngineOptions.RuleOrder` at the policy level overrides per-group
+  `RuleOrder`.** If the policy sets `STRICT_ORDER` globally, changing an
+  individual stateful rule group to `DEFAULT_ACTION_ORDER` has no effect —
+  the policy enforces strict order globally. Always check `StatefulEngineOptions`
+  before diagnosing shadowing issues; per-group settings can be silently
+  overridden and produce misleading audit results.
+
+- **Stateless rules referencing a managed prefix list silently no-match if the
+  prefix list is missing, in another Region, or owned by another account.**
+  `update-rule-group` accepts the reference without warning; the rule simply
+  never matches traffic. AWS does NOT surface this in the API response — the
+  only signal is `MatchedPackets` staying at zero for that rule. Treat any
+  `Source.PrefixListId` / `Destination.PrefixListId` reference as suspect
+  until the prefix list is confirmed resolvable in the firewall's account and
+  Region.
+
 ### Step 1: Routing topology (ROUTING_GAP)
 
 The firewall is only effective if traffic actually traverses its ENIs. For
@@ -413,6 +486,34 @@ REMEDIATION:
      aws network-firewall associate-tls-inspection-config ...
 ```
 
+### Multi-firewall inputs
+
+When the input contains more than one firewall (e.g., a JSON array, a
+spreadsheet export, or multiple ARNs), emit ONE verdict block per firewall.
+Do NOT merge findings across firewalls — a shared policy is not a signal to
+collapse verdicts. Process firewalls in input order; if two firewalls share a
+policy, both still get independent blocks (the shared policy's defects appear
+in each, with a `REMEDIATION` note flagging the blast radius).
+
+For very large inputs (>20 firewalls), batch by VPC or account and warn the
+operator that the run may exceed a single model response — emit a final
+`VERDICT: ERROR` summary block with the count of unprocessed firewalls
+rather than silently truncating.
+
+### Pagination retry / backoff
+
+`describe-rule-group` is per-group and rate-limited. On `ThrottlingException`,
+use exponential backoff with full jitter: base 1s, factor 2, cap 30s, max 5
+retries per group. Do NOT parallelize `describe-rule-group` calls — the quota
+is per-account and concurrent calls amplify throttling. Serialize with retry
+and record any group that exhausted retries as `VERDICT: ERROR` with reason
+`rule-group fetch throttled after N retries`.
+
+`list-rule-groups --scope MANAGED` and `--scope CUSTOMER` are independent
+paginations — both must be exhausted before the rule inventory is complete.
+A policy can reference rule groups from either scope; missing one scope
+silently undercounts the ruleset.
+
 ## Expert edge cases
 
 ### The `forward_to_sfe` default is the stateful engine's lifeline
@@ -539,6 +640,19 @@ reviewed. Note the managed group's version in the output for traceability.
   write. A stale token produces `InvalidTokenException`. Re-fetch before each
   mutation.
 
+- NEVER pin to "the latest" AWS-managed rule group without recording the
+  version. Managed groups (ThreatSignatures, domain lists) update
+  independently; a passing audit today can fail tomorrow when the managed
+  group adds rules that interact with custom rules. Capture the managed
+  group's version / `LastModifiedTime` in the audit output for
+  reproducibility, and flag managed-group version drift between audits.
+
+- NEVER assume egress is inspected just because ingress is. Many policies
+  scope rules tightly for inbound traffic but ship a `pass ip $HOME_NET any
+  -> $EXTERNAL_NET any` baseline for outbound — data exfiltration and C2
+  callbacks egress uninspected. Evaluate egress rules with the same rigor as
+  ingress; a permissive egress baseline is PERMISSIVE_RULE, not OK.
+
 ## Pre-flight safety checks (run before any remediation CLI)
 
 - **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
@@ -649,9 +763,22 @@ effect immediately while you investigate what the pass was protecting.
 | `InvalidTokenException` | `UpdateToken` was stale (another write occurred between fetch and mutation) | Re-fetch with `describe-firewall-policy` / `describe-rule-group`, retry the mutation with the fresh token. Never cache tokens across calls. |
 | `AccessDeniedException` on `update-*` | The auditor's IAM role lacks `network-firewall:UpdateFirewallPolicy` or `UpdateRuleGroup` | Verify IAM permissions BEFORE emitting remediation CLI — surface the missing action to the operator rather than letting the command fail at runtime. |
 | `InvalidOperationException` | Attempting to modify an AWS-managed rule group (`Type: MANAGED`) | Managed groups are not customer-editable. Detach the managed group and create a custom replacement if different behavior is needed. |
-| `ThrottlingException` | Rate-limited on `describe-rule-group` during bulk audit (pagination) | Implement exponential backoff. `describe-rule-group` is per-group; batching does not help — serialize with retry. |
+| `ThrottlingException` | Rate-limited on `describe-rule-group` during bulk audit (pagination) | Serialize calls (do NOT parallelize — the quota is per-account and concurrent calls amplify throttling). Exponential backoff with full jitter: base 1s, factor 2, cap 30s, max 5 retries per group. Record any group that exhausted retries as `VERDICT: ERROR` rather than silently skipping it. |
 
-## Recent AWS features (2024-2026)
+## Domain
+
+AWS CloudOps / Network Security & Intrusion Prevention.
+
+## AWS documentation
+
+- **AWS Network Firewall Developer Guide** — https://docs.aws.amazon.com/network-firewall/latest/developerguide/
+- **Network Firewall security chapter** — https://docs.aws.amazon.com/network-firewall/latest/developerguide/security.html
+- **Network Firewall API Reference** — https://docs.aws.amazon.com/network-firewall/latest/APIReference/
+- **AWS CLI Network Firewall reference** — https://docs.aws.amazon.com/cli/latest/reference/network-firewall/
+- **Suricata rule syntax (AWS-managed engine)** — https://docs.aws.amazon.com/network-firewall/latest/developerguide/suricata-rule-evaluation.html
+- **TLS inspection configuration** — https://docs.aws.amazon.com/network-firewall/latest/developerguide/tls-inspection.html
+
+## Changelog — Recent AWS features (2024-2026)
 
 - **Suricata 6 compatibility (2024):** Network Firewall updated its Suricata
   engine to version 6, adding support for new protocol parsers and detection
@@ -672,16 +799,3 @@ effect immediately while you investigate what the pass was protecting.
 - **Firewall policy versioning visibility (2025):** Improved
   `DescribeFirewallPolicy` response includes `LastModifiedTime`. Auditors
   should flag policies not modified in > 90 days for rule freshness review.
-
-## Domain
-
-AWS CloudOps / Network Security & Intrusion Prevention.
-
-## AWS documentation
-
-- **AWS Network Firewall Developer Guide** — https://docs.aws.amazon.com/network-firewall/latest/developerguide/
-- **Network Firewall security chapter** — https://docs.aws.amazon.com/network-firewall/latest/developerguide/security.html
-- **Network Firewall API Reference** — https://docs.aws.amazon.com/network-firewall/latest/APIReference/
-- **AWS CLI Network Firewall reference** — https://docs.aws.amazon.com/cli/latest/reference/network-firewall/
-- **Suricata rule syntax (AWS-managed engine)** — https://docs.aws.amazon.com/network-firewall/latest/developerguide/suricata-rule-evaluation.html
-- **TLS inspection configuration** — https://docs.aws.amazon.com/network-firewall/latest/developerguide/tls-inspection.html

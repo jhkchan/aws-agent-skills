@@ -97,7 +97,7 @@ test_cases:
         - "VERDICT"
         - "REASON"
         - "REMEDIATION"
-        - "FAILED"
+        - "222222222222"
       must_not_contain:
         - "VERDICT: OK"
         - "VERDICT: UNTRIAGED_FINDINGS"

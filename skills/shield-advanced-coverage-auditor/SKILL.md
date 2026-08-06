@@ -69,13 +69,16 @@ metadata:
     - "DDoS response team access"
     - "harden DDoS posture"
   invocation_schema: >-
-    Input: either (a) a Shield Advanced configuration snapshot (subscription
-    state, internet-facing resource inventory, Protections list, DRT access
-    config, health-check associations, proactive-engagement state, emergency
-    contact list, WAF Web ACL associations), OR (b) an account-id for
-    live-account audit. Output: deterministic SCOPE/VERDICT/REASON/FINDINGS/
-    REMEDIATION block, where VERDICT is in {UNPROTECTED, NO_DRT_ACCESS,
-    CONFIG_GAP, OK, ERROR}.
+    Input — one of: (a) config_snapshot object with keys:
+    subscription_state (ACTIVE|INACTIVE), resource_inventory (list of
+    {type, arn}), protections (list of {id, name, resource_arn,
+    health_check_ids}), drt_access ({role_arn, log_buckets}),
+    proactive_engagement (ENABLED|DISABLED), emergency_contact_list (list),
+    web_acls (list of {resource_arn, web_acl_arn}); OR (b) account_id
+    (string) for live-account audit. Output — deterministic block:
+    SCOPE (string), VERDICT (enum: UNPROTECTED|NO_DRT_ACCESS|CONFIG_GAP|OK|ERROR),
+    REASON (string), FINDINGS (list of {severity, description, step}),
+    REMEDIATION (list of strings, one per finding).
 ---
 
 # Shield Advanced Coverage Auditor
@@ -105,6 +108,20 @@ A resource with Shield Standard only is behind the first line of defence but
 NOT behind Shield Advanced's enhanced detection, DRT manual mitigation, or
 cost-protection credits. That gap is what this auditor catches.
 
+## Quick-start — the audit in 7 steps
+
+For agents that need the high-level flow before reading the detail:
+
+1. **Subscription gate** — INACTIVE = UNPROTECTED, stop.
+2. **Coverage** — every ALB/NLB/CLB/EIP must have a Protection with matching `ResourceArn`. CloudFront + Route 53 are auto-protected (do NOT flag).
+3. **DRT access** — no RoleArn = NO_DRT_ACCESS. RoleArn but no LogBuckets = CONFIG_GAP.
+4. **Health-based detection** — each explicit Protection needs `HealthCheckIds`. Empty = CONFIG_GAP.
+5. **Proactive engagement** — ENABLED + populated contacts = OK. Anything else = CONFIG_GAP.
+6. **WAF + automatic response** — each ALB Protection needs a WAF Web ACL; verify Application Layer Automatic Response is enabled on critical ALBs.
+7. **Aggregate** — worst verdict wins: UNPROTECTED > NO_DRT_ACCESS > CONFIG_GAP > OK.
+
+Paginate `ListProtections` to completion (100/page cap). Audit each region independently. Full threshold table, expert gotchas, and edge cases follow.
+
 ## Quick reference — verdict thresholds
 
 | Condition | Verdict | Rule |
@@ -117,7 +134,8 @@ cost-protection credits. That gap is what this auditor catches.
 | Proactive engagement DISABLED | **CONFIG_GAP** | Step 5 |
 | Proactive engagement ENABLED but EmergencyContactList empty | **CONFIG_GAP** | Step 5 |
 | ALB protection has no WAF Web ACL (L3/L4 only) | **CONFIG_GAP** | Step 6 |
-| All resources covered + DRT role+logs + health checks + proactive + WAF | **OK** | Step 7 |
+| ALB has WAF but Application Layer Automatic Response disabled | **CONFIG_GAP** (advisory) | Step 6b |
+| All resources covered + DRT role+logs + health checks + proactive + WAF + auto-response | **OK** | Step 7 |
 | CloudFront distribution or Route 53 zone NOT in Protections list | **OK** (auto-protected — do NOT flag) | Step 0a |
 
 See the ordered steps below for edge cases. Deep Shield Advanced internals
@@ -165,136 +183,34 @@ REMEDIATION: Re-fetch with aws shield get-subscription-state, aws shield list-pr
 
 ## Process — Classification logic (apply in order, aggregate worst)
 
-### Step 0: Expert knowledge — non-obvious Shield Advanced behaviors that change classification
+### Step 0: Expert knowledge — non-obvious behaviors that change classification
 
-These behaviors are easy to misjudge without operational Shield Advanced
-experience. Each changes a verdict if ignored:
+These behaviors cause false positives or silent failures if ignored. Each
+is explained in depth in [Deep reference: Shield Advanced
+internals](#deep-reference-shield-advanced-internals); the one-liner here
+is the classification-impacting summary.
 
-- **CloudFront distributions and Route 53 hosted zones are AUTO-PROTECTED.**
-  Once Shield Advanced is subscribed (SubscriptionState ACTIVE), EVERY
-  CloudFront distribution and Route 53 hosted zone in the account is
-  automatically protected — no `CreateProtection` call is needed or
-  accepted. An audit that flags a CloudFront distribution as UNPROTECTED
-  because it is absent from the Protections list is a **false positive**.
-  The Protections list only contains resources requiring explicit
-  protection (ALB, NLB, CLB, EIP). This was announced at re:Invent 2023
-  and is the single most common Shield Advanced audit error.
-
-- **DRT needs BOTH a role AND log-bucket access for full incident
-  response.** `AssociateDRTRole` grants the DRT an IAM role they assume to
-  act on your behalf (create WAF rules, analyze traffic). Without it, the
-  DRT cannot act at all — this is NO_DRT_ACCESS. `AssociateDRTLogBucket`
-  grants the DRT read access to an S3 bucket containing your access logs
-  (ALB access logs, CloudFront access logs). Without the log bucket, the
-  DRT can act but is BLIND to attack patterns visible only in logs. Missing
-  log bucket alone = CONFIG_GAP (partial DRT). Missing role = NO_DRT_ACCESS
-  (no DRT capability).
-
-- **Proactive engagement requires BOTH EnableProactiveEngagement AND a
-  populated EmergencyContactList.** The API rejects
-  `EnableProactiveEngagement` with an empty contact list, but a stale state
-  where contacts were removed after enabling can persist. ENABLED with an
-  empty contact list = CONFIG_GAP (DRT cannot reach you during an event).
-  DISABLED = CONFIG_GAP (no proactive contact at all — you must notice the
-  attack yourself and open a case).
-
-- **Health-based detection is PER-PROTECTION, not per-account.**
-  `AssociateHealthCheck` ties a Route 53 health check to a specific
-  Protection ID. Each critical protected resource needs its own health
-  check. Without health-based detection, Shield Advanced relies only on
-  network-layer (L3/L4) volumetric thresholds — L7 application-layer
-  attacks that degrade response time without tripping bandwidth thresholds
-  go undetected. This also disqualifies you from DDoS cost-protection
-  credits for that resource.
-
-- **WAF Web ACL is REQUIRED for Shield Advanced L7 mitigation.** The DRT
-  mitigates L7 DDoS attacks by injecting rate-based rules into the
-  resource's WAF Web ACL. An ALB with a Shield protection but NO WAF Web
-  ACL = L3/L4 only protected. The DRT cannot create L7 mitigations for that
-  ALB. This is CONFIG_GAP, not UNPROTECTED (L3/L4 volumetric protection
-  still applies via Shield Advanced always-on detections).
-
-- **EIP protection covers the associated EC2 instance.** The protected
-  resource ARN is the EIP allocation
-  (`arn:aws:ec2:<region>:<account>:elastic-ip/eipalloc-xxx`), NOT the EC2
-  ARN. An EC2 instance with only a private IP cannot be DDoS-attacked from
-  the internet — do NOT flag it. Only EC2 instances with an associated EIP
-  (public IP) are in scope.
-
-- **Shield Advanced subscription is a 1-YEAR commitment.** `CreateSubscription`
-  starts a non-cancellable, non-prorated 1-year term. The monthly fee
-  applies regardless of how many resources you protect. Without an active
-  subscription, NO protections are in effect — even CloudFront/Route 53
-  auto-protection reverts to Shield Standard (L3/L4 free tier).
-
-- **Shield Standard (free) is L3/L4 only.** It does NOT include DRT access,
-  health-based detection, WAF integration, cost-protection credits, or
-  proactive engagement. Shield Advanced is the upgrade that adds all of
-  these. An account on Shield Standard only is effectively UNPROTECTED for
-  L7 and has no manual mitigation path.
-
-- **Cost protection (DDoS scaling credits) requires health checks AND
-  WAF.** Shield Advanced credits the cost of auto-scaling triggered by a
-  DDoS attack, but ONLY if the affected resource has health-based detection
-  and (for L7) a WAF Web ACL. Without these, you may not qualify for
-  credits — the scaling cost is yours.
-
-- **Application Layer Automatic Response (2023+ GA, 2024 enhanced).**
-  Shield Advanced can automatically create and tune WAF rules per-protection
-  without DRT manual intervention, via `EnableApplicationLayerAutomaticResponse`.
-  This is COMPLEMENTARY to DRT access — it does not replace the DRT, but
-  reduces response time for known attack patterns. An ALB protection with
-  automatic response enabled but no WAF Web ACL is a CONFIG_GAP (automatic
-  response has no Web ACL to inject rules into).
-
-- **`ListProtections` caps at 100 protections per page.** Accounts with
-  many ALBs/NLBs/CLBs/EIPs can exceed this — the first page silently
-  truncates. Use `--next-token` from the prior `NextToken` to drain all
-  pages. A coverage audit that reads only the first page will FALSELY
-  report resources as UNPROTECTED because their Protections are on page
-  2+. Always paginate to completion before classifying coverage.
-
-- **Protection `Name` is NOT unique — `ResourceArn` is.** Two Protections
-  can share the same `Name` but protect different resources. Do NOT use
-  `Name` as a deduplication key or coverage proof — match on
-  `ResourceArn` exclusively. An audit that checks "does a protection named
-  'prod-alb' exist?" will find a match even if the protection references a
-  stale (deleted) ALB ARN while the live ALB is unprotected.
-
-- **DRT role trust policy requires the exact service principal
-  `service-role.shield.amazonaws.com`.** The common mistake is using
-  `shield.amazonaws.com` (without the `service-role/` prefix) in the IAM
-  trust policy. `AssociateDRTRole` accepts the association — the API does
-  NOT validate the trust policy — but the DRT cannot actually assume the
-  role at incident time. The error surfaces only during a live attack when
-  the DRT attempts `sts:AssumeRole` and gets `AccessDenied`. Always verify
-  the trust policy principal is `service-role.shield.amazonaws.com`, not
-  `shield.amazonaws.com`.
-
-- **`AssociateHealthCheck` is write-only — there is no Shield API to LIST
-  health-check associations.** To verify which health checks are wired to a
-  protection, you MUST call `DescribeProtection` and read the
-  `HealthCheckIds` field. `aws route53 list-health-checks` lists ALL Route
-  53 health checks in the account but does NOT indicate which are
-  associated with Shield protections. Do not assume a health check exists
-  for a protection just because it exists in Route 53 — verify the
-  association via `DescribeProtection`.
-
-- **EIP Protection uses the ALLOCATION ID, not the public IP.** The
-  `ResourceArn` for an EIP protection is
-  `arn:aws:ec2:<region>:<account>:elastic-ip/eipalloc-xxx` — the
-  allocation ID. Using the public IP address (e.g., `203.0.113.5`) or the
-  EC2 instance ARN fails silently: `CreateProtection` accepts the string
-  but the protection references a non-existent resource. Always verify the
-  EIP allocation ARN via `aws ec2 describe-addresses` before creating a
-  protection.
-
-- **The 1-year subscription AUTO-RENEWS.** `CreateSubscription` starts a
-  1-year term that auto-renews for another year at expiry unless you
-  explicitly cancel before the renewal date. There is no proration. An
-  account that subscribes for a one-time event (e.g., a product launch)
-  and forgets to cancel will be billed for year 2 silently. Surface this
-  in the confirmation gate for `CreateSubscription`.
+- **CloudFront + Route 53 are AUTO-PROTECTED** (re:Invent 2023). Flagging
+  their absence from the Protections list is the #1 false positive.
+- **DRT needs BOTH a role AND log-bucket access.** No role = NO_DRT_ACCESS.
+  Role but no log bucket = CONFIG_GAP (blind, not helpless).
+- **Proactive engagement needs EnableProactiveEngagement AND a populated
+  EmergencyContactList.** ENABLED with empty contacts = CONFIG_GAP.
+- **Health-based detection is PER-PROTECTION.** Missing = CONFIG_GAP and
+  disqualifies cost-protection credits.
+- **WAF Web ACL is required for L7 mitigation.** ALB Protection without
+  WAF = CONFIG_GAP (L3/L4 only).
+- **Application Layer Automatic Response** (2023 GA) auto-tunes WAF rules
+  without DRT — verify it on critical ALBs (requires WAF Web ACL).
+- **`ListProtections` caps at 100/page** — paginate with `NextToken` or
+  silently miss Protections on page 2+.
+- **Match on `ResourceArn`, never `Name`** — Name is not unique; ARN is.
+- **DRT role trust policy needs `service-role.shield.amazonaws.com`** —
+  `shield.amazonaws.com` fails silently at incident time.
+- **`AssociateHealthCheck` is write-only** — verify associations via
+  `DescribeProtection`, not `route53 list-health-checks`.
+- **EIP Protection uses allocation ID** (`eipalloc-xxx`), not public IP.
+- **Subscription auto-renews** — 1-year term, non-prorated, silent renewal.
 
 ### Step 1: Subscription gate (highest priority — no subscription = no coverage)
 
@@ -420,13 +336,34 @@ Cognito (regional resources). For Shield Advanced coverage, the WAF check
 is ALB-specific (and CloudFront, but CloudFront is auto-protected and its
 WAF is a separate audit dimension).
 
+### Step 6b: Application Layer Automatic Response evaluation
+
+For each ALB Protection with a WAF Web ACL, check whether Application
+Layer Automatic Response is enabled:
+
+- **Automatic Response ENABLED** (`EnableApplicationLayerAutomaticResponse`
+  called) → OK. Shield automatically creates and tunes WAF rate-based
+  rules without waiting for DRT manual intervention, reducing L7 attack
+  response time from minutes to seconds.
+- **Automatic Response NOT enabled** → **CONFIG_GAP** (advisory). The
+  protection still works via DRT manual mitigation (Step 3) and always-on
+  L3/L4 detections, but the faster automated path is dormant. Surface as
+  a lower-priority finding — not every ALB needs automatic response, but
+  critical internet-facing ALBs should have it.
+
+**Expert note:** Automatic Response requires a WAF Web ACL on the
+protection. An ALB with automatic response enabled but no Web ACL is a
+hard CONFIG_GAP — the feature has nowhere to inject rules. This is
+distinct from Step 6 (missing WAF entirely, which blocks all L7
+mitigation).
+
 ### Step 7: Aggregation — worst verdict wins
 
 The final verdict is the **maximum severity** across all steps, where
 UNPROTECTED > NO_DRT_ACCESS > CONFIG_GAP > OK:
 
 ```text
-verdict = max(coverage_verdict, drt_verdict, health_verdict, engagement_verdict, waf_verdict)
+verdict = max(coverage_verdict, drt_verdict, health_verdict, engagement_verdict, waf_verdict, auto_response_verdict)
 ```
 
 If no findings (all dimensions OK), the verdict is **OK**.
@@ -443,6 +380,32 @@ FINDINGS:
   - [CONFIG_GAP] No health check on <protection> (Step 4)
   - [OK] CloudFront distributions auto-protected (Step 0a)
 REMEDIATION: <specific action per finding, or "None required" if OK>
+```
+
+**Pagination loop (mandatory for large accounts):** `ListProtections`
+returns at most 100 Protections per call. Drain ALL pages before
+classifying coverage:
+
+```text
+protections = []
+token = None
+loop:
+  resp = shield list-protections [--next-token token]
+  protections += resp.Protections
+  token = resp.NextToken
+  if token is None: break
+```
+
+A first-page-only read will FALSELY report page-2+ resources as
+UNPROTECTED. Always confirm `NextToken` is null before proceeding to
+Step 2.
+
+**Multi-region aggregation:** ALB/NLB/CLB/EIP Protections are regional.
+Run the full audit (Steps 1-7) per region and emit one FINDINGS block per
+region. The aggregate account-level verdict is the worst across all
+regions. CloudFront/Route 53 auto-protection is global — check it once.
+```text
+ACCOUNT-LEVEL VERDICT: worst(us-east-1, eu-west-1, ap-southeast-2, ...)
 ```
 
 ### Worked example — ALB protected but no DRT access, no health check
@@ -580,9 +543,23 @@ REMEDIATION:
   are borne by the customer.
 
 - NEVER overlook stale Protections referencing deleted resources. A
-  Protection whose `ResourceArn` points to a deleted ALB is dead weight.
-  The re-created ALB (new ARN) is UNPROTECTED. Always cross-reference
-  Protections against the live resource inventory.
+  Protection whose `ResourceArn` points to a deleted ALB is actively
+  dangerous, not just dead weight: it inflates the apparent coverage
+  count (dashboards show "10 Protections" but only 8 are live), it
+  silently fails during incident response because the DRT attempts to
+  mitigate a non-existent resource and wastes the critical first minutes
+  of an attack, and it masks the UNPROTECTED status of the re-created
+  resource. Always cross-reference Protections against the live resource
+  inventory and delete stale entries.
+
+- NEVER leave a stale Protection in place after resource recreation. When
+  an ALB/EIP is deleted and re-created (e.g., Terraform destroy/apply),
+  the old Protection still references the dead ARN. The operator assumes
+  coverage exists because the Protection name matches — but the live
+  resource is UNPROTECTED. The remediation is a two-step sequence: (1)
+  `DeleteProtection` on the stale entry, then (2) `CreateProtection` on
+  the new ARN. Skipping step 1 leaves orphaned Protections that pollute
+  future audits.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -703,6 +680,63 @@ Shield Advanced protection operates in two modes:
    resource must be individually added via `CreateProtection`. The
    `ListProtections` API returns these. Coverage gaps occur when resources
    are created without adding a Protection.
+
+### Non-obvious classification gotchas — detailed
+
+The one-liners in Step 0 summarize these; the full operational detail is
+here for agents that need the reasoning behind each classification call.
+
+- **DRT role trust policy principal.** The IAM role passed to
+  `AssociateDRTRole` must have a trust policy allowing
+  `service-role.shield.amazonaws.com` — not `shield.amazonaws.com`. The
+  Shield API does NOT validate the trust policy on association; it
+  accepts the role ARN silently. The failure surfaces only when the DRT
+  attempts `sts:AssumeRole` during a live attack and receives
+  `AccessDenied`. This is a silent NO_DRT_ACCESS that
+  `DescribeDRTAccess` reports as healthy (it returns the RoleArn).
+
+- **`AssociateHealthCheck` is write-only.** There is no Shield API to
+  list which health checks are associated with which Protections. You
+  MUST call `DescribeProtection` per Protection and read
+  `HealthCheckIds`. `route53 list-health-checks` lists all health checks
+  but does not indicate Shield associations. An auditor that assumes
+  "a health check exists in Route 53, therefore the protection is
+  covered" will produce false OK verdicts.
+
+- **EIP Protection uses the allocation ID.** The `ResourceArn` for an EIP
+  is `arn:aws:ec2:<region>:<account>:elastic-ip/eipalloc-xxx`. Using the
+  public IP or EC2 instance ARN fails silently — `CreateProtection`
+  accepts the string but the protection references a non-existent
+  resource. The DRT cannot mitigate a resource that doesn't resolve.
+  Verify via `aws ec2 describe-addresses` before creating.
+
+- **Cost-protection credits require health checks AND WAF.** Without
+  health-based detection, Shield cannot demonstrate to the cost-protection
+  team that the scaling was caused by a detected DDoS event. Without WAF
+  on an L7 attack, there is no mitigation record. Both are gating
+  conditions for credit approval — their absence is a financial risk,
+  not just a detection gap.
+
+- **Subscription auto-renewal trap.** `CreateSubscription` starts a
+  1-year term that auto-renews unless explicitly cancelled before the
+  renewal date. There is no proration. An account subscribed for a
+  one-time event (product launch, election night) that forgets to cancel
+  will be billed silently for year 2. The confirmation gate must surface
+  this.
+
+- **`DescribeDRTAccess` can return a stale RoleArn.** If the IAM role
+  referenced by `AssociateDRTRole` was deleted directly in IAM (not via
+  `DisassociateDRTRole`), the Shield API may still return the old
+  RoleArn. The DRT cannot assume a deleted role. This is a silent
+  NO_DRT_ACCESS — cross-reference the RoleArn against live IAM roles
+  using `iam get-role`.
+
+- **TAG-based Protection grouping is not coverage.** Shield Advanced has
+  no native resource-group or tag-based protection. Each Protection is a
+  1:1 mapping to a single `ResourceArn`. An operator who assumes "all
+  resources tagged `shield=protected` are covered" will miss any
+  resource without an explicit Protection entry. Do not infer coverage
+  from tags.
 
 ### DRT incident-response workflow
 

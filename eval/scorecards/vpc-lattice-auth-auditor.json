@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 18,
+      "score": 17,
       "max": 20,
-      "justification": "Adds many expert\u2011level specifics (default\u2011open auth\u2011policy, NotAction inverse\u2011wildcard semantics, cross\u2011account invoke always CONFIG_GAP even with strong conditions, IP target\u2011group risk, RAM share visibility vs. invocation, service\u2011level override behavior, strong vs. weak condition taxonomy). However, roughly 10\u201115% of the content repeats what a senior CloudOps engineer could already know (e.g., basic IAM intersection model), so full 20 is not awarded."
+      "justification": "Introduces several non\u2011trivial expert insights not commonly known to a baseline model: the default\u2011open nature of a missing auth policy, the inverse\u2011wildcard effect of NotAction, the rule that any cross\u2011account Invoke is always a CONFIG_GAP regardless of conditions, the detailed condition\u2011strength taxonomy, and the service\u2011level auth\u2011policy override semantics. These constitute genuine delta, though the core concepts (auth\u2011policy structure, IAM intersection) are already documented, so full 20 is not awarded."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific, ordered procedure: pre\u2011flight GetAuthPolicy, enumerate services, list RAM shares, classify principals, actions, and conditions, evaluate target groups, RAM shares, and service\u2011level overrides, then aggregate the worst finding. Includes concrete CLI commands and safety gates. Only a minor gap: it does not explicitly prescribe checking the caller's IAM identity\u2011based policy beyond a brief mention."
+      "justification": "Provides an AWS\u2011specific procedural flow: pre\u2011flight permission checks, pagination handling for list\u2011* calls, IAM simulation commands, explicit ordering of audit steps, and safety gates before state\u2011changing actions. The only shortfall is a minor lack of concrete pagination loop code (e.g., handling NextToken) and no explicit mention of rate\u2011limit back\u2011off beyond ThrottlingException, which prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never treat NO_AUTH_POLICY as OK, never ignore NotAction, never rely on security groups to replace auth policy). Lacks a few niche pitfalls such as forgetting to rotate backup auth\u2011policy files after changes, so a small deduction."
+      "justification": "Contains a comprehensive NEVER list with concrete reasoning (e.g., never treat NO_AUTH_POLICY as OK, never rely on Resource scoping, never ignore NotAction). The only weakness is the omission of a specific warning about stale auth\u2011policy backups after PutAuthPolicy failures, which is a subtle but real pitfall."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and an invocation schema are present. The schema is described in prose rather than a strict JSON schema, which could hinder automated parsing, so a small deduction is applied."
+      "justification": "Frontmatter is complete, activation triggers and invocation schema are well defined, and the description explains purpose and keywords. The \"when_to_use\" paragraph, while adequate, is slightly verbose and could be tighter for reliable activation, preventing a perfect score."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections (quick reference, pre\u2011flight, stepwise process, deep reference). However, the anti\u2011pattern and remediation sections are dense and could overwhelm a first\u2011pass reader, indicating slight over\u2011exposure of detail."
+      "justification": "The skill layers information logically: quick\u2011start summary first, then detailed steps, edge\u2011cases, anti\u2011patterns, safety checks, and deep expert knowledge. However, some critical rules (e.g., condition\u2011strength definitions) are buried in the middle sections, requiring a deeper scroll before a novice agent can act, causing a small deduction."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates tightly for destructive actions (confirmation gate, lockout prevention, backup policy) and leaves freedom for read\u2011only audits. Does not explicitly constrain DeleteServiceNetwork operations, a small gap."
+      "justification": "Calibrates freedom appropriately: destructive actions require double confirmation, backup of current policy, lockout prevention, and explicit guidance on eventual consistency. The only minor issue is that the remediation examples for NO_AUTH_POLICY assume same\u2011account only, not covering cross\u2011account scoped policies, leaving a tiny gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Edge cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation \u2192 Deep reference). Minor inconsistency in ordering of anti\u2011patterns vs. safety checks prevents a perfect score."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick\u2011start \u2192 Process \u2192 Output \u2192 Edge\u2011cases \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation \u2192 Expert knowledge). Section titles are slightly unconventional but the overall structure is coherent, losing only one point for minor ad\u2011hoc naming."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Model output demonstrates correct verdicts, error handling, and remediation steps; however, handling of partially malformed statements could be more detailed, and no explicit example of a malformed input is shown."
+      "justification": "The skill provides a clear decision tree, output format, worked examples, and remediation commands. It also covers error handling (malformed policy, API errors). The only shortfall is the absence of a concrete example of the offline JSON input shape, which could hinder immediate execution."
     }
   ],
-  "total_score": 107,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 38318,
-  "latency_ms": 11710,
+  "grade": "A",
+  "token_count": 40248,
+  "latency_ms": 8735,
   "assertions_passed": true,
   "assertions_passed_count": 6,
   "assertions_failed_count": 0

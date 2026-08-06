@@ -65,11 +65,12 @@ metadata:
     - "no auth policy on service network"
     - "vpc-lattice:Invoke exposure"
   invocation_schema: >-
-    Input: either (a) a VPC Lattice auth-policy JSON document optionally
-    paired with service-network metadata (associations, services, target
-    groups, RAM shares), OR (b) a service-network identifier for live-account
-    audit. Output: deterministic VERDICT block per service network, where
-    VERDICT is NO_AUTH_POLICY, PUBLIC_SERVICE_NETWORK, CONFIG_GAP, OK, or ERROR.
+    Input shape (one of): (a) auth-policy JSON + optional metadata
+    (associations, services, target groups, RAM shares) for offline
+    classification; (b) service-network identifier (sn-xxx) for live-account
+    audit. Output shape: { SERVICE_NETWORK, VERDICT, REASON, FINDINGS[],
+    REMEDIATION } where VERDICT ∈ { NO_AUTH_POLICY, PUBLIC_SERVICE_NETWORK,
+    CONFIG_GAP, OK, ERROR }.
 ---
 
 # VPC Lattice Auth Auditor
@@ -94,6 +95,18 @@ auth model differs from KMS or S3 in a critical way:
 - **Service-level auth policy overrides network-level.** A service can carry
   its OWN auth policy that silently replaces the service network's. A secure
   network-level policy is bypassed by a permissive service-level override.
+
+## Quick-start (90-second audit)
+
+For first-pass triage — full classification logic, edge cases, and remediation below.
+
+1. **Auth policy present?** `NOT_SET` → **NO_AUTH_POLICY** (default-open, worst verdict). Stop.
+2. **Any `Principal: "*"` with Invoke or `vpc-lattice:*` or `NotAction`?** → **PUBLIC_SERVICE_NETWORK**. Stop.
+3. **Any cross-account principal with Invoke?** → **CONFIG_GAP** (always, even with strong conditions). Stop.
+4. **IP targets outside VPC CIDR, RAM share without scoped policy, or permissive service-level override?** → **CONFIG_GAP**.
+5. **All dimensions clean?** → **OK**.
+
+Worst finding wins: NO_AUTH_POLICY > PUBLIC_SERVICE_NETWORK > CONFIG_GAP > OK.
 
 ## Quick reference — verdict matrix
 
@@ -131,6 +144,22 @@ Before evaluating the auth policy, classify the service network itself.
    A service network shared cross-account via RAM grants the consumer
    account visibility. If no auth policy gates the share, consumer VPC
    resources can invoke services.
+4. **Enumerate the caller's IAM identity-based policy.** For each principal
+   granted Invoke in the auth policy, run
+   `aws iam list-attached-role-policies --role-name <role>` and
+   `aws iam list-inline-role-policies --role-name <role>` to confirm the
+   intersection model actually permits invocation. An auth-policy Allow
+   without a corresponding IAM Allow means cross-account callers CANNOT
+   invoke (but same-account callers still can via union).
+5. **Handle pagination on all list-* calls.** `list-services`,
+   `list-target-groups`, and `list-resource-shares` may paginate. Use
+   `--no-paginate` or loop on `--starting-token` until `NextToken` is null.
+   Missing paginated results means missed services, missed target groups,
+   and a false OK verdict.
+6. **After any PutAuthPolicy remediation, wait for eventual consistency.**
+   Re-run `get-auth-policy` after 10 seconds to confirm the new policy is
+   `ACTIVE` — the API is eventually consistent and may return stale results
+   immediately after a write.
 
 | Attribute | Value | Effect on audit |
 |---|---|---|
@@ -153,89 +182,24 @@ REMEDIATION: Retrieve the canonical policy with aws vpc-lattice get-auth-policy 
 
 ## Process — Classification logic (apply in order, aggregate worst)
 
-### Step 0: Expert knowledge — non-obvious VPC Lattice behaviors that change classification
+### Step 0: Critical classification rules (see Expert Knowledge for depth)
 
-- **Auth policy absence is NOT "no access" — it is DEFAULT-OPEN.** VPC
-  Lattice service networks are created WITHOUT an auth policy. Unlike KMS
-  (always has a key policy) or S3 (default bucket policy), a Lattice service
-  network with no auth policy lets ANY resource in an associated VPC invoke
-  services. Operators assume "no policy = locked down." It means the opposite.
+- **No auth policy = DEFAULT-OPEN**, not locked down. Any resource in an
+  associated VPC can invoke. This drives Step 1.
+- **NotAction in an Allow = inverse wildcard.** Invoke is included. Treat
+  as INVOKE_ACCESS. This drives Rule 5b.
+- **Cross-account Invoke is ALWAYS CONFIG_GAP**, even with a STRONG
+  condition. Same-account + STRONG = OK (Rule 5h). This drives Step 5.
+- **Service-level auth policy silently overrides network-level.** Always
+  enumerate service-level policies independently. This drives Step 8.
+- **CloudTrail does NOT log `vpc-lattice:Invoke`** data-plane events.
+  Forensics need VPC Flow Logs, not CloudTrail.
+- **The `Resource` element is effectively ignored** in Lattice auth policies.
+  Use Principal and Condition to scope, never Resource.
 
-- **`vpc-lattice:Invoke` is the only action in the auth policy that
-  controls service invocation.** Management actions (CreateService,
-  DeleteService, PutAuthPolicy) are governed by IAM identity-based policy, NOT
-  the auth policy. An auth policy with `vpc-lattice:*` grants Invoke plus
-  read operations through the resource-based layer, but management actions
-  still require IAM. Do NOT flag `vpc-lattice:CreateService` in an auth
-  policy as a management-action finding — it is redundant (IAM controls it).
-
-- **Service-level auth policy overrides service-network auth policy.** If a
-  service has its OWN auth policy (set via `put-auth-policy --resource-arn
-  <service-arn>`), the service network's auth policy does NOT apply to that
-  service. A secure network policy is silently bypassed. Always enumerate
-  service-level policies independently.
-
-- **VPC association is ROUTING, not AUTH.** Associating a VPC with a service
-  network enables DNS resolution and traffic routing to services. It does
-  NOT restrict which resources can invoke — any resource in the associated
-  VPC can route to the service (unless an auth policy gates it). Treating
-  VPC association as a security boundary is a fundamental misread.
-
-- **RAM sharing grants VISIBILITY, not INVOCATION.** Sharing a service
-  network cross-account via RAM lets the consumer account list and describe
-  services. It does NOT grant `vpc-lattice:Invoke`. The consumer needs BOTH
-  the auth policy to Allow them AND IAM `vpc-lattice:Invoke` in their
-  identity-based policy. However, without an auth policy at all, the RAM
-  share + consumer VPC association is enough — there is no resource-based
-  gate.
-
-- **NotAction in an Allow auth policy is an inverse wildcard.**
-  `NotAction: ["vpc-lattice:Get*"]` grants every VPC Lattice action
-  INCLUDING Invoke except the listed read operations. Treat any NotAction in
-  an Allow as INVOKE_ACCESS — the caller can invoke services.
-
-- **Cross-account auth-policy evaluation is INTERSECTION-based.** For a
-  cross-account caller to invoke, BOTH the auth policy (resource-based) AND
-  the caller's IAM identity-based policy must Allow. This is the same
-  intersection model as S3 cross-account. For same-account callers, EITHER
-  suffices (union) — but ONLY if an auth policy exists.
-
-- **IP target groups can route to arbitrary IPs.** Unlike INSTANCE targets
-  (bound to EC2 ENIs in the VPC), IP targets can point to any IP —
-  cross-VPC, cross-account, or on-premises via Direct Connect. An IP target
-  group with targets outside the VPC CIDR is a potential exfiltration path
-  or routing black hole. Flag as CONFIG_GAP.
-
-- **Security group on the VPC association is the last network-level gate.**
-  VPC Lattice uses a security group attached to the VPC association to
-  control traffic between the Lattice data plane and targets. If this
-  security group allows `0.0.0.0/0` ingress, targets may be reachable from
-  unintended sources. Check it, but the auth policy is the primary auth
-  gate.
-
-- **Auth policies are NOT versioned.** Like KMS key policies, replacing a
-  Lattice auth policy is atomic and non-reversible without a backup file.
-  `PutAuthPolicy` replaces the entire document — no diff, no staged rollout.
-
-- **Service DNS names resolve in ALL associated VPCs.** A service that
-  should be private to one account may be DNS-resolvable and invocable from
-  a consumer account's VPC if the network is shared via RAM and the VPC is
-  associated. DNS visibility is NOT scoped by account.
-
-- **`aws:SourceVpc` and `aws:SourceVpce` are the strongest lattice-adjacent
-  conditions.** They are set by the VPC endpoint infrastructure and couple
-  invocation to a specific VPC or endpoint. `aws:SourceAccount` is also
-  strong. `aws:SourceIp` is WEAK — bypassable via NAT, proxy, or VPN.
-
-- **Cross-account invoke is ALWAYS at least CONFIG_GAP, even with a STRONG
-  condition.** This is the most common classification error: a cross-account
-  principal with `vpc-lattice:Invoke` and `aws:SourceAccount` looks "scoped"
-  but is still an external trust dependency. A policy edit, a deleted role,
-  or a compromised external account widens exposure. The STRONG condition
-  narrows the blast radius but does NOT eliminate the cross-account risk.
-  Same-account invoke with a STRONG condition is OK (Rule 5h). Cross-account
-  invoke with a STRONG condition is CONFIG_GAP (Rule 5d). The ONLY
-  difference is whether the principal is in the owning account or not.
+Full rationale and additional non-obvious behaviors in
+[Expert knowledge](#expert-knowledge-non-obvious-vpc-lattice-behaviors)
+at the end.
 
 ### Step 1: Auth-policy presence (highest priority — default-open exposure)
 
@@ -451,6 +415,38 @@ REMEDIATION:
   REASON: "Auth policy has no statements — all invocation is denied. Verify
   this is intentional."
 
+### Worked example — partially malformed auth policy
+
+```text
+SERVICE NETWORK: sn-0malformed1
+VERDICT: CONFIG_GAP
+REASON: One statement is valid and grants cross-account Invoke (CONFIG_GAP);
+two statements are malformed and cannot be classified (ERROR notes below).
+FINDINGS:
+  - [CONFIG_GAP] Statement "ExternalInvoke" grants vpc-lattice:Invoke to
+    arn:aws:iam::222222222222:role/consumer (Rule 5c)
+  - [ERROR] Statement "BrokenStmt1" is missing required field "Effect" —
+    cannot classify
+  - [ERROR] Statement "BrokenStmt2" is missing required field "Action" —
+    cannot classify
+REMEDIATION: Fix malformed statements by retrieving the canonical policy with
+  aws vpc-lattice get-auth-policy --resource-arn <arn> --output json. Address
+  the CONFIG_GAP finding by scoping or removing the cross-account principal.
+```
+
+Key rule: one malformed statement does NOT make the entire network ERROR.
+Classify valid statements normally, emit ERROR notes for malformed ones, and
+aggregate the worst valid finding as the verdict.
+
+- **API errors during live-account audit.** If `get-auth-policy` returns
+  `AccessDeniedException`, output VERDICT: ERROR with REMEDIATION noting the
+  caller lacks `vpc-lattice:GetAuthPolicy`. If `ThrottlingException` occurs,
+  retry with exponential backoff. If `ResourceNotFoundException`, the
+  service network may have been deleted mid-audit — note and skip.
+- **All CONFIG_GAP findings require a remediation ticket within 24 hours.**
+  Even scoped cross-account invoke is a fragile state — the auditor should
+  recommend a concrete fix, never defer with "acceptable risk."
+
 ## Anti-Patterns — NEVER
 
 - NEVER classify a service network with NO auth policy as OK or CONFIG_GAP.
@@ -517,6 +513,35 @@ REMEDIATION:
   targets, not who can invoke services through Lattice. They are
   complementary layers, not substitutes.
 
+- NEVER forget to archive backup auth-policy files after each change.
+  `PutAuthPolicy` is atomic with no version history and no rollback API.
+  Store the previous policy in a versioned location (S3 with versioning
+  enabled, git, or a secrets manager) before every replacement. A lost
+  backup means no recovery path — the only option is to reconstruct the
+  policy from memory or CloudTrail management-event logs.
+
+- NEVER assume `Resource: <specific-arn>` in a Lattice auth policy scopes
+  the grant. The policy is attached to a service network or service; the
+  Resource element is effectively ignored regardless of what you specify.
+  Setting Resource to a single service ARN gives a false sense of scoping.
+  Use Principal and Condition to restrict, not Resource.
+
+- NEVER rely on `aws:SourceIp` conditions in a Lattice auth policy. Lattice
+  proxies requests through its data plane, so the source IP is a Lattice
+  internal address — not the original caller's IP. A SourceIp condition
+  either matches unpredictably or blocks legitimate traffic. It is
+  architecturally unreliable, not merely weak.
+
+- NEVER skip IPv6 CIDR checks on target groups and security groups. Lattice
+  supports IPv6; an IP target group with IPv6 targets (::/0, fc00::/7) is
+  just as dangerous as IPv4 targets outside the VPC CIDR. Audit both
+  families.
+
+- NEVER ignore CloudWatch Lattice metrics during an audit window. A sudden
+  spike in `ProcessedBytes` or `4xxErrorCount` for a service may indicate
+  unauthorized invocation attempts. Correlate metrics with auth-policy
+  findings to prioritize remediation.
+
 ## Pre-flight safety checks (run before any remediation CLI)
 
 - **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
@@ -524,6 +549,13 @@ REMEDIATION:
   MUST emit:
   `CONFIRM: About to <action> on service network <id> in account <account>.
   This affects <consequence>. Proceed? (yes/no)`
+- **DeleteServiceNetwork is DESTRUCTIVE and NON-RECOVERABLE.** Deleting a
+  service network severs ALL VPC associations and routing — every service
+  in the network becomes unreachable instantly. There is no recycle bin.
+  The auditor MUST require a second confirmation for DeleteServiceNetwork
+  specifically, including a check that all associated VPCs and services
+  have been enumerated and acknowledged. Prefer disassociating individual
+  VPCs over deleting the network when scoping access.
 - **PutAuthPolicy lockout prevention.** The replacement auth policy MUST
   include at least one Allow statement for a principal in the owning
   account. An auth policy that denies the owning account is an instant
@@ -544,15 +576,30 @@ REMEDIATION:
 
 ### For NO_AUTH_POLICY — no auth policy (default-open)
 
-1. Create and attach an auth policy scoped to same-account principals:
+1. Create a scoped auth policy:
    `aws vpc-lattice put-auth-policy --resource-arn <sn-arn> --policy
    file://auth-policy.json`
-2. The policy should Allow `vpc-lattice:Invoke` only to specific same-account
-   role ARNs, with `aws:SourceVpc` or `aws:SourceAccount` conditions.
-3. Verify the policy is effective:
+2. Sample correct policy (same-account, SourceVpc-scoped):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::111111111111:role/app-service-role"},
+      "Action": "vpc-lattice:Invoke",
+      "Resource": "*",
+      "Condition": {"StringEquals": {"aws:SourceVpc": "vpc-0eee6666bbbb"}}
+    }
+  ]
+}
+```
+
+3. Verify the policy is effective (wait 10s for eventual consistency):
    `aws vpc-lattice get-auth-policy --resource-arn <sn-arn>`
-4. If cross-account access is required, add the consumer account's role ARN
-   with `aws:SourceAccount` condition.
+4. If cross-account is required, add the consumer role ARN with
+   `aws:SourceAccount` — but expect CONFIG_GAP verdict (external trust).
 
 ### For PUBLIC_SERVICE_NETWORK — wildcard Invoke (Rule 5a/5b)
 
@@ -594,72 +641,94 @@ REMEDIATION:
 3. Recommend adding a Deny on `aws:SecureTransport: false` for defense in
    depth.
 
+## Expert knowledge: non-obvious VPC Lattice behaviors
+
+These are operational gotchas and silent failures that are NOT in AWS docs
+or require hard-won production experience to discover.
+
+- **Auth policy absence is DEFAULT-OPEN.** VPC Lattice service networks are
+  created WITHOUT an auth policy. Unlike KMS or S3, no auth policy means ANY
+  resource in an associated VPC can invoke. Operators assume "no policy =
+  locked down." It means the opposite.
+
+- **`vpc-lattice:Invoke` is the only auth-policy action controlling
+  invocation.** Management actions (CreateService, PutAuthPolicy) are
+  IAM-gated, not auth-policy-gated. An auth policy with `vpc-lattice:*`
+  grants Invoke but management actions still require IAM.
+
+- **VPC association is ROUTING, not AUTH.** Associating a VPC enables DNS
+  resolution and routing. It does NOT restrict invocation — any resource in
+  the associated VPC can route to services. Treating VPC association as a
+  security boundary is a fundamental misread.
+
+- **RAM sharing grants VISIBILITY, not INVOCATION.** The consumer needs BOTH
+  the auth policy to Allow them AND IAM `vpc-lattice:Invoke`. Without an
+  auth policy, the RAM share + VPC association is sufficient (no
+  resource-based gate).
+
+- **Cross-account auth-policy evaluation is INTERSECTION-based.** Both auth
+  policy AND caller's IAM must Allow (same as S3). Same-account: EITHER
+  suffices (union) — but only if an auth policy exists.
+
+- **IP target groups route to arbitrary IPs.** Unlike INSTANCE targets
+  (bound to VPC ENIs), IP targets point anywhere — cross-VPC, cross-account,
+  on-premises. Targets outside the VPC CIDR are a potential exfiltration path.
+
+- **Auth policies are NOT versioned.** `PutAuthPolicy` replaces the entire
+  document atomically — no diff, no staged rollout, no rollback API.
+
+- **Service DNS names resolve in ALL associated VPCs.** A service private to
+  one account is DNS-resolvable from a consumer account's VPC if the network
+  is RAM-shared. DNS visibility is NOT scoped by account.
+
+- **`aws:SourceVpc`/`aws:SourceVpce` are the strongest conditions.** Set by
+  VPC endpoint infrastructure; caller cannot forge. `aws:SourceAccount` is
+  strong. `aws:SourceIp` is architecturally unreliable for Lattice (see
+  anti-patterns).
+
+- **`PutAuthPolicy` is eventually consistent.** GetAuthPolicy may return
+  stale results for seconds after a write. No state-transition event exists.
+
+- **Auth policy has no DryRun or validation API.** You cannot validate a
+  policy document before putting it. A syntax-valid but semantically broken
+  policy (e.g., denying the owning account) takes effect immediately with
+  no preview. Always test in a non-production service network first.
+
+- **Deny statements override Allow in the same auth policy.** A Deny on
+  `Principal: "*"` with `aws:SecureTransport: false` blocks non-TLS but does
+  NOT restrict TLS from a wildcard principal — the Allow still applies for
+  TLS traffic. Deny+Allow overlap on Invoke requires explicit Deny of the
+  principal/action, not a condition-based Deny.
+
 ## Deep reference: Lattice authorization
 
-### Authorization evaluation pipeline
+### Authorization evaluation pipeline (condensed)
 
-VPC Lattice evaluates an invocation request in this order:
+Request flow: routing (associated VPC resolves DNS) → auth policy (if absent,
+default-open ALLOW) → IAM intersection (cross-account) or union (same-account)
+→ target forwarding (security group on VPC association is last network gate).
 
-1. **Routing** — the request arrives at a Lattice endpoint via an associated
-   VPC. The service DNS name resolves to the Lattice data-plane IP.
-2. **Auth policy evaluation** — if an auth policy exists on the service
-   (or inherited from the service network), the caller's principal is
-   evaluated against it. If no auth policy, the request is allowed
-   (default-open).
-3. **IAM identity-based policy** — for cross-account callers, both the auth
-   policy AND the caller's IAM policy must Allow. For same-account callers,
-   either suffices if an auth policy exists.
-4. **Target forwarding** — the request is forwarded to the target group.
-   The security group on the VPC association controls network-level access
-   to the targets.
+### Cross-account intersection model (condensed)
 
-### Cross-account intersection model
+Cross-account invocation requires BOTH the auth policy AND the caller's IAM
+identity-based policy to Allow (intersection, same as S3). Same-account
+callers need EITHER to Allow (union) — but only if an auth policy exists.
+Without an auth policy, only IAM matters (default-open). **The caller's IAM
+identity-based policy is a mandatory audit dimension.**
 
-For a cross-account caller to invoke a service through Lattice:
-- The auth policy must include an Allow statement for the caller's principal.
-- The caller's IAM identity-based policy must include `vpc-lattice:Invoke`.
-- Both must Allow — this is the intersection model (same as S3 cross-account).
+Concrete verification: for each cross-account principal granted Invoke in
+the auth policy, run:
+`aws iam simulate-principal-policy --policy-source-arn <caller-role-arn>
+--action-names vpc-lattice:Invoke --resource-arns <sn-arn>`
+If `EvalDecision` is `allowed`, the intersection permits invocation. If
+`implicitDeny`, the auth-policy Allow is inert — the caller CANNOT invoke
+despite being listed.
 
-For same-account callers:
-- If an auth policy exists, EITHER the auth policy OR the IAM policy can
-  Allow (union) — same as KMS with the root-of-trust statement.
-- If NO auth policy exists, only the IAM policy matters (default-open).
+### Auth policy vs IAM policy scope (key differences)
 
-### Auth policy vs IAM policy scope
-
-| Dimension | Auth policy (resource-based) | IAM identity-based policy |
-|---|---|---|
-| Attached to | Service network or service | IAM role/user/group |
-| Controls | Who can invoke via Lattice | What the caller can do in AWS |
-| Default | NOT_SET (absent = open) | Must be explicit (absent = deny) |
-| Cross-account | Intersection with IAM | Intersection with auth policy |
-| Versioning | None (atomic replace) | Managed policies: 10 versions |
-
-## Recent AWS features (2024-2026)
-
-- **Service-level auth policies GA (2024):** Services can now have their own
-  auth policies that override the service network's. Auditors must check
-  each service independently — a secure network policy can be silently
-  bypassed by a permissive service-level override.
-- **Cross-zone and cross-region routing enhancements (2024-2025):** VPC
-  Lattice now supports routing across VPCs in different Availability Zones
-  and Regions via Transit Gateway integration. Auditors should verify that
-  cross-region routing does not unintentionally expose services to VPCs in
-  other regions.
-- **IPv6 support (2025):** VPC Lattice now supports IPv6 for service
-  communication. Auditors should verify that security groups and network
-  ACLs cover both IPv4 and IPv6 ranges — an IPv6-only security group rule
-  may miss IPv4 traffic (and vice versa).
-- **Enhanced observability with CloudWatch metrics (2025):** VPC Lattice
-  now emits per-service and per-listener CloudWatch metrics including
-  request count, latency, and 4xx/5xx error rates. Auditors should verify
-  that anomalous invocation spikes (potential unauthorized access) trigger
-  alarms.
-- **Gateway Load Balancer integration (2025-2026):** VPC Lattice can now
-  route traffic through GWLB for inline security inspection. Auditors should
-  verify that the GWLB insertion point does not bypass the auth policy —
-  the auth policy is evaluated before the request reaches the target, but
-  GWLB inspection occurs in the data plane.
+Auth policy: attached to service network/service, default NOT_SET (absent =
+open), no versioning (atomic replace). IAM identity-based policy: attached
+to role/user, default deny, managed policies support 10 versions.
 
 ## Domain
 

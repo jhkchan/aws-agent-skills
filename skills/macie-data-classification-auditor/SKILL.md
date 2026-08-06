@@ -78,6 +78,21 @@ metadata:
 
 # Macie Data Classification Auditor
 
+## Quick-start
+
+1. **Scanning?** Session ENABLED + at least one active job (RUNNING/COMPLETE)
+   or ASDD ENABLED. If neither → **NO_CLASSIFICATION**.
+2. **Triaged?** Zero open (`archived: false`) HIGH-severity findings. If
+   any exist → **UNTRIAGED_FINDINGS**.
+3. **Plumbing?** Security Hub export on, allow-list scoped (no wildcards),
+   no active auto-archive filter, ASDD fresh (<48h). If any gap →
+   **CONFIG_GAP**.
+4. **All pass?** → **OK**.
+
+Deep Macie behaviors, edge cases, and non-obvious failure modes are in
+the [Reference — Expert knowledge](#reference--expert-knowledge--non-obvious-macie-behaviors)
+section at the end.
+
 ## Mindset
 
 **One-line takeaway:** the verdict flows from coverage to action to
@@ -143,6 +158,16 @@ attributes short-circuit the audit.
 independent session, jobs, findings, and configuration. A clean posture
 in us-east-1 tells you nothing about ap-southeast-1. For live-account
 audits, iterate `get-macie-session` per region and audit each separately.
+If a region's snapshot is incomplete (missing session, jobs, or findings
+fields), emit `VERDICT: ERROR` for that region only — do not let one
+region's missing data invalidate the audit of other regions.
+
+**Pagination and IAM notes:** `list-findings` and `list-classification-jobs`
+return paginated results. Use `--max-results` and `--next-token` to
+enumerate all entries. An `AccessDeniedException` on any Macie API call
+usually means the Macie service-linked role is missing or the principal
+lacks `macie2:*` permissions — emit `VERDICT: ERROR` with the IAM error
+rather than guessing at the posture.
 
 **If the posture snapshot is malformed** (missing required fields:
 session status, job list, or findings summary), output:
@@ -157,77 +182,12 @@ integration data. See the live-account commands in the Remediation section.
 
 ## Process — Classification logic (apply in order, first match wins)
 
-### Step 0: Expert knowledge — non-obvious Macie behaviors
-
-These behaviors are easy to misjudge without operational Macie experience.
-Each changes a verdict if ignored:
-
-- **ASDD does probabilistic sampling, not full scans.** Automated
-  sensitive data discovery samples objects in each bucket — it does NOT
-  scan every object. A bucket "covered by ASDD" may have sensitive data
-  that the sampling window missed. Only a classification job with
-  `samplingPercentage: 100` guarantees every object is checked. Do NOT
-  treat ASDD-enabled as equivalent to full job coverage for
-  compliance-driven audits (PCI-DSS, HIPAA, GDPR).
-
-- **`jobStatus: USER_CANCELLED` produces partial results — a silent blind
-  spot.** When an operator cancels a job mid-scan, findings exist for the
-  objects already scanned, but the unscanned majority is never checked.
-  A job in `USER_CANCELLED` is NOT active. A `FAILED` job (system
-  cancelled, often throttling or IAM permission drift) similarly produces
-  partial or no results. Only `RUNNING` and `COMPLETE` count as active.
-
-- **`initialRun: false` on a new classification job creates a 24h+ blind
-  spot.** The first scan does not run until the next scheduled interval.
-  A daily job created at 09:00 with `initialRun: false` will not scan
-  until 09:00 the next day. During that window, sensitive data uploaded
-  to the target bucket is invisible to Macie.
-
-- **Findings `severity` is about the data TYPE, not volume.** A single
-  HIGH finding with `count: 1_000_000` represents one exposure point
-  (one data type in one bucket), not "a million findings." Severity
-  follows the managed-data-identifier category: `AWS_CREDENTIALS`,
-  `CREDIT_CARD_NUMBER`, `US_SOCIAL_SECURITY_NUMBER` are HIGH; email
-  addresses and names are typically MEDIUM. Do not escalate severity
-  based on count alone.
-
-- **`archived: true` is "marked as read," NOT "remediated."** Archiving a
-  finding in Macie is a bookkeeping action — the sensitive data is still
-  in the bucket. An archived HIGH finding still represents real PII or
-  credentials at rest. Only treat archived findings as "triaged" when
-  accompanied by evidence of investigation (annotation, ticket reference,
-  or verified data removal). For the verdict logic, `archived: false`
-  findings with severity HIGH are the UNTRIAGED_FINDINGS trigger.
-
-- **Security Hub export is NOT retroactive.** Enabling the integration
-  only pushes NEW findings to Security Hub. Pre-existing findings
-  generated before the integration was enabled do NOT appear in Security
-  Hub automatically. They must be exported manually via
-  `aws macie2 export-findings`.
-
-- **`bucket_allow_list` with wildcard prefixes silently masks future
-  sensitive data.** An allow-list entry like `s3://data-lake/logs/*`
-  tells Macie to never scan that prefix. If someone later stores PII in
-  `s3://data-lake/logs/exports/`, it will never be detected. The
-  allow-list should be scoped to specific object paths, not wildcards.
-
-- **`findingsFilters` with `action: ARCHIVE` auto-suppress findings.** A
-  findings filter can automatically archive findings matching criteria
-  (e.g., all MEDIUM findings in a specific bucket). This is useful for
-  known false positives but can also hide real findings from operators.
-  An active ARCHIVE filter is a CONFIG_GAP — it reduces visibility.
-
-- **Macie charges per GB scanned.** Classification jobs bill by data
-  volume. A full scan of a 100 TB data lake costs significantly more than
-  a 1% sample. The allow-list and job scoping (bucket criteria) control
-  cost. A job with `samplingPercentage: 1` on a large bucket is
-  cost-optimised but can miss sensitive data in the other 99%.
-
-- **Managed data identifiers cannot be disabled per-job.** Every
-  classification job runs all managed identifiers (150+ patterns). You
-  cannot tell Macie "skip credit card detection on this job." To suppress
-  specific managed-identifier findings, use a findings filter or
-  allow-list, not job configuration.
+> **Expert knowledge:** non-obvious Macie behaviors that change verdicts
+> (ASDD sampling, USER_CANCELLED partial results, initialRun blind spots,
+> Security Hub non-retroactivity, cost traps) are documented in the
+> [Reference — Expert knowledge](#reference--expert-knowledge--non-obvious-macie-behaviors)
+> section at the end of this skill. Consult it when a verdict is
+> borderline or an edge case is not covered by the steps below.
 
 ### Step 1: Classification coverage check (NO_CLASSIFICATION gate)
 
@@ -351,6 +311,9 @@ FINDINGS:
   - [OK] ASDD enabled, classification job in COMPLETE status (Step 1)
   - [OK] Security Hub export enabled (Step 3a)
 REMEDIATION:
+  CONFIRM: About to rotate IAM access key and archive findings in account
+  333333333333 (us-east-1). This affects the exposed credential and 3
+  findings. Proceed? (yes/no)
   1. Immediately investigate the AWS credential finding — rotate the
      exposed key: aws iam list-access-keys --user-name <user>, then
      aws iam delete-access-key --access-key-id <AKIA...> --user-name <user>.
@@ -408,8 +371,12 @@ REMEDIATION:
 - NEVER overlook `findingsFilters` with `action: ARCHIVE`. These filters
   auto-suppress findings before operators see them. A filter matching
   "all findings in bucket X" can hide an entire bucket's worth of
-  sensitive data discoveries. Always enumerate active filters during the
-  audit.
+  sensitive data discoveries. Concrete example: an ARCHIVE filter set to
+  suppress MEDIUM-severity findings in `s3://app-logs/` will also
+  suppress a HIGH-severity AWS credential finding that Macie
+  mis-categorised as MEDIUM due to context scoring — the SOC never sees
+  the exposed key. Always enumerate active filters during the audit and
+  cross-reference each filter's criteria against the full severity range.
 
 - NEVER treat Macie findings as real-time. Even with ASDD, there is a
   latency (up to 24 hours) between when sensitive data is uploaded to S3
@@ -544,6 +511,112 @@ REMEDIATION:
   captured in log entries (e.g., query-string parameters containing
   tokens). Auditors should verify that access-log buckets are in scope
   for classification jobs.
+
+## Reference — Expert knowledge — non-obvious Macie behaviors
+
+These behaviors are easy to misjudge without operational Macie experience.
+Each changes a verdict if ignored:
+
+- **ASDD does probabilistic sampling, not full scans.** Automated
+  sensitive data discovery samples objects in each bucket — it does NOT
+  scan every object. A bucket "covered by ASDD" may have sensitive data
+  that the sampling window missed. Only a classification job with
+  `samplingPercentage: 100` guarantees every object is checked. Do NOT
+  treat ASDD-enabled as equivalent to full job coverage for
+  compliance-driven audits (PCI-DSS, HIPAA, GDPR).
+
+- **`samplingPercentage` uses deterministic interval sampling, not
+  random.** At `samplingPercentage: 25`, Macie selects every 4th object
+  in S3 ListObjects order — the same objects on every run. Newly
+  uploaded data that lands between sampled intervals is persistently
+  missed across runs. An attacker who knows the sampling cadence can
+  place sensitive data in the non-sampled positions. For
+  compliance-driven audits, only `samplingPercentage: 100` eliminates
+  this blind spot.
+
+- **`jobStatus: USER_CANCELLED` produces partial results — a silent blind
+  spot.** When an operator cancels a job mid-scan, findings exist for the
+  objects already scanned, but the unscanned majority is never checked.
+  A job in `USER_CANCELLED` is NOT active. A `FAILED` job (system
+  cancelled, often throttling or IAM permission drift) similarly produces
+  partial or no results. Only `RUNNING` and `COMPLETE` count as active.
+
+- **`initialRun: false` on a new classification job creates a 24h+ blind
+  spot.** The first scan does not run until the next scheduled interval.
+  A daily job created at 09:00 with `initialRun: false` will not scan
+  until 09:00 the next day. During that window, sensitive data uploaded
+  to the target bucket is invisible to Macie.
+
+- **Findings `severity` is about the data TYPE, not volume.** A single
+  HIGH finding with `count: 1_000_000` represents one exposure point
+  (one data type in one bucket), not "a million findings." Severity
+  follows the managed-data-identifier category: `AWS_CREDENTIALS`,
+  `CREDIT_CARD_NUMBER`, `US_SOCIAL_SECURITY_NUMBER` are HIGH; email
+  addresses and names are typically MEDIUM. Do not escalate severity
+  based on count alone.
+
+- **The `count` field is per-object occurrences, not object or finding
+  count.** A finding showing `count: 45000` for
+  `US_SOCIAL_SECURITY_NUMBER` means 45,000 SSN matches were detected in
+  a single S3 object (e.g., one large CSV). It does NOT mean 45,000
+  findings or 45,000 objects. A bucket with 10,000 objects each
+  containing 5 SSNs produces one finding with `count: 50000`, not
+  10,000 findings. When triaging, investigate the object itself, not
+  the count magnitude.
+
+- **Classification jobs silently truncate on very large datasets.** Macie
+  does not error when a job's data volume exceeds internal processing
+  limits; the job reaches `COMPLETED` status but processes fewer objects
+  than exist. Compare `statistics.numberOfBytesProcessed` against the
+  total bucket size — a significant gap means objects were skipped. For
+  data lakes exceeding ~1 TB per bucket, scope jobs to individual prefix
+  levels rather than entire buckets.
+
+- **Custom data identifiers silently no-op if the regex is too complex.**
+  A CDI with a regex near or beyond the internal complexity threshold
+  (nested quantifiers, deep backtracking) will be accepted by the API but
+  produce zero findings on every object — with no error in job
+  statistics. A CDI that works in testing on small files may silently
+  fail on large production objects. Always validate CDIs against
+  realistic object sizes and verify expected match counts in test runs.
+
+- **`archived: true` is "marked as read," NOT "remediated."** Archiving a
+  finding in Macie is a bookkeeping action — the sensitive data is still
+  in the bucket. An archived HIGH finding still represents real PII or
+  credentials at rest. Only treat archived findings as "triaged" when
+  accompanied by evidence of investigation (annotation, ticket reference,
+  or verified data removal). For the verdict logic, `archived: false`
+  findings with severity HIGH are the UNTRIAGED_FINDINGS trigger.
+
+- **Security Hub export is NOT retroactive.** Enabling the integration
+  only pushes NEW findings to Security Hub. Pre-existing findings
+  generated before the integration was enabled do NOT appear in Security
+  Hub automatically. They must be exported manually via
+  `aws macie2 export-findings`.
+
+- **`bucket_allow_list` with wildcard prefixes silently masks future
+  sensitive data.** An allow-list entry like `s3://data-lake/logs/*`
+  tells Macie to never scan that prefix. If someone later stores PII in
+  `s3://data-lake/logs/exports/`, it will never be detected. The
+  allow-list should be scoped to specific object paths, not wildcards.
+
+- **`findingsFilters` with `action: ARCHIVE` auto-suppress findings.** A
+  findings filter can automatically archive findings matching criteria
+  (e.g., all MEDIUM findings in a specific bucket). This is useful for
+  known false positives but can also hide real findings from operators.
+  An active ARCHIVE filter is a CONFIG_GAP — it reduces visibility.
+
+- **Macie charges per GB scanned.** Classification jobs bill by data
+  volume. A full scan of a 100 TB data lake costs significantly more than
+  a 1% sample. The allow-list and job scoping (bucket criteria) control
+  cost. A job with `samplingPercentage: 1` on a large bucket is
+  cost-optimised but can miss sensitive data in the other 99%.
+
+- **Managed data identifiers cannot be disabled per-job.** Every
+  classification job runs all managed identifiers (150+ patterns). You
+  cannot tell Macie "skip credit card detection on this job." To suppress
+  specific managed-identifier findings, use a findings filter or
+  allow-list, not job configuration.
 
 ## Domain
 

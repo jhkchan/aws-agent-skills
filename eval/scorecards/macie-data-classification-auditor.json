@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 18,
       "max": 20,
-      "justification": "Adds many expert Macie nuances (e.g., USER_CANCELLED partial results, initialRun false blind spot, ASDD sampling caveats, archived not remediated, wildcard allow\u2011list risks). However, a portion restates information a competent model already knows and omits deeper thresholds such as exact samplingPercentage implications, so not a full 20."
+      "justification": "Adds specific thresholds (90\u2011day job age, 48\u2011hour ASDD staleness), deterministic sampling behavior, wildcard allow\u2011list detection, auto\u2011archive filter impact, recent 2024\u20112026 feature changes, and detailed edge\u2011case handling not present in baseline model knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes an exact AWS\u2011specific audit flow (pre\u2011flight session status, per\u2011region iteration, active job definition, severity check, config\u2011gap checks) and provides concrete CLI remediation commands. Lacks explicit guidance for pagination or IAM permission error handling, costing one point."
+      "justification": "Specifies AWS\u2011specific audit flow, pagination handling, IAM error handling, region\u2011by\u2011region iteration, and exact CLI commands. Lacks a step\u2011by\u2011step org\u2011admin delegation verification, which would make it fully comprehensive."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with reasons, but the rationale for auto\u2011archive filters is brief (\u201chides findings\u201d) and lacks a concrete impact example or mitigation strategy, making the anti\u2011pattern guidance less actionable."
+      "justification": "Contains a comprehensive NEVER list with concrete reasons (e.g., never treat FAILED jobs as active, never assume archived = remediated, never rely on ASDD for compliance), only missing a few niche pitfalls such as cost\u2011trap specifics for multi\u2011TB scans."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. The only shortfall is a slightly vague \"when_to_use\" narrative that could be tighter for deterministic activation."
+      "justification": "Complete frontmatter, clear description, precise activation triggers, and a well\u2011defined invocation schema. Slight vagueness in the 'when_to_use' prose could be tighter, preventing a perfect score."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered into sections, but the top of the document front\u2011loads a large amount of detail (expert knowledge, full tables) before the concise high\u2011level summary, causing potential cognitive overload for quick look\u2011ups."
+      "justification": "Layers information effectively: quick\u2011start, then detailed steps, then deep expert reference. Some users may need to scroll through long sections to find the top\u2011level rule, but overall overload is limited."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive remediation steps are gated by a recommended confirmation prompt, yet the skill does not enforce or embed that prompt in the example outputs, leaving a small freedom\u2011calibration gap for risky actions."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts; creative tasks (e.g., cost estimation) are left open. No over\u2011constraining of benign operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset \u2192 Steps \u2192 Output \u2192 Anti\u2011Patterns \u2192 Remediation) but deviates from the canonical \"Mindset, Navigation, Philosophy, Process, Tool\" pattern, making the overall pattern slightly ad\u2011hoc."
+      "justification": "Follows a recognizable structure (quick\u2011start \u2192 mindset \u2192 process \u2192 output \u2192 anti\u2011patterns \u2192 safety \u2192 remediation \u2192 recent features). Minor deviation in ordering of sections but overall coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides working examples, decision tree, and CLI commands, but lacks explicit handling for malformed multi\u2011region snapshots, missing allow\u2011list entries, and does not demonstrate the mandatory confirmation gate in the sample remediation flow, leaving edge\u2011case execution uncertain."
+      "justification": "Model output matches required format, includes correct verdict logic, lists findings, and provides actionable CLI remediation; handles error cases and pagination notes."
     }
   ],
-  "total_score": 107,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 33149,
-  "latency_ms": 27234,
-  "assertions_passed": false,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 1
+  "grade": "A",
+  "token_count": 36862,
+  "latency_ms": 17562,
+  "assertions_passed": true,
+  "assertions_passed_count": 6,
+  "assertions_failed_count": 0
 }
