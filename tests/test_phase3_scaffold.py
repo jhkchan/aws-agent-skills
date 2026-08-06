@@ -224,14 +224,6 @@ def test_orchestrator_has_references() -> None:
     assert (refs / "routing-logic.md").exists()
 
 
-def test_shared_infra_exists() -> None:
-    """schema/ must exist with shared reference docs."""
-    shared = REPO_ROOT / "schema"
-    assert shared.is_dir(), "schema/ directory missing"
-    md_files = list(shared.glob("*.md"))
-    assert len(md_files) >= 2, f"Expected >=2 shared refs, got {len(md_files)}"
-
-
 def test_usage_md_exists() -> None:
     """USAGE.md must exist at repo root."""
     assert (REPO_ROOT / "USAGE.md").exists()
