@@ -8,4 +8,3 @@ Inbound rules:
     Protocol: TCP
     Source: 10.0.0.0/8
 
-Expected verdict: RESTRICTED

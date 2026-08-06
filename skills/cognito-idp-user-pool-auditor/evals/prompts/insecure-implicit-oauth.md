@@ -1,6 +1,5 @@
 # Eval prompt: insecure-implicit-oauth
 
-**Expected verdict:** INSECURE
 **Difficulty:** medium
 **Branch:** Rule 1b — implicit OAuth overrides otherwise strong controls
 

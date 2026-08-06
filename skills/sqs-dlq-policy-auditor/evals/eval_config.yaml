@@ -10,7 +10,7 @@
 skill_name: sqs-dlq-policy-auditor
 snapshot_date: "2026-08-05"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -39,7 +39,7 @@ evals:
     prompt_file: prompts/config-gap-maxreceive-one.md
     baseline_file: baselines/config-gap-maxreceive-one.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: ok-clean-config
     difficulty: easy
     prompt_file: prompts/ok-clean-config.md

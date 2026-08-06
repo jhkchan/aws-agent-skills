@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
   "skill": "codedeploy-deployment-group-auditor",
   "version": "1.0.0",
   "description": "Structured eval definitions for the CodeDeploy Deployment Group Auditor. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",

@@ -1,6 +1,5 @@
 # Eval prompt: insecure-no-mfa-weak-password
 
-**Expected verdict:** INSECURE
 **Difficulty:** easy
 **Branch:** Rule 1a + 1c + 1d — multiple critical deficiencies
 

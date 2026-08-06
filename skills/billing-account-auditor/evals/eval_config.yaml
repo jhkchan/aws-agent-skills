@@ -10,7 +10,7 @@
 skill_name: billing-account-auditor
 snapshot_date: "2026-08-04"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -33,7 +33,7 @@ evals:
     prompt_file: prompts/no-anomaly-detection.md
     baseline_file: baselines/no-anomaly-detection.md
     expected_verdict: NO_ANOMALY_DETECTION
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: config-gap-no-budgets
     difficulty: easy
     prompt_file: prompts/config-gap-no-budgets.md

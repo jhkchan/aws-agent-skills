@@ -1,6 +1,5 @@
 # Eval: tor-on-public-alb
 
-**Expected verdict:** LIKELY_FALSE_POSITIVE
 **Difficulty:** hard
 **Branch:** Step 1 / FP-4 — expected Tor traffic on public-facing service
 

@@ -1,6 +1,5 @@
 # Eval: port-probe-low
 
-**Expected verdict:** LOW
 **Difficulty:** easy
 **Branch:** Step 5 — reconnaissance, low impact (default numeric banding)
 

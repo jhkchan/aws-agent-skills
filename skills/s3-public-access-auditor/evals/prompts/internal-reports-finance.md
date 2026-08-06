@@ -1,6 +1,5 @@
 # Eval: internal-reports-finance
 
-**Expected verdict:** AMBIGUOUS
 **Difficulty:** hard
 **Branch:** Rule 4 — condition-restricted wildcard (strong VPCe condition)
 

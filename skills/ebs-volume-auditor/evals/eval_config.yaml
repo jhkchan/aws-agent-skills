@@ -10,7 +10,7 @@
 skill_name: ebs-volume-auditor
 snapshot_date: "2026-08-04"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -33,13 +33,13 @@ evals:
     prompt_file: prompts/unattached-volume-cost-waste.md
     baseline_file: baselines/unattached-volume-cost-waste.md
     expected_verdict: UNATTACHED
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: stale-snapshot-no-consumer
     difficulty: hard
     prompt_file: prompts/stale-snapshot-no-consumer.md
     baseline_file: baselines/stale-snapshot-no-consumer.md
     expected_verdict: STALE_SNAPSHOT
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: legacy-type-gp2-volume
     difficulty: easy
     prompt_file: prompts/legacy-type-gp2-volume.md

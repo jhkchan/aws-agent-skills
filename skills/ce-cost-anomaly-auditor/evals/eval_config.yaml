@@ -10,7 +10,7 @@
 skill_name: ce-cost-anomaly-auditor
 snapshot_date: "2026-08-04"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -33,19 +33,19 @@ evals:
     prompt_file: prompts/low-ri-coverage-steady-state.md
     baseline_file: baselines/low-ri-coverage-steady-state.md
     expected_verdict: LOW_RI_COVERAGE
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: immediate-monitor-weekly-subscription
     difficulty: hard
     prompt_file: prompts/immediate-monitor-weekly-subscription.md
     baseline_file: baselines/immediate-monitor-weekly-subscription.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: daily-only-no-cur
     difficulty: hard
     prompt_file: prompts/daily-only-no-cur.md
     baseline_file: baselines/daily-only-no-cur.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: well-configured-production
     difficulty: easy
     prompt_file: prompts/well-configured-production.md

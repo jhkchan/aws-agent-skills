@@ -1,6 +1,5 @@
 # Eval: app-data-prod
 
-**Expected verdict:** SAFE
 **Difficulty:** medium
 **Branch:** Rule 1 — BPA authoritative (Deny policy is a red herring)
 

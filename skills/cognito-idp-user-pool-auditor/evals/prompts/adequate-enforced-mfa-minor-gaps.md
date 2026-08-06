@@ -1,6 +1,5 @@
 # Eval prompt: adequate-enforced-mfa-minor-gaps
 
-**Expected verdict:** ADEQUATE
 **Difficulty:** hard
 **Branch:** Rule 3a + 3e — ASF not enforced, SMS-only MFA
 

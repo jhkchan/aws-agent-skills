@@ -10,7 +10,7 @@
 skill_name: budgets-auditor
 snapshot_date: "2026-08-04"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -39,7 +39,7 @@ evals:
     prompt_file: prompts/single-threshold-actual-only.md
     baseline_file: baselines/single-threshold-actual-only.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: well-configured-with-zero-spend
     difficulty: easy
     prompt_file: prompts/well-configured-with-zero-spend.md
@@ -51,4 +51,4 @@ evals:
     prompt_file: prompts/new-account-no-zero-spend.md
     baseline_file: baselines/new-account-no-zero-spend.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE

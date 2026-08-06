@@ -1,6 +1,5 @@
 # Eval: backup-exports
 
-**Expected verdict:** SAFE
 **Difficulty:** easy
 **Branch:** Rule 1 — BPA authoritative, no public configs
 

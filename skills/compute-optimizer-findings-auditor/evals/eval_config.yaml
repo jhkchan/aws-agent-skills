@@ -9,7 +9,7 @@
 skill_name: compute-optimizer-findings-auditor
 snapshot_date: "2026-08-04"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -38,13 +38,13 @@ evals:
     prompt_file: prompts/lambda-overprovisioned-memory.md
     baseline_file: baselines/lambda-overprovisioned-memory.md
     expected_verdict: UNDERUTILIZED
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: ec2-overprovisioned-low-confidence-inferred-memory
     difficulty: hard
     prompt_file: prompts/ec2-overprovisioned-low-confidence-inferred-memory.md
     baseline_file: baselines/ec2-overprovisioned-low-confidence-inferred-memory.md
     expected_verdict: NOT_OPTIMIZED
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: ec2-optimized-clean
     difficulty: easy
     prompt_file: prompts/ec2-optimized-clean.md

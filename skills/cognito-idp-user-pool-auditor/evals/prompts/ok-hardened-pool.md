@@ -1,6 +1,5 @@
 # Eval prompt: ok-hardened-pool
 
-**Expected verdict:** OK
 **Difficulty:** easy
 **Branch:** Rule 4 — all controls met
 

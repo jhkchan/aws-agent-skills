@@ -1,6 +1,5 @@
 # Eval: crypto-mining-critical
 
-**Expected verdict:** CRITICAL
 **Difficulty:** medium
 **Branch:** Step 2 — active compromise (threat-category escalation to CRITICAL)
 

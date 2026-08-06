@@ -8,4 +8,3 @@ Inbound rules:
     Protocol: TCP
     Source: 0.0.0.0/0
 
-Expected verdict: OPEN

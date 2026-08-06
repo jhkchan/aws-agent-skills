@@ -1,6 +1,5 @@
 # Eval: port-sweep-from-scanner
 
-**Expected verdict:** LIKELY_FALSE_POSITIVE
 **Difficulty:** hard
 **Branch:** Step 1 / FP-1 — authorized security scanner override
 

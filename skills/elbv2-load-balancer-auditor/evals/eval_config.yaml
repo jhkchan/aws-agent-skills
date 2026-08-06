@@ -10,7 +10,7 @@
 skill_name: elbv2-load-balancer-auditor
 snapshot_date: "2026-08-04"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -39,13 +39,13 @@ evals:
     prompt_file: prompts/idle-no-targets.md
     baseline_file: baselines/idle-no-targets.md
     expected_verdict: IDLE
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: nlb-config-gap
     difficulty: hard
     prompt_file: prompts/nlb-config-gap.md
     baseline_file: baselines/nlb-config-gap.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: clean-ok
     difficulty: easy
     prompt_file: prompts/clean-ok.md

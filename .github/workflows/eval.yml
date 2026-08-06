@@ -52,7 +52,7 @@ jobs:
           for skill_dir in skills/*/; do
             [ -d "$skill_dir" ] || continue
             skill_name=$(basename "$skill_dir")
-            if [ ! -d "${skill_dir}eval" ]; then
+            if [ ! -d "${skill_dir}eval" || [ -d "${skill_dir}evals" ] ]; then
               echo "::warning file=${skill_dir}SKILL.md::Skill ${skill_name} has no eval/ directory — eval-backed contract requires co-located test cases"
             fi
           done

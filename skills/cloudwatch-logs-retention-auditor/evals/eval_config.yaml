@@ -12,7 +12,7 @@
 skill_name: cloudwatch-logs-retention-auditor
 snapshot_date: "2026-08-05"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -47,7 +47,7 @@ evals:
     prompt_file: prompts/missing-anomaly-detector-config-gap.md
     baseline_file: baselines/missing-anomaly-detector-config-gap.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: fully-secured-ok
     difficulty: easy
     prompt_file: prompts/fully-secured-ok.md

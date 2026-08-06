@@ -1,6 +1,5 @@
 # Eval: console-login-anomalous
 
-**Expected verdict:** MEDIUM
 **Difficulty:** easy
 **Branch:** Step 4 — behavioral anomaly (no FP override, no escalation)
 

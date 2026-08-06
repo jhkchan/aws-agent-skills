@@ -10,7 +10,7 @@
 skill_name: firewall-manager-compliance-auditor
 snapshot_date: "2026-08-05"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -21,34 +21,34 @@ evals:
     prompt_file: prompts/policy-not-ready.md
     baseline_file: baselines/policy-not-ready.md
     expected_verdict: CONFIG_GAP
-    expected_risk: CONFIG_GAP
+    expected_risk: LOW
   - id: waf-noncompliant-remediation
     difficulty: medium
     prompt_file: prompts/waf-noncompliant-remediation.md
     baseline_file: baselines/waf-noncompliant-remediation.md
     expected_verdict: NONCOMPLIANT
-    expected_risk: NONCOMPLIANT
+    expected_risk: HIGH
   - id: shield-tag-scope-incomplete
     difficulty: hard
     prompt_file: prompts/shield-tag-scope-incomplete.md
     baseline_file: baselines/shield-tag-scope-incomplete.md
     expected_verdict: INCOMPLETE_COVERAGE
-    expected_risk: INCOMPLETE_COVERAGE
+    expected_risk: MODERATE
   - id: remediation-disabled-config-gap
     difficulty: medium
     prompt_file: prompts/remediation-disabled-config-gap.md
     baseline_file: baselines/remediation-disabled-config-gap.md
     expected_verdict: CONFIG_GAP
-    expected_risk: CONFIG_GAP
+    expected_risk: LOW
   - id: sg-common-full-coverage-ok
     difficulty: easy
     prompt_file: prompts/sg-common-full-coverage-ok.md
     baseline_file: baselines/sg-common-full-coverage-ok.md
     expected_verdict: OK
-    expected_risk: OK
+    expected_risk: LOW
   - id: waf-legacy-policy-type
     difficulty: hard
     prompt_file: prompts/waf-legacy-policy-type.md
     baseline_file: baselines/waf-legacy-policy-type.md
     expected_verdict: CONFIG_GAP
-    expected_risk: CONFIG_GAP
+    expected_risk: LOW

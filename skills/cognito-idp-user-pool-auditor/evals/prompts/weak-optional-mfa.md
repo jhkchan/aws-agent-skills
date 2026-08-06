@@ -1,6 +1,5 @@
 # Eval prompt: weak-optional-mfa
 
-**Expected verdict:** WEAK
 **Difficulty:** medium
 **Branch:** Rule 2a + 2e — MFA optional, long-lived tokens
 

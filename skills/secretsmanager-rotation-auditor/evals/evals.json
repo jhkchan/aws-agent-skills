@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
   "skill": "secretsmanager-rotation-auditor",
   "version": "1.0.0",
   "snapshot_date": "2026-08-04",

@@ -1,6 +1,5 @@
 # Eval: ssh-brute-force-high
 
-**Expected verdict:** HIGH
 **Difficulty:** medium
 **Branch:** Step 3 — brute-force threat-category escalation to HIGH
 

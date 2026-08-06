@@ -10,7 +10,7 @@
 skill_name: securityhub-control-compliance-auditor
 snapshot_date: "2026-08-04"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -39,7 +39,7 @@ evals:
     prompt_file: prompts/not-available-service-disabled.md
     baseline_file: baselines/not-available-service-disabled.md
     expected_verdict: WARNING
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: suppressed-failed
     difficulty: hard
     prompt_file: prompts/suppressed-failed.md

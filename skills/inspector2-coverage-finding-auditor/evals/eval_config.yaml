@@ -10,7 +10,7 @@
 skill_name: inspector2-coverage-finding-auditor
 snapshot_date: "2026-08-04"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -39,7 +39,7 @@ evals:
     prompt_file: prompts/ecr-prod-stale-scan.md
     baseline_file: baselines/ecr-prod-stale-scan.md
     expected_verdict: MEDIUM
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: ec2-low-cve-only
     difficulty: easy
     prompt_file: prompts/ec2-low-cve-only.md

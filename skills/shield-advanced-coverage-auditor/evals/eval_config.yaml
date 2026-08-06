@@ -10,7 +10,7 @@
 skill_name: shield-advanced-coverage-auditor
 snapshot_date: "2026-08-05"
 baseline_model: amazon.nova-pro-v1:0
-judge_model: openai.gpt-oss-120b-1:0
+judge_model_id: openai.gpt-oss-120b-1:0
 profile: default
 region: us-east-1
 temperature: 0.0
@@ -39,16 +39,16 @@ evals:
     prompt_file: prompts/no-health-based-detection.md
     baseline_file: baselines/no-health-based-detection.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: proactive-engagement-disabled
     difficulty: medium
     prompt_file: prompts/proactive-engagement-disabled.md
     baseline_file: baselines/proactive-engagement-disabled.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE
   - id: drt-role-no-log-bucket
     difficulty: hard
     prompt_file: prompts/drt-role-no-log-bucket.md
     baseline_file: baselines/drt-role-no-log-bucket.md
     expected_verdict: CONFIG_GAP
-    expected_risk: MEDIUM
+    expected_risk: MODERATE

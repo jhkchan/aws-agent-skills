@@ -1,6 +1,5 @@
 # Eval: public-assets-cdn
 
-**Expected verdict:** PUBLIC
 **Difficulty:** medium
 **Branch:** Rule 2 — unrestricted wildcard Allow (read-only, HIGH severity)
 

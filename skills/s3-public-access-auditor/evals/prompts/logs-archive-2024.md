@@ -1,6 +1,5 @@
 # Eval: logs-archive-2024
 
-**Expected verdict:** PUBLIC
 **Difficulty:** medium
 **Branch:** Rule 3 — legacy ACL grant (AllUsers READ)
 

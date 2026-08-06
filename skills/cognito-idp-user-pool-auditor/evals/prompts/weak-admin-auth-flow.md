@@ -1,6 +1,5 @@
 # Eval prompt: weak-admin-auth-flow
 
-**Expected verdict:** WEAK
 **Difficulty:** medium
 **Branch:** Rule 2a + 2f + 2h — MFA optional, ASF OFF, insecure OAuth redirects
 
