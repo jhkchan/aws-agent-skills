@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill supplies concrete thresholds (e.g., >20% noncurrent bytes, 128\u202fKB minimum IA size, 7\u2011day multipart leak, 30\u2011day IA minimum\u2011duration) and detailed cost\u2011impact formulas that a generic model would not enumerate. However many of these facts are documented in AWS guides, so the added expert insight is valuable but not exhaustive."
+      "justification": "The skill supplies many concrete AWS\u2011specific numbers (e.g., 128\u202fKB IA minimum, 30\u2011day IA minimum charge, monitoring fee $0.0025/1k objects, retrieval fees per tier, regional price matrix) and decision\u2011trees that a generic model would not enumerate. However, most of this information is publicly documented and can be recalled by a capable model; the skill does not introduce a novel heuristic or proprietary insight, so it falls short of a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: exact CLI commands, pre\u2011flight checks (versioning, lifecycle fetch, multipart list, Storage Lens), ordering of steps, and rollback plan. Some steps are generic (e.g., \"check security\", \"run list\u2011objects\u2011v2\" without region\u2011specific pagination strategy) which prevents a perfect score."
+      "justification": "Encodes AWS\u2011specific pre\u2011flight steps, exact CLI commands, pagination guidance, Storage Lens usage, and a confirm\u2011gate before any put\u2011bucket\u2011lifecycle\u2011configuration. The procedures are detailed but some are generic (e.g., \"capture current state\" without specifying exact backup naming convention) and could be tighter."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains an extensive NEVER list with concrete reasoning (e.g., never transition objects <128\u202fKB to IA, never omit NoncurrentVersionExpiration on versioned buckets, never apply lifecycle to directory buckets). Only one minor omission: no explicit warning about CRR defaulting to Standard storage class, which would merit a full score."
+      "justification": "A comprehensive NEVER list is provided with concrete reasoning (e.g., IA for <128\u202fKB objects, minimum\u2011duration charges, rule\u2011no\u2011op on Object Lock, Intelligent\u2011Tiering monitoring fee). The only shortfall is the omission of a specific warning about recommending expiration on versioned buckets without a matching non\u2011current rule in the \u2018data\u2011lake\u2011curated\u2019 example, which contradicts the anti\u2011pattern guidance."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description explains WHAT and WHEN, keywords and activation triggers are listed. The \"when_to_use\" paragraph is long and the activation triggers are numerous, making precise invocation slightly ambiguous; a tighter, single\u2011sentence trigger would improve reliability."
+      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and invocation schema are present. The \"when_to_use\" and \"activation_triggers\" are fairly exhaustive, but the schema description is informal (plain text) rather than a strict JSON schema, which could hinder automated activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "The skill is well\u2011structured into sections (quick reference, mindset, pre\u2011flight, stepwise process, anti\u2011patterns, error handling). However, critical rules (e.g., zero\u2011savings rule) are buried deep, and the initial sections contain a high density of details that could overload the agent before it knows which part to apply."
+      "justification": "The skill layers information (quick reference, mindset, step\u2011by\u2011step process, then detailed anti\u2011patterns). However the document is very long and some critical rules (e.g., zero\u2011savings rule) are buried deep, causing potential cognitive overload for an agent that needs only the top\u2011level verdict logic."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibration matches task fragility: destructive lifecycle changes require explicit CONFIRM gate, backup JSON, rollback steps, rate\u2011limit guidance, and region\u2011specific cost variance handling. Only minor omission is lack of an explicit \u201cdry\u2011run\u201d mode flag."
+      "justification": "Destructive actions are tightly constrained: mandatory CONFIRM gate, backup of existing lifecycle config, rollback procedure, rate\u2011limit guidance, and region\u2011specific pricing. Creative analysis steps are left open, which is appropriate. No major over\u2011 or under\u2011constraining detected."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 process \u2192 anti\u2011patterns \u2192 error handling \u2192 rollback), aiding comprehension. Some sections (e.g., pricing matrix, recent features) feel appended rather than integrated, giving a slightly ad\u2011hoc feel."
+      "justification": "Follows a recognizable pattern (mindset \u2192 process steps \u2192 anti\u2011patterns \u2192 output format). The structure is consistent with other CloudOps skills, aiding comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 8,
       "max": 15,
-      "justification": "Model output examples expose execution gaps: the \"data-lake-curated\" example emits VERDICT OPPORTUNITY_FOUND with MONTHLY_SAVING $0.00, violating the zero\u2011savings rule; other examples show inconsistent arithmetic and missing savings validation. These contradictions reduce confidence that an agent can use the skill reliably."
+      "justification": "The skill provides decision trees, error handling, and concrete examples. Nevertheless, the model output examples contain critical flaws: arithmetic mismatches in the first example, a zero\u2011saving OPPORTUNITY_FOUND in the \u2018data\u2011lake\u2011curated\u2019 case (violating the zero\u2011savings rule), and inconsistent handling of negative savings. These errors indicate that an agent following the skill could produce invalid classifications, resulting in a substantial deduction."
     }
   ],
-  "total_score": 101,
+  "total_score": 99,
   "max_score": 120,
   "grade": "B",
-  "token_count": 57559,
-  "latency_ms": 7972,
+  "token_count": 58388,
+  "latency_ms": 15145,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1
