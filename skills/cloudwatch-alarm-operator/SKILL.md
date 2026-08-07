@@ -59,6 +59,7 @@ metadata:
   family: Management
   task_type: operate
   skill_class: capability
+  lifecycle_status: active
   verdict_shape: "READY | BLOCKED | COMPLETED"
   when_to_use: >-
     Creating or tuning CloudWatch alarms (CPU, memory, disk, error rate,

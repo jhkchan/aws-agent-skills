@@ -1,11 +1,10 @@
 ---
 name: incident-response-automator
-description: 'Designs and implements automated AWS incident response workflows across detection (GuardDuty, Security Hub, CloudWatch alarms, EventBridge, AWS Health) and response patterns (EC2 quarantine
-  SG, IAM credential revocation, EBS forensic snapshot, memory capture via SSM, WAF/NACL IP block, secret rotation, session revoke), notification (SNS/Slack/Teams via Lambda, on-call paging), and recovery
-  (restore from backup, clean AMI redeploy). Orchestrates via EventBridge rule (GuardDuty severity >= 7) to Step Functions state machine (isolate -> snapshot -> notify -> human approval -> recover), SSM
-  Automation documents (AWS-IsolateEC2Instance, AWS-DisableIAMUserAccessKey, AWS-RevokeSession), and Systems Manager Incident Manager (response plan with chat channel, on-call). Enforces safety: kill-switch
-  required, isolated-account testing, manual override, full CloudTrail + Step Functions audit. Emits deterministic verdict AUTOMATED with response plan or MANUAL_STEP_REQUIRED with specific gap. Use when
-  designing IR playbooks or wiring GuardDuty or Security Hub to remediation.'
+description: 'Designs automated AWS incident response workflows across detection (GuardDuty, Security Hub, CloudWatch alarms, EventBridge, AWS Health) and response patterns (EC2 quarantine SG, IAM credential
+  revocation, EBS forensic snapshot, memory capture via SSM, WAF/NACL IP block, secret rotation, session revoke), notification (SNS/Slack/Teams via Lambda, on-call paging), and recovery (restore from backup,
+  clean AMI redeploy). Orchestrates via EventBridge rule (GuardDuty severity >= 7) to Step Functions state machine (isolate, snapshot, notify, human approval, recover), SSM Automation documents
+  (AWS-IsolateEC2Instance, AWS-DisableIAMUserAccessKey, AWS-RevokeSession), and Systems Manager Incident Manager. Enforces safety: kill-switch required, isolated-account testing, manual override, full
+  CloudTrail + Step Functions audit. Emits verdict AUTOMATED with response plan or MANUAL_STEP_REQUIRED with gap. Use when designing IR playbooks or wiring GuardDuty/Security Hub to remediation.'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

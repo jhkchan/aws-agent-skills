@@ -52,6 +52,7 @@ metadata:
   family: DevTools
   task_type: automate
   skill_class: capability
+  lifecycle_status: active
   verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
   when_to_use: Designing or implementing a CI/CD pipeline using CodePipeline, CodeBuild, CodeDeploy, CloudFormation, CDK, or Terraform. Setting up source (CodeCommit, GitHub, CodeStar Connection), build
     (buildspec.yml, VPC-aware CodeBuild), test (unit, integration, CodeGuru), or deploy (CloudFormation change-set, CodeDeploy in-place or blue/green, ECS rolling, S3, Service Catalog) stages. Wiring cross-account
