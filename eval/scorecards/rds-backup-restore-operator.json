@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill provides many non\u2011trivial expert details that a generic model would not enumerate, e.g., the 5\u2011minute lag of LatestRestorableTime, exact BacktrackWindow limits, cross\u2011account snapshot KMS policy requirements, cost per backtrack change, and the effect of modifying BackupRetentionPeriod on immediate backup creation. However, most of these facts are documented in AWS docs and a well\u2011trained model could retrieve them, so the delta is strong but not maximal."
+      "justification": "The skill aggregates many expert nuances (e.g., PITR 5\u2011minute lag, BacktrackWindow limits, cross\u2011region KMS re\u2011encryption, fast\u2011clone storage billing) that a generic model may not list, but most of these facts are already documented in AWS docs and known to senior engineers, so the added delta is strong but not completely novel."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides a concrete AWS\u2011specific procedure order (pre\u2011checks, confirm gate, capture pre\u2011state, waiters, post\u2011verify). One point deducted because some steps are generic (e.g., \"check IAM role\") without enumerating the exact policy actions required."
+      "justification": "Provides a detailed AWS\u2011specific procedure flow: pre\u2011flight metadata checks, exact CLI commands, confirm gate, waiters, and post\u2011verification. The only shortfall is a few generic steps (e.g., \u201cverify IAM role has required permissions\u201d) that lack concrete AWS\u2011specific actions."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Comprehensive NEVER list with concrete reasons (e.g., new endpoint, KMS policy, Backtrack limits). Missing a few common pitfalls such as forgetting to re\u2011enable deletion\u2011protection after a restore and brief reasoning for some items, leading to a 2\u2011point loss."
+      "justification": "Contains a thorough NEVER list with concrete reasons (new endpoint surprise, PITR with retention\u202f0, cross\u2011account KMS grant, etc.). Missing some common pitfalls such as never deleting manual snapshots unintentionally and never disabling deletion protection on restored instances."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. Deducted 1 point because the activation trigger list, while extensive, omits a few edge phrases (e.g., \"cross\u2011account snapshot restore\") that could affect reliable activation."
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. The \u2018when to invoke\u2019 guidance lives in metadata rather than a clear top\u2011level clause, making trigger detection slightly less reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document is logically layered (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns, examples). However, the initial sections are dense and contain many details that could overwhelm an agent before it knows which part to use, leading to some cognitive overload."
+      "justification": "Uses quick navigation, layered sections, and worked examples, which reduces overload. However, the pre\u2011flight and process sections are dense and some critical rules (e.g., cost warnings) are buried deep, requiring extra scrolling."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained by mandatory CONFIRM gate and exhaustive pre\u2011checks. One point deducted because the skill does not specify a timeout or automatic abort for the confirm step, leaving a small freedom gap."
+      "justification": "Destructive operations are tightly constrained by pre\u2011checks, confirm gate, and rollback capture. Creative planning steps are left open. Slight deduction because cost\u2011related constraints (e.g., cross\u2011region copy fees) are mentioned but not quantified with hard limits."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (metadata \u2192 what it does \u2192 quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 anti\u2011patterns \u2192 recent features). Slightly ad\u2011hoc ordering prevents a perfect score."
+      "justification": "Follows a recognizable pattern (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns), aiding comprehension. The pattern is not a formally named framework, so it feels a bit ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides exact CLI commands, decision trees, examples, and verification steps, enabling an agent to execute the plan. Lacks detailed handling of transient CLI errors (rate limiting, retries) and does not include fallback logic, costing 2 points."
+      "justification": "Provides concrete CLI sequences, decision trees, and verification steps that an agent could execute. Missing explicit commands for cross\u2011account snapshot sharing (KMS policy grant) and for cross\u2011region copy, and error\u2011handling for waiters is not fully fleshed out, limiting end\u2011to\u2011end execution."
     }
   ],
-  "total_score": 106,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43296,
-  "latency_ms": 16883,
+  "token_count": 42168,
+  "latency_ms": 12522,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

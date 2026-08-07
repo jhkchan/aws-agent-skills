@@ -90,6 +90,18 @@ perform", "Client.UnauthorizedOperation", "Lambda cannot access cross-account",
 "ECS task AccessDenied", "implicit deny on simulate-principal-policy", "SCP
 blocked the call", "permissions boundary blocking".
 
+## Quick navigation
+
+| Section | What it covers | When to read it |
+|---|---|---|
+| **§ Quick reference** | Error-type → evaluation-path map (AccessDenied, ExplicitDeny, etc.) | Identify which error type you're dealing with |
+| **§ Process** | Six-layer diagnostic decision tree (SCP → resource → identity → boundary → session → VPCe) | Walk this in order for every diagnosis |
+| **§ Output format** | ROOT_CAUSE_FOUND / NEED_MORE_INFO / ESCALATE template | Format the response |
+| **§ Diagnostic commands** | Exact CLI commands for each diagnostic step | When you need to gather evidence |
+| **§ Expert edge cases** | Non-obvious gotchas (KMS cross-account, PassRole, service-linked roles) | When the standard tree doesn't find the cause |
+| **§ Anti-Patterns** | NEVER list — common misdiagnoses and shortcuts that miss the real cause | Review before concluding |
+| **§ Remediation** | Step-by-step fix procedures for each root cause | After root cause is identified |
+
 ## Mindset
 
 **One-line takeaway:** an AWS permission decision is the intersection of up to

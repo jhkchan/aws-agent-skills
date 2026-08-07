@@ -175,6 +175,45 @@ order creates windows of exposure or silently fails:
 The order matters because each layer DEPENDS ON or is STRENGTHENED BY
 the prior layer. The provisioning procedure below follows this order.
 
+## S3 configuration dependency graph (novel heuristic)
+
+S3 configurations are NOT independent. Many silently no-op or silently
+degrade if their dependencies are missing — the API returns success in
+all three "silent" rows below, which makes them especially dangerous.
+Use this graph both to sequence provisioning and to debug
+"why doesn't this work?" when a config appears applied but has no effect.
+
+| Configuration | Hard dependencies (API error without) | Silent failure mode (returns 200, does nothing) | Enables downstream |
+|---|---|---|---|
+| Account-level BPA | none | — | overrides all bucket-level BPA relaxations |
+| Bucket-level BPA | bucket exists | — | public-ACL / public-policy prevention |
+| Default encryption (SSE-S3) | bucket exists | — | write-time encryption only |
+| Default encryption (SSE-KMS) | bucket exists; KMS key ARN valid; key policy grants S3 | objects written before setting stay unencrypted | per-object CloudTrail KMS audit |
+| Object Ownership = BucketOwnerEnforced | bucket exists | pre-existing ACL-based access silently breaks | disables ALL ACLs |
+| Versioning | bucket exists | — | lifecycle non-current rules; replication; MFA Delete |
+| Bucket policy | bucket exists; BPA must allow attach (Deny policies always pass) | — | HTTPS + SSE enforcement |
+| Access logging | log target bucket exists in SAME region | **log target missing `s3:PutObject` grant to `logging.s3.amazonaws.com` → no logs, no error** | audit trail |
+| CloudTrail data events | trail exists | trail in wrong region → silently no events | API-level audit trail |
+| Lifecycle rules | versioning enabled (for non-current rules); respects min storage duration per class | **`NoncurrentVersion*` rules silently no-op without versioning** | cost optimization |
+| Replication | versioning on source AND destination; destination bucket exists; IAM role with `s3:ReplicateObject` + KMS decrypt | **objects written before the rule was added are NOT backfilled — partial replication, no signal** | cross-region / same-region copy |
+| MFA Delete | versioning enabled; caller is the ROOT account (not IAM user/role) | MFADelete=Enabled silently ignored if caller is not root | ransomware / accidental-delete protection |
+
+**The three silent-failure rows are the ones a baseline model misses.**
+Lifecycle, access logging, and replication backfill all return HTTP 200
+on apply — only post-config verification (Step 9) catches the gap. This
+is why the procedure verifies every configuration item against the
+bucket's actual state rather than trusting the API response.
+
+**Cross-dependency gotchas** (not visible in the table):
+- Setting `BucketOwnerEnforced` on the LOG TARGET silently breaks log
+  delivery if the log-delivery ACL was the only grant — must switch to
+  a bucket policy grant (see `references/bucket-policy-examples.md`).
+- Enabling SSE-KMS on a bucket with cross-account readers requires the
+  KMS key policy to grant them `kms:Decrypt`; the bucket policy alone
+  is not enough.
+- Removing the last KMS key referenced by a bucket policy is
+  irreversible — encrypted objects become cryptographically unreadable.
+
 ## Prerequisites (verify before provisioning)
 
 Before emitting provisioning commands, verify these prerequisites. If
@@ -221,6 +260,14 @@ principals. All 4 together = full BPA.
 **Common mistake**: Enabling only bucket-level BPA without account-level.
 Account-level BPA overrides any bucket-level relaxation. Always set both.
 
+**If it fails**: `AccessDenied` means the caller lacks
+`s3:PutBucketPublicAccessBlock` (bucket-level) or
+`s3:PutAccountPublicAccessBlock` (account-level) — these are separate
+IAM permissions and both must be in the caller's policy. `NoSuchBucket`
+on the bucket-level call means the bucket does not exist yet; create
+it first (and apply bucket-level BPA in the same CloudFormation stack
+or Terraform run as the create, so the public-exposure window is zero).
+
 ### Step 2 — Default encryption
 
 Choose SSE-S3 (free, AWS-managed) or SSE-KMS (customer-controlled key).
@@ -246,6 +293,21 @@ before this setting are NOT retroactively encrypted.
 high-throughput buckets (logs, CDN), SSE-S3 is the better default. Use
 SSE-KMS only when compliance or audit requirements mandate it.
 
+**Common mistake**: Forgetting to set `BucketKeyEnabled: true` on
+SSE-KMS buckets. Without Bucket Keys, every PutObject triggers a
+`kms:GenerateDataKey` call ($0.03/10k + ~50-100ms latency) and you
+risk hitting KMS throttle limits (5,500-10,000 req/s region default)
+on high-throughput workloads.
+
+**If it fails**: `KMSNotFoundException` or `AccessDenied` on the
+SSE-KMS call almost always means ONE of: (a) the KMS key ARN region
+or account ID is wrong, (b) the key is in `PendingDeletion` state,
+(c) the key policy does not grant the S3 service principal
+`kms:Encrypt` + `kms:GenerateDataKey` — verify with
+`aws kms describe-key --key-id <ARN>` and inspect the policy with
+`aws kms get-key-policy`. `MalformedJSON` usually means shell escaping
+ate the inner double-quotes — wrap the JSON in single quotes.
+
 ### Step 3 — Object Ownership = BucketOwnerEnforced
 
 Disables ALL ACLs — the bucket owner always owns every object.
@@ -259,6 +321,18 @@ aws s3api put-bucket-ownership-controls \
 **Why**: ACLs are a legacy access-control mechanism that's easy to
 misconfigure. BucketOwnerEnforced eliminates ACL-based exposure vectors.
 Cross-account access must flow through bucket policies (more auditable).
+
+**Common mistake**: Flipping BucketOwnerEnforced on a bucket that has
+existing cross-account writers using ACL-granted object ownership. The
+switch is immediate and silent — those writers' next PutObject will
+succeed but lose their per-object ownership, breaking any downstream
+ACL-based read workflow. Audit `s3:GetObjectAcl` across writers first;
+migrate grants to the bucket policy before flipping.
+
+**If it fails**: `AccessDenied` means the caller lacks
+`s3:PutBucketOwnershipControls` (separate from `s3:PutBucketPolicy`).
+`OwnershipControlsNotFoundError` is benign on a brand-new bucket —
+re-issue the call once.
 
 ### Step 4 — Versioning
 
@@ -277,7 +351,54 @@ aws s3api put-bucket-versioning \
 **Why**: Versioning protects against accidental deletion and overwrites.
 Required for lifecycle rules on non-current versions and for replication.
 
+**Common mistake**: Setting `MFADelete=Enabled` from an IAM user or
+role. MFA Delete can ONLY be configured by the root account credentials
+— an IAM principal issuing the call gets a silent success with no MFA
+enforcement. Verify the actual MFADelete state with
+`aws s3api get-bucket-versioning --bucket <BUCKET>` after the call.
+
+**If it fails**: `AccessDenied` on the MFA Delete call almost always
+means the caller is an IAM principal rather than root — re-run with
+root account credentials (and rotate them after). `InvalidArgument` on
+the `--mfa` flag means the device ARN or code is wrong, or the device
+is not yet attached to the root account.
+
 ### Step 5 — Bucket policy (HTTPS-only + SSE enforcement)
+
+Apply a deny-style policy that blocks two upload vectors at once:
+insecure transport (HTTP) and unencrypted object uploads. The policy
+is DENY-based with `Principal: "*"` — this is safe because BPA at the
+account level prevents anyone from attaching a more permissive policy
+later, and the conditions are client-side requirements, not identity
+requirements.
+
+**Summary of statements** (full JSON, SSE-S3 variant, log-delivery
+grant, and cross-account templates live in
+`references/bucket-policy-examples.md`):
+
+| Sid | Effect | Condition | Purpose |
+|---|---|---|---|
+| `DenyInsecureTransport` | Deny `s3:*` | `aws:SecureTransport == false` | force HTTPS on both bucket and object ARNs |
+| `DenyUnEncryptedObjectUploads` | Deny `s3:PutObject` | `s3:x-amz-server-side-encryption` NOT in `["AES256","aws:kms"]` | force SSE header on every upload |
+
+```bash
+# Apply from a policy file (recommended — avoids shell-escaping bugs)
+aws s3api put-bucket-policy --bucket <BUCKET> --policy file://policy.json
+```
+
+**Common mistake**: Using `Principal: "*"` with `Effect: "Allow"`.
+The deny-style policies above are safe with `*` because the condition
+gates the call. An ALLOW with `Principal: "*"` is genuine public access
+and will be blocked by BPA — but if BPA is ever relaxed, the bucket
+becomes public. Always use deny-style for enforcement policies.
+
+**If it fails**: `AccessDenied` usually means BPA's
+`BlockPublicPolicy=true` is blocking a policy containing `Principal: "*"`
+with `Allow` (our deny policies should pass). `MalformedPolicy` means
+JSON syntax error — validate with `python -m json.tool policy.json` or
+`jq . policy.json`. `NoSuchBucket` means the bucket doesn't exist yet.
+
+### Step 5.1 — Bucket policy (legacy full-JSON reference)
 
 ```json
 {

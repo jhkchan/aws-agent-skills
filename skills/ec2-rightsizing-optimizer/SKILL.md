@@ -385,6 +385,39 @@ obvious choice:
     --query 'InstanceTypes[].{VCpuInfo:VCpuInfo, MemoryInfo:MemoryInfo, NetworkInfo:NetworkInfo}' --output json
   ```
 
+  **Parsing the response for a rightsizing decision:**
+
+  ```bash
+  aws ec2 describe-instance-types --instance-types <candidate-type> \
+    --output json | jq '.InstanceTypes[] | {
+      vcpus: .VCpuInfo.DefaultVCpus,
+      memory_gib: (.MemoryInfo.SizeInMiB / 1024),
+      architectures: .ProcessorInfo.SupportedArchitectures,
+      network_perf: .NetworkInfo.NetworkPerformance,        # "Up to 12.5 Gbps"
+      ebs_optimized: .EbsInfo.EbsOptimizedSupport,           # "supported" | "unsupported"
+      ebs_throughput: .EbsInfo.EbsOptimizedInfo.BandwidthGbps,
+      burstable: (.BurstablePerformance.Supported // false),  # true for t-family
+      instance_storage: .InstanceStorageInfo.Disks[].SizeInGB,
+      supported_virtualization: .SupportedVirtualizationTypes  # ["hvm"] required for current gen
+    }'
+  ```
+
+  **Decision gates when comparing candidate vs current type:**
+
+  | Field | Gate | Why it matters |
+  |---|---|---|
+  | `SupportedArchitectures` includes `arm64` | Graviton path available (otherwise stay x86). | Determines AMI family and runtime compatibility. |
+  | `EbsInfo.EbsOptimizedSupport == "supported"` | Required for EBS-heavy workloads. | Legacy m4/c4 lack this by default; current-gen includes it. |
+  | `BurstablePerformance.Supported == true` | Candidate is t-family — apply Step 6 credit math before recommending. | A downsize into t-family without credit math triggers the performance cliff. |
+  | `NetworkInfo.NetworkPerformance` starts with "Up to" | Burst bandwidth; derate by 30% for sustained ceiling. | Network-bound workloads need guaranteed bandwidth (n-family). |
+  | `MemoryInfo.SizeInMiB / VCpuInfo.DefaultVCpus` ratio | Match to workload shape (general ~1:4, compute 1:2, memory 1:8). | Wrong ratio = wrong family even if raw size seems correct. |
+  | `InstanceStorageInfo` present | Candidate has NVMe/SSD local storage. | Required for storage-optimized (i4i, im4gn) workloads; costs more if unused. |
+
+  If ANY of these fields is absent from the response, the candidate
+  type is not available in the region or the API version is stale.
+  Fall back to a documented alternative from
+  `references/instance-selection-reference.md` rather than guessing.
+
 ### Step 1: Validate input and data sufficiency
 
 If `MemoryUtilization` is absent from the input metrics (CWAgent not
@@ -418,6 +451,41 @@ Proceed only if both conditions are met.
 If a Compute Optimizer finding is provided, reconcile with CloudWatch
 metrics. Compute Optimizer's 30-day analysis is a sanity check; the
 fresh CloudWatch signal wins on disagreement.
+
+**Concrete parsing of `get-ec2-instance-recommendations` output:**
+
+```bash
+aws compute-optimizer get-ec2-instance-recommendations \
+  --instance-arns arn:aws:ec2:us-east-1:<acct>:instance/<id> \
+  --output json | jq '
+    .instanceRecommendations[] | {
+      instance_arn: .instanceArn,
+      current_type: .currentInstanceType,
+      finding: .finding,                  # Optimized | Underprovisioned | Overprovisioned
+      finding_reasons: .findingReasonCodes,
+      recommendations: [
+        .recommendationOptions[] | {
+          rank: .rank,                    # 1 = highest savings (may carry highest risk)
+          type: .instanceType,
+          performance_risk: .performanceRisk,  # 1 (safe) .. 5 (risky)
+          vcpus: .instanceDigest.vCpu.vCpus,
+          memory_gb: (.instanceDigest.instanceMemory.sizeInMiB / 1024),
+          savings_pct: .savingsOpportunity.savingsPercentage,
+          monthly_savings: .savingsOpportunity.estimatedMonthlySavings.amount
+        }
+      ],
+      last_refresh: .lastRefreshTimestamp,
+      utilization_metrics: .utilizationMetrics
+    }'
+```
+
+| Field to verify | What it tells you | Action if missing/stale |
+|---|---|---|
+| `finding` | High-level classification (Optimized/Under/Over) | If absent, finding is `NotOptimized` due to insufficient data → emit NEED_MORE_INFO. |
+| `recommendationOptions[].performanceRisk` | Risk that the recommended type cannot handle the workload (1=low ... 5=high) | Always prefer options with `performanceRisk ≤ 2` for production. If only risk ≥ 4 options exist, emit NEED_MORE_INFO and investigate manually. |
+| `lastRefreshTimestamp` | When Compute Optimizer last re-analyzed | If > 30 days old, treat as stale; re-run `get-ec2-instance-recommendations` or rely on CloudWatch. |
+| `utilizationMetrics[]` | Source data Compute Optimizer used | Cross-check against your CloudWatch pull. If they disagree, freshest CloudWatch wins. |
+| `savingsOpportunity.estimatedMonthlySavings` | Dollar savings estimate | Sanity-check against your own hourly math (Step 9). Compute Optimizer uses list price; your actual RI/SP rate may differ. |
 
 | Compute Optimizer finding | CloudWatch agreement | Action |
 |---|---|---|
@@ -735,6 +803,102 @@ MIGRATION_STEPS:
   Do NOT right-size based on CPU-only data.
 ```
 
+## Verdict semantics — reconciling the verdict_shape
+
+The `verdict_shape` metadata declares the three primary verdicts
+(`OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL`). Two additional
+**data-gating** verdicts (`NEED_MORE_INFO`, `BLOCKED`) appear in the
+workflow when the data required for a confident decision is missing.
+Treat them as pre-decision guards, not as alternatives to the primary
+three:
+
+| Verdict | When to emit | Position in workflow |
+|---|---|---|
+| `OPPORTUNITY_FOUND` | At least one dimension (size, family, Graviton, pricing) has a concrete, savings-bearing recommendation. | Primary — terminal for actionable findings. |
+| `OPTIMIZED` | A change was applied and verified this session; metrics confirm the new size lands within healthy bands. | Primary — only emitted post-remediation. |
+| `ALREADY_OPTIMAL` | All dimensions pass for the current type AND the pricing model is already committed (RI/Savings Plan covering ≥ 95% of steady-state spend). | Primary — terminal for healthy findings. |
+| `NEED_MORE_INFO` | Data gate failed: MemoryUtilization absent, observation window < 14 days, Compute Optimizer `NotOptimized` due to insufficient data, or freshest CloudWatch signal disagrees with an old Compute Optimizer finding. | Pre-decision — emit before any sizing recommendation; the next action is data collection, not remediation. |
+| `BLOCKED` | A hard precondition prevents evaluation: Compute Optimizer enrollment `Inactive` AND no CloudWatch metrics retrievable, instance is in `Stopped`/`Terminated` for > 50% of the window, or IAM denies `cloudwatch:GetMetricStatistics`. | Pre-decision — emit when no reliable signal exists at all. |
+
+**Rule:** never emit `OPPORTUNITY_FOUND` without first discharging every
+`NEED_MORE_INFO`/`BLOCKED` gate in Step 1. A downsize recommendation
+that hides a missing MemoryUtilization signal is the single highest-
+risk misclassification the skill can make.
+
+## Network-limit calculation (concrete formula)
+
+D7 references "Network > 50% of limit" without defining the limit. Use
+this formula to make the threshold deterministic:
+
+```
+instance_limit_Mbps =
+  describe-instance-types.NetworkInfo.NetworkPerformance
+    parsed from the documented "Up to N Gbps" or "N Gbps" string.
+
+utilization_pct =
+  ( max(NetworkIn_bytes_per_sec, NetworkOut_bytes_per_sec)
+    / (instance_limit_Mbps * 125000) ) * 100
+
+# NetworkIn/Out come from CloudWatch get-metric-statistics,
+# statistic=Maximum, period=3600, over the 14-30 day window.
+# Use the MAX, not the average — bursts saturate the interface
+# even when the average is modest.
+```
+
+| `utilization_pct` (peak hour) | Verdict contribution |
+|---|---|
+| > 80% sustained > 1 hour/day | `OPPORTUNITY_FOUND` (upsize or migrate to n-family). Performance risk is active. |
+| 50-80% sustained | `OPPORTUNITY_FOUND` if combined with another dimension; otherwise surface as MEDIUM-severity finding. |
+| < 50% | Network is not the bottleneck; proceed with other dimensions. |
+
+For "Up to N Gbps" instances, treat N as the burst ceiling, not the
+sustained limit — subtract ~30% to derive the realistic sustained
+ceiling (e.g., m5.large "Up to 10 Gbps" → ~7 Gbps sustained).
+Guaranteed-bandwidth families (c6n, m6n, r6n, p5) use the documented
+value directly.
+
+## Error handling — CLI and data-source failures
+
+The workflow depends on three live data sources (CloudWatch, Compute
+Optimizer, EC2 API). Each can fail independently. Handle every branch
+explicitly; silent failures produce misclassifications.
+
+### CloudWatch metric failures
+
+| Failure mode | Detection | Handling |
+|---|---|---|
+| `get-metric-statistics` returns empty `Datapoints` array for CPUUtilization | `len(Datapoints) == 0` | Verdict: `BLOCKED`. Reason: "CloudWatch returned no CPU data for <id> over <window>. The instance may have been stopped for the entire window, or IAM denies cloudwatch:GetMetricStatistics." Recommendation: re-pull with `--start-time` shifted 1 day forward; verify IAM policy includes `cloudwatch:GetMetricStatistics` for `AWS/EC2`. |
+| `mem_used_percent` absent from CWAgent namespace | `list-metrics` returns no match | Verdict: `NEED_MORE_INFO` per Step 1. Never downgrade to `OPPORTUNITY_FOUND` on CPU-only data. |
+| Datapoints present but `SampleCount < 168` (less than 7 days of hourly data) | `len(Datapoints) < window_days * 24 * 0.7` | Verdict: `NEED_MORE_INFO`. Reason: "Insufficient samples (<70% of expected hourly datapoints) — observation window is not representative." |
+| CloudWatch API throttling (`Throttling` error) | Exit code non-zero, stderr contains "Throttling" | Retry with exponential backoff (`--max-attempts 5`). If still failing, fall back to a 7-day window and flag the result as LOW-confidence. |
+
+### Compute Optimizer failures
+
+| Failure mode | Detection | Handling |
+|---|---|---|
+| Enrollment `Inactive` | `get-enrollment-status` returns `"status": "Inactive"` | Compute Optimizer findings are unavailable. Proceed with CloudWatch-only analysis; mark `compute_optimizer_cross_check: unavailable` in the output. Do NOT block the workflow. |
+| `get-ec2-instance-recommendations` returns empty `recommendations` array | `len(recommendations) == 0` | Either the instance is Optimal (no findings) or Compute Optimizer has not yet analyzed it. Cross-check `lastRefreshTimestamp`; if > 30 days old, treat as stale and rely on CloudWatch. If recent, treat as `Optimized` from Compute Optimizer's perspective. |
+| Compute Optimizer finding present but `performanceRisk` missing | Field absent in JSON | Reject the finding as LOW-confidence. Fall back to CloudWatch thresholds; do not blindly apply the recommendation. |
+| `AccessDeniedException` for `compute-optimizer:*` | Exit code non-zero | Compute Optimizer is not enabled in the account or the role lacks permissions. Proceed with CloudWatch-only; surface the gap in the output. |
+
+### EC2 API failures
+
+| Failure mode | Detection | Handling |
+|---|---|---|
+| `describe-instance-types` returns `UnknownInstanceType` | API error | The target type (e.g., next-gen not yet rolled out in this region) is unavailable. Fall back to a documented alternative from the references/instance-selection-reference.md table. |
+| `describe-instances` shows instance `Terminated` | `State.Name == "terminated"` | Skip the instance entirely. Emit no verdict; note in the fleet rollup as "terminated during evaluation." |
+| `modify-instance-attribute` fails with `IncorrectInstanceState` | Instance not stopped | Stop the instance first (`stop-instances`), wait for `State.Name == "stopped"`, retry. Surface the stop/start sequence in MIGRATION_STEPS. |
+| `purchase-reserved-instances-offering` fails with `InvalidParticle` | Offering ID stale or already fulfilled | Re-query `describe-reserved-instances-offerings --offering-class <standard|convertible> --instance-type <type>` to fetch a fresh offering-id. |
+
+### Aggregate behavior
+
+If ANY data source fails with a transient error (throttling, network),
+retry up to 3 times with exponential backoff before emitting `BLOCKED`.
+For persistent failures (IAM denial, terminated instance, enrollment
+Inactive), emit the appropriate gating verdict and proceed with the
+remaining dimensions — do not abort the entire evaluation on a single
+source failure.
+
 ## Anti-Patterns — NEVER
 
 - NEVER recommend a downsize without MemoryUtilization data. CPU is the
@@ -814,6 +978,39 @@ MIGRATION_STEPS:
   workload with sustained CPU > 50%. Unlimited charges for overage
   credits indefinitely; migrating to m-family is cheaper above ~40%
   sustained utilization.
+
+- NEVER recommend Spot without checking the Spot Placement Score (SPS)
+  for the target instance type and AZ. SPS predicts the likelihood of
+  Spot capacity being available; a low score (≤ 10) means Spot requests
+  in that AZ/type are frequently unfulfilled or interrupted. Without
+  SPS, a "90% savings" Spot recommendation may be unlaunchable in
+  practice, or may interrupt so frequently that the workload fails.
+  Always pull
+  `aws ec2 get-spot-placement-scores --instance-types <type>
+  --target-capacity 1 --region-name <region>` and surface the SPS in
+  the recommendation. Prefer types with SPS ≥ 50 for production-
+  adjacent Spot workloads.
+
+- NEVER recommend a Standard RI when the workload may need to change
+  instance families within the commitment term. **Why Standard RIs
+  cannot be exchanged:** AWS models Standard RIs as a fixed
+  reservation of a specific instance family + size + AZ (Zonal) or
+  family + size (Regional). The discount is bound to that exact
+  configuration for the full 1- or 3-year term because AWS uses the
+  commitment to provision underlying capacity. Convertible RIs allow
+  exchanges (family, size, OS, tenancy) but charge a slightly lower
+  discount in exchange for the optionality. If a right-size may
+  trigger a family migration (e.g., m5 → r6i for memory-bound drift),
+  default to Convertible RI or Compute Savings Plan. Standard RI is
+  only appropriate when the workload is locked to a single family for
+  the full term (e.g., a vendor-certified appliance that pins to c6i).
+
+- NEVER interpret Compute Optimizer `Optimized` as ALREADY_OPTIMAL
+  without checking the pricing model separately. Compute Optimizer
+  evaluates utilization only — it does not flag On-Demand spend that
+  could move to an RI or Savings Plan. An "Optimized" instance may
+  still be 100% On-Demand, missing 30-72% in commitment savings.
+  Always run Step 8 (pricing model) before emitting ALREADY_OPTIMAL.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 

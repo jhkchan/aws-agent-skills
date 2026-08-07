@@ -101,6 +101,18 @@ operation behind a CONFIRM gate, and verifies the result. Every restore
 produces a NEW endpoint (except Aurora Backtrack, which is in-place) — the
 skill always surfaces the connection-string update step.
 
+## Quick navigation
+
+| Section | What it covers | When to read it |
+|---|---|---|
+| **§ Quick reference** | Verdict thresholds (BLOCKED/READY/COMPLETED) + pre-check priority order | Before any operation |
+| **§ Mindset** | Why pre-checks matter, the new-endpoint surprise, the confirm gate | Understanding the safety model |
+| **§ Pre-flight** | Instance metadata gate — status, retention, snapshot, VPC resources | Before executing any CLI |
+| **§ Process** | Per-operation planning: backup, snapshot, PITR, backtrack, S3 export/import | When choosing which operation to run |
+| **§ Output format** | Structured output template with VERDICT, COMMANDS, ENDPOINT, VERIFICATION | Formatting the response |
+| **§ Anti-Patterns** | NEVER list — common mistakes that cause data loss or silent failures | Review before risky operations |
+| **§ Pre-flight safety** | Additional checks before any remediation CLI | Defense-in-depth |
+
 ## Quick reference — verdict thresholds
 
 | Verdict | Trigger condition | Action |
