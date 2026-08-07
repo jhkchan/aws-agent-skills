@@ -1,0 +1,70 @@
+{
+  "skill": "dynamodb-throttling-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides a detailed decision tree, specific thresholds (5\u2011minute burst window, >10% traffic on a single key, <100 distinct values for hot\u2011key detection) and precise RCU/WCU consumption formulas, which extend beyond generic knowledge. However it omits explicit numeric limits for burst exhaustion, lacks guidance on DynamoDB auto\u2011scaling policies, and does not cover newer edge\u2011case features such as per\u2011partition on\u2011demand burst limits, preventing a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (per\u2011GSI throttled\u2011requests check, contributor\u2011insights enablement, exact CLI commands), yet a few steps are generic like \u201ccheck CloudWatch\u201d without a strict sequence, leaving some ambiguity in the diagnostic flow."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER list contains concrete pitfalls (e.g., never raise capacity for hot partitions) with clear reasoning, but it omits several common anti\u2011patterns such as on\u2011demand burst\u2011limit throttling and IAM permission mis\u2011configurations, reducing its completeness."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter, activation triggers, invocation schema, and clear WHEN\u2011TO\u2011USE/WHEN\u2011NOT\u2011TO\u2011USE sections are all present and well\u2011defined, enabling reliable activation of the skill."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick reference \u2192 detailed steps \u2192 deep dive), yet the initial sections are dense and contain many tables and commands, risking cognitive overload before the agent knows which path to follow."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive operations (e.g., update\u2011table, switch to on\u2011demand) are presented with verification steps and post\u2011apply monitoring, while analytical steps remain open, showing good calibration to task fragility. Minor omission: no explicit safety flag or dry\u2011run suggestion for the CLI commands."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick Reference \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Remediation), making the structure easy to follow."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a complete decision tree, concrete CLI examples, and output format, enabling an agent to act. However, edge cases such as on\u2011demand burst\u2011limit throttling, multi\u2011region tables, or missing IAM permissions are not addressed, which could cause execution failures."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 53072,
+  "latency_ms": 9194,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

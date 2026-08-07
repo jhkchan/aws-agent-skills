@@ -1,0 +1,70 @@
+{
+  "skill": "vpc-connectivity-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds genuine expert knowledge: OSI\u2011layered diagnostic tree, silent\u2011failure cases (overlapping CIDRs, cross\u2011VPC SG references), NACL stateless return\u2011path requirement, VPC DNS flag interactions, TGW propagation nuances, PrivateLink endpoint\u2011service health checks, and concrete CLI probes. This depth exceeds what a generic model already knows."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Transfers AWS\u2011specific mindset and procedures (OSI ordering, exact CLI commands per layer, Reachability Analyzer usage). Minor loss: some steps (e.g., \"run nc -vz\") are generic OS\u2011level checks rather than AWS\u2011specific, and the decision tree is described in prose rather than a formal algorithm."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a thorough NEVER list with concrete reasoning (e.g., SG reference cross\u2011VPC, overlapping CIDRs, NACL directionality). Missing: anti\u2011patterns around NAT gateway mis\u2011configurations, IAM permission failures for CLI calls, and pagination/ throttling pitfalls. Hence a small deduction."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, invocation_schema, and example are all present and detailed. Slight issue: activation_triggers are overly exhaustive, risking false activation, and the invocation_schema mixes optional and required fields in a way that could be ambiguous for an agent."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "Content is layered (Quick start \u2192 Mindset \u2192 Process \u2192 Deep reference), but critical rules and anti\u2011patterns are buried deep, leading to cognitive overload for a first\u2011time user. The initial sections contain a large amount of detail before the core decision tree, reducing optimal progressive disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibration is strong: read\u2011only probes first, explicit CONFIRM gates before any state\u2011changing CLI, and clear guidance on batch limits. Minor gap: no explicit check for required IAM permissions before suggesting a state\u2011changing command, which could cause failed operations in a restricted environment."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows a clear, repeatable pattern (Quick\u2011Start \u2192 Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011Patterns \u2192 References), making it easy to recognize and navigate."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a usable decision tree, concrete CLI commands, output format, and worked examples that an agent can follow. Minor gaps: intermittent failure handling is only briefly mentioned, and region/partition handling is not explicitly covered, which could cause edge\u2011case failures."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 66612,
+  "latency_ms": 24191,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}
