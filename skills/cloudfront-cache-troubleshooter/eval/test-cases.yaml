@@ -9,7 +9,9 @@ temperature: 0.0
 
 test_cases:
   - id: origin-no-store-header
-    description: Cache miss on every request because the S3 origin sends Cache-Control: no-store on all objects
+    description: >-
+      Cache miss on every request because the S3 origin sends
+      Cache-Control: no-store on all objects
     input: |
       Scenario: A CloudFront distribution E1A2B3C4D5
       (d123.cloudfront.net) is not caching any responses. Every request

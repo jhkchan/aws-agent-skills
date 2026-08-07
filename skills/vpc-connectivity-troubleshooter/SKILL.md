@@ -1,11 +1,18 @@
 ---
 name: vpc-connectivity-troubleshooter
-description: 'Diagnoses AWS VPC network connectivity issues through a systematic OSI-layered diagnostic tree — Layer 3 routing (missing route, wrong target IGW/NAT/TGW/peering/VPN, overlapping CIDRs on
-  peered VPCs), Layer 4 security groups (stateful inbound on listener port, outbound return path, SG references that silently fail cross-VPC), Layer 4 NACLs (stateless both directions, ephemeral port range
-  1024-65535), Layer 7 DNS (Route 53 private hosted zones, VPC DNS resolution and support settings), VPC endpoint policies blocking traffic, and application-level auth/SSL. Cross-VPC coverage: VPC peering
-  (DNS resolution flag, security group references only within peered VPC), Transit Gateway (route table associations and propagation), and PrivateLink (interface endpoint NLB and endpoint service configuration).
-  Uses Reachability Analyzer networkInsightsPath for automated path analysis and VPC Flow Logs for packet-level visibility. Emits ROOT_CAUSE_FOUND with the specific layer and failing probe, NEED_MORE_INFO
-  when a.'
+description: >-
+  Diagnoses AWS VPC network connectivity issues through a systematic
+  OSI-layered diagnostic tree: Layer 3 routing (missing route, wrong
+  target IGW/NAT/TGW/peering/VPN, overlapping CIDRs on peered VPCs),
+  Layer 4 security groups (stateful inbound, outbound return path,
+  SG references that silently fail cross-VPC), Layer 4 NACLs
+  (stateless both directions, ephemeral range 1024-65535), Layer 7
+  DNS (Route 53 private hosted zones, VPC DNS resolution settings),
+  VPC endpoint policies, and application-level auth/SSL. Cross-VPC
+  coverage: VPC peering (DNS flag, SG references), Transit Gateway
+  (route table associations, propagation), and PrivateLink (interface
+  endpoint NLB). Uses Reachability Analyzer and VPC Flow Logs. Emits
+  ROOT_CAUSE_FOUND, NEED_MORE_INFO, or ESCALATE.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -57,6 +64,7 @@ metadata:
   family: Networking
   task_type: troubleshoot
   skill_class: capability
+  lifecycle_status: active
   verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
   when_to_use: Diagnosing a VPC network connectivity issue (cannot reach an endpoint, intermittent connectivity, port blocked, DNS resolution failure, cross-VPC traffic failure, VPC endpoint policy block,
     peering asymmetry, TGW route propagation gap), walking a symptom to the failed layer with verify and fix commands, validating why an EC2 instance / Lambda / ECS task / on-prem host cannot reach a destination,
