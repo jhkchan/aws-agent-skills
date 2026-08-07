@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 15,
+      "score": 17,
       "max": 20,
-      "justification": "Provides a concrete decision matrix and specific thresholds (CPU <30% & Memory <50%, up to 40% Graviton price\u2011performance gain) that a generic model may not know, but many of these rules restate common best\u2011practice guidance rather than novel expert insight."
+      "justification": "Adds concrete expert thresholds (CPU<30% & Memory<50% for downsize, CPU>70% or Memory>80% for upsize), explicit network\u2011utilization formula, burst\u2011credit math, Graviton compatibility matrix, pricing\u2011model decision tree and detailed instance\u2011family mapping. Missing newer Graviton4 families and region\u2011specific pricing nuances, so not a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (CLI commands, snapshot before change, mandatory CONFIRM gate, batch size limit) and reflect expert thinking. However, some steps are generic (e.g., \"check compatibility\" without detailing how to parse `describe-instance-types` output) and the workflow for parsing Compute Optimizer findings is not fully fleshed out."
+      "justification": "Encodes senior\u2011engineer mindset (cost\u2011quality trade\u2011off, data\u2011gate first) and AWS\u2011specific procedures (CLI commands for CloudWatch, EC2, Compute Optimizer, Savings Plans, confirmation gates, batch limits). Lacks an explicit pre\u2011check that the target instance type is available in the desired AZ before migration."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never downsize without memory data, never use Spot for stateful workloads). Missing a few experienced pitfalls such as ignoring Spot Placement Score when recommending Spot, and the rationale for why Standard RIs cannot be exchanged across families could be more explicit."
+      "justification": "Contains an extensive NEVER list with concrete reasoning (memory\u2011only downsizing, Spot for stateful workloads, Graviton compatibility, burst\u2011credit cliffs, RI exchange limits, etc.). Missing explicit warnings about IAM permission failures and the need to check Spot Placement Scores before Spot recommendations."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are present, enabling reliable activation. The trigger list is extensive and may cause false positives; the schema description is textual rather than a strict JSON schema, which reduces precision."
+      "justification": "Front\u2011matter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. The \"when_to_use\" narrative is a bit verbose, causing slight ambiguity about exact trigger boundaries."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers information (quick start, mindset, philosophy, detailed process, anti\u2011patterns, safety checks). Nevertheless, critical anti\u2011pattern warnings are buried deep, and the initial sections are dense, risking cognitive overload before the agent reaches actionable steps."
+      "justification": "Top\u2011level quick\u2011start gives concise guidance; deeper sections (philosophy, pre\u2011flight, detailed process, anti\u2011patterns) are revealed later. Some critical formulas (network limit calculation, credit math) are buried deep, causing slight cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained: mandatory CONFIRM gate, snapshot before change, stop\u2011instance requirement, batch size ceiling, and rollback guidance. Creative tasks (pricing\u2011model selection) are left open, matching the fragility of the operations."
+      "justification": "Destructive actions are tightly constrained: mandatory CONFIRM gate, snapshot before change, batch size limit of 5, rollback steps, off\u2011peak scheduling, and explicit safety checks for each data source. Calibration matches fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (front\u2011matter, quick start, mindset, philosophy, reference tables, process steps, anti\u2011patterns, safety checks, remediation). However the mix of narrative and tabular sections is slightly ad\u2011hoc, preventing a perfectly clean, reusable template."
+      "justification": "Follows a recognizable structure (quick start \u2192 mindset \u2192 philosophy \u2192 reference \u2192 pre\u2011flight \u2192 process \u2192 output format \u2192 anti\u2011patterns). Minor ad\u2011hoc ordering of some sections prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision trees, and output format, enabling an agent to act. Defects: the verdict_shape enumerates only OPTIMIZED|OPPORTUNITY_FOUND|ALREADY_OPTIMAL, yet the skill emits NEED_MORE_INFO and BLOCKED, causing a mismatch. Network\u2011limit calculations are referenced but not concretely defined, and error handling for CLI failures is absent."
+      "justification": "Provides decision trees, working CLI snippets, error\u2011handling branches, and concrete example outputs that an agent can execute. Lacks explicit integration of Spot Placement Score in Spot recommendations and some edge\u2011case handling (e.g., stale Compute Optimizer data) which reduces usability slightly."
     }
   ],
-  "total_score": 102,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 57952,
-  "latency_ms": 19373,
+  "grade": "A",
+  "token_count": 65548,
+  "latency_ms": 14865,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

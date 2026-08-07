@@ -510,14 +510,17 @@ RECOMMENDATION:
   }
 SAVINGS:
   CURRENT_MONTHLY: $446.20  (19,400 GB × $0.023)
-  PROJECTED_MONTHLY: $114.85
-    - 7,400 GB current × Standard $0.023 = $170.20
-    - 4,200 GB current × Standard-IA $0.0125 = $52.50
-    - 2,800 GB current × Glacier IR $0.004 = $11.20
-    - 5,000 GB noncurrent × Glacier IR $0.004 = $20.00 (after 90d transition)
-    - 0 GB at the 365d expiry horizon
-  MONTHLY_SAVING: $331.35
-  ANNUAL_SAVING: $3,976.20
+  PROJECTED_MONTHLY: $139.96
+    - 2,400 GB current at Standard (< 30d) × $0.023 = $55.20
+    - 1,400 GB current at Standard-IA (30-90d) × $0.0125 = $17.50
+    - 2,000 GB current at Glacier IR (90-180d) × $0.004 = $8.00
+    - 1,600 GB current at Glacier (180-365d) × $0.0036 = $5.76
+    - 3,000 GB noncurrent at Standard-IA (30-90d) × $0.0125 = $37.50
+    - 4,000 GB noncurrent at Glacier IR (90-180d) × $0.004 = $16.00
+    - 5,000 GB noncurrent expired (> 180d) = $0.00
+    - Arithmetic check: 55.20 + 17.50 + 8.00 + 5.76 + 37.50 + 16.00 = $139.96
+  MONTHLY_SAVING: $306.24  ($446.20 − $139.96)
+  ANNUAL_SAVING: $3,674.88
   CAVEATS:
     - Standard-IA 30-day minimum: objects deleted before day 30 still bill.
     - Glacier IR 90-day minimum applies.
@@ -554,6 +557,330 @@ SAVINGS:
   CAVEATS: Glacier Deep Archive retrieval is $2-10/TB Standard, 12h latency.
 IMPLEMENTATION: None required. Posture is correct for the workload archetype.
 ```
+
+### Worked example — Intelligent-Tiering trap (small objects, proposed plan rejected)
+
+This example demonstrates the **zero-savings rule**: when the proposed
+transition would cost MORE than the current tier, the verdict is
+`ALREADY_OPTIMAL` for the transition dimension — never
+`OPPORTUNITY_FOUND` with $0 or negative savings.
+
+```text
+BUCKET: app-config-state
+VERDICT: ALREADY_OPTIMAL
+REASON: Proposed Intelligent-Tiering transition on 8.2M objects averaging
+  4.2 KB each is MORE expensive than Standard. The monitoring fee alone
+  ($20.50/month) exceeds total current cost. The 128 KB minimum billable
+  size on the Infrequent tier makes tiering even more costly if objects
+  drop. The proposed plan is rejected (Step 3 Archetype C threshold check
+  fails: average object size < 128 KB).
+RECOMMENDATION: No storage-class transition. Standard is already the cheapest
+  tier for this object-size profile. Optionally add AbortIncompleteMultipartUpload
+  hygiene rule (zero-cost, preventive).
+SAVINGS:
+  CURRENT_MONTHLY: $10.09
+    - Storage: 32.0 GiB × $0.023 = $0.74
+    - GETs: 8.2M × 3/month × $0.00038/1K = $9.35
+    - PUTs: negligible (write-once workload)
+  PROJECTED_MONTHLY (Intelligent-Tiering, best case — all in Frequent tier):
+    - Monitoring fee: 8,200,000 / 1,000 × $0.0025 = $20.50
+    - Storage: 32.0 GiB × $0.023 = $0.74
+    - GETs: 8.2M × 3/month × $0.00038/1K = $9.35 (unchanged)
+    - Total projected: $30.59
+  MONTHLY_SAVING: -$20.50  (NEGATIVE — monitoring fee alone exceeds saving)
+  ANNUAL_SAVING: -$246.00
+  CAVEATS: The proposed plan INCREASES cost by $20.50/month (the monitoring
+    fee). If objects auto-tier to Infrequent Access, cost rises further
+    due to the 128 KB minimum billable size (8.2M × 128 KB = 1,025 GiB
+    billable vs 32 GiB actual — a 32x storage inflation). The verdict is
+    ALREADY_OPTIMAL because Standard is already the cheapest applicable
+    tier. The operator should NOT proceed with Intelligent-Tiering.
+IMPLEMENTATION:
+  1. Do NOT apply the proposed Intelligent-Tiering transition.
+  2. Optional hygiene rule (zero-cost):
+     {
+       "Rules": [{
+         "ID": "abort-incomplete-multipart-uploads",
+         "Status": "Enabled",
+         "Filter": {},
+         "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+       }]
+     }
+  3. Re-evaluate if average object size grows > 128 KB in the future.
+```
+
+**Why this verdict is ALREADY_OPTIMAL, not OPPORTUNITY_FOUND:** the
+proposed plan was a transition to Intelligent-Tiering, but the math
+shows it costs MORE than Standard for this object profile. There is
+no saving to capture — the cheapest applicable tier is already in
+place. Emitting `OPPORTUNITY_FOUND` with `$0.00` or negative savings
+is a hard error per the Verdict consistency rules above.
+
+### Worked example — compliance archive with no lifecycle (OPPORTUNITY_FOUND with correct math)
+
+This example demonstrates the **positive-savings rule**: when a
+compliance archive has no lifecycle and objects sit in Standard at
+120+ days old, transitioning to Deep Archive captures real savings.
+The verdict is `OPPORTUNITY_FOUND` because the math shows positive
+monthly savings.
+
+```text
+BUCKET: compliance-archive-7yr
+VERDICT: OPPORTUNITY_FOUND
+REASON: Compliance archive with 5,000 GiB in Standard at 120 days average
+  age, no lifecycle, accessed < 1x/year. Transitioning to Glacier Deep
+  Archive at 90 days captures 95.7% storage saving. Versioning is Enabled
+  with 0 noncurrent bytes (write-once workload). Object Lock not configured
+  — surface as a parallel compliance finding (Step 5).
+RECOMMENDATION:
+  {
+    "Rules": [
+      {
+        "ID": "compliance-archive-deep-archive",
+        "Status": "Enabled",
+        "Filter": { "Prefix": "" },
+        "Transitions": [
+          { "Days": 90, "StorageClass": "GLACIER_DEEP_ARCHIVE" }
+        ]
+      },
+      {
+        "ID": "abort-incomplete-multipart-uploads",
+        "Status": "Enabled",
+        "Filter": {},
+        "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+      }
+    ]
+  }
+SAVINGS:
+  CURRENT_MONTHLY: $115.00  (5,000 GiB × $0.023 Standard)
+  PROJECTED_MONTHLY: $4.95  (5,000 GiB × $0.00099 Deep Archive)
+  MONTHLY_SAVING: $110.05
+  ANNUAL_SAVING: $1,320.60
+  CAVEATS:
+    - Deep Archive 180-day minimum duration: objects deleted before day 180
+      still bill. Workload is write-once with 7-year retention — no conflict.
+    - Retrieval is $2-10/TB Standard (12h), $2.50/TB Bulk (48h). Budget
+      separately if regulatory retrieval is likely.
+    - Object Lock is NOT configured. For a compliance archive, recommend
+      enabling Object Lock in COMPLIANCE mode with 2555-day retention
+      (Step 5 finding — not a verdict change).
+IMPLEMENTATION:
+  1. CONFIRM: About to put-bucket-lifecycle-configuration on bucket
+     compliance-archive-7yr. This enables Deep Archive transition at 90d
+     and multipart abort. Proceed? (yes/no)
+  2. aws s3api put-bucket-lifecycle-configuration \
+       --bucket compliance-archive-7yr \
+       --lifecycle-configuration file://lifecycle.json
+  3. Verify: aws s3api get-bucket-lifecycle-configuration \
+       --bucket compliance-archive-7yr
+  4. Backfill existing objects > 90 days old via S3 Batch Operations
+     (lifecycle only applies to objects reaching 90 days AFTER the rule
+     is created):
+     aws s3control create-job --account-id <acct> \
+       --operation '{"S3CopyObject": {"TargetStorageClass": "GLACIER_DEEP_ARCHIVE"}}' \
+       --manifest-location s3://<manifest-bucket>/manifest.csv \
+       --report-spec '<report-config>' \
+       --role-arn arn:aws:iam::<acct>:role/<batch-role>
+```
+
+## Verdict consistency rules (prevent misclassification)
+
+The skill MUST emit verdicts that are mathematically and logically
+self-consistent. The following rules are mandatory checks before any
+output is finalized:
+
+1. **Zero-savings rule.** If `MONTHLY_SAVING == $0.00` for every
+   dimension, the verdict MUST be `ALREADY_OPTIMAL`, never
+   `OPPORTUNITY_FOUND`. A finding with "OPPORTUNITY_FOUND" and
+   "$0.00 monthly saving" in the same output block is a contradiction
+   and a hard error.
+
+2. **Negative-savings rule.** If the projected monthly cost is HIGHER
+   than current (e.g., Intelligent-Tiering monitoring fee exceeds the
+   transition saving, or minimum-duration charges net out negative),
+   the verdict for that dimension is "no action" and MUST NOT be
+   aggregated into `OPPORTUNITY_FOUND`. Either pick a different
+   storage class or emit `ALREADY_OPTIMAL` with the reasoning that the
+   current tier is already cheapest.
+
+3. **OPPORTUNITY_FOUND requires a non-zero savings line.** When emitting
+   `OPPORTUNITY_FOUND`, the SAVINGS block must show a positive
+   `MONTHLY_SAVING` for at least one dimension. If no dimension has
+   positive savings, downgrade to `ALREADY_OPTIMAL`.
+
+4. **SAVINGS arithmetic check.** `CURRENT_MONTHLY − PROJECTED_MONTHLY`
+   MUST equal `MONTHLY_SAVING`. If the three numbers don't reconcile,
+   re-compute before emitting. Round to 2 decimal places.
+
+5. **Dimension coverage rule.** For a versioned bucket,
+   `OPPORTUNITY_FOUND` MUST include either a `NoncurrentVersionExpiration`
+   rule OR a documented reason why one is not applicable (e.g., "Object
+   Lock COMPLIANCE mode requires version retention"). An
+   `OPPORTUNITY_FOUND` on a versioned bucket with only `Expiration`
+   (current-version) rules is incomplete — it leaves noncurrent bytes
+   accumulating indefinitely.
+
+6. **Storage-class transition must include retrieval caveats.** Any
+   transition to a Glacier tier MUST include the retrieval cost and
+   latency in `CAVEATS`. A bare `Transitions` rule without retrieval
+   cost disclosure is non-compliant.
+
+7. **Intelligent-Tiering object-size gate.** Recommending Intelligent-
+   Tiering on a bucket where the average object size < 128 KB MUST
+   surface the monitoring-fee calculation and confirm it does not
+   exceed the transition saving.
+
+8. **Filter-prefix reality check.** Before emitting `OPPORTUNITY_FOUND`
+   on a transition rule, verify the proposed `Filter.Prefix` matches
+   actual key prefixes in Storage Lens or `list-objects-v2 --prefix`.
+   A rule with a non-matching prefix is silently a no-op.
+
+These rules are evaluated AFTER Step 6 aggregation but BEFORE emitting
+the output block. If any rule fails, re-run the relevant step.
+
+## Error handling — CLI and data-source failures
+
+The workflow depends on S3 API, S3 Control API (Storage Lens), and
+optional CloudTrail data. Each can fail independently; silent failures
+produce misclassifications (especially false `ALREADY_OPTIMAL` on
+buckets where Storage Lens is not enabled).
+
+### Storage Lens failures
+
+| Failure mode | Detection | Handling |
+|---|---|---|
+| `get-storage-lens-configuration` returns `NoSuchConfiguration` | API error | Storage Lens is not enabled. Fall back to `list-objects-v2` with `--page-size 1000` for a sample; flag the recommendation as MEDIUM confidence due to absent access-pattern data. Surface "Enable Storage Lens" as a parallel finding. |
+| Storage Lens enabled but `ExportVersion` > 7 days stale | `ExportDataFreshness` check | Noncurrent-byte % and storage-class distribution may not reflect recent changes. Re-pull if possible; otherwise flag as MEDIUM confidence. |
+| Storage Lens shows 0 noncurrent bytes on a versioned bucket | Cross-check with `list-object-versions --noncurrent-versions` | Iflist shows noncurrent versions but Storage Lens shows 0, the dashboard is misconfigured. Trust the direct API call. |
+
+### S3 API failures
+
+| Failure mode | Detection | Handling |
+|---|---|---|
+| `get-bucket-lifecycle-configuration` returns `NoSuchLifecycleConfiguration` (404) | HTTP 404 | This is NORMAL — the bucket has no lifecycle. Proceed with full recommendation; do NOT treat as an error. |
+| `get-bucket-versioning` returns `{}` (empty) | Response body empty | Versioning was never enabled. Skip the noncurrent-version dimension entirely. |
+| `list-multipart-uploads` returns empty `Uploads` array | `len(Uploads) == 0` | No stale multipart uploads. Still emit the `AbortIncompleteMultipartUpload` rule as preventive; do not mark multipart dimension as OPPORTUNITY_FOUND. |
+| `put-bucket-lifecycle-configuration` fails with `MalformedXML` | API error | The JSON payload has a schema error. Common causes: `NoncurrentDays` < 1, `Filter` and `Prefix` at the same rule level, or unsupported `StorageClass` value. Validate against the S3 Lifecycle schema and retry. |
+| `list-objects-v2` returns `AccessDenied` | API error | The role lacks `s3:ListBucket` on the bucket. Surface as a BLOCKED finding; recommend the operator grant `s3:ListBucket` and `s3:GetLifecycleConfiguration` to the audit role. |
+| `list-objects-v2` is paginating > 100 pages on a large bucket | Pagination count | STOP iterating live. Use S3 Inventory (daily export) or Storage Lens aggregate metrics instead. Live iteration of a billion-object bucket can take hours and incur request charges. |
+
+### Object Lock interaction failures
+
+| Failure mode | Detection | Handling |
+|---|---|---|
+| Lifecycle `ExpirationInDays` shorter than Object Lock retention | Cross-check `get-object-lock-configuration` retention period vs `ExpirationInDays` | The rule is silently a no-op on locked objects. Surface as a CONFIG finding; do not change the verdict based on the (silently ineffective) expiration rule. |
+| Object Lock `GOVERNANCE` mode on compliance data | `Mode == GOVERNANCE` for a compliance workload | Surface that any principal with `s3:BypassGovernanceRetention` can shorten retention. Recommend `COMPLIANCE` mode. This is a finding, not a verdict change. |
+
+### Batch Operations failures
+
+| Failure mode | Detection | Handling |
+|---|---|---|
+| `create-job` fails with `AccessDenied` | API error | The role lacks `s3control:CreateJob`. Batch Operations requires a dedicated role with `s3:ObjectLambda`/`s3:ReplicateObject` permissions. Surface the IAM requirement in the IMPLEMENTATION block. |
+| Batch job manifest generation fails | Manifest S3 location not writable | The manifest bucket must be in the same region as the Batch Operations job. Verify region alignment before emitting the IMPLEMENTATION step. |
+
+### Rate-limit and large-batch guidance
+
+For fleet-wide lifecycle audits covering > 100 buckets:
+
+1. **Serialize, do not parallelize** the `put-bucket-lifecycle-configuration`
+   calls across buckets in the same region. S3 Control API has a
+   sustained rate limit of ~5 lifecycle-configuration puts per second
+   per account; parallel puts will throttle.
+2. **Page list-buckets by region** using `--region <region>` on each
+   call. A global `list-buckets` returns buckets across all regions,
+   but lifecycle configuration is region-specific.
+3. **For > 1,000 buckets**, split into batches of 50 buckets per
+   operator CONFIRM gate. Each batch emits a single consolidated
+   CONFIRM; the operator reviews the savings rollup before applying.
+4. **Verify propagation** after each batch: lifecycle rules are
+   eventually consistent (~24 hours for first execution). Surface this
+   in the post-apply verification step.
+
+## Rollback procedure (beyond JSON backup)
+
+The pre-flight captures a JSON backup of the current lifecycle config.
+Rollback is a three-step procedure — the JSON backup alone is
+insufficient because lifecycle rules are eventually consistent and
+objects may have already transitioned.
+
+1. **Restore the prior configuration:**
+   ```bash
+   aws s3api put-bucket-lifecycle-configuration \
+     --bucket <name> \
+     --lifecycle-configuration file://<name>-lifecycle-backup-<timestamp>.json
+   ```
+   This stops FUTURE transitions but does not revert objects that have
+   already moved to a cheaper tier.
+
+2. **Identify objects that transitioned during the bad window:**
+   ```bash
+   # Find objects that transitioned to the target storage class
+   # between the bad-put timestamp and the rollback timestamp.
+   aws s3api list-objects-v2 --bucket <name> \
+     --query "Contents[?StorageClass=='STANDARD_IA']" \
+     --output json > transitioned-objects.json
+   ```
+   For large buckets, use S3 Inventory (daily export) filtered by
+   storage-class column instead of `list-objects-v2`.
+
+3. **Restore the storage class of affected objects via S3 Batch
+   Operations:**
+   ```bash
+   aws s3control create-job --account-id <acct> \
+     --operation '{"S3CopyObject": {"TargetStorageClass": "STANDARD",
+       "ReplaceMetadata": {"ContentType": "application/octet-stream"}}}' \
+     --manifest-location s3://<manifest-bucket>/manifest.csv \
+     --report-spec '{"ReportFormat":"Report_20170828","Bucket":"s3://<report-bucket>","Enabled":true,"ReportScope":"AllTasks"}' \
+     --role-arn arn:aws:iam::<acct>:role/<batch-role> \
+     --client-request-token $(uuidgen)
+   ```
+   This copies each object back to Standard. The copy operation incurs
+   request and data-transfer charges — include them in the rollback
+   cost estimate.
+
+4. **Verify Storage Lens metrics stabilize** within 24-48 hours post-
+   rollback. The noncurrent-byte % and storage-class distribution
+   should return to pre-bad-put levels.
+
+**Cost of rollback:** a bad lifecycle put on a 100 TB bucket that
+triggers a mass Standard → Standard-IA transition costs ~$50-150 in
+request fees (1 PUT per object on transition) plus ~$1,000-2,000 in
+Batch Operations copy-back fees. Surface this in the CONFIRM gate
+before applying any lifecycle change on a large bucket.
+
+## Cross-region cost variance detail
+
+The Quick reference pricing table is us-east-1 baseline. S3 pricing
+varies materially by region; a recommendation that saves money in
+us-east-1 may save MORE or LESS in another region:
+
+| Region | Standard $/GB-mo | Standard-IA $/GB-mo | Deep Archive $/GB-mo | Notes |
+|---|---|---|---|---|
+| us-east-1, us-west-2 | 0.023 | 0.0125 | 0.00099 | Baseline |
+| eu-west-1 (Ireland) | 0.024 | 0.013 | 0.001 | ~4% premium |
+| eu-central-1 (Frankfurt) | 0.0245 | 0.013 | 0.001 | ~7% premium; high egress |
+| ap-southeast-1 (Singapore) | 0.025 | 0.0141 | 0.001 | ~9% premium |
+| ap-southeast-2 (Sydney) | 0.025 | 0.014 | 0.0011 | ~9% premium |
+| ap-northeast-1 (Tokyo) | 0.025 | 0.0138 | 0.0011 | ~9% premium |
+| ap-south-1 (Mumbai) | 0.0259 | 0.0144 | 0.00114 | ~13% premium |
+| sa-east-1 (São Paulo) | 0.0309 | 0.01688 | 0.00153 | ~35% premium; egress highest |
+| af-south-1 (Cape Town) | 0.0304 | 0.0166 | 0.00153 | ~32% premium |
+
+**Decision impact:**
+
+- **High-premium regions (sa-east-1, af-south-1):** lifecycle
+  transitions capture MORE savings because the gap between Standard
+  and Glacier is wider. Recommend AGGRESSIVE transitions (earlier
+  `Days` thresholds) — the math favours moving to Glacier IR or
+  Flexible sooner.
+- **Low-premium regions (us-east-1, us-east-2):** the savings delta
+  is smaller; the Intelligent-Tiering monitoring fee and minimum-
+  duration charges eat a larger share of the saving. Be more
+  conservative on small-object buckets.
+- **Always re-state the regional rate** in the SAVINGS block when the
+  bucket is not in us-east-1. Pull the rate from the AWS Pricing API
+  (`aws pricing get-products --service-code AmazonS3 --filters ...`)
+  rather than estimating from the multiplier.
 
 ## Anti-Patterns — NEVER
 
@@ -609,6 +936,38 @@ IMPLEMENTATION: None required. Posture is correct for the workload archetype.
 - NEVER recommend deleting noncurrent versions without confirming the workload
   can tolerate loss of version history. Some compliance frameworks require
   version retention — surface Object Lock as the parallel control.
+
+- NEVER assume Cross-Region Replication (CRR) preserves the SOURCE storage
+  class. CRR defaults to copying objects in the **destination bucket's
+  default storage class** (Standard unless the replication rule overrides
+  it). A common anti-pattern: source bucket transitions to Glacier Deep
+  Archive, but the CRR destination remains in Standard indefinitely —
+  doubling the storage bill instead of halving it. **Why this happens:**
+  replication rules are independent of lifecycle rules; lifecycle does not
+  propagate across the replication boundary. Always design source AND
+  destination lifecycle rules in tandem, OR explicitly set
+  `ExistingObjectReplication: false` and `StorageClass` on the replication
+  rule to match the source tier.
+
+- NEVER emit `OPPORTUNITY_FOUND` on a bucket where the projected monthly
+  cost equals or exceeds the current monthly cost. The verdict requires
+  a positive net saving — minimum-duration charges, Intelligent-Tiering
+  monitoring fees, and request fees on bulk transitions can net out
+  negative. If the math shows $0 or negative saving, the verdict is
+  `ALREADY_OPTIMAL` for that dimension, not `OPPORTUNITY_FOUND`.
+
+- NEVER recommend a lifecycle transition on a bucket without first
+  confirming the average object size from Storage Lens. A bucket of
+  millions of < 128 KB objects costs MORE in any IA tier than in Standard,
+  due to the 128 KB minimum billable size. Surface the object-size
+  distribution as the gating check before any transition recommendation.
+
+- NEVER conflate `ExpirationInDays` (current version) with
+  `NoncurrentVersionExpiration.NoncurrentDays` (prior versions). The two
+  are independent — a rule that expires the current version creates a
+  new noncurrent version on a versioned bucket, INCREASING storage if no
+  parallel noncurrent rule exists. This is the single most common
+  lifecycle misconfiguration in production S3 environments.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 

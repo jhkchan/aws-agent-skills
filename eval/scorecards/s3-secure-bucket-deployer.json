@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 15,
       "max": 20,
-      "justification": "The skill adds useful expert ordering (BPA first, encryption before upload, versioning before lifecycle/replication) and cost notes for SSE\u2011KMS, which a baseline model may not enumerate, but most of the content restates well\u2011known AWS best\u2011practices rather than novel decision trees or thresholds."
+      "justification": "Introduces a novel dependency\u2011graph table that lists silent\u2011failure API behaviours and a concrete ordering rationale that many engineers overlook. However, a large portion restates well\u2011known best practices (BPA, encryption, versioning) that a capable model already knows, so the delta is not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific, step\u2011by\u2011step provisioning flow with exact CLI syntax and verification steps, reflecting real\u2011world operational mindset. Missing is a concrete procedure for creating the replication IAM role and handling MFA\u2011Delete device registration, which are essential for the full workflow."
+      "justification": "Procedures are AWS\u2011specific and detailed (CLI commands, exact order), but some steps are generic (e.g., \u201cverify prerequisites\u201d) and the permission matrix for each CLI call is omitted, leaving the mindset partially under\u2011specified."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 11,
+      "score": 14,
       "max": 15,
-      "justification": "Contains useful warnings (e.g., enabling only bucket\u2011level BPA, KMS cost, ACL pitfalls) and a \"Common mistake\" note, but does not present a dedicated NEVER list or systematic anti\u2011pattern catalog with explicit rationales for each. Anti\u2011pattern guidance is present but not exhaustive."
+      "justification": "A solid NEVER list with concrete reasons is provided, yet it omits a few common pitfalls (e.g., KMS key rotation, bucket\u2011policy size limits) that would make the anti\u2011pattern coverage exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, keywords, and activation contract are well defined. Output format is precisely specified. Minor issue: the \"Output format\" block could be tighter about required ordering of labels; otherwise compliance is strong."
+      "justification": "Front\u2011matter, description, activation keywords, and output format are present, but the \u2018when_to_use\u2019 narrative is verbose and the contract lacks a concrete example of the exact checklist block, which could cause activation ambiguity."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The skill layers information: high\u2011level purpose, then prerequisites, then a concise 10\u2011step procedure, then detailed CLI snippets, and finally the output format. However, some dense blocks (full JSON policy) are presented early, adding cognitive load before the operator knows they need it."
+      "justification": "The document front\u2011loads large tables and dense paragraphs before the concise 10\u2011step procedure, creating cognitive overload; critical rules are buried in the dependency graph rather than being surfaced early."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (BPA, encryption, versioning) are gated by a strict invocation contract and a prerequisite checklist, limiting accidental execution. Optional features (replication, lifecycle) are clearly marked as optional. Slight looseness: no explicit guard against running the commands on a non\u2011existent bucket."
+      "justification": "The skill correctly constrains destructive actions (e.g., MFA Delete) with warnings, but it does not enforce the root\u2011only requirement programmatically, leaving a fragile gap for high\u2011risk operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: activation \u2192 contract \u2192 reasoning \u2192 prerequisites \u2192 procedural steps \u2192 output format. The structure is consistent and aids comprehension."
+      "justification": "The overall layout follows a recognizable pattern (metadata, activation, reasoning, steps, anti\u2011patterns, output), yet the mix of narrative, tables, and code blocks feels ad\u2011hoc rather than a clean, reusable template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 13,
       "max": 15,
-      "justification": "Provides copy\u2011pasteable CLI commands, verification commands, and a ready\u2011to\u2011deploy checklist, enabling an agent to act. Missing are error\u2011handling branches (e.g., what to do if a command fails), guidance for existing buckets that already have partial configuration, and the replication IAM role creation step."
+      "justification": "Provides concrete CLI commands, verification steps, and a ready\u2011to\u2011emit checklist. Model output examples show minor inconsistencies (different checkbox styles, missing handling of PREREQUISITES_MISSING) that could trip an automated agent, so usability is high but not flawless."
     }
   ],
-  "total_score": 97,
+  "total_score": 102,
   "max_score": 120,
   "grade": "B",
-  "token_count": 32382,
-  "latency_ms": 5106,
+  "token_count": 44709,
+  "latency_ms": 21140,
   "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }

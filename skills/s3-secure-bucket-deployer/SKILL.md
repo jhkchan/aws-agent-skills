@@ -336,6 +336,12 @@ re-issue the call once.
 
 ### Step 4 — Versioning
 
+Enable versioning to keep every historical version of every object.
+This is the foundation for lifecycle rules on non-current versions
+(Step 7), replication (Step 8), and ransomware-resistant recovery.
+MFA Delete is optional but recommended for production buckets holding
+irreplaceable data.
+
 ```bash
 aws s3api put-bucket-versioning \
   --bucket <BUCKET> \
@@ -398,46 +404,14 @@ with `Allow` (our deny policies should pass). `MalformedPolicy` means
 JSON syntax error — validate with `python -m json.tool policy.json` or
 `jq . policy.json`. `NoSuchBucket` means the bucket doesn't exist yet.
 
-### Step 5.1 — Bucket policy (legacy full-JSON reference)
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "DenyInsecureTransport",
-      "Effect": "Deny",
-      "Principal": "*",
-      "Action": "s3:*",
-      "Resource": [
-        "arn:aws:s3:::<BUCKET>",
-        "arn:aws:s3:::<BUCKET>/*"
-      ],
-      "Condition": {
-        "Bool": { "aws:SecureTransport": "false" }
-      }
-    },
-    {
-      "Sid": "DenyUnEncryptedObjectUploads",
-      "Effect": "Deny",
-      "Principal": "*",
-      "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::<BUCKET>/*",
-      "Condition": {
-        "StringNotEquals": {
-          "s3:x-amz-server-side-encryption": ["AES256", "aws:kms"]
-        }
-      }
-    }
-  ]
-}
-```
-
-```bash
-aws s3api put-bucket-policy --bucket <BUCKET> --policy file://policy.json
-```
-
 ### Step 6 — Access logging
+
+Enable S3 server access logs for the data bucket (every request is
+logged with requester, source IP, action, response code, bytes) AND
+CloudTrail data events for the API-level audit trail. The log target
+bucket must exist in the SAME region and must grant
+`logging.s3.amazonaws.com` write access via bucket policy (ACL grants
+do not work with `BucketOwnerEnforced`).
 
 ```bash
 aws s3api put-bucket-logging \
@@ -460,7 +434,32 @@ aws cloudtrail put-event-selectors \
     "Values":["arn:aws:s3:::<BUCKET>/"]}]}]'
 ```
 
+**Common mistake**: Setting the log target to a bucket with
+`BucketOwnerEnforced` enabled but granting log delivery via the legacy
+`log-delivery` ACL. BucketOwnerEnforced disables ALL ACLs, so S3 log
+delivery silently stops with no error. Grant `s3:PutObject` to
+`logging.s3.amazonaws.com` via a bucket policy on the log target —
+see `references/bucket-policy-examples.md` "Log-delivery grant".
+
+**If it fails**: `put-bucket-logging` returns 200 even when the log
+target is misconfigured — the only signal is that no logs appear after
+1+ hours. Diagnostic order: (1) `aws s3api get-bucket-logging --bucket
+<LOG-BUCKET>` to confirm S3 log delivery is the configured target;
+(2) verify log target exists in the SAME region as the source bucket
+(cross-region log delivery is unsupported for S3 server access logs);
+(3) check the log target's bucket policy for the
+`logging.s3.amazonaws.com` grant. CloudTrail `TrailNotFoundException`
+means the trail name is wrong or the trail is in a different region.
+
 ### Step 7 — Lifecycle rules
+
+Apply lifecycle rules to transition objects through cheaper storage
+classes over time and to expire non-current versions and incomplete
+multipart uploads. Rules require versioning (Step 4) for any
+`NoncurrentVersion*` action — without it the rule applies as a silent
+no-op. Mind the minimum-storage-duration constraints per class
+(STANDARD_IA: 30d, GLACIER: 90d, DEEP_ARCHIVE: 180d) or you will pay
+early-deletion fees.
 
 ```bash
 aws s3api put-bucket-lifecycle-configuration \
@@ -487,6 +486,22 @@ aws s3api put-bucket-lifecycle-configuration \
 - **GLACIER**: archival, minutes-to-hours retrieval (90+ days)
 - **DEEP_ARCHIVE**: long-term retention, 12h retrieval (180+ days)
 
+**Common mistake**: Writing `NoncurrentVersion*` rules before checking
+that versioning is enabled. Without versioning the rule applies
+silently as a no-op — the API returns success, no objects transition,
+and you only discover the cost leak weeks later via Storage Lens. Also:
+transitioning objects smaller than 128 KB to STANDARD_IA / ONEZONE_IA /
+GLACIER_IR costs MORE than leaving them in STANDARD due to the
+minimum-size fee — use `ObjectSizeGreaterThan: 131072` in the filter.
+
+**If it fails**: `MalformedXML` almost always means the `Filter` element
+is missing — every modern rule requires `"Filter": {"Prefix": ""}` even
+when matching all objects. If rules apply but objects do not transition,
+verify (a) versioning is `Enabled`, (b) the object has been in its
+current storage class for at least the minimum duration (30 / 60 / 90 /
+180 days), and (c) for `NoncurrentVersion*` rules, the object has at
+least one non-current version (a bucket with no overwrites has none).
+
 ### Step 8 — Replication (optional, if CRR/SRR required)
 
 Prerequisites: versioning enabled (Step 4), destination bucket with its
@@ -505,6 +520,23 @@ aws s3api put-bucket-replication \
     }]
   }'
 ```
+
+**Common mistake**: Forgetting that replication does NOT backfill
+objects written before the rule was added. Only new PutObject calls
+after the rule is active are replicated. For pre-existing objects, run
+an S3 Batch Operations Copy job or restart replication with
+`ExistingObjectReplication: Enabled` (v2 config only).
+
+**If it fails**: `InvalidRequest` typically means versioning is not
+enabled on the SOURCE or the DESTINATION bucket (both are required).
+`AccessDenied` on the role assume means the trust policy doesn't list
+`s3.amazonaws.com` as principal, or the role doesn't exist in this
+account. If the call succeeds but replicas do not appear, check the
+replication role's permissions: it needs `s3:ReplicateObject` AND
+`s3:GetObjectVersionForReplication` on source + `kms:Decrypt` on the
+source KMS key + `kms:Encrypt` / `kms:GenerateDataKey` on the
+destination KMS key. Use S3 replication metrics (`S3:ReplicationLatency`,
+`S3:BytesPendingReplication`) to detect silent stalls.
 
 ### Step 9 — Verification
 
@@ -538,6 +570,89 @@ aws s3api get-bucket-lifecycle-configuration --bucket <BUCKET>
 ### Step 10 — Emit checklist
 
 The agent outputs the READY_TO_DEPLOY checklist (see Output format below).
+
+## NEVER do these things
+
+These anti-patterns cause silent failures, exposure windows, or
+compliance violations. Each one has been observed in production
+incidents — the "why it's wrong" line is the post-mortem finding, not
+hypothetical. Treat each as a hard rule.
+
+1. **NEVER enable only bucket-level BPA without account-level BPA.**
+   Why it's wrong: account-level BPA is authoritative — a future admin
+   who relaxes account-level BPA immediately re-exposes every bucket
+   that lacks its own bucket-level setting. Set both for defense-in-
+   depth; the cost is one extra CLI call.
+
+2. **NEVER upload objects before configuring default encryption.**
+   Why it's wrong: bucket-level default encryption applies at write
+   time only. Pre-existing objects stay unencrypted and remediation
+   requires S3 Batch Operations Copy (slow, costly, and logged as a
+   security incident in audits). Configure encryption BEFORE the first
+   PutObject, ideally in the same CloudFormation / Terraform run as
+   the bucket create.
+
+3. **NEVER set `BucketOwnerEnforced` without auditing existing ACLs.**
+   Why it's wrong: this setting disables ALL ACLs immediately and
+   silently. Any cross-account writer relying on ACL-granted object
+   ownership loses their workflow on the next PutObject — there is no
+   deprecation window, no CloudTrail event beyond the ownership-change
+   API call. Inventory `s3:GetObjectAcl` across all writers first;
+   migrate those grants to the bucket policy before flipping.
+
+4. **NEVER configure `NoncurrentVersion*` lifecycle rules without
+   confirming versioning is `Enabled`.**
+   Why it's wrong: the API accepts the rule and returns HTTP 200, but
+   the rule is a silent no-op without versioning. You discover the
+   miss weeks later via Storage Lens showing unbounded growth in old
+   versions. Always check `get-bucket-versioning` immediately before
+   `put-bucket-lifecycle-configuration`.
+
+5. **NEVER configure replication if versioning is not enabled on BOTH
+   source and destination buckets.**
+   Why it's wrong: versioning on the source is required for the API
+   call to succeed, but versioning on the DESTINATION is required for
+   replicas to actually land. Worse, objects written to the source
+   BEFORE the replication rule was added are NEVER backfilled — you
+   get partial replication with no error signal. Run
+   `ExistingObjectReplication: Enabled` (v2 config) or a Batch
+   Operations Copy job to catch up.
+
+6. **NEVER use SSE-KMS without `BucketKeyEnabled: true` on
+   high-throughput buckets.**
+   Why it's wrong: without Bucket Keys every PutObject triggers
+   `kms:GenerateDataKey` ($0.03 / 10k calls + 50-100ms latency). At
+   1M writes/day that is ~$1,095/year in KMS fees alone, and you risk
+   hitting the KMS region throttle (5,500-10,000 req/s default),
+   which surfaces as `ThrottlingException` on S3 writes. Bucket Keys
+   cut KMS calls by ~99% with no security downside.
+
+7. **NEVER attach a bucket policy with `Principal: "*"` and
+   `Effect: "Allow"`, even briefly "to test".**
+   Why it's wrong: a 30-second window with a public-allow policy is
+   enough for internet scanners (GrayhatWarfare, Censys, Shodan) to
+   enumerate the bucket and download objects. Use BPA + signed URLs +
+   CloudFront Origin Access Control for any "public-ish" workload.
+   Deny-style policies with `Principal: "*"` (used in Step 5) are safe
+   because the condition gates the call; Allow-style is not.
+
+8. **NEVER use the AWS-managed `aws/s3` KMS key for compliance
+   workloads (HIPAA / PCI-DSS / SOC2 / FedRAMP).**
+   Why it's wrong: you cannot customize the `aws/s3` key policy, so
+   you lose the second access gate (`kms:Decrypt`) that makes SSE-KMS
+   valuable for compliance. A principal with `s3:GetObject` can read
+   any object encrypted with the managed key. Always provision a
+   customer-managed CMK with an explicit key policy that grants
+   `kms:Decrypt` only to authorized principals.
+
+9. **NEVER delete the last KMS key referenced by a bucket's default
+   encryption or bucket policy without draining the bucket first.**
+   Why it's wrong: every GET / HEAD on an encrypted object fails with
+   `AccessDenied` the moment the key enters `PendingDeletion` state.
+   There is no recovery once the key's waiting period elapses — the
+   data is cryptographically lost. Always disable encryption on the
+   bucket, run a Batch Operations Copy to re-encrypt with a new key,
+   verify, THEN schedule the old key for deletion.
 
 ## Output format
 

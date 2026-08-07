@@ -200,9 +200,11 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | dms-replication-task-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 18.3s | 39911 |
 | dynamodb-table-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.8s | 38416 |
 | ebs-volume-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 16.0s | 35713 |
+| ec2-rightsizing-optimizer | amazon.nova-pro-v1:0 | 108/120 | A | 3/5 | 14.9s | 65548 |
 | ec2-security-group-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 5/5 | 11.5s | 38372 |
 | ecr-repository-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 12.4s | 46409 |
 | ecs-task-definition-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 13.9s | 45015 |
+| ecs-task-troubleshooter | amazon.nova-pro-v1:0 | 109/120 | A | 2/5 | 12.3s | 55277 |
 | efs-filesystem-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 38429 |
 | eks-cluster-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.7s | 34838 |
 | elbv2-load-balancer-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 8.6s | 47542 |
@@ -214,10 +216,13 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | guardduty-finding-severity-triage | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.3s | 55940 |
 | health-event-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 12.4s | 42780 |
 | iam-least-privilege-advisor | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 7.8s | 33835 |
+| iam-permission-troubleshooter | amazon.nova-pro-v1:0 | 106/120 | B | 5/5 | 12.9s | 47128 |
+| iam-role-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 20.9s | 54672 |
 | inspector2-coverage-finding-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.3s | 52550 |
 | kinesis-stream-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 27.1s | 42232 |
 | kms-key-policy-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.2s | 49516 |
 | lakeformation-data-lake-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 13.1s | 43103 |
+| lambda-function-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 3/5 | 9.6s | 49830 |
 | lambda-runtime-deprecation-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 15.4s | 45863 |
 | macie-data-classification-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 17.6s | 36862 |
 | msk-cluster-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 12.2s | 36499 |
@@ -225,11 +230,15 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | networkmanager-core-network-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.3s | 34956 |
 | opensearch-domain-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 7.9s | 34037 |
 | organizations-scp-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.7s | 33467 |
+| rds-backup-restore-operator | amazon.nova-pro-v1:0 | 105/120 | B | 3/5 | 12.5s | 42168 |
+| rds-connectivity-troubleshooter | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 36.9s | 65609 |
 | rds-instance-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 10.9s | 46275 |
 | redshift-cluster-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 9.8s | 45953 |
 | resiliencehub-app-assessment-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.7s | 48588 |
 | route53-record-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.8s | 37358 |
+| s3-lifecycle-optimizer | amazon.nova-pro-v1:0 | 101/120 | B | 4/5 | 8.0s | 57559 |
 | s3-public-access-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 5/5 | 14.7s | 40044 |
+| s3-secure-bucket-deployer | amazon.nova-pro-v1:0 | 102/120 | B | 3/5 | 21.1s | 44709 |
 | sagemaker-endpoint-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 5.5s | 37189 |
 | secretsmanager-rotation-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 11.2s | 48554 |
 | securityhub-control-compliance-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 47500 |
@@ -243,6 +252,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | trustedadvisor-check-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 16.1s | 40241 |
 | verified-permissions-policy-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 10.6s | 40262 |
 | vpc-lattice-auth-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 8.7s | 40248 |
+| vpc-network-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 14.4s | 62426 |
 | wafv2-web-acl-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 12.1s | 43695 |
 | wellarchitected-workload-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 20.5s | 41739 |
 <!-- END EVAL SCORECARD TABLE -->
