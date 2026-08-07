@@ -1,0 +1,233 @@
+# Eval test cases for rds-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimisation pattern. Each case's DB ID
+# embeds the test-case id so the model naturally echoes it (avoids assertion-
+# token mismatch). The decision matrix in SKILL.md produces exactly the
+# expected verdicts below.
+skill: rds-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: overprovisioned-postgres-rightsize-ri
+    description: >-
+      db.r6i.2xlarge PostgreSQL with 30 days of CloudWatch and Performance
+      Insights data. CPU avg 12%, FreeableMemory avg 28 GB (of 64 GB),
+      DatabaseConnections avg 15. No RI/Savings Plan in place. Graviton-
+      compatible (PostgreSQL 15). Multi-AZ correctly enabled for production.
+      Expected verdict: OPPORTUNITY_FOUND with downsize to r6g.large +
+      Graviton + 3-yr RI recommendation.
+    input: |
+      DBInstanceIdentifier: db-overprovisioned-postgres-rightsize-ri
+      Engine: postgres (PostgreSQL 15.4)
+      DBInstanceClass: db.r6i.2xlarge (8 vCPU, 64 GB RAM)
+      Region: us-east-1
+      Multi-AZ: true
+      Storage: 500 GB gp3
+      License model: postgresql-license (open-source)
+      Pricing: On-Demand (no RI/Savings Plan)
+
+      CloudWatch metrics (last 30 days):
+        - CPUUtilization: avg=12%, max=25%
+        - FreeableMemory: avg=28 GB (of 64 GB total), stable
+        - DatabaseConnections: avg=15, max=30
+
+      Performance Insights:
+        - DBLoad: avg=2, max=8 (low for 8 vCPUs)
+        - Top SQL: evenly distributed, no single dominant query
+
+      Workload context: production OLTP database for an e-commerce platform.
+      Steady-state 24/7 with moderate peak during business hours.
+
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "overprovisioned-postgres-rightsize-ri"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "Graviton"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+        - "Savings Plan"
+
+  - id: idle-database-deletion
+    description: >-
+      db.m6i.large MySQL with 0 connections for 30+ days, CPU < 1%
+      sustained. Performance Insights shows no queries. The database
+      bills $285/month for zero usage. Expected verdict:
+      OPPORTUNITY_FOUND with idle-database deletion recommendation
+      (after final snapshot and app-team verification).
+    input: |
+      DBInstanceIdentifier: db-idle-database-deletion
+      Engine: mysql (MySQL 8.0)
+      DBInstanceClass: db.m6i.large (2 vCPU, 8 GB RAM)
+      Region: us-east-1
+      Multi-AZ: false (Single-AZ)
+      Storage: 100 GB gp3
+      Pricing: On-Demand
+
+      CloudWatch metrics (last 30 days):
+        - CPUUtilization: avg=0.2%, max=1% (near-zero)
+        - FreeableMemory: avg=7.8 GB (of 8 GB) — no memory pressure
+        - DatabaseConnections: avg=0, max=0 for ALL 30 days
+
+      Performance Insights:
+        - DBLoad: 0 for entire 30-day window
+        - No SQL statements recorded
+
+      Workload context: database was created for a feature that was
+      deprecated 6 months ago. No application is configured to connect.
+
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "idle-database-deletion"
+        - "RECOMMENDATION"
+        - "application team"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+        - "downsize"
+
+  - id: multiaz-nonprod-removal
+    description: >-
+      db.m6i.xlarge PostgreSQL in a STAGING environment with Multi-AZ
+      enabled. The standby instance costs the same as the primary but
+      staging does not need HA. Expected verdict: OPPORTUNITY_FOUND with
+      recommendation to disable Multi-AZ, halving compute cost.
+    input: |
+      DBInstanceIdentifier: db-multiaz-nonprod-removal
+      Engine: postgres (PostgreSQL 15.4)
+      DBInstanceClass: db.m6i.xlarge (4 vCPU, 16 GB RAM)
+      Region: us-east-1
+      Multi-AZ: true
+      Storage: 200 GB gp3
+      Pricing: On-Demand
+
+      CloudWatch metrics (last 30 days):
+        - CPUUtilization: avg=35%, max=55%
+        - FreeableMemory: avg=10 GB (of 16 GB)
+        - DatabaseConnections: avg=25, max=50
+
+      Workload context: staging database for QA testing. Runs during
+      business hours only. No HA requirement — QA accepts downtime.
+
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "multiaz-nonprod-removal"
+        - "RECOMMENDATION"
+        - "Multi-AZ"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-prod-postgres-ri
+    description: >-
+      db.r6g.2xlarge PostgreSQL (Graviton) on a 3-year Standard RI,
+      CPU avg 55%, FreeableMemory avg 40%, Multi-AZ correctly enabled
+      for production, gp3 storage correctly sized. All dimensions pass.
+      Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      DBInstanceIdentifier: db-already-optimal-prod-postgres-ri
+      Engine: postgres (PostgreSQL 15.4)
+      DBInstanceClass: db.r6g.2xlarge (8 vCPU, 64 GB RAM, Graviton3)
+      Region: us-east-1
+      Multi-AZ: true
+      Storage: 1 TB gp3 (used: 800 GB)
+      Pricing: 3-year Standard Reserved Instance (No Upfront), active
+
+      CloudWatch metrics (last 30 days):
+        - CPUUtilization: avg=55%, max=70%
+        - FreeableMemory: avg=26 GB (of 64 GB), stable
+        - DatabaseConnections: avg=120, max=200
+
+      Performance Insights:
+        - DBLoad: avg=4, max=12 (healthy for 8 vCPUs)
+        - Top SQL: well-distributed, no single dominant query
+
+      Workload context: production OLTP database for a SaaS platform.
+      Steady-state 24/7.
+
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-prod-postgres-ri"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: aurora-serverless-acu-tuning
+    description: >-
+      Aurora Serverless v2 PostgreSQL cluster with min ACU set to 8 but
+      actual average ACU utilization is 4. The min ACU is too high,
+      causing a floor cost of $701/month vs $350/month achievable at
+      min ACU 2. Expected verdict: OPPORTUNITY_FOUND with ACU tuning
+      recommendation.
+    input: |
+      DBClusterIdentifier: aurora-serverless-acu-tuning
+      Engine: aurora-postgresql (Aurora PostgreSQL 15.3)
+      Region: us-east-1
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 8.0 ACU
+        MaxCapacity: 64.0 ACU
+
+      CloudWatch metrics (last 30 days):
+        - ACUUtilization: avg=4.2, max=12, min=4.0
+        - CPUUtilization: avg=18%, max=50%
+        - FreeableMemory: high (workload using ~25% of provisioned)
+        - DatabaseConnections: avg=40, max=80
+
+      Performance Insights:
+        - DBLoad: avg=1, max=4 (low)
+
+      Workload context: internal analytics database with variable load.
+      Peak during business hours (9am-5pm), near-idle overnight and
+      weekends. Genuine scale-down pattern exists.
+
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "aurora-serverless-acu-tuning"
+        - "min ACU"
+        - "RECOMMENDATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"

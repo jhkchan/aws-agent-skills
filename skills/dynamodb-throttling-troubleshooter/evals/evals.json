@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "dynamodb-throttling-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DynamoDB Throttling Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "gsi-hot-key-status-field",
+      "name": "Base table write throttling — low-cardinality GSI partition key (status) propagates throttle to base table",
+      "difficulty": "hard",
+      "prompt_file": "prompts/gsi-hot-key-status-field.md",
+      "baseline_file": "baselines/gsi-hot-key-status-field.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "GSI_HOT_KEY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "GSI_HOT_KEY", "status", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "raise WriteCapacityUnits"]
+        }
+      ]
+    },
+    {
+      "id": "hot-partition-status-active",
+      "name": "Throttling persists after scale-up — partition key userId=admin receives 80% of write traffic",
+      "difficulty": "hard",
+      "prompt_file": "prompts/hot-partition-status-active.md",
+      "baseline_file": "baselines/hot-partition-status-active.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "HOT_PARTITION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "HOT_PARTITION", "partition key", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "burst-capacity-exhaustion-spiky",
+      "name": "Intermittent throttling — burst capacity exhausted on spiky batch-write traffic every 2 minutes",
+      "difficulty": "medium",
+      "prompt_file": "prompts/burst-capacity-exhaustion-spiky.md",
+      "baseline_file": "baselines/burst-capacity-exhaustion-spiky.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "BURST_EXHAUSTED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "BURST_EXHAUSTED", "burst", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "scan-misuse-full-table",
+      "name": "Read throttling — periodic full-table Scan consuming entire RCU budget on a 50 GB table",
+      "difficulty": "medium",
+      "prompt_file": "prompts/scan-misuse-full-table.md",
+      "baseline_file": "baselines/scan-misuse-full-table.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "SCAN_MISUSE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "SCAN_MISUSE", "Scan", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-context-need-table-name",
+      "name": "Vague report of DynamoDB throttling — request table name, region, and CloudWatch metrics",
+      "difficulty": "easy",
+      "prompt_file": "prompts/insufficient-context-need-table-name.md",
+      "baseline_file": "baselines/insufficient-context-need-table-name.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "ThrottledRequests"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

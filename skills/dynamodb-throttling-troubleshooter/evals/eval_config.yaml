@@ -1,0 +1,47 @@
+# Eval configuration for dynamodb-throttling-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: dynamodb-throttling-troubleshooter
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: gsi-hot-key-status-field
+    difficulty: hard
+    prompt_file: prompts/gsi-hot-key-status-field.md
+    baseline_file: baselines/gsi-hot-key-status-field.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: GSI_HOT_KEY
+  - id: hot-partition-status-active
+    difficulty: hard
+    prompt_file: prompts/hot-partition-status-active.md
+    baseline_file: baselines/hot-partition-status-active.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: HOT_PARTITION
+  - id: burst-capacity-exhaustion-spiky
+    difficulty: medium
+    prompt_file: prompts/burst-capacity-exhaustion-spiky.md
+    baseline_file: baselines/burst-capacity-exhaustion-spiky.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: BURST_EXHAUSTED
+  - id: scan-misuse-full-table
+    difficulty: medium
+    prompt_file: prompts/scan-misuse-full-table.md
+    baseline_file: baselines/scan-misuse-full-table.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: SCAN_MISUSE
+  - id: insufficient-context-need-table-name
+    difficulty: easy
+    prompt_file: prompts/insufficient-context-need-table-name.md
+    baseline_file: baselines/insufficient-context-need-table-name.md
+    expected_verdict: NEED_MORE_INFO

@@ -1,0 +1,176 @@
+# Eval test cases for rds-instance-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across workload types (Aurora OLTP, MySQL Multi-AZ, global
+# DR, serverless burst) and missing-prerequisite branches.
+skill: rds-instance-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: aurora-postgres-production
+    description: >-
+      Provision an Aurora PostgreSQL production cluster with customer CMK,
+      Multi-AZ cluster topology, 14-day backups, Enhanced Monitoring +
+      Performance Insights, custom parameter group (force_ssl, shared_buffers),
+      deletion protection. Expects READY_TO_DEPLOY with all checklist items
+      verified.
+    input: |
+      Provision an Aurora PostgreSQL production cluster in us-east-1 for
+      an OLTP orders workload. Cluster name: "prod-orders-pg". Engine
+      aurora-postgresql 16.3. Instance class db.r7g.large. Use KMS
+      customer-managed CMK alias/prod-rds-key. Need a writer + 2 readers
+      across us-east-1a/b/c for read-scaling and failover. 14-day backup
+      retention. Enhanced Monitoring at 30s interval. Performance Insights
+      on. Force SSL via parameter group. Add pgaudit option. Deletion
+      protection on. Master credentials via Secrets Manager.
+      DB subnet group "prod-db-subnet-group" spans 3 AZs. App SG
+      "sg-prod-app" should be the only inbound on port 5432.
+      Tags: Environment=production, Workload=orders.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-orders-pg"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "aurora-postgresql"
+        - "Multi-AZ"
+        - "KMS"
+        - "Enhanced Monitoring"
+        - "Performance Insights"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: mysql-multi-az-commerce
+    description: >-
+      Provision a MySQL 8.0 Multi-AZ non-Aurora instance with customer CMK,
+      deletion protection, Performance Insights, parameter group tuning.
+      Expects READY_TO_DEPLOY with the non-Aurora Multi-AZ pattern.
+    input: |
+      Provision a MySQL 8.0 RDS instance for a commerce workload in
+      us-east-1. Instance identifier: "commerce-mysql-prod". Instance
+      class db.m7g.large. Multi-AZ (synchronous standby). Storage 200 GB
+      gp3 with 6000 IOPS. Use KMS customer-managed CMK alias/commerce-rds-key.
+      Backup retention 7 days. Enhanced Monitoring 30s. Performance Insights
+      on. Parameter group: tune innodb_buffer_pool_size and
+      max_connections=500. Force secure transport. Auto minor version upgrade
+      on. Deletion protection on. DB subnet group "prod-db-subnet-group"
+      spans 2 AZs. App SG "sg-commerce-app" inbound on 3306.
+      Tags: Environment=production, Workload=commerce.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "commerce-mysql-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Multi-AZ"
+        - "KMS"
+        - "Performance Insights"
+        - "3306"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-cmk-and-subnet-group
+    description: >-
+      Operator requests a new RDS instance but has not provided the KMS CMK
+      ARN and no DB subnet group exists yet. Expects PREREQUISITES_MISSING
+      with specific gaps cited.
+    input: |
+      Help me create a new PostgreSQL RDS instance called "users-db-prod"
+      in us-east-1. It needs to be encrypted. I haven't created a subnet
+      group or decided on a KMS key yet. Engine postgres 16, instance class
+      db.m7g.large. Account ID: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "users-db-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "subnet"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: aurora-global-database
+    description: >-
+      Provision an Aurora MySQL Global Database with primary in us-east-1
+      and secondary in eu-west-1 for cross-region DR. Backtrack enabled.
+      Expects READY_TO_DEPLOY with Global Database-specific patterns.
+    input: |
+      Provision an Aurora MySQL Global Database for a global commerce
+      workload. Primary cluster "commerce-global-primary" in us-east-1,
+      secondary cluster "commerce-global-secondary" in eu-west-1 (read-only
+      DR). Engine aurora-mysql 8.0. Instance class db.r7g.large. Use
+      separate customer CMKs: alias/commerce-rds-key in us-east-1,
+      alias/commerce-rds-key-eu in eu-west-1. Backtrack window 72 hours
+      on primary. 14-day backup retention. Enhanced Monitoring + Performance
+      Insights on both clusters. Force SSL via cluster parameter group.
+      Deletion protection on both clusters. Tags: Environment=production,
+      Workload=commerce-global. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "commerce-global-primary"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Global Database"
+        - "Backtrack"
+        - "KMS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: aurora-serverless-v2-bursty
+    description: >-
+      Provision an Aurora PostgreSQL Serverless v2 cluster for a bursty SaaS
+      workload. MinCapacity=2 (avoid cold-start), MaxCapacity=32. Expects
+      READY_TO_DEPLOY with the Serverless v2 pattern.
+    input: |
+      Provision an Aurora PostgreSQL Serverless v2 cluster for a multi-tenant
+      SaaS workload in us-east-1. Cluster name "saas-tenant-db". Engine
+      aurora-postgresql 16.3. Traffic is bursty — quiet at night, spikes
+      during business hours. MinCapacity 2 (avoid cold-start latency for
+      production), MaxCapacity 32. Use KMS customer-managed CMK
+      alias/saas-rds-key. 7-day backup retention. Enhanced Monitoring 30s.
+      Performance Insights on. Force SSL via cluster parameter group.
+      Deletion protection on. DB subnet group "prod-db-subnet-group" spans
+      3 AZs. App SG "sg-saas-app" inbound on 5432.
+      Tags: Environment=production, Workload=saas-multitenant.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "saas-tenant-db"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Serverless v2"
+        - "MinCapacity"
+        - "MaxCapacity"
+        - "KMS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

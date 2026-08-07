@@ -1,0 +1,183 @@
+# Eval test cases for apigateway-rest-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: apigateway-rest-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: lambda-proxy-rest-api
+    description: >-
+      Standard REST API (v1) with Lambda proxy integration, Cognito user
+      pool authorizer, usage plan with API keys for per-consumer throttling,
+      WAFv2 REGIONAL Web ACL, JSON access logging to CloudWatch, canary
+      enabled at 10 percent, custom domain via ACM. All checklist dimensions
+      pass.
+    input: |
+      Design a deployment plan for a production REST API. Emit the
+      standard VERDICT block (API_SPEC, VERDICT, ARCHITECTURE, CHECKLIST,
+      FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - API type: REST (v1) — needs usage plans and resource policies
+      - Endpoint type: REGIONAL (us-east-1)
+      - Resources: /users [GET, POST], /users/{userId} [GET, PUT, DELETE]
+      - Integration: AWS_PROXY to Lambda user-service-handler
+      - Authorization: COGNITO_USER_POOLS (user pool prod-users-pool)
+      - Usage plan: prod-consumer-plan, rate=100, burst=200, quota=1M/month
+      - API keys: required on all methods (per-consumer rate limiting)
+      - WAF: REGIONAL scope, CommonRuleSet + rate-based
+      - Access logging: JSON to CloudWatch with $context variables
+      - Canary: enabled at 10 percent traffic
+      - Custom domain: api.example.com with base path v1
+      - ACM cert: arn:aws:acm:us-east-1:111111111111:certificate/abc-123
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "lambda-proxy-rest-api"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "AWS_PROXY"
+        - "COGNITO_USER_POOLS"
+        - "usage plan"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: vpc-link-private-integration
+    description: >-
+      REST API with VPC Link to NLB for private backend integration.
+      The NLB targets an ECS service in private subnets. Requires IAM
+      authorization (sigv4) for service-to-service access.
+    input: |
+      Design a deployment plan for a REST API with private backend
+      integration. Emit the standard VERDICT block.
+
+      Requirements:
+      - API type: REST (v1)
+      - Endpoint type: REGIONAL (us-east-1)
+      - Resources: /orders [GET, POST], /orders/{id} [GET]
+      - Integration: HTTP_PROXY via VPC Link to internal NLB
+      - VPC Link target: arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/net/prod-nlb/abc123
+      - NLB listener: TCP 443 (TLS termination at ECS service)
+      - Authorization: AWS_IAM (service-to-service)
+      - WAF: REGIONAL scope, CommonRuleSet + KnownBadInputsRuleSet
+      - Access logging: JSON to CloudWatch
+      - Custom domain: internal-api.example.com with ACM cert
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "vpc-link-private-integration"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VPC_LINK"
+        - "NLB"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-acm-domain-cert
+    description: >-
+      Custom domain requested but no ACM certificate ARN provided.
+      Cannot deploy the custom domain mapping without the cert. Must
+      emit PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a REST API. Emit the standard VERDICT
+      block.
+
+      Requirements:
+      - API type: REST (v1)
+      - Endpoint type: REGIONAL (us-east-1)
+      - Resources: /health [GET]
+      - Integration: AWS_PROXY to Lambda health-check-handler
+      - Authorization: NONE (public health check)
+      - Custom domain: api.example.com with base path v1
+
+      The user did not specify the ACM certificate ARN. They expect the
+      skill to flag this as a missing prerequisite.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-acm-domain-cert"
+        - "VERDICT"
+        - "ACM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: canary-rest-api-deploy
+    description: >-
+      REST API deployment with canary traffic shifting at 10 percent,
+      stage throttling at 1000 rps / 500 burst, and access logging
+      with $context.requestId and responseLatency for Insights queries.
+    input: |
+      Design a deployment plan for a REST API with canary rollout. Emit
+      the standard VERDICT block.
+
+      Requirements:
+      - API type: REST (v1)
+      - Endpoint type: REGIONAL (us-east-1)
+      - Resources: /products [GET, POST], /products/{id} [GET, PUT, DELETE]
+      - Integration: AWS_PROXY to Lambda products-handler
+      - Authorization: COGNITO_USER_POOLS
+      - Stage throttling: 1000 rps / 500 burst default
+      - Per-method throttling override: POST /products 100 rps / 50 burst
+      - Canary: 10 percent traffic shifting
+      - Access logging: JSON with requestId, status, latency, sourceIp
+      - WAF: REGIONAL, rate-based 2000 req/5min per IP
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "canary-rest-api-deploy"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "canary"
+        - "throttle"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-required-fields
+    description: >-
+      Incomplete deployment specification — missing API type and
+      integration type. Cannot produce a deployment plan without
+      required fields.
+    input: |
+      Design a deployment plan for an API. Emit the standard VERDICT
+      block.
+
+      Requirements:
+      - Endpoint type: REGIONAL (us-east-1)
+      - Resources: /items [GET]
+      - Authorization: AWS_IAM
+
+      The user did not specify: API type (REST or HTTP), integration
+      type (Lambda, HTTP, etc.), or any details about how requests
+      reach the backend.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-required-fields"
+        - "VERDICT"
+        - "REQUIRED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

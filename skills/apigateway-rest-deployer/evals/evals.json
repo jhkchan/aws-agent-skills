@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "apigateway-rest-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the API Gateway REST Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "lambda-proxy-rest-api",
+      "name": "Standard Lambda proxy REST API with Cognito authorizer, usage plan, WAF, access logging — all checklist dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/lambda-proxy-rest-api.md",
+      "baseline_file": "baselines/lambda-proxy-rest-api.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "lambda-proxy-rest-api", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "AWS_PROXY", "COGNITO_USER_POOLS", "usage plan"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "vpc-link-private-integration",
+      "name": "REST API with VPC Link to NLB for private backend integration",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpc-link-private-integration.md",
+      "baseline_file": "baselines/vpc-link-private-integration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "vpc-link-private-integration", "VERDICT", "CHECKLIST", "VPC_LINK", "NLB"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "missing-acm-domain-cert",
+      "name": "Custom domain requested but no ACM certificate provided — PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-acm-domain-cert.md",
+      "baseline_file": "baselines/missing-acm-domain-cert.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-acm-domain-cert", "VERDICT", "ACM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "canary-rest-api-deploy",
+      "name": "REST API deployment with canary traffic shifting at 10 percent plus stage throttling",
+      "difficulty": "medium",
+      "prompt_file": "prompts/canary-rest-api-deploy.md",
+      "baseline_file": "baselines/canary-rest-api-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "canary-rest-api-deploy", "VERDICT", "CHECKLIST", "canary", "throttle"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "missing-required-fields",
+      "name": "Incomplete spec — missing API type and integration type (PREREQUISITES_MISSING)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/missing-required-fields.md",
+      "baseline_file": "baselines/missing-required-fields.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-required-fields", "VERDICT", "REQUIRED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

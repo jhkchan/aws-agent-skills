@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "nat-gateway-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the NAT Gateway Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "missing-s3-gateway-endpoint",
+      "name": "Production VPC with 900 GB/month S3 traffic through NAT and no Gateway endpoint — clear free-endpoint win",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-s3-gateway-endpoint.md",
+      "baseline_file": "baselines/missing-s3-gateway-endpoint.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "missing-s3-gateway-endpoint", "RECOMMENDATION", "SAVINGS", "Gateway Endpoint", "IMPLEMENTATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "interface-endpoint-below-breakeven",
+      "name": "ECR Interface endpoint proposed at 60 GB/month — below break-even, recommendation rejected",
+      "difficulty": "hard",
+      "prompt_file": "prompts/interface-endpoint-below-breakeven.md",
+      "baseline_file": "baselines/interface-endpoint-below-breakeven.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "interface-endpoint-below-breakeven", "break-even"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "create-vpc-endpoint"]
+        }
+      ]
+    },
+    {
+      "id": "redundant-multi-az-nat-nonprod",
+      "name": "Staging VPC with 2 NAT Gateways and only 80 GB/month — consolidate to single NAT",
+      "difficulty": "medium",
+      "prompt_file": "prompts/redundant-multi-az-nat-nonprod.md",
+      "baseline_file": "baselines/redundant-multi-az-nat-nonprod.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "redundant-multi-az-nat-nonprod", "RECOMMENDATION", "SAVINGS", "single"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-prod-endpoints",
+      "name": "Production VPC with S3/DynamoDB Gateway endpoints, ECR Interface endpoint above break-even, correct topology — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-prod-endpoints.md",
+      "baseline_file": "baselines/already-optimal-prod-endpoints.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-prod-endpoints", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "nat-instance-devtest-substitution",
+      "name": "Dev VPC with 2 TB/month through NAT Gateway — NAT Instance saves $90+/month with reliability warning",
+      "difficulty": "hard",
+      "prompt_file": "prompts/nat-instance-devtest-substitution.md",
+      "baseline_file": "baselines/nat-instance-devtest-substitution.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "nat-instance-devtest-substitution", "RECOMMENDATION", "NAT Instance", "single point of failure"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

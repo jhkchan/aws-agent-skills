@@ -5,8 +5,8 @@
     "url": "https://github.com/jhkchan/aws-agent-skills"
   },
   "metadata": {
-    "description": "Eval-backed AWS CloudOps agent skills \u2014 90 skills across 6 task types (audit, deploy, troubleshoot, optimize, operate, automate) with median-of-3 judge scoring and co-located evals",
-    "version": "2.0.0"
+    "description": "Eval-backed AWS CloudOps agent skills \u2014 100 skills across 6 task types with median-of-3 judge scoring and co-located evals",
+    "version": "2.1.0"
   },
   "plugins": [
     {
@@ -103,7 +103,17 @@
         "./skills/rds-connectivity-troubleshooter",
         "./skills/s3-lifecycle-optimizer",
         "./skills/s3-secure-bucket-deployer",
-        "./skills/vpc-network-deployer"
+        "./skills/vpc-network-deployer",
+        "./skills/apigateway-rest-deployer",
+        "./skills/cloudfront-cache-troubleshooter",
+        "./skills/cloudfront-distribution-deployer",
+        "./skills/dynamodb-table-deployer",
+        "./skills/dynamodb-throttling-troubleshooter",
+        "./skills/lambda-invocation-troubleshooter",
+        "./skills/nat-gateway-cost-optimizer",
+        "./skills/rds-cost-optimizer",
+        "./skills/rds-instance-deployer",
+        "./skills/vpc-connectivity-troubleshooter"
       ],
       "skill_count": 90
     }

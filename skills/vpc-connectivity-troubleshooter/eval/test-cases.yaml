@@ -1,0 +1,275 @@
+# Eval test cases for vpc-connectivity-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: vpc-connectivity-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: sg-inbound-dead-cross-vpc-ref
+    description: >-
+      Cross-VPC connectivity between vpc-source (10.0.0.0/16) and
+      vpc-target (172.16.0.0/16) via peering pcx-aaa (Active).
+      Destination SG references a deleted SG; the live caller's CIDR
+      is not in any rule. Symptom: telnet hangs and times out.
+      Expected layer: SG_INBOUND.
+    input: |
+      Symptom: application on i-app (private IP 10.0.1.10, subnet
+      subnet-app, SG sg-app, AZ us-east-1a, VPC vpc-source
+      10.0.0.0/16) cannot reach i-db (private IP 172.16.1.10, subnet
+      subnet-db, SG sg-db, AZ us-east-1b, VPC vpc-target
+      172.16.0.0/16) on tcp/5432. nc -vz 172.16.1.10 5432 hangs and
+      returns "Connection timed out" after 10 seconds. No error in
+      the PostgreSQL log.
+
+      Peering: pcx-aaa between vpc-source and vpc-target, status
+      Active. Both VPCs' route tables have a pcx-aaa route to the
+      other VPC's CIDR.
+
+      NACLs (both subnets): default VPC NACL (allow all in and out).
+
+      SG sg-db inbound rules:
+        - tcp/5432 from sg-app-old (a deleted security group)
+        - tcp/5432 from 172.16.0.0/16 (same-VPC admin access)
+
+      SG sg-app egress: allow all.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "sg-inbound-dead-cross-vpc-ref"
+        - "SG_INBOUND"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+        - "LAYER: ROUTE_TABLE_MISSING"
+
+  - id: nacl-missing-ephemeral-outbound
+    description: >-
+      Custom NACL on the destination subnet allows inbound on tcp/443
+      but has no outbound rule on the ephemeral range (1024-65535).
+      SYN reaches destination; SYN-ACK dropped on the outbound
+      evaluation. Connection times out. Expected layer: NACL_STATELESS.
+    input: |
+      Symptom: application on i-web-client (private IP 10.0.10.10,
+      subnet subnet-web, SG sg-web, VPC vpc-app 10.0.0.0/16) cannot
+      reach i-api-server (private IP 10.0.20.10, subnet subnet-api,
+      SG sg-api, same VPC) on tcp/443. nc -vz 10.0.20.10 443 hangs
+      and times out.
+
+      Same-VPC routing: route table for subnet-web has local route
+      to 10.0.0.0/16. subnet-api route table has local route to
+      10.0.0.0/16.
+
+      SG sg-api inbound: tcp/443 from 10.0.0.0/16 (allow).
+      SG sg-web egress: allow all.
+
+      NACL acl-web (subnet-web): default (allow all in and out).
+      NACL acl-api (subnet-api): custom NACL with rules:
+        - Inbound rule 100: tcp/443 from 10.0.0.0/8 (allow)
+        - Outbound rule 100: tcp/443 to 10.0.0.0/8 (allow)
+        - Default rule *: DENY all (inbound and outbound)
+
+      Note: there is no outbound rule for the ephemeral port range
+      (1024-65535) on acl-api. The default rule denies everything
+      not explicitly allowed.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "nacl-missing-ephemeral-outbound"
+        - "NACL_STATELESS"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: SG_INBOUND"
+
+  - id: route-overlapping-cidr-silent
+    description: >-
+      Two VPCs both using 10.0.0.0/16 are peered. Peering is Active,
+      route tables both have pcx-aaa route, SGs allow the rule, NACLs
+      default. Packets never deliver due to overlapping CIDRs (silent
+      peering failure). Expected layer: ROUTE_OVERLAPPING_CIDR.
+    input: |
+      Symptom: i-app (private IP 10.0.1.10, subnet subnet-app in
+      vpc-a, CIDR 10.0.0.0/16) cannot reach i-db (private IP
+      10.0.2.10, subnet subnet-db in vpc-b, CIDR 10.0.0.0/16) on
+      tcp/5432. nc -vz 10.0.2.10 5432 hangs and times out. Both VPCs
+      are in us-east-1.
+
+      Peering: pcx-aaa between vpc-a and vpc-b, status Active.
+
+      Route tables:
+        - subnet-app (vpc-a): local 10.0.0.0/16 + pcx-aaa →
+          10.0.0.0/16 (note: same destination as local route; AWS
+          silently prefers local route over peering route for
+          overlapping CIDRs)
+        - subnet-db (vpc-b): local 10.0.0.0/16 + pcx-aaa →
+          10.0.0.0/16
+
+      SG sg-db inbound: tcp/5432 from 10.0.0.0/16 (allow).
+      SG sg-app egress: allow all.
+
+      NACLs (both subnets): default (allow all in and out).
+
+      VPC CIDRs:
+        - vpc-a: 10.0.0.0/16
+        - vpc-b: 10.0.0.0/16
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "route-overlapping-cidr-silent"
+        - "ROUTE_OVERLAPPING_CIDR"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: PEERING_INACTIVE"
+
+  - id: phz-cross-account-no-association
+    description: >-
+      Route 53 private hosted zone for corp.example.internal exists
+      in account A. Consumer VPC is in account B (peered with A). PHZ
+      is not associated with the consumer VPC and no Resolver Rule
+      is configured. DNS queries for corp.example.internal fail in
+      account B. Expected layer: DNS_PHZ_ASSOCIATION.
+    input: |
+      Symptom: application on i-app in vpc-consumer (account
+      222222222222, us-east-1) cannot resolve
+      "db.corp.example.internal". dig returns NXDOMAIN. The same
+      hostname resolves correctly from i-app-source in
+      vpc-source-owner (account 111111111111, us-east-1).
+
+      VPC peering: pcx-aaa between vpc-consumer and vpc-source-owner,
+      status Active. Routes both ways.
+
+      Route 53 hosted zone:
+        - Hosted zone Z111 in account 111111111111 for
+          corp.example.internal (private)
+        - Associated VPCs: only vpc-source-owner (account
+          111111111111)
+        - vpc-consumer is NOT associated with the hosted zone
+
+      Resolver rules in account 222222222222:
+        - Default SYSTEM rule (.) → AmazonProvidedDNS
+        - No FORWARD rule for corp.example.internal
+
+      VPC DNS settings (both VPCs):
+        - enableDnsSupport: true
+        - enableDnsHostnames: true
+
+      Peering DNS flag:
+        - AllowDnsResolutionFromRemoteVpcDomainName: true on both
+          sides
+
+      The hostname db.corp.example.internal only exists as a Route
+      53 record in the private hosted zone Z111.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "phz-cross-account-no-association"
+        - "DNS_PHZ_ASSOCIATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: DNS_RESOLUTION"
+
+  - id: tgw-route-propagation-missing
+    description: >-
+      Two VPCs attached to a shared Transit Gateway via separate
+      attachments. Both attachments are associated with the TGW route
+      table. However, vpc-b's attachment has propagation DISABLED on
+      the TGW route table, so vpc-b's CIDR is invisible to vpc-a.
+      Symptom: traffic from vpc-a to vpc-b times out. Expected layer:
+      TGW_ROUTE_PROPAGATION.
+    input: |
+      Symptom: i-app (private IP 10.1.1.10, subnet subnet-a,
+      vpc-a 10.1.0.0/16) cannot reach i-db (private IP 10.2.1.10,
+      subnet subnet-b, vpc-b 10.2.0.0/16) on tcp/5432. nc -vz
+      10.2.1.10 5432 hangs and times out. Both VPCs are in us-east-1.
+
+      Transit Gateway tgw-shared:
+        - Attachment tgw-attach-a: vpc-a, state Available,
+          associated with TGW route table tgw-rtb-default,
+          propagation ENABLED on tgw-rtb-default
+        - Attachment tgw-attach-b: vpc-b, state Available,
+          associated with TGW route table tgw-rtb-default,
+          propagation DISABLED on tgw-rtb-default
+
+      TGW route table tgw-rtb-default contents:
+        - Static route: 10.1.0.0/16 via tgw-attach-a (added by
+          propagation from vpc-a's attachment)
+        - NO route for 10.2.0.0/16 — vpc-b's CIDR is not propagated
+          into tgw-rtb-default
+
+      VPC route tables:
+        - subnet-a (vpc-a): local 10.1.0.0/16 + tgw-shared →
+          10.2.0.0/16 (operator added this manually expecting it
+          to work)
+        - subnet-b (vpc-b): local 10.2.0.0/16 + tgw-shared →
+          10.1.0.0/16
+
+      SG sg-db inbound: tcp/5432 from 10.1.0.0/16 (allow).
+      SG sg-app egress: allow all.
+
+      NACLs (both subnets): default (allow all).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "tgw-route-propagation-missing"
+        - "TGW_ROUTE_PROPAGATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: TGW_ASSOCIATION_MISSING"

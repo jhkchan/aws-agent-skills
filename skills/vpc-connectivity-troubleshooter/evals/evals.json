@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "vpc-connectivity-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the VPC Connectivity Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "sg-inbound-dead-cross-vpc-ref",
+      "name": "Cross-VPC timeout — destination SG references a deleted SG; new caller CIDR not in any rule",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sg-inbound-dead-cross-vpc-ref.md",
+      "baseline_file": "baselines/sg-inbound-dead-cross-vpc-ref.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "SG_INBOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "sg-inbound-dead-cross-vpc-ref", "SG_INBOUND", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "LAYER: ROUTE_TABLE_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "nacl-missing-ephemeral-outbound",
+      "name": "Custom NACL on destination subnet allows inbound on 443 but has no outbound rule on ephemeral range 1024-65535",
+      "difficulty": "hard",
+      "prompt_file": "prompts/nacl-missing-ephemeral-outbound.md",
+      "baseline_file": "baselines/nacl-missing-ephemeral-outbound.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "NACL_STATELESS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "nacl-missing-ephemeral-outbound", "NACL_STATELESS", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: SG_INBOUND"]
+        }
+      ]
+    },
+    {
+      "id": "route-overlapping-cidr-silent",
+      "name": "Peered VPCs with overlapping 10.0.0.0/16 CIDRs — peering Active, routes present, but packets never deliver",
+      "difficulty": "hard",
+      "prompt_file": "prompts/route-overlapping-cidr-silent.md",
+      "baseline_file": "baselines/route-overlapping-cidr-silent.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "ROUTE_OVERLAPPING_CIDR",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "route-overlapping-cidr-silent", "ROUTE_OVERLAPPING_CIDR", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: PEERING_INACTIVE"]
+        }
+      ]
+    },
+    {
+      "id": "phz-cross-account-no-association",
+      "name": "Route 53 private hosted zone in account A; consumer VPC in account B is not associated; DNS fails in B",
+      "difficulty": "hard",
+      "prompt_file": "prompts/phz-cross-account-no-association.md",
+      "baseline_file": "baselines/phz-cross-account-no-association.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "DNS_PHZ_ASSOCIATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "phz-cross-account-no-association", "DNS_PHZ_ASSOCIATION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: DNS_RESOLUTION"]
+        }
+      ]
+    },
+    {
+      "id": "tgw-route-propagation-missing",
+      "name": "TGW attachments both Active; one attachment associated but not propagating its VPC CIDR into the shared TGW route table",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tgw-route-propagation-missing.md",
+      "baseline_file": "baselines/tgw-route-propagation-missing.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "TGW_ROUTE_PROPAGATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "tgw-route-propagation-missing", "TGW_ROUTE_PROPAGATION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: TGW_ASSOCIATION_MISSING"]
+        }
+      ]
+    }
+  ]
+}

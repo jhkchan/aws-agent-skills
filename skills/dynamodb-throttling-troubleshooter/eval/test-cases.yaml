@@ -1,0 +1,135 @@
+# Eval test cases for dynamodb-throttling-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: dynamodb-throttling-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: gsi-hot-key-status-field
+    description: Base table write throttling caused by a low-cardinality GSI partition key (status field with 4 values), propagating to the base table
+    input: |
+      Scenario: A DynamoDB table "orders-prod" in us-east-1 is returning
+      ProvisionedThroughputExceededException on PutItem. The table is in
+      PROVISIONED mode with WriteCapacityUnits=10000 and
+      ReadCapacityUnits=5000. CloudWatch shows ThrottledRequests > 0 on
+      the base table (Operation: PutItem) sustained for 30 minutes.
+      ConsumedWriteCapacityUnits is 8000 (below the 10000 provisioned).
+      describe-table shows a GSI "status-index" with KeySchema
+      [{AttributeName: status, KeyType: HASH}]. Per-GSI CloudWatch
+      metrics show ThrottledRequests > 0 on status-index. Contributor
+      Insights shows the top GSI key "status=ACTIVE" accounts for 60%
+      of GSI traffic. The status attribute has only 4 distinct values
+      (PENDING, ACTIVE, SHIPPED, DELIVERED). Raising base table
+      WriteCapacityUnits to 20000 did not resolve the throttling.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "GSI_HOT_KEY"
+        - "status"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "raise WriteCapacityUnits"
+
+  - id: hot-partition-status-active
+    description: Throttling persists after capacity scale-up because one partition key value receives 80% of traffic
+    input: |
+      Scenario: A DynamoDB table "sessions-prod" in us-east-1 is
+      throttling on writes despite raising WriteCapacityUnits from
+      10000 to 50000. ConsumedWriteCapacityUnits is only 8000 (well
+      below the 50000 provisioned). ThrottledRequests is sustained > 0.
+      The table is in PROVISIONED mode with no GSIs. Contributor Insights
+      shows the partition key "userId=admin" accounts for 80% of all
+      write traffic. The partition key is userId (String). The
+      application is a session store where a batch job writes all
+      sessions under userId=admin for aggregation.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "HOT_PARTITION"
+        - "partition key"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: burst-capacity-exhaustion-spiky
+    description: Intermittent throttling caused by burst capacity exhaustion on spiky batch-write traffic every 2 minutes
+    input: |
+      Scenario: A DynamoDB table "events-ingest" in us-east-1 throttles
+      intermittently. The table is in PROVISIONED mode with
+      WriteCapacityUnits=5000. CloudWatch ConsumedWriteCapacityUnits at
+      1-minute period shows alternating 0 and 12000 datapoints — the
+      application batches writes every 2 minutes. At 5-minute averaging,
+      ConsumedWriteCapacityUnits is 4000 (below the 5000 provisioned).
+      ThrottledRequests starts at minute 5 after the first batch and
+      continues on every subsequent batch. The traffic pattern is
+      confirmed spiky with no sustained component. The partition key
+      distribution is even (Contributor Insights shows no dominant key).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "BURST_EXHAUSTED"
+        - "burst"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: scan-misuse-full-table
+    description: Read throttling caused by periodic full-table Scan operations consuming the entire RCU budget on a 50 GB table
+    input: |
+      Scenario: A DynamoDB table "products-prod" in us-east-1 (50 GB,
+      PROVISIONED mode, ReadCapacityUnits=10000) throttles on reads
+      periodically. CloudTrail shows Scan events correlating with the
+      throttle spikes — a dashboard report runs a Scan every 10 minutes.
+      ConsumedReadCapacityUnits spikes to 10000 (the full provisioned
+      budget) during each Scan. Between Scans, ConsumedReadCapacityUnits
+      is 2000. The Scan uses a FilterExpression that filters out 95% of
+      items. No GSI exists on the table. GetItem and Query traffic
+      between Scans is well within provisioned capacity.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "SCAN_MISUSE"
+        - "Scan"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: insufficient-context-need-table-name
+    description: Vague report of DynamoDB throttling without table name, region, or CloudWatch metrics
+    input: |
+      Scenario: A user reports "my DynamoDB is throttling, the
+      application is throwing errors." They mention the application
+      name "checkout-service" but do not provide the table name, the
+      region, the throttle error string, the CloudWatch metric pattern,
+      or the access pattern.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "ThrottledRequests"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

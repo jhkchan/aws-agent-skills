@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "lambda-invocation-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Lambda Invocation Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "timeout-downstream-dynamodb-throttled",
+      "name": "TaskTimeoutException on 30% of invocations; DynamoDB PutItem throttled at 100 WCU on provisioned table",
+      "difficulty": "hard",
+      "prompt_file": "prompts/timeout-downstream-dynamodb-throttled.md",
+      "baseline_file": "baselines/timeout-downstream-dynamodb-throttled.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "TIMEOUT_DOWNSTREAM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "timeout-downstream-dynamodb", "TIMEOUT_DOWNSTREAM", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "LAYER: TIMEOUT_CONFIG"]
+        }
+      ]
+    },
+    {
+      "id": "oom-memory-too-low",
+      "name": "Runtime.ExitError OutOfMemory on image-resize Lambda; MemorySize 256 MB, payloads 4-8 MB",
+      "difficulty": "medium",
+      "prompt_file": "prompts/oom-memory-too-low.md",
+      "baseline_file": "baselines/oom-memory-too-low.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "MEMORY_CONFIG",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "oom-memory-too-low", "MEMORY_CONFIG", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: TIMEOUT_CONFIG"]
+        }
+      ]
+    },
+    {
+      "id": "vpc-no-nat-no-internet",
+      "name": "VPC-attached Lambda cannot reach external API — public subnet, no NAT Gateway in route table",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpc-no-nat-no-internet.md",
+      "baseline_file": "baselines/vpc-no-nat-no-internet.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "VPC_CONNECTIVITY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "vpc-no-nat-no-internet", "VPC_CONNECTIVITY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: TIMEOUT_CONFIG"]
+        }
+      ]
+    },
+    {
+      "id": "kms-decrypt-cmk-role-missing",
+      "name": "Lambda KMS decrypt error after migrating env vars to customer-managed CMK; role missing kms:Decrypt",
+      "difficulty": "hard",
+      "prompt_file": "prompts/kms-decrypt-cmk-role-missing.md",
+      "baseline_file": "baselines/kms-decrypt-cmk-role-missing.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "ENV_VAR_KMS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "kms-decrypt-cmk-role-missing", "ENV_VAR_KMS", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: ENV_VAR_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "ecr-image-cross-account-policy",
+      "name": "Cross-account container Lambda fails to initialise — ECR repo policy missing caller account grant",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ecr-image-cross-account-policy.md",
+      "baseline_file": "baselines/ecr-image-cross-account-policy.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "ECR_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ecr-image-cross-account-policy", "ECR_POLICY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: ECR_IMAGE"]
+        }
+      ]
+    }
+  ]
+}

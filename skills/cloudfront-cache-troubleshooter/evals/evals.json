@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudfront-cache-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudFront Cache Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "origin-no-store-header",
+      "name": "Cache miss on every request — S3 origin sends Cache-Control: no-store on all objects",
+      "difficulty": "hard",
+      "prompt_file": "prompts/origin-no-store-header.md",
+      "baseline_file": "baselines/origin-no-store-header.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "ORIGIN_NO_STORE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ORIGIN_NO_STORE", "no-store", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "raise the TTL"]
+        }
+      ]
+    },
+    {
+      "id": "user-agent-in-cache-key",
+      "name": "Low cache hit ratio — User-Agent in cache policy headers whitelist fragments the cache",
+      "difficulty": "hard",
+      "prompt_file": "prompts/user-agent-in-cache-key.md",
+      "baseline_file": "baselines/user-agent-in-cache-key.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "CACHE_KEY_BLOAT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "CACHE_KEY_BLOAT", "User-Agent", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "stale-content-no-invalidation",
+      "name": "Stale content served — no invalidation sent after S3 origin update, TTL has not expired",
+      "difficulty": "medium",
+      "prompt_file": "prompts/stale-content-no-invalidation.md",
+      "baseline_file": "baselines/stale-content-no-invalidation.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "STALE_NO_INVALIDATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "STALE_NO_INVALIDATION", "invalidation", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "waf-blocking-cache-requests",
+      "name": "403 errors from CloudFront — WAF rate-based rule blocks legitimate health-check traffic from a single NAT IP",
+      "difficulty": "medium",
+      "prompt_file": "prompts/waf-blocking-cache-requests.md",
+      "baseline_file": "baselines/waf-blocking-cache-requests.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "WAF_BLOCK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "WAF_BLOCK", "WAF", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-context-need-distribution-id",
+      "name": "Vague report of CloudFront caching issues — request distribution ID, domain, and curl headers",
+      "difficulty": "easy",
+      "prompt_file": "prompts/insufficient-context-need-distribution-id.md",
+      "baseline_file": "baselines/insufficient-context-need-distribution-id.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "curl"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

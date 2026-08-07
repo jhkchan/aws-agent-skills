@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudfront-distribution-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudFront Distribution Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "s3-oac-full-security",
+      "name": "Standard S3 origin CDN with OAC, WAF, security headers, logging — all checklist dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/s3-oac-full-security.md",
+      "baseline_file": "baselines/s3-oac-full-security.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "s3-oac-full-security", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "OAC", "TLSv1.2_2021", "WAF"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "alb-custom-origin-deploy",
+      "name": "ALB custom origin with HTTPS-only, custom verify header, managed cache policy",
+      "difficulty": "medium",
+      "prompt_file": "prompts/alb-custom-origin-deploy.md",
+      "baseline_file": "baselines/alb-custom-origin-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "alb-custom-origin-deploy", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "https-only", "ALB"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "acm-cert-wrong-region",
+      "name": "ACM certificate in eu-west-1 instead of us-east-1 — hard blocker for CloudFront",
+      "difficulty": "medium",
+      "prompt_file": "prompts/acm-cert-wrong-region.md",
+      "baseline_file": "baselines/acm-cert-wrong-region.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "acm-cert-wrong-region", "VERDICT", "us-east-1"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "origin-group-failover",
+      "name": "Multi-origin active-passive failover with primary ALB and secondary regional DR",
+      "difficulty": "hard",
+      "prompt_file": "prompts/origin-group-failover.md",
+      "baseline_file": "baselines/origin-group-failover.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "origin-group-failover", "VERDICT", "CHECKLIST", "origin group", "failover"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "missing-required-fields",
+      "name": "Incomplete spec — missing viewer protocol policy and ACM cert ARN (PREREQUISITES_MISSING)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/missing-required-fields.md",
+      "baseline_file": "baselines/missing-required-fields.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-required-fields", "VERDICT", "REQUIRED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+# Eval test cases for cloudfront-distribution-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudfront-distribution-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: s3-oac-full-security
+    description: >-
+      Standard S3 origin CloudFront distribution with all security
+      dimensions: OAC for S3 origin, TLSv1.2_2021 viewer minimum, ACM
+      certificate in us-east-1, WAFv2 Web ACL with managed rule groups,
+      CachingOptimized cache policy, response headers policy with HSTS
+      and CSP, geo restriction whitelist, S3 access logging, CloudFront
+      Function for SPA URL rewrite. All checklist dimensions pass.
+    input: |
+      Design a deployment plan for a production CloudFront distribution.
+      Emit the standard VERDICT block (DISTRIBUTION_SPEC, VERDICT,
+      ARCHITECTURE, CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Origin: S3 REST (prod-app-assets.s3.us-east-1.amazonaws.com)
+      - OAC for S3 origin (replaces legacy OAI)
+      - Viewer protocol: redirect-to-https
+      - TLS minimum: TLSv1.2_2021
+      - ACM certificate: arn:aws:acm:us-east-1:111111111111:certificate/abc-123
+        (covers app.example.com and www.example.com)
+      - WAF: WAFv2 CLOUDFRONT scope in us-east-1, CommonRuleSet + rate-based
+      - Cache policy: CachingOptimized (static assets)
+      - Response headers: HSTS 2yr preload, CSP, X-Frame-Options DENY
+      - Geo: whitelist US, CA, GB, DE, FR
+      - Price class: PriceClass_100
+      - Edge compute: CloudFront Function for SPA URL rewrite
+      - Logging: S3 standard with ACL grant to awslogsdelivery
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "s3-oac-full-security"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "OAC"
+        - "TLSv1.2_2021"
+        - "WAF"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: alb-custom-origin-deploy
+    description: >-
+      ALB custom origin distribution with HTTPS-only OriginProtocolPolicy,
+      custom verify header for origin authentication, managed cache policy
+      with AllViewerExceptHostHeader origin request policy. Acceptable for
+      production dynamic applications.
+    input: |
+      Design a deployment plan for a CloudFront distribution in front of
+      an ALB. Emit the standard VERDICT block.
+
+      Requirements:
+      - Origin: ALB (prod-alb.us-east-1.elb.amazonaws.com) with HTTPS on 443
+      - Origin protocol policy: https-only
+      - Custom origin header: X-Origin-Verify with shared secret
+      - Viewer protocol: redirect-to-https
+      - TLS minimum: TLSv1.2_2021
+      - ACM cert: arn:aws:acm:us-east-1:111111111111:certificate/def-456
+        (covers app.example.com)
+      - WAF: CLOUDFRONT scope, CommonRuleSet + SQLiRuleSet + rate-based
+      - Cache policy: CachingDisabled (dynamic API)
+      - Origin request policy: AllViewerExceptHostHeader
+      - Response headers: security headers (HSTS, CSP, X-Frame-Options)
+      - Geo: none (global B2B SaaS)
+      - Price class: PriceClass_All
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "alb-custom-origin-deploy"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "https-only"
+        - "ALB"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: acm-cert-wrong-region
+    description: >-
+      ACM certificate was created in eu-west-1 instead of us-east-1.
+      CloudFront can only read ACM certificates from us-east-1 — this is
+      an AWS hard constraint. Must emit PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a production CloudFront distribution.
+      Emit the standard VERDICT block.
+
+      Requirements:
+      - Origin: S3 REST (app-assets-eu.s3.eu-west-1.amazonaws.com)
+      - OAC for S3 origin
+      - Viewer protocol: redirect-to-https
+      - TLS minimum: TLSv1.2_2021
+      - ACM certificate: arn:aws:acm:eu-west-1:111111111111:certificate/wrong-region
+        (covers app.eu.example.com)
+      - WAF: CLOUDFRONT scope in us-east-1
+      - Cache policy: CachingOptimized
+
+      Existing-account context: one prior distribution uses a us-east-1
+      ACM cert successfully. The user mistakenly created this cert in
+      eu-west-1 thinking the cert should be co-located with the S3 origin.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "acm-cert-wrong-region"
+        - "VERDICT"
+        - "us-east-1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: origin-group-failover
+    description: >-
+      Multi-origin distribution with origin group for active-passive
+      failover: primary ALB in us-east-1, secondary ALB in us-west-2 for
+      DR. Failover triggers on 500, 502, 503, 504, 403, 404.
+    input: |
+      Design a deployment plan for a multi-region failover CloudFront
+      distribution. Emit the standard VERDICT block.
+
+      Requirements:
+      - Primary origin: prod-alb-us-east-1.us-east-1.elb.amazonaws.com (HTTPS)
+      - Secondary origin: prod-alb-us-west-2.us-west-2.elb.amazonaws.com (HTTPS)
+      - Origin group: active-passive failover on 500, 502, 503, 504, 403, 404
+      - Origin protocol policy: https-only on both
+      - Custom origin headers: X-Origin-Verify on both
+      - Viewer protocol: https-only (strict environment)
+      - TLS minimum: TLSv1.2_2021
+      - ACM cert in us-east-1: covers api.example.com
+      - WAF: CLOUDFRONT scope, CommonRuleSet + rate-based
+      - Cache policy: CachingDisabled (dynamic API)
+      - Origin request policy: AllViewerExceptHostHeader
+      - Response headers: security headers
+      - Price class: PriceClass_All
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "origin-group-failover"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "origin group"
+        - "failover"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-required-fields
+    description: >-
+      Incomplete deployment specification — missing viewer protocol
+      policy and ACM certificate ARN. Cannot produce a deployment plan
+      without required fields.
+    input: |
+      Design a deployment plan for a CloudFront distribution. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Origin: S3 REST (app-assets.s3.us-east-1.amazonaws.com)
+      - Domain: app.example.com
+      - Cache policy: CachingOptimized
+      - Price class: PriceClass_100
+
+      The user did not specify: viewer protocol policy, TLS minimum,
+      ACM certificate ARN, or WAF requirements.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-required-fields"
+        - "VERDICT"
+        - "REQUIRED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

@@ -1,0 +1,140 @@
+# Eval test cases for cloudfront-cache-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudfront-cache-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: origin-no-store-header
+    description: Cache miss on every request because the S3 origin sends Cache-Control: no-store on all objects
+    input: |
+      Scenario: A CloudFront distribution E1A2B3C4D5
+      (d123.cloudfront.net) is not caching any responses. Every request
+      shows "x-cache: Miss from cloudfront" and "Age: 0" in the response
+      headers. The cache policy attached to the default behavior is the
+      managed "CachingOptimized" policy (MinTTL=1, DefaultTTL=86400,
+      MaxTTL=31536000) with no headers, cookies, or query strings in the
+      cache key. The origin is an S3 bucket. curl -I directly to the S3
+      origin shows "Cache-Control: no-store" on all objects. CloudFront
+      access logs show x-edge-result-type "Miss" on 100% of requests.
+      There are no Lambda@Edge functions or WAF on the distribution.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ORIGIN_NO_STORE"
+        - "no-store"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "raise the TTL"
+
+  - id: user-agent-in-cache-key
+    description: Low cache hit ratio because User-Agent is in the cache policy headers whitelist, fragmenting the cache
+    input: |
+      Scenario: A CloudFront distribution E2B3C4D5E6
+      (d456.cloudfront.net) has a cache hit ratio of 4% for the /static/*
+      path pattern, well below the target of 90%. The cache policy for
+      the /static/* behavior has HeadersConfig.HeaderBehavior "whitelist"
+      with Headers.Items ["User-Agent"]. CookieBehavior is "none",
+      QueryStringBehavior is "none". The TTL settings are MinTTL=1,
+      DefaultTTL=86400, MaxTTL=31536000. The origin sends "Cache-Control:
+      public, max-age=86400" on all static assets. CloudFront access logs
+      show x-edge-result-type "Miss" on 95% of requests to /static/*;
+      the 5% hits come from repeated User-Agent strings (e.g.,
+      "curl/8.0"). The static assets have hashed filenames (e.g.,
+      app.abc123.js) and do not vary by client type.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "CACHE_KEY_BLOAT"
+        - "User-Agent"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: stale-content-no-invalidation
+    description: Stale content served because no invalidation was sent after an S3 origin update, and the TTL has not expired
+    input: |
+      Scenario: A CloudFront distribution E3C4D5E6F7
+      (d789.cloudfront.net) serves stale content for the path
+      /api/config.json. The origin (S3 bucket) was updated 30 minutes
+      ago with new config data, but CloudFront still serves the old
+      version. curl -I to the origin returns "Cache-Control: public,
+      max-age=86400" (24-hour TTL). curl -I to CloudFront returns
+      "x-cache: Hit from cloudfront" and "Age: 7200" (2 hours cached).
+      No invalidation has been sent since the S3 update. The cache
+      policy respects origin headers (OriginCacheControlHeaders: respect)
+      with MinTTL=60, DefaultTTL=3600, MaxTTL=86400. There are no
+      Lambda@Edge functions. The operator expected the content to update
+      immediately after the S3 push.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "STALE_NO_INVALIDATION"
+        - "invalidation"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: waf-blocking-cache-requests
+    description: 403 errors from CloudFront because a WAF web ACL rule is blocking legitimate API requests
+    input: |
+      Scenario: A CloudFront distribution E4D5E6F7G8
+      (dabc.cloudfront.net) returns 403 Forbidden on all requests to
+      /api/*. The origin (ALB) returns 200 OK when accessed directly
+      (bypassing CloudFront). curl -I to CloudFront returns "HTTP/2 403"
+      with an "x-amzn-waf-action: BLOCK" response header. The
+      distribution has a WebACLId attached (web ACL ID:
+      1a2b3c4d-5e6f-...). The /api/* cache behavior uses the
+      CachingDisabled policy (dynamic API content). There are no
+      Lambda@Edge functions. The WAF web ACL has a rate-based rule
+      set to 100 requests per 5 minutes per IP, and the application's
+      health check sends 200 requests per minute from a single NAT
+      gateway IP.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "WAF_BLOCK"
+        - "WAF"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: insufficient-context-need-distribution-id
+    description: Vague report of CloudFront caching issues without distribution ID, domain, or curl headers
+    input: |
+      Scenario: A user reports "CloudFront is not caching my content,
+      the origin is overloaded." They mention the application name
+      "web-frontend" but do not provide the distribution ID, the
+      CloudFront domain, the curl -I response headers, the cache policy
+      ID, or the access log data.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "curl"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

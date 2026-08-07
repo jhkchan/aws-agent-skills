@@ -1,0 +1,171 @@
+# Eval test cases for dynamodb-table-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across workload types (session store, audit log, ad-tech,
+# cold archive) and missing-prerequisite branches.
+skill: dynamodb-table-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: high-throughput-session-store
+    description: >-
+      Provision a high-throughput session store table with on-demand capacity,
+      random-suffix partition key, KEYS_ONLY GSI for reverse lookup, customer
+      CMK, PITR, TTL on session expiry, Streams for CDC. Expects
+      READY_TO_DEPLOY with all checklist items verified.
+    input: |
+      Provision a production DynamoDB table named "prod-sessions" in
+      us-east-1 for a high-throughput session store. Session IDs are UUID v4.
+      We need a GSI to look up sessions by userId (most sessions have one,
+      some anonymous sessions do not). Use SSE-KMS with customer-managed CMK
+      alias/prod-dynamodb-key. Sessions expire after 24 hours via TTL on
+      the "expiresAt" attribute. Enable DynamoDB Streams with
+      NEW_AND_OLD_IMAGES — a downstream Lambda publishes session-change
+      events. Traffic is bursty and unpredictable. Tags: Environment=
+      production, Workload=session-store. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-sessions"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "PAY_PER_REQUEST"
+        - "SSE-KMS"
+        - "PITR"
+        - "TTL"
+        - "NEW_AND_OLD_IMAGES"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: compliance-audit-log-table
+    description: >-
+      Provision a compliance audit log table with provisioned capacity +
+      autoscaling, customer CMK, PITR, deletion protection, NO TTL (immutable
+      audit log), Streams off (no CDC). Expects READY_TO_DEPLOY with the
+      audit-log-specific guidance (no TTL).
+    input: |
+      Provision a DynamoDB table for compliance audit logging in us-east-1.
+      Table name: "audit-events-prod". Workload is steady high-throughput
+      (10k events/sec sustained, predictable). Use provisioned capacity
+      with autoscaling. Use SSE-KMS with customer-managed CMK
+      alias/audit-kms-key. Items must NEVER expire (regulatory retention).
+      No downstream CDC consumer — Streams not needed. Use a composite
+      partition key (tenantId + yyyy-mm bucket) with eventId as sort key.
+      Deletion protection on. Tags: Environment=production,
+      Workload=audit-log, DataClassification=confidential.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "audit-events-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "PROVISIONED"
+        - "autoscaling"
+        - "SSE-KMS"
+        - "PITR"
+        - "Deletion protection"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-cmk-and-key-schema
+    description: >-
+      Operator requests a new table but has not specified the partition key
+      design nor the KMS CMK ARN for SSE-KMS. Expects PREREQUISITES_MISSING
+      with specific gaps cited.
+    input: |
+      Help me create a new DynamoDB table called "orders-prod" in us-east-1.
+      It needs SSE-KMS encryption. We will store order data — I think
+      orderId should be the key but not sure about distribution. Region:
+      us-east-1, Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "orders-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "partition key"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: ad-tech-event-ingest
+    description: >-
+      Provision an ad-tech event ingest table with on-demand capacity,
+      time-range sort key, sparse GSI with INCLUDE projection for the
+      "active" subset, TTL on event expiry, Streams for OpenSearch zero-ETL.
+      Expects READY_TO_DEPLOY with ad-tech-specific patterns.
+    input: |
+      Provision a DynamoDB table named "ad-events-prod" in us-east-1 for
+      real-time ad-tech event ingest. Events arrive at 50k/sec, bursty.
+      Partition key: adId (high cardinality). Sort key: eventTimestamp
+      (ISO 8601 — for time-range queries). Need a sparse GSI
+      "gsi_unprocessed_events" with partitionKey=status ("PENDING"),
+      sortKey=eventTimestamp, INCLUDE projection on "bidAmount" and
+      "advertiserId" attributes. TTL on "expiresAt" attribute (events
+      expire after 7 days). Streams NEW_AND_OLD_IMAGES for OpenSearch
+      zero-ETL indexing. SSE-KMS with customer CMK alias/adtech-kms-key.
+      PITR on. Tags: Environment=production, Workload=ad-tech.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ad-events-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "PAY_PER_REQUEST"
+        - "NEW_AND_OLD_IMAGES"
+        - "INCLUDE"
+        - "sparse"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cost-optimized-ia-table
+    description: >-
+      Provision a cost-optimized cold archive table on Standard-IA table
+      class. Low traffic, infrequent access. Expects READY_TO_DEPLOY with
+      Standard-IA table class.
+    input: |
+      Provision a DynamoDB table named "historical-orders-archive" in
+      us-east-1 for archived order data (3-year retention). Traffic is
+      very low (a few queries per week from BI). Use the most
+      cost-effective table class. Items DO expire at 3 years via TTL on
+      "retainUntil". Use SSE-KMS with customer CMK alias/archive-kms-key.
+      No GSI needed (single access pattern by orderId). PITR on for safety.
+      Deletion protection on. Tags: Environment=production,
+      Workload=archive. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "historical-orders-archive"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "STANDARD_INFREQUENT_ACCESS"
+        - "Standard-IA"
+        - "PITR"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

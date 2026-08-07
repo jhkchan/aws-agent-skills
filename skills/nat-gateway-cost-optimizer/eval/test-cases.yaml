@@ -1,0 +1,247 @@
+# Eval test cases for nat-gateway-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimisation pattern. Each case's VPC ID
+# embeds the test-case id so the model naturally echoes it (avoids assertion-
+# token mismatch). The decision matrix in SKILL.md produces exactly the
+# expected verdicts below.
+skill: nat-gateway-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: missing-s3-gateway-endpoint
+    description: >-
+      3-AZ production VPC with 3 NAT Gateways processing 2,400 GB/month.
+      900 GB/month of S3 traffic and 200 GB/month of DynamoDB traffic
+      flow through NAT. No Gateway endpoints exist. ECR traffic at 150
+      GB/month is below break-even for a 3-AZ Interface endpoint. Expected
+      verdict: OPPORTUNITY_FOUND with S3 + DynamoDB Gateway endpoint
+      recommendation (FREE) and estimated $49.50/month savings.
+    input: |
+      VPC: vpc-missing-s3-gateway-endpoint
+      Region: us-east-1
+      Environment: production
+
+      NAT Gateways: 3 (one per AZ — us-east-1a, 1b, 1c), all available
+      Current VPC Endpoints: none
+
+      Data processing (Cost Explorer, last 30 days):
+        - NAT Gateway data processing: 2,400 GB total ($108.00)
+        - NAT Gateway base: 3 × $32.85 = $98.55
+        - Total NAT cost: $206.55 (Cost Explorer shows $140.85 after discounts)
+
+      Traffic breakdown (VPC Flow Logs, last 7 days, monthly projection):
+        - S3: 900 GB/month
+        - DynamoDB: 200 GB/month
+        - ECR: 150 GB/month
+        - Other AWS services (SSM, STS, etc.): 150 GB/month
+        - Internet (non-AWS): 1,000 GB/month
+
+      Workload context: EKS production cluster with multiple microservices
+      pulling container images from ECR and reading/writing S3 and DynamoDB.
+
+      Emit the standard optimisation block (VPC, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "missing-s3-gateway-endpoint"
+        - "RECOMMENDATION"
+        - "SAVINGS"
+        - "Gateway Endpoint"
+        - "IMPLEMENTATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: interface-endpoint-below-breakeven
+    description: >-
+      2-AZ production VPC with an S3 Gateway endpoint already in place.
+      Operator is considering an ECR Interface endpoint for 60 GB/month
+      of ECR traffic. Below the ~160 GB/month break-even for even a
+      single-AZ endpoint. Expected verdict: ALREADY_OPTIMAL for the ECR
+      dimension — do NOT create the Interface endpoint (would increase
+      cost by ~$8.90/month).
+    input: |
+      VPC: vpc-interface-endpoint-below-breakeven
+      Region: us-east-1
+      Environment: production
+
+      NAT Gateways: 2 (us-east-1a, 1b), both available
+      Current VPC Endpoints:
+        - S3 Gateway endpoint (com.amazonaws.us-east-1.s3), in route tables rtb-a, rtb-b
+
+      Data processing (Cost Explorer, last 30 days):
+        - NAT Gateway data processing: 200 GB total ($9.00)
+        - NAT Gateway base: 2 × $32.85 = $65.70
+
+      Traffic breakdown (VPC Flow Logs, last 7 days, monthly projection):
+        - S3: 0 GB (already on Gateway endpoint)
+        - ECR: 60 GB/month
+        - Other AWS services: 40 GB/month
+        - Internet: 100 GB/month
+
+      Operator question: "Should I add an ECR Interface endpoint to save
+      on the 60 GB/month of ECR data-processing charges through NAT?"
+
+      Emit the standard optimisation block (VPC, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "interface-endpoint-below-breakeven"
+        - "break-even"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "create-vpc-endpoint"
+
+  - id: redundant-multi-az-nat-nonprod
+    description: >-
+      2-AZ staging VPC with 2 NAT Gateways but only 80 GB/month total
+      traffic (40 GB S3, 40 GB other). Cross-AZ traffic is minimal
+      (< 30 GB/month). Consolidating to a single NAT Gateway plus adding
+      the S3 Gateway endpoint saves ~$33/month. Expected verdict:
+      OPPORTUNITY_FOUND.
+    input: |
+      VPC: vpc-redundant-multi-az-nat-nonprod
+      Region: us-east-1
+      Environment: staging
+
+      NAT Gateways: 2 (us-east-1a, 1b), both available
+      Current VPC Endpoints: none
+
+      Data processing (Cost Explorer, last 30 days):
+        - NAT Gateway data processing: 80 GB total ($3.60)
+        - NAT Gateway base: 2 × $32.85 = $65.70
+        - Total NAT cost: $69.20
+
+      Traffic breakdown (VPC Flow Logs, last 7 days, monthly projection):
+        - S3: 40 GB/month
+        - Other AWS services: 10 GB/month
+        - Internet: 30 GB/month
+      Cross-AZ traffic: < 30 GB/month
+
+      Workload context: staging environment for QA testing; no HA
+      requirement; runs during business hours only.
+
+      Emit the standard optimisation block (VPC, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "redundant-multi-az-nat-nonprod"
+        - "RECOMMENDATION"
+        - "SAVINGS"
+        - "single"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-prod-endpoints
+    description: >-
+      3-AZ production VPC with S3 and DynamoDB Gateway endpoints in
+      place, ECR Interface endpoint in all 3 AZs (ECR traffic at 500
+      GB/month exceeds 480 GB break-even for 3-AZ). Topology correct
+      for production. Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      VPC: vpc-already-optimal-prod-endpoints
+      Region: us-east-1
+      Environment: production
+
+      NAT Gateways: 3 (one per AZ), all available
+      Current VPC Endpoints:
+        - S3 Gateway endpoint (com.amazonaws.us-east-1.s3), route tables rtb-a, rtb-b, rtb-c
+        - DynamoDB Gateway endpoint (com.amazonaws.us-east-1.dynamodb), route tables rtb-a, rtb-b, rtb-c
+        - ECR API Interface endpoint (com.amazonaws.us-east-1.ecr.api), subnets subnet-a, subnet-b, subnet-c
+        - ECR Docker Interface endpoint (com.amazonaws.us-east-1.ecr.dkr), subnets subnet-a, subnet-b, subnet-c
+
+      Data processing (Cost Explorer, last 30 days):
+        - NAT Gateway data processing: 1,950 GB total ($87.75)
+        - NAT Gateway base: 3 × $32.85 = $98.55
+        - Total NAT cost: $186.30
+
+      Traffic breakdown (VPC Flow Logs, last 7 days, monthly projection):
+        - S3: 0 GB (on Gateway endpoint)
+        - DynamoDB: 0 GB (on Gateway endpoint)
+        - ECR: 0 GB (on Interface endpoint)
+        - Other AWS services: 150 GB/month
+        - Internet: 1,800 GB/month
+
+      Workload context: production EKS cluster, high-throughput, requires
+      multi-AZ HA for outbound traffic.
+
+      Emit the standard optimisation block (VPC, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-prod-endpoints"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: nat-instance-devtest-substitution
+    description: >-
+      Single-AZ dev VPC with 1 NAT Gateway processing 2 TB/month of
+      data (build agent pulling large container images and datasets).
+      HA not required. NAT Instance (t3.micro) substitution saves
+      ~$90+/month. Expected verdict: OPPORTUNITY_FOUND with NAT
+      Instance recommendation and reliability warning.
+    input: |
+      VPC: vpc-nat-instance-devtest-substitution
+      Region: us-east-1
+      Environment: dev
+
+      NAT Gateways: 1 (us-east-1a), available
+      Current VPC Endpoints: none
+
+      Data processing (Cost Explorer, last 30 days):
+        - NAT Gateway data processing: 2,000 GB total ($90.00)
+        - NAT Gateway base: 1 × $32.85 = $32.85
+        - Total NAT cost: $122.85
+
+      Traffic breakdown (VPC Flow Logs, last 7 days, monthly projection):
+        - S3: 1,500 GB/month (large dataset pulls)
+        - Other AWS services: 100 GB/month
+        - Internet: 400 GB/month
+
+      Workload context: single developer build agent running CI jobs;
+      no HA requirement; tolerate downtime; runs in a single AZ.
+
+      Emit the standard optimisation block (VPC, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "nat-instance-devtest-substitution"
+        - "RECOMMENDATION"
+        - "NAT Instance"
+        - "single point of failure"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"

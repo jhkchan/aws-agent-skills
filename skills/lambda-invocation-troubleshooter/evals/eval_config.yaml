@@ -1,0 +1,48 @@
+# Eval configuration for lambda-invocation-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: lambda-invocation-troubleshooter
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: timeout-downstream-dynamodb-throttled
+    difficulty: hard
+    prompt_file: prompts/timeout-downstream-dynamodb-throttled.md
+    baseline_file: baselines/timeout-downstream-dynamodb-throttled.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: TIMEOUT_DOWNSTREAM
+  - id: oom-memory-too-low
+    difficulty: medium
+    prompt_file: prompts/oom-memory-too-low.md
+    baseline_file: baselines/oom-memory-too-low.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: MEMORY_CONFIG
+  - id: vpc-no-nat-no-internet
+    difficulty: hard
+    prompt_file: prompts/vpc-no-nat-no-internet.md
+    baseline_file: baselines/vpc-no-nat-no-internet.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: VPC_CONNECTIVITY
+  - id: kms-decrypt-cmk-role-missing
+    difficulty: hard
+    prompt_file: prompts/kms-decrypt-cmk-role-missing.md
+    baseline_file: baselines/kms-decrypt-cmk-role-missing.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: ENV_VAR_KMS
+  - id: ecr-image-cross-account-policy
+    difficulty: hard
+    prompt_file: prompts/ecr-image-cross-account-policy.md
+    baseline_file: baselines/ecr-image-cross-account-policy.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: ECR_POLICY
