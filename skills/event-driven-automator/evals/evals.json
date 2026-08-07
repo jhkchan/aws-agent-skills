@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "event-driven-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Event-Driven Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "guardduty-lambda-auto-remediation",
+      "name": "GuardDuty high-severity finding -> Lambda isolate-instance with DLQ and idempotency",
+      "difficulty": "easy",
+      "prompt_file": "prompts/guardduty-lambda-auto-remediation.md",
+      "baseline_file": "baselines/guardduty-lambda-auto-remediation.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "guardduty-lambda-auto-remediation", "aws.guardduty", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "codebuild-failure-sns-notify",
+      "name": "CodeBuild failure -> SNS -> Lambda Slack notifier with bounded retry and idempotency",
+      "difficulty": "medium",
+      "prompt_file": "prompts/codebuild-failure-sns-notify.md",
+      "baseline_file": "baselines/codebuild-failure-sns-notify.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "codebuild-failure-sns-notify", "aws.codebuild", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "circular-dependency-detected",
+      "name": "Rule A -> Lambda B publishes -> rule C -> Lambda D publishes -> rule A — cycle",
+      "difficulty": "hard",
+      "prompt_file": "prompts/circular-dependency-detected.md",
+      "baseline_file": "baselines/circular-dependency-detected.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "circular-dependency-detected", "VERDICT", "circular", "GAP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "dlq-idempotency-gap",
+      "name": "Existing S3 rule has no DLQ and consumer has no idempotency — both gaps cited",
+      "difficulty": "hard",
+      "prompt_file": "prompts/dlq-idempotency-gap.md",
+      "baseline_file": "baselines/dlq-idempotency-gap.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "dlq-idempotency-gap", "VERDICT", "idempotency", "DLQ", "GAP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "pipes-enrichment-pipeline",
+      "name": "DynamoDB Streams -> Lambda enrichment -> Step Functions via EventBridge Pipes",
+      "difficulty": "hard",
+      "prompt_file": "prompts/pipes-enrichment-pipeline.md",
+      "baseline_file": "baselines/pipes-enrichment-pipeline.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "pipes-enrichment-pipeline", "create-pipe", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

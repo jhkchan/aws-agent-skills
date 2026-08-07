@@ -1,0 +1,262 @@
+# Eval test cases for cloudwatch-alarm-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-alarm-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-cpu-alarm-ready
+    description: >-
+      Create a CPU utilization alarm for a production EC2 instance.
+      Metric is publishing, dimensions are correct, SNS topic exists,
+      ActionsEnabled not yet set (new alarm). All pre-checks pass;
+      plan should produce READY with the put-metric-alarm CLI,
+      CONFIRM gate, and the 5-min detection-lag caveat.
+    input: |
+      Operation: create
+      Alarm name: ec2-cpu-high-prod-web-1
+      Namespace: AWS/EC2
+      Metric: CPUUtilization
+      Dimensions: InstanceId=i-0123456789abcdef0
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: arn:aws:sns:us-east-1:111111111111:on-call-critical
+      OKActions: arn:aws:sns:us-east-1:111111111111:on-call-info
+      TreatMissingData: notBreaching
+
+      Metric checks (already performed by caller):
+        aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
+          --metric-name CPUUtilization \
+          --dimensions Name=InstanceId,Value=i-0123456789abcdef0 \
+          --start-time 2026-08-07T09:00:00Z --end-time 2026-08-07T10:00:00Z \
+          --period 300 --statistics Average:
+          datapoints: 60 (Average ~45%, Maximum 72%)
+        aws sns get-topic-attributes \
+          --topic-arn arn:aws:sns:us-east-1:111111111111:on-call-critical:
+          OK (subscriptions: 3)
+        aws sns get-topic-attributes \
+          --topic-arn arn:aws:sns:us-east-1:111111111111:on-call-info:
+          OK (subscriptions: 8)
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, STATE, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "ec2-cpu-high-prod-web-1"
+        - "put-metric-alarm"
+        - "VERDICT"
+        - "CONFIRM"
+        - "TreatMissingData"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: diagnose-insufficient-data-dimensions-wrong
+    description: >-
+      Diagnose an alarm stuck in INSUFFICIENT_DATA for 6 days. The
+      underlying metric is not returning datapoints because the
+      LoadBalancer dimension references a deleted ALB. Pre-checks must
+      BLOCK on the missing-metric finding and surface the exact
+      dimension mismatch.
+    input: |
+      Operation: diagnose
+      Alarm name: api-error-rate-prod
+
+      Existing alarm config (aws cloudwatch describe-alarms):
+        AlarmName: api-error-rate-prod
+        StateValue: INSUFFICIENT_DATA
+        StateUpdatedTimestamp: 2026-08-01T14:30:00Z (6 days ago)
+        Namespace: AWS/ApplicationELB
+        MetricName: HTTPCode_ELB_5XX_Count
+        Dimensions: [{Name: LoadBalancer, Value: app/prod-alb/abc-def-OLD}]
+        Statistic: Sum
+        Period: 60
+        EvaluationPeriods: 5
+        DatapointsToAlarm: 3
+        Threshold: 10
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: missing (default — not set)
+        AlarmActions: [arn:aws:sns:us-east-1:111111111111:on-call-critical]
+        ActionsEnabled: true
+
+      Metric checks:
+        aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB \
+          --metric-name HTTPCode_ELB_5XX_Count \
+          --dimensions Name=LoadBalancer,Value=app/prod-alb/abc-def-OLD \
+          --start-time 2026-08-07T09:00:00Z --end-time 2026-08-07T10:00:00Z \
+          --period 60 --statistics Sum:
+          datapoints: 0
+
+        aws cloudwatch describe-load-balancers --names prod-alb:
+          DNSName: prod-alb-1234567890.us-east-1.elb.amazonaws.com
+          (current ALB ARN: app/prod-alb/1234567890)
+
+      Alarm history (describe-alarm-history, StateHistory, 7 days):
+        2026-08-01T14:30:00Z: OK -> INSUFFICIENT_DATA (metric stopped reporting)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "INSUFFICIENT_DATA"
+        - "LoadBalancer"
+        - "VERDICT"
+        - "TreatMissingData"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: composite-alarm-reduce-fatigue-ready
+    description: >-
+      Build a composite alarm to roll up three existing child alarms
+      (5xx rate, latency anomaly, Lambda errors) into one escalation
+      SNS topic. All children exist; the composite Rule fits within
+      512 chars. Pre-checks pass and plan should produce READY.
+    input: |
+      Operation: composite
+      Composite alarm name: prod-checkout-critical-rollup
+      Rule: ALARM(alb-error-ratio-prod) OR ALARM(alb-latency-anomaly-prod) OR ALARM(lambda-errors-high-prod-checkout)
+      AlarmActions: arn:aws:sns:us-east-1:111111111111:on-call-escalation
+      TreatMissingData: notBreaching
+
+      Child alarm existence checks:
+        aws cloudwatch describe-alarms --alarm-names alb-error-ratio-prod:
+          OK (StateValue: OK)
+        aws cloudwatch describe-alarms --alarm-names alb-latency-anomaly-prod:
+          OK (StateValue: OK)
+        aws cloudwatch describe-alarms --alarm-names lambda-errors-high-prod-checkout:
+          OK (StateValue: OK)
+        aws sns get-topic-attributes \
+          --topic-arn arn:aws:sns:us-east-1:111111111111:on-call-escalation:
+          OK (subscriptions: 2 — different from on-call-critical)
+
+      Rule length: 91 chars (<= 512)
+      Alarm references: 3 (<= 100)
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-checkout-critical-rollup"
+        - "put-composite-alarm"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: anomaly-detection-warmup-blocked
+    description: >-
+      Convert a static-threshold latency alarm to anomaly detection on
+      a freshly-promoted ALB (15 min of history only). The anomaly
+      detector requires ~15 min of metric history before bands are
+      valid; the conversion should BLOCK until warm-up completes.
+    input: |
+      Operation: anomaly
+      Alarm name: alb-latency-anomaly-prod
+      Namespace: AWS/ApplicationELB
+      Metric: TargetResponseTime
+      Dimensions: LoadBalancer=app/prod-alb/1234567890
+      Statistic: Average
+      Stdev: 2
+      AlarmActions: arn:aws:sns:us-east-1:111111111111:on-call-critical
+
+      Metric checks:
+        aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB \
+          --metric-name TargetResponseTime \
+          --dimensions Name=LoadBalancer,Value=app/prod-alb/1234567890 \
+          --start-time 2026-08-07T09:45:00Z --end-time 2026-08-07T10:00:00Z \
+          --period 60 --statistics Average:
+          datapoints: 8 (only 8 min of history — ALB promoted 8 min ago)
+
+        aws cloudwatch describe-anomaly-detectors \
+          --namespace AWS/ApplicationELB:
+          [] (no existing detector for this metric)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "warm-up"
+        - "anomaly"
+        - "VERDICT"
+        - "TargetResponseTime"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "put-metric-alarm"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: tune-tmd-completed
+    description: >-
+      Tune an existing alarm's TreatMissingData from the default
+      "missing" to "breaching" for an availability metric. Pre-checks
+      pass, the tune has been executed, and post-verification shows
+      the updated config and the expected state behavior. Plan should
+      produce COMPLETED.
+    input: |
+      Operation: tune (post-verification after execution)
+      Alarm name: prod-alb-availability
+      Change: TreatMissingData missing -> breaching
+      Reason: ALB stopped publishing due to a VPC route table issue;
+        the alarm should fire when the metric goes missing rather than
+        going dark.
+
+      Pre-tune snapshot:
+        TreatMissingData: missing (default)
+        StateValue: INSUFFICIENT_DATA (stuck 2 hours after route table
+          misconfig caused the ALB to stop emitting)
+
+      Executed CLI:
+        aws cloudwatch describe-alarms --alarm-names prod-alb-availability \
+          --output json > /tmp/prod-alb-availability-backup-2026-08-07.json
+        aws cloudwatch put-metric-alarm --alarm-name prod-alb-availability \
+          --treat-missing-data breaching \
+          [...rest of config preserved...]
+
+      Post-execution checks (all passed):
+        aws cloudwatch describe-alarms --alarm-names prod-alb-availability:
+          TreatMissingData: breaching
+          StateValue: ALARM (transitioned from INSUFFICIENT_DATA to
+            ALARM because the metric is still missing and
+            TreatMissingData=breaching now treats gaps as breaches)
+          ActionsEnabled: true
+          AlarmActions: [arn:aws:sns:us-east-1:111111111111:on-call-critical]
+        aws sns list-subscriptions-by-topic \
+          --topic-arn arn:aws:sns:us-east-1:111111111111:on-call-critical:
+          3 subscriptions confirmed
+        On-call confirmed receiving the page within 60s of state transition
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "prod-alb-availability"
+        - "TreatMissingData"
+        - "VERDICT"
+        - "POST_VERIFY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

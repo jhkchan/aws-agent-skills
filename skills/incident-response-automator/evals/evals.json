@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "incident-response-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Incident Response Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "guardduty-ec2-quarantine",
+      "name": "Automated EC2 quarantine on GuardDuty severity >= 7 via AWS-IsolateEC2Instance — all safety gates pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/guardduty-ec2-quarantine.md",
+      "baseline_file": "baselines/guardduty-ec2-quarantine.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "guardduty-ec2-quarantine", "VERDICT", "WORKFLOW", "AWS-IsolateEC2Instance"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "iam-key-revocation-workflow",
+      "name": "Automated IAM access key revocation + session revoke on CredentialAccess finding — all gates pass",
+      "difficulty": "medium",
+      "prompt_file": "prompts/iam-key-revocation-workflow.md",
+      "baseline_file": "baselines/iam-key-revocation-workflow.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "iam-key-revocation-workflow", "VERDICT", "WORKFLOW", "UpdateAccessKey"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "stepfunctions-full-playbook",
+      "name": "Full-playbook Step Functions state machine (isolate + snapshot + notify + recover) — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/stepfunctions-full-playbook.md",
+      "baseline_file": "baselines/stepfunctions-full-playbook.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "stepfunctions-full-playbook", "VERDICT", "WORKFLOW", "Step Functions"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "missing-kill-switch",
+      "name": "Validate existing IR workflow missing kill-switch + manual approval gate + over-broad IAM (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/missing-kill-switch.md",
+      "baseline_file": "baselines/missing-kill-switch.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "missing-kill-switch", "VERDICT", "kill-switch"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "eventbridge-pattern-gap",
+      "name": "Validate existing EventBridge rule missing severity filter (MANUAL_STEP_REQUIRED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/eventbridge-pattern-gap.md",
+      "baseline_file": "baselines/eventbridge-pattern-gap.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "eventbridge-pattern-gap", "VERDICT", "severity"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    }
+  ]
+}

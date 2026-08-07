@@ -1,0 +1,198 @@
+# Eval test cases for incident-response-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: incident-response-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: guardduty-ec2-quarantine
+    description: >-
+      Design an automated workflow that triggers on GuardDuty severity >= 7
+      findings for EC2 and moves the instance to a pre-provisioned quarantine
+      security group via AWS-IsolateEC2Instance. Includes kill-switch,
+      isolated-account test, scoped IAM, manual override. Verdict: AUTOMATED.
+    input: |
+      Design an automated incident response workflow. Emit the standard
+      VERDICT block (FINDING_SOURCE, RESPONSE_SCOPE, VERDICT, WORKFLOW,
+      SAFETY, AUDIT, FINDINGS, REMEDIATION).
+
+      Requirements:
+      - Finding source: guardduty
+      - Response scope: isolate (EC2 only)
+      - Severity threshold: 7.0
+      - Containment: AWS-IsolateEC2Instance (move to quarantine SG)
+      - Kill-switch: Parameter Store /ir/kill-switch
+      - Tested in isolated account: security-test (555555555555)
+      - Manual override: yes (Step Functions task-token callback)
+      - Notification: SNS -> Lambda -> Slack
+      - IAM role scoped to ec2:ModifyInstanceAttribute + ssm:StartAutomationExecution
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "guardduty-ec2-quarantine"
+        - "VERDICT"
+        - "WORKFLOW"
+        - "AWS-IsolateEC2Instance"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: iam-key-revocation-workflow
+    description: >-
+      Design an automated workflow that triggers on GuardDuty
+      CredentialAccess:IAMUser/AnomalousBehavior findings. Deactivates the
+      access key AND puts a Deny-all policy to revoke active sessions. All
+      safety gates pass. Verdict: AUTOMATED.
+    input: |
+      Design an automated incident response workflow. Emit the standard
+      VERDICT block.
+
+      Requirements:
+      - Finding source: guardduty (CredentialAccess:IAMUser/AnomalousBehavior)
+      - Response scope: contain (revoke IAM access key + revoke sessions)
+      - Severity threshold: 7.0
+      - Actions:
+        1. iam:UpdateAccessKey --status Inactive
+        2. iam:PutUserPolicy with explicit Deny on *:* to revoke sessions
+      - Kill-switch: Parameter Store /ir/iam-kill-switch
+      - Tested in security-test account
+      - Idempotency: skip if key already Inactive
+      - Notification: SNS -> on-call pager
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "iam-key-revocation-workflow"
+        - "VERDICT"
+        - "WORKFLOW"
+        - "UpdateAccessKey"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: stepfunctions-full-playbook
+    description: >-
+      Design a full-playbook Step Functions state machine for GuardDuty EC2
+      findings. Orchestrates: kill-switch check -> parse finding -> parallel
+      (isolate + snapshot + notify) -> wait for human approval -> recover or
+      close. All safety gates pass. Verdict: AUTOMATED.
+    input: |
+      Design a full incident response playbook. Emit the standard VERDICT
+      block.
+
+      Requirements:
+      - Finding source: guardduty
+      - Response scope: full-playbook (isolate + snapshot + notify + recover)
+      - Severity threshold: 7.0
+      - Orchestration: EventBridge rule -> Step Functions state machine
+      - State machine: CheckKillSwitch -> ParseFinding -> Parallel(Isolate, Snapshot, Notify) -> WaitForHumanApproval (task token) -> RecoverOrClose
+      - Parallel branches: AWS-IsolateEC2Instance, Lambda snapshot-volumes, Lambda notify-slack
+      - Human approval via SQS task token
+      - Recovery: restore from known-good AMI
+      - Kill-switch: Parameter Store /ir/kill-switch
+      - Audit: CloudTrail + Step Functions execution history + SSM outputs tagged with IncidentId
+      - Tested in security-test account
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "stepfunctions-full-playbook"
+        - "VERDICT"
+        - "WORKFLOW"
+        - "Step Functions"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: missing-kill-switch
+    description: >-
+      Validate an existing IR workflow definition. The EventBridge rule
+      triggers a Lambda on every GuardDuty finding of severity >= 7 with NO
+      kill-switch, NO manual approval gate, and an over-broad IAM role
+      (ec2:* on Resource:*). Multiple CRITICAL safety gates fail. Verdict:
+      MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing incident response workflow. Emit the standard
+      VERDICT block.
+
+      EventBridge rule pattern: source=aws.guardduty, severity>=7
+      Target: Lambda function ir-quarantine
+
+      Lambda execution role policy:
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [{
+          "Effect": "Allow",
+          "Action": "ec2:*",
+          "Resource": "*"
+        }]
+      }
+      ```
+
+      Workflow:
+      1. Lambda receives finding
+      2. Calls ec2:ModifyInstanceAttribute to swap SG
+      3. Calls ec2:CreateSnapshot for each volume
+      4. Calls sns:Publish to notify
+      5. Terminates the instance
+
+      No kill-switch.
+      No human approval gate.
+      No isolated-account test.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "missing-kill-switch"
+        - "VERDICT"
+        - "kill-switch"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: eventbridge-pattern-gap
+    description: >-
+      Validate an existing EventBridge rule pattern for GuardDuty. The
+      pattern filters only on detail-type without scoping to service or
+      severity, which would trigger on ALL GuardDuty findings including
+      informational ones. Safety gate fails. Verdict: MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing EventBridge rule for an IR workflow. Emit the
+      standard VERDICT block.
+
+      ```json
+      {
+        "source": ["aws.guardduty"],
+        "detail-type": ["GuardDuty Finding"]
+      }
+      ```
+
+      Target: Step Functions state machine ir-full-playbook
+      Kill-switch: present (Parameter Store /ir/kill-switch)
+      Manual approval gate: present
+      IAM role: scoped correctly
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "eventbridge-pattern-gap"
+        - "VERDICT"
+        - "severity"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"

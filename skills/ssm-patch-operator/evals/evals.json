@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ssm-patch-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SSM Patch Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "install-single-host-ready",
+      "name": "Install on single managed Amazon Linux 2 host — all pre-checks pass (READY, NoReboot deferred-reboot caveat)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/install-single-host-ready.md",
+      "baseline_file": "baselines/install-single-host-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "i-0abc123def456789a", "VERDICT", "PRE_CHECKS", "AWS-RunPatchBaseline", "Operation", "Install", "CONFIRM", "NoReboot"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "install-blocked-no-patch-group",
+      "name": "Install BLOCKED — instance has no Patch Group tag and falls back to AWS default, not operator's intended custom baseline",
+      "difficulty": "hard",
+      "prompt_file": "prompts/install-blocked-no-patch-group.md",
+      "baseline_file": "baselines/install-blocked-no-patch-group.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "i-0fedcba9876543210", "VERDICT", "PRE_CHECKS", "Patch Group", "prod-linux-critical"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "send-command", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "scan-association-missing-patches",
+      "name": "Operator reports association green but compliance NON_COMPLIANT — diagnose Scan-only association, switch to Install (READY update-association)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/scan-association-missing-patches.md",
+      "baseline_file": "baselines/scan-association-missing-patches.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "Scan", "Install", "update-association", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "delete-association", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "install-blocked-disk-full",
+      "name": "Install BLOCKED — root volume has 800 MB free, below the 2 GB threshold",
+      "difficulty": "hard",
+      "prompt_file": "prompts/install-blocked-disk-full.md",
+      "baseline_file": "baselines/install-blocked-disk-full.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "i-0full00000012345", "VERDICT", "PRE_CHECKS", "disk"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "Operation=[Install]", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "mw-register-task-ready",
+      "name": "Maintenance window register-task for prod-patch-window targeting Patch Group tag, with rate-control 10% / max-errors 0 (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/mw-register-task-ready.md",
+      "baseline_file": "baselines/mw-register-task-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "mw-0bbb", "register-task-with-maintenance-window", "max-concurrency", "max-errors", "CONFIRM", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

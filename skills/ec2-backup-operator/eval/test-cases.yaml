@@ -1,0 +1,216 @@
+# Eval test cases for ec2-backup-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ec2-backup-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-ami-pre-migration-ready
+    description: >-
+      Pre-migration AMI creation from a running prod webapp instance.
+      All pre-checks pass (instance running, all 3 volumes in-use,
+      AMI name unique, --no-reboot=true accepted for crash-consistent
+      capture). Plan must emit READY with the exact create-image CLI,
+      the CONFIRM gate, and the deferred-reboot/deregister+delete
+      cleanup notes.
+    input: |
+      Operation: create-image
+      Target: i-0prodapp123456789ab (prod webapp, running)
+      AMI name: prod-webapp-pre-migration-2026-08-07
+      Reboot tolerance: --no-reboot=true accepted (webapp is stateless;
+        DB has its own snapshot)
+
+      Instance metadata:
+        InstanceId: i-0prodapp123456789ab
+        State: running
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1, VolumeId: vol-0root123, State: in-use
+          - DeviceName: /dev/sdb, VolumeId: vol-0logs123, State: in-use
+          - DeviceName: /dev/sdc, VolumeId: vol-0data123, State: in-use
+        IamInstanceProfile: arn:aws:iam::111111111111:instance-profile/prod-webapp
+        Architecture: x86_64
+
+      AMI name uniqueness (describe-images --owners self --filters
+        Name=name,Values=prod-webapp-pre-migration-2026-08-07): empty
+
+      Caller IAM: ec2:CreateImage on instance ARN confirmed.
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NEW_RESOURCE, REBOOT, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "i-0prodapp123456789ab"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "create-image"
+        - "no-reboot"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: cross-account-copy-blocked-kms
+    description: >-
+      Cross-account encrypted snapshot share BLOCKED because the source
+      KMS key policy does NOT grant the recipient kms:Decrypt or
+      kms:CreateGrant. Snapshot attribute is shared but recipient cannot
+      create-volume. Plan must BLOCK before any copy-snapshot, surface
+      the KMS key policy remediation.
+    input: |
+      Operation: copy-snapshot (cross-account, encrypted)
+      Source: snap-0enc1234567890abc (in account 111111111111, us-east-1)
+      Recipient: account 222222222222
+      KMS key: arn:aws:kms:us-east-1:111111111111:key/abc
+
+      Snapshot metadata:
+        SnapshotId: snap-0enc1234567890abc
+        State: completed
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc
+        VolumeId: vol-0source
+        Description: prod-data-pre-share
+
+      createVolumePermission attribute: includes 222222222222
+
+      KMS key policy (aws kms get-key-policy --key-id abc):
+        - Statement "Allow recipient account to use the snapshot": MISSING
+        - Statement "default": root access only
+
+      Destination region us-west-2: opted-in
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "snap-0enc1234567890abc"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "kms:Decrypt"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "copy-snapshot --source-snapshot-id"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: delete-snapshot-blocked-ami-ref
+    description: >-
+      delete-snapshot BLOCKED because the snapshot is referenced by a
+      registered AMI's BlockDeviceMappings. Plan must surface the AMI
+      and require deregister-image first.
+    input: |
+      Operation: delete-snapshot
+      Target: snap-0amibacking123
+
+      Snapshot metadata:
+        SnapshotId: snap-0amibacking123
+        State: completed
+        VolumeId: vol-0old
+        Description: AMI backing snapshot
+        Encrypted: false
+
+      AMI reference check (describe-images --owners self --filters
+        BlockDeviceMapping.SnapshotId=snap-0amibacking123):
+        - ami-0oldprod (State: available)
+
+      FSR check (describe-fast-snapshot-restores --filters
+        snapshot-id=snap-0amibacking123): empty
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "snap-0amibacking123"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "deregister-image"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "delete-snapshot --snapshot-id snap-0amibacking123"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: aws-backup-restore-ready
+    description: >-
+      AWS Backup start-restore-job for EC2. All pre-checks pass
+      (recovery point COMPLETED, IAM role trusts backup.amazonaws.com,
+      metadata includes InstanceType/SubnetId/SecurityGroupIds).
+      Plan must emit READY with the exact start-restore-job CLI,
+      rate-control-style metadata, the CONFIRM gate, and the
+      new-instance / connection-string cutover notes.
+    input: |
+      Operation: start-restore-job (AWS Backup, EC2)
+      Recovery point: arn:aws:backup:us-east-1:111111111111:recovery-point:1a2b3c-4d5e-6f7g
+      Restore IAM role: arn:aws:iam::111111111111:role/service-role/AWSBackupRestoreRole
+        (trusts backup.amazonaws.com)
+      Target subnet: subnet-0prod (has capacity)
+
+      Recovery point metadata:
+        BackupVaultName: prod-ec2-vault
+        ResourceArn: arn:aws:ec2:us-east-1:111111111111:instance/i-0source123
+        Status: COMPLETED
+        CompletionDate: 2026-08-07T01:00:00Z
+        Metadata (defaults): InstanceType=t3.large, SubnetId=subnet-0prod,
+          SecurityGroupIds=[sg-0prod],
+          IamInstanceProfile=arn:aws:iam::111111111111:instance-profile/prod-webapp
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "start-restore-job"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: dlm-policy-create-ready
+    description: >-
+      DLM create-lifecycle-policy for daily snapshots of volumes tagged
+      BackupSchedule=daily (10 volumes match). All pre-checks pass.
+      Plan must emit READY with the exact create-lifecycle-policy CLI,
+      retain count 7, copy-tags, the CONFIRM gate, and the IAM role
+      verification notes.
+    input: |
+      Operation: create-lifecycle-policy (DLM)
+      PolicyType: EBS_SNAPSHOT_MANAGEMENT
+      Target tags: Key=BackupSchedule, Value=daily
+      Schedule: rate(1 day), Times=["03:00"]
+      Retention: count=7
+      IAM role: arn:aws:iam::111111111111:role/service-role/AWS-DLM-LifeCycleRole
+        (trusts dlm.amazonaws.com, has ec2:CreateSnapshot/CreateTags/DeleteSnapshot)
+
+      Target membership (ec2 describe-volumes --filters
+        Name=tag:BackupSchedule,Values=daily): 10 volumes match
+
+      Region: us-east-1
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-lifecycle-policy"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"

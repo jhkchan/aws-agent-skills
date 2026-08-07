@@ -1,0 +1,248 @@
+# Eval test cases for cicd-pipeline-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cicd-pipeline-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: greenfield-cfn-pipeline-automated
+    description: >-
+      Greenfield pipeline request for a Node 18 service deploying to
+      a same-account CloudFormation stack. All requirements satisfied
+      (CodeStar Connection Available, deploy role exists, KMS key with
+      correct policy, artifact bucket with versioning, approval SNS
+      topic). Plan should produce AUTOMATED with the full V2 pipeline
+      template.
+    input: |
+      Operation: create
+      Pipeline name: prod-checkout-pipeline
+      Source: GitHub (CodeStar Connection arn:aws:codestar-connections:
+        us-east-1:111111111111:connection/abc-123)
+      Repository: acme-org/checkout-service
+      Branch: main
+      Language: Node 18
+      Build image: aws/codebuild/standard:7.0
+      Deploy target: CloudFormation stack prod-checkout in same account
+      Approval gate: yes, SNS arn:aws:sns:us-east-1:111111111111:pipeline-approval
+      Template format: CloudFormation
+
+      Requirement checks (already performed by caller):
+        aws codestar-connections get-connection \
+          --connection-arn arn:aws:codestar-connections:...:abc-123:
+          ConnectionStatus: Available
+        aws iam get-role --role-name prod-deploy:
+          TrustPolicy: cloudformation.amazonaws.com (OK)
+        aws kms describe-key --key-id arn:aws:kms:...:key/abc:
+          KeyPolicy grants pipeline role + deploy role (OK)
+        aws s3api get-bucket-versioning --bucket prod-checkout-artifacts:
+          MFADelete: Disabled, Status: Enabled (OK)
+        aws sns get-topic-attributes \
+          --topic-arn arn:aws:sns:...:pipeline-approval:
+          subscriptions: 2 (OK)
+        aws codebuild list-curated-environment-images | grep standard:7.0:
+          available, supports nodejs:18
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      REQUIREMENTS, PIPELINE_TEMPLATE, MANUAL_GAPS, NOTES).
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "prod-checkout-pipeline"
+        - "AWS::CodePipeline::Pipeline"
+        - "VERDICT"
+        - "V2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: cross-account-kms-gap-manual
+    description: >-
+      Cross-account pipeline request. The target-account deploy role
+      exists and has the correct trust policy, but the source-account
+      artifact KMS key policy does NOT grant the target account
+      kms:Decrypt. Plan should produce MANUAL_STEP_REQUIRED with the
+      exact KMS key policy snippet to close the gap.
+    input: |
+      Operation: create
+      Pipeline name: cross-account-deploy-pipeline
+      Source: GitHub (CodeStar Connection)
+      Build image: aws/codebuild/standard:8.0
+      Deploy target: CloudFormation stack in target account 222222222222
+        via deploy role arn:aws:iam::222222222222:role/target-deploy
+      Source account: 111111111111
+      Artifact KMS key: arn:aws:kms:us-east-1:111111111111:key/abc
+      Artifact bucket: prod-checkout-artifacts (in source account)
+
+      Requirement checks:
+        aws codestar-connections get-connection: Available
+        aws iam get-role --role-name target-deploy:
+          TrustPolicy: codepipeline.amazonaws.com with
+            aws:SourceAccount=111111111111 condition (OK)
+        aws kms describe-key --key-id arn:aws:kms:...:key/abc:
+          KeyPolicy does NOT include account 222222222222 (FAIL)
+        aws s3api get-bucket-versioning --bucket prod-checkout-artifacts:
+          OK
+        aws s3api get-bucket-policy --bucket prod-checkout-artifacts:
+          Policy includes account 222222222222 s3:GetObject (OK)
+        aws codebuild list-curated-environment-images | grep standard:8.0:
+          available, supports nodejs:20
+
+      Emit the standard VERDICT block.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "kms:Decrypt"
+        - "222222222222"
+        - "VERDICT"
+        - "KMS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: AUTOMATED"
+
+  - id: cdk-pipeline-with-blue-green-lambda-automated
+    description: >-
+      Request a CDK pipeline that deploys a Lambda function with
+      CodeDeploy canary 10%/90% blue/green. All requirements satisfied
+      (CodeStar Connection Available, CodeDeploy application exists,
+      PreTrafficHook/PostTrafficHook functions deployed, deploy role
+      with AWSCodeDeployRoleForLambda). Plan should produce AUTOMATED
+      with the CDK template.
+    input: |
+      Operation: create
+      Pipeline name: cdk-lambda-bluegreen-pipeline
+      Template format: CDK (TypeScript)
+      Source: GitHub via CodeStar Connection (Available)
+      Deploy target: Lambda function with CodeDeploy canary 10%/5min
+      PreTrafficHook: pre-traffic-validator (exists)
+      PostTrafficHook: post-traffic-smoke-test (exists)
+      CodeDeploy application: prod-lambda-deploy (exists)
+      CodeDeploy deployment group: prod-lambda-dg (exists)
+      Deploy role: arn:aws:iam::111111111111:role/lambda-deploy
+        (has AWSCodeDeployRoleForLambda managed policy)
+
+      Requirement checks (all passed):
+        CodeStar Connection: Available
+        CodeDeploy application: exists, computePlatform: Lambda
+        Deployment group: exists, deploymentStyle: BLUE_GREEN /
+          WITH_TRAFFIC_CONTROL
+        PreTrafficHook Lambda: exists, tested OK
+        PostTrafficHook Lambda: exists, tested OK
+        Deploy role: AWSCodeDeployRoleForLambda attached
+        Build image: standard:8.0 supports TypeScript
+
+      Emit the standard VERDICT block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "cdk"
+        - "blue/green"
+        - "VERDICT"
+        - "canary"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: v1-pipeline-migration-manual
+    description: >-
+      Request to migrate a V1 pipeline to V2. The pipeline uses GitHub
+      v1 OAuth source (ThirdParty/GitHub), which is deprecated and
+      incompatible with V2. Plan should produce MANUAL_STEP_REQUIRED
+      with the explicit instruction to migrate the source to CodeStar
+      Connection before V2 upgrade.
+    input: |
+      Operation: migrate-v2
+      Pipeline name: legacy-github-v1-pipeline
+
+      Existing pipeline definition (aws codepipeline get-pipeline):
+        name: legacy-github-v1-pipeline
+        pipelineType: V1
+        stages[0].actions[0]:
+          actionTypeId:
+            category: Source
+            owner: ThirdParty
+            provider: GitHub
+            version: 1
+          configuration:
+            Owner: acme-org
+            Repo: legacy-service
+            Branch: master
+            OAuthToken: **** (stored in Secrets Manager)
+          outputArtifacts: [SourceOutput]
+
+      Requirement checks:
+        aws codestar-connections list-connections: [] (no connections
+          exist in the account)
+        Pipeline uses ThirdParty/GitHub (v1 OAuth): DEPRECATED, V2
+          requires CodeStarConnection provider
+
+      Emit the standard VERDICT block.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "CodeStar Connection"
+        - "GitHub"
+        - "VERDICT"
+        - "deprecated"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: AUTOMATED"
+
+  - id: ecs-rolling-circuit-breaker-automated
+    description: >-
+      Request a CloudFormation pipeline for an ECS service deploy with
+      circuit breaker rollback. All requirements satisfied (ECR repo
+      exists, ECS cluster + service exists with circuit breaker enabled,
+      task execution role exists, deploy role with ecs:* permissions).
+      Plan should produce AUTOMATED with the CloudFormation template.
+    input: |
+      Operation: create
+      Pipeline name: ecs-rolling-pipeline
+      Template format: CloudFormation
+      Source: CodeCommit (no extra cred needed)
+      Repository: checkout-service
+      Branch: main
+      Build image: aws/codebuild/standard:8.0
+      Deploy target: ECS cluster prod-cluster, service checkout-service
+        (DeploymentCircuitBreaker: Enable=true, Rollback=true)
+
+      Requirement checks (all passed):
+        aws codecommit get-repository --repository-name checkout-service:
+          OK
+        aws ecr describe-repositories --repository-names checkout-service:
+          OK
+        aws ecs describe-services --cluster prod-cluster --services
+          checkout-service:
+          deploymentConfiguration.deploymentCircuitBreaker:
+            enable: true, rollback: true
+        aws iam get-role --role-name checkout-ecs-deploy:
+          TrustPolicy: ecs-tasks.amazonaws.com (OK)
+          Policies: AmazonECSTaskExecutionRolePolicy +
+            custom ecr:GetAuthorizationToken (OK)
+        aws kms describe-key: artifact key exists with policy granting
+          pipeline role and deploy role (OK)
+        aws s3api get-bucket-versioning: artifact bucket versioned (OK)
+
+      Emit the standard VERDICT block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "ecs-rolling-pipeline"
+        - "circuit"
+        - "VERDICT"
+        - "CodeCommit"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MANUAL_STEP_REQUIRED"

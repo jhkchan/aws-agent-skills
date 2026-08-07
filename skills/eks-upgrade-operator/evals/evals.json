@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "eks-upgrade-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EKS Upgrade Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "upgrade-control-plane-1-28-to-1-29-ready",
+      "name": "Control plane upgrade 1.28 -> 1.29 with all pre-checks passing (READY)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/upgrade-control-plane-1-28-to-1-29-ready.md",
+      "baseline_file": "baselines/upgrade-control-plane-1-28-to-1-29-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod-cluster-01", "update-cluster-version", "VERDICT", "PRE_CHECKS", "1.29", "CONFIRM", "CANNOT be rolled back"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "upgrade-nodegroup-pdb-blocks-drain-blocked",
+      "name": "Node group upgrade BLOCKED by PDB minAvailable=replicas (no disruption allowed)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/upgrade-nodegroup-pdb-blocks-drain-blocked.md",
+      "baseline_file": "baselines/upgrade-nodegroup-pdb-blocks-drain-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "PodDisruptionBudget", "minAvailable", "VERDICT", "PRE_CHECKS", "kubectl patch pdb"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "update-nodegroup-version", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "upgrade-addon-vpc-cni-bridge-version-ready",
+      "name": "VPC-CNI pre-upgrade bridge version compatible with both 1.28 and 1.29 (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/upgrade-addon-vpc-cni-bridge-version-ready.md",
+      "baseline_file": "baselines/upgrade-addon-vpc-cni-bridge-version-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "vpc-cni", "update-addon", "VERDICT", "PRE_CHECKS", "bridge", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "upgrade-control-plane-skip-version-blocked",
+      "name": "Attempt to skip from 1.27 directly to 1.29 (BLOCKED — sequential minor required)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/upgrade-control-plane-skip-version-blocked.md",
+      "baseline_file": "baselines/upgrade-control-plane-skip-version-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "1.27", "1.29", "sequential", "VERDICT", "PRE_CHECKS", "1.28"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "update-cluster-version --kubernetes-version 1.29", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "post-upgrade-verify-all-pass-completed",
+      "name": "Post-upgrade verification — all nodes Ready, no CrashLoopBackOff, addon versions match (COMPLETED)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/post-upgrade-verify-all-pass-completed.md",
+      "baseline_file": "baselines/post-upgrade-verify-all-pass-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "prod-cluster-01", "1.29", "VERDICT", "POST_VERIFY", "Ready", "apiservices"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

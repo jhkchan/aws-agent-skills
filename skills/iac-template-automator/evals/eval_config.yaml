@@ -1,0 +1,43 @@
+# Eval configuration for iac-template-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: iac-template-automator
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: lambda-apigw-dynamodb-cfn
+    difficulty: easy
+    prompt_file: prompts/lambda-apigw-dynamodb-cfn.md
+    baseline_file: baselines/lambda-apigw-dynamodb-cfn.md
+    expected_verdict: AUTOMATED
+  - id: vpc-cdk-l3-construct
+    difficulty: medium
+    prompt_file: prompts/vpc-cdk-l3-construct.md
+    baseline_file: baselines/vpc-cdk-l3-construct.md
+    expected_verdict: AUTOMATED
+  - id: terraform-s3-backend-workspace
+    difficulty: medium
+    prompt_file: prompts/terraform-s3-backend-workspace.md
+    baseline_file: baselines/terraform-s3-backend-workspace.md
+    expected_verdict: AUTOMATED
+  - id: cfn-hardcoded-secrets
+    difficulty: hard
+    prompt_file: prompts/cfn-hardcoded-secrets.md
+    baseline_file: baselines/cfn-hardcoded-secrets.md
+    expected_verdict: MANUAL_STEP_REQUIRED
+  - id: terraform-wildcard-iam
+    difficulty: hard
+    prompt_file: prompts/terraform-wildcard-iam.md
+    baseline_file: baselines/terraform-wildcard-iam.md
+    expected_verdict: MANUAL_STEP_REQUIRED

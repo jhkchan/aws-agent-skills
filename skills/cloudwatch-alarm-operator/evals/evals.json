@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-alarm-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Alarm Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-cpu-alarm-ready",
+      "name": "Create CPU utilization alarm — all pre-checks pass (READY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/create-cpu-alarm-ready.md",
+      "baseline_file": "baselines/create-cpu-alarm-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "ec2-cpu-high-prod-web-1", "put-metric-alarm", "VERDICT", "CONFIRM", "TreatMissingData"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "diagnose-insufficient-data-dimensions-wrong",
+      "name": "Diagnose alarm stuck in INSUFFICIENT_DATA — wrong LoadBalancer dimension (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/diagnose-insufficient-data-dimensions-wrong.md",
+      "baseline_file": "baselines/diagnose-insufficient-data-dimensions-wrong.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "INSUFFICIENT_DATA", "LoadBalancer", "VERDICT", "TreatMissingData"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "composite-alarm-reduce-fatigue-ready",
+      "name": "Build composite alarm to roll up three children (READY with escalation action)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/composite-alarm-reduce-fatigue-ready.md",
+      "baseline_file": "baselines/composite-alarm-reduce-fatigue-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod-checkout-critical-rollup", "put-composite-alarm", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "anomaly-detection-warmup-blocked",
+      "name": "Anomaly detection conversion blocked — metric has only 8 min of history (warm-up required)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/anomaly-detection-warmup-blocked.md",
+      "baseline_file": "baselines/anomaly-detection-warmup-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "warm-up", "anomaly", "VERDICT", "TargetResponseTime"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "put-metric-alarm", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "tune-tmd-completed",
+      "name": "Tune alarm TreatMissingData to breaching — post-verification passed (COMPLETED)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/tune-tmd-completed.md",
+      "baseline_file": "baselines/tune-tmd-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "prod-alb-availability", "TreatMissingData", "VERDICT", "POST_VERIFY"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

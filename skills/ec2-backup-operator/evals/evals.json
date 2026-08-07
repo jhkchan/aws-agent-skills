@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ec2-backup-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EC2 Backup Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-ami-pre-migration-ready",
+      "name": "Pre-migration AMI creation from running prod webapp instance — all pre-checks pass (READY, --no-reboot crash-consistent accepted)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/create-ami-pre-migration-ready.md",
+      "baseline_file": "baselines/create-ami-pre-migration-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "i-0prodapp123456789ab", "VERDICT", "PRE_CHECKS", "create-image", "no-reboot", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-copy-blocked-kms",
+      "name": "Cross-account encrypted snapshot share BLOCKED — source KMS key policy does not grant recipient kms:Decrypt or kms:CreateGrant",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-copy-blocked-kms.md",
+      "baseline_file": "baselines/cross-account-copy-blocked-kms.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "snap-0enc1234567890abc", "VERDICT", "PRE_CHECKS", "kms:Decrypt"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "copy-snapshot --source-snapshot-id", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "delete-snapshot-blocked-ami-ref",
+      "name": "delete-snapshot BLOCKED — snapshot referenced by registered AMI's BlockDeviceMappings; require deregister-image first",
+      "difficulty": "medium",
+      "prompt_file": "prompts/delete-snapshot-blocked-ami-ref.md",
+      "baseline_file": "baselines/delete-snapshot-blocked-ami-ref.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "MEDIUM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "snap-0amibacking123", "VERDICT", "PRE_CHECKS", "deregister-image"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "delete-snapshot --snapshot-id snap-0amibacking123", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "aws-backup-restore-ready",
+      "name": "AWS Backup start-restore-job for EC2 — recovery point COMPLETED, IAM role valid, metadata populated (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/aws-backup-restore-ready.md",
+      "baseline_file": "baselines/aws-backup-restore-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "start-restore-job", "VERDICT", "PRE_CHECKS", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "dlm-policy-create-ready",
+      "name": "DLM create-lifecycle-policy for daily snapshots of 10 tagged volumes, retain count 7 (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/dlm-policy-create-ready.md",
+      "baseline_file": "baselines/dlm-policy-create-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-lifecycle-policy", "VERDICT", "PRE_CHECKS", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

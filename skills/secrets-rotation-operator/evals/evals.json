@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "secrets-rotation-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Secrets Manager Rotation Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "enable-rotation-rds-postgres-ready",
+      "name": "Enable rotation on RDS PostgreSQL secret — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/enable-rotation-rds-postgres-ready.md",
+      "baseline_file": "baselines/enable-rotation-rds-postgres-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod/payments-db-credentials", "rotate-secret", "VERDICT", "PRE_CHECKS", "AutomaticallyAfterDays", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "trigger-rotation-reserved-concurrency-zero-blocked",
+      "name": "Trigger rotation on Lambda with reserved concurrency=0 (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/trigger-rotation-reserved-concurrency-zero-blocked.md",
+      "baseline_file": "baselines/trigger-rotation-reserved-concurrency-zero-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "ReservedConcurrentExecutions", "VERDICT", "PRE_CHECKS", "Throttles", "put-function-concurrency"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "rotate-secret --secret-id", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "recover-pending-stuck-awspending-completed",
+      "name": "Recover stuck AWSPENDING version (COMPLETED with promotion)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/recover-pending-stuck-awspending-completed.md",
+      "baseline_file": "baselines/recover-pending-stuck-awspending-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "prod/api-gateway-token", "AWSPENDING", "AWSCURRENT", "update-secret-version-stage", "VERDICT", "POST_VERIFY"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "diagnose-rotation-lambda-timeout-blocked",
+      "name": "Diagnose failing rotation — Lambda timeout 3s on RDS (BLOCKED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/diagnose-rotation-lambda-timeout-blocked.md",
+      "baseline_file": "baselines/diagnose-rotation-lambda-timeout-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "Task timed out", "timeout", "VERDICT", "update-function-configuration", "30"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-rotation-access-denied-blocked",
+      "name": "Diagnose cross-account rotation Lambda AccessDeniedException (BLOCKED with policy fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-rotation-access-denied-blocked.md",
+      "baseline_file": "baselines/cross-account-rotation-access-denied-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "AccessDeniedException", "put-resource-policy", "VERDICT", "cross-account", "lambda:InvokeFunction"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

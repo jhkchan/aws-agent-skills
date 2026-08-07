@@ -1,0 +1,324 @@
+# Eval test cases for secrets-rotation-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: secrets-rotation-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: enable-rotation-rds-postgres-ready
+    description: >-
+      Operator wants to enable rotation on an RDS PostgreSQL secret. All
+      pre-checks pass: Lambda Active, resource-based policy present,
+      reserved concurrency 5, execution role has SecretsManagerRotation +
+      rds-db:connect + kms:Decrypt, VPC config routes to DB. Plan should
+      produce READY with the rotate-secret CLI and a CONFIRM gate.
+    input: |
+      Operation: enable-rotation
+      Secret: prod/payments-db-credentials
+      Target rotation Lambda: arn:aws:lambda:us-east-1:111111111111:function:SecretsManagerRDSPostgreSQLRotation
+      Schedule: AutomaticallyAfterDays=30
+      Rotate immediately on enable: yes
+
+      Secret metadata (aws secretsmanager describe-secret):
+        Name: prod/payments-db-credentials
+        RotationEnabled: false
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/payments-cmk
+        OwningService: rds
+        PrimaryRegion: null
+        DeletedDate: null
+
+      Lambda metadata (aws lambda get-function-configuration):
+        FunctionName: SecretsManagerRDSPostgreSQLRotation
+        State: Active
+        Runtime: python3.12
+        Timeout: 30
+        Role: arn:aws:iam::111111111111:role/service-role/SecretsManagerRDSPostgreSQLRotationRole
+        ReservedConcurrentExecutions: 5
+        VpcConfig: {SubnetIds: [subnet-aaa, subnet-bbb], SecurityGroupIds: [sg-lambda-rotation]}
+
+      Lambda resource-based policy (aws lambda get-policy):
+        Allows Principal: secretsmanager.amazonaws.com,
+        Action: lambda:InvokeFunction,
+        SourceArn: arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/payments-db-credentials-??????
+
+      IAM role attached policies:
+        - SecretsManagerRotation
+        - AWSLambdaVPCAccessExecutionRole
+        - Custom: rds-db:connect on arn:aws:rds-db:us-east-1:111111111111:dbuser:db-ABCDEFGHIJKLMNOP/postgres
+        - Custom: kms:Decrypt on arn:aws:kms:us-east-1:111111111111:key/payments-cmk
+
+      Network checks:
+        DB security group sg-rds-prod ingress from sg-lambda-rotation on port 5432: OK
+        Lambda subnets route to DB subnets via VPC route table: OK
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod/payments-db-credentials"
+        - "rotate-secret"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "AutomaticallyAfterDays"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: trigger-rotation-reserved-concurrency-zero-blocked
+    description: >-
+      Operator wants to trigger a manual rotation, but the rotation Lambda
+      has ReservedConcurrentExecutions=0 — a stealth kill switch. The Lambda
+      is Active but every invocation throttles. Pre-checks must BLOCK and
+      surface the put-function-concurrency fix.
+    input: |
+      Operation: trigger-rotation
+      Secret: prod/orders-service-token
+      Trigger immediately: yes
+
+      Secret metadata (aws secretsmanager describe-secret):
+        Name: prod/orders-service-token
+        RotationEnabled: true
+        RotationLambdaARN: arn:aws:lambda:us-east-1:111111111111:function:OrdersServiceTokenRotation
+        RotationRules: {AutomaticallyAfterDays: 7}
+        LastRotatedDate: 2026-07-01T03:14:22Z (37 days ago — overdue 4 intervals)
+        KmsKeyId: aws/secretsmanager (default managed key)
+        VersionIdsToStages: {
+          v1: [AWSPREVIOUS],
+          v2: [AWSCURRENT]
+        }
+        PrimaryRegion: null
+        DeletedDate: null
+
+      Lambda metadata (aws lambda get-function-configuration):
+        FunctionName: OrdersServiceTokenRotation
+        State: Active
+        Runtime: python3.12
+        Timeout: 10
+        Role: arn:aws:iam::111111111111:role/service-role/OrdersServiceTokenRotationRole
+
+      Lambda concurrency (aws lambda get-function-concurrency):
+        ReservedConcurrentExecutions: 0
+
+      Lambda CloudWatch metrics (last 7 days):
+        Throttles: 14 spikes at 03:00 UTC (the scheduled rotation time)
+        Errors: 0
+        Invocations: 0
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "ReservedConcurrentExecutions"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "Throttles"
+        - "put-function-concurrency"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: recover-pending-stuck-awspending-completed
+    description: >-
+      A rotation failed mid-flight leaving version a1b2c3d4 in AWSPENDING.
+      Connection tests confirm AWSPENDING is the live credential on the
+      target (the operator has verified). Recover by promoting AWSPENDING
+      to AWSCURRENT. Post-verification confirms no version remains in
+      AWSPENDING.
+    input: |
+      Operation: recover-pending
+      Secret: prod/api-gateway-token
+
+      Secret metadata (aws secretsmanager describe-secret):
+        Name: prod/api-gateway-token
+        RotationEnabled: true
+        RotationLambdaARN: arn:aws:lambda:us-east-1:111111111111:function:ApiGatewayTokenRotation
+        LastRotatedDate: 2026-07-15T03:00:00Z
+        VersionIdsToStages: {
+          e5f6g7h8: [AWSPREVIOUS],
+          i9j0k1l2: [AWSCURRENT],
+          a1b2c3d4: [AWSPENDING]
+        }
+        PrimaryRegion: null
+        DeletedDate: null
+
+      Connection tests (operator-confirmed):
+        Connection with AWSPENDING value (a1b2c3d4): SUCCESS (new credential is live on the target)
+        Connection with AWSCURRENT value (i9j0k1l2): FAILED (old credential already replaced)
+
+      Root cause investigation:
+        CloudWatch Logs: finishSecret step failed with AccessDeniedException
+        on UpdateSecretVersionStage. Execution role was missing that action.
+        Operator has updated the role to include UpdateSecretVersionStage.
+
+      Post-fix verification (already executed):
+        aws secretsmanager update-secret-version-stage \
+          --secret-id prod/api-gateway-token \
+          --version-stage AWSCURRENT \
+          --move-to-version-id a1b2c3d4 \
+          --remove-from-version-id i9j0k1l2
+        Result: success
+
+        aws secretsmanager list-secret-version-ids --secret-id prod/api-gateway-token:
+          a1b2c3d4: [AWSCURRENT]
+          i9j0k1l2: [AWSPREVIOUS]
+          e5f6g7h8: (gone, no stages)
+          (no version in AWSPENDING)
+
+        Application metrics (5-min sample post-fix): no auth failures
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "prod/api-gateway-token"
+        - "AWSPENDING"
+        - "AWSCURRENT"
+        - "update-secret-version-stage"
+        - "VERDICT"
+        - "POST_VERIFY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: diagnose-rotation-lambda-timeout-blocked
+    description: >-
+      A rotation has been failing for two weeks with LastRotatedDate stuck
+      at 2026-07-15. CloudWatch Logs show "Task timed out after 3.00
+      seconds". The Lambda timeout is the default 3 seconds — too short
+      for RDS PostgreSQL rotation. Diagnose and emit BLOCKED with the
+      update-function-configuration fix.
+    input: |
+      Operation: diagnose-rotation
+      Secret: prod/payments-db-credentials
+
+      Secret metadata (aws secretsmanager describe-secret):
+        Name: prod/payments-db-credentials
+        RotationEnabled: true
+        RotationLambdaARN: arn:aws:lambda:us-east-1:111111111111:function:SecretsManagerRDSPostgreSQLRotation
+        RotationRules: {AutomaticallyAfterDays: 30}
+        LastRotatedDate: 2026-07-15T03:00:00Z (23 days overdue)
+        LastChangedDate: 2026-06-15T03:00:00Z
+        VersionIdsToStages: {
+          v1: [AWSPREVIOUS],
+          v2: [AWSCURRENT]
+        }
+        (no version in AWSPENDING)
+
+      Lambda metadata (aws lambda get-function-configuration):
+        FunctionName: SecretsManagerRDSPostgreSQLRotation
+        State: Active
+        Runtime: python3.12
+        Timeout: 3
+        ReservedConcurrentExecutions: 5
+
+      CloudWatch Logs (last 14 days, filter ERROR):
+        2026-08-05 03:00:14 "TASK FAILED: Task timed out after 3.00 seconds"
+        2026-08-04 03:00:11 "TASK FAILED: Task timed out after 3.00 seconds"
+        2026-08-03 03:00:09 "TASK FAILED: Task timed out after 3.00 seconds"
+        (and 11 more identical entries on prior days)
+
+      IAM role permissions: verified complete
+        (SecretsManagerRotation, AWSLambdaVPCAccessExecutionRole,
+         rds-db:connect, kms:Decrypt)
+
+      KMS key: verified Enabled, policy grants Lambda role
+
+      VPC reachability: verified OK (DB SG allows Lambda SG on 5432)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "Task timed out"
+        - "timeout"
+        - "VERDICT"
+        - "update-function-configuration"
+        - "30"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: cross-account-rotation-access-denied-blocked
+    description: >-
+      The rotation Lambda lives in account B (the security tooling account)
+      and the secret lives in account A (the application account). All
+      rotations fail with AccessDeniedException. The Lambda's
+      resource-based policy is missing the secretsmanager.amazonaws.com
+      principal. Diagnose and emit BLOCKED with the cross-account policy
+      fix.
+    input: |
+      Operation: diagnose-rotation
+      Secret: arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/shared-api-key-ABC123
+        (Secret lives in account 111111111111 / account A)
+      Rotation Lambda: arn:aws:lambda:us-east-1:222222222222:function:SharedApikeyRotationLambda
+        (Lambda lives in account 222222222222 / account B)
+
+      Secret metadata (aws secretsmanager describe-secret, called in account A):
+        Name: prod/shared-api-key
+        RotationEnabled: true
+        RotationLambdaARN: arn:aws:lambda:us-east-1:222222222222:function:SharedApikeyRotationLambda
+        RotationRules: {AutomaticallyAfterDays: 14}
+        LastRotatedDate: null (rotation enabled 60 days ago, never succeeded)
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/shared-api-cmk
+        VersionIdsToStages: {
+          v1: [AWSCURRENT]
+        }
+
+      Secret resource-based policy (aws secretsmanager get-resource-policy):
+        Statement: [{
+          Effect: Allow,
+          Principal: {AWS: arn:aws:iam::222222222222:role/SharedApikeyRotationRole},
+          Action: [secretsmanager:GetSecretValue, secretsmanager:PutSecretValue,
+                   secretsmanager:UpdateSecretVersionStage, secretsmanager:DescribeSecret]
+        }]
+        (Secret side is correctly configured)
+
+      Lambda resource-based policy (aws lambda get-policy, called in account B):
+        Statement: [
+          {Effect: Allow, Principal: {Service: sqs.amazonaws.com},
+           Action: lambda:InvokeFunction}
+        ]
+        (MISSING: secretsmanager.amazonaws.com principal)
+
+      Lambda execution role (account B):
+        Has secretsmanager:GetSecretValue etc on the cross-account secret ARN
+        Has kms:Decrypt on the cross-account KMS key ARN
+
+      KMS key policy (account A):
+        Grants role arn:aws:iam::222222222222:role/SharedApikeyRotationRole kms:Decrypt
+
+      CloudWatch Logs (account B):
+        2026-08-05 03:00:01 "AccessDeniedException: User: arn:aws:sts::222222222222:assumed-role/SharedApikeyRotationRole/SecretsManager is not authorized to perform: lambda:InvokeFunction on resource: arn:aws:lambda:us-east-1:222222222222:function:SharedApikeyRotationLambda"
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "AccessDeniedException"
+        - "put-resource-policy"
+        - "VERDICT"
+        - "cross-account"
+        - "lambda:InvokeFunction"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"

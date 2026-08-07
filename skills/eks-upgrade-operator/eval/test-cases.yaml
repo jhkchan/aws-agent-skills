@@ -1,0 +1,286 @@
+# Eval test cases for eks-upgrade-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: eks-upgrade-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: upgrade-control-plane-1-28-to-1-29-ready
+    description: >-
+      Operator wants to upgrade an EKS cluster from 1.28 to 1.29. All
+      pre-checks pass: cluster ACTIVE, no update in progress, add-ons
+      already at bridge versions (VPC-CNI v1.17.x, CoreDNS v1.11.x,
+      kube-proxy v1.28.x), kubent scan clean for 1.29, all managed node
+      groups at 1.28, all nodes Ready. Plan should produce READY with
+      the update-cluster-version CLI and a CONFIRM gate noting control
+      plane CANNOT be rolled back.
+    input: |
+      Operation: upgrade-control-plane
+      Cluster: prod-cluster-01
+      Current version: 1.28
+      Target version: 1.29
+      Region: us-east-1
+
+      Cluster metadata (aws eks describe-cluster):
+        name: prod-cluster-01
+        status: ACTIVE
+        version: 1.28
+        roleArn: arn:aws:iam::111111111111:role/prod-cluster-01-role
+        logging.clusterLogging:
+          - types: [api, audit, authenticator, controllerManager, scheduler]
+            enabled: true
+
+      Update in progress check (aws eks describe-update):
+        No updates in progress
+
+      EKS add-ons (aws eks list-addons / describe-addon):
+        vpc-cni: v1.17.3-eksbuild.2, status: ACTIVE
+          Compatibility with 1.28: Yes
+          Compatibility with 1.29: Yes (bridge version)
+        coredns: v1.11.1-eksbuild.4, status: ACTIVE
+          Compatibility with 1.28: Yes
+          Compatibility with 1.29: Yes (bridge version)
+        kube-proxy: v1.28.7-minimal-1, status: ACTIVE
+          Compatibility with 1.28: Yes
+          Compatibility with 1.29: Yes (bridge version)
+
+      Managed node groups (aws eks describe-nodegroup):
+        prod-ng-1: version 1.28, status ACTIVE
+        prod-ng-2: version 1.28, status ACTIVE
+
+      kubectl get nodes -o wide:
+        All 10 nodes Ready, all at v1.28.x
+
+      kubent scan against 1.29:
+        No deprecated APIs in use (no FlowSchema v1beta1 found)
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, ROLLBACK, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-cluster-01"
+        - "update-cluster-version"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "1.29"
+        - "CONFIRM"
+        - "CANNOT be rolled back"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: upgrade-nodegroup-pdb-blocks-drain-blocked
+    description: >-
+      Operator wants to upgrade a managed node group from 1.28 to 1.29
+      after the control plane upgrade. The payments-api deployment has
+      a PDB with minAvailable=4 and replicas=4, so disruptionsAllowed=0
+      on nodes running payments-api pods. Pre-checks must BLOCK with the
+      kubectl patch pdb remediation.
+    input: |
+      Operation: upgrade-nodegroup
+      Cluster: prod-cluster-01
+      Node group: prod-ng-1
+      Current node version: 1.28
+      Target node version: 1.29
+      Control plane version: 1.29 (already upgraded)
+
+      Node group metadata (aws eks describe-nodegroup):
+        nodegroupName: prod-ng-1
+        status: ACTIVE
+        version: 1.28
+        clusterName: prod-cluster-01
+        instanceTypes: [m5.large]
+        subnets: [subnet-aaa, subnet-bbb, subnet-ccc]
+        scalingConfig: {minSize: 3, desiredSize: 5, maxSize: 10}
+        updateConfig: {maxUnavailable: 1, maxSurge: 0}
+
+      Cluster control plane version (aws eks describe-cluster):
+        version: 1.29
+
+      Subnet IP availability:
+        subnet-aaa: 47 IPs available
+        subnet-bbb: 51 IPs available
+        subnet-ccc: 38 IPs available
+
+      Pod Disruption Budgets (kubectl get poddisruptionbudgets --all-namespaces):
+       NAMESPACE    NAME                   MINAVAILABLE   ALLOWEDDISRUPTIONS   AGE
+        payments     payments-api-pdb       4              0                   14d
+        kube-system  coredns-pdb            1              1                   30d
+
+      payments-api deployment: replicas=4, spread across 4 nodes in prod-ng-1
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "PodDisruptionBudget"
+        - "minAvailable"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "kubectl patch pdb"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: upgrade-addon-vpc-cni-bridge-version-ready
+    description: >-
+      Operator wants to pre-upgrade VPC-CNI to a bridge version
+      compatible with both current Kubernetes 1.28 and target 1.29.
+      The current VPC-CNI is v1.15.x (only compatible with 1.27 and
+      1.28). The bridge version v1.17.3 is compatible with both. Plan
+      should produce READY with the update-addon CLI.
+    input: |
+      Operation: upgrade-addon
+      Cluster: prod-cluster-01
+      Add-on: vpc-cni
+      Current add-on version: v1.15.5-eksbuild.1
+      Target add-on version: v1.17.3-eksbuild.2 (bridge version)
+      Reason: pre-upgrade to v1.29
+      Current Kubernetes: 1.28
+      Target Kubernetes: 1.29
+
+      Add-on metadata (aws eks describe-addon):
+        addonName: vpc-cni
+        addonVersion: v1.15.5-eksbuild.1
+        status: ACTIVE
+        clusterName: prod-cluster-01
+
+      Add-on version compatibility (aws eks describe-addon-versions):
+        v1.17.3-eksbuild.2:
+          Compatibility with 1.28: Yes
+          Compatibility with 1.29: Yes
+        v1.19.1-eksbuild.1:
+          Compatibility with 1.28: No
+          Compatibility with 1.29: Yes
+
+      ConfigurationValues backup:
+        kubectl get daemonset aws-node -n kube-system -o yaml >
+          /tmp/vpc-cni-preupgrade-20260807.yaml (done)
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "vpc-cni"
+        - "update-addon"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "bridge"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: upgrade-control-plane-skip-version-blocked
+    description: >-
+      Operator wants to upgrade from 1.27 directly to 1.29 — skipping
+      1.28. EKS requires sequential minor-version upgrades. Pre-checks
+      must BLOCK and surface the target-N+1 (1.28) remediation.
+    input: |
+      Operation: upgrade-control-plane
+      Cluster: prod-cluster-01
+      Current version: 1.27
+      Target version: 1.29
+      Region: us-east-1
+
+      Cluster metadata (aws eks describe-cluster):
+        name: prod-cluster-01
+        status: ACTIVE
+        version: 1.27
+
+      Available versions in us-east-1:
+        1.27, 1.28, 1.29, 1.30, 1.31
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "1.27"
+        - "1.29"
+        - "sequential"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "1.28"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: post-upgrade-verify-all-pass-completed
+    description: >-
+      The control plane and node groups of prod-cluster-01 have been
+      upgraded from 1.28 to 1.29. All post-upgrade verification checks
+      passed: cluster version 1.29, all nodes Ready and on 1.29, no
+      CrashLoopBackOff, add-ons at 1.29-compatible versions, no
+      unavailable APIServices, canary rollout succeeded. Emit COMPLETED.
+    input: |
+      Operation: post-upgrade-verify
+      Cluster: prod-cluster-01
+      Previous version: 1.28
+      Target version: 1.29
+
+      Post-upgrade verification results (all passed):
+
+      aws eks describe-cluster --name prod-cluster-01:
+        version: 1.29
+        status: ACTIVE
+
+      kubectl get nodes -o wide:
+      NAME                                       STATUS   ROLES    VERSION
+      ip-10-0-1-1.us-east-1.compute.internal     Ready    <none>   v1.29.3-eks-...
+      ip-10-0-2-1.us-east-1.compute.internal     Ready    <none>   v1.29.3-eks-...
+      ip-10-0-3-1.us-east-1.compute.internal     Ready    <none>   v1.29.3-eks-...
+      (10 total, all Ready, all at v1.29.3)
+
+      kubectl get pods --all-namespaces --field-selector status.phase=Failed:
+        No resources found.
+
+      kubectl get apiservices | grep False:
+        (empty — all API services available)
+
+      EKS add-ons (aws eks describe-addon):
+        vpc-cni: v1.18.4-eksbuild.1, status: ACTIVE
+          Compatibility with 1.29: Yes
+        coredns: v1.11.3-eksbuild.3, status: ACTIVE
+          Compatibility with 1.29: Yes
+        kube-proxy: v1.29.3-minimal-1, status: ACTIVE
+          Compatibility with 1.29: Yes
+
+      Canary deployment rollout status:
+        kubectl rollout status deployment/canary -n canary:
+        deployment "canary" successfully rolled out
+
+      Application metrics (CloudWatch, 15-min sample post-upgrade):
+        Error rate: 0.02% (baseline: 0.02%) — no spike
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "prod-cluster-01"
+        - "1.29"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "Ready"
+        - "apiservices"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

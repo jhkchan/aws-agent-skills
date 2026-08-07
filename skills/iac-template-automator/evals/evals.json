@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "iac-template-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the IaC Template Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "lambda-apigw-dynamodb-cfn",
+      "name": "Generate CloudFormation SAM serverless template (Lambda + API Gateway + DynamoDB) — all gates pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/lambda-apigw-dynamodb-cfn.md",
+      "baseline_file": "baselines/lambda-apigw-dynamodb-cfn.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "lambda-apigw-dynamodb-cfn", "VERDICT", "TEMPLATE", "SECURITY", "AWS::Serverless::Function"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "vpc-cdk-l3-construct",
+      "name": "Generate CDK v2 VPC stack using L3 Vpc construct with flow logs and HA NAT — all gates pass",
+      "difficulty": "medium",
+      "prompt_file": "prompts/vpc-cdk-l3-construct.md",
+      "baseline_file": "baselines/vpc-cdk-l3-construct.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "vpc-cdk-l3-construct", "VERDICT", "TEMPLATE", "Vpc", "SubnetType"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "terraform-s3-backend-workspace",
+      "name": "Generate Terraform module with S3 backend + DynamoDB lock and pinned AWS provider v5",
+      "difficulty": "medium",
+      "prompt_file": "prompts/terraform-s3-backend-workspace.md",
+      "baseline_file": "baselines/terraform-s3-backend-workspace.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "terraform-s3-backend-workspace", "VERDICT", "TEMPLATE", "hashicorp/aws", "dynamodb_table"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "cfn-hardcoded-secrets",
+      "name": "Validate existing CloudFormation with hardcoded MasterUserPassword + wildcard IAM (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cfn-hardcoded-secrets.md",
+      "baseline_file": "baselines/cfn-hardcoded-secrets.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "cfn-hardcoded-secrets", "VERDICT", "MasterUserPassword"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "terraform-wildcard-iam",
+      "name": "Validate existing Terraform with IAM policy Action:* Resource:* (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/terraform-wildcard-iam.md",
+      "baseline_file": "baselines/terraform-wildcard-iam.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "terraform-wildcard-iam", "VERDICT", "Action"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    }
+  ]
+}

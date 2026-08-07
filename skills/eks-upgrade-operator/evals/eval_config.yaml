@@ -1,0 +1,47 @@
+# Eval configuration for eks-upgrade-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: eks-upgrade-operator
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: upgrade-control-plane-1-28-to-1-29-ready
+    difficulty: hard
+    prompt_file: prompts/upgrade-control-plane-1-28-to-1-29-ready.md
+    baseline_file: baselines/upgrade-control-plane-1-28-to-1-29-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: upgrade-nodegroup-pdb-blocks-drain-blocked
+    difficulty: hard
+    prompt_file: prompts/upgrade-nodegroup-pdb-blocks-drain-blocked.md
+    baseline_file: baselines/upgrade-nodegroup-pdb-blocks-drain-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: upgrade-addon-vpc-cni-bridge-version-ready
+    difficulty: medium
+    prompt_file: prompts/upgrade-addon-vpc-cni-bridge-version-ready.md
+    baseline_file: baselines/upgrade-addon-vpc-cni-bridge-version-ready.md
+    expected_verdict: READY
+    expected_risk: LOW
+  - id: upgrade-control-plane-skip-version-blocked
+    difficulty: medium
+    prompt_file: prompts/upgrade-control-plane-skip-version-blocked.md
+    baseline_file: baselines/upgrade-control-plane-skip-version-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: post-upgrade-verify-all-pass-completed
+    difficulty: easy
+    prompt_file: prompts/post-upgrade-verify-all-pass-completed.md
+    baseline_file: baselines/post-upgrade-verify-all-pass-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: LOW

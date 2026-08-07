@@ -1,0 +1,235 @@
+# Eval test cases for ssm-patch-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ssm-patch-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: install-single-host-ready
+    description: >-
+      Install operation on a single managed Amazon Linux 2 host. All
+      pre-checks pass (PingStatus Active, IAM role correct, free disk OK,
+      effective baseline non-empty, approval rules reviewed). Operator
+      wants NoReboot. Plan must emit READY with the exact send-command
+      and a CONFIRM gate, plus the deferred-reboot caveat.
+    input: |
+      Operation: install
+      Target: i-0abc123def456789a (Amazon Linux 2, prod web server)
+      Baseline: pb-0aaa1234 (custom, prod-linux-critical, via Patch Group
+        tag "prod-linux-critical")
+      Reboot tolerance: NoReboot=true preferred (kernel patches will
+        activate on the next maintenance-window reboot)
+
+      Instance metadata (aws ssm describe-instance-information):
+        InstanceId: i-0abc123def456789a
+        PingStatus: Active
+        LastPingDateTime: 2026-08-07T02:30:00Z (2 min ago)
+        ResourceType: EC2Instance
+        PlatformType: Linux
+        PlatformName: Amazon Linux
+        PlatformVersion: 2.0.20240620.0
+        IamRoleARN: arn:aws:iam::111111111111:role/AmazonSSMManagedInstanceCore-Role
+
+      EC2 metadata:
+        State: running
+        Root volume free: 18 GB
+        Tags: Patch Group=prod-linux-critical, env=prod
+
+      Effective baseline (aws ssm get-patch-baseline-for-instance):
+        BaselineId: pb-0aaa1234
+        OperatingSystem: AMAZON_LINUX_2
+        Name: prod-linux-critical
+        ApprovalRules:
+          - Classification: Security
+            Severity: [Critical, Important]
+            ApproveAfterDays: 3
+            ComplianceLevel: CRITICAL
+        14 patches qualify under the rule.
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, COMPLIANCE_DELTA, REBOOT, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "i-0abc123def456789a"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "AWS-RunPatchBaseline"
+        - "Operation"
+        - "Install"
+        - "CONFIRM"
+        - "NoReboot"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: install-blocked-no-patch-group
+    description: >-
+      Install operation on an Amazon Linux 2 host where the operator
+      intends to use the prod-linux-critical custom baseline but the
+      instance has no Patch Group tag and no explicit association — the
+      effective baseline is the AWS default. Must BLOCK before any
+      send-command because the Install would apply the default-baseline
+      approved set, not the operator's intent.
+    input: |
+      Operation: install
+      Target: i-0fedcba9876543210 (Amazon Linux 2)
+      Operator intent: apply the prod-linux-critical baseline rules
+
+      Instance metadata:
+        InstanceId: i-0fedcba9876543210
+        PingStatus: Active
+        ResourceType: EC2Instance
+        PlatformType: Linux
+        PlatformName: Amazon Linux
+        PlatformVersion: 2.0.20240620.0
+        IamRoleARN: arn:aws:iam::111111111111:role/AmazonSSMManagedInstanceCore-Role
+
+      EC2 metadata:
+        State: running
+        Root volume free: 22 GB
+        Tags: env=prod  (no Patch Group tag)
+
+      Effective baseline:
+        BaselineId: arn:aws:ssm:us-east-1:733311325942:patchbaseline/pb-0fb1df32
+        (this is AWS-AmazonLinux2DefaultPatchBaseline — the AWS default)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "i-0fedcba9876543210"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "Patch Group"
+        - "prod-linux-critical"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "send-command"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: scan-association-missing-patches
+    description: >-
+      Operator reports "we have an association, why are we still
+      NON_COMPLIANT?" Diagnose: the association runs Operation=Scan only
+      (the default). Scan reports green but does not remediate. Plan must
+      switch the association to Install (via update-association, not
+      delete), and emit READY for the first Install.
+    input: |
+      Operation: diagnose + remediate
+      Instance: i-0a1b2c3d4e5f67890 (Ubuntu 22.04)
+      Symptom: Association Status Success, but
+        list-compliance-items shows ComplianceStatus NON_COMPLIANT with
+        12 missing Critical patches
+
+      Association metadata:
+        AssociationId: 0a1b2c3d-4567-8901-abcd-ef0123456789
+        DocumentName: AWS-RunPatchBaseline
+        Parameters: {"Operation": ["Scan"]}
+        ScheduleExpression: rate(1 day)
+        LastExecutionDate: 2026-08-07T02:00:00Z
+        Status: Success
+
+      Effective baseline: pb-0ubuntu-prod (custom, Ubuntu2204)
+      Free disk: 14 GB
+      PingStatus Active, IAM role OK, EC2 running
+
+      Emit a VERDICT block proposing the safest remediation.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "Scan"
+        - "Install"
+        - "update-association"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "delete-association"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: install-blocked-disk-full
+    description: >-
+      Install operation BLOCKED because the root volume has only 800 MB
+      free (below the 2 GB threshold). Scan can still proceed. Plan must
+      BLOCK the Install and surface disk-remediation before retry.
+    input: |
+      Operation: install
+      Target: i-0full00000012345 (RHEL 9, prod worker)
+      Effective baseline: pb-0rhel-prod (Security/Critical+Important,
+        ApproveAfterDays=7)
+      8 patches qualify.
+
+      Instance metadata:
+        PingStatus Active, IAM role OK, EC2 running, in maintenance
+        window mw-0ccc (95 min remaining)
+
+      Root volume free: 800 MB  (verified via
+        aws ssm send-command AWS-RunShellScript "df -m /")
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "i-0full00000012345"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "disk"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "Operation=[Install]"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: mw-register-task-ready
+    description: >-
+      Maintenance window register-task for the prod-patch-window (Saturdays
+      02:00 UTC, 4h duration, 1h cutoff). Targets 14 instances tagged
+      Patch Group=prod-linux-critical. All pre-checks pass. Plan must emit
+      READY with the exact register-task-with-maintenance-window command
+      and the CONFIRM gate, including rate-control max-concurrency 10%
+      and max-errors 0.
+    input: |
+      Operation: register-mw-task
+      Window: mw-0bbb
+        Schedule: cron(0 2 ? * SAT *)
+        Duration: 4 hours
+        Cutoff: 1 hour
+        Timezone: UTC
+      Targets: Key=tag:"Patch Group",Values=prod-linux-critical
+        (14 instances match, verified via describe-maintenance-window-targets)
+      Task: AWS-RunPatchBaseline, RUN_COMMAND, Operation=Install,
+        RebootOption=NoReboot
+      Service role: arn:aws:iam::111111111111:role/service-role/AmazonSSMAutomationRole
+        (trusts ssm.amazonaws.com, has AmazonSSMAutomationRole)
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "mw-0bbb"
+        - "register-task-with-maintenance-window"
+        - "max-concurrency"
+        - "max-errors"
+        - "CONFIRM"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"

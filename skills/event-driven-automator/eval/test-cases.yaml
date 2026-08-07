@@ -1,0 +1,189 @@
+# Eval test cases for event-driven-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: event-driven-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: guardduty-lambda-auto-remediation
+    description: >-
+      Standard GuardDuty high-severity finding to Lambda workflow with
+      managed risk profile. The skill should produce an AUTOMATED
+      architecture with the correct event pattern, Lambda target, DLQ,
+      retry policy, idempotency, and audit steps.
+    input: |
+      Design reference: guardduty-lambda-auto-remediation
+      Account: 111111111111
+      Region: us-east-1
+
+      Source: AWS GuardDuty high-severity findings (severity >= 7)
+      Desired action: invoke Lambda `isolate-instance` to move the
+      implicated EC2 instance into an isolation security group.
+      The Lambda is idempotent (dedupes on finding-id) and tested.
+      DLQ: arn:aws:sqs:us-east-1:111111111111:eventbridge-guardduty-dlq
+        (already created).
+      Lambda ARN: arn:aws:lambda:us-east-1:111111111111:function:isolate-instance
+
+      Emit the standard ARCHITECTURE block (BUS, PATTERN, TARGETS,
+      RETRY, SAFETY, AUDIT, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "guardduty-lambda-auto-remediation"
+        - "aws.guardduty"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: codebuild-failure-sns-notify
+    description: >-
+      CodeBuild build failure notification via SNS + Lambda for Slack
+      delivery. AUTOMATED workflow with bounded retry (notifications
+      should not be retried for 24h) and idempotency on build-id.
+    input: |
+      Design reference: codebuild-failure-sns-notify
+      Account: 111111111111
+      Region: us-east-1
+
+      Source: AWS CodeBuild build state change (FAILED only)
+      Desired action: SNS topic that fans out to a Lambda that posts
+      to Slack.
+      The Lambda is idempotent on detail.build-id + detail.build-status.
+      SNS topic ARN: arn:aws:sns:us-east-1:111111111111:codebuild-events
+      DLQ ARN: arn:aws:sqs:us-east-1:111111111111:eventbridge-codebuild-dlq
+      Both pre-created.
+
+      Emit the standard ARCHITECTURE block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "codebuild-failure-sns-notify"
+        - "aws.codebuild"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: circular-dependency-detected
+    description: >-
+      Proposed workflow creates a cycle: rule A triggers Lambda B which
+      publishes an event matching rule C which triggers Lambda D which
+      publishes an event matching rule A. Skill must detect the cycle,
+      classify MANUAL_STEP_REQUIRED, and recommend a poison-pill or
+      cross-bus fix.
+    input: |
+      Design reference: circular-dependency-detected
+      Account: 111111111111
+      Region: us-east-1
+
+      Existing rules:
+        - rule-A: matches my.app.user event on custom bus "app-events",
+          target Lambda-B
+        - rule-C: matches my.app.audit event on custom bus "app-events",
+          target Lambda-D
+
+      Proposed new behavior: Lambda-B publishes my.app.audit. Lambda-D
+      publishes my.app.user.
+
+      Emit the standard ARCHITECTURE block including the
+      circular-dependency check.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "circular-dependency-detected"
+        - "VERDICT"
+        - "circular"
+        - "GAP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: dlq-idempotency-gap
+    description: >-
+      Existing EventBridge rule with a Lambda target that has no DLQ
+      and no idempotency check. Skill must classify
+      MANUAL_STEP_REQUIRED and cite both gaps with specific fixes
+      (attach DLQ; implement dedup on event fields).
+    input: |
+      Design reference: dlq-idempotency-gap
+      Account: 111111111111
+      Region: us-east-1
+
+      Existing rule on default bus:
+        Name: s3-object-created-trigger
+        Pattern: source=aws.s3, detail-type=Object Created
+        Target: Lambda process-upload (ARN: arn:aws:lambda:us-east-1:111111111111:function:process-upload)
+        RetryPolicy: defaults (185 attempts / 24h)
+        DeadLetterConfig: NONE
+
+      Consumer state: the Lambda does not dedupe on
+      bucket+key+etag. CloudWatch shows duplicate invocations for
+      the same S3 object.
+
+      Emit the standard ARCHITECTURE block. Identify the gaps and
+      recommend fixes.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "dlq-idempotency-gap"
+        - "VERDICT"
+        - "idempotency"
+        - "DLQ"
+        - "GAP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: pipes-enrichment-pipeline
+    description: >-
+      DynamoDB Streams source with Lambda enrichment and Step Functions
+      target. AUTOMATED workflow using EventBridge Pipes with the
+      correct role, source parameters, and filter pattern.
+    input: |
+      Design reference: pipes-enrichment-pipeline
+      Account: 111111111111
+      Region: us-east-1
+
+      Source: DynamoDB Streams on table Orders (status transitions to
+      PAID). Stream ARN:
+        arn:aws:dynamodb:us-east-1:111111111111:table/Orders/stream/2026-08-01
+      Enrichment: Lambda enrich-order (calls pricing service, adds
+        fields)
+      Target: Step Functions state machine order-flow
+        (arn:aws:states:us-east-1:111111111111:stateMachine:order-flow)
+      Role ARN: arn:aws:iam::111111111111:role/service-role/EventBridge-Pipe-Role
+        (already created with DynamoDB Streams read + SFN StartExecution).
+
+      Emit the standard ARCHITECTURE block. Include the
+      create-pipe CLI with the filter pattern on status=PAID.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "pipes-enrichment-pipeline"
+        - "create-pipe"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"

@@ -1,0 +1,182 @@
+# Eval test cases for auto-remediation-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: auto-remediation-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: s3-public-access-auto
+    description: >-
+      Standard S3 public-read finding with a clear managed-runbook mapping
+      and reversible fix. The skill should produce an AUTOMATED workflow
+      with the AWS-DisableS3BucketPublicAccess runbook, automatic trigger,
+      and the standard safety gates (retry limit, CloudTrail alarm,
+      Config timeline verification).
+    input: |
+      Design reference: s3-public-access-auto
+      Account: 111111111111
+      Region: us-east-1
+
+      Config rule: s3-bucket-public-read-prohibited (AWS-managed)
+      Scope: AWS::S3::Bucket
+      Sample NON_COMPLIANT resource: app-uploads-bucket-prod
+      Recorder scope: allSupported=true, includeGlobalResourceTypes=true.
+      SSM service role ARN:
+        arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole
+      Pre-prod validation: completed (3 buckets tested, all flipped to COMPLIANT).
+
+      Emit the standard REMEDIATION block (RULE, RESOURCE_TYPE, WORKFLOW,
+      TRIGGER, SAFETY, AUDIT, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "s3-public-access-auto"
+        - "AWS-DisableS3BucketPublicAccess"
+        - "VERDICT"
+        - "TRIGGER"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: iam-unused-key-revoke
+    description: >-
+      IAM unused access key finding with managed runbook available. The
+      workflow should be AUTOMATED with the AWS-IAMRevokeUnusedAccessKey
+      runbook but flag a manual caveat if the key is in active use. The
+      skill should produce a working template and audit steps.
+    input: |
+      Design reference: iam-unused-key-revoke
+      Account: 111111111111
+      Region: us-east-1
+
+      Config rule: iam-access-no-unused-access-keys (AWS-managed, periodic)
+      Scope: AWS::IAM::User
+      Sample NON_COMPLIANT resource: deployment-user (key AKIAXYZ aged 95 days unused)
+      Recorder scope: includeGlobalResourceTypes=true.
+      SSM service role ARN:
+        arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole
+      Pre-prod validation: completed.
+
+      Emit the standard REMEDIATION block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "iam-unused-key-revoke"
+        - "AWS-IAMRevokeUnusedAccessKey"
+        - "VERDICT"
+        - "TRIGGER"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: manual-gap-custom-resource
+    description: >-
+      Security group open to 0.0.0.0/0 — no AWS-managed runbook exists.
+      The skill should classify MANUAL_STEP_REQUIRED because a custom SSM
+      Automation document is required and must be built and tested before
+      wiring remediation. GAP must cite the missing custom runbook.
+    input: |
+      Design reference: manual-gap-custom-resource
+      Account: 111111111111
+      Region: us-east-1
+
+      Config rule: custom-sg-no-open-ingress (custom Lambda rule)
+      Scope: AWS::EC2::SecurityGroup
+      Sample NON_COMPLIANT resource: sg-0abc123def (ingress 0.0.0.0/0 on port 22)
+      Recorder scope: includes AWS::EC2::SecurityGroup.
+      SSM service role ARN:
+        arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole
+      Pre-prod validation: NOT completed (no custom runbook yet).
+
+      Emit the standard REMEDIATION block.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "manual-gap-custom-resource"
+        - "VERDICT"
+        - "TRIGGER"
+        - "GAP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: safety-destructive-blocked
+    description: >-
+      IAM policy detachment would be destructive to a production
+      application. The remediation must NOT be wired with Automatic: true.
+      Skill should classify MANUAL_STEP_REQUIRED and cite the destructive
+      impact and the requirement for SSM Change Manager.
+    input: |
+      Design reference: safety-destructive-blocked
+      Account: 111111111111
+      Region: us-east-1
+
+      Config rule: custom-iam-no-power-user (custom Lambda rule)
+      Scope: AWS::IAM::User
+      Sample NON_COMPLIANT resource: prod-app-svc-user (attached PowerUserAccess)
+      The user is the production application service account; detaching
+      PowerUserAccess will break the application immediately.
+      Recorder scope: includeGlobalResourceTypes=true.
+      SSM service role ARN: arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole
+
+      Emit the standard REMEDIATION block.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "safety-destructive-blocked"
+        - "VERDICT"
+        - "GAP"
+        - "destructive"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: conformance-pack-bulk
+    description: >-
+      Multi-rule baseline suitable for conformance-pack bulk remediation.
+      The skill should produce an AUTOMATED workflow with the
+      conformance-pack YAML including RemediationConfiguration blocks
+      and verify deployment.
+    input: |
+      Design reference: conformance-pack-bulk
+      Account: 111111111111
+      Region: us-east-1
+
+      Requirements: deploy a security baseline covering
+      - s3-bucket-public-read-prohibited -> AWS-DisableS3BucketPublicAccess
+      - s3-bucket-server-side-encryption-enabled -> AWS-EnableS3BucketEncryption
+      - s3-bucket-versioning-enabled -> AWS-EnableS3BucketVersioning
+      All three are AWS-managed, reversible, and validated in pre-prod.
+
+      Emit the standard REMEDIATION block. Include the conformance-pack
+      YAML template with RemediationConfiguration resources.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "conformance-pack-bulk"
+        - "RemediationConfiguration"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"

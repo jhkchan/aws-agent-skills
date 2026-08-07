@@ -1,0 +1,194 @@
+# Eval test cases for iac-template-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: iac-template-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: lambda-apigw-dynamodb-cfn
+    description: >-
+      Generate a CloudFormation (SAM) template for a serverless Lambda +
+      API Gateway + DynamoDB application. All security dimensions pass:
+      DynamoDB SSE + PITR enabled, IAM policies scoped via SAM policy
+      templates (no Action:*/Resource:*), Lambda runtime supported,
+      Parameters for env-specific values. Verdict: AUTOMATED.
+    input: |
+      Generate an IaC template. Emit the standard VERDICT block (PATTERN,
+      TOOL, VERDICT, TEMPLATE, VALIDATION, SECURITY, FINDINGS, REMEDIATION).
+
+      Requirements:
+      - Pattern: serverless-lambda-apigw (Lambda + API Gateway + DynamoDB)
+      - Tool: cloudformation (SAM accepted)
+      - Environment: prod
+      - Lambda runtime: python3.12
+      - DynamoDB: PAY_PER_REQUEST, SSE enabled, PITR enabled
+      - IAM: least-privilege (DynamoDBReadPolicy + DynamoDBWritePolicy
+        scoped to the table)
+      - No hardcoded secrets
+      - Tags: Environment, Owner
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "lambda-apigw-dynamodb-cfn"
+        - "VERDICT"
+        - "TEMPLATE"
+        - "SECURITY"
+        - "AWS::Serverless::Function"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: vpc-cdk-l3-construct
+    description: >-
+      Generate a CDK v2 stack for a VPC + subnets + NAT + routes using the
+      L3 Vpc construct with flow logs, three AZs, two NAT gateways for HA
+      (prod), and S3 VPC endpoint. All dimensions pass. Verdict: AUTOMATED.
+    input: |
+      Generate IaC code. Emit the standard VERDICT block (PATTERN, TOOL,
+      VERDICT, TEMPLATE, VALIDATION, SECURITY, FINDINGS, REMEDIATION).
+
+      Requirements:
+      - Pattern: vpc (VPC + public/private subnets + NAT + routes)
+      - Tool: cdk (v2, TypeScript)
+      - Environment: prod
+      - CIDR: 10.0.0.0/16
+      - 3 AZs, 2 NAT gateways (HA), flow logs to CloudWatch
+      - Private subnets route egress through NAT
+      - S3 VPC endpoint
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "vpc-cdk-l3-construct"
+        - "VERDICT"
+        - "TEMPLATE"
+        - "Vpc"
+        - "SubnetType"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: terraform-s3-backend-workspace
+    description: >-
+      Generate a Terraform module with S3 backend + DynamoDB lock, pinned
+      AWS provider v5, default_tags on the provider block, and a VPC module
+      invocation. All dimensions pass. Verdict: AUTOMATED.
+    input: |
+      Generate a Terraform module. Emit the standard VERDICT block (PATTERN,
+      TOOL, VERDICT, TEMPLATE, VALIDATION, SECURITY, FINDINGS, REMEDIATION).
+
+      Requirements:
+      - Pattern: vpc
+      - Tool: terraform (>= 1.5.0)
+      - AWS provider: source=hashicorp/aws, version=~> 5.0
+      - S3 backend with DynamoDB lock, encrypt=true
+      - default_tags on the provider block (Environment, Owner)
+      - Use the terraform-aws-modules/vpc/aws module
+      - Region: us-east-1
+      - Environment: prod
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "terraform-s3-backend-workspace"
+        - "VERDICT"
+        - "TEMPLATE"
+        - "hashicorp/aws"
+        - "dynamodb_table"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: cfn-hardcoded-secrets
+    description: >-
+      Validate an existing CloudFormation template for an RDS Aurora cluster
+      with a hardcoded MasterUserPassword literal in Properties and an
+      Action:*/Resource:* IAM policy on the rotation Lambda role. Multiple
+      CRITICAL security gates fail. Verdict: MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing CloudFormation template. Emit the standard
+      VERDICT block.
+
+      ```yaml
+      Resources:
+        DBCluster:
+          Type: AWS::RDS::DBCluster
+          Properties:
+            Engine: aurora-postgresql
+            MasterUsername: appadmin
+            MasterUserPassword: MyPassword123!  # HARDCODED
+            StorageEncrypted: true
+        RotationRole:
+          Type: AWS::IAM::Role
+          Properties:
+            AssumeRolePolicyDocument: {...}
+            Policies:
+              - PolicyName: rotation
+                PolicyDocument:
+                  Statement:
+                    - Effect: Allow
+                      Action: '*'
+                      Resource: '*'
+      ```
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "cfn-hardcoded-secrets"
+        - "VERDICT"
+        - "MasterUserPassword"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: terraform-wildcard-iam
+    description: >-
+      Validate an existing Terraform module that creates an IAM role with
+      Action: "*" and Resource: "*" in the attached policy. The least-
+      privilege gate fails. Verdict: MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing Terraform module. Emit the standard VERDICT
+      block.
+
+      ```hcl
+      resource "aws_iam_role" "app_role" {
+        name = "app-role"
+        assume_role_policy = data.aws_iam_policy_document.assume.json
+      }
+
+      resource "aws_iam_role_policy" "app_policy" {
+        role = aws_iam_role.app_role.id
+        policy = jsonencode({
+          Version = "2012-10-17"
+          Statement = [{
+            Effect   = "Allow"
+            Action   = "*"
+            Resource = "*"
+          }]
+        })
+      }
+      ```
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "terraform-wildcard-iam"
+        - "VERDICT"
+        - "Action"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
