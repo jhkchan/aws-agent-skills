@@ -1,0 +1,47 @@
+# Eval configuration for iam-permission-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: iam-permission-troubleshooter
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: kms-cross-account-decrypt
+    difficulty: hard
+    prompt_file: prompts/kms-cross-account-decrypt.md
+    baseline_file: baselines/kms-cross-account-decrypt.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_layer: "KMS key policy (resource-based)"
+  - id: assume-role-trust-policy
+    difficulty: medium
+    prompt_file: prompts/assume-role-trust-policy.md
+    baseline_file: baselines/assume-role-trust-policy.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_layer: "Trust policy (resource-based on target role)"
+  - id: scp-region-restriction
+    difficulty: medium
+    prompt_file: prompts/scp-region-restriction.md
+    baseline_file: baselines/scp-region-restriction.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_layer: "Organisation SCP (explicit deny)"
+  - id: ec2-passrole-missing
+    difficulty: medium
+    prompt_file: prompts/ec2-passrole-missing.md
+    baseline_file: baselines/ec2-passrole-missing.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_layer: "Identity-based policy — missing iam:PassRole"
+  - id: insufficient-context-need-more-info
+    difficulty: easy
+    prompt_file: prompts/insufficient-context-need-more-info.md
+    baseline_file: baselines/insufficient-context-need-more-info.md
+    expected_verdict: NEED_MORE_INFO

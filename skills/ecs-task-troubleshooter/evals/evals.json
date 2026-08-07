@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ecs-task-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ECS Task Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "fargate-essential-container-secret-injection",
+      "name": "Fargate task exits in 2s — execution role lacks secretsmanager:GetSecretValue",
+      "difficulty": "hard",
+      "prompt_file": "prompts/fargate-essential-container-secret-injection.md",
+      "baseline_file": "baselines/fargate-essential-container-secret-injection.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "ESSENTIAL_CONTAINER_EXIT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESSENTIAL_CONTAINER_EXIT", "secretsmanager:GetSecretValue", "execution role", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "privileged"]
+        }
+      ]
+    },
+    {
+      "id": "fargate-oom-jvm-heap",
+      "name": "Java container OOMKilled — -Xmx exceeds container memory hard limit",
+      "difficulty": "medium",
+      "prompt_file": "prompts/fargate-oom-jvm-heap.md",
+      "baseline_file": "baselines/fargate-oom-jvm-heap.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "OOM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "OOM", "memory", "Xmx", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "privileged"]
+        }
+      ]
+    },
+    {
+      "id": "alb-health-check-path-mismatch",
+      "name": "ALB target group unhealthy — health check path /healthz does not match app /api/health",
+      "difficulty": "medium",
+      "prompt_file": "prompts/alb-health-check-path-mismatch.md",
+      "baseline_file": "baselines/alb-health-check-path-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "HEALTH_CHECK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "HEALTH_CHECK", "/api/health", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "ecr-image-pull-execution-role",
+      "name": "Fargate CannotPullContainerError — execution role lacks ecr:BatchGetImage",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ecr-image-pull-execution-role.md",
+      "baseline_file": "baselines/ecr-image-pull-execution-role.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "IMAGE_PULL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "IMAGE_PULL", "ecr:BatchGetImage", "execution role", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-context-need-task-arn",
+      "name": "Vague report of failing ECS tasks — request task ARN + describe-tasks output",
+      "difficulty": "easy",
+      "prompt_file": "prompts/insufficient-context-need-task-arn.md",
+      "baseline_file": "baselines/insufficient-context-need-task-arn.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "describe-tasks"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

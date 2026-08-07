@@ -1,0 +1,131 @@
+# Eval test cases for iam-permission-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: iam-permission-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: kms-cross-account-decrypt
+    description: Cross-account Lambda cannot read KMS-encrypted S3 object — KMS key policy missing caller
+    input: |
+      Scenario: A Lambda function in account 111111111111 (role
+      arn:aws:iam::111111111111:role/app-lambda) calls s3:GetObject on
+      arn:aws:s3:::prod-data/report.csv in account 222222222222. The
+      bucket policy allows the Lambda role ARN. The Lambda role's
+      identity policy has s3:GetObject on the bucket ARN AND kms:Decrypt
+      on arn:aws:kms:us-east-1:222222222222:key/abc123. The bucket is
+      encrypted with that KMS key. The KMS key policy in account
+      222222222222 lists only account-222 roles in Principal. AccessDenied.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "kms"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "REMEDIATION"
+        - "cross-account"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "wildcard"
+
+  - id: assume-role-trust-policy
+    description: sts:AssumeRole fails because target role trust policy does not list the caller principal
+    input: |
+      Scenario: A CI/CD runner using role
+      arn:aws:iam::111111111111:role/cicd-runner attempts to assume
+      arn:aws:iam::222222222222:role/deploy-target via sts:AssumeRole.
+      The runner's identity policy allows sts:AssumeRole on the target
+      ARN. The target role's assumeRolePolicyDocument has Principal.AWS
+      = arn:aws:iam::222222222222:role/internal-deploy only. Error:
+      "User arn:aws:sts::111111111111:assumed-role/cicd-runner/... is
+      not authorized to perform sts:AssumeRole on resource
+      arn:aws:iam::222222222222:role/deploy-target."
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "trust policy"
+        - "VERDICT"
+        - "Principal"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "identity-based"
+
+  - id: scp-region-restriction
+    description: Workload deployed to new region fails due to organization SCP restricting regions
+    input: |
+      Scenario: A workload deployed to ap-southeast-2 fails to launch
+      EC2 instances. The same IaC template works in us-east-1. The
+      EC2 instance role has ec2:RunInstances and iam:PassRole on the
+      instance profile ARN. CloudTrail shows the failure with
+      errorMessage "User is not authorized to perform
+      ec2:RunInstances ... with an explicit deny in a Service Control
+      Policy." The SCP at the production OU root has
+      Condition StringNotEquals aws:RequestedRegion: ["us-east-1",
+      "us-west-2"].
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "SCP"
+        - "aws:RequestedRegion"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: ec2-passrole-missing
+    description: EC2 Client.UnauthorizedOperation on RunInstances due to missing iam:PassRole
+    input: |
+      Scenario: An operator launches an EC2 instance with instance
+      profile arn:aws:iam::111111111111:role/ec2-app-profile. Error:
+      "Client.UnauthorizedOperation: You are not authorized to perform
+      this operation. Encoded authorization failure message: ...". The
+      caller's identity policy has ec2:RunInstances on "*" and
+      ec2:Describe* on "*". No iam:PassRole is present in any attached
+      policy.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "iam:PassRole"
+        - "VERDICT"
+        - "PassRole"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "Action: '*'"
+
+  - id: insufficient-context-need-more-info
+    description: AccessDenied report without CloudTrail or simulator output should request more info
+    input: |
+      Scenario: A user reports "I am getting AccessDenied on
+      s3:GetObject from my Lambda function." They provide the Lambda
+      role ARN and the bucket name. They have not run
+      simulate-principal-policy and have not pulled the CloudTrail
+      event. No policy documents are attached.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "CloudTrail"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

@@ -139,10 +139,10 @@ def test_orchestrator_routing(prompt: str, expected_skill: str) -> None:
 
 
 def test_route_emits_phase_indicator() -> None:
-    """The route command must emit a [Phase: ...] indicator."""
+    """The route command must emit a [Phase: ...] or [Task: ...] indicator."""
     output = _run_cli("route", "audit my S3 buckets")
-    assert re.search(r"\[Phase:\s*\w+", output), (
-        f"Phase indicator missing from route output:\n{output}"
+    assert re.search(r"\[(?:Phase|Task):\s*\w+", output), (
+        f"Phase/Task indicator missing from route output:\n{output}"
     )
 
 

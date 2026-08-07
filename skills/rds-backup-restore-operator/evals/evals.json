@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "rds-backup-restore-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the RDS Backup Restore Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "pitr-restore-target-subnet-missing",
+      "name": "PITR restore request — target DB subnet group does not exist (BLOCKED pre-check)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/pitr-restore-target-subnet-missing.md",
+      "baseline_file": "baselines/pitr-restore-target-subnet-missing.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "dr-subnet-group", "VERDICT", "PRE_CHECKS", "DBSubnetGroupNotFound"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "restore-db-instance-to-point-in-time", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "snapshot-missing-for-pre-migration",
+      "name": "Manual snapshot referenced for pre-migration restore does not exist (BLOCKED pre-check)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/snapshot-missing-for-pre-migration.md",
+      "baseline_file": "baselines/snapshot-missing-for-pre-migration.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "prod-pre-migration-snap", "DBSnapshotNotFound", "VERDICT", "BackupRetentionPeriod"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "restore-db-instance-from-db-snapshot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "aurora-backtrack-in-window",
+      "name": "Aurora MySQL cluster backtracking 2h within 24h BacktrackWindow (READY, in-place rewind)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/aurora-backtrack-in-window.md",
+      "baseline_file": "baselines/aurora-backtrack-in-window.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "aurora-prod-cluster", "backtrack-db-cluster", "VERDICT", "in-place", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "restore-db-instance", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "retention-zero-pitr-disabled",
+      "name": "PITR request on PostgreSQL with BackupRetentionPeriod=0 — PITR disabled, BLOCKED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/retention-zero-pitr-disabled.md",
+      "baseline_file": "baselines/retention-zero-pitr-disabled.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "BackupRetentionPeriod", "PITR", "VERDICT", "modify-db-instance"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "restore-db-instance-to-point-in-time", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "snapshot-restore-verified-completed",
+      "name": "Snapshot restore executed and post-verification passed (COMPLETED with new endpoint)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/snapshot-restore-verified-completed.md",
+      "baseline_file": "baselines/snapshot-restore-verified-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "prod-checkout-restored", "VERDICT", "POST_VERIFY", "Endpoint.Address", "connection"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

@@ -5,8 +5,8 @@
     "url": "https://github.com/jhkchan/aws-agent-skills"
   },
   "metadata": {
-    "description": "Eval-backed AWS CloudOps agent skills \u2014 79 detective auditors with deterministic verdicts, median-of-3 judge scoring, and co-located evals",
-    "version": "1.0.0"
+    "description": "Eval-backed AWS CloudOps agent skills \u2014 90 skills across 6 task types (audit, deploy, troubleshoot, optimize, operate, automate) with median-of-3 judge scoring and co-located evals",
+    "version": "2.0.0"
   },
   "plugins": [
     {
@@ -93,8 +93,19 @@
         "./skills/verified-permissions-policy-auditor",
         "./skills/vpc-lattice-auth-auditor",
         "./skills/wafv2-web-acl-auditor",
-        "./skills/wellarchitected-workload-auditor"
-      ]
+        "./skills/wellarchitected-workload-auditor",
+        "./skills/ec2-rightsizing-optimizer",
+        "./skills/ecs-task-troubleshooter",
+        "./skills/iam-permission-troubleshooter",
+        "./skills/iam-role-deployer",
+        "./skills/lambda-function-deployer",
+        "./skills/rds-backup-restore-operator",
+        "./skills/rds-connectivity-troubleshooter",
+        "./skills/s3-lifecycle-optimizer",
+        "./skills/s3-secure-bucket-deployer",
+        "./skills/vpc-network-deployer"
+      ],
+      "skill_count": 90
     }
   ]
 }

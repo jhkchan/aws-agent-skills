@@ -1,0 +1,43 @@
+# Eval configuration for ec2-rightsizing-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ec2-rightsizing-optimizer
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: overprovisioned-downsize-graviton
+    difficulty: medium
+    prompt_file: prompts/overprovisioned-downsize-graviton.md
+    baseline_file: baselines/overprovisioned-downsize-graviton.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: memory-data-missing-blocked
+    difficulty: hard
+    prompt_file: prompts/memory-data-missing-blocked.md
+    baseline_file: baselines/memory-data-missing-blocked.md
+    expected_verdict: NEED_MORE_INFO
+  - id: underprovisioned-upsize-memory
+    difficulty: medium
+    prompt_file: prompts/underprovisioned-upsize-memory.md
+    baseline_file: baselines/underprovisioned-upsize-memory.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: already-optimal-with-savings-plan
+    difficulty: easy
+    prompt_file: prompts/already-optimal-with-savings-plan.md
+    baseline_file: baselines/already-optimal-with-savings-plan.md
+    expected_verdict: ALREADY_OPTIMAL
+  - id: t-family-credit-exhaustion
+    difficulty: hard
+    prompt_file: prompts/t-family-credit-exhaustion.md
+    baseline_file: baselines/t-family-credit-exhaustion.md
+    expected_verdict: OPPORTUNITY_FOUND

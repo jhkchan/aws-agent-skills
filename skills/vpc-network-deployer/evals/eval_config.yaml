@@ -1,0 +1,43 @@
+# Eval configuration for vpc-network-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: vpc-network-deployer
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: ha-multi-az-three-tier
+    difficulty: easy
+    prompt_file: prompts/ha-multi-az-three-tier.md
+    baseline_file: baselines/ha-multi-az-three-tier.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: cidr-overlap-with-onprem
+    difficulty: medium
+    prompt_file: prompts/cidr-overlap-with-onprem.md
+    baseline_file: baselines/cidr-overlap-with-onprem.md
+    expected_verdict: PREREQUISITES_MISSING
+  - id: single-nat-cost-optimized
+    difficulty: medium
+    prompt_file: prompts/single-nat-cost-optimized.md
+    baseline_file: baselines/single-nat-cost-optimized.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: single-tier-public-only
+    difficulty: hard
+    prompt_file: prompts/single-tier-public-only.md
+    baseline_file: baselines/single-tier-public-only.md
+    expected_verdict: PREREQUISITES_MISSING
+  - id: missing-required-fields
+    difficulty: easy
+    prompt_file: prompts/missing-required-fields.md
+    baseline_file: baselines/missing-required-fields.md
+    expected_verdict: PREREQUISITES_MISSING

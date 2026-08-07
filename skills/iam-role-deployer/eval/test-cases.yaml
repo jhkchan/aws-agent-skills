@@ -1,0 +1,171 @@
+# Eval test cases for iam-role-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: iam-role-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: lambda-service-role-scoped
+    description: >-
+      Standard Lambda service role: trust policy with lambda.amazonaws.com
+      principal, aws:SourceAccount and aws:SourceArn conditions (scoped to
+      one function family), least-privilege permissions (CloudWatch Logs +
+      scoped S3/DynamoDB). All checklist dimensions pass.
+    input: |
+      Design a deployment plan for an IAM role. Emit the standard VERDICT
+      block (ROLE_SPEC, VERDICT, TRUST_POLICY, PERMISSIONS, CHECKLIST,
+      FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Role name: my-app-lambda-role
+      - Principal type: AWS service (lambda.amazonaws.com)
+      - Scoped to: functions matching arn:aws:lambda:us-east-1:111111111111:function:my-app-*
+      - Permissions: CloudWatch Logs (AWSLambdaBasicExecutionRole) + S3 GetObject on arn:aws:s3:::prod-data/* + DynamoDB PutItem on arn:aws:dynamodb:us-east-1:111111111111:table/prod-table
+      - Session duration: default (1 hour, auto-renewed by Lambda)
+      - MFA: not required (service role)
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "lambda-service-role-scoped"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "lambda.amazonaws.com"
+        - "SourceArn"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-externalid-deploy-role
+    description: >-
+      Cross-account CI/CD deploy role with ExternalId for confused-deputy
+      protection, permission boundary limiting to prod VPC, scoped CloudFormation
+      and ECS permissions. All dimensions pass.
+    input: |
+      Design a deployment plan for an IAM role. Emit the standard VERDICT
+      block (ROLE_SPEC, VERDICT, TRUST_POLICY, PERMISSIONS, CHECKLIST,
+      FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Role name: cross-account-deploy-role
+      - Principal type: cross-account (CI/CD account 222222222222)
+      - ExternalId: prod-deploy-2026-unique-id
+      - Permissions: cloudformation:* on stacks matching prod-*, s3:PutObject on arn:aws:s3:::build-artifacts/*, ecs:UpdateService on arn:aws:ecs:us-east-1:111111111111:service/prod-cluster/*, iam:PassRole on ecs-task-execution and ecs-task-app roles
+      - Permission boundary: limit to prod VPC vpc-aaaabbbbcccc, deny IAM role creation/deletion
+      - Session duration: 3600 (CI/CD jobs are short)
+      - MFA: not required (service-to-service via OIDC at the CI/CD source)
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-account-externalid-deploy-role"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "ExternalId"
+        - "222222222222"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: oidc-github-actions-role
+    description: >-
+      OIDC role for GitHub Actions CI/CD: trust policy with token.actions.githubusercontent.com
+      federated principal, sub condition scoped to main branch, deploy permissions
+      with scoped iam:PassRole. All dimensions pass.
+    input: |
+      Design a deployment plan for an IAM role. Emit the standard VERDICT
+      block (ROLE_SPEC, VERDICT, TRUST_POLICY, PERMISSIONS, CHECKLIST,
+      FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Role name: github-actions-deploy-role
+      - Principal type: Web Identity (OIDC) via token.actions.githubusercontent.com
+      - Scoped to: repo:my-org/my-repo:ref:refs/heads/main
+      - Permissions: s3 sync to arn:aws:s3:::prod-frontend/*, cloudformation:CreateChangeSet on arn:aws:cloudformation:us-east-1:111111111111:stack/prod-web-*, iam:PassRole on cloudformation-execution-role
+      - Session duration: 3600 (GitHub Actions jobs max ~1 hour)
+      - The OIDC provider arn:aws:iam::111111111111:oidc-provider/token.actions.githubusercontent.com already exists.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "oidc-github-actions-role"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "token.actions.githubusercontent.com"
+        - "AssumeRoleWithWebIdentity"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: wildcard-principal-trust-policy
+    description: >-
+      Dangerous anti-pattern: trust policy with Principal: {"AWS": "*"} and
+      AdministratorAccess permission policy with no permission boundary. This
+      is the most dangerous IAM misconfiguration. Must emit PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for an IAM role. Emit the standard VERDICT
+      block (ROLE_SPEC, VERDICT, TRUST_POLICY, PERMISSIONS, CHECKLIST,
+      FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Role name: open-admin-role
+      - Principal type: any AWS account (Principal: {"AWS": "*"})
+      - Permissions: AdministratorAccess (Action: * on Resource: *)
+      - No permission boundary
+      - Session duration: 43200 (12 hours)
+      - No MFA required
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "wildcard-principal-trust-policy"
+        - "VERDICT"
+        - "Principal"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: service-role-missing-sourcearn
+    description: >-
+      Lambda service role WITHOUT aws:SourceArn or aws:SourceAccount conditions.
+      Any Lambda function in the account can assume the role — lateral-movement
+      vector. Must emit PREREQUISITES_MISSING because the trust policy is
+      unscoped.
+    input: |
+      Design a deployment plan for an IAM role. Emit the standard VERDICT
+      block (ROLE_SPEC, VERDICT, TRUST_POLICY, PERMISSIONS, CHECKLIST,
+      FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Role name: shared-lambda-role
+      - Principal type: AWS service (lambda.amazonaws.com)
+      - Trust policy: Principal: {"Service": "lambda.amazonaws.com"} with no conditions
+      - Permissions: s3:GetObject on arn:aws:s3:::sensitive-data/*, dynamodb:Scan on all tables
+      - Intended for ONE specific function: my-app-processor
+      - No MFA (service role)
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "service-role-missing-sourcearn"
+        - "VERDICT"
+        - "SourceArn"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

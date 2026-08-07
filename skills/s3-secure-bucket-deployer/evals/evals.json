@@ -1,0 +1,184 @@
+{
+  "skill": "s3-secure-bucket-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-07",
+  "description": "Structured eval definitions for the S3 Secure Bucket Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across workload types (compliance, data-lake, CDN, backup+DR) and missing-prerequisite branches. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "secure-compliance-bucket",
+      "name": "Compliance-grade bucket with full security baseline + MFA Delete",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, SSE-KMS + MFA Delete + lifecycle",
+      "prompt": "Provision a production S3 bucket named \"compliance-archive-2024\" in us-east-1 for compliance workloads (HIPAA). Use SSE-KMS with customer-managed CMK (alias/compliance-s3-key), enable versioning with MFA delete, access logging to \"s3-access-logs-prod\", CloudTrail data events on trail \"aws-controltower-trail\", lifecycle: STANDARD_IA@30d then GLACIER@90d then DEEP_ARCHIVE@365d, expire noncurrent versions at 180d. Tags: Environment=production, DataClassification=phi. Account ID: 123456789012.",
+      "prompt_file": "prompts/secure-compliance-bucket.md",
+      "baseline_file": "baselines/secure-compliance-bucket.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUCKET: compliance-archive-2024\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]        Block Public Access — bucket level (all 4 settings)\n  [✓]        Block Public Access — account level (defense-in-depth)\n  [✓]        Default encryption — SSE-KMS (alias/compliance-s3-key, BucketKeyEnabled)\n  [✓]        Object Ownership — BucketOwnerEnforced (ACLs disabled)\n  [✓]        Versioning — Enabled\n  [✓]        MFA Delete — Enabled (compliance workload)\n  [✓]        Bucket policy — HTTPS-only + SSE-KMS upload enforcement\n  [✓]        Access logging — Target: s3-access-logs-prod\n  [✓]        CloudTrail data events — Trail: aws-controltower-trail\n  [✓]        Lifecycle — STANDARD_IA@30d → GLACIER@90d → DEEP_ARCHIVE@365d, expire noncurrent@180d\n  [OPTIONAL] Replication — Not configured\n  [✓]        Tags — Environment=production, DataClassification=phi\nVERIFICATION_COMMANDS:\n  aws s3api get-public-access-block --bucket compliance-archive-2024\n  aws s3api get-bucket-encryption --bucket compliance-archive-2024\n  aws s3api get-bucket-ownership-controls --bucket compliance-archive-2024",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "compliance-archive-2024",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Block Public Access",
+            "SSE-KMS",
+            "BucketOwnerEnforced",
+            "Versioning",
+            "put-public-access-block"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-bpa-bucket",
+      "name": "Legacy bucket missing BPA and Object Ownership — needs hardening",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — bucket exists but lacks BPA and ownership controls",
+      "prompt": "We created a bucket \"legacy-app-data\" last year and just realized it has no Block Public Access configured, no Object Ownership setting, and no bucket policy. It does have SSE-S3 default encryption and versioning. Help me get this to production-ready security baseline. Region: us-west-2, Account: 123456789012.",
+      "prompt_file": "prompts/missing-bpa-bucket.md",
+      "baseline_file": "baselines/missing-bpa-bucket.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BUCKET: legacy-app-data\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗]      Block Public Access — bucket level (NOT configured — enable immediately)\n  [✗]      Object Ownership — NOT set (defaults to ObjectWriter, ACLs honored)\n  [✓]      Default encryption — SSE-S3 (AES256)\n  [✓]      Versioning — Enabled\n  [✗]      Bucket policy — NOT configured (no HTTPS enforcement)\nVERIFICATION_COMMANDS:\n  aws s3api get-public-access-block --bucket legacy-app-data\n  aws s3api get-bucket-ownership-controls --bucket legacy-app-data\n  aws s3api get-bucket-policy --bucket legacy-app-data",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "legacy-app-data",
+            "VERDICT",
+            "CHECKLIST",
+            "Block Public Access"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data-lake-intelligent-tiering",
+      "name": "Data lake bucket with INTELLIGENT_TIERING lifecycle",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — data-lake workload with Intelligent-Tiering",
+      "prompt": "Create a data lake landing zone bucket named \"datalake-raw-zone\" in us-east-1. Use SSE-KMS with alias/datalake-kms-key. Enable Intelligent-Tiering for the lifecycle (unknown access patterns). Enable access logging to \"datalake-logs\". Versioning on. No replication needed. Tags: Environment=production, Workload=data-lake, Zone=raw. Account: 123456789012.",
+      "prompt_file": "prompts/data-lake-intelligent-tiering.md",
+      "baseline_file": "baselines/data-lake-intelligent-tiering.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUCKET: datalake-raw-zone\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]        Block Public Access — bucket level (all 4 settings)\n  [✓]        Default encryption — SSE-KMS (alias/datalake-kms-key, BucketKeyEnabled)\n  [✓]        Object Ownership — BucketOwnerEnforced\n  [✓]        Versioning — Enabled\n  [✓]        Bucket policy — HTTPS-only + SSE-KMS enforcement\n  [✓]        Lifecycle — INTELLIGENT_TIERING (auto-tiering for unknown access patterns)\n  [OPTIONAL] Replication — Not configured\n  [✓]        Tags — Environment=production, Workload=data-lake, Zone=raw\nVERIFICATION_COMMANDS:\n  aws s3api get-public-access-block --bucket datalake-raw-zone\n  aws s3api get-bucket-encryption --bucket datalake-raw-zone",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "datalake-raw-zone",
+            "VERDICT",
+            "CHECKLIST",
+            "INTELLIGENT_TIERING",
+            "Block Public Access",
+            "BucketOwnerEnforced"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "static-assets-cdn",
+      "name": "CDN static assets bucket with SSE-S3 (no KMS, no lifecycle)",
+      "difficulty": "easy",
+      "branch": "READY_TO_DEPLOY — CDN workload with SSE-S3 (cost-sensitive)",
+      "prompt": "Create an S3 bucket for static website assets served via CloudFront. Name: \"cdn-assets-prod\", region: us-east-1. This is a CDN origin so it will be accessed frequently. Use SSE-S3 encryption (cost-sensitive, not compliance data). No lifecycle needed (frequently accessed). Access logging to \"s3-access-logs-prod\". Account: 123456789012.",
+      "prompt_file": "prompts/static-assets-cdn.md",
+      "baseline_file": "baselines/static-assets-cdn.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUCKET: cdn-assets-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]        Block Public Access — bucket level (all 4 settings)\n  [✓]        Default encryption — SSE-S3 (AES256)\n  [✓]        Object Ownership — BucketOwnerEnforced\n  [OPTIONAL] Versioning — Suspended (frequently overwritten CDN assets)\n  [✓]        Bucket policy — HTTPS-only enforcement\n  [✓]        Access logging — Target: s3-access-logs-prod\n  [OPTIONAL] Lifecycle — Not configured (frequently accessed via CloudFront)\nVERIFICATION_COMMANDS:\n  aws s3api get-public-access-block --bucket cdn-assets-prod\n  aws s3api get-bucket-encryption --bucket cdn-assets-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cdn-assets-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "SSE-S3",
+            "Block Public Access"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "full-deploy-with-replication",
+      "name": "Production backup bucket with CRR + MFA Delete + full lifecycle",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all items including CRR replication + MFA Delete",
+      "prompt": "Provision a production backup bucket named \"prod-backup-primary\" in us-east-1 with CRR to \"prod-backup-dr\" in us-west-2. Use SSE-KMS (alias/prod-backup-key in us-east-1, alias/prod-backup-key-dr in us-west-2). Enable MFA delete, versioning, lifecycle: GLACIER@90d then DEEP_ARCHIVE@180d, expire noncurrent@365d. Access logging to \"s3-access-logs-prod\". CloudTrail data events on trail \"management-trail\". Tags: Environment=production, Workload=backup. Account: 123456789012.",
+      "prompt_file": "prompts/full-deploy-with-replication.md",
+      "baseline_file": "baselines/full-deploy-with-replication.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUCKET: prod-backup-primary\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Block Public Access — bucket level (all 4 settings)\n  [✓]      Block Public Access — account level (defense-in-depth)\n  [✓]      Default encryption — SSE-KMS (alias/prod-backup-key, BucketKeyEnabled)\n  [✓]      Object Ownership — BucketOwnerEnforced\n  [✓]      Versioning — Enabled\n  [✓]      MFA Delete — Enabled (backup workload)\n  [✓]      Bucket policy — HTTPS-only + SSE-KMS enforcement\n  [✓]      Access logging — Target: s3-access-logs-prod\n  [✓]      CloudTrail data events — Trail: management-trail\n  [✓]      Lifecycle — GLACIER@90d → DEEP_ARCHIVE@180d, expire noncurrent@365d\n  [✓]      Replication — CRR to prod-backup-dr in us-west-2\n  [✓]      Tags — Environment=production, Workload=backup\nVERIFICATION_COMMANDS:\n  aws s3api get-public-access-block --bucket prod-backup-primary\n  aws s3api get-bucket-encryption --bucket prod-backup-primary\n  aws s3api get-bucket-replication --bucket prod-backup-primary",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-backup-primary",
+            "VERDICT",
+            "CHECKLIST",
+            "Block Public Access",
+            "SSE-KMS",
+            "Replication",
+            "MFA Delete",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

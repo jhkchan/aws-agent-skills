@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ec2-rightsizing-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EC2 Rightsizing Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "overprovisioned-downsize-graviton",
+      "name": "m5.2xlarge Java app, full metrics, Graviton-compatible — clear downsize + Graviton + pricing model opportunity",
+      "difficulty": "medium",
+      "prompt_file": "prompts/overprovisioned-downsize-graviton.md",
+      "baseline_file": "baselines/overprovisioned-downsize-graviton.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "overprovisioned-downsize-graviton", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "Graviton"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "memory-data-missing-blocked",
+      "name": "m5.xlarge with CPU-only data — CWAgent not installed, downsize blocked",
+      "difficulty": "hard",
+      "prompt_file": "prompts/memory-data-missing-blocked.md",
+      "baseline_file": "baselines/memory-data-missing-blocked.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "memory-data-missing-blocked", "CloudWatch Agent"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: ALREADY_OPTIMAL", "downsize"]
+        }
+      ]
+    },
+    {
+      "id": "underprovisioned-upsize-memory",
+      "name": "m5.xlarge PostgreSQL underprovisioned on CPU + memory — upsize to r6i",
+      "difficulty": "medium",
+      "prompt_file": "prompts/underprovisioned-upsize-memory.md",
+      "baseline_file": "baselines/underprovisioned-upsize-memory.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "underprovisioned-upsize-memory", "RECOMMENDATION", "ESTIMATED_SAVINGS", "r6i"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-with-savings-plan",
+      "name": "c6i.4xlarge healthy utilization, already on 3-yr Savings Plan, no Graviton path — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-with-savings-plan.md",
+      "baseline_file": "baselines/already-optimal-with-savings-plan.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-with-savings-plan", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO", "Graviton"]
+        }
+      ]
+    },
+    {
+      "id": "t-family-credit-exhaustion",
+      "name": "t3.large web server with chronic CPUCreditBalance depletion — architecture change needed",
+      "difficulty": "hard",
+      "prompt_file": "prompts/t-family-credit-exhaustion.md",
+      "baseline_file": "baselines/t-family-credit-exhaustion.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "t-family-credit-exhaustion", "CPUCreditBalance", "RECOMMENDATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+# Eval test cases for vpc-network-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: vpc-network-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ha-multi-az-three-tier
+    description: >-
+      Standard production VPC deployment: 3-AZ, three-tier (public/private/database),
+      HA NAT topology (1 per AZ), RFC 1918 CIDR with no overlap, Gateway Endpoints
+      for S3/DynamoDB, Interface Endpoints for Secrets Manager/SSM/KMS, Flow Logs
+      to S3. All checklist dimensions pass.
+    input: |
+      Design a deployment plan for a production VPC. Emit the standard
+      VERDICT block (VPC_SPEC, VERDICT, ARCHITECTURE, CHECKLIST, FINDINGS,
+      DEPLOY_COMMANDS).
+
+      Requirements:
+      - Region: us-east-1
+      - AZ count: 3 (us-east-1a, us-east-1b, us-east-1c)
+      - CIDR: 10.0.0.0/16 (RFC 1918, verified no overlap with existing VPCs)
+      - Tiers: public, private, database
+      - NAT strategy: HA (one NAT Gateway per AZ)
+      - VPC Endpoints: S3, DynamoDB (Gateway), Secrets Manager, SSM, KMS (Interface)
+      - Flow Logs: all-traffic to S3, 1-year retention
+      - Security Groups: reference by name, least-privilege
+      - DNS: enableDnsHostnames + enableDnsSupport
+      - IPv6: dual-stack
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ha-multi-az-three-tier"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "10.0.0.0/16"
+        - "Gateway"
+        - "Interface"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cidr-overlap-with-onprem
+    description: >-
+      Proposed VPC CIDR 10.0.0.0/16 overlaps with the on-premises datacenter
+      range (10.0.0.0/16). This is a hard blocker for Direct Connect/VPN —
+      asymmetric routing. Must emit PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a production VPC. Emit the standard
+      VERDICT block (VPC_SPEC, VERDICT, ARCHITECTURE, CHECKLIST, FINDINGS,
+      DEPLOY_COMMANDS).
+
+      Requirements:
+      - Region: us-east-1
+      - AZ count: 3
+      - CIDR: 10.0.0.0/16
+      - Tiers: public, private, database
+      - NAT strategy: HA
+
+      Constraints from network team:
+      - The on-premises datacenter uses 10.0.0.0/16 (confirmed via Direct Connect BGP routes).
+      - There is a Site-to-Site VPN to the corporate network.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "cidr-overlap-with-onprem"
+        - "VERDICT"
+        - "overlap"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: single-nat-cost-optimized
+    description: >-
+      Dev/staging VPC with single NAT Gateway (cost-optimized topology).
+      Acceptable for non-production. Must emit READY_TO_DEPLOY with a
+      finding warning about AZ failure risk.
+    input: |
+      Design a deployment plan for a staging VPC. Emit the standard
+      VERDICT block (VPC_SPEC, VERDICT, ARCHITECTURE, CHECKLIST, FINDINGS,
+      DEPLOY_COMMANDS).
+
+      Requirements:
+      - Region: us-west-2
+      - AZ count: 2 (us-west-2a, us-west-2b)
+      - CIDR: 10.50.0.0/16 (RFC 1918, no overlap)
+      - Tiers: public, private (no database tier needed for staging)
+      - NAT strategy: cost-optimized (single NAT Gateway in AZ-a)
+      - VPC Endpoints: S3, DynamoDB (Gateway only — keep costs low)
+      - Flow Logs: all-traffic to S3, 90-day retention
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "single-nat-cost-optimized"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "10.50.0.0/16"
+        - "NAT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: single-tier-public-only
+    description: >-
+      Non-production pattern: single-tier VPC with only public subnets
+      (all instances internet-reachable). This is an anti-pattern for any
+      real workload. Must emit PREREQUISITES_MISSING because there is no
+      private tier.
+    input: |
+      Design a deployment plan for a VPC. Emit the standard VERDICT block
+      (VPC_SPEC, VERDICT, ARCHITECTURE, CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Region: ap-southeast-1
+      - AZ count: 1 (ap-southeast-1a only)
+      - CIDR: 10.99.0.0/24
+      - Tiers: public only (single tier)
+      - NAT strategy: none
+      - Endpoints: none
+      - Flow Logs: not required
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "single-tier-public-only"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-required-fields
+    description: >-
+      Incomplete deployment specification — missing region and CIDR block.
+      Cannot produce a deployment plan without required fields.
+    input: |
+      Design a deployment plan for a VPC. Emit the standard VERDICT block
+      (VPC_SPEC, VERDICT, ARCHITECTURE, CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - AZ count: 3
+      - Tiers: public, private, database
+      - NAT strategy: HA
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-required-fields"
+        - "VERDICT"
+        - "REQUIRED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

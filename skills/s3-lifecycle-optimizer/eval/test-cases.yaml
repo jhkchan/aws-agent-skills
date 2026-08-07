@@ -1,0 +1,219 @@
+# Eval test cases for s3-lifecycle-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-lifecycle-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: logs-bucket-no-lifecycle
+    description: >-
+      Versioned logs bucket with 12 TB current + 8 TB noncurrent bytes, all in
+      Standard, no lifecycle policy. Classic opportunity for logs-lifecycle
+      pattern plus noncurrent cleanup plus multipart abort.
+    input: |
+      Bucket: app-logs-prod
+      Region: us-east-1
+      Versioning: Enabled
+      Object Lock: not configured
+      Current lifecycle configuration: none (NoSuchLifecycleConfiguration)
+      S3 Storage Lens (last 30 days):
+        Total storage bytes: 20,000,000,000,000 (20 TB)
+        Noncurrent bytes: 8,000,000,000,000 (8 TB, 40% of total)
+        Storage class distribution:
+          Standard: 100%
+          Standard-IA: 0%
+          Glacier: 0%
+        Average object age: 95 days
+        Multipart uploads in progress (>7 days): 14
+      Key prefix layout: logs/, application/, archive/
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON, RECOMMENDATION,
+      SAVINGS, IMPLEMENTATION).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "app-logs-prod"
+        - "VERDICT"
+        - "RECOMMENDATION"
+        - "SAVINGS"
+        - "NoncurrentVersionExpiration"
+        - "AbortIncompleteMultipartUpload"
+        - "put-bucket-lifecycle-configuration"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: OPTIMIZED"
+
+  - id: compliance-archive-no-deep-archive
+    description: >-
+      Compliance archive bucket that should be in Glacier Deep Archive but sits
+      in Standard with no lifecycle. 7-year regulatory retention. Verify the
+      recommendation targets Deep Archive with the correct 90-day minimum
+      transition and warns about retrieval fees.
+    input: |
+      Bucket: compliance-archive-7yr
+      Region: us-east-1
+      Versioning: Enabled
+      Object Lock: not configured
+      Current lifecycle configuration: none
+      Workload: write-once compliance archive, accessed < 1x/year
+      Regulatory retention: 7 years (2555 days)
+      S3 Storage Lens (last 30 days):
+        Total storage bytes: 5,000,000,000,000 (5 TB)
+        Noncurrent bytes: 0 (write-once workload)
+        Storage class distribution:
+          Standard: 100%
+        Average object age: 120 days
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON, RECOMMENDATION,
+      SAVINGS, IMPLEMENTATION).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "compliance-archive-7yr"
+        - "VERDICT"
+        - "GLACIER_DEEP_ARCHIVE"
+        - "Deep Archive"
+        - "retrieval"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "STANDARD_IA"
+
+  - id: small-objects-intelligent-tiering-trap
+    description: >-
+      Bucket of 8 million small JSON config files (avg 4 KB) in Standard with
+      a recommendation request to move to Intelligent-Tiering. Verify the skill
+      REJECTS Intelligent-Tiering due to the $0.0025/1K monitoring fee
+      exceeding the saving on sub-128KB objects, and recommends Standard or
+      one-zone-IA only if patterns are genuinely cold.
+    input: |
+      Bucket: app-config-state
+      Region: us-east-1
+      Versioning: Suspended
+      Object Lock: not configured
+      Current lifecycle configuration: none
+      Workload: small JSON config state files
+      S3 Storage Lens (last 30 days):
+        Total objects: 8,200,000
+        Average object size: 4.2 KB
+        Total storage bytes: 34.4 GB
+        Storage class distribution:
+          Standard: 100%
+        Access pattern: GET every ~10 days (uniform)
+      Proposed plan (operator asks): "should I move this to Intelligent-Tiering?"
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON, RECOMMENDATION,
+      SAVINGS, IMPLEMENTATION). Address the proposed Intelligent-Tiering
+      plan explicitly.
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "app-config-state"
+        - "monitoring fee"
+        - "128"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "INTELLIGENT_TIERING"
+        - "Intelligent-Tiering"
+        - "VERDICT: OPPORTUNITY_FOUND"
+
+  - id: multipart-upload-leak-only
+    description: >-
+      Otherwise-clean bucket with well-tuned lifecycle but a stale multipart
+      upload leak. 23 incomplete multipart uploads older than 30 days. Verify
+      the skill recommends ONLY the abort rule and surfaces the leak cost.
+    input: |
+      Bucket: data-lake-curated
+      Region: us-east-1
+      Versioning: Enabled
+      Object Lock: not configured
+      Current lifecycle configuration:
+        Rules:
+          - ID: tier-to-ia
+            Status: Enabled
+            Filter: {Prefix: "ingest/"}
+            Transitions:
+              - {Days: 30, StorageClass: STANDARD_IA}
+              - {Days: 90, StorageClass: GLACIER_IR}
+            Expiration: {Days: 365}
+          - ID: noncurrent-cleanup
+            Status: Enabled
+            Filter: {}
+            NoncurrentVersionExpiration: {NoncurrentDays: 90}
+      S3 Storage Lens (last 30 days):
+        Total storage bytes: 800 GB
+        Noncurrent bytes: 12 GB (1.5% — within healthy range)
+        Storage class distribution:
+          Standard: 30%
+          Standard-IA: 50%
+          Glacier IR: 20%
+      aws s3api list-multipart-uploads output:
+        23 multipart uploads with Initiated dates between 30 and 75 days ago
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON, RECOMMENDATION,
+      SAVINGS, IMPLEMENTATION).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "data-lake-curated"
+        - "AbortIncompleteMultipartUpload"
+        - "multipart"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "GLACIER_DEEP_ARCHIVE"
+
+  - id: already-optimal-compliance-bucket
+    description: >-
+      Compliance archive bucket that already transitions to Glacier Deep Archive
+      at 90 days, has Object Lock in COMPLIANCE mode with 2555-day retention,
+      no incomplete multipart uploads. All dimensions clean.
+    input: |
+      Bucket: regulated-archive-final
+      Region: us-east-1
+      Versioning: Enabled
+      Object Lock: Enabled, COMPLIANCE mode, default retention 2555 days
+      Current lifecycle configuration:
+        Rules:
+          - ID: archive-to-deep-archive
+            Status: Enabled
+            Filter: {Prefix: "archive/"}
+            Transitions:
+              - {Days: 90, StorageClass: GLACIER_DEEP_ARCHIVE}
+          - ID: abort-incomplete-mpu
+            Status: Enabled
+            Filter: {}
+            AbortIncompleteMultipartUpload: {DaysAfterInitiation: 7}
+      S3 Storage Lens (last 30 days):
+        Total storage bytes: 20 TB
+        Noncurrent bytes: 0
+        Storage class distribution:
+          Standard: 5%
+          Glacier Deep Archive: 95%
+        Incomplete multipart uploads: 0
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON, RECOMMENDATION,
+      SAVINGS, IMPLEMENTATION).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "regulated-archive-final"
+        - "VERDICT"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: OPTIMIZED"

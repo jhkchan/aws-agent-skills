@@ -1,0 +1,227 @@
+# Eval test cases for ec2-rightsizing-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# InstanceId embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision matrix in SKILL.md
+# produces exactly the expected verdicts below.
+skill: ec2-rightsizing-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: overprovisioned-downsize-graviton
+    description: >-
+      m5.2xlarge Java application with full CloudWatch Agent metrics over
+      30 days. CPU avg 8%, Memory avg 22%, Network low, Disk low. Graviton-
+      compatible workload (Java 17). Compute Optimizer finding agrees
+      (Overprovisioned, performanceRisk 1). Expected verdict:
+      OPPORTUNITY_FOUND with downsize + Graviton recommendation.
+    input: |
+      InstanceId: i-overprovisioned-downsize-graviton
+      Current instance type: m5.2xlarge
+      Region: us-east-1
+      Pricing: On-Demand (no RI/Savings Plan)
+
+      Utilization metrics (last 30 days, CWAgent reporting):
+        - CPUUtilization: avg=8%, max=15% (CloudWatch)
+        - MemoryUtilization: avg=22%, max=30% (CloudWatchAgent)
+        - NetworkIn: avg=0.05 MB/s, max=0.1 MB/s
+        - DiskReadOps+DiskWriteOps: avg=10/s, max=20/s
+
+      Compute Optimizer finding: Overprovisioned
+      Finding reasons: ["CPUOverprovisioned", "MemoryOverprovisioned"]
+      Recommendation options:
+        - rank: 1, instanceType: t3.large, performanceRisk: 1,
+          savingsOpportunity: {savingsPercentage: 75, estimatedMonthlySavings: 150}
+      Last refresh: 2026-07-25
+
+      Workload context: Java 17 application (Spring Boot), containerized
+      via Docker multi-arch image (arm64 available), steady-state 24/7.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "overprovisioned-downsize-graviton"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "Graviton"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: memory-data-missing-blocked
+    description: >-
+      m5.xlarge instance with CPU-only CloudWatch data. CWAgent not
+      installed. CPU avg 12% suggests Overprovisioned, but the downsize
+      recommendation is blocked without memory data. Expected verdict:
+      NEED_MORE_INFO (NOT a downsize recommendation).
+    input: |
+      InstanceId: i-memory-data-missing-blocked
+      Current instance type: m5.xlarge
+      Region: us-east-1
+      Pricing: On-Demand
+
+      Utilization metrics (last 30 days):
+        - CPUUtilization: avg=12%, max=20% (CloudWatch)
+        - MemoryUtilization: ABSENT (CloudWatch Agent not installed)
+        - NetworkIn: avg=0.1 MB/s, max=0.2 MB/s
+
+      Compute Optimizer finding: Overprovisioned (LOW confidence —
+      memory inferred from instance type specifications, performanceRisk 4)
+
+      Workload context: unknown runtime; metrics show low CPU but no
+      memory visibility.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "memory-data-missing-blocked"
+        - "CloudWatch Agent"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "downsize"
+
+  - id: underprovisioned-upsize-memory
+    description: >-
+      m5.xlarge instance with full CWAgent metrics showing CPU avg 75%,
+      Memory avg 88% sustained over 30 days. Workload is relational
+      database. Expected verdict: OPPORTUNITY_FOUND with upsize +
+      migration to memory-optimized family.
+    input: |
+      InstanceId: i-underprovisioned-upsize-memory
+      Current instance type: m5.xlarge
+      Region: us-east-1
+      Pricing: On-Demand
+
+      Utilization metrics (last 30 days, CWAgent reporting):
+        - CPUUtilization: avg=75%, max=92% (CloudWatch)
+        - MemoryUtilization: avg=88%, max=95% (CloudWatchAgent)
+        - NetworkIn: avg=0.5 MB/s, max=1.0 MB/s
+        - DiskReadOps+DiskWriteOps: avg=500/s, max=800/s
+
+      Compute Optimizer finding: Underprovisioned
+      Finding reasons: ["CPUUnderprovisioned", "MemoryUnderprovisioned"]
+      Recommendation options:
+        - rank: 1, instanceType: r6i.2xlarge, performanceRisk: 1
+
+      Workload context: self-managed PostgreSQL on EC2; high read/write
+      IOPS; memory pressure visible in OOM kills (recent event in
+      CloudWatch).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "underprovisioned-upsize-memory"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "r6i"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-with-savings-plan
+    description: >-
+      c6i.4xlarge instance with healthy utilization (CPU avg 55%, Memory
+      avg 65%) already on a 3-year Compute Savings Plan covering 100% of
+      the hourly spend. Workload uses x86 SIMD intrinsics (no Graviton
+      path). Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      InstanceId: i-already-optimal-with-savings-plan
+      Current instance type: c6i.4xlarge
+      Region: us-east-1
+      Pricing: 3-year Compute Savings Plan covering 100% of hourly spend
+
+      Utilization metrics (last 30 days, CWAgent reporting):
+        - CPUUtilization: avg=55%, max=70% (CloudWatch)
+        - MemoryUtilization: avg=65%, max=78% (CloudWatchAgent)
+        - NetworkIn: avg=2 MB/s, max=4 MB/s
+        - DiskReadOps+DiskWriteOps: avg=100/s, max=150/s
+
+      Compute Optimizer finding: Optimized
+      Finding reasons: []
+
+      Workload context: C++ batch processing application using AVX2 SIMD
+      intrinsics for video transcoding. No arm64 build available.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-with-savings-plan"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"
+        - "Graviton"
+
+  - id: t-family-credit-exhaustion
+    description: >-
+      t3.large web server with chronic CPUCreditBalance depletion. CPU
+      avg 35% sustained (above the 20% earn rate baseline), causing
+      intermittent latency spikes during business hours. Expected
+      verdict: OPPORTUNITY_FOUND with architecture change (migrate to
+      m-family or enable Unlimited mode).
+    input: |
+      InstanceId: i-t-family-credit-exhaustion
+      Current instance type: t3.large
+      Region: us-east-1
+      Pricing: On-Demand
+
+      Utilization metrics (last 30 days, CWAgent reporting):
+        - CPUUtilization: avg=35%, max=80% (CloudWatch)
+        - CPUCreditBalance: chronically < 30, frequently drops to 0
+          during business hours
+        - MemoryUtilization: avg=45%, max=55% (CloudWatchAgent)
+        - NetworkIn: avg=0.3 MB/s, max=0.5 MB/s
+
+      Compute Optimizer finding: Underprovisioned
+      Finding reasons: ["CPUUnderprovisioned"]
+
+      Workload context: PHP web application serving business-hours
+      traffic. Users report intermittent 5x latency spikes during peak
+      hours; CloudWatch shows CPUCreditBalance hits 0 during these spikes.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "t-family-credit-exhaustion"
+        - "CPUCreditBalance"
+        - "RECOMMENDATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"

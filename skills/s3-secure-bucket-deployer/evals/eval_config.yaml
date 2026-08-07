@@ -1,0 +1,49 @@
+# Eval configuration for s3-secure-bucket-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: s3-secure-bucket-deployer
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: secure-compliance-bucket
+    difficulty: hard
+    prompt_file: prompts/secure-compliance-bucket.md
+    baseline_file: baselines/secure-compliance-bucket.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-bpa-bucket
+    difficulty: medium
+    prompt_file: prompts/missing-bpa-bucket.md
+    baseline_file: baselines/missing-bpa-bucket.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: data-lake-intelligent-tiering
+    difficulty: medium
+    prompt_file: prompts/data-lake-intelligent-tiering.md
+    baseline_file: baselines/data-lake-intelligent-tiering.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: static-assets-cdn
+    difficulty: easy
+    prompt_file: prompts/static-assets-cdn.md
+    baseline_file: baselines/static-assets-cdn.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: full-deploy-with-replication
+    difficulty: hard
+    prompt_file: prompts/full-deploy-with-replication.md
+    baseline_file: baselines/full-deploy-with-replication.md
+    expected_verdict: READY_TO_DEPLOY

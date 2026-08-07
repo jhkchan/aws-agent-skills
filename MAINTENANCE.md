@@ -79,3 +79,62 @@ This is the sustainable freshness model — the community surfaces new features 
 | 2026-08-05 | Initial freshness pass | 71 (all) | Lambda MicroVM, Bedrock inference profiles, GuardDuty runtime monitoring, CloudTrail Lake, RDS Blue/Green, ECS Service Connect, S3 directory buckets, + more | (this commit) |
 
 > **Add a row each quarter** so the freshness history is trackable.
+
+## Skill lifecycle: impact evaluation + retirement cadence
+
+### Why retire skills?
+
+Agent skills serve two purposes:
+1. **Capability skills** teach the model AWS-specific knowledge it lacks (multi-step diagnostic procedures, service-specific config rules, gotchas). These are durable — they survive model improvements.
+2. **Preference skills** codify workflows, output formats, and default choices. As models improve, they internalize these patterns — the skill becomes redundant. A skill that doesn't measurably improve performance wastes tokens (100-200 tokens overhead per invocation).
+
+### Quarterly impact evaluation
+
+Alongside the freshness re-audit (week 3), run the impact evaluation harness:
+
+```bash
+aws sso login --profile default
+python3 eval/impact_eval.py --skill <skill-name>
+# OR for all skills:
+python3 eval/impact_eval.py
+```
+
+The impact harness measures the **with-skill vs without-skill performance delta**:
+1. Runs the target model WITHOUT the skill loaded (baseline)
+2. Runs the target model WITH the skill loaded
+3. Judges both outputs with gpt-oss-120b on the same 8-dimension rubric
+4. Reports the per-case and average delta
+
+### Impact recommendations
+
+| avg_delta | Recommendation | Action |
+|---|---|---|
+| > +10 | HIGH_IMPACT | Keep — the skill provides significant value |
+| +5 to +10 | MODERATE_IMPACT | Keep — the skill provides measurable value |
+| 0 to +5 | LOW_IMPACT | Monitor — re-eval next quarter; consider simplifying |
+| ≤ 0 | RETIRE_CANDIDATE | The model no longer benefits from this skill. Tag `lifecycle_status: deprecated`, announce retirement, remove in next release |
+
+### Retirement process
+
+1. **Tag**: Set `lifecycle_status: deprecated` in the skill's frontmatter metadata.
+2. **Announce**: Add a deprecation notice to the skill's description.
+3. **Grace period**: Keep for one release cycle (one quarter) for users who depend on the skill's output format.
+4. **Retire**: Move to `skills/_retired/` (preserved for reference). Remove from CLI routing, marketplace.json, and commands/.
+5. **Document**: Add a row to the retirement log below.
+
+### Retirement log
+
+| Date | Skill | avg_delta at retirement | Reason | Replaced by |
+|---|---|---|---|---|
+| *(none yet)* | | | | |
+
+> **Add a row when a skill is retired** so the history is trackable.
+
+### Capability vs Preference tagging
+
+Every skill carries `skill_class: capability | preference` in its frontmatter metadata:
+
+- **capability**: Teaches knowledge the model fundamentally lacks (AWS-specific config rules, multi-step diagnostic procedures, service-specific gotchas, API quirks). Example: `iam-permission-troubleshooter` (policy evaluation logic is complex and unlikely to be internalized). These are durable — they survive model improvements.
+- **preference**: Codifies a workflow, output format, or default choice. Example: `s3-secure-bucket-deployer` (the model already knows about BPA; the skill just codifies the exact checklist order). These are more likely to become RETIRE_CANDIDATEs as models improve.
+
+Preference skills should be re-evaluated for impact each quarter. Capability skills can be re-evaluated semi-annually (they degrade more slowly).

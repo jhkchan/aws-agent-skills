@@ -1,0 +1,177 @@
+{
+  "skill": "lambda-function-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-07",
+  "description": "Structured eval definitions for the Lambda Function Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across workload types (API backend, Java SnapStart, report generator) and prerequisite failure branches (deprecated runtime, missing NAT Gateway). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "secure-api-backend",
+      "name": "Production API backend with VPC + NAT Gateway + KMS + on-failure destination",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — full checklist with VPC, NAT Gateway, KMS, tracing",
+      "prompt": "Deploy a production Lambda function named \"order-api-prod\" in us-east-1. Runtime: python3.12. Handler: app.handler. It needs to access an RDS PostgreSQL instance in a VPC (subnets: subnet-aaa, subnet-bbb; security group: sg-orders-api). The function also calls Stripe API (needs internet access via NAT Gateway). Use KMS key alias/lambda-env-key for env var encryption. Environment: DB_HOST=orders-db.cluster.example.rds.amazonaws.com. STRIPE_API_KEY referenced via Secrets Manager. Memory: 512 MB, Timeout: 15s. On-failure destination: order-api-dlq (SQS). X-Ray tracing active. CloudWatch retention: 30 days. Account: 123456789012.",
+      "prompt_file": "prompts/secure-api-backend.md",
+      "baseline_file": "baselines/secure-api-backend.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FUNCTION: order-api-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Execution IAM role — least-privilege (DynamoDB + S3 + Secrets Manager scoped)\n  [✓]      Runtime — python3.12 (supported)\n  [✓]      Memory — 512 MB\n  [✓]      Timeout — 15s\n  [✓]      Environment variables — KMS-encrypted (alias/lambda-env-key)\n  [✓]      VPC — Private subnets (subnet-aaa, subnet-bbb) + sg-orders-api + NAT Gateway\n  [✓]      Destination — On-failure SQS (order-api-dlq)\n  [✓]      Logging — /aws/lambda/order-api-prod, retention 30 days\n  [✓]      Tracing — X-Ray Active mode\nVERIFICATION_COMMANDS:\n  aws lambda get-function-configuration --function-name order-api-prod\n  aws lambda get-function-event-invoke-config --function-name order-api-prod\n  aws logs describe-log-groups --log-group-name-prefix /aws/lambda/order-api-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "order-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "python3.12",
+            "NAT Gateway"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deprecated-runtime-node14",
+      "name": "Deprecated nodejs14.x runtime — deployment blocker",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — deprecated runtime blocks deployment",
+      "prompt": "Deploy a Lambda function named \"legacy-processor\" in us-east-1. Runtime: nodejs14.x. Handler: index.handler. Memory: 256 MB, Timeout: 10s. Execution role: legacy-processor-role. The zip package is at ./function.zip. Account: 123456789012.",
+      "prompt_file": "prompts/deprecated-runtime-node14.md",
+      "baseline_file": "baselines/deprecated-runtime-node14.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "FUNCTION: legacy-processor\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗]      Runtime — nodejs14.x is DEPRECATED (blocked for deployment). Migrate to nodejs20.x or nodejs22.x.\n  [✓]      Execution IAM role — legacy-processor-role\n  [✓]      Memory — 256 MB\n  [✓]      Timeout — 10s\nVERIFICATION_COMMANDS:\n  aws lambda get-function-configuration --function-name legacy-processor",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "legacy-processor",
+            "VERDICT",
+            "CHECKLIST",
+            "nodejs14.x"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vpc-no-nat-gateway",
+      "name": "VPC-attached function needing internet but no NAT Gateway",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — NAT Gateway required for internet access",
+      "prompt": "Deploy a Lambda function named \"webhook-sender\" in us-east-1. Runtime: nodejs20.x. Handler: index.handler. The function is attached to VPC subnets subnet-private-a, subnet-private-b (private subnets, no NAT Gateway configured). It needs to send HTTP POST to https://api.partner.com/webhook (external internet endpoint). Memory: 512 MB, Timeout: 10s. Execution role exists with AWSLambdaBasicExecutionRole. Account: 123456789012.",
+      "prompt_file": "prompts/vpc-no-nat-gateway.md",
+      "baseline_file": "baselines/vpc-no-nat-gateway.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "FUNCTION: webhook-sender\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Runtime — nodejs20.x (supported)\n  [✓]      VPC — Private subnets (subnet-private-a, subnet-private-b)\n  [✗]      VPC — NAT Gateway REQUIRED for internet access (https://api.partner.com). Without NAT Gateway, the VPC-attached function cannot reach external endpoints.\nVERIFICATION_COMMANDS:\n  aws ec2 describe-nat-gateways --filter Name=subnet-id,Values=subnet-public",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "webhook-sender",
+            "VERDICT",
+            "CHECKLIST",
+            "NAT Gateway"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "java-snapstart-provisioned",
+      "name": "Java 21 Spring Boot with SnapStart + provisioned concurrency",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SnapStart + provisioned concurrency on alias",
+      "prompt": "Deploy a production Java Lambda function named \"enterprise-api-prod\" in us-east-1. Runtime: java21. Handler: com.example.ApiHandler::handleRequest. It is a Spring Boot API behind API Gateway with strict latency requirements (P99 < 200ms). Enable SnapStart to reduce cold starts. Provisioned concurrency: 20 on the \"prod\" alias. Memory: 2048 MB, Timeout: 30s. X-Ray tracing active. On-failure destination: enterprise-api-dlq (SQS). ECR image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/enterprise-api:latest. CloudWatch retention: 90 days. Execution role: enterprise-api-exec. Account: 123456789012.",
+      "prompt_file": "prompts/java-snapstart-provisioned.md",
+      "baseline_file": "baselines/java-snapstart-provisioned.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FUNCTION: enterprise-api-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Execution IAM role — enterprise-api-exec\n  [✓]      Runtime — java21 (supported, SnapStart eligible)\n  [✓]      Memory — 2048 MB\n  [✓]      Timeout — 30s\n  [✓]      SnapStart — Enabled (ApplyOn=PublishedVersions)\n  [✓]      Provisioned concurrency — 20 on alias \"prod\"\n  [✓]      Packaging — ECR image (123456789012.dkr.ecr.us-east-1.amazonaws.com/enterprise-api:latest)\n  [✓]      Destination — On-failure SQS (enterprise-api-dlq)\n  [✓]      Logging — /aws/lambda/enterprise-api-prod, retention 90 days\n  [✓]      Tracing — X-Ray Active mode\nVERIFICATION_COMMANDS:\n  aws lambda get-function-configuration --function-name enterprise-api-prod\n  aws lambda get-function-configuration --function-name enterprise-api-prod --query 'SnapStart'\n  aws lambda list-provisioned-concurrency-configs --function-name enterprise-api-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "enterprise-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "SnapStart",
+            "Provisioned concurrency",
+            "java21",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "full-correct-config",
+      "name": "Report generator with all correct defaults (DynamoDB + S3 + layers)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, layers + Powertools",
+      "prompt": "Deploy a production Lambda function named \"report-generator-prod\" in us-east-1. Runtime: python3.12. Handler: generate.handler. The function reads from DynamoDB (table: reports-table) and writes PDF reports to S3 (bucket: reports-output-prod). Use the AWSLambdaBasicExecutionRole managed policy plus scoped DynamoDB read + S3 write permissions. KMS key alias/lambda-env-key for env var encryption. Environment: REPORTS_TABLE=reports-table, OUTPUT_BUCKET=reports-output-prod. Memory: 1024 MB, Timeout: 60s. Layers: Powertools for Python v3 (python3.12-x86_64). On-failure destination: report-gen-dlq (SQS). X-Ray active. CloudWatch retention: 30 days. Tags: Environment=production, Workload=report-generator. Account: 123456789012.",
+      "prompt_file": "prompts/full-correct-config.md",
+      "baseline_file": "baselines/full-correct-config.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FUNCTION: report-generator-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Execution IAM role — least-privilege (DynamoDB + S3 scoped)\n  [✓]      Runtime — python3.12 (supported)\n  [✓]      Memory — 1024 MB\n  [✓]      Timeout — 60s\n  [✓]      Environment variables — KMS-encrypted (alias/lambda-env-key)\n  [✓]      Layers — Powertools for Python v3\n  [✓]      Destination — On-failure SQS (report-gen-dlq)\n  [✓]      Logging — /aws/lambda/report-generator-prod, retention 30 days\n  [✓]      Tracing — X-Ray Active mode\n  [✓]      Tags — Environment=production, Workload=report-generator\nVERIFICATION_COMMANDS:\n  aws lambda get-function-configuration --function-name report-generator-prod\n  aws lambda get-function-event-invoke-config --function-name report-generator-prod\n  aws logs describe-log-groups --log-group-name-prefix /aws/lambda/report-generator-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "report-generator-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "python3.12",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,255 @@
+# Eval test cases for rds-backup-restore-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: rds-backup-restore-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: pitr-restore-target-subnet-missing
+    description: >-
+      PITR restore request for a MySQL 8.0 instance with retention=7 and a
+      valid restore window, but the target DB subnet group "dr-subnet-group"
+      does not exist in the target region. Pre-checks must BLOCK before any
+      CLI executes.
+    input: |
+      Operation: pitr-restore
+      Source: prod-orders-db (mysql 8.0.35, 500 GB, encrypted)
+      Target identifier: prod-orders-db-pitr-2026-08-07
+      Restore time: 2026-08-07T10:00:00Z
+      Target DB subnet group: dr-subnet-group
+      Target security group: sg-prod-rds
+      Target option group: default:mysql-8-0
+      Target parameter group: prod-mysql80
+      KMS key: arn:aws:kms:us-east-1:111111111111:key/prod-key
+
+      Source instance metadata (aws rds describe-db-instances):
+        DBInstanceIdentifier: prod-orders-db
+        DBInstanceStatus: available
+        Engine: mysql
+        EngineVersion: 8.0.35
+        AllocatedStorage: 500
+        BackupRetentionPeriod: 7
+        EarliestRestorableTime: 2026-07-31T00:00:00Z
+        LatestRestorableTime: 2026-08-07T10:55:00Z
+        StorageEncrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/prod-key
+
+      Target resource checks (already performed by caller):
+        aws rds describe-db-subnet-groups --db-subnet-group-name dr-subnet-group:
+          DBSubnetGroupNotFoundFault
+        aws ec2 describe-security-groups --group-ids sg-prod-rds: OK
+        aws rds describe-option-groups --option-group-name default:mysql-8-0: OK
+        aws rds describe-db-parameter-groups --db-parameter-group-name prod-mysql80: OK
+        aws kms describe-key --key-id arn:aws:kms:us-east-1:111111111111:key/prod-key: OK
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, ENDPOINT, NOTES).
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "dr-subnet-group"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "DBSubnetGroupNotFound"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "restore-db-instance-to-point-in-time"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: snapshot-missing-for-pre-migration
+    description: >-
+      Operator wants to create a pre-migration manual snapshot, but the
+      instance BackupRetentionPeriod is 0 and the only "snapshot" referenced
+      is a non-existent identifier. Pre-checks must BLOCK and surface that
+      no automated backup exists.
+    input: |
+      Operation: snapshot-restore (operator wants to restore from
+        "prod-pre-migration-snap" before applying a risky schema change)
+      Source snapshot: prod-pre-migration-snap
+      Target identifier: prod-checkout-restored
+
+      Source instance metadata (aws rds describe-db-instances):
+        DBInstanceIdentifier: prod-checkout
+        DBInstanceStatus: available
+        Engine: postgres
+        EngineVersion: 15.4
+        AllocatedStorage: 200
+        BackupRetentionPeriod: 0
+        StorageEncrypted: true
+
+      Snapshot checks:
+        aws rds describe-db-snapshots --db-snapshot-identifier prod-pre-migration-snap:
+          DBSnapshotNotFoundFault
+        aws rds describe-db-snapshots --db-instance-identifier prod-checkout --snapshot-type automated:
+          []
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "prod-pre-migration-snap"
+        - "DBSnapshotNotFound"
+        - "VERDICT"
+        - "BackupRetentionPeriod"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "restore-db-instance-from-db-snapshot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: aurora-backtrack-in-window
+    description: >-
+      Aurora MySQL cluster with BacktrackWindow=86400 (24h), operator wants
+      to rewind 2 hours to undo a bad bulk UPDATE. All pre-checks pass;
+      plan should produce READY with the backtrack CLI and the in-place
+      rewind caveat.
+    input: |
+      Operation: backtrack
+      Source cluster: aurora-prod-cluster
+      Backtrack to: 2026-08-07T09:00:00Z (about 2 hours ago)
+      Reason: bad bulk UPDATE that needs to be reversed
+
+      Source cluster metadata (aws rds describe-db-clusters):
+        DBClusterIdentifier: aurora-prod-cluster
+        DBClusterStatus: available
+        Engine: aurora-mysql
+        EngineVersion: 8.0.mysql_aurora.3.05.2
+        BacktrackWindow: 86400
+        AllocatedStorage: 2000
+        StorageEncrypted: true
+        GlobalClusterMember: false
+        ActivityStreamStatus: stopped
+
+      Existing backtrack check:
+        aws rds describe-db-cluster-backtracks --db-cluster-identifier aurora-prod-cluster:
+          []
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "aurora-prod-cluster"
+        - "backtrack-db-cluster"
+        - "VERDICT"
+        - "in-place"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "restore-db-instance"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: retention-zero-pitr-disabled
+    description: >-
+      PITR restore request for a PostgreSQL 15.4 instance with
+      BackupRetentionPeriod=0 — automated backups disabled, PITR not
+      available. Pre-checks must BLOCK and surface the modify-db-instance
+      remediation plus the manual-snapshot fallback path.
+    input: |
+      Operation: pitr-restore
+      Source: prod-analytics-db (postgres 15.4)
+      Target identifier: prod-analytics-db-pitr
+      Restore time: 2026-08-07T08:00:00Z
+      Reason: dropped the wrong table 30 minutes ago
+
+      Source instance metadata (aws rds describe-db-instances):
+        DBInstanceIdentifier: prod-analytics-db
+        DBInstanceStatus: available
+        Engine: postgres
+        EngineVersion: 15.4
+        AllocatedStorage: 1000
+        BackupRetentionPeriod: 0
+        LatestRestorableTime: null
+        EarliestRestorableTime: null
+        StorageEncrypted: true
+
+      Manual snapshot check:
+        aws rds describe-db-snapshots --db-instance-identifier prod-analytics-db --snapshot-type manual:
+          [
+            {"DBSnapshotIdentifier": "prod-analytics-quarterly-2026-07-01",
+             "SnapshotCreateTime": "2026-07-01T03:00:00Z",
+             "Status": "available"}
+          ]
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "BackupRetentionPeriod"
+        - "PITR"
+        - "VERDICT"
+        - "modify-db-instance"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "restore-db-instance-to-point-in-time"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: snapshot-restore-verified-completed
+    description: >-
+      Snapshot restore has been executed successfully. Post-verification
+      should pass all checks and emit COMPLETED with the new endpoint,
+      connection-string update step, and cleanup plan for the original
+      instance.
+    input: |
+      Operation: snapshot-restore (post-verification after execution)
+      Source snapshot: prod-checkout-pre-migration-2026-08-07
+      Target instance: prod-checkout-restored
+
+      Restore execution result (already executed):
+        aws rds restore-db-instance-from-db-snapshot \
+          --db-instance-identifier prod-checkout-restored \
+          --db-snapshot-identifier prod-checkout-pre-migration-2026-08-07 \
+          --db-subnet-group-name prod-subnet-group \
+          --vpc-security-group-ids sg-prod-rds \
+          --option-group-name default:mysql-8-0 \
+          --db-parameter-group-name prod-mysql80 \
+          --deletion-protection \
+          --copy-tags-to-snapshot
+        Result: DBInstanceIdentifier=prod-checkout-restored,
+          DBInstanceStatus=available,
+          Endpoint.Address=prod-checkout-restored.abc123.us-east-1.rds.amazonaws.com,
+          Endpoint.Port=3306
+
+      Post-execution checks (all passed):
+        aws rds describe-db-instances --db-instance-identifier prod-checkout-restored:
+          DBInstanceStatus: available
+          Engine: mysql 8.0.35
+          AllocatedStorage: 200
+          StorageEncrypted: true
+          MultiAZ: true
+        mysql -h prod-checkout-restored.abc123.us-east-1.rds.amazonaws.com \
+          -u admin -p*** -e "SELECT COUNT(*) FROM orders.orders_by_date":
+          COUNT(*): 4827193  (matches pre-restore expectation of 4,827,193)
+        mysql ... -e "SELECT MAX(created_at) FROM orders.audit_log":
+          MAX(created_at): 2026-08-07T09:42:11Z  (snapshot point)
+
+      Original instance prod-checkout is still available and unchanged.
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "prod-checkout-restored"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "Endpoint.Address"
+        - "connection"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

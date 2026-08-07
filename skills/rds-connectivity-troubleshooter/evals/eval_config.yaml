@@ -1,0 +1,48 @@
+# Eval configuration for rds-connectivity-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: rds-connectivity-troubleshooter
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: timeout-sg-missing-rule
+    difficulty: medium
+    prompt_file: prompts/timeout-sg-missing-rule.md
+    baseline_file: baselines/timeout-sg-missing-rule.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: NETWORK_SG
+  - id: auth-failed-iam-token-expiry
+    difficulty: hard
+    prompt_file: prompts/auth-failed-iam-token-expiry.md
+    baseline_file: baselines/auth-failed-iam-token-expiry.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: AUTH_IAM
+  - id: tls-cert-mismatch
+    difficulty: hard
+    prompt_file: prompts/tls-cert-mismatch.md
+    baseline_file: baselines/tls-cert-mismatch.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: TLS_CERT
+  - id: connection-refused-failover
+    difficulty: medium
+    prompt_file: prompts/connection-refused-failover.md
+    baseline_file: baselines/connection-refused-failover.md
+    expected_verdict: ESCALATE
+    expected_layer: INSTANCE_FAILOVER
+  - id: too-many-connections-aurora-derived
+    difficulty: medium
+    prompt_file: prompts/too-many-connections-aurora-derived.md
+    baseline_file: baselines/too-many-connections-aurora-derived.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: CAPACITY_MAX_CONNECTIONS

@@ -1,0 +1,164 @@
+# Eval test cases for lambda-function-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across workload types and prerequisite branches.
+skill: lambda-function-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: secure-api-backend
+    description: >-
+      Deploy a production API backend Lambda with least-privilege role,
+      python3.12, right-sized memory, KMS-encrypted env vars, VPC with
+      NAT Gateway, on-failure destination, X-Ray tracing, and CloudWatch
+      log group retention. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a production Lambda function named "order-api-prod" in
+      us-east-1. Runtime: python3.12. Handler: app.handler. It needs to
+      access an RDS PostgreSQL instance in a VPC (subnets: subnet-aaa,
+      subnet-bbb in ap-southeast-2; security group: sg-orders-api). The
+      function also calls Stripe API (needs internet access via NAT
+      Gateway). Use KMS key alias/lambda-env-key for env var encryption.
+      Environment: DB_HOST=orders-db.cluster.example.rds.amazonaws.com,
+      STRIPE_API_KEY=sk_live_xxx (reference via Secrets Manager). Memory:
+      512 MB, Timeout: 15s. On-failure destination: order-api-dlq (SQS).
+      X-Ray tracing active. CloudWatch retention: 30 days. Account:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "order-api-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "python3.12"
+        - "NAT Gateway"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deprecated-runtime-node14
+    description: >-
+      Deploy a function with nodejs14.x runtime. Expects
+      PREREQUISITES_MISSING due to deprecated runtime. The skill must
+      flag the deprecation and recommend nodejs20.x.
+    input: |
+      Deploy a Lambda function named "legacy-processor" in us-east-1.
+      Runtime: nodejs14.x. Handler: index.handler. Memory: 256 MB,
+      Timeout: 10s. Execution role: legacy-processor-role. The zip
+      package is at ./function.zip. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "legacy-processor"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "nodejs14.x"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: vpc-no-nat-gateway
+    description: >-
+      Deploy a VPC-attached Lambda that needs internet access (calls
+      external API) but no NAT Gateway is configured. Expects
+      PREREQUISITES_MISSING with the NAT Gateway gap flagged.
+    input: |
+      Deploy a Lambda function named "webhook-sender" in us-east-1.
+      Runtime: nodejs20.x. Handler: index.handler. The function is
+      attached to VPC subnets subnet-private-a, subnet-private-b (private
+      subnets, no NAT Gateway configured). It needs to send HTTP POST to
+      https://api.partner.com/webhook (external internet endpoint).
+      Memory: 512 MB, Timeout: 10s. Execution role exists with
+      AWSLambdaBasicExecutionRole. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "webhook-sender"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "NAT Gateway"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: java-snapstart-provisioned
+    description: >-
+      Deploy a Java 21 Spring Boot Lambda with SnapStart and provisioned
+      concurrency for a latency-sensitive enterprise API. Expects
+      READY_TO_DEPLOY with SnapStart and provisioned concurrency on an
+      alias.
+    input: |
+      Deploy a production Java Lambda function named
+      "enterprise-api-prod" in us-east-1. Runtime: java21. Handler:
+      com.example.ApiHandler::handleRequest. It is a Spring Boot API
+      behind API Gateway with strict latency requirements (P99 < 200ms).
+      Enable SnapStart to reduce cold starts. Provisioned concurrency:
+      20 on the "prod" alias. Memory: 2048 MB, Timeout: 30s. X-Ray
+      tracing active. On-failure destination: enterprise-api-dlq (SQS).
+      ECR image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/enterprise-api:latest.
+      CloudWatch retention: 90 days. Execution role: enterprise-api-exec.
+      Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "enterprise-api-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "SnapStart"
+        - "Provisioned concurrency"
+        - "java21"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: full-correct-config
+    description: >-
+      Deploy a Lambda function with all correct configurations: supported
+      runtime, least-privilege role, right-sized memory, KMS encryption,
+      logging retention, tracing, and layers. Expects READY_TO_DEPLOY
+      with all checklist items verified.
+    input: |
+      Deploy a production Lambda function named "report-generator-prod"
+      in us-east-1. Runtime: python3.12. Handler: generate.handler. The
+      function reads from DynamoDB (table: reports-table) and writes PDF
+      reports to S3 (bucket: reports-output-prod). Use the
+      AWSLambdaBasicExecutionRole managed policy plus scoped DynamoDB
+      read + S3 write permissions. KMS key alias/lambda-env-key for env
+      var encryption. Environment: REPORTS_TABLE=reports-table,
+      OUTPUT_BUCKET=reports-output-prod. Memory: 1024 MB, Timeout: 60s.
+      Layers: Powertools for Python v3 (python3.12-x86_64).
+      On-failure destination: report-gen-dlq (SQS). X-Ray active.
+      CloudWatch retention: 30 days. Tags: Environment=production,
+      Workload=report-generator. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "report-generator-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "python3.12"
+        - "Block Public Access"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

@@ -92,7 +92,8 @@ def _skill_dirs() -> list[Path]:
     skills_root = REPO_ROOT / "skills"
     if not skills_root.is_dir():
         return []
-    return [d for d in sorted(skills_root.iterdir()) if d.is_dir()]
+    # Only include dirs that have a SKILL.md (skip empty dirs from in-progress builds)
+    return [d for d in sorted(skills_root.iterdir()) if d.is_dir() and (d / "SKILL.md").exists()]
 
 
 @pytest.mark.parametrize("skill_dir", _skill_dirs(), ids=lambda p: str(p.name))

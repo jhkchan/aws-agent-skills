@@ -4,7 +4,10 @@
   "title": "AWS CloudOps Agent Skill Schema (agentskills.io compliant)",
   "description": "Schema for SKILL.md YAML frontmatter. Follows the agentskills.io spec with AWS-CloudOps-auditor extensions in metadata (pipeline phase, CloudOps family, verdict shape). Validates the full softaworks pattern frontmatter used by every shipped skill.",
   "type": "object",
-  "required": ["name", "description"],
+  "required": [
+    "name",
+    "description"
+  ],
   "properties": {
     "name": {
       "type": "string",
@@ -37,23 +40,61 @@
     },
     "keywords": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Discovery keywords for routing (AWS service names, audit verbs, compliance frameworks)"
     },
     "tags": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Top-level tags for discoverability (mirrors metadata.tags for backwards compatibility)"
     },
     "dependencies": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Other skills this skill routes to or requires (e.g., aws-orchestrator for pipeline-aware skills)"
     },
     "metadata": {
       "type": "object",
       "additionalProperties": true,
-      "description": "AWS CloudOps agent extensions. Fields: domain (aws-cloudops), complexity (low|medium|high), requires_llm (bool), phase (integer 1-4 mapping to Assess|Audit|Prioritize|Remediate), supports_pipeline (bool), entry_point (bool, true only for aws-orchestrator), family (Security|Compute|Storage|Networking|FinOps|Governance|Databases|Analytics|AppIntegration|DevTools|AI/ML|Management|Migration), verdict_shape (string describing the deterministic output, e.g., 'SAFE|PUBLIC|AMBIGUOUS'), version, author, tags[], dependencies[], keywords[], when_to_use."
+      "description": "AWS CloudOps agent extensions. Fields: domain (aws-cloudops), complexity (low|medium|high), requires_llm (bool), phase (integer 1-4 mapping to Assess|Audit|Prioritize|Remediate), supports_pipeline (bool), entry_point (bool, true only for aws-orchestrator), family (Security|Compute|Storage|Networking|FinOps|Governance|Databases|Analytics|AppIntegration|DevTools|AI/ML|Management|Migration), verdict_shape (string describing the deterministic output, e.g., 'SAFE|PUBLIC|AMBIGUOUS'), version, author, tags[], dependencies[], keywords[], when_to_use.",
+      "properties": {
+        "task_type": {
+          "type": "string",
+          "enum": [
+            "audit",
+            "deploy",
+            "troubleshoot",
+            "optimize",
+            "operate",
+            "automate"
+          ],
+          "description": "CloudOps task type: audit (assess posture), deploy (provision), troubleshoot (diagnose), optimize (reduce cost/improve perf), operate (day-2 ops), automate (workflow/pipeline)."
+        },
+        "skill_class": {
+          "type": "string",
+          "enum": [
+            "capability",
+            "preference"
+          ],
+          "description": "Capability = durable knowledge; Preference = temporary, retire as models improve."
+        },
+        "lifecycle_status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "deprecated",
+            "retired"
+          ],
+          "default": "active",
+          "description": "Lifecycle status for retirement cadence."
+        }
+      }
     }
   },
   "additionalProperties": false

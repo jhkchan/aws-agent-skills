@@ -1,0 +1,48 @@
+# Eval configuration for lambda-function-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: lambda-function-deployer
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: secure-api-backend
+    difficulty: hard
+    prompt_file: prompts/secure-api-backend.md
+    baseline_file: baselines/secure-api-backend.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: deprecated-runtime-node14
+    difficulty: medium
+    prompt_file: prompts/deprecated-runtime-node14.md
+    baseline_file: baselines/deprecated-runtime-node14.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: vpc-no-nat-gateway
+    difficulty: hard
+    prompt_file: prompts/vpc-no-nat-gateway.md
+    baseline_file: baselines/vpc-no-nat-gateway.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: java-snapstart-provisioned
+    difficulty: hard
+    prompt_file: prompts/java-snapstart-provisioned.md
+    baseline_file: baselines/java-snapstart-provisioned.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: full-correct-config
+    difficulty: medium
+    prompt_file: prompts/full-correct-config.md
+    baseline_file: baselines/full-correct-config.md
+    expected_verdict: READY_TO_DEPLOY

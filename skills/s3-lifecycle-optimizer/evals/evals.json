@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-lifecycle-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Lifecycle Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "logs-bucket-no-lifecycle",
+      "name": "Versioned logs bucket — no lifecycle, 40% noncurrent bytes, stale multipart uploads",
+      "difficulty": "hard",
+      "prompt_file": "prompts/logs-bucket-no-lifecycle.md",
+      "baseline_file": "baselines/logs-bucket-no-lifecycle.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "app-logs-prod", "VERDICT", "RECOMMENDATION", "SAVINGS", "NoncurrentVersionExpiration", "AbortIncompleteMultipartUpload", "put-bucket-lifecycle-configuration"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "compliance-archive-no-deep-archive",
+      "name": "Compliance archive bucket — should be in Glacier Deep Archive, currently 100% Standard",
+      "difficulty": "medium",
+      "prompt_file": "prompts/compliance-archive-no-deep-archive.md",
+      "baseline_file": "baselines/compliance-archive-no-deep-archive.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "compliance-archive-7yr", "VERDICT", "GLACIER_DEEP_ARCHIVE", "Deep Archive", "retrieval"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "STANDARD_IA"]
+        }
+      ]
+    },
+    {
+      "id": "small-objects-intelligent-tiering-trap",
+      "name": "8M small JSON config files — Intelligent-Tiering monitoring fee exceeds savings on sub-128KB objects",
+      "difficulty": "hard",
+      "prompt_file": "prompts/small-objects-intelligent-tiering-trap.md",
+      "baseline_file": "baselines/small-objects-intelligent-tiering-trap.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "app-config-state", "monitoring fee", "128", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "INTELLIGENT_TIERING", "Intelligent-Tiering", "VERDICT: OPPORTUNITY_FOUND"]
+        }
+      ]
+    },
+    {
+      "id": "multipart-upload-leak-only",
+      "name": "Otherwise-clean bucket — 23 stale multipart uploads older than 30 days, lifecycle already tuned",
+      "difficulty": "medium",
+      "prompt_file": "prompts/multipart-upload-leak-only.md",
+      "baseline_file": "baselines/multipart-upload-leak-only.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "data-lake-curated", "AbortIncompleteMultipartUpload", "multipart", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: ALREADY_OPTIMAL", "GLACIER_DEEP_ARCHIVE"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-compliance-bucket",
+      "name": "Compliance archive — Deep Archive at 90d, Object Lock COMPLIANCE 2555d, no MPU leaks, all dimensions clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-compliance-bucket.md",
+      "baseline_file": "baselines/already-optimal-compliance-bucket.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "regulated-archive-final", "VERDICT", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}

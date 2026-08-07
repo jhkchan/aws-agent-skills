@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "rds-connectivity-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the RDS Connectivity Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "timeout-sg-missing-rule",
+      "name": "Connection timeout — RDS SG inbound rule does not match caller's subnet CIDR",
+      "difficulty": "medium",
+      "prompt_file": "prompts/timeout-sg-missing-rule.md",
+      "baseline_file": "baselines/timeout-sg-missing-rule.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "NETWORK_SG",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "timeout-sg-missing-rule", "NETWORK_SG", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "auth-failed-iam-token-expiry",
+      "name": "IAM database auth token expired in long-lived connection pool — auth failed",
+      "difficulty": "hard",
+      "prompt_file": "prompts/auth-failed-iam-token-expiry.md",
+      "baseline_file": "baselines/auth-failed-iam-token-expiry.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "AUTH_IAM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "auth-iam-token-expiry", "AUTH_IAM", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: AUTH_CREDENTIALS"]
+        }
+      ]
+    },
+    {
+      "id": "tls-cert-mismatch",
+      "name": "Client truststore missing rds-ca-e2024 after instance CA rotation — TLS handshake fails",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tls-cert-mismatch.md",
+      "baseline_file": "baselines/tls-cert-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "TLS_CERT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "tls-cert-mismatch", "TLS_CERT", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: TLS_CONFIG"]
+        }
+      ]
+    },
+    {
+      "id": "connection-refused-failover",
+      "name": "Aurora PostgreSQL cluster mid Multi-AZ failover — connection refused, AWS-side incident",
+      "difficulty": "medium",
+      "prompt_file": "prompts/connection-refused-failover.md",
+      "baseline_file": "baselines/connection-refused-failover.md",
+      "expected_verdict": "ESCALATE",
+      "expected_layer": "INSTANCE_FAILOVER",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ESCALATE", "connection-refused-failover", "INSTANCE_FAILOVER", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ROOT_CAUSE_FOUND", "LAYER: NETWORK_SG"]
+        }
+      ]
+    },
+    {
+      "id": "too-many-connections-aurora-derived",
+      "name": "Aurora MySQL hitting derived max_connections cap — engine refuses new connections",
+      "difficulty": "medium",
+      "prompt_file": "prompts/too-many-connections-aurora-derived.md",
+      "baseline_file": "baselines/too-many-connections-aurora-derived.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "CAPACITY_MAX_CONNECTIONS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "too-many-connections-aurora", "CAPACITY_MAX_CONNECTIONS", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: INSTANCE_UNAVAILABLE"]
+        }
+      ]
+    }
+  ]
+}

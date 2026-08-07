@@ -1,0 +1,133 @@
+# Eval test cases for ecs-task-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ecs-task-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: fargate-essential-container-secret-injection
+    description: Fargate task fails within 2 seconds because execution role lacks secretsmanager:GetSecretValue on the referenced secret ARN
+    input: |
+      Scenario: An ECS service on a Fargate cluster crashes immediately
+      on task start. The failing task is in STOPPED state with
+      stoppedReason "Essential container in task exited". The container
+      reason is empty (the application never started). CloudWatch Logs
+      has one line: "ResourceInitializationError: unable to retrieve
+      secrets: 1 error occurred: AccessDeniedException: User
+      arn:aws:sts::111111111111:assumed-role/ecsTaskExecutionRole/...
+      is not authorized to perform secretsmanager:GetSecretValue on
+      resource arn:aws:secretsmanager:us-east-1:111111111111:secret:db-password-AbCdEf".
+      The task definition secrets array references the same ARN.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESSENTIAL_CONTAINER_EXIT"
+        - "secretsmanager:GetSecretValue"
+        - "execution role"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "privileged"
+
+  - id: fargate-oom-jvm-heap
+    description: Java container OOMKilled because -Xmx exceeds container memory hard limit
+    input: |
+      Scenario: A Java (Spring Boot) container on Fargate is
+      periodically OOM-killed. Task stoppedReason "Essential container
+      in task exited". Container reason "OOMKilled" with exitCode 137.
+      The container ran for ~2 hours each time. Task definition shows
+      container memory: 1024 (1 GB). The Dockerfile CMD includes
+      "java -Xmx2g -jar app.jar". CloudWatch Container Insights shows
+      MemoryUtilization trending to 100% just before each crash.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "OOM"
+        - "memory"
+        - "Xmx"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "privileged"
+
+  - id: alb-health-check-path-mismatch
+    description: ALB target group unhealthy because health check path /healthz does not match application endpoint /api/health
+    input: |
+      Scenario: An ECS service behind an ALB has tasks RUNNING but the
+      target group marks them unhealthy. Tasks stop after ~90 seconds.
+      describe-target-groups shows HealthCheckPath "/healthz",
+      HealthCheckPort "traffic-port", HealthCheckProtocol "HTTP".
+      describe-task-definition shows container port mapping 8080→8080
+      (awsvpc). CloudWatch Logs has GET requests to /healthz returning
+      404; the application defines its health endpoint at /api/health.
+      ECS Exec into the container confirms curl
+      http://localhost:8080/api/health returns 200 OK.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "HEALTH_CHECK"
+        - "/api/health"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: ecr-image-pull-execution-role
+    description: Fargate task CannotPullContainerError because execution role lacks ecr:BatchGetImage
+    input: |
+      Scenario: A Fargate task fails to start. stoppedReason "Essential
+      container in task exited". containers[].reason
+      "CannotPullContainerError: inspect image has been retried 5
+      times". The task definition references image
+      111111111111.dkr.ecr.us-east-1.amazonaws.com/app:v1. The execution
+      role has an inline policy with logs:CreateLogStream and
+      logs:PutLogEvents but NO ECR actions. aws ecr describe-images
+      confirms the image exists. aws iam simulate-principal-policy for
+      the execution role against ecr:BatchGetImage returns
+      implicitDeny.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "IMAGE_PULL"
+        - "ecr:BatchGetImage"
+        - "execution role"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: insufficient-context-need-task-arn
+    description: Vague report of ECS tasks failing without task ARN, cluster, or specific symptom
+    input: |
+      Scenario: A user reports "my ECS service is broken, tasks keep
+      stopping". They mention the cluster name "prod-app" and the
+      service name "api-svc" but do not provide a task ARN, the
+      stoppedReason, the exit code, or any CloudWatch Logs output.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "describe-tasks"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

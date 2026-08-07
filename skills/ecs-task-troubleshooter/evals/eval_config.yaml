@@ -1,0 +1,47 @@
+# Eval configuration for ecs-task-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ecs-task-troubleshooter
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: fargate-essential-container-secret-injection
+    difficulty: hard
+    prompt_file: prompts/fargate-essential-container-secret-injection.md
+    baseline_file: baselines/fargate-essential-container-secret-injection.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: ESSENTIAL_CONTAINER_EXIT
+  - id: fargate-oom-jvm-heap
+    difficulty: medium
+    prompt_file: prompts/fargate-oom-jvm-heap.md
+    baseline_file: baselines/fargate-oom-jvm-heap.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: OOM
+  - id: alb-health-check-path-mismatch
+    difficulty: medium
+    prompt_file: prompts/alb-health-check-path-mismatch.md
+    baseline_file: baselines/alb-health-check-path-mismatch.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: HEALTH_CHECK
+  - id: ecr-image-pull-execution-role
+    difficulty: medium
+    prompt_file: prompts/ecr-image-pull-execution-role.md
+    baseline_file: baselines/ecr-image-pull-execution-role.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: IMAGE_PULL
+  - id: insufficient-context-need-task-arn
+    difficulty: easy
+    prompt_file: prompts/insufficient-context-need-task-arn.md
+    baseline_file: baselines/insufficient-context-need-task-arn.md
+    expected_verdict: NEED_MORE_INFO

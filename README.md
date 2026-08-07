@@ -4,7 +4,7 @@
 > · License: **Apache-2.0** · Maintainer: **Jacky Chan, AWS Community Builder (ML & GenAI)**
 > · A solo, community-driven project.
 
-**79 eval-backed AWS CloudOps agent skills** — every skill is a deterministic detective auditor with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric, with co-located structured evals (cases + baselines + delta comparison) on every skill.
+**90 eval-backed AWS CloudOps agent skills** across **6 task types** (audit · deploy · troubleshoot · optimize · operate) — every skill ships with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric, with co-located structured evals (cases + baselines + delta comparison) on every skill.
 
 ---
 
@@ -38,8 +38,12 @@ The repo includes `.claude-plugin/marketplace.json` for agent runtimes that supp
 ```bash
 git clone https://github.com/jhkchan/aws-agent-skills.git
 cd aws-agent-skills
-node cli/bin/cli.js list          # list all 79 skills + the orchestrator
+node cli/bin/cli.js list          # list all skills + the orchestrator
+node cli/bin/cli.js list --task-type deploy     # filter by task type
 node cli/bin/cli.js route "audit my S3 buckets for public access"  # route a prompt
+node cli/bin/cli.js route "deploy a secure VPC"  # deploy routing
+node cli/bin/cli.js route "why is my Lambda timing out"  # troubleshoot routing
+node cli/bin/cli.js status        # coverage + eval status summary
 ```
 
 ---
@@ -76,6 +80,25 @@ Run a full CloudOps security audit across my AWS account.
 
 The `aws-orchestrator` skill routes the request across relevant auditors (S3, IAM, EC2, GuardDuty, KMS, etc.) in a 4-phase pipeline: **Assess > Audit > Prioritize > Remediate**.
 
+### Beyond auditing — deploy, troubleshoot, optimize
+
+The repo now covers **6 task types**, not just audit:
+
+| Task type | What it does | Example skills |
+|---|---|---|
+| **audit** | Assess posture, compliance, configuration drift | `s3-public-access-auditor`, `iam-least-privilege-advisor` |
+| **deploy** | Provision with correct defaults and best practices | `s3-secure-bucket-deployer`, `lambda-function-deployer`, `vpc-network-deployer` |
+| **troubleshoot** | Diagnose and resolve operational issues | `iam-permission-troubleshooter`, `rds-connectivity-troubleshooter` |
+| **optimize** | Reduce cost or improve performance | `ec2-rightsizing-optimizer`, `s3-lifecycle-optimizer` |
+| **operate** | Day-2 operations (backup, restore, failover) | `rds-backup-restore-operator` |
+| **automate** | Workflow/pipeline patterns | *(planned — see skill-universe.md)* |
+
+```
+Deploy a secure S3 bucket with encryption and lifecycle rules.
+```
+
+The `s3-secure-bucket-deployer` walks through the 10-step provisioning procedure and emits a READY_TO_DEPLOY checklist.
+
 ### Slash commands
 
 Each skill has a slash command (in `commands/aws/`):
@@ -85,7 +108,12 @@ Each skill has a slash command (in `commands/aws/`):
 /aws:audit-iam-least-privilege
 /aws:audit-ec2-security-group
 /aws:audit-guardduty-findings
-... (79 commands total)
+/aws:deploy-s3-secure-bucket-deployer
+/aws:deploy-vpc-network-deployer
+/aws:troubleshoot-iam-permission-troubleshooter
+/aws:optimize-ec2-rightsizing-optimizer
+/aws:operate-rds-backup-restore-operator
+... (101 commands total)
 ```
 
 ---
@@ -221,7 +249,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 
 > Scorecard rows appear once eval runs commit JSON artifacts to `eval/scorecards/`. Run `python3 eval/generate_readme_table.py` to refresh.
 
-**Eval-backed standard: ALL 79 shipped skills are Grade A (>=108/120)** -- zero exceptions. Every skill is measured by the median-of-3 judge (reproducible); none assert quality without evidence.
+**Eval-backed standard: ALL 79 audit skills are Grade A (>=108/120)** -- zero exceptions. Every audit skill is measured by the median-of-3 judge (reproducible); none assert quality without evidence. Non-audit skills (deploy/troubleshoot/optimize/operate) carry assertion-layer evals; median-of-3 judge scorecards pending.
 
 ---
 
@@ -261,6 +289,9 @@ python3 eval/run_eval.py --assertion-only
 aws sso login --profile default
 python3 eval/run_eval.py                 # all skills
 python3 eval/run_eval.py --skill s3-public-access-auditor  # one skill
+
+# Impact eval (with-skill vs without-skill delta) -- requires AWS SSO
+python3 eval/impact_eval.py --skill s3-public-access-auditor
 ```
 
 ---
@@ -327,25 +358,43 @@ Every contribution must ship with:
 
 ## Coverage
 
-**79 eval-backed skills across all 12 CloudOps families** (all Grade A):
+**90 eval-backed skills across 12 CloudOps families and 5 task types** (79 audit + 4 deploy + 3 troubleshoot + 2 optimize + 1 operate + 1 orchestrator):
+
+| Task type | Count | What it does |
+|---|---|---|
+| **audit** | 80 | Assess security posture, compliance, configuration drift |
+| **deploy** | 4 | Provision infrastructure with correct defaults |
+| **troubleshoot** | 3 | Diagnose and resolve operational issues |
+| **optimize** | 2 | Reduce cost / improve performance |
+| **operate** | 1 | Day-2 operations (backup, restore, failover) |
 
 | Family | Count | Examples |
 |---|---|---|
-| Security | 21 | S3, IAM, EC2, GuardDuty, KMS, WAFv2, Secrets Manager, Inspector2, ACM, STS, Cognito, Access Analyzer, Security Hub, Macie, Firewall Manager, Detective, Shield, Network Firewall, Verified Permissions, VPC Lattice, CloudHSM |
-| Compute | 6 | Lambda, ECS, ECR, EKS, Auto Scaling, Compute Optimizer |
-| Storage | 4 | EBS, EFS, Backup, DLM |
-| Networking | 5 | CloudFront, ELBv2, Route53, DirectConnect, Network Manager |
+| Security | 23 | S3, IAM, EC2, GuardDuty, KMS, WAFv2, Secrets Manager, Inspector2, ACM, STS, Cognito, Access Analyzer, Security Hub, Macie, Firewall Manager, Detective, Shield, Network Firewall, Verified Permissions, VPC Lattice, CloudHSM, **IAM Role Deployer**, **IAM Permission Troubleshooter** |
+| Compute | 7 | Lambda, ECS, ECR, EKS, Auto Scaling, Compute Optimizer, **Lambda Deployer** |
+| Storage | 5 | EBS, EFS, Backup, DLM, **S3 Secure Bucket Deployer**, **S3 Lifecycle Optimizer** |
+| Networking | 6 | CloudFront, ELBv2, Route53, DirectConnect, Network Manager, **VPC Network Deployer** |
 | FinOps | 5 | Billing, Budgets, Cost Explorer, Cost Optimization Hub, CUR |
 | Governance | 7 | CloudTrail, Config, Organizations, Control Tower, Well-Architected, Trusted Advisor, Audit Manager |
-| Databases | 2 | RDS, DynamoDB |
+| Databases | 4 | RDS, DynamoDB, **RDS Connectivity Troubleshooter**, **RDS Backup Restore Operator** |
 | App Integration | 5 | SQS, SNS, EventBridge, Step Functions, API Gateway |
 | Developer Tools | 4 | CodeBuild, CodeCommit, CodeDeploy, CodePipeline |
 | AI/ML | 3 | Bedrock Guardrails, Bedrock Model Access, SageMaker |
-| Management | 6 | CloudWatch Alarms, CloudWatch Logs, SSM, Service Quotas, Health, Resilience Hub |
+| Management | 7 | CloudWatch Alarms, CloudWatch Logs, SSM, Service Quotas, Health, Resilience Hub, **EC2 Rightsizing Optimizer** |
 | Analytics | 10 | Athena, Glue, Kinesis, OpenSearch, LakeFormation, Redshift, Firehose, MSK, EMR, CleanRooms |
 | Migration | 1 | DMS |
 
-See [MAINTENANCE.md](./MAINTENANCE.md) for the quarterly freshness re-audit cadence.
+### Skill universe — the full roadmap
+
+The complete enumeration of planned skills is in [`features/aws-cloudops-skills-oss/skill-universe.md`](./features/aws-cloudops-skills-oss/skill-universe.md) — every CloudOps-relevant AWS service × every applicable task type (~500 total skill slots, 90 built today). The universe grows through phased builds toward exhaustive coverage.
+
+### Skill lifecycle — capability vs preference + retirement
+
+Every skill is classified as:
+- **capability** — durable knowledge the model fundamentally lacks (AWS-specific diagnostic procedures, config rules, gotchas). Survives model improvements.
+- **preference** — temporary workflow/style guidance the model will internalize over time. Retired when the model's without-skill performance matches with-skill.
+
+The **impact eval** (`eval/impact_eval.py`) measures the with-skill vs without-skill performance delta. Skills where the delta ≤ 0 are tagged RETIRE_CANDIDATE. See [MAINTENANCE.md](./MAINTENANCE.md) for the quarterly retirement cadence.
 
 ---
 

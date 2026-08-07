@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 // AWS CloudOps Agent Skills — CLI entry point
 // A functional CLI for skill discovery, routing, and validation.
-// Commands: list, route <prompt>, validate, status, help
+// Commands: list, route <prompt>, validate, status, impact, help
 //
 // Usage:
 //   node cli/bin/cli.js list
+//   node cli/bin/cli.js list --task-type deploy
 //   node cli/bin/cli.js route "check my S3 buckets for public access"
+//   node cli/bin/cli.js route "deploy a secure VPC"
 //   node cli/bin/cli.js validate
 //   node cli/bin/cli.js status
+//   node cli/bin/cli.js impact
 //   node cli/bin/cli.js help
 
 import { readFileSync, readdirSync, existsSync } from "fs";
@@ -109,6 +112,10 @@ function discoverSkills() {
     const hasEvals = existsSync(join(SKILLS_DIR, entry.name, "evals"));
     const hasReferences = existsSync(join(SKILLS_DIR, entry.name, "references"));
 
+    // Extract task_type from metadata (default: audit for backward compat)
+    const meta = frontmatter.metadata || {};
+    const taskType = meta.task_type || inferTaskTypeFromName(entry.name);
+
     skills.push({
       name: frontmatter.name || entry.name,
       description: frontmatter.description || "",
@@ -116,7 +123,10 @@ function discoverSkills() {
       keywords: [...(frontmatter.keywords || []), ...keywords],
       tags: frontmatter.tags || [],
       dependencies: frontmatter.dependencies || [],
-      metadata: frontmatter.metadata || {},
+      metadata: meta,
+      taskType,
+      skillClass: meta.skill_class || (taskType === "audit" ? "capability" : "capability"),
+      lifecycleStatus: meta.lifecycle_status || "active",
       dir: entry.name,
       hasEval,
       hasEvals,
@@ -130,9 +140,45 @@ function discoverSkills() {
 // Routing — keyword + description match scoring (functional orchestrator)
 // ---------------------------------------------------------------------------
 
+// Infer task_type from skill name suffix when metadata is absent (backward compat)
+function inferTaskTypeFromName(name) {
+  if (/auditor$|advisor$|triage$|inventory$/.test(name)) return "audit";
+  if (/deployer$/.test(name)) return "deploy";
+  if (/troubleshooter$/.test(name)) return "troubleshoot";
+  if (/optimizer$/.test(name)) return "optimize";
+  if (/operator$/.test(name)) return "operate";
+  if (/automator$/.test(name)) return "automate";
+  return "audit";
+}
+
+// Task-type keyword map for routing
+const TASK_TYPE_KEYWORDS = {
+  audit: ["audit", "check", "review", "scan", "inspect", "assess", "compliance", "posture", "verdict", "exposed", "vulnerable"],
+  deploy: ["deploy", "provision", "create", "set up", "build", "configure", "infrastructure", "terraform", "cdk", "cloudformation", "provision"],
+  troubleshoot: ["troubleshoot", "debug", "diagnose", "error", "fail", "failing", "broken", "why is", "cannot", "unable", "access denied", "connection refused", "timeout"],
+  optimize: ["optimize", "reduce cost", "save money", "cheaper", "right-size", "rightsizing", "performance", "faster", "efficient", "lifecycle", "reserved", "savings plan"],
+  operate: ["backup", "restore", "snapshot", "rotate", "patch", "scale", "failover", "upgrade", "renew", "day-2", "operate", "maintenance"],
+  automate: ["automate", "pipeline", "ci/cd", "continuous", "event-driven", "schedule", "workflow", "runbook", "automation", "remediation"],
+};
+
+function inferTaskType(prompt) {
+  const lower = prompt.toLowerCase();
+  let bestType = "audit";
+  let bestScore = 0;
+  for (const [type, keywords] of Object.entries(TASK_TYPE_KEYWORDS)) {
+    const score = keywords.filter((kw) => lower.includes(kw)).length;
+    if (score > bestScore) {
+      bestScore = score;
+      bestType = type;
+    }
+  }
+  return bestType;
+}
+
 function route(prompt, skills) {
   const promptLower = prompt.toLowerCase();
   const promptTokens = promptLower.split(/\s+/).filter((t) => t.length > 2);
+  const detectedTaskType = inferTaskType(prompt);
 
   const scored = skills
     .filter((s) => !s.name.endsWith("-orchestrator") || skills.length === 1)
@@ -161,13 +207,16 @@ function route(prompt, skills) {
         if (promptLower.includes(nToken) && nToken.length > 2) score += 4;
       }
 
-      // Phase match: if the prompt mentions "audit"/"check"/"review" and skill is phase 2 (Audit)
-      const auditVerbs = ["audit", "check", "review", "scan", "inspect", "assess"];
-      if (auditVerbs.some((v) => promptLower.includes(v))) {
-        score += 1;
+      // Task-type match: boost skills whose task_type matches the detected intent
+      // and penalize mismatches (a deploy skill shouldn't win for an audit prompt)
+      if (skill.taskType === detectedTaskType) {
+        score += 5;
+      } else if (skill.taskType && skill.taskType !== "audit") {
+        // Non-audit skill for a non-matching task type: mild penalty
+        score -= 3;
       }
 
-      return { skill: skill.name, score, dir: skill.dir };
+      return { skill: skill.name, score, dir: skill.dir, taskType: skill.taskType };
     })
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score);
@@ -179,22 +228,34 @@ function route(prompt, skills) {
 // Commands
 // ---------------------------------------------------------------------------
 
-function cmdList() {
-  const skills = discoverSkills();
+function cmdList(filterTaskType) {
+  let skills = discoverSkills();
   if (skills.length === 0) {
     console.log("No skills found in skills/");
     return;
   }
-  console.log(`\nAWS CloudOps Agent Skills (${skills.length}):\n`);
+  if (filterTaskType) {
+    skills = skills.filter((s) => s.taskType === filterTaskType);
+    console.log(`\nAWS CloudOps Agent Skills — task_type=${filterTaskType} (${skills.length}):\n`);
+  } else {
+    console.log(`\nAWS CloudOps Agent Skills (${skills.length}):\n`);
+  }
+
+  // Group by task type
+  const byType = {};
   for (const s of skills) {
-    const evalBadge = s.hasEval || s.hasEvals ? "eval-backed" : "NO EVAL";
-    const refBadge = s.hasReferences ? "refs" : "no-refs";
-    console.log(`  ${s.name.padEnd(40)} v${s.version}  [${evalBadge}] [${refBadge}]`);
-    if (s.description) {
-      const desc = s.description.length > 100
-        ? s.description.substring(0, 97) + "..."
-        : s.description;
-      console.log(`    ${desc}\n`);
+    const tt = s.taskType || "audit";
+    if (!byType[tt]) byType[tt] = [];
+    byType[tt].push(s);
+  }
+
+  for (const tt of Object.keys(byType).sort()) {
+    if (!filterTaskType) console.log(`--- ${tt} (${byType[tt].length}) ---`);
+    for (const s of byType[tt]) {
+      const evalBadge = s.hasEval || s.hasEvals ? "eval-backed" : "NO EVAL";
+      const refBadge = s.hasReferences ? "refs" : "no-refs";
+      const classBadge = s.skillClass ? `[${s.skillClass}]` : "";
+      console.log(`  ${s.name.padEnd(45)} v${s.version}  [${evalBadge}] [${refBadge}] ${classBadge}`);
     }
   }
 }
@@ -215,10 +276,10 @@ function cmdRoute(prompt) {
   const top = results[0];
   const others = results.slice(1, 4);
 
-  // Emit phase indicator (mirrors the orchestrator skill format)
-  const phase = inferPhase(prompt);
+  // Emit task-type indicator (replaces phase-only inference)
+  const taskType = inferTaskType(prompt);
   console.log(
-    `[Phase: ${phase} | Skills routed: ${results.slice(0, 3).map((r) => r.skill).join(", ")}]`
+    `[Task: ${taskType} | Skills routed: ${results.slice(0, 3).map((r) => r.skill).join(", ")}]`
   );
   console.log(`\nPrimary route: ${top.skill} (score: ${top.score})`);
 
@@ -236,14 +297,18 @@ function cmdRoute(prompt) {
   }
 }
 
+// Legacy phase inference (for backward compat with orchestrator)
 function inferPhase(prompt) {
-  const lower = prompt.toLowerCase();
-  if (/remediate|fix|patch|remediation|repair|resolve/.test(lower)) return "Remediate";
-  if (/prioriti|rank|severity|critical|order|importance/.test(lower)) return "Prioritize";
-  if (/audit|check|review|scan|inspect|verdict|public|exposed|open|compliance/.test(lower))
-    return "Audit";
-  if (/inventory|enumerate|list|baseline|coverage|gap|discover/.test(lower)) return "Assess";
-  return "Audit"; // default
+  const taskType = inferTaskType(prompt);
+  const phaseMap = {
+    audit: "Audit",
+    deploy: "Remediate",
+    troubleshoot: "Audit",
+    optimize: "Prioritize",
+    operate: "Remediate",
+    automate: "Remediate",
+  };
+  return phaseMap[taskType] || "Audit";
 }
 
 function cmdValidate() {
@@ -282,24 +347,31 @@ function cmdValidate() {
 
 function cmdStatus() {
   const skills = discoverSkills();
-  const audited = skills.filter((s) => s.hasEval || s.hasEvals);
+  const evalBacked = skills.filter((s) => s.hasEval || s.hasEvals);
   const orchestrator = skills.find((s) => s.name === "aws-orchestrator");
 
-  console.log("\nAWS CloudOps Skills — Status");
-  console.log("=".repeat(50));
-  console.log(`Total skills:        ${skills.length}`);
-  console.log(`Eval-backed:         ${audited.length}`);
-  console.log(`Orchestrator:        ${orchestrator ? "present" : "MISSING"}`);
-  console.log(
-    `Pipeline phases:     Assess -> Audit -> Prioritize -> Remediate`
-  );
-
-  // Per-skill eval status
-  console.log("\nPer-skill eval status:");
+  // Task-type breakdown
+  const byType = {};
   for (const s of skills) {
-    const status = s.hasEval || s.hasEvals ? "[eval-backed]" : "[NO EVAL     ]";
-    console.log(`  ${status}  ${s.name}`);
+    const tt = s.taskType || "audit";
+    if (!byType[tt]) byType[tt] = { total: 0, evalBacked: 0 };
+    byType[tt].total++;
+    if (s.hasEval || s.hasEvals) byType[tt].evalBacked++;
   }
+
+  console.log("\nAWS CloudOps Skills — Status");
+  console.log("=".repeat(60));
+  console.log(`Total skills:        ${skills.length}`);
+  console.log(`Eval-backed:         ${evalBacked.length}`);
+  console.log(`Orchestrator:        ${orchestrator ? "present" : "MISSING"}`);
+  console.log("");
+  console.log("By task type:");
+  for (const tt of Object.keys(byType).sort()) {
+    const d = byType[tt];
+    console.log(`  ${tt.padEnd(15)} ${String(d.total).padStart(4)} skills  (${d.evalBacked} eval-backed)`);
+  }
+  console.log("");
+  console.log("Task types:  audit -> deploy -> troubleshoot -> optimize -> operate -> automate");
 }
 
 function cmdHelp() {
@@ -310,23 +382,81 @@ Usage:
   aws-skills <command> [args]
 
 Commands:
-  list              List all discovered skills with eval status
-  route <prompt>    Route a natural-language prompt to the best-matching skill(s)
-  validate          Validate all skills against schema/SKILL.schema.json
-  status            Show skill-suite coverage + eval status summary
-  help              Show this help message
+  list [--task-type <type>]  List skills, optionally filtered by task type
+  route <prompt>             Route a natural-language prompt to best skill(s)
+  validate                   Validate all skills against schema/SKILL.schema.json
+  status                     Show skill-suite coverage + eval status summary
+  impact                     Show impact-eval recommendations (retirement cadence)
+  help                       Show this help message
+
+Task types:
+  audit        Assess security posture, compliance, configuration drift
+  deploy       Provision infrastructure with correct defaults and best practices
+  troubleshoot Diagnose and resolve operational issues (errors, slowness, downtime)
+  optimize     Reduce cost or improve performance (right-sizing, lifecycle, caching)
+  operate      Day-2 operations (backup, restore, scale, patch, rotate, failover)
+  automate     Workflow/pipeline patterns (CI/CD, event-driven, auto-remediation, IaC)
 
 Slash commands (in Claude Code / Cursor / Windsurf):
-  /aws:pipeline     Enter the full CloudOps pipeline (Assess -> Audit -> Prioritize -> Remediate)
-  /aws:status       One-line phase + skill-routing summary
+  /aws:pipeline     Enter the full CloudOps pipeline
+  /aws:status       One-line task-type + skill-routing summary
   /aws:help         List all commands + natural-language triggers
-
-Pipeline phases:
-  1. Assess      — inventory resources, enumerate coverage gaps, baseline state
-  2. Audit       — detective auditors: read AWS config, emit deterministic VERDICT
-  3. Prioritize  — rank findings by severity, cost-impact, compliance-mandate
-  4. Remediate   — generate remediation CLI commands, IaC patches, runbook steps
 `);
+}
+
+function cmdImpact() {
+  const impactDir = join(REPO_ROOT, "eval", "impact-reports");
+  if (!existsSync(impactDir)) {
+    console.log("\nNo impact reports found.");
+    console.log("Run: python3 eval/impact_eval.py [--skill <name>]");
+    return;
+  }
+
+  const reports = [];
+  for (const entry of readdirSync(impactDir)) {
+    if (!entry.endsWith(".json")) continue;
+    try {
+      const data = JSON.parse(readFileSync(join(impactDir, entry), "utf-8"));
+      reports.push(data);
+    } catch (e) {
+      // skip malformed
+    }
+  }
+
+  if (reports.length === 0) {
+    console.log("\nNo impact reports found.");
+    console.log("Run: python3 eval/impact_eval.py [--skill <name>]");
+    return;
+  }
+
+  reports.sort((a, b) => (b.avg_delta || 0) - (a.avg_delta || 0));
+
+  console.log("\nImpact Evaluation Reports");
+  console.log("=".repeat(70));
+  console.log(`${"Skill".padEnd(45)} ${"Avg Δ".padStart(6)}  ${"Cases".padStart(5)}  Recommendation`);
+  console.log("-".repeat(70));
+  for (const r of reports) {
+    const delta = r.avg_delta !== undefined ? (r.avg_delta > 0 ? "+" : "") + r.avg_delta.toFixed(1) : "N/A";
+    console.log(
+      `${(r.skill || "?").padEnd(45)} ${delta.padStart(6)}  ${String(r.case_count || 0).padStart(5)}  ${r.recommendation || "UNKNOWN"}`
+    );
+  }
+  console.log("-".repeat(70));
+
+  const retire = reports.filter((r) => r.recommendation === "RETIRE_CANDIDATE");
+  const low = reports.filter((r) => r.recommendation === "LOW_IMPACT");
+  if (retire.length > 0) {
+    console.log(`\n⚠ RETIRE CANDIDATES (${retire.length}):`);
+    for (const r of retire) {
+      console.log(`  - ${r.skill} (avg delta: ${r.avg_delta})`);
+    }
+  }
+  if (low.length > 0) {
+    console.log(`\n⚠ LOW IMPACT (${low.length}):`);
+    for (const r of low) {
+      console.log(`  - ${r.skill} (avg delta: ${r.avg_delta})`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -336,9 +466,12 @@ Pipeline phases:
 const [command, ...args] = process.argv.slice(2);
 
 switch (command) {
-  case "list":
-    cmdList();
+  case "list": {
+    const ttIdx = args.indexOf("--task-type");
+    const filterTaskType = ttIdx >= 0 ? args[ttIdx + 1] : undefined;
+    cmdList(filterTaskType);
     break;
+  }
   case "route":
     cmdRoute(args.join(" "));
     break;
@@ -347,6 +480,9 @@ switch (command) {
     break;
   case "status":
     cmdStatus();
+    break;
+  case "impact":
+    cmdImpact();
     break;
   case "help":
   case "--help":

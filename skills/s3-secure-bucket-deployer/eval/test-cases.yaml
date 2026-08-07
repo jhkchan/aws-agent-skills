@@ -1,0 +1,159 @@
+# Eval test cases for s3-secure-bucket-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across workload types and missing-prerequisite branches.
+skill: s3-secure-bucket-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: secure-compliance-bucket
+    description: >-
+      Provision a compliance-grade bucket with all security defaults,
+      SSE-KMS, versioning, lifecycle, and access logging. Expects
+      READY_TO_DEPLOY with all checklist items verified.
+    input: |
+      Provision a production S3 bucket named "compliance-archive-2024"
+      in us-east-1 for compliance workloads (HIPAA). Use SSE-KMS with
+      customer-managed CMK (alias/compliance-s3-key), enable versioning
+      with MFA delete, access logging to "s3-access-logs-prod", CloudTrail
+      data events on trail "aws-controltower-trail", lifecycle:
+      STANDARD_IA@30d → GLACIER@90d → DEEP_ARCHIVE@365d, expire
+      noncurrent versions at 180d. Tags: Environment=production,
+      DataClassification=phi. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "compliance-archive-2024"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Block Public Access"
+        - "SSE-KMS"
+        - "BucketOwnerEnforced"
+        - "Versioning"
+        - "put-public-access-block"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-bpa-bucket
+    description: >-
+      An existing bucket was provisioned without BPA and without
+      Object Ownership controls. Expects PREREQUISITES_MISSING (or
+      READY_TO_DEPLOY with [✗] on BPA and ownership, since the task
+      is to audit and remediate). The skill must flag the missing BPA
+      and recommend enabling it immediately.
+    input: |
+      We created a bucket "legacy-app-data" last year and just realized
+      it has no Block Public Access configured, no Object Ownership
+      setting, and no bucket policy. It does have SSE-S3 default
+      encryption and versioning. Help me get this to production-ready
+      security baseline. Region: us-west-2, Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "legacy-app-data"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Block Public Access"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: data-lake-intelligent-tiering
+    description: >-
+      Provision a data lake bucket with INTELLIGENT_TIERING lifecycle,
+      SSE-KMS, BucketOwnerEnforced, and access logging. Expects
+      READY_TO_DEPLOY with the data-lake-specific lifecycle pattern.
+    input: |
+      Create a data lake landing zone bucket named "datalake-raw-zone"
+      in us-east-1. Use SSE-KMS with alias/datalake-kms-key. Enable
+      Intelligent-Tiering for the lifecycle (unknown access patterns).
+      Enable access logging to "datalake-logs". Versioning on. No
+      replication needed. Tags: Environment=production,
+      Workload=data-lake, Zone=raw. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "datalake-raw-zone"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "INTELLIGENT_TIERING"
+        - "Block Public Access"
+        - "BucketOwnerEnforced"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: static-assets-cdn
+    description: >-
+      Provision a static assets bucket for CloudFront CDN origin.
+      Uses SSE-S3 (not SSE-KMS), versioning suspended, no lifecycle
+      (frequently accessed via CloudFront). Expects READY_TO_DEPLOY
+      with SSE-S3 and appropriate workload-specific guidance.
+    input: |
+      Create an S3 bucket for static website assets served via
+      CloudFront. Name: "cdn-assets-prod", region: us-east-1.
+      This is a CDN origin so it will be accessed frequently.
+      Use SSE-S3 encryption (cost-sensitive, not compliance data).
+      No lifecycle needed (frequently accessed). Access logging to
+      "s3-access-logs-prod". Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cdn-assets-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "SSE-S3"
+        - "Block Public Access"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: full-deploy-with-replication
+    description: >-
+      Provision a production bucket with all security defaults plus
+      cross-region replication to a DR region. Expects READY_TO_DEPLOY
+      with replication role and destination bucket configuration.
+    input: |
+      Provision a production backup bucket named "prod-backup-primary"
+      in us-east-1 with CRR to "prod-backup-dr" in us-west-2. Use
+      SSE-KMS (alias/prod-backup-key in us-east-1, alias/prod-backup-key-dr
+      in us-west-2). Enable MFA delete, versioning, lifecycle:
+      GLACIER@90d → DEEP_ARCHIVE@180d, expire noncurrent@365d. Access
+      logging to "s3-access-logs-prod". CloudTrail data events on trail
+      "management-trail". Tags: Environment=production,
+      Workload=backup. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-backup-primary"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Block Public Access"
+        - "SSE-KMS"
+        - "Replication"
+        - "MFA Delete"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

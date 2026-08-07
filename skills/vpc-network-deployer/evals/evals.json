@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "vpc-network-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the VPC Network Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "ha-multi-az-three-tier",
+      "name": "HA multi-AZ three-tier production VPC — all checklist dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ha-multi-az-three-tier.md",
+      "baseline_file": "baselines/ha-multi-az-three-tier.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "ha-multi-az-three-tier", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "10.0.0.0/16", "Gateway", "Interface"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "cidr-overlap-with-onprem",
+      "name": "VPC CIDR overlaps on-premises datacenter range — hard blocker for Direct Connect",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cidr-overlap-with-onprem.md",
+      "baseline_file": "baselines/cidr-overlap-with-onprem.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "cidr-overlap-with-onprem", "VERDICT", "overlap"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "single-nat-cost-optimized",
+      "name": "Staging VPC with cost-optimized single NAT Gateway — deployable with finding",
+      "difficulty": "medium",
+      "prompt_file": "prompts/single-nat-cost-optimized.md",
+      "baseline_file": "baselines/single-nat-cost-optimized.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "single-nat-cost-optimized", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "10.50.0.0/16", "NAT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "single-tier-public-only",
+      "name": "Single-tier public-only VPC — anti-pattern, no private tier (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/single-tier-public-only.md",
+      "baseline_file": "baselines/single-tier-public-only.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "single-tier-public-only", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "missing-required-fields",
+      "name": "Incomplete spec — missing region and CIDR block (PREREQUISITES_MISSING)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/missing-required-fields.md",
+      "baseline_file": "baselines/missing-required-fields.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-required-fields", "VERDICT", "REQUIRED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

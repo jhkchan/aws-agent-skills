@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "iam-role-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the IAM Role Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "lambda-service-role-scoped",
+      "name": "Lambda service role with SourceArn/SourceAccount conditions — all dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/lambda-service-role-scoped.md",
+      "baseline_file": "baselines/lambda-service-role-scoped.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "lambda-service-role-scoped", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "lambda.amazonaws.com", "SourceArn"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-externalid-deploy-role",
+      "name": "Cross-account deploy role with ExternalId + permission boundary",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cross-account-externalid-deploy-role.md",
+      "baseline_file": "baselines/cross-account-externalid-deploy-role.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "cross-account-externalid-deploy-role", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "ExternalId", "222222222222"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "oidc-github-actions-role",
+      "name": "OIDC role for GitHub Actions CI/CD — federated trust with sub condition",
+      "difficulty": "hard",
+      "prompt_file": "prompts/oidc-github-actions-role.md",
+      "baseline_file": "baselines/oidc-github-actions-role.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "oidc-github-actions-role", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "token.actions.githubusercontent.com", "AssumeRoleWithWebIdentity"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "wildcard-principal-trust-policy",
+      "name": "Dangerous wildcard principal trust policy with admin permissions (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/wildcard-principal-trust-policy.md",
+      "baseline_file": "baselines/wildcard-principal-trust-policy.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "wildcard-principal-trust-policy", "VERDICT", "Principal"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "service-role-missing-sourcearn",
+      "name": "Lambda service role without SourceArn/SourceAccount — unscoped trust (PREREQUISITES_MISSING)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/service-role-missing-sourcearn.md",
+      "baseline_file": "baselines/service-role-missing-sourcearn.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "service-role-missing-sourcearn", "VERDICT", "SourceArn"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}
