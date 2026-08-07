@@ -1,0 +1,70 @@
+{
+  "skill": "apigateway-rest-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many concrete, non\u2011obvious rules (e.g., burst \u2264\u202f25\u202f% of rate, VPC Link only supports NLB, EDGE cert must be in us-east-1, API keys are not authentication). However, most of these facts are already known to senior engineers and the skill restates rather than introduces brand\u2011new insights, so it falls short of a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers an AWS\u2011specific, ordered procedure (create\u2011rest\u2011api \u2192 resources \u2192 methods \u2192 authorizer \u2192 integration \u2192 lambda permission \u2192 usage plan \u2192 API key \u2192 VPC Link \u2192 WAF \u2192 deployment \u2192 canary \u2192 logging \u2192 custom domain). Missing only a brief rollback/idempotent update procedure for existing APIs."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a concrete NEVER list with specific reasoning (e.g., API keys are not auth, never modify without deployment, never use ALB with VPC Link, never expose ANY with NONE auth). Lacks a few common pitfalls such as missing CORS configuration or forgetting to set stage variables for Lambda versioning, so the anti\u2011pattern coverage is strong but not exhaustive."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Front\u2011matter includes all required metadata, a clear description, when_to_use, activation_triggers, and a precise invocation_schema. The skill unambiguously defines WHAT it does, WHEN to invoke, and KEYWORDS, enabling reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Top\u2011level sections (Mindset, Quick reference) give a concise overview, with deeper details (pre\u2011flight, step\u2011by\u2011step process, anti\u2011patterns, remediation) revealed later. The Quick reference table is dense, and some critical rules (e.g., confirmation gate) are buried deeper, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (create\u2011deployment) are gated by an explicit confirmation prompt and extensive pre\u2011flight safety checks. Creative tasks (architecture planning) are left open. The only shortfall is that the skill does not explicitly restrict the VPC Link creation command beyond the pre\u2011flight check, but overall calibration is well\u2011matched to task fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Process \u2192 Output \u2192 Verification \u2192 Anti\u2011patterns). Slightly ad\u2011hoc naming of sections prevents a perfect pattern score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a complete deployment plan template, decision tree, checklist, and concrete AWS CLI commands. Placeholders (<id>, <plan-id>) require user substitution, and error\u2011handling for failed CLI calls is not detailed, but an agent can follow the instructions to produce a working deployment."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 48821,
+  "latency_ms": 15803,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

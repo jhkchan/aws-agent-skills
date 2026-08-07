@@ -1,0 +1,70 @@
+{
+  "skill": "lambda-invocation-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill supplies several expert\u2011level nuggets that a generic model would not enumerate by default \u2013 e.g., the exact linear memory\u2011to\u2011vCPU mapping, the fact that Lambda in a public subnet never gets a public IP (inverse of EC2), SnapStart availability only for Java 11+, the 10\u202fGB container image cap and its cold\u2011start impact, and the precise retry timeline for async invocations. However, most of these facts are documented in AWS docs and a senior engineer could already know them, so the delta is substantial but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The procedure chain is AWS\u2011specific and ordered (get\u2011function\u2011configuration \u2192 CloudWatch logs \u2192 CloudTrail lookup \u2192 iam simulate\u2011principal\u2011policy \u2192 VPC route\u2011table check, etc.). It embeds the senior\u2011engineer mindset of \u201cverify with a probe before concluding\u201d. A few steps are generic (e.g., \u201ccheck logs for last line\u201d) but overall the flow is tightly tied to Lambda diagnostics."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill contains a thorough NEVER list with concrete reasoning (e.g., never raise timeout without checking memory, never assume public subnet gives internet, never delete a Layer version referenced by a function). It misses a couple of common pitfalls such as over\u2011provisioning provisioned concurrency cost warnings, so the anti\u2011pattern coverage is strong but not exhaustive."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter is complete (name, description, version, author, license, keywords, metadata, activation_triggers, invocation_schema, example). The description clearly states WHAT the skill does and WHEN to invoke it. Minor issue: the description is long and could be tighter, but activation triggers and schema are sufficient for reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document starts with a quick\u2011start table, then expands into mindset, philosophy, detailed tables, pre\u2011flight, and step\u2011by\u2011step decision tree. While the hierarchy exists, the initial sections dump a large amount of detail (full tables, extensive prose) which can overload a first\u2011time reader before they know which part they need."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "All state\u2011changing commands are gated behind explicit CONFIRM prompts. The skill distinguishes read\u2011only probes from mutable actions, calibrates tightly for fragile operations (e.g., updating memory, VPC config, ECR policy) and leaves creative tasks (e.g., choosing a new timeout value) open to operator discretion."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern: Quick start \u2192 Mindset \u2192 Philosophy \u2192 Reference tables \u2192 Pre\u2011flight \u2192 Process \u2192 Step\u2011by\u2011step tree. It is coherent and aids comprehension, though the pattern is a custom one rather than a widely\u2011adopted template, hence a slight deduction."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "The decision tree, CLI probes, and output format enable an agent to execute the troubleshooting end\u2011to\u2011end. Edge cases such as multi\u2011region functions, missing qualifier handling, or ambiguous error strings are mentioned but not fully fleshed out, leaving some gaps for an autonomous agent."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 67093,
+  "latency_ms": 10861,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}
