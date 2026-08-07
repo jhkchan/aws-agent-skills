@@ -1,0 +1,70 @@
+{
+  "skill": "ecs-task-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds concrete expert knowledge such as exact PROVISIONING timeout thresholds (2\u202fmin Fargate, 1\u202fmin EC2), ENI attachment limits, Fargate spot capacity behavior, EFA support checks, service\u2011linked role requirement, and capacity\u2011provider drift detection. Missing newer 2024\u20112026 features like Service Connect troubleshooting and IAM Identity Center permission\u2011boundary nuances, so not a full 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific diagnostic mindset with a step\u2011by\u2011step decision tree, ordered probing (ENI \u2192 subnet IP \u2192 capacity \u2192 logs), and precise CLI commands for each AWS service. Some procedures (e.g., \"Check logs\") are generic, but the majority are tightly scoped to ECS."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a comprehensive \"NEVER\" list with concrete reasoning (e.g., never raise container memory on Fargate, never assume stoppedReason is the root cause, never use privileged mode as a fix). Only minor gaps such as no explicit warning about editing a task definition without versioning."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields, description clearly states WHAT it does, WHEN to invoke, and provides exhaustive keywords and activation triggers. Invocation schema is well\u2011defined. No deficiencies detected."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered: high\u2011level activation, quick\u2011reference table, then detailed step\u2011by\u2011step process, then deep command reference and edge\u2011case notes. The quick\u2011reference table is dense, causing slight cognitive overload, hence a small deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Calibrates well: destructive actions (IAM policy changes, task definition updates) are presented with verification steps, while exploratory steps (log inspection) are permissive. However, some command examples (e.g., `aws ecs update-task-definition --memory`) are inaccurate, risking unsafe execution."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick Reference \u2192 Process \u2192 Decision Tree \u2192 Output Format \u2192 References), matching the established skill structure."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides a usable decision tree, concrete CLI commands, and output template. Gaps remain: no guidance when CloudWatch Logs are inaccessible, limited handling of cross\u2011account ECR pulls, missing Service Connect failure path, and no explicit steps for IAM Identity Center permission\u2011boundary issues."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 55277,
+  "latency_ms": 12334,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}

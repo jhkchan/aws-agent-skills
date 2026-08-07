@@ -1,0 +1,70 @@
+{
+  "skill": "rds-backup-restore-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill provides many non\u2011trivial expert details that a generic model would not enumerate, e.g., the 5\u2011minute lag of LatestRestorableTime, exact BacktrackWindow limits, cross\u2011account snapshot KMS policy requirements, cost per backtrack change, and the effect of modifying BackupRetentionPeriod on immediate backup creation. However, most of these facts are documented in AWS docs and a well\u2011trained model could retrieve them, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a concrete AWS\u2011specific procedure order (pre\u2011checks, confirm gate, capture pre\u2011state, waiters, post\u2011verify). One point deducted because some steps are generic (e.g., \"check IAM role\") without enumerating the exact policy actions required."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., new endpoint, KMS policy, Backtrack limits). Missing a few common pitfalls such as forgetting to re\u2011enable deletion\u2011protection after a restore and brief reasoning for some items, leading to a 2\u2011point loss."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. Deducted 1 point because the activation trigger list, while extensive, omits a few edge phrases (e.g., \"cross\u2011account snapshot restore\") that could affect reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The document is logically layered (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns, examples). However, the initial sections are dense and contain many details that could overwhelm an agent before it knows which part to use, leading to some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained by mandatory CONFIRM gate and exhaustive pre\u2011checks. One point deducted because the skill does not specify a timeout or automatic abort for the confirm step, leaving a small freedom gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (metadata \u2192 what it does \u2192 quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 anti\u2011patterns \u2192 recent features). Slightly ad\u2011hoc ordering prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides exact CLI commands, decision trees, examples, and verification steps, enabling an agent to execute the plan. Lacks detailed handling of transient CLI errors (rate limiting, retries) and does not include fallback logic, costing 2 points."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 43296,
+  "latency_ms": 16883,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

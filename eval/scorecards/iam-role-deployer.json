@@ -1,0 +1,70 @@
+{
+  "skill": "iam-role-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill aggregates a large amount of expert\u2011level IAM knowledge (decision trees, specific condition\u2011key recommendations, recent 2024\u20112026 features, nuanced boundary behavior). However, roughly 3 points are deducted because many of the facts (e.g., MaxSessionDuration limits, iam:PassRole dangers) are already documented in AWS reference material and a capable model could reproduce them without this skill."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a clear AWS\u2011specific procedural flow (principal classification \u2192 trust\u2011policy design \u2192 permission\u2011policy \u2192 boundary \u2192 conditions \u2192 MFA \u2192 chaining \u2192 session policies \u2192 verification). One point is deducted because the early \u201crun simulation\u201d step is generic and not tied to a concrete AWS\u2011specific ordering (e.g., exact CLI sequence for boundary placement)."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never use Principal \"*\", never use iam:PassRole with \"*\", never require MFA on service roles). Missing a few niche pitfalls such as over\u2011granting iam:PassRole via service\u2011linked roles and the weakness of aws:SourceIp as a condition."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present. The invocation schema is described in prose rather than a strict JSON schema, which could lead to ambiguous activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (Mindset, Quick reference, detailed steps, templates, anti\u2011patterns, edge cases), but the initial sections are dense and critical checklist items appear later, creating some cognitive overload for a first\u2011time user."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive operations are gated by explicit confirmation prompts and pre\u2011flight safety checks, matching the fragility of IAM changes. However, the skill does not enforce constraints on policy size limits or automatically handle retries on AWS CLI failures."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a clear, recognizable structure (Mindset \u2192 Quick reference \u2192 Process \u2192 Templates \u2192 Anti\u2011patterns \u2192 Edge cases \u2192 Output format) that aids comprehension and aligns with established skill patterns."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete AWS CLI commands, checklist, and example JSON documents, enabling an agent to execute the plan. The examples assume external files (trust-policy.json, permissions.json) without guidance on generating them and lack explicit error\u2011handling or retry logic."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 54672,
+  "latency_ms": 20894,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

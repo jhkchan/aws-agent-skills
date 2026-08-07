@@ -1,0 +1,70 @@
+{
+  "skill": "rds-connectivity-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides specific expert formulas (Aurora max_connections derivation), exact token TTL (15\u202fmin), CA rotation timeline, and OSI\u2011ordered diagnostic tree\u2014knowledge beyond a generic model. However, many sections restate well\u2011known best practices and omit niche details (e.g., IPv6 handling, IAM policy simulation), limiting full delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes senior\u2011engineer mindset (treat database as innocent, OSI ordering) and concrete AWS\u2011CLI procedures for each layer. Minor gaps: no explicit IAM policy simulation step and limited guidance for multi\u2011AZ DNS cache clearing."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Extensive NEVER list with concrete reasoning (e.g., SG cross\u2011VPC references, NACL statelessness, public\u2011accessible flag). Deductions for a few generic warnings and omission of anti\u2011patterns like over\u2011permissive 0.0.0.0/0 SG changes."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete frontmatter, clear description, activation triggers, invocation schema, example, and metadata. All required fields present and well\u2011formed."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Top\u2011level quick\u2011start gives concise mapping; deeper sections unfold step\u2011by\u2011step. Some critical anti\u2011patterns and deep references are buried later, causing occasional cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Tight constraints on destructive actions (mandatory CONFIRM), generous freedom for read\u2011only probes. Slight over\u2011generality in batch remediation guidance (no explicit limit on batch size beyond suggestion)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent pattern: Quick start \u2192 Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011patterns \u2192 Pre\u2011flight \u2192 Diagnostic steps \u2192 Output format \u2192 Remediation \u2192 Deep reference."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides deterministic output format, decision tree, and concrete CLI commands enabling an agent to act. Lacks explicit error\u2011handling for CLI failures and pagination guidance, which could hinder automation."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 65609,
+  "latency_ms": 36887,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

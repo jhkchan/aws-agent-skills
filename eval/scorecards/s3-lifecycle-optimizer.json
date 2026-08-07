@@ -1,0 +1,70 @@
+{
+  "skill": "s3-lifecycle-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides several expert\u2011level thresholds and decision points not commonly memorised (e.g., >20% noncurrent bytes = high\u2011confidence opportunity, >50% = severe; explicit minimum\u2011duration charge modeling, small\u2011object surcharge, monitoring\u2011fee break\u2011even size, exact JSON rule snippets). However much of the pricing table and basic lifecycle concepts are restatements of public docs, so full 20 is not earned."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Lists AWS\u2011specific pre\u2011flight CLI steps, pagination advice, and backup before put\u2011lifecycle, but some procedures are generic (e.g., cross\u2011region cost variance is only mentioned, not detailed) and rollback steps beyond JSON backup are not fully fleshed out."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasons (small\u2011object IA surcharge, minimum\u2011duration charges, expiration vs noncurrent rules, Glacier retrieval cost, Intelligent\u2011Tiering monitoring fee, directory\u2011bucket limitations, etc.). Lacks a few niche pitfalls (e.g., CRR storage\u2011class mismatch) so deduct one point."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The \"when to invoke\" section is slightly redundant with activation triggers, and the description could be tighter, thus a small deduction."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document is layered (quick reference, mindset, process steps, anti\u2011patterns, safety checks), yet some dense sections (full pricing matrix, extensive rule JSON) appear early, risking cognitive overload before the core decision flow is understood."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (put\u2011bucket\u2011lifecycle\u2011configuration) are tightly guarded by mandatory confirmation, backup, and validation steps. Creative analysis sections are appropriately open. Only a minor gap: no explicit rate\u2011limit guidance for large\u2011scale batch updates."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (What it does \u2192 Quick reference \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011patterns \u2192 Safety). The pattern is coherent, earning near\u2011max."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 8,
+      "max": 15,
+      "justification": "Model output examples reveal inconsistencies: compliance\u2011archive bucket marked OPPORTUNITY_FOUND despite zero savings and contradictory cost calculations; data\u2011lake\u2011curated recommendation shows no savings yet flags an opportunity; missing noncurrent\u2011version transition rules in some outputs. These gaps indicate the skill\u2019s guidance cannot be executed reliably without error."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 41260,
+  "latency_ms": 21033,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

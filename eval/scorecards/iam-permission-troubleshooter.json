@@ -1,0 +1,70 @@
+{
+  "skill": "iam-permission-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill compiles many known IAM evaluation rules, root\u2011cause catalog numbers and a decision tree, but most of the content restates publicly documented behavior rather than introducing novel heuristics or thresholds that a senior CloudOps engineer could not already find in AWS docs."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (policy\u2011layer order, SCP checks, trust\u2011policy validation) and well\u2011structured, yet a few steps are generic (e.g., \u201crun CLI commands\u201d) without prescribing the exact ordering for service\u2011specific nuances such as EC2 RunInstances resource checks."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a thorough NEVER list with concrete reasoning (e.g., never add Action:\"*\"; never assume implicit deny is identity\u2011policy). One minor weakness: the list does not explicitly warn about VPC endpoint policies, which are a known pitfall."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Front\u2011matter includes description, activation triggers and keywords, but the `invocation_schema` is informal prose rather than a concrete JSON schema or example input, which could cause unreliable activation by an agent."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The document front\u2011loads a large amount of detail (quick reference, full decision tree, edge\u2011case catalog) before the agent knows which part is needed, risking cognitive overload; critical rules (e.g., the NEVER list) are buried deep instead of being highlighted early."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill correctly constrains destructive actions (policy edits) by requiring verification steps, but it does not explicitly mandate safeguards such as change\u2011approval workflow or role\u2011based gating before suggesting a policy edit."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The overall layout follows a recognizable pattern (activation \u2192 mindset \u2192 process \u2192 output \u2192 commands), yet the mixture of narrative, tables and ad\u2011hoc sections (e.g., \u201cExpert edge cases\u201d) makes the structure slightly irregular."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill provides a usable decision tree, command list and output template, but the example outputs lack explicit handling for ambiguous simulator results or missing resources, and the remediation steps assume immediate policy edit without showing rollback or audit guidance."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 46170,
+  "latency_ms": 9219,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
