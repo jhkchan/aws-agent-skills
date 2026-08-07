@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // AWS CloudOps Agent Skills — CLI entry point
-// Mirrors the reference repo's cli/bin/cli.js but is FUNCTIONAL (not a stub).
+// A functional CLI for skill discovery, routing, and validation.
 // Commands: list, route <prompt>, validate, status, help
 //
 // Usage:
