@@ -4,7 +4,7 @@
 > · License: **Apache-2.0** · Maintainer: **Jacky Chan, AWS Community Builder (ML & GenAI)**
 > · A solo, community-driven project.
 
-**79 eval-backed AWS CloudOps agent skills** — every skill is a deterministic detective auditor with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric and the softaworks agent-toolkit evaluated-skill pattern.
+**79 eval-backed AWS CloudOps agent skills** — every skill is a deterministic detective auditor with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric, with co-located structured evals (cases + baselines + delta comparison) on every skill.
 
 ---
 
