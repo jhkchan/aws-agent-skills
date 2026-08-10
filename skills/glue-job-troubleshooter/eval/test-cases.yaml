@@ -1,0 +1,260 @@
+# Eval test cases for glue-job-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per Glue failure category. Each case's
+# JobName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The diagnostic tree in SKILL.md
+# produces exactly the expected verdicts below.
+skill: glue-job-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: python-exception-attributeerror-script
+    description: >-
+      Glue job FAILED with a short ExecutionTime and an AttributeError
+      traceback in CloudWatch Logs. from_catalog returned None when
+      the source table was empty. Expected verdict: ROOT_CAUSE_FOUND
+      with CATEGORY=SCRIPT_EXCEPTION.
+    input: |
+      JobName: nightly-sales-aggregation
+        (case python-exception-attributeerror-script)
+      RunId: jr_abc123def456
+      Region: us-east-1
+      GlueVersion: 4.0
+      WorkerType: G.1X
+      NumberOfWorkers: 5
+      Timeout: 60
+
+      get-job-run output:
+        State: FAILED
+        ExecutionTime: 42
+        ErrorMessage: "No ErrorReason"
+
+      CloudWatch Logs filter (filter-pattern "Traceback"):
+        Traceback (most recent call last):
+          File "tmp/script.py", line 47, in <module>
+            df = df.withColumn('revenue', col('price') * col('qty'))
+          AttributeError: 'NoneType' object has no attribute '_jvc'
+
+      Source: Glue Data Catalog table analytics_prod.sales_raw.
+      Last crawler run: 6 hours ago. Table row count in S3: 0.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "python-exception-attributeerror-script"
+        - "SCRIPT_EXCEPTION"
+        - "AttributeError"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: jdbc-connection-missing-security-group
+    description: >-
+      Glue job FAILED with "VPC Connection error" after 18 seconds.
+      Glue connection's SG is sg-glue123 but the RDS SG sg-rds456
+      lacks inbound on port 5432 from sg-glue123. Last successful run
+      was 3 days ago. Expected verdict: ROOT_CAUSE_FOUND with
+      CATEGORY=JDBC_VPC.
+    input: |
+      JobName: orders-etl-job
+        (case jdbc-connection-missing-security-group)
+      RunId: jr_def789abc012
+      Region: us-east-1
+      GlueVersion: 4.0
+      WorkerType: G.1X
+      NumberOfWorkers: 3
+
+      get-job-run output:
+        State: FAILED
+        ExecutionTime: 18
+        ErrorMessage: "VPC Connection error: Failed to connect"
+
+      Glue connection nightly-rds-conn:
+        SUBNET_ID: subnet-glue-private-1a
+        SECURITY_GROUP_ID: sg-glue123
+        JDBC URL: jdbc:postgresql://orders-db.cluster-abc.us-east-1.rds.amazonaws.com:5432/orders
+
+      Database SG (sg-rds456) inbound rules:
+        - port 5432, source 10.0.0.0/8 (corporate VPN)
+        (NO rule for sg-glue123 on 5432)
+
+      Glue SG (sg-glue123) egress rules:
+        - 0.0.0.0/0 all ports (default)
+
+      Route table for subnet-glue-private-1a:
+        - routes to DB subnet via VPC peering (OK)
+
+      Last successful run: 3 days ago.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "jdbc-connection-missing-security-group"
+        - "JDBC_VPC"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: bookmark-not-advancing-layout-drift
+    description: >-
+      Glue job is reprocessing data the bookmark should skip. Source
+      layout changed from year=YYYY/month=MM/ to dt=YYYY-MM-DD/ but
+      the bookmark still tracks (year, month). Expected verdict:
+      ROOT_CAUSE_FOUND with CATEGORY=BOOKMARK_STALL.
+    input: |
+      JobName: hourly-events-rollup
+        (case bookmark-not-advancing-layout-drift)
+      RunId: jr_xyz987abc321
+      Region: us-east-1
+      GlueVersion: 3.0
+
+      get-job-run output:
+        State: SUCCEEDED
+        ExecutionTime: 47
+        ErrorMessage: ""
+
+      Symptom: job reprocesses ~100% of source bytes on every run.
+      Source S3 prefix was s3://events/year=2025/month=08/... until
+      yesterday; today it is s3://events/dt=2025-08-09/...
+
+      get-job-bookmark output:
+        JobBookmarks:
+          - Attempt: 12
+            Args:
+              partitionKeys: ["year", "month"]
+
+      Job argument --job-bookmark-option: enable
+      Job IAM role: includes glue:GetJobBookmark and
+        glue:UpdateJobBookmark (Allow).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "bookmark-not-advancing-layout-drift"
+        - "BOOKMARK_STALL"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: spark-oom-stage-skew
+    description: >-
+      Glue job FAILED with "Container killed by YARN for exceeding
+      memory limits" at ExecutionTime 23. Spark UI shows one task
+      reading 380 GB vs median 1.2 GB — 316x skew on customer_id =
+      ACME-001. Expected verdict: ROOT_CAUSE_FOUND with
+      CATEGORY=SPARK_OOM.
+    input: |
+      JobName: big-join-batch (case spark-oom-stage-skew)
+      RunId: jr_oom456def789
+      Region: us-east-1
+      GlueVersion: 4.0
+      WorkerType: G.1X
+      NumberOfWorkers: 10
+      Timeout: 240
+
+      get-job-run output:
+        State: FAILED
+        ExecutionTime: 23
+        ErrorMessage: "Container killed by YARN for exceeding memory limits"
+
+      Spark UI stage 7 (join on customer_id) task metrics:
+        min=12s, median=45s, max=2h17m
+        max/median task bytes ratio = 316x
+        One task processed 380 GB (single customer_id "ACME-001")
+        Median task processed 1.2 GB
+
+      No Python traceback in CloudWatch Logs.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "spark-oom-stage-skew"
+        - "SPARK_OOM"
+        - "skew"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: catalog-table-not-found
+    description: >-
+      Glue job FAILED with EntityNotFoundException for a table that
+      IS in the catalog but the job's IAM role lacks glue:GetTable on
+      the resource-account. Expected verdict: ROOT_CAUSE_FOUND with
+      CATEGORY=CATALOG_MISSING.
+    input: |
+      JobName: cross-account-reader
+        (case catalog-table-not-found)
+      RunId: jr_cat112233445
+      Region: us-east-1
+      GlueVersion: 4.0
+
+      get-job-run output:
+        State: FAILED
+        ExecutionTime: 6
+        ErrorMessage: "EntityNotFoundException: Table sales_raw not found"
+
+      Probe: aws glue get-table --database-name analytics_prod
+        --name sales_raw (run with the job's IAM role)
+        → AccessDeniedException: User is not authorized to perform
+          glue:GetTable on resource
+          arn:aws:glue:us-east-1:111122223333:table/analytics_prod/sales_raw
+
+      Probe: aws glue get-table (run with admin role)
+        → Table exists, row count 14.2M, last crawled 2 hours ago.
+
+      Cross-account: catalog lives in account 111122223333; the Glue
+      job runs in account 444455556666.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "catalog-table-not-found"
+        - "CATALOG_MISSING"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"

@@ -1,0 +1,219 @@
+# Eval test cases for dr-failover-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: dr-failover-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: pilot-light-aurora-global
+    description: >-
+      Design a pilot-light DR strategy with Aurora Global Database for a
+      three-tier app. RTO 30min, RPO 5min, us-east-1 -> us-west-2. Includes
+      Route 53 health-checked failover, Aurora managed planned failover,
+      ASG scale-out on the secondary, Step Functions orchestrator with
+      kill-switch + verification + human approval. All gates pass.
+      Verdict: AUTOMATED.
+    input: |
+      Design a DR failover plan for our three-tier web application. Emit
+      the standard DR block (STRATEGY, FAILOVER, ORCHESTRATION,
+      VERIFICATION, VERDICT, FINDINGS, REMEDIATION).
+
+      Requirements:
+      - Application tier: mixed (web, app, DB)
+      - RTO target: 30 minutes
+      - RPO target: 5 minutes
+      - Primary region: us-east-1
+      - Secondary region: us-west-2
+      - Strategy: pilot light
+      - Database: Aurora Global Database (managed planned failover)
+      - Compute: EC2 Auto Scaling Group (scale from 0 to 10 on failover)
+      - DNS: Route 53 failover record with health check (HTTPS /health,
+        interval=30s, threshold=3)
+      - Orchestration: Step Functions state machine with kill-switch
+        (Parameter Store /dr/kill-switch), verify-primary-down Lambda,
+        promote-secondary Lambda, Route 53 UPSERT, verify-secondary-up
+        Lambda, SQS task-token human approval
+      - Game-day drill: last run 2026-07-15, RTO measured 22min, RPO 1s
+      - Resilience Hub assessment score: 92
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "pilot-light-aurora-global"
+        - "VERDICT"
+        - "STRATEGY"
+        - "failover-global-cluster"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: warm-standby-route53
+    description: >-
+      Design a warm-standby DR strategy with Route 53 health-checked
+      failover and Aurora Global. RTO 5min, RPO 1min. Secondary always
+      running at reduced capacity. All gates pass. Verdict: AUTOMATED.
+    input: |
+      Design a warm-standby DR strategy for our production API. Emit the
+      standard DR block.
+
+      Requirements:
+      - Application tier: app + DB
+      - RTO target: 5 minutes
+      - RPO target: 1 minute
+      - Primary region: us-east-1
+      - Secondary region: us-west-2
+      - Strategy: warm standby
+      - Secondary: always-on scaled-down (2x t3.medium EC2, Aurora
+        Serverless v2 at 0.5 ACU)
+      - Database: Aurora Global Database
+      - DNS: Route 53 failover record, TTL 60s, health check
+        HTTPS /health interval=30s threshold=3
+      - Orchestration: Step Functions with kill-switch, verify-primary,
+        promote, DNS, verify-secondary, SQS task-token approval
+      - Global Accelerator in front for sub-second client failover
+      - Game-day drill: 2026-08-01, RTO measured 4min
+      - Resilience Hub score: 88
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "warm-standby-route53"
+        - "VERDICT"
+        - "FAILOVER"
+        - "Route 53"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: drs-ec2-recovery
+    description: >-
+      Design an Elastic Disaster Recovery (DRS) based failover for 20
+      stateful EC2 instances. Includes DRS launch, non-blocking agent,
+      drill mode, launch templates. All gates pass. Verdict: AUTOMATED.
+    input: |
+      Design a DR failover plan using AWS Elastic Disaster Recovery (DRS)
+      for 20 stateful EC2 instances. Emit the standard DR block.
+
+      Requirements:
+      - Application tier: compute (EC2 stateful)
+      - RTO target: 60 minutes
+      - RPO target: 15 minutes
+      - Primary region: us-east-1
+      - Secondary region: us-west-2
+      - Strategy: pilot light with DRS
+      - DRS: non-blocking agent installed on all 20 source servers
+      - Launch templates configured per source (instance type, subnet,
+        SG, IAM role)
+      - Drill: run quarterly with is_drill=true in isolated subnet
+      - Orchestration: Step Functions with kill-switch, verify-primary,
+        DRS launch (start-recovery), Route 53 update, verify, notify
+      - DNS: Route 53 failover record, TTL 60s
+      - Game-day drill: 2026-07-20, RTO measured 45min, RPO 5min
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "drs-ec2-recovery"
+        - "VERDICT"
+        - "start-recovery"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: no-verification-split-brain
+    description: >-
+      Validate an existing warm-standby failover workflow that has no
+      primary verification step, no kill-switch, no human approval gate,
+      and no game-day drill. Health check threshold=1 (too sensitive).
+      Multiple CRITICAL gates fail. Verdict: MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing DR failover workflow. Emit the standard DR
+      block.
+
+      Current state:
+      - Strategy: warm standby
+      - RTO target: 5 minutes, RPO target: 1 minute
+      - Primary: us-east-1, Secondary: us-west-2
+
+      Existing workflow:
+      - Route 53 health check: HTTPS /health, interval=30s, threshold=1
+      - Lambda triggered directly by health check alarm (no Step Functions)
+      - Lambda calls rds:promote-read-replica immediately
+      - Lambda calls route53 change-resource-record-sets
+      - No kill-switch
+      - No primary verification step
+      - No post-failover verification
+      - No human approval gate
+      - No game-day drill in 18 months
+      - Resilience Hub score: 65
+
+      Expected: MANUAL_STEP_REQUIRED. The skill must flag multiple
+      CRITICAL gaps:
+      1. No primary verification — split-brain risk on transient failures.
+      2. No kill-switch — misconfigured health check causes flapping.
+      3. Health check threshold=1 — false positives trigger failover.
+      4. No drill in 18 months — configuration drift likely.
+      5. No post-failover verification — clients may hit broken secondary.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "no-verification-split-brain"
+        - "VERDICT"
+        - "split-brain"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: aurora-unplanned-failover
+    description: >-
+      Design an unplanned Aurora Global Database failover runbook for a
+      region outage. Covers remove-from-global-cluster + promote, DNS
+      update, verification, and rollback path documentation. All gates
+      pass. Verdict: AUTOMATED.
+    input: |
+      Design an unplanned Aurora Global Database failover runbook for
+      us-east-1 region outage. Emit the standard DR block.
+
+      Requirements:
+      - Application tier: DB + app
+      - RTO target: 15 minutes
+      - RPO target: 1 second (Aurora Global async lag)
+      - Primary region: us-east-1 (currently down)
+      - Secondary region: us-west-2 (to be promoted)
+      - Strategy: warm standby with Aurora Global
+      - Failover procedure:
+        1. Verify primary region is down (Lambda + retries)
+        2. rds remove-from-global-cluster on us-west-2 secondary
+           (promotes to standalone writable cluster)
+        3. Update Route 53 to point at us-west-2 Aurora writer endpoint
+        4. Verify application writes succeed from us-west-2
+        5. Notify on-call via SNS
+      - Rollback path documented: snapshot new primary, create new
+        global cluster with secondary in us-east-1 once region recovers
+      - Kill-switch: Parameter Store /dr/kill-switch
+      - Step Functions orchestration with SQS task-token approval
+      - Game-day drill: 2026-07-10, unplanned failover tested
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "aurora-unplanned-failover"
+        - "VERDICT"
+        - "remove-from-global-cluster"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"

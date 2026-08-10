@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudformation-stack-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudFormation Stack Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cfn-create-iam-capability-missing",
+      "name": "CREATE_FAILED then ROLLBACK_COMPLETE because AWS::IAM::Role declared but create-stack called without --capabilities CAPABILITY_IAM",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cfn-create-iam-capability-missing.md",
+      "baseline_file": "baselines/cfn-create-iam-capability-missing.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "CREATE_FAILED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "CREATE_FAILED", "CAPABILITY_IAM", "ROLLBACK_COMPLETE", "TaskRole", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "update-stack"]
+        }
+      ]
+    },
+    {
+      "id": "cfn-update-replacement-required",
+      "name": "UPDATE_FAILED because ChangeSet reports Replacement: true on a DynamoDB OrdersTable KeySchema change (immutable)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cfn-update-replacement-required.md",
+      "baseline_file": "baselines/cfn-update-replacement-required.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "UPDATE_FAILED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "UPDATE_FAILED", "Replacement", "KeySchema", "OrdersTable", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "ROLLBACK_COMPLETE", "delete-stack"]
+        }
+      ]
+    },
+    {
+      "id": "cfn-delete-s3-bucket-not-empty",
+      "name": "DELETE_FAILED because the LogsBucket S3 bucket still contains objects across versions",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cfn-delete-s3-bucket-not-empty.md",
+      "baseline_file": "baselines/cfn-delete-s3-bucket-not-empty.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "DELETE_FAILED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "DELETE_FAILED", "not empty", "versions", "LogsBucket", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "DeletionPolicy: Retain"]
+        }
+      ]
+    },
+    {
+      "id": "cfn-update-rollback-nested-stack",
+      "name": "UPDATE_ROLLBACK_FAILED on parent platform-root because nested NetworkStack child cannot roll back its VPC CIDR change",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cfn-update-rollback-nested-stack.md",
+      "baseline_file": "baselines/cfn-update-rollback-nested-stack.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "UPDATE_ROLLBACK_FAILED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "UPDATE_ROLLBACK_FAILED", "nested", "ContinueUpdateRollback", "NetworkStack", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "cfn-vague-report-need-stack-info",
+      "name": "Vague report of CloudFormation failure without stack name, region, or status — request the identifying inputs",
+      "difficulty": "easy",
+      "prompt_file": "prompts/cfn-vague-report-need-stack-info.md",
+      "baseline_file": "baselines/cfn-vague-report-need-stack-info.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "describe-stack-events"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

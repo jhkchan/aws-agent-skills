@@ -1,0 +1,237 @@
+# Eval test cases for multi-account-governance-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: multi-account-governance-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: greenfield-org-control-tower
+    description: >-
+      Design a greenfield 50-account AWS organization with Control Tower
+      landing zone. Includes OU hierarchy (Security, Infrastructure,
+      Workloads-Prod, Workloads-NonProd, Sandbox, Suspended), root-level
+      guardrail SCPs (deny-leave-org, deny-root-actions), delegated
+      administration (audit + log-archive), Config aggregator, CloudTrail
+      org trail, IAM Identity Center with break-glass path, and Resource
+      Explorer. All gates pass. Verdict: AUTOMATED.
+    input: |
+      Design a multi-account governance baseline for our greenfield AWS
+      organization. Emit the standard GOVERNANCE block (STRUCTURE,
+      CONTROLS, DELEGATION, SHARING, VERDICT, FINDINGS, REMEDIATION).
+
+      Requirements:
+      - Intent: new org
+      - Account count target: 50
+      - Compliance framework: PCI
+      - Landing surface: Control Tower Landing Zone v2
+      - OU hierarchy: Security (audit, log-archive), Infrastructure,
+        Workloads-Prod, Workloads-NonProd, Sandbox, Suspended
+      - SCPs: deny-leave-org + deny-root-actions at root;
+        region throttle at Workloads-Prod (us-east-1, eu-west-1 only)
+      - Delegation: GuardDuty + Security Hub + Config to audit account
+        111111111111
+      - CloudTrail org trail to log-archive account 222222222222
+      - IAM Identity Center with AWSAdministratorAccess (1h) +
+        AWSReadOnlyAccess (4h) + EmergencyAdmin break-glass
+      - Resource Explorer aggregator in audit account
+      - RAM shares scoped to org (allow-external-principals=false)
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "greenfield-org-control-tower"
+        - "VERDICT"
+        - "STRUCTURE"
+        - "DELEGATION"
+        - "LeaveOrganization"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: scp-guardrail-baseline
+    description: >-
+      Design a root-level SCP baseline for an existing org that has no
+      SCPs attached. Covers deny-leave-org, deny-root-actions (except
+      IAM MFA setup), deny-disable-guardduty, deny-delete-cloudtrail.
+      All gates pass. Verdict: AUTOMATED.
+    input: |
+      Design a root-level SCP guardrail baseline for our existing AWS
+      organization. Emit the standard GOVERNANCE block.
+
+      Requirements:
+      - Org: all-features, 30 member accounts, currently no SCPs
+      - SCPs to create:
+        1. Deny organizations:LeaveOrganization (prevent escape)
+        2. Deny root-account actions except iam:CreateVirtualMFADevice,
+           iam:EnableRootMFA, iam:Get*, iam:List*
+        3. Deny guardduty:DeleteDetector + guardduty:UpdateDetector +
+           guardduty:DisassociateFromMasterAccount
+        4. Deny cloudtrail:DeleteTrail + cloudtrail:StopLogging +
+           cloudtrail:UpdateTrail
+      - Attach at root so all 30 member accounts inherit
+      - Management account MFA: yes (virtual MFA, no access keys)
+      - Dry-run tested on sandbox account before root attachment
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "scp-guardrail-baseline"
+        - "VERDICT"
+        - "CONTROLS"
+        - "LeaveOrganization"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: delegated-admin-setup
+    description: >-
+      Design the delegated administration layer for an org: GuardDuty,
+      Security Hub, Config aggregator, CloudTrail org trail, Access
+      Analyzer delegated to the audit account. Includes IAM Identity
+      Center with break-glass. All gates pass. Verdict: AUTOMATED.
+    input: |
+      Design the delegated administration layer for our org. Emit the
+      standard GOVERNANCE block.
+
+      Requirements:
+      - Org: 40 member accounts
+      - Audit account: 111111111111
+      - Log-archive account: 222222222222
+      - Delegate to audit: GuardDuty, Security Hub (CIS + Foundational),
+        Config (org source aggregator, AllRegions), Access Analyzer
+      - CloudTrail org trail delivering to log-archive S3 bucket
+        org-trail-logs-2222 with KMS encryption
+      - Log-archive S3 bucket policy uses aws:PrincipalOrgID condition
+      - KMS key policy allows member accounts kms:GenerateDataKey for
+        CloudTrail
+      - IAM Identity Center: AWSAdministratorAccess (1h) +
+        AWSReadOnlyAccess (4h) + EmergencyAdmin (break-glass, sealed
+        envelope, tested 2026-07-15)
+      - Resource Explorer aggregator index in audit account
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "delegated-admin-setup"
+        - "VERDICT"
+        - "DELEGATION"
+        - "PrincipalOrgID"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: flat-org-no-scp
+    description: >-
+      Validate an existing org with flat OU structure (all accounts under
+      root), no SCPs, GuardDuty running from the management account, no
+      Config aggregator, no IAM Identity Center. Multiple CRITICAL gates
+      fail. Verdict: MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing AWS organization governance posture. Emit
+      the standard GOVERNANCE block.
+
+      Current state:
+      - Org: all-features, 12 member accounts, all under root (flat, no
+        OUs)
+      - SCPs: none attached
+      - GuardDuty: running from the management account (NOT delegated)
+      - Security Hub: not enabled
+      - Config aggregator: not configured
+      - CloudTrail: per-account trails (no org trail)
+      - IAM Identity Center: not configured (cross-account assume-role
+        only)
+      - No break-glass path documented
+      - RAM shares: 3 shares with allow-external-principals=true
+
+      Expected: MANUAL_STEP_REQUIRED. The skill must flag multiple
+      CRITICAL gaps:
+      1. No deny-leave-org SCP — any member can escape governance.
+      2. Flat OU — blast radius equals management account for all 12.
+      3. GuardDuty in management account — couples security to the
+         most privileged account.
+      4. No Config aggregator — compliance not centralized.
+      5. No IAM Identity Center — not scalable.
+      6. RAM shares with allow-external-principals=true — unintended
+         principals can accept.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "flat-org-no-scp"
+        - "VERDICT"
+        - "LeaveOrganization"
+        - "flat"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: scp-inheritance-conflict
+    description: >-
+      Validate an existing SCP tree where an Allow-list SCP at the root
+      conflicts with a Deny-list SCP at the Workloads-Prod OU. Operator
+      expects Allow to override Deny; it does not. Inheritance gate
+      fails. Verdict: MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing SCP inheritance chain. Emit the standard
+      GOVERNANCE block.
+
+      SCP at root (attached):
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [{
+          "Sid": "AllowEC2",
+          "Effect": "Allow",
+          "Action": ["ec2:*"],
+          "Resource": "*"
+        }]
+      }
+      ```
+
+      SCP at Workloads-Prod OU (attached):
+      ```json
+      {
+        "Version": "2012-10-17",
+        "Statement": [{
+          "Sid": "DenyLargeInstances",
+          "Effect": "Deny",
+          "Action": ["ec2:RunInstances"],
+          "Resource": "*",
+          "Condition": {
+            "StringEquals": {
+              "ec2:InstanceType": ["m5.24xlarge", "r5.24xlarge"]
+            }
+          }
+        }]
+      }
+      ```
+
+      Operator reports: "prod accounts cannot launch m5.24xlarge. The
+      root Allow should override the OU Deny."
+
+      Expected: MANUAL_STEP_REQUIRED. Deny always wins over Allow in
+      SCP evaluation. The operator's mental model is wrong. The fix is
+      to add a condition exception in the Deny or restructure the SCPs.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "scp-inheritance-conflict"
+        - "VERDICT"
+        - "Deny"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"

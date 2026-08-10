@@ -1,0 +1,48 @@
+# Eval configuration for wafv2-web-acl-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: wafv2-web-acl-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: regional-alb-with-managed-rules
+    difficulty: medium
+    prompt_file: prompts/regional-alb-with-managed-rules.md
+    baseline_file: baselines/regional-alb-with-managed-rules.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-logging-destination
+    difficulty: hard
+    prompt_file: prompts/missing-logging-destination.md
+    baseline_file: baselines/missing-logging-destination.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: cloudfront-global-with-bot-control
+    difficulty: hard
+    prompt_file: prompts/cloudfront-global-with-bot-control.md
+    baseline_file: baselines/cloudfront-global-with-bot-control.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: rate-based-forwarded-ip-api-gateway
+    difficulty: hard
+    prompt_file: prompts/rate-based-forwarded-ip-api-gateway.md
+    baseline_file: baselines/rate-based-forwarded-ip-api-gateway.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: captcha-atp-login-protection
+    difficulty: hard
+    prompt_file: prompts/captcha-atp-login-protection.md
+    baseline_file: baselines/captcha-atp-login-protection.md
+    expected_verdict: READY_TO_DEPLOY

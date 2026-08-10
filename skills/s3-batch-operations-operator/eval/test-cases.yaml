@@ -1,0 +1,228 @@
+# Eval test cases for s3-batch-operations-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-batch-operations-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-copy-job-inventory-manifest-ready
+    description: >-
+      Operator wants to create a Batch Operations copy job using an S3
+      inventory report manifest. All pre-checks pass: manifest readable,
+      report bucket in the same Region, role has batchoperations + copy
+      grants + KMS decrypt/encrypt, rate control valid. Plan should
+      produce READY with the create-job CLI and a CONFIRM gate.
+    input: |
+      Operation: create-job
+      Manifest: s3://prod-inventory/2026-08-01/manifest.json (S3 inventory, versioned V2)
+      Report bucket: prod-batch-reports (us-east-1)
+      Operation type: Copy (overwrite in place with new SSE-KMS key)
+      Source bucket: prod-data (SSE-KMS with old-key)
+      Destination: same bucket (in-place re-encrypt), new SSE-KMS key: arn:aws:kms:us-east-1:111111111111:key/new-key
+      Role: arn:aws:iam::111111111111:role/S3BatchOpsRole
+      RequestsPerSecond: 500
+      Priority: 50
+      Estimated object count: 12,400,000
+
+      Caller permissions: s3control:CreateJob + iam:PassRole on S3BatchOpsRole
+      Role trust: batchoperations.amazonaws.com allowed to sts:AssumeRole
+      Role attached policies:
+        - s3:GetObject on prod-data/*
+        - s3:PutObject on prod-data/*
+        - s3:GetObject on prod-inventory/manifests/*
+        - s3:PutObject on prod-batch-reports/*
+        - kms:Decrypt on arn:aws:kms:us-east-1:111111111111:key/old-key
+        - kms:Encrypt on arn:aws:kms:us-east-1:111111111111:key/new-key
+      New KMS key policy grants role Encrypt: confirmed
+      Report bucket in us-east-1: confirmed
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-job"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "RequestsPerSecond"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: invoke-lambda-job-blocked-permissions
+    description: >-
+      Operator wants to invoke a Lambda across a manifest, but the
+      Lambda resource-based policy is missing the
+      batchoperations.amazonaws.com principal. The role is otherwise
+      correct. Pre-checks must BLOCK and surface the add-permission
+      fix.
+    input: |
+      Operation: create-job
+      Operation type: Invoke Lambda (MyObjectProcessor)
+      Manifest: s3://prod-manifests/objects.csv (CSV, unversioned)
+      Report bucket: prod-batch-reports (us-east-1)
+      Role: arn:aws:iam::111111111111:role/S3BatchOpsRole
+      RequestsPerSecond: 100
+      Lambda: arn:aws:lambda:us-east-1:111111111111:function:MyObjectProcessor
+      Lambda State: Active
+      Lambda Timeout: 60
+      Lambda reserved concurrency: 100
+      Lambda resource-based policy (aws lambda get-policy):
+        Statement: [
+          {Effect: Allow, Principal: {Service: s3.amazonaws.com},
+           Action: lambda:InvokeFunction}
+        ]
+        (MISSING: batchoperations.amazonaws.com principal)
+
+      Role has s3:GetObject on prod-data/*, s3:PutObject on prod-batch-reports/*.
+      Caller has s3control:CreateJob + iam:PassRole.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "batchoperations.amazonaws.com"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "add-permission"
+        - "lambda:InvokeFunction"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: glacier-bulk-restore-completed
+    description: >-
+      A Glacier bulk-restore job has finished. Post-verification
+      confirms Status: Complete, zero failures, completion report
+      empty (FailedTasksOnly), sample objects show ongoing-request
+      (expected for Bulk tier). Emit COMPLETED.
+    input: |
+      Operation: create-job (post-verification)
+      JobId: a1b2c3d4-5678-90ef-ghij-klmnopqrstuv
+      Manifest: s3://archive-inventory/2026-07-15/manifest.json (2,300,000 objects)
+      Operation type: S3InitiateRestoreObject (GlacierJobTier: BULK, ExpirationInDays: 30)
+
+      Post-execution describe-job:
+        Status: Complete
+        NumberOfTasksSucceeded: 2,300,000
+        NumberOfTasksFailed: 0
+
+      Completion report (FailedTasksOnly):
+        Empty file (no failures)
+
+      Sample object verification (head-object --restore on 5 random objects):
+        All show: ongoing-request="true", expiry in 48h
+        (Expected for Bulk tier — restore is asynchronous)
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "Complete"
+        - "NumberOfTasksSucceeded"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "ongoing-request"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: kms-reencrypt-job-blocked-key-policy
+    description: >-
+      Operator wants to bulk re-encrypt objects with a new KMS key,
+      but the new key policy does not grant the role kms:Encrypt.
+      Pre-checks must BLOCK and surface the put-key-policy fix.
+    input: |
+      Operation: create-job
+      Operation type: Copy (in-place re-encrypt with new SSE-KMS key)
+      Source/destination: prod-data (same bucket)
+      Manifest: s3://prod-inventory/2026-08-01/manifest.json (12.4M objects)
+      Report bucket: prod-batch-reports (us-east-1)
+      Role: arn:aws:iam::111111111111:role/S3BatchOpsRole
+      RequestsPerSecond: 1000
+      New KMS key: arn:aws:kms:us-east-1:111111111111:key/new-key
+
+      Role identity-based policy:
+        - kms:Decrypt on arn:aws:kms:us-east-1:111111111111:key/old-key
+        - kms:Encrypt on arn:aws:kms:us-east-1:111111111111:key/new-key
+
+      New KMS key policy (aws kms get-key-policy):
+        Statement: [
+          {Effect: Allow, Principal: {AWS: "arn:aws:iam::111111111111:root"},
+           Action: "kms:*", Resource: "*"}
+        ]
+        (MISSING: explicit grant for S3BatchOpsRole on kms:Encrypt — root principal
+         covers account but the role is not granted via the key policy's
+         service-linked statement; Batch Operations assumes the role and
+         the key policy's grant must include the role ARN explicitly for
+         cross-service access)
+
+      Caller has s3control:CreateJob + iam:PassRole.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "kms:Encrypt"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "put-key-policy"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: large-job-billion-objects-ready
+    description: >-
+      Operator wants to plan a billion-object re-encrypt job. KMS quota
+      pre-verified, manifest sharded by prefix, rate control set.
+      Pre-checks pass and produce READY with the multi-job plan,
+      CloudWatch alarms, and KMS quota verification.
+    input: |
+      Operation: create-job
+      Operation type: Copy (in-place re-encrypt with new SSE-KMS key)
+      Source bucket: prod-data (1,000,000,000 objects, SSE-KMS old-key)
+      Manifest: S3 inventory report, sharded by prefix into 10 jobs of 100M objects each
+      Report bucket: prod-batch-reports (us-east-1)
+      Role: arn:aws:iam::111111111111:role/S3BatchOpsRole
+      RequestsPerSecond: 1000 per shard
+      CompletionWindow: P30D (30 days)
+      Priority: 50 per shard
+
+      KMS quota: pre-verified at 20,000 req/s (Decrypt + Encrypt combined)
+      Role grants: s3:GetObject + s3:PutObject on prod-data, kms:Decrypt
+        on old-key, kms:Encrypt on new-key
+      New key policy grants role: confirmed
+      Report scope: FailedTasksOnly (per shard)
+
+      Caller has s3control:CreateJob + iam:PassRole.
+
+      Emit the standard VERDICT block for the first shard.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-job"
+        - "VERDICT"
+        - "RequestsPerSecond"
+        - "shard"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"

@@ -1,0 +1,138 @@
+# Eval test cases for cloudformation-stack-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudformation-stack-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cfn-create-iam-capability-missing
+    description: Stack fails to create because template declares AWS::IAM::Role but create-stack was called without --capabilities CAPABILITY_IAM
+    input: |
+      Scenario: A CloudFormation stack "app-platform" in us-east-1
+      fails to create. describe-stacks shows StackStatus
+      ROLLBACK_COMPLETE and StackStatusReason "The following
+      resource(s) failed to create: [TaskRole]." describe-stack-events
+      shows the TaskRole resource (AWS::IAM::Role) with
+      ResourceStatus CREATE_FAILED and ResourceStatusReason "Requires
+      capabilities : [CAPABILITY_IAM]. User requested no
+      capabilities." The stack was created via "aws cloudformation
+      create-stack --stack-name app-platform --template-body
+      file://template.yaml" with no --capabilities flag. No other
+      CREATE_FAILED resources appear in the events.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "CREATE_FAILED"
+        - "CAPABILITY_IAM"
+        - "ROLLBACK_COMPLETE"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "update-stack"
+
+  - id: cfn-update-replacement-required
+    description: UPDATE_FAILED because the ChangeSet reports Replacement true on a DynamoDB table KeySchema change (immutable)
+    input: |
+      Scenario: A CloudFormation stack "orders-table" in us-east-1
+      fails to update. The template modifies the KeySchema of the
+      OrdersTable resource (AWS::DynamoDB::Table) from a simple
+      primary key to a composite key. describe-change-set for the
+      most recent ChangeSet shows OrdersTable with Action "Modify",
+      Replacement "True", Scope ["Properties"]. describe-stack-events
+      shows OrdersTable with ResourceStatus UPDATE_FAILED and
+      ResourceStatusReason "Resource update cancelled". StackStatus
+      is UPDATE_ROLLBACK_COMPLETE (rollback succeeded).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "UPDATE_FAILED"
+        - "Replacement"
+        - "KeySchema"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "ROLLBACK_COMPLETE"
+
+  - id: cfn-delete-s3-bucket-not-empty
+    description: DELETE_FAILED because the S3 bucket being deleted still contains objects (and versions)
+    input: |
+      Scenario: A CloudFormation stack "logging-bucket-stack" in
+      us-east-1 fails to delete. describe-stack-events shows the
+      LogsBucket resource (AWS::S3::Bucket) with ResourceStatus
+      DELETE_FAILED and ResourceStatusReason "The bucket you tried
+      to delete is not empty. You must delete all versions in the
+      bucket." The bucket has versioning enabled. StackStatus is
+      DELETE_FAILED. The template has DeletionPolicy: Delete on the
+      bucket.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "DELETE_FAILED"
+        - "not empty"
+        - "versions"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "DeletionPolicy: Retain"
+
+  - id: cfn-update-rollback-nested-stack
+    description: UPDATE_ROLLBACK_FAILED on parent stack because a nested child stack cannot roll back its update
+    input: |
+      Scenario: A CloudFormation parent stack "platform-root" in
+      us-east-1 ends in StackStatus UPDATE_ROLLBACK_FAILED after an
+      update attempt. describe-stack-events shows the
+      NetworkStack resource (AWS::CloudFormation::Stack) with
+      ResourceStatus UPDATE_ROLLBACK_FAILED. The PhysicalResourceId
+      of NetworkStack is
+      arn:aws:cloudformation:us-east-1:111111111111:stack/platform-root-NetworkStack-abc/def.
+      describe-stacks on that nested stack shows it is itself in
+      UPDATE_ROLLBACK_FAILED, with a VPC resource that cannot be
+      rolled back because its CIDR block was modified (immutable).
+      No other resources in the parent stack failed.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "UPDATE_ROLLBACK_FAILED"
+        - "nested"
+        - "ContinueUpdateRollback"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: cfn-vague-report-need-stack-info
+    description: Vague report of CloudFormation failure without stack name, region, or status
+    input: |
+      Scenario: A user reports "my CloudFormation deployment is
+      broken, the stack keeps failing." They mention it is a "prod
+      stack" but do not provide a stack name, region, StackStatus,
+      ResourceStatusReason, or failing resource logical id.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "describe-stack-events"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

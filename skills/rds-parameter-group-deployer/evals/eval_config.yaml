@@ -1,0 +1,48 @@
+# Eval configuration for rds-parameter-group-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: rds-parameter-group-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: postgres15-common-tuning
+    difficulty: medium
+    prompt_file: prompts/postgres15-common-tuning.md
+    baseline_file: baselines/postgres15-common-tuning.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: mysql8-buffer-pool-tuning
+    difficulty: medium
+    prompt_file: prompts/mysql8-buffer-pool-tuning.md
+    baseline_file: baselines/mysql8-buffer-pool-tuning.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-db-family
+    difficulty: hard
+    prompt_file: prompts/missing-db-family.md
+    baseline_file: baselines/missing-db-family.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: aurora-serverless-v2-capacity
+    difficulty: hard
+    prompt_file: prompts/aurora-serverless-v2-capacity.md
+    baseline_file: baselines/aurora-serverless-v2-capacity.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: static-param-reboot-warning
+    difficulty: hard
+    prompt_file: prompts/static-param-reboot-warning.md
+    baseline_file: baselines/static-param-reboot-warning.md
+    expected_verdict: READY_TO_DEPLOY

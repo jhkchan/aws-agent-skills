@@ -1,0 +1,47 @@
+# Eval configuration for codepipeline-failure-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: codepipeline-failure-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: cp-source-github-token-expired
+    difficulty: medium
+    prompt_file: prompts/cp-source-github-token-expired.md
+    baseline_file: baselines/cp-source-github-token-expired.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: SOURCE_STAGE_FAILED
+  - id: cp-build-buildspec-missing
+    difficulty: hard
+    prompt_file: prompts/cp-build-buildspec-missing.md
+    baseline_file: baselines/cp-build-buildspec-missing.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: BUILD_STAGE_FAILED
+  - id: cp-deploy-cfn-changeset-empty
+    difficulty: medium
+    prompt_file: prompts/cp-deploy-cfn-changeset-empty.md
+    baseline_file: baselines/cp-deploy-cfn-changeset-empty.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: DEPLOY_STAGE_FAILED
+  - id: cp-cross-account-role-trust-expired
+    difficulty: hard
+    prompt_file: prompts/cp-cross-account-role-trust-expired.md
+    baseline_file: baselines/cp-cross-account-role-trust-expired.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: CROSS_ACCOUNT_ROLE_FAILED
+  - id: cp-vague-report-need-pipeline-info
+    difficulty: easy
+    prompt_file: prompts/cp-vague-report-need-pipeline-info.md
+    baseline_file: baselines/cp-vague-report-need-pipeline-info.md
+    expected_verdict: NEED_MORE_INFO

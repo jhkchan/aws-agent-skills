@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ec2-instance-recovery-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EC2 Instance Recovery Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cloudwatch-recovery-alarm-stop-start-ready",
+      "name": "Recover SystemStatus-impaired instance via stop/start — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cloudwatch-recovery-alarm-stop-start-ready.md",
+      "baseline_file": "baselines/cloudwatch-recovery-alarm-stop-start-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "stop-instances", "start-instances", "VERDICT", "PRE_CHECKS", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "diagnose-kernel-panic-blocked",
+      "name": "Diagnose instance with kernel panic — OS hung, SSH/SSM down (BLOCKED with EBS detach/attach fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/diagnose-kernel-panic-blocked.md",
+      "baseline_file": "baselines/diagnose-kernel-panic-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "kernel panic", "VERDICT", "PRE_CHECKS", "detach"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "ebs-detach-attach-completed",
+      "name": "EBS detach/attach data salvage — volume repaired and reattached (COMPLETED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ebs-detach-attach-completed.md",
+      "baseline_file": "baselines/ebs-detach-attach-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "vol-0abc", "VERDICT", "POST_VERIFY", "in-use"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "asg-instance-store-blocked",
+      "name": "Stop/start ASG-managed instance-store instance — double BLOCKED (data loss + ASG termination)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/asg-instance-store-blocked.md",
+      "baseline_file": "baselines/asg-instance-store-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "instance-store", "VERDICT", "PRE_CHECKS", "suspend-processes"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "forensic-ami-before-recovery-ready",
+      "name": "Capture forensic AMI before recovery — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/forensic-ami-before-recovery-ready.md",
+      "baseline_file": "baselines/forensic-ami-before-recovery-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-image", "VERDICT", "PRE_CHECKS", "no-reboot", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

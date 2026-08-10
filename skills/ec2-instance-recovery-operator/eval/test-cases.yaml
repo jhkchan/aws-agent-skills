@@ -1,0 +1,230 @@
+# Eval test cases for ec2-instance-recovery-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ec2-instance-recovery-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cloudwatch-recovery-alarm-stop-start-ready
+    description: >-
+      Operator wants to recover an EC2 instance with SystemStatus
+      impaired (hardware degradation). All pre-checks pass: EBS root,
+      no ASG, no Capacity Reservation, no pending events, no existing
+      recovery alarm. Plan should produce READY with stop/start and a
+      CloudWatch recovery alarm recommendation.
+    input: |
+      Operation: stop-start (recover from SystemStatus impaired)
+      Instance: i-0abcdef1234567890
+
+      Instance metadata (aws ec2 describe-instance-status):
+        State: running
+        SystemStatus.Status: impaired
+        InstanceStatus.Status: ok
+        Events: none
+
+      Instance details (aws ec2 describe-instances):
+        InstanceType: m5.2xlarge
+        RootDeviceType: ebs
+        BlockDeviceMappings: [{DeviceName: /dev/xvda, Ebs: {VolumeId: vol-0abc, DeleteOnTermination: true}}]
+        Placement: {GroupName: "", Tenancy: default}
+        CapacityReservationId: null
+
+      ASG membership (aws autoscaling describe-auto-scaling-instances):
+        (empty — not in an ASG)
+
+      Existing recovery alarms:
+        (none)
+
+      Caller has ec2:StopInstances, ec2:StartInstances,
+      cloudwatch:PutMetricAlarm.
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "stop-instances"
+        - "start-instances"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: diagnose-kernel-panic-blocked
+    description: >-
+      An instance is running but unreachable. Console output shows a
+      kernel panic from a bad module. SSM PingStatus is ConnectionLost.
+      Diagnose and emit BLOCKED with the EBS detach/attach fix path.
+    input: |
+      Operation: diagnose-impaired
+      Instance: i-0abcdef1234567890
+
+      Instance metadata (aws ec2 describe-instance-status):
+        State: running
+        SystemStatus.Status: ok
+        InstanceStatus.Status: impaired
+        Events: none
+
+      SSM status (aws ssm describe-instance-information):
+        PingStatus: ConnectionLost
+
+      Console output (aws ec2 get-console-output --latest):
+        [   10.123456] kernel panic - not syncing: Fatal module load
+        error in xyz-driver
+        [   10.123789] CPU: 0 PID: 456 Comm: modprobe
+        [   10.124012] Call Trace:
+        [...]
+        [   10.130000] ---[ end Kernel panic - not syncing...
+
+      Instance details: RootDeviceType: ebs, not in ASG.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "kernel panic"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "detach"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: ebs-detach-attach-completed
+    description: >-
+      An EBS detach/attach data-salvage operation has completed. The
+      root volume was detached, attached to a rescue instance, the
+      bad nginx config was reverted, and the volume was reattached to
+      the original instance. Post-verification confirms the volume is
+      in-use and the application responds.
+    input: |
+      Operation: detach-attach-ebs (post-verification)
+      Instance: i-0abcdef1234567890
+      Volume: vol-0abc (root, /dev/xvda)
+      Rescue instance: i-0rescue9999 (same AZ: us-east-1a)
+
+      Pre-execution:
+        - Source instance unreachable (OS hung)
+        - EBS volume vol-0abc attached, DeleteOnTermination: false
+        - Rescue instance i-0rescue9999 in same AZ
+        - Device /dev/sdf free on rescue
+
+      Execution (completed):
+        1. detach-volume --volume-id vol-0abc --instance-id i-0abcdef --force
+        2. attach-volume --volume-id vol-0abc --instance-id i-0rescue9999 --device /dev/sdf
+        3. Operator reverted bad config in /mnt/recovery/etc/nginx/nginx.conf
+        4. detach-volume from rescue
+        5. attach-volume to original instance at /dev/xvda
+
+      Post-execution verification:
+        - describe-volumes: vol-0abc in-use on i-0abcdef1234567890 at /dev/xvda
+        - Instance boots, nginx config valid
+        - Application health check: HTTP 200
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "vol-0abc"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "in-use"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: asg-instance-store-blocked
+    description: >-
+      Operator wants to stop/start an ASG-managed instance with
+      instance-store root volume. Pre-checks must BLOCK: stop would
+      lose the root volume AND the ASG would terminate the instance
+      during the stop.
+    input: |
+      Operation: stop-start
+      Instance: i-0abcdef1234567890
+
+      Instance metadata:
+        State: running
+        SystemStatus.Status: impaired
+        InstanceStatus.Status: ok
+
+      Instance details:
+        RootDeviceType: instance-store
+        Placement: {Tenancy: default}
+
+      ASG membership:
+        AutoScalingGroupName: prod-web-asg
+        LifecycleState: InService
+        HealthStatus: Healthy
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "instance-store"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "suspend-processes"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: forensic-ami-before-recovery-ready
+    description: >-
+      Operator wants to capture a forensic AMI from a failing instance
+      before attempting recovery. All pre-checks pass: instance running,
+      EBS root, AMI name unique. Plan should produce READY with the
+      create-image command and a CONFIRM gate.
+    input: |
+      Operation: forensic-ami
+      Instance: i-0abcdef1234567890
+
+      Instance metadata:
+        State: running
+        SystemStatus.Status: impaired
+        InstanceStatus.Status: ok
+
+      Instance details:
+        RootDeviceType: ebs
+        BlockDeviceMappings: [
+          {DeviceName: /dev/xvda, Ebs: {VolumeId: vol-0abc, DeleteOnTermination: true}},
+          {DeviceName: /dev/xvdb, Ebs: {VolumeId: vol-0def, DeleteOnTermination: false}}
+        ]
+
+      Existing AMIs with prefix "forensic-i-0abcdef":
+        (none — no name collision)
+
+      Operator wants --no-reboot (instance is hung, clean shutdown
+      not possible).
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-image"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "no-reboot"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"

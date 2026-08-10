@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "glue-job-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Glue Job Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "python-exception-attributeerror-script",
+      "name": "Glue job FAILED with AttributeError traceback — from_catalog returned None on empty table",
+      "difficulty": "easy",
+      "prompt_file": "prompts/python-exception-attributeerror-script.md",
+      "baseline_file": "baselines/python-exception-attributeerror-script.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "python-exception-attributeerror-script", "SCRIPT_EXCEPTION", "AttributeError", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "jdbc-connection-missing-security-group",
+      "name": "Glue job JDBC failure — database SG lacks inbound from Glue SG on port 5432",
+      "difficulty": "medium",
+      "prompt_file": "prompts/jdbc-connection-missing-security-group.md",
+      "baseline_file": "baselines/jdbc-connection-missing-security-group.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "jdbc-connection-missing-security-group", "JDBC_VPC", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "bookmark-not-advancing-layout-drift",
+      "name": "Glue bookmark tracks (year, month) but source layout changed to dt= — job reprocesses everything",
+      "difficulty": "hard",
+      "prompt_file": "prompts/bookmark-not-advancing-layout-drift.md",
+      "baseline_file": "baselines/bookmark-not-advancing-layout-drift.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "bookmark-not-advancing-layout-drift", "BOOKMARK_STALL", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "spark-oom-stage-skew",
+      "name": "Spark executor OOM in stage 7 join — 316x skew on hot key customer_id=ACME-001",
+      "difficulty": "hard",
+      "prompt_file": "prompts/spark-oom-stage-skew.md",
+      "baseline_file": "baselines/spark-oom-stage-skew.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "spark-oom-stage-skew", "SPARK_OOM", "skew", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "catalog-table-not-found",
+      "name": "EntityNotFoundException fires because cross-account job role lacks glue:GetTable, not because table is missing",
+      "difficulty": "medium",
+      "prompt_file": "prompts/catalog-table-not-found.md",
+      "baseline_file": "baselines/catalog-table-not-found.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "catalog-table-not-found", "CATALOG_MISSING", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    }
+  ]
+}

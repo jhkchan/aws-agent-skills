@@ -1,0 +1,177 @@
+# Eval test cases for rds-parameter-group-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across database engines (PostgreSQL, MySQL, Aurora),
+# parameter types (static requiring reboot, dynamic immediate), and
+# prerequisite failure branches (missing DB family/engine version).
+skill: rds-parameter-group-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: postgres15-common-tuning
+    description: >-
+      Provision a PostgreSQL 15 DB parameter group with standard
+      production tuning: max_connections, shared_buffers (static,
+      pending reboot), work_mem, wal_buffers,
+      checkpoint_completion_target (dynamic, immediate), and
+      association with a DB instance. Expects READY_TO_DEPLOY with
+      a note that static parameters require a reboot.
+    input: |
+      Provision an RDS DB parameter group for PostgreSQL 15 in
+      us-east-1. Name: payments-pg15-params. Family: postgres15.
+      Parameters: max_connections=200 (pending-reboot),
+      shared_buffers={DBInstanceClassMemory/4} (pending-reboot),
+      work_mem=8MB (immediate),
+      wal_buffers=16MB (immediate),
+      checkpoint_completion_target=0.9 (immediate),
+      effective_cache_size={DBInstanceClassMemory*3/4} (immediate),
+      random_page_cost=1.1 (immediate),
+      log_min_duration_statement=1000 (immediate). Associate with
+      DB instance payments-db-pg15. Tags: Environment=production,
+      Application=payments.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "payments-pg15-params"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "postgres15"
+        - "shared_buffers"
+        - "PENDING REBOOT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: mysql8-buffer-pool-tuning
+    description: >-
+      Provision a MySQL 8.0 DB parameter group with
+      innodb_buffer_pool_size, max_connections (static),
+      slow_query_log, long_query_time, and association with a DB
+      instance. Expects READY_TO_DEPLOY.
+    input: |
+      Provision an RDS DB parameter group for MySQL 8.0 in
+      us-east-1. Name: orders-mysql8-params. Family: mysql8.0.
+      Parameters: innodb_buffer_pool_size={DBInstanceClassMemory*3/4}
+      (immediate), max_connections=300 (pending-reboot),
+      slow_query_log=1 (immediate), long_query_time=1 (immediate),
+      innodb_flush_log_at_trx_commit=1 (immediate),
+      character_set_server=utf8mb4 (pending-reboot). Associate
+      with DB instance orders-db-mysql8. Tags: Environment=production,
+      Application=orders.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "orders-mysql8-params"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "mysql8.0"
+        - "innodb_buffer_pool_size"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-db-family
+    description: >-
+      Provision a DB parameter group but the user does not specify
+      the DB engine or engine version, so the parameter group family
+      cannot be determined. Expects PREREQUISITES_MISSING — the family
+      is immutable and must match the engine version.
+    input: |
+      Provision an RDS DB parameter group in us-east-1. Name:
+      app-pg-params. Parameters: max_connections=100,
+      shared_buffers={DBInstanceClassMemory/4}, work_mem=8MB.
+      I'm not sure which family to use — the DB instance is running
+      either PostgreSQL or MySQL, I don't remember the version.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "app-pg-params"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "family"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: aurora-serverless-v2-capacity
+    description: >-
+      Provision an Aurora Serverless v2 PostgreSQL 15 cluster
+      parameter group with formula-based memory values and capacity
+      configuration. Expects READY_TO_DEPLOY with a note that
+      absolute memory values must not be used on Serverless v2.
+    input: |
+      Provision an Aurora DB cluster parameter group for
+      PostgreSQL 15 Serverless v2 in us-east-1. Name:
+      slsv2-pg15-params. Family: aurora-postgresql15. Parameters:
+      shared_buffers={DBInstanceClassMemory/4} (pending-reboot),
+      work_mem=4MB (immediate),
+      effective_cache_size={DBInstanceClassMemory*3/4} (immediate),
+      max_connections={LEAST({DBInstanceClassMemory/9531392},5000)}
+      (pending-reboot),
+      autovacuum_naptime=30s (immediate). Cluster scaling:
+      MinCapacity=2, MaxCapacity=16. Associate with Aurora cluster
+      slsv2-cluster. Tags: Environment=production,
+      Application=serverless.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "slsv2-pg15-params"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "aurora-postgresql15"
+        - "DBInstanceClassMemory"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: static-param-reboot-warning
+    description: >-
+      Provision a PostgreSQL parameter group where shared_buffers
+      (static) and max_connections (static) are changed alongside
+      dynamic parameters. Expects READY_TO_DEPLOY with an explicit
+      warning that static parameters require a DB instance reboot.
+    input: |
+      Provision an RDS DB parameter group for PostgreSQL 16 in
+      us-east-1. Name: analytics-pg16-params. Family: postgres16.
+      Parameters: shared_buffers={DBInstanceClassMemory/4},
+      max_connections=100, work_mem=64MB (immediate),
+      maintenance_work_mem=1GB (immediate),
+      effective_cache_size={DBInstanceClassMemory*3/4} (immediate),
+      random_page_cost=1.1 (immediate). Associate with DB instance
+      analytics-db-pg16. This is a read-heavy analytics workload.
+      Tags: Environment=production, Application=analytics.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "analytics-pg16-params"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "postgres16"
+        - "PENDING REBOOT"
+        - "shared_buffers"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

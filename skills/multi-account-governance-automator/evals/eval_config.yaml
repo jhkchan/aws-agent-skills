@@ -1,0 +1,43 @@
+# Eval configuration for multi-account-governance-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: multi-account-governance-automator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: greenfield-org-control-tower
+    difficulty: hard
+    prompt_file: prompts/greenfield-org-control-tower.md
+    baseline_file: baselines/greenfield-org-control-tower.md
+    expected_verdict: AUTOMATED
+  - id: scp-guardrail-baseline
+    difficulty: medium
+    prompt_file: prompts/scp-guardrail-baseline.md
+    baseline_file: baselines/scp-guardrail-baseline.md
+    expected_verdict: AUTOMATED
+  - id: delegated-admin-setup
+    difficulty: hard
+    prompt_file: prompts/delegated-admin-setup.md
+    baseline_file: baselines/delegated-admin-setup.md
+    expected_verdict: AUTOMATED
+  - id: flat-org-no-scp
+    difficulty: hard
+    prompt_file: prompts/flat-org-no-scp.md
+    baseline_file: baselines/flat-org-no-scp.md
+    expected_verdict: MANUAL_STEP_REQUIRED
+  - id: scp-inheritance-conflict
+    difficulty: medium
+    prompt_file: prompts/scp-inheritance-conflict.md
+    baseline_file: baselines/scp-inheritance-conflict.md
+    expected_verdict: MANUAL_STEP_REQUIRED

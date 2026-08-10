@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds deep expert knowledge: exact upgrade ordering (add\u2011ons \u2192 control plane \u2192 node groups), concrete version\u2011compatibility matrices, deprecated\u2011API tables, cost/time baselines, recent AWS features (Auto Mode, Hybrid Nodes, Access Entries, Pod Identity). Missing: detailed IAM\u2011role permission checks, cross\u2011account considerations, Karpenter\u2011specific upgrade handling."
+      "justification": "Adds concrete expert details not usually known to a generic model: exact sequential\u2011minor\u2011version rule, add\u2011on bridge\u2011version requirement, IP\u2011capacity check for surge upgrades, extended\u2011support pricing ($0.10/cluster\u2011hour), recent AWS features (Auto Mode, Hybrid Nodes, Access Entries, Pod Identity, Karpenter v1) and a detailed deprecated\u2011API matrix. No major missing knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: precise CLI flags, confirm\u2011gate workflow, pre\u2011check priority list, and post\u2011verification steps. Weakness: some steps are generic (e.g., \"run kubent\" without version flag) and no explicit fallback plan for a failed control\u2011plane upgrade."
+      "justification": "Encodes AWS\u2011specific upgrade mindset (add\u2011ons first, control\u2011plane second, node\u2011groups third) and precise procedural steps: pre\u2011flight metadata gate, mandatory CONFIRM gate, backup of cluster state, exact CLI flags, polling logic, and post\u2011verification checklist. All procedures are AWS\u2011specific rather than generic."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasons (add\u2011on sequencing, one\u2011way control\u2011plane upgrade, PDB drain blocking, resolve\u2011conflicts handling, deprecated\u2011API scan). Lacks anti\u2011patterns around IAM permission errors and pagination pitfalls beyond a brief mention."
+      "justification": "Provides a concrete NEVER list with specific reasons (e.g., skipping add\u2011on upgrade breaks networking, PDBs block drain, using --resolve-conflicts OVERWRITE without backup). Includes additional pitfalls (IAM role permissions, concurrent updates) but could list a few more edge\u2011cases such as forgetting to disable pod\u2011identity add\u2011on before upgrade."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Full frontmatter, clear description of WHAT it does, WHEN to invoke, exhaustive keyword list, activation triggers, and a precise invocation schema. No missing or vague elements."
+      "justification": "Frontmatter is complete with description, version, author, license, compatibility, keywords, tags, metadata, activation triggers, and invocation schema. The description clearly states WHAT the skill does, WHEN to invoke, and KEYWORDS. Minor omission: the \"when_to_use\" field repeats the description but could be a concise bullet list."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick reference, mindset, pre\u2011flight, process, output format). Critical safety rules (e.g., rollback advisory) are repeated deep in the document, and the size of the skill may overload an agent before it reaches the needed section."
+      "justification": "Content is layered: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns, and worked examples. Critical rules appear early, deeper references later. Slight overload in the long \"Step 0\" knowledge block, but overall the layering is effective."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained with confirm gates, version\u2011skip checks, and capacity validation. Some flexibility remains (e.g., surge parameters are not bounded by explicit limits) and IAM\u2011role validation is only mentioned generically."
+      "justification": "Destructive actions are tightly constrained with mandatory CONFIRM gate, rollback advisory, IP\u2011capacity and PDB checks, and explicit safety warnings. Creative or read\u2011only tasks (pre\u2011check, post\u2011verify) are left flexible. No over\u2011constraining of harmless operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns). Structure is coherent, though section naming is slightly ad\u2011hoc rather than a standard template."
+      "justification": "Follows a recognizable pattern (frontmatter \u2192 What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output format \u2192 Anti\u2011Patterns \u2192 Safety checks). The structure aids comprehension; only minor ad\u2011hoc phrasing in some tables."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 11,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI commands, example outputs, and error\u2011handling notes. Missing: explicit handling of pagination errors, detailed remediation steps for failed CLI calls, and some placeholders remain (e.g., <update-id-from-step-2>) requiring runtime substitution."
+      "justification": "Provides decision trees, concrete CLI commands, and examples, but the example outputs violate the \"no placeholders\" rule (e.g., <update-id-from-step-2>) and contain ambiguous pre\u2011check statements (target version same as cluster). Error handling for IAM permission failures is only briefly mentioned. These gaps reduce immediate executability."
     }
   ],
-  "total_score": 107,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44654,
-  "latency_ms": 14802,
+  "token_count": 44640,
+  "latency_ms": 20907,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

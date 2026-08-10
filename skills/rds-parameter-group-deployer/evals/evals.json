@@ -1,0 +1,182 @@
+{
+  "skill": "rds-parameter-group-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the RDS Parameter Group Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across database engines (PostgreSQL 15/16, MySQL 8.0, Aurora Serverless v2), parameter types (static requiring reboot, dynamic immediate), and prerequisite failure branches (missing DB family). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "postgres15-common-tuning",
+      "name": "PostgreSQL 15 parameter group with standard production tuning",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — postgres15 family, static shared_buffers/max_connections (pending reboot), dynamic work_mem/wal_buffers/checkpoint_completion_target (immediate)",
+      "prompt": "Provision an RDS DB parameter group for PostgreSQL 15 in us-east-1. Name: payments-pg15-params. Family: postgres15. Parameters: max_connections=200 (pending-reboot), shared_buffers={DBInstanceClassMemory/4} (pending-reboot), work_mem=8MB (immediate), wal_buffers=16MB (immediate), checkpoint_completion_target=0.9 (immediate), effective_cache_size={DBInstanceClassMemory*3/4} (immediate), random_page_cost=1.1 (immediate), log_min_duration_statement=1000 (immediate). Associate with DB instance payments-db-pg15. Tags: Environment=production, Application=payments.",
+      "prompt_file": "prompts/postgres15-common-tuning.md",
+      "baseline_file": "baselines/postgres15-common-tuning.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GROUP: payments-pg15-params\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Family — postgres15\n  [✓]      Type — DBParameterGroup\n  [✓]      max_connections — 200 (static, PENDING REBOOT required)\n  [✓]      shared_buffers — {DBInstanceClassMemory/4} (static, PENDING REBOOT required)\n  [✓]      work_mem — 8MB (dynamic, immediate)\n  [✓]      wal_buffers — 16MB (dynamic, immediate)\n  [✓]      checkpoint_completion_target — 0.9 (dynamic, immediate)\n  [✓]      effective_cache_size — {DBInstanceClassMemory*3/4} (dynamic, immediate)\n  [✓]      random_page_cost — 1.1 (dynamic, immediate)\n  [✓]      log_min_duration_statement — 1000 (dynamic, immediate)\n  [✓]      Association — DB instance payments-db-pg15\n  [✓]      Reboot required — YES (static params: max_connections, shared_buffers)\n  [✓]      Tags — Environment=production, Application=payments\nVERIFICATION_COMMANDS:\n  aws rds describe-db-parameters --db-parameter-group-name payments-pg15-params\n  aws rds describe-db-instances --db-instance-identifier payments-db-pg15\n  aws rds describe-pending-maintenance-actions --db-instance-identifier payments-db-pg15",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "payments-pg15-params",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "postgres15",
+            "shared_buffers",
+            "PENDING REBOOT"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mysql8-buffer-pool-tuning",
+      "name": "MySQL 8.0 parameter group with buffer pool and slow query tuning",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — mysql8.0 family, innodb_buffer_pool_size (dynamic), max_connections (static), slow_query_log (dynamic)",
+      "prompt": "Provision an RDS DB parameter group for MySQL 8.0 in us-east-1. Name: orders-mysql8-params. Family: mysql8.0. Parameters: innodb_buffer_pool_size={DBInstanceClassMemory*3/4} (immediate), max_connections=300 (pending-reboot), slow_query_log=1 (immediate), long_query_time=1 (immediate), innodb_flush_log_at_trx_commit=1 (immediate), character_set_server=utf8mb4 (pending-reboot). Associate with DB instance orders-db-mysql8. Tags: Environment=production, Application=orders.",
+      "prompt_file": "prompts/mysql8-buffer-pool-tuning.md",
+      "baseline_file": "baselines/mysql8-buffer-pool-tuning.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GROUP: orders-mysql8-params\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Family — mysql8.0\n  [✓]      Type — DBParameterGroup\n  [✓]      innodb_buffer_pool_size — {DBInstanceClassMemory*3/4} (dynamic, immediate)\n  [✓]      max_connections — 300 (static, PENDING REBOOT required)\n  [✓]      slow_query_log — 1 (dynamic, immediate)\n  [✓]      long_query_time — 1 (dynamic, immediate)\n  [✓]      innodb_flush_log_at_trx_commit — 1 (dynamic, immediate)\n  [✓]      character_set_server — utf8mb4 (static, PENDING REBOOT required)\n  [✓]      Association — DB instance orders-db-mysql8\n  [✓]      Reboot required — YES (static params: max_connections, character_set_server)\n  [✓]      Tags — Environment=production, Application=orders\nVERIFICATION_COMMANDS:\n  aws rds describe-db-parameters --db-parameter-group-name orders-mysql8-params\n  aws rds describe-db-instances --db-instance-identifier orders-db-mysql8\n  aws rds describe-pending-maintenance-actions --db-instance-identifier orders-db-mysql8",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "orders-mysql8-params",
+            "VERDICT",
+            "CHECKLIST",
+            "mysql8.0",
+            "innodb_buffer_pool_size",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-db-family",
+      "name": "Parameter group requested but DB engine and version not specified",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — parameter group family required and immutable",
+      "prompt": "Provision an RDS DB parameter group in us-east-1. Name: app-pg-params. Parameters: max_connections=100, shared_buffers={DBInstanceClassMemory/4}, work_mem=8MB. I'm not sure which family to use — the DB instance is running either PostgreSQL or MySQL, I don't remember the version.",
+      "prompt_file": "prompts/missing-db-family.md",
+      "baseline_file": "baselines/missing-db-family.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "GROUP: app-pg-params\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [INPUT NEEDED] Family — MISSING. The DB engine and version are not specified. The parameter group family (e.g., postgres15, mysql8.0) is immutable after creation and MUST match the DB engine version. Run describe-db-instances to determine the engine.\n  [✓]      max_connections — 100 (static, pending-reboot)\n  [✓]      shared_buffers — {DBInstanceClassMemory/4} (static, pending-reboot)\n  [✓]      work_mem — 8MB (dynamic, immediate)\nVERIFICATION_COMMANDS:\n  aws rds describe-db-instances --query 'DBInstances[].{Engine:Engine,EngineVersion:EngineVersion}'\n  aws rds describe-db-engine-versions --engine postgres --query 'DBEngineVersions[].DBParameterGroupFamily'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "app-pg-params",
+            "VERDICT",
+            "CHECKLIST",
+            "family"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aurora-serverless-v2-capacity",
+      "name": "Aurora Serverless v2 PostgreSQL 15 cluster parameter group with formula values",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — aurora-postgresql15 cluster parameter group, formula-based memory values, capacity configuration",
+      "prompt": "Provision an Aurora DB cluster parameter group for PostgreSQL 15 Serverless v2 in us-east-1. Name: slsv2-pg15-params. Family: aurora-postgresql15. Parameters: shared_buffers={DBInstanceClassMemory/4} (pending-reboot), work_mem=4MB (immediate), effective_cache_size={DBInstanceClassMemory*3/4} (immediate), max_connections={LEAST({DBInstanceClassMemory/9531392},5000)} (pending-reboot), autovacuum_naptime=30s (immediate). Cluster scaling: MinCapacity=2, MaxCapacity=16. Associate with Aurora cluster slsv2-cluster. Tags: Environment=production, Application=serverless.",
+      "prompt_file": "prompts/aurora-serverless-v2-capacity.md",
+      "baseline_file": "baselines/aurora-serverless-v2-capacity.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GROUP: slsv2-pg15-params\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Family — aurora-postgresql15\n  [✓]      Type — DBClusterParameterGroup\n  [✓]      shared_buffers — {DBInstanceClassMemory/4} (static, PENDING REBOOT required, formula adapts to dynamic ACU)\n  [✓]      work_mem — 4MB (dynamic, immediate, conservative for min ACU)\n  [✓]      effective_cache_size — {DBInstanceClassMemory*3/4} (dynamic, immediate)\n  [✓]      max_connections — {LEAST({DBInstanceClassMemory/9531392},5000)} (static, PENDING REBOOT required, formula-based scaling)\n  [✓]      autovacuum_naptime — 30s (dynamic, immediate)\n  [✓]      Serverless v2 scaling — MinCapacity=2, MaxCapacity=16 (set on cluster, not parameter group)\n  [✓]      Association — Aurora cluster slsv2-cluster\n  [✓]      Tags — Environment=production, Application=serverless\nVERIFICATION_COMMANDS:\n  aws rds describe-db-cluster-parameters --db-cluster-parameter-group-name slsv2-pg15-params\n  aws rds describe-db-clusters --db-cluster-identifier slsv2-cluster --query 'DBClusters[].ServerlessV2ScalingConfigurationInfo'\n  aws rds describe-db-clusters --db-cluster-identifier slsv2-cluster --query 'DBClusters[].DBClusterParameterGroup'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "slsv2-pg15-params",
+            "VERDICT",
+            "CHECKLIST",
+            "aurora-postgresql15",
+            "DBInstanceClassMemory",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "static-param-reboot-warning",
+      "name": "PostgreSQL 16 parameter group with static params requiring explicit reboot warning",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — postgres16 family, static params flagged for reboot, analytics tuning (high work_mem)",
+      "prompt": "Provision an RDS DB parameter group for PostgreSQL 16 in us-east-1. Name: analytics-pg16-params. Family: postgres16. Parameters: shared_buffers={DBInstanceClassMemory/4}, max_connections=100, work_mem=64MB (immediate), maintenance_work_mem=1GB (immediate), effective_cache_size={DBInstanceClassMemory*3/4} (immediate), random_page_cost=1.1 (immediate). Associate with DB instance analytics-db-pg16. This is a read-heavy analytics workload. Tags: Environment=production, Application=analytics.",
+      "prompt_file": "prompts/static-param-reboot-warning.md",
+      "baseline_file": "baselines/static-param-reboot-warning.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GROUP: analytics-pg16-params\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Family — postgres16\n  [✓]      Type — DBParameterGroup\n  [✓]      shared_buffers — {DBInstanceClassMemory/4} (static, PENDING REBOOT required)\n  [✓]      max_connections — 100 (static, PENDING REBOOT required)\n  [✓]      work_mem — 64MB (dynamic, immediate, analytics-tuned for large sorts/hashes)\n  [✓]      maintenance_work_mem — 1GB (dynamic, immediate, faster VACUUM/CREATE INDEX)\n  [✓]      effective_cache_size — {DBInstanceClassMemory*3/4} (dynamic, immediate)\n  [✓]      random_page_cost — 1.1 (dynamic, immediate, SSD-optimized)\n  [✓]      Association — DB instance analytics-db-pg16\n  [✓]      Reboot required — YES (static params: shared_buffers, max_connections must be applied via reboot)\n  [✓]      Tags — Environment=production, Application=analytics\nVERIFICATION_COMMANDS:\n  aws rds describe-db-parameters --db-parameter-group-name analytics-pg16-params\n  aws rds describe-db-instances --db-instance-identifier analytics-db-pg16\n  aws rds describe-pending-maintenance-actions --db-instance-identifier analytics-db-pg16",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "analytics-pg16-params",
+            "VERDICT",
+            "CHECKLIST",
+            "postgres16",
+            "PENDING REBOOT",
+            "shared_buffers",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

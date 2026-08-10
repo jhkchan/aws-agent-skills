@@ -1,0 +1,144 @@
+# Eval test cases for codepipeline-failure-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: codepipeline-failure-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cp-source-github-token-expired
+    description: Source stage fails because the GitHub v1 personal access token stored in the pipeline has expired
+    input: |
+      Scenario: A CodePipeline "app-cicd" in us-east-1 fails at the
+      Source stage. The Source action uses a GitHub v1 source action
+      with a personal access token stored in Secrets Manager.
+      list-action-executions shows the Source action with lastStatus
+      Failed and externalExecutionSummary "Could not authenticate to
+      GitHub". The GitHub connection was last successfully used 92
+      days ago. The PAT in Secrets Manager has a "Credential
+      requires renewal" flag in the GitHub audit log. No other
+      actions failed.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "SOURCE_STAGE_FAILED"
+        - "GitHub"
+        - "token"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "buildspec"
+
+  - id: cp-build-buildspec-missing
+    description: Build stage fails because buildspec.yml is not at the configured path in the source artifact
+    input: |
+      Scenario: A CodePipeline "app-cicd" in us-east-1 fails at the
+      Build stage. The Build action invokes CodeBuild project
+      "app-build". batch-get-builds on the build ID shows buildStatus
+      FAILED with DOWNLOAD_SOURCE phase SUCCEEDED and INSTALL phase
+      FAILED, phaseFailureReason "BUILD_CONTAINER_FAILED". The
+      CloudWatch Logs show "YAML_FILE_ERROR Message: buildspec.yml is
+      empty or missing". The CodeBuild project's buildspec is unset
+      (defaults to buildspec.yml at repo root). The last commit
+      moved buildspec.yml to ci/buildspec.yml. No other phases
+      reported errors.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "BUILD_STAGE_FAILED"
+        - "buildspec"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "GitHub"
+
+  - id: cp-deploy-cfn-changeset-empty
+    description: Deploy stage fails because the CloudFormation change-set has no changes (template identical to deployed state)
+    input: |
+      Scenario: A CodePipeline "app-cicd" in us-east-1 fails at the
+      Deploy stage. The Deploy action is a CloudFormation action
+      with ActionMode CREATE_UPDATE and ChangeSet processing.
+      list-action-executions shows the Deploy action with lastStatus
+      Failed and externalExecutionSummary "ChangeSet is empty".
+      describe-change-set on the auto-generated change-set returns
+      Status FAILED with StatusReason "The submitted information
+      didn't contain changes". The CodeBuild build succeeded and
+      produced a template.json output artifact that is byte-identical
+      to the currently-deployed template. No stack-level
+      UPDATE_FAILED occurred.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "DEPLOY_STAGE_FAILED"
+        - "change-set"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "buildspec"
+
+  - id: cp-cross-account-role-trust-expired
+    description: Cross-account Deploy action fails because the customer-managed role trust policy in the target account no longer lists the pipeline service role
+    input: |
+      Scenario: A CodePipeline "app-cicd" in account 111111111111
+      (us-east-1) fails at the Deploy stage. The Deploy action
+      deploys into account 222222222222 via a customer-managed role
+      arn:aws:iam::222222222222:role/cross-acct-deploy.
+      list-action-executions shows the Deploy action with lastStatus
+      Failed and lastStatusChangeReason "Action execution failed"
+      with externalExecutionSummary "is not authorized to perform:
+      sts:AssumeRole on resource
+      arn:aws:iam::222222222222:role/cross-acct-deploy".
+      aws iam get-role on the cross-acct-deploy role in account
+      222222222222 shows the AssumeRolePolicyDocument Principal.AWS
+      lists an OLD pipeline service role ARN
+      (arn:aws:iam::111111111111:role/AWSCodePipelineServiceRole-old-pipeline)
+      that no longer matches the current pipeline service role
+      arn:aws:iam::111111111111:role/AWSCodePipelineServiceRole-app-cicd.
+      The pipeline was recently renamed.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "CROSS_ACCOUNT_ROLE_FAILED"
+        - "sts:AssumeRole"
+        - "trust"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "buildspec"
+
+  - id: cp-vague-report-need-pipeline-info
+    description: Vague report of CodePipeline failure without pipeline name, region, or failed stage
+    input: |
+      Scenario: A user reports "our CI/CD pipeline is broken, the
+      build keeps failing." They mention it is "the prod pipeline"
+      but do not provide a pipeline name, region, execution ID,
+      failed stage, action name, or lastStatusChangeReason.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "list-action-executions"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

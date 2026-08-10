@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "codepipeline-failure-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CodePipeline Failure Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cp-source-github-token-expired",
+      "name": "Source stage FAILED because the GitHub v1 personal access token stored in Secrets Manager has expired",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cp-source-github-token-expired.md",
+      "baseline_file": "baselines/cp-source-github-token-expired.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "SOURCE_STAGE_FAILED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "SOURCE_STAGE_FAILED", "GitHub", "token", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "buildspec"]
+        }
+      ]
+    },
+    {
+      "id": "cp-build-buildspec-missing",
+      "name": "Build stage FAILED because buildspec.yml was moved to ci/buildspec.yml but the CodeBuild project still uses the default path",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cp-build-buildspec-missing.md",
+      "baseline_file": "baselines/cp-build-buildspec-missing.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "BUILD_STAGE_FAILED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "BUILD_STAGE_FAILED", "buildspec", "ci/buildspec.yml", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "GitHub", "KMS"]
+        }
+      ]
+    },
+    {
+      "id": "cp-deploy-cfn-changeset-empty",
+      "name": "Deploy stage FAILED because the CloudFormation change-set has no changes (template identical to deployed state)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cp-deploy-cfn-changeset-empty.md",
+      "baseline_file": "baselines/cp-deploy-cfn-changeset-empty.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "DEPLOY_STAGE_FAILED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "DEPLOY_STAGE_FAILED", "change-set", "no changes", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "buildspec", "UPDATE_FAILED"]
+        }
+      ]
+    },
+    {
+      "id": "cp-cross-account-role-trust-expired",
+      "name": "Cross-account Deploy FAILED because the customer role trust policy in the target account lists an old pipeline service role ARN (pipeline was renamed)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cp-cross-account-role-trust-expired.md",
+      "baseline_file": "baselines/cp-cross-account-role-trust-expired.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "CROSS_ACCOUNT_ROLE_FAILED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "CROSS_ACCOUNT_ROLE_FAILED", "sts:AssumeRole", "trust", "Principal", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "buildspec"]
+        }
+      ]
+    },
+    {
+      "id": "cp-vague-report-need-pipeline-info",
+      "name": "Vague report of CodePipeline failure without pipeline name, region, or failed stage — request the identifying inputs",
+      "difficulty": "easy",
+      "prompt_file": "prompts/cp-vague-report-need-pipeline-info.md",
+      "baseline_file": "baselines/cp-vague-report-need-pipeline-info.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "list-action-executions"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

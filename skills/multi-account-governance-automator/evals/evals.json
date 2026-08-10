@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "multi-account-governance-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Multi-Account Governance Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "greenfield-org-control-tower",
+      "name": "Greenfield 50-account org with Control Tower landing zone, full SCP + delegation + Identity Center baseline — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/greenfield-org-control-tower.md",
+      "baseline_file": "baselines/greenfield-org-control-tower.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "greenfield-org-control-tower", "VERDICT", "STRUCTURE", "DELEGATION", "LeaveOrganization"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "scp-guardrail-baseline",
+      "name": "Root-level SCP guardrail baseline (deny-leave-org, deny-root-actions, deny-disable-guardduty, deny-delete-cloudtrail) — all gates pass",
+      "difficulty": "medium",
+      "prompt_file": "prompts/scp-guardrail-baseline.md",
+      "baseline_file": "baselines/scp-guardrail-baseline.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "scp-guardrail-baseline", "VERDICT", "CONTROLS", "LeaveOrganization"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "delegated-admin-setup",
+      "name": "Delegated administration layer: GuardDuty, Security Hub, Config aggregator, CloudTrail org trail, Identity Center with break-glass — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/delegated-admin-setup.md",
+      "baseline_file": "baselines/delegated-admin-setup.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "delegated-admin-setup", "VERDICT", "DELEGATION", "PrincipalOrgID"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "flat-org-no-scp",
+      "name": "Validate existing flat org with no SCPs, GuardDuty in management account, no Config aggregator, no Identity Center (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/flat-org-no-scp.md",
+      "baseline_file": "baselines/flat-org-no-scp.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "flat-org-no-scp", "VERDICT", "LeaveOrganization", "flat"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "scp-inheritance-conflict",
+      "name": "Validate SCP inheritance conflict: Allow at root does not override Deny at child OU (MANUAL_STEP_REQUIRED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/scp-inheritance-conflict.md",
+      "baseline_file": "baselines/scp-inheritance-conflict.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "scp-inheritance-conflict", "VERDICT", "Deny"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    }
+  ]
+}

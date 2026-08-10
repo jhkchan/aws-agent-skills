@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "dr-failover-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DR Failover Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "pilot-light-aurora-global",
+      "name": "Pilot-light DR with Aurora Global Database for three-tier app, RTO 30min, RPO 5min — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/pilot-light-aurora-global.md",
+      "baseline_file": "baselines/pilot-light-aurora-global.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "pilot-light-aurora-global", "VERDICT", "STRATEGY", "failover-global-cluster"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "warm-standby-route53",
+      "name": "Warm-standby DR with Route 53 health-checked failover, Aurora Global, Global Accelerator — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/warm-standby-route53.md",
+      "baseline_file": "baselines/warm-standby-route53.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "warm-standby-route53", "VERDICT", "FAILOVER", "Route 53"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "drs-ec2-recovery",
+      "name": "Elastic Disaster Recovery (DRS) failover for 20 stateful EC2 instances with drill mode — all gates pass",
+      "difficulty": "medium",
+      "prompt_file": "prompts/drs-ec2-recovery.md",
+      "baseline_file": "baselines/drs-ec2-recovery.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "drs-ec2-recovery", "VERDICT", "start-recovery"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "no-verification-split-brain",
+      "name": "Validate existing warm-standby workflow with no primary verification, no kill-switch, threshold=1 (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-verification-split-brain.md",
+      "baseline_file": "baselines/no-verification-split-brain.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "no-verification-split-brain", "VERDICT", "split-brain"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "aurora-unplanned-failover",
+      "name": "Unplanned Aurora Global Database failover runbook for region outage (remove-from-global-cluster + promote) — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/aurora-unplanned-failover.md",
+      "baseline_file": "baselines/aurora-unplanned-failover.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "aurora-unplanned-failover", "VERDICT", "remove-from-global-cluster"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

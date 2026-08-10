@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-batch-operations-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Batch Operations Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-copy-job-inventory-manifest-ready",
+      "name": "Create copy job with S3 inventory manifest — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/create-copy-job-inventory-manifest-ready.md",
+      "baseline_file": "baselines/create-copy-job-inventory-manifest-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-job", "VERDICT", "PRE_CHECKS", "RequestsPerSecond", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "invoke-lambda-job-blocked-permissions",
+      "name": "Invoke Lambda job — Lambda resource-based policy missing batchoperations principal (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/invoke-lambda-job-blocked-permissions.md",
+      "baseline_file": "baselines/invoke-lambda-job-blocked-permissions.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "batchoperations.amazonaws.com", "VERDICT", "PRE_CHECKS", "add-permission", "lambda:InvokeFunction"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "glacier-bulk-restore-completed",
+      "name": "Glacier bulk restore job — Status Complete, zero failures, post-verification passes (COMPLETED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/glacier-bulk-restore-completed.md",
+      "baseline_file": "baselines/glacier-bulk-restore-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "Complete", "NumberOfTasksSucceeded", "VERDICT", "POST_VERIFY", "ongoing-request"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "kms-reencrypt-job-blocked-key-policy",
+      "name": "Bulk KMS re-encrypt — destination key policy denies role (BLOCKED with put-key-policy fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/kms-reencrypt-job-blocked-key-policy.md",
+      "baseline_file": "baselines/kms-reencrypt-job-blocked-key-policy.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "kms:Encrypt", "VERDICT", "PRE_CHECKS", "put-key-policy"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "large-job-billion-objects-ready",
+      "name": "Billion-object re-encrypt — sharded manifest, KMS quota pre-verified, rate control set (READY)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/large-job-billion-objects-ready.md",
+      "baseline_file": "baselines/large-job-billion-objects-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-job", "VERDICT", "RequestsPerSecond", "shard", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

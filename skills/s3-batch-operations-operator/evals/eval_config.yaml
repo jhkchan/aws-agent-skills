@@ -1,0 +1,47 @@
+# Eval configuration for s3-batch-operations-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: s3-batch-operations-operator
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: create-copy-job-inventory-manifest-ready
+    difficulty: medium
+    prompt_file: prompts/create-copy-job-inventory-manifest-ready.md
+    baseline_file: baselines/create-copy-job-inventory-manifest-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: invoke-lambda-job-blocked-permissions
+    difficulty: hard
+    prompt_file: prompts/invoke-lambda-job-blocked-permissions.md
+    baseline_file: baselines/invoke-lambda-job-blocked-permissions.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: glacier-bulk-restore-completed
+    difficulty: hard
+    prompt_file: prompts/glacier-bulk-restore-completed.md
+    baseline_file: baselines/glacier-bulk-restore-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: MODERATE
+  - id: kms-reencrypt-job-blocked-key-policy
+    difficulty: hard
+    prompt_file: prompts/kms-reencrypt-job-blocked-key-policy.md
+    baseline_file: baselines/kms-reencrypt-job-blocked-key-policy.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: large-job-billion-objects-ready
+    difficulty: hard
+    prompt_file: prompts/large-job-billion-objects-ready.md
+    baseline_file: baselines/large-job-billion-objects-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE

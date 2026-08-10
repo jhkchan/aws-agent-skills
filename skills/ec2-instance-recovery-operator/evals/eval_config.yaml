@@ -1,0 +1,47 @@
+# Eval configuration for ec2-instance-recovery-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: ec2-instance-recovery-operator
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: cloudwatch-recovery-alarm-stop-start-ready
+    difficulty: medium
+    prompt_file: prompts/cloudwatch-recovery-alarm-stop-start-ready.md
+    baseline_file: baselines/cloudwatch-recovery-alarm-stop-start-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: diagnose-kernel-panic-blocked
+    difficulty: hard
+    prompt_file: prompts/diagnose-kernel-panic-blocked.md
+    baseline_file: baselines/diagnose-kernel-panic-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: ebs-detach-attach-completed
+    difficulty: hard
+    prompt_file: prompts/ebs-detach-attach-completed.md
+    baseline_file: baselines/ebs-detach-attach-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: MODERATE
+  - id: asg-instance-store-blocked
+    difficulty: hard
+    prompt_file: prompts/asg-instance-store-blocked.md
+    baseline_file: baselines/asg-instance-store-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: forensic-ami-before-recovery-ready
+    difficulty: medium
+    prompt_file: prompts/forensic-ami-before-recovery-ready.md
+    baseline_file: baselines/forensic-ami-before-recovery-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE

@@ -1,0 +1,180 @@
+# Eval test cases for wafv2-web-acl-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across workload types (regional ALB, CloudFront global,
+# API Gateway rate limiting, CAPTCHA/ATP) and prerequisite failure branches
+# (missing logging destination, missing scope decision).
+skill: wafv2-web-acl-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: regional-alb-with-managed-rules
+    description: >-
+      Provision a REGIONAL-scope Web ACL for an ALB with
+      AWSManagedRulesCommonRuleSet, SQLiRuleSet, AmazonIpReputationList,
+      a custom IP-set allow rule, a rate-based rule (IP aggregate),
+      Kinesis Firehose logging, and ALB association. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Provision a WAFv2 Web ACL in us-east-1 for the payments
+      API ALB. Name: payments-api-waf. Scope: REGIONAL. Default
+      action: Allow. Managed rules: AWSManagedRulesCommonRuleSet
+      (priority 10), AWSManagedRulesSQLiRuleSet (priority 20),
+      AmazonIpReputationList (priority 100). Custom rule: allow
+      partner IPs from IP set partner-ips at priority 0. Rate-based
+      rule: 2000 req/5min on /api/ paths, aggregate key IP, priority
+      5000. Logging: Kinesis Firehose delivery stream
+      aws-waf-logs-payments. Association: ALB arn:aws:elasticload
+      balancing:us-east-1:123456789012:loadbalancer/app/
+      payments-alb/50dc6c495c0c9188. Tags: Environment=production,
+      Application=payments.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "payments-api-waf"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "REGIONAL"
+        - "AWSManagedRulesCommonRuleSet"
+        - "aws-waf-logs-payments"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-logging-destination
+    description: >-
+      Provision a Web ACL that requests WAF logging but does not
+      provide a Firehose delivery stream name, CloudWatch log group
+      ARN, or S3 bucket ARN. Expects PREREQUISITES_MISSING — the
+      logging destination must exist before WAF can write logs.
+    input: |
+      Provision a WAFv2 Web ACL in us-east-1 for the payments API.
+      Name: payments-api-waf. Scope: REGIONAL. Managed rules:
+      AWSManagedRulesCommonRuleSet. Enable WAF logging to Kinesis
+      Firehose. ALB association: arn:aws:elasticloadbalancing:us-east-1:
+      123456789012:loadbalancer/app/payments-alb/50dc6c495c0c9188.
+      I have not created the Firehose delivery stream yet.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "payments-api-waf"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "logging"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: cloudfront-global-with-bot-control
+    description: >-
+      Provision a CLOUDFRONT-scope Web ACL with CommonRuleSet,
+      BotControlRuleSet, AmazonIpReputationList, geo-blocking,
+      and FORWARDED_IP rate limiting. Expects READY_TO_DEPLOY.
+    input: |
+      Provision a WAFv2 Web ACL for a CloudFront distribution.
+      Name: payments-cdn-waf. Scope: CLOUDFRONT. Managed rules:
+      AWSManagedRulesCommonRuleSet (priority 10),
+      AWSManagedRulesBotControlRuleSet (priority 200, allow
+      CategorySearchEngine, block CategorySpam),
+      AmazonIpReputationList (priority 100). Custom geo-block
+      rule: block RU, KP, IR at priority 1000. Rate-based rule:
+      1000 req/5min aggregate key FORWARDED_IP with
+      X-Forwarded-For Position FIRST on all paths, priority 5000.
+      Logging: Kinesis Firehose aws-waf-logs-payments-cdn.
+      Tags: Environment=production, Application=payments-cdn.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "payments-cdn-waf"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "CLOUDFRONT"
+        - "AWSManagedRulesBotControlRuleSet"
+        - "FORWARDED_IP"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: rate-based-forwarded-ip-api-gateway
+    description: >-
+      Provision a REGIONAL Web ACL for an API Gateway REST API with
+      a FORWARDED_IP rate-based rule and SQLi managed rules. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Provision a WAFv2 Web ACL in us-west-2 for an API Gateway
+      REST API. Name: orders-api-waf. Scope: REGIONAL. Managed
+      rules: AWSManagedRulesCommonRuleSet (priority 10),
+      AWSManagedRulesSQLiRuleSet (priority 20). Rate-based rule:
+      500 req/5min aggregate key FORWARDED_IP, header
+      X-Forwarded-For, Position FIRST, FallbackBehavior NO_MATCH,
+      scope down to /v1/orders path, priority 5000. Logging:
+      CloudWatch Logs log group /aws/wafv2/orders-api.
+      Association: API Gateway stage
+      arn:aws:apigateway:us-west-2::/restapis/abc123/stages/prod.
+      Tags: Environment=production, Application=orders-api.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "orders-api-waf"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "FORWARDED_IP"
+        - "X-Forwarded-For"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: captcha-atp-login-protection
+    description: >-
+      Provision a REGIONAL Web ACL with CAPTCHA action on the
+      signup endpoint and ATP managed rules on the login endpoint.
+      Expects READY_TO_DEPLOY.
+    input: |
+      Provision a WAFv2 Web ACL in us-east-1 for the auth service.
+      Name: auth-service-waf. Scope: REGIONAL. Managed rules:
+      AWSManagedRulesCommonRuleSet (priority 10),
+      AWSManagedRulesSQLiRuleSet (priority 20),
+      AWSManagedRulesATPRuleSet (priority 200, login path
+      /api/v1/login, payload JSON, username field "email",
+      password field "password", OverrideAction Count). Custom
+      CAPTCHA rule on /signup path at priority 1000. Rate-based
+      rule: 100 req/5min aggregate key IP on /api/v1/login path,
+      priority 5000. Logging: Kinesis Firehose
+      aws-waf-logs-auth-service. Association: ALB
+      arn:aws:elasticloadbalancing:us-east-1:123456789012:
+      loadbalancer/app/auth-alb/abc123. Tags: Environment=production,
+      Application=auth.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "auth-service-waf"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "CAPTCHA"
+        - "AWSManagedRulesATPRuleSet"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
