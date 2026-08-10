@@ -1,0 +1,70 @@
+{
+  "skill": "cloudformation-stack-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill assembles a detailed decision tree, specific sub\u2011symptom tables, and recent AWS features (e.g., enhanced import\u2011resources, ContinueUpdateRollback for nested stacks) that a generic model would not spontaneously provide. However much of the content (e.g., basic CloudFormation lifecycle phases, common IAM/limit errors) is already present in standard AWS documentation, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific diagnostic mindset and a concrete ordered procedure (capture signals, map StackStatus, run ChangeSet, use iam simulate\u2011principal\u2011policy, etc.). A few steps are generic (e.g., \"run cfn\u2011lint\" without CloudFormation\u2011specific nuance) which prevents a full score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never update a ROLLBACK_COMPLETE stack, never rely on StackStatus alone). Some anti\u2011patterns are missing or only superficially covered (e.g., deeper guidance on when to import resources vs. rename) and a few warnings lack the explicit \"why\" rationale."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The activation_triggers list is overly broad, which could cause spurious activation, so it loses one point."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick reference, then detailed steps) but the initial sections are dense and include many deep details (full tables, edge\u2011case catalog) that could overload the agent before it knows whether they are needed."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (delete\u2011stack, ContinueUpdateRollback) are guarded with checks, showing good calibration. However, the recommendation to \"skip the failing resource\" in UPDATE_ROLLBACK_FAILED is presented without a mandatory safety check, leaving a slight over\u2011freedom."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable structure (Activation \u2192 Mindset \u2192 Quick reference \u2192 Steps \u2192 Output contract \u2192 Anti\u2011patterns). The inclusion of an ad\u2011hoc \"Expert edge cases\" section slightly breaks the uniform pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 10,
+      "max": 15,
+      "justification": "Model outputs show several practical gaps: missing exact quoted ResourceStatusReason strings, extra non\u2011required evidence lines, omission of required fields in some cases, and ambiguous root\u2011cause statements (e.g., generic \"Resource update cancelled\" without property detail). These defects directly affect an agent's ability to execute the skill reliably."
+    }
+  ],
+  "total_score": 102,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 48126,
+  "latency_ms": 9544,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

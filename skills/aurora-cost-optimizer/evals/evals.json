@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "aurora-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Aurora Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "aurora-io-optimized-tier-crossover",
+      "name": "1,000 GB cluster with 600M I/O/month on Standard — crosses the 400M break-even for I/O-Optimized",
+      "difficulty": "medium",
+      "prompt_file": "prompts/aurora-io-optimized-tier-crossover.md",
+      "baseline_file": "baselines/aurora-io-optimized-tier-crossover.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "aurora-io-optimized-tier-crossover", "I/O-Optimized", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "serverless-v2-acu-floor-too-high",
+      "name": "Serverless v2 MinCapacity=8 but avg ACU=4.5 and CPU < 10% — floor wastes ~$300+/month",
+      "difficulty": "medium",
+      "prompt_file": "prompts/serverless-v2-acu-floor-too-high.md",
+      "baseline_file": "baselines/serverless-v2-acu-floor-too-high.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "serverless-v2-acu-floor-too-high", "MinCapacity", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "writer-reader-rightsize-mirrored-replicas",
+      "name": "Writer db.r6g.2xlarge at 15% CPU + 2 mirrored readers at 8% — independent right-size opportunity",
+      "difficulty": "medium",
+      "prompt_file": "prompts/writer-reader-rightsize-mirrored-replicas.md",
+      "baseline_file": "baselines/writer-reader-rightsize-mirrored-replicas.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "writer-reader-rightsize-mirrored-replicas", "db.r6g.xlarge", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "ondemand-steady-state-ri-candidate",
+      "name": "14-month steady On-Demand cluster on db.r6g.2xlarge, no RI, no migration plan — RI candidate",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ondemand-steady-state-ri-candidate.md",
+      "baseline_file": "baselines/ondemand-steady-state-ri-candidate.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "ondemand-steady-state-ri-candidate", "Reserved Instance", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-iopt-ri-rightsized",
+      "name": "I/O-Optimized tier, RI on writer+reader, rightsized CPU 45%, top-SQL evenly distributed — already optimal",
+      "difficulty": "hard",
+      "prompt_file": "prompts/already-optimal-iopt-ri-rightsized.md",
+      "baseline_file": "baselines/already-optimal-iopt-ri-rightsized.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-iopt-ri-rightsized", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

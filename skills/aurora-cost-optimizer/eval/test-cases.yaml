@@ -1,0 +1,211 @@
+# Eval test cases for aurora-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per Aurora optimisation pattern. Each
+# case's Cluster embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The decision matrix in
+# SKILL.md produces exactly the expected verdicts below.
+skill: aurora-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: aurora-io-optimized-tier-crossover
+    description: >-
+      Aurora PostgreSQL cluster on Standard tier with 1,000 GB storage
+      and 600M I/O requests/month. I/O cost ($120/mo) is high relative
+      to storage cost ($100/mo); 600M exceeds the 400M break-even for
+      1,000 GB. Expected verdict: OPPORTUNITY_FOUND with switch to
+      Aurora I/O-Optimized.
+    input: |
+      Cluster: orders-prod-io
+        (case aurora-io-optimized-tier-crossover)
+      Engine: aurora-mysql (8.0)
+      Region: us-east-1
+      Storage tier: Standard
+      Storage used: 1,000 GB
+      I/O requests (last 30 days): 600,000,000
+      Cost Explorer (last 30 days):
+        - Aurora:StorageUsage: 1,000 GB × $0.10 = $100
+        - Aurora:IOUsage: 600M × $0.20 = $120
+        - Aurora:InstanceUsage: minimal (this case isolates I/O tier)
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "aurora-io-optimized-tier-crossover"
+        - "I/O-Optimized"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: serverless-v2-acu-floor-too-high
+    description: >-
+      Aurora Serverless v2 cluster with MinCapacity=8 but avg CPU < 10%
+      and avg ACU 4.5. Floor bills $700.80/month even when idle.
+      Expected verdict: OPPORTUNITY_FOUND with drop MinCapacity to 2.
+    input: |
+      Cluster: reporting-serverless
+        (case serverless-v2-acu-floor-too-high)
+      Engine: aurora-postgresql (15)
+      Region: us-east-1
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 8
+        MaxCapacity: 32
+      CloudWatch (last 30 days):
+        - CPUUtilization: avg=8%, max=22%
+        - ServerlessDatabaseCapacity: avg=4.5, peak=14
+      Cost Explorer:
+        - Aurora:ServerlessUsage: ~$700/month (consistent with
+          MinCapacity=8 floor dominating)
+      Workload: internal BI dashboard with spiky daytime load;
+        idle overnight; no sub-second latency SLA.
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "serverless-v2-acu-floor-too-high"
+        - "MinCapacity"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: writer-reader-rightsize-mirrored-replicas
+    description: >-
+      Aurora cluster with writer db.r6g.2xlarge at avg 15% CPU and two
+      readers mirrored to db.r6g.2xlarge at avg 8% CPU. Writer can
+      downsize to db.r6g.xlarge; readers to db.r6g.large. Expected
+      verdict: OPPORTUNITY_FOUND with right-size recommendation.
+    input: |
+      Cluster: orders-prod-cluster
+        (case writer-reader-rightsize-mirrored-replicas)
+      Engine: aurora-mysql (8.0)
+      Region: us-east-1
+      Instances:
+        - writer: db.r6g.2xlarge (8 vCPU, 64 GB) — $1.16/h
+        - reader-1: db.r6g.2xlarge — $1.16/h
+        - reader-2: db.r6g.2xlarge — $1.16/h
+      CloudWatch (last 30 days):
+        - writer CPUUtilization: avg=15%, max=28%
+        - reader-1 CPUUtilization: avg=8%, max=18%
+        - reader-2 CPUUtilization: avg=7%, max=15%
+      Performance Insights:
+        - writer DBLoad: avg=1.2, max=4.5 (low for 8 vCPU)
+      Storage tier: Standard, 200 GB used
+      Pricing: On-Demand
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "writer-reader-rightsize-mirrored-replicas"
+        - "db.r6g.xlarge"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: ondemand-steady-state-ri-candidate
+    description: >-
+      Aurora cluster running On-Demand for 14 months steady on
+      db.r6g.2xlarge, no RI in place, mission-critical and stable.
+      Expected verdict: OPPORTUNITY_FOUND with 1-yr No Upfront RI
+      recommendation on writer and primary reader.
+    input: |
+      Cluster: billing-prod-cluster
+        (case ondemand-steady-state-ri-candidate)
+      Engine: aurora-postgresql (15)
+      Region: us-east-1
+      Instances:
+        - writer: db.r6g.2xlarge — On-Demand
+        - reader-1: db.r6g.2xlarge — On-Demand
+      Cluster uptime: 14 months steady
+      CloudWatch (last 30 days):
+        - writer CPUUtilization: avg=42%, max=65% (no downsize candidate)
+        - reader-1 CPUUtilization: avg=35%, max=55%
+      describe-reserved-db-instances: empty (no RI held)
+      Migration plans: none (mission-critical, long-term)
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "ondemand-steady-state-ri-candidate"
+        - "Reserved Instance"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-iopt-ri-rightsized
+    description: >-
+      Aurora cluster already on I/O-Optimized tier, writers and readers
+      rightsized to CPU avg 45%, 1-yr RI on writer + primary reader,
+      no Global DB waste, no backtrack, Performance Insights top-SQL
+      evenly distributed. Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      Cluster: reporting-cluster-prod
+        (case already-optimal-iopt-ri-rightsized)
+      Engine: aurora-postgresql (15)
+      Region: us-east-1
+      Storage tier: Aurora I/O-Optimized (aurora-iopt1)
+      Storage used: 800 GB
+      I/O requests (last 30 days): 750,000,000 (well above break-even)
+      Instances:
+        - writer: db.r6g.xlarge — 1-yr No Upfront RI
+        - reader-1: db.r6g.large — 1-yr No Upfront RI
+        - reader-2 (analytics): db.r6g.xlarge — On-Demand (spiky)
+      CloudWatch (last 30 days):
+        - writer CPUUtilization: avg=45%, max=60%
+        - reader-1 CPUUtilization: avg=40%, max=55%
+        - reader-2 CPUUtilization: avg=35%, max=80% (analytics spikes)
+      Performance Insights:
+        - writer DBLoad: avg=2.0, top-SQL evenly distributed
+        - No single SQL > 15% of DBLoad
+      Reserved Instances held:
+        - db.r6g.xlarge aurora-postgresql 1-yr No Upfront (covers writer)
+        - db.r6g.large aurora-postgresql 1-yr No Upfront (covers reader-1)
+      Global DB: not in use
+      Backtrack: disabled
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-iopt-ri-rightsized"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"
