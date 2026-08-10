@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "route53-failover-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Route 53 Failover Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "planned-failover-weighted-ready",
+      "name": "Planned weighted failover 100/0 -> 0/100 — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/planned-failover-weighted-ready.md",
+      "baseline_file": "baselines/planned-failover-weighted-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "api.example.com", "change-resource-record-sets", "VERDICT", "PRE_CHECKS", "Weight", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "emergency-failover-ttl-too-high-blocked",
+      "name": "Emergency failover with 300s TTL — must lower TTL first (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/emergency-failover-ttl-too-high-blocked.md",
+      "baseline_file": "baselines/emergency-failover-ttl-too-high-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "TTL", "VERDICT", "PRE_CHECKS", "300"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "failback-to-primary-completed",
+      "name": "Failback to restored primary — post-verification passes (COMPLETED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/failback-to-primary-completed.md",
+      "baseline_file": "baselines/failback-to-primary-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "api.example.com", "test-dns-answer", "VERDICT", "POST_VERIFY"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "both-records-unhealthy-blocked",
+      "name": "Both primary and secondary unhealthy — Route 53 last-resort (BLOCKED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/both-records-unhealthy-blocked.md",
+      "baseline_file": "baselines/both-records-unhealthy-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "Unhealthy", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-route53-access-denied-blocked",
+      "name": "Cross-account Route 53 AccessDeniedException — missing RAM share (BLOCKED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-route53-access-denied-blocked.md",
+      "baseline_file": "baselines/cross-account-route53-access-denied-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "AccessDeniedException", "VERDICT", "cross-account", "ChangeResourceRecordSets"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

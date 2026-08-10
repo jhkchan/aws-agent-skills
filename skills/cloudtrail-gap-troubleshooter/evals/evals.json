@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudtrail-gap-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudTrail Gap Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "s3-data-events-not-configured",
+      "name": "Operator expects GetObject events; trail DataResources is empty; management events flow normally",
+      "difficulty": "medium",
+      "prompt_file": "prompts/s3-data-events-not-configured.md",
+      "baseline_file": "baselines/s3-data-events-not-configured.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "MISSING_DATA_EVENTS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "MISSING_DATA_EVENTS", "DataResources", "AWS::S3::Object", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "outage"]
+        }
+      ]
+    },
+    {
+      "id": "trail-stopped-inadvertently",
+      "name": "Trail IsLogging false after inadvertent stop-logging; bucket policy and config are correct",
+      "difficulty": "easy",
+      "prompt_file": "prompts/trail-stopped-inadvertently.md",
+      "baseline_file": "baselines/trail-stopped-inadvertently.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "TRAIL_NOT_LOGGING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "TRAIL_NOT_LOGGING", "start-logging", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "privileged"]
+        }
+      ]
+    },
+    {
+      "id": "bucket-policy-missing-acl-condition",
+      "name": "Trail IsLogging true but no delivery — bucket policy PutObject Allow lacks bucket-owner-full-control condition",
+      "difficulty": "hard",
+      "prompt_file": "prompts/bucket-policy-missing-acl-condition.md",
+      "baseline_file": "baselines/bucket-policy-missing-acl-condition.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "BUCKET_POLICY_BLOCKING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "BUCKET_POLICY_BLOCKING", "bucket-owner-full-control", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "org-trail-member-shadow-stopped",
+      "name": "Org trail logs 9 of 10 members — one member's shadow trail IsLogging false",
+      "difficulty": "hard",
+      "prompt_file": "prompts/org-trail-member-shadow-stopped.md",
+      "baseline_file": "baselines/org-trail-member-shadow-stopped.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "ORG_TRAIL_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ORG_TRAIL_GAP", "shadow", "start-logging", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-context-need-trail-name",
+      "name": "Vague report of CloudTrail not logging — request trail name + describe-trails output",
+      "difficulty": "easy",
+      "prompt_file": "prompts/insufficient-context-need-trail-name.md",
+      "baseline_file": "baselines/insufficient-context-need-trail-name.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "describe-trails"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

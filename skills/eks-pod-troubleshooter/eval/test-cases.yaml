@@ -1,0 +1,127 @@
+# Eval test cases for eks-pod-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: eks-pod-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: crashloop-missing-env-var
+    description: Pod CrashLoopBackOff because container reads DB_HOST env var that is not set in pod spec
+    input: |
+      Scenario: A Kubernetes pod on an EKS cluster is in CrashLoopBackOff
+      with a climbing restart count. kubectl describe pod shows Last
+      State: Terminated, Reason: Error, Exit Code: 1, started/finished
+      ~0.8s apart. kubectl logs <pod> --previous shows:
+      "Traceback (most recent call last): File /app/main.py line 12
+      in <module> db_host = os.environ['DB_HOST'] ... KeyError:
+      'DB_HOST'". The pod spec has env vars APP_PORT and LOG_LEVEL but
+      no DB_HOST.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "CRASH_LOOP"
+        - "DB_HOST"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "privileged"
+
+  - id: imagepullbackoff-node-role-no-ecr
+    description: Pod ImagePullBackOff because node instance role lacks ecr:BatchGetImage
+    input: |
+      Scenario: A Kubernetes pod on EKS is in ImagePullBackOff. The pod
+      image is
+      111111111111.dkr.ecr.us-east-1.amazonaws.com/app:v1. kubectl
+      describe pod Events shows "Failed to pull image ... rpc error:
+      code = Unknown desc = Error response from daemon: Head ... v2/
+      app/manifests/v1: unauthorized: Not Authorized". aws ecr
+      describe-images confirms the image exists. The node's instance
+      role has only AmazonSSMManagedInstanceCore and AmazonEKS_CNI_Policy
+      attached. aws iam simulate-principal-policy for the node role
+      against ecr:BatchGetImage returns implicitDeny.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "IMAGE_PULL"
+        - "ecr:BatchGetImage"
+        - "node"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: pending-failedscheduling-taint
+    description: Pod Pending because all nodes are tainted dedicated=batch:NoSchedule and pod has no toleration
+    input: |
+      Scenario: A Kubernetes pod on EKS is stuck Pending. kubectl
+      describe pod Events shows: "Warning FailedScheduling default-
+      scheduler 0/3 nodes are available: 3 node(s) had taints that the
+      pod didn't tolerate." kubectl get nodes -o custom-columns=NAME,
+      TAINTS shows all 3 nodes have
+      taint=[map[effect:NoSchedule key:dedicated value:batch]]. The
+      pod spec has no tolerations field.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "PENDING"
+        - "taint"
+        - "toleration"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: liveness-probe-path-mismatch
+    description: Pod Running but restart count climbs because liveness probe path /healthz returns 404; app serves /api/health
+    input: |
+      Scenario: An EKS pod is Running with a climbing restart count.
+      kubectl describe pod Events shows "Liveness probe failed: HTTP
+      probe failed with statuscode: 404" followed by "Killing container
+      ... failed liveness probe". The pod's livenessProbe.httpGet.path
+      is /healthz, port 8080. kubectl exec into the pod and curl
+      http://localhost:8080/healthz returns 404, while curl
+      http://localhost:8080/api/health returns 200 OK.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "PROBE_FAILURE"
+        - "/api/health"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: insufficient-context-need-pod-name
+    description: Vague report of pods failing without pod name, namespace, or specific symptom
+    input: |
+      Scenario: A user reports "some of my pods on EKS keep failing".
+      They mention the cluster name "prod-cluster" but do not provide a
+      pod name, namespace, status, restart count, or any kubectl
+      describe / logs output.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "kubectl"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "eventbridge-rule-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EventBridge Rule Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "guardduty-lambda-ready-to-deploy",
+      "name": "GuardDuty high-severity finding -> Lambda isolate-instance with DLQ and idempotent consumer (all prerequisites met)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/guardduty-lambda-ready-to-deploy.md",
+      "baseline_file": "baselines/guardduty-lambda-ready-to-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "guardduty-lambda-ready-to-deploy", "aws.guardduty", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "scheduled-step-functions-deploy",
+      "name": "Nightly 02:00 UTC Step Functions trigger via cron schedule rule with bounded retry",
+      "difficulty": "medium",
+      "prompt_file": "prompts/scheduled-step-functions-deploy.md",
+      "baseline_file": "baselines/scheduled-step-functions-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "scheduled-step-functions-deploy", "cron", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "dlq-missing-prerequisites",
+      "name": "CodeBuild failure -> Slack Lambda with NO DLQ, no idempotency, default retry — PREREQUISITES_MISSING with specific gaps",
+      "difficulty": "hard",
+      "prompt_file": "prompts/dlq-missing-prerequisites.md",
+      "baseline_file": "baselines/dlq-missing-prerequisites.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "dlq-missing-prerequisites", "VERDICT", "DLQ", "GAP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-bus-policy-deploy",
+      "name": "Cross-account PutEvents from producer 222222222222 to receiver 111111111111 custom bus with bus policy + target ACL",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-bus-policy-deploy.md",
+      "baseline_file": "baselines/cross-account-bus-policy-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "cross-account-bus-policy-deploy", "put-permission", "PutEvents", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "input-transformer-lambda-deploy",
+      "name": "S3 object-created -> Lambda with InputTransformer extracting bucket/key/etag into simplified payload",
+      "difficulty": "hard",
+      "prompt_file": "prompts/input-transformer-lambda-deploy.md",
+      "baseline_file": "baselines/input-transformer-lambda-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "input-transformer-lambda-deploy", "InputTransformer", "InputPathsMap", "InputTemplate", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    }
+  ]
+}

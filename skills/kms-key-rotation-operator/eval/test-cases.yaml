@@ -1,0 +1,248 @@
+# Eval test cases for kms-key-rotation-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: kms-key-rotation-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: enable-rotation-symmetric-cmk-ready
+    description: >-
+      Operator wants to enable automatic rotation on a customer-managed
+      symmetric CMK used for application encryption. All pre-checks
+      pass: key Enabled, SYMMETRIC_DEFAULT, ENCRYPT_DECRYPT, Origin
+      AWS_KMS, single-region, calling role has kms:EnableKeyRotation
+      via key policy. Plan should produce READY with the
+      enable-key-rotation CLI and a CONFIRM gate.
+    input: |
+      Operation: enable-rotation
+      KeyId: arn:aws:kms:us-east-1:111111111111:key/abcd1234-5678-90ef-...
+      Alias: alias/prod-app-encryption-key
+      Rotation period: 365 days (default)
+
+      Key metadata (aws kms describe-key):
+        KeyId: abcd1234-5678-90ef-...
+        Arn: arn:aws:kms:us-east-1:111111111111:key/abcd1234-5678-90ef-...
+        KeyState: Enabled
+        Enabled: true
+        KeyUsage: ENCRYPT_DECRYPT
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+        MultiRegionConfiguration: null (single-region)
+        DeletionDate: null
+        Description: Production application encryption key
+
+      Current rotation status (aws kms get-key-rotation-status):
+        Enabled: false
+        (rotation not yet configured)
+
+      Key policy (aws kms get-key-policy, default policy):
+        Statement:
+          - Sid: "Enable rotation IAM"
+            Effect: Allow
+            Principal: {AWS: arn:aws:iam::111111111111:role/SecurityAdmin}
+            Action: ["kms:EnableKeyRotation", "kms:GetKeyRotationStatus",
+                     "kms:DisableKeyRotation"]
+            Resource: "*"
+
+      Calling identity: arn:aws:iam::111111111111:role/SecurityAdmin
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "enable-key-rotation"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "SYMMETRIC_DEFAULT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: enable-rotation-asymmetric-key-blocked
+    description: >-
+      Operator tries to enable automatic rotation on an RSA_2048
+      signing key. Asymmetric keys do NOT support automatic rotation
+      (hard KMS limitation). Pre-checks must BLOCK and surface the
+      manual rotation plan.
+    input: |
+      Operation: enable-rotation
+      KeyId: arn:aws:kms:us-east-1:111111111111:key/rsa12345-...
+      Alias: alias/prod-signing-key
+
+      Key metadata (aws kms describe-key):
+        KeyState: Enabled
+        KeyUsage: SIGN_VERIFY
+        KeySpec: RSA_2048
+        Origin: AWS_KMS
+        MultiRegionConfiguration: null
+        DeletionDate: null
+
+      Current rotation status:
+        Enabled: false
+
+      Calling identity has kms:EnableKeyRotation via key policy.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "RSA_2048"
+        - "SIGN_VERIFY"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "enable-key-rotation --key-id"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: verify-rotation-enabled-completed
+    description: >-
+      Operator wants to verify that rotation is enabled on a CMK and
+      that CloudTrail shows the EnableKeyRotation event. All checks
+      pass. Emit COMPLETED with post-verification results.
+    input: |
+      Operation: verify-rotation
+      KeyId: arn:aws:kms:us-east-1:111111111111:key/abcd1234-...
+      Alias: alias/prod-app-encryption-key
+
+      Key metadata (aws kms describe-key):
+        KeyState: Enabled
+        KeyUsage: ENCRYPT_DECRYPT
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+
+      Rotation status (aws kms get-key-rotation-status):
+        Enabled: true
+        RotationPeriodInSeconds: 31536000 (365 days)
+        NextRotationDate: 2027-02-08T00:00:00Z
+
+      CloudTrail (aws cloudtrail lookup-events, last 30 days):
+        EventName: EnableKeyRotation
+        EventTime: 2026-08-05T14:32:11Z
+        Username: arn:aws:iam::111111111111:role/SecurityAdmin
+        Resources: [{ResourceType: AWS::KMS::Key,
+                     ResourceName: arn:aws:kms:us-east-1:111111111111:key/abcd1234-...}]
+
+      Key policy: unchanged from pre-rotation (verified via diff
+        against yesterday's snapshot)
+
+      Grants (aws kms list-grants): 3 grants, all Active, none Retiring
+
+      Application spot-check:
+        aws kms encrypt --key-id alias/prod-app-encryption-key --plaintext "test"
+        Result: OK (CiphertextBlob returned)
+        aws kms decrypt --ciphertext-blob ... Result: OK (Plaintext returned)
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "EnableKeyRotation"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "NextRotationDate"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: enable-rotation-disabled-key-blocked
+    description: >-
+      Operator tries to enable rotation on a Disabled key. KMS returns
+      KMSInvalidStateException. Pre-checks must BLOCK and surface the
+      enable-key step first.
+    input: |
+      Operation: enable-rotation
+      KeyId: arn:aws:kms:us-east-1:111111111111:key/disabled123-...
+      Alias: alias/old-app-key
+
+      Key metadata (aws kms describe-key):
+        KeyState: Disabled
+        Enabled: false
+        KeyUsage: ENCRYPT_DECRYPT
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+        MultiRegionConfiguration: null
+        DeletionDate: null
+
+      Current rotation status:
+        (cannot fetch — key disabled returns AccessDeniedException on
+         get-key-rotation-status for non-root callers)
+
+      Calling identity has kms:EnableKeyRotation via key policy (but
+        key is Disabled, so all KMS operations on it fail except
+        describe-key, enable-key, schedule-key-deletion).
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "Disabled"
+        - "enable-key"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "enable-key-rotation --key-id"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: multi-region-replica-rotation-blocked
+    description: >-
+      Operator tries to enable rotation on a Multi-Region REPLICA key.
+      EnableKeyRotation returns InvalidOperationException. Pre-checks
+      must BLOCK and direct the operator to the primary key.
+    input: |
+      Operation: enable-rotation
+      KeyId: arn:aws:kms:us-east-1:111111111111:key/multi-replica-...
+      Alias: alias/prod-dr-key
+
+      Key metadata (aws kms describe-key):
+        KeyState: Enabled
+        KeyUsage: ENCRYPT_DECRYPT
+        KeySpec: SYMMETRIC_DEFAULT
+        Origin: AWS_KMS
+        MultiRegionConfiguration:
+          MultiRegionKeyType: REPLICA
+          PrimaryKey:
+            Arn: arn:aws:kms:eu-west-1:111111111111:key/multi-primary-...
+            Region: eu-west-1
+          ReplicaKeys:
+            - {Region: us-east-1, Arn: arn:aws:kms:us-east-1:111111111111:key/multi-replica-...}
+        DeletionDate: null
+
+      Current rotation status (aws kms get-key-rotation-status):
+        AccessDeniedException (replica — operator is in us-east-1 but
+          the primary's rotation status can only be modified in
+          eu-west-1)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "REPLICA"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "primary"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "enable-key-rotation --key-id arn:aws:kms:us-east-1"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"

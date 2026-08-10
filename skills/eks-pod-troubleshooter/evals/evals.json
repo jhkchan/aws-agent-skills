@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "eks-pod-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EKS Pod Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "crashloop-missing-env-var",
+      "name": "Pod CrashLoopBackOff — container reads DB_HOST env var that is not set in pod spec",
+      "difficulty": "medium",
+      "prompt_file": "prompts/crashloop-missing-env-var.md",
+      "baseline_file": "baselines/crashloop-missing-env-var.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "CRASH_LOOP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "CRASH_LOOP", "DB_HOST", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "privileged"]
+        }
+      ]
+    },
+    {
+      "id": "imagepullbackoff-node-role-no-ecr",
+      "name": "Pod ImagePullBackOff — node instance role lacks ecr:BatchGetImage",
+      "difficulty": "medium",
+      "prompt_file": "prompts/imagepullbackoff-node-role-no-ecr.md",
+      "baseline_file": "baselines/imagepullbackoff-node-role-no-ecr.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "IMAGE_PULL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "IMAGE_PULL", "ecr:BatchGetImage", "node", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "privileged"]
+        }
+      ]
+    },
+    {
+      "id": "pending-failedscheduling-taint",
+      "name": "Pod Pending — all nodes tainted dedicated=batch:NoSchedule, pod has no toleration",
+      "difficulty": "medium",
+      "prompt_file": "prompts/pending-failedscheduling-taint.md",
+      "baseline_file": "baselines/pending-failedscheduling-taint.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "PENDING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "PENDING", "taint", "toleration", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "liveness-probe-path-mismatch",
+      "name": "Pod Running but restart count climbs — liveness probe path /healthz returns 404; app serves /api/health",
+      "difficulty": "hard",
+      "prompt_file": "prompts/liveness-probe-path-mismatch.md",
+      "baseline_file": "baselines/liveness-probe-path-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "PROBE_FAILURE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "PROBE_FAILURE", "/api/health", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-context-need-pod-name",
+      "name": "Vague report of EKS pods failing — request pod name + namespace + describe output",
+      "difficulty": "easy",
+      "prompt_file": "prompts/insufficient-context-need-pod-name.md",
+      "baseline_file": "baselines/insufficient-context-need-pod-name.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "kubectl"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

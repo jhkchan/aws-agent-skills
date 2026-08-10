@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "kms-key-rotation-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the KMS Key Rotation Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "enable-rotation-symmetric-cmk-ready",
+      "name": "Enable rotation on symmetric CMK — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/enable-rotation-symmetric-cmk-ready.md",
+      "baseline_file": "baselines/enable-rotation-symmetric-cmk-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "enable-key-rotation", "VERDICT", "PRE_CHECKS", "SYMMETRIC_DEFAULT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "enable-rotation-asymmetric-key-blocked",
+      "name": "Enable rotation on asymmetric RSA key — not supported (BLOCKED with manual-rotation plan)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/enable-rotation-asymmetric-key-blocked.md",
+      "baseline_file": "baselines/enable-rotation-asymmetric-key-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "RSA_2048", "SIGN_VERIFY", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "enable-key-rotation --key-id", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "verify-rotation-enabled-completed",
+      "name": "Verify rotation is enabled + CloudTrail event present (COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/verify-rotation-enabled-completed.md",
+      "baseline_file": "baselines/verify-rotation-enabled-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "EnableKeyRotation", "VERDICT", "POST_VERIFY", "NextRotationDate"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "enable-rotation-disabled-key-blocked",
+      "name": "Enable rotation on Disabled key — must enable first (BLOCKED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/enable-rotation-disabled-key-blocked.md",
+      "baseline_file": "baselines/enable-rotation-disabled-key-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "Disabled", "enable-key", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "enable-key-rotation --key-id", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "multi-region-replica-rotation-blocked",
+      "name": "Enable rotation on Multi-Region replica — must use primary (BLOCKED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/multi-region-replica-rotation-blocked.md",
+      "baseline_file": "baselines/multi-region-replica-rotation-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "REPLICA", "VERDICT", "PRE_CHECKS", "primary"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "enable-key-rotation --key-id arn:aws:kms:us-east-1", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+# Eval test cases for elasticache-cache-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across workload types
+# (cluster mode enabled, cluster mode disabled, Memcached,
+#  Global Datastore, missing prerequisites).
+skill: elasticache-cache-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: production-redis-cluster-mode
+    description: >-
+      Provision a production Redis cluster with cluster mode enabled
+      (3 shards), Multi-AZ failover, customer CMK encryption at rest,
+      TLS + AUTH, maxmemory-policy allkeys-lru, snapshots. Expects
+      READY_TO_DEPLOY with all checklist items verified.
+    input: |
+      Provision a production ElastiCache Redis cluster named
+      "prod-cache" in us-east-1. We need cluster mode enabled with
+      3 shards (1 replica per shard for Multi-AZ failover). Traffic
+      is mixed read/write at ~80k writes/sec sustained. Use
+      cache.r6g.2xlarge nodes. The cluster is a general-purpose cache
+      (data is disposable). Use customer-managed CMK
+      alias/prod-cache-kms for encryption at rest. Enable TLS and AUTH
+      (token in Secrets Manager). Snapshots: 7-day retention, window
+      03:00-05:00 UTC. Subnet group prod-cache-subnet spans 3 AZs.
+      Security group sg-cache123 has inbound 6379 from sg-app456.
+      Tags: Environment=production, Workload=cache.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-cache"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "redis"
+        - "ENABLED"
+        - "cache.r6g.2xlarge"
+        - "Multi-AZ"
+        - "allkeys-lru"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: session-store-redis-replication
+    description: >-
+      Provision a Redis cluster-mode-disabled replication group for a
+      session store. Uses noeviction maxmemory-policy (sessions must
+      NOT be silently evicted). Multi-AZ with 1 replica.
+    input: |
+      Provision an ElastiCache Redis cluster named "prod-sessions" in
+      us-east-1 for a session store. Session IDs are UUIDs; writes are
+      modest (~5k writes/sec, will not grow). Use cluster mode
+      DISABLED with 1 primary + 1 replica for Multi-AZ failover. The
+      maxmemory-policy must NOT evict silently (sessions would be
+      lost) — use noeviction. cache.r6g.large nodes. TLS + AUTH
+      enabled. Customer CMK alias/sessions-kms for encryption at rest.
+      Snapshots 7 days, window 04:00-06:00 UTC. Subnet group
+      prod-sessions-subnet spans 3 AZs. Security group sg-sessions
+      inbound 6379 from sg-app. Tags: Environment=production,
+      Workload=session-store. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-sessions"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "redis"
+        - "DISABLED"
+        - "noeviction"
+        - "Multi-AZ"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-subnet-group-and-sg
+    description: >-
+      Operator requests a Redis cluster but has not specified the
+      subnet group, security group, or AUTH token details. Multi-AZ
+      requires a multi-AZ subnet group; AUTH requires TLS. Expects
+      PREREQUISITES_MISSING with specific gaps cited.
+    input: |
+      Help me create a new ElastiCache Redis cluster called
+      "orders-cache" in us-east-1. I want Multi-AZ with failover and
+      AUTH enabled. We will cache order data — should be pretty
+      simple. Region: us-east-1, Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "orders-cache"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: memcached-simple-cache
+    description: >-
+      Provision a Memcached cluster for a simple, ephemeral, multi-
+      threaded key-value cache. Operator explicitly accepts no
+      failover, no persistence, no encryption. Expects READY_TO_DEPLOY
+      with Memcached-specific patterns (no Multi-AZ, no snapshots).
+    input: |
+      Provision an ElastiCache Memcached cluster named "dev-cache"
+      in us-east-1. This is a simple, ephemeral key-value cache —
+      data is disposable, cache-miss is acceptable, no failover
+      needed, no persistence needed. We want 3 cache.r6g.large nodes
+      distributed across AZs (cross-az mode) for AZ-spread. Subnet
+      group dev-cache-subnet spans 3 AZs. Security group sg-dev-cache
+      inbound 11211 from sg-dev-app. Tags: Environment=dev,
+      Workload=cache. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "dev-cache"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "memcached"
+        - "11211"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+        - "Multi-AZ with automatic failover: Enabled"
+
+  - id: global-datastore-cross-region
+    description: >-
+      Provision a Redis Global Datastore with primary in us-east-1 and
+      secondary in eu-west-1 for cross-region low-latency reads.
+      Primary must be cluster-mode-enabled. Expects READY_TO_DEPLOY
+      with Global Datastore member list.
+    input: |
+      Provision an ElastiCache Redis Global Datastore named
+      "prod-geo-cache" with primary in us-east-1 and secondary in
+      eu-west-1. Primary cluster prod-geo-cache-us-east-1 is cluster
+      mode enabled (3 shards, 1 replica each, Multi-AZ). Secondary
+      cluster prod-geo-cache-eu-west-1 mirrors the topology. Both
+      use cache.r6g.2xlarge, customer CMK (alias/geo-cache-kms-us
+      and alias/geo-cache-kms-eu respectively, each in its region).
+      TLS + AUTH enabled everywhere. Snapshots 7 days. Subnet groups
+      in each region span 3 AZs. Tags: Environment=production,
+      Workload=geo-cache. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "redis"
+        - "Global Datastore"
+        - "us-east-1"
+        - "eu-west-1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

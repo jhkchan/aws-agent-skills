@@ -1,0 +1,249 @@
+# Eval test cases for route53-failover-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: route53-failover-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: planned-failover-weighted-ready
+    description: >-
+      Operator wants to shift weighted routing 100/0 to 0/100 on
+      api.example.com as a planned failover. Both endpoints are
+      healthy; TTL is 60s; green endpoint is reachable. Plan should
+      produce READY with the change-resource-record-sets change-batch
+      and a CONFIRM gate.
+    input: |
+      Operation: planned-failover
+      FQDN: api.example.com
+      Hosted zone: Z2ABCDEFGHIJK
+
+      Current record sets (aws route53 list-resource-record-sets):
+        api.example.com. A SetIdentifier=blue  Weight=100
+          TTL=60 Value=10.0.0.10 HealthCheckId=h-blue123
+        api.example.com. A SetIdentifier=green Weight=0
+          TTL=60 Value=10.0.1.10 HealthCheckId=h-abcdef1234
+
+      Health check status (aws route53 get-health-check-status):
+        h-blue123:        Healthy (3 checker regions)
+        h-abcdef1234:     Healthy (3 checker regions)
+
+      Secondary reachability (independent probe):
+        10.0.1.10:443 TCP probe: OK
+
+      test-dns-answer (aws route53 test-dns-answer, resolver 1.1.1.1):
+        Returns: 10.0.0.10 (blue, as expected)
+
+      CloudWatch alarms:
+        api-example-failover: OK (on AWS/Route53 HealthCheckStatus for h-blue123)
+
+      Cross-account: hosted zone is in account 111111111111
+      (same as operator). No cross-account grant needed.
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "api.example.com"
+        - "change-resource-record-sets"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "Weight"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: emergency-failover-ttl-too-high-blocked
+    description: >-
+      Primary is down. Operator wants to emergency-failover to
+      secondary, but the current TTL is 300s. The pre-check must
+      BLOCK and surface the TTL-lowering step before flipping
+      routing.
+    input: |
+      Operation: emergency-failover
+      FQDN: api.example.com
+      Hosted zone: Z2ABCDEFGHIJK
+
+      Current record sets:
+        api.example.com. A SetIdentifier=primary   Failover=PRIMARY
+          TTL=300 Value=10.0.0.10 HealthCheckId=h-primary
+        api.example.com. A SetIdentifier=secondary Failover=SECONDARY
+          TTL=300 Value=10.0.1.10
+
+      Health check status:
+        h-primary:   Unhealthy
+          (reason: "Connection timed out" from all 3 checker regions,
+           3 consecutive failures)
+        (secondary has no health check)
+
+      Secondary reachability (independent probe):
+        10.0.1.10:443 TCP probe: OK
+
+      test-dns-answer (resolver 1.1.1.1):
+        Returns: 10.0.0.10 AND 10.0.1.10 (both — Route 53 last-resort
+        because primary health check is unhealthy and there is no
+        secondary health check to filter)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "TTL"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "300"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: failback-to-primary-completed
+    description: >-
+      After a prior emergency failover, the primary endpoint has been
+      restored and its health check has been Healthy for 5 minutes.
+      Operator wants to failback. Post-verification confirms
+      test-dns-answer returns the primary IP from all resolvers.
+    input: |
+      Operation: failback
+      FQDN: api.example.com
+      Hosted zone: Z2ABCDEFGHIJK
+
+      Current state (after prior emergency failover):
+        PRIMARY record now points to 10.0.1.10 (was secondary, became
+          primary during the emergency topology swap)
+        SECONDARY record now points to 10.0.0.10 (was primary, became
+          secondary)
+        TTL: 60s
+
+      Health check status:
+        h-primary (wired to 10.0.1.10): Healthy (last 5 minutes)
+        h-restored (newly created for 10.0.0.10): Healthy
+          (2 consecutive intervals at 30s each = 60s healthy)
+
+      Independent probe:
+        10.0.0.10:443 TCP probe: OK
+        10.0.0.10 /health HTTPS: 200 OK
+
+      Post-execution verification (already done):
+        Change-batch applied, ChangeInfo.Status: INSYNC
+        test-dns-answer (1.1.1.1): 10.0.0.10
+        test-dns-answer (8.8.8.8): 10.0.0.10
+        test-dns-answer (9.9.9.9): 10.0.0.10
+        dig @1.1.1.1 api.example.com +short: 10.0.0.10
+        Application metrics (2x TTL = 120s sample): no error spike
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "api.example.com"
+        - "test-dns-answer"
+        - "VERDICT"
+        - "POST_VERIFY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: both-records-unhealthy-blocked
+    description: >-
+      A failover was attempted but BOTH primary and secondary health
+      checks are Unhealthy. Route 53 returns both IPs as last-resort.
+      Diagnose and emit BLOCKED with the secondary-restoration fix.
+    input: |
+      Operation: diagnose-failover
+      FQDN: api.example.com
+      Hosted zone: Z2ABCDEFGHIJK
+
+      Current record sets:
+        api.example.com. A SetIdentifier=primary   Failover=PRIMARY
+          TTL=60 Value=10.0.0.10 HealthCheckId=h-primary
+        api.example.com. A SetIdentifier=secondary Failover=SECONDARY
+          TTL=60 Value=10.0.1.10 HealthCheckId=h-secondary
+
+      Health check status:
+        h-primary:   Unhealthy
+          (reason: "Connection timed out" from all 3 checker regions)
+        h-secondary: Unhealthy
+          (reason: "No response from server" from all 3 checker regions)
+
+      test-dns-answer (resolver 1.1.1.1):
+        Returns: 10.0.0.10 AND 10.0.1.10 (both — Route 53 last-resort
+        mode because both records are unhealthy)
+
+      Independent probes:
+        10.0.0.10:443 TCP probe: TIMEOUT
+        10.0.1.10:443 TCP probe: CONNECTION REFUSED
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "Unhealthy"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: cross-account-route53-access-denied-blocked
+    description: >-
+      Hosted zone lives in account A (security tooling). Operator
+      calls from account B (application). Operator's role lacks
+      route53:ChangeResourceRecordSets granted by the zone-owning
+      account. Diagnose and emit BLOCKED with the cross-account IAM
+      grant fix.
+    input: |
+      Operation: diagnose-failover
+      FQDN: api.example.com
+      Hosted zone: Z2ABCDEFGHIJK (lives in account 111111111111 / account A)
+      Operator: role in account 222222222222 / account B
+
+      Operator's last attempt:
+        aws route53 change-resource-record-sets \
+          --hosted-zone-id Z2ABCDEFGHIJK --change-batch ...
+        Result: AccessDeniedException — User: arn:aws:iam::222222222222:role/AppOpsRole
+          is not authorized to perform: route53:ChangeResourceRecordSets
+          on resource: arn:aws:route53:::hostedzone/Z2ABCDEFGHIJK
+
+      Operator's identity-based policy (account B):
+        Allows route53:* on * (verified)
+
+      Zone-owning account (account A) hosted zone config:
+        No RAM resource share for Z2ABCDEFGHIJK with account B.
+        No inline policy on a role in account B granting access.
+
+      Record sets (read via a break-glass role in account A):
+        api.example.com. A SetIdentifier=primary Failover=PRIMARY
+          Value=10.0.0.10 HealthCheckId=h-primary (Healthy)
+        api.example.com. A SetIdentifier=secondary Failover=SECONDARY
+          Value=10.0.1.10
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "AccessDeniedException"
+        - "VERDICT"
+        - "cross-account"
+        - "ChangeResourceRecordSets"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"

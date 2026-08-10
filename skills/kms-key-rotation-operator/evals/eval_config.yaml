@@ -1,0 +1,47 @@
+# Eval configuration for kms-key-rotation-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: kms-key-rotation-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: enable-rotation-symmetric-cmk-ready
+    difficulty: medium
+    prompt_file: prompts/enable-rotation-symmetric-cmk-ready.md
+    baseline_file: baselines/enable-rotation-symmetric-cmk-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: enable-rotation-asymmetric-key-blocked
+    difficulty: hard
+    prompt_file: prompts/enable-rotation-asymmetric-key-blocked.md
+    baseline_file: baselines/enable-rotation-asymmetric-key-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: verify-rotation-enabled-completed
+    difficulty: medium
+    prompt_file: prompts/verify-rotation-enabled-completed.md
+    baseline_file: baselines/verify-rotation-enabled-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: LOW
+  - id: enable-rotation-disabled-key-blocked
+    difficulty: hard
+    prompt_file: prompts/enable-rotation-disabled-key-blocked.md
+    baseline_file: baselines/enable-rotation-disabled-key-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: multi-region-replica-rotation-blocked
+    difficulty: hard
+    prompt_file: prompts/multi-region-replica-rotation-blocked.md
+    baseline_file: baselines/multi-region-replica-rotation-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH

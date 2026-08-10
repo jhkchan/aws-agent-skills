@@ -1,0 +1,47 @@
+# Eval configuration for eks-pod-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: eks-pod-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: crashloop-missing-env-var
+    difficulty: medium
+    prompt_file: prompts/crashloop-missing-env-var.md
+    baseline_file: baselines/crashloop-missing-env-var.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: CRASH_LOOP
+  - id: imagepullbackoff-node-role-no-ecr
+    difficulty: medium
+    prompt_file: prompts/imagepullbackoff-node-role-no-ecr.md
+    baseline_file: baselines/imagepullbackoff-node-role-no-ecr.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: IMAGE_PULL
+  - id: pending-failedscheduling-taint
+    difficulty: medium
+    prompt_file: prompts/pending-failedscheduling-taint.md
+    baseline_file: baselines/pending-failedscheduling-taint.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: PENDING
+  - id: liveness-probe-path-mismatch
+    difficulty: hard
+    prompt_file: prompts/liveness-probe-path-mismatch.md
+    baseline_file: baselines/liveness-probe-path-mismatch.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: PROBE_FAILURE
+  - id: insufficient-context-need-pod-name
+    difficulty: easy
+    prompt_file: prompts/insufficient-context-need-pod-name.md
+    baseline_file: baselines/insufficient-context-need-pod-name.md
+    expected_verdict: NEED_MORE_INFO

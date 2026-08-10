@@ -1,0 +1,45 @@
+# Eval configuration for data-transfer-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the
+# same case can run with-skill (SKILL.md loaded) vs without-skill
+# (baseline only) for delta comparison. This is the canonical
+# structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer
+# shim discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This
+# file does not replace it — it adds the structured with-skill-vs-
+# baseline dimension.
+skill_name: data-transfer-optimizer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: nat-gateway-no-gateway-endpoints
+    difficulty: medium
+    prompt_file: prompts/nat-gateway-no-gateway-endpoints.md
+    baseline_file: baselines/nat-gateway-no-gateway-endpoints.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: cross-az-rds-primary-not-pinned
+    difficulty: medium
+    prompt_file: prompts/cross-az-rds-primary-not-pinned.md
+    baseline_file: baselines/cross-az-rds-primary-not-pinned.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: tgw-versus-peering-small-fleet
+    difficulty: hard
+    prompt_file: prompts/tgw-versus-peering-small-fleet.md
+    baseline_file: baselines/tgw-versus-peering-small-fleet.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: rds-multiaz-to-aurora-migration
+    difficulty: medium
+    prompt_file: prompts/rds-multiaz-to-aurora-migration.md
+    baseline_file: baselines/rds-multiaz-to-aurora-migration.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: already-optimal-data-transfer
+    difficulty: easy
+    prompt_file: prompts/already-optimal-data-transfer.md
+    baseline_file: baselines/already-optimal-data-transfer.md
+    expected_verdict: ALREADY_OPTIMAL

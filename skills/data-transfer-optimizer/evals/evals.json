@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "data-transfer-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Data Transfer Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "nat-gateway-no-gateway-endpoints",
+      "name": "12TB/month S3 traffic through NAT Gateway, no VPC Gateway Endpoints deployed",
+      "difficulty": "medium",
+      "prompt_file": "prompts/nat-gateway-no-gateway-endpoints.md",
+      "baseline_file": "baselines/nat-gateway-no-gateway-endpoints.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "nat-gateway-no-gateway-endpoints", "Gateway Endpoint", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "cross-az-rds-primary-not-pinned",
+      "name": "Worker ASG spread across 3 AZs reading from RDS primary in 1a — $160/month cross-AZ waste",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cross-az-rds-primary-not-pinned.md",
+      "baseline_file": "baselines/cross-az-rds-primary-not-pinned.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "cross-az-rds-primary-not-pinned", "RECOMMENDATION", "AZ", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "tgw-versus-peering-small-fleet",
+      "name": "Transit Gateway on 3 intra-region VPCs with modest traffic — peering would be cheaper",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tgw-versus-peering-small-fleet.md",
+      "baseline_file": "baselines/tgw-versus-peering-small-fleet.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "tgw-versus-peering-small-fleet", "peering", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "rds-multiaz-to-aurora-migration",
+      "name": "RDS for PostgreSQL Multi-AZ high-write workload — Aurora migration eliminates $50/month cross-AZ replication",
+      "difficulty": "medium",
+      "prompt_file": "prompts/rds-multiaz-to-aurora-migration.md",
+      "baseline_file": "baselines/rds-multiaz-to-aurora-migration.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "rds-multiaz-to-aurora-migration", "Aurora", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-data-transfer",
+      "name": "All seven dimensions at cost-optimal config — Gateway Endpoints deployed, AZ-pinned, CloudFront, peering, Aurora, DX",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-data-transfer.md",
+      "baseline_file": "baselines/already-optimal-data-transfer.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-data-transfer", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

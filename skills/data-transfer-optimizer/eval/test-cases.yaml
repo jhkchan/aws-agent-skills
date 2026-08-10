@@ -1,0 +1,222 @@
+# Eval test cases for data-transfer-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# Account embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision matrix in SKILL.md
+# produces exactly the expected verdicts below.
+skill: data-transfer-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: nat-gateway-no-gateway-endpoints
+    description: >-
+      AWS account with 12TB/month S3 traffic flowing through NAT
+      Gateway. No VPC Gateway Endpoints deployed. Classic surprise
+      bill pattern. Expected verdict: OPPORTUNITY_FOUND with VPC
+      Gateway Endpoint recommendation.
+    input: |
+      Account: 123456789012 (case nat-gateway-no-gateway-endpoints)
+      Region: us-east-1 primary
+      Monthly data transfer costs (Cost Explorer, last 30 days):
+        - NatGateway-Bytes: 12,000 GB × $0.045 = $540
+        - NatGateway hourly: 3 NAT × $0.045/h × 730h = $98.55
+        - DataTransfer-Regional-Bytes: 1,000 GB × $0.02 = $20
+        - DataTransfer-Out-Bytes: 800 GB × $0.09 = $72
+      VPC topology:
+        - VPC-A in us-east-1 (3 AZs; primary app)
+        - 3 NAT Gateways (one per AZ for HA)
+        - VPC Endpoints: NONE
+      Workload context: microservices in private subnets pulling
+      from S3 (~95% of NAT traffic) and DynamoDB (~3%). General
+      internet egress is minimal.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "nat-gateway-no-gateway-endpoints"
+        - "Gateway Endpoint"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: cross-az-rds-primary-not-pinned
+    description: >-
+      Worker ASG spread across 3 AZs reading from RDS primary in
+      us-east-1a. Cross-AZ transfer is $160/month. Expected verdict:
+      OPPORTUNITY_FOUND with AZ-pinning recommendation.
+    input: |
+      Account: 123456789013 (case cross-az-rds-primary-not-pinned)
+      Region: us-east-1
+      Monthly data transfer costs (Cost Explorer, last 30 days):
+        - DataTransfer-Regional-Bytes: 8,000 GB × $0.02 = $160
+        - NatGateway-Bytes: minimal ($20/month)
+        - DataTransfer-Out-Bytes: minimal ($30/month)
+      VPC topology:
+        - VPC-A in us-east-1 (3 AZs)
+        - RDS for PostgreSQL primary in us-east-1a, standby in 1b
+          (Multi-AZ non-Aurora)
+        - Worker ASG spread across 1a, 1b, 1c (3 AZs)
+        - VPC Endpoints: S3 Gateway Endpoint deployed
+      Workload context: workers read ~265GB/day from RDS primary;
+      2/3 of workers are in different AZ from primary.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "cross-az-rds-primary-not-pinned"
+        - "RECOMMENDATION"
+        - "AZ"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: tgw-versus-peering-small-fleet
+    description: >-
+      Account has Transit Gateway deployed for 3 intra-region VPCs
+      with modest inter-VPC traffic. Peering would be cheaper. VPCs
+      have full mesh potential. Expected verdict: OPPORTUNITY_FOUND
+      with VPC peering migration recommendation.
+    input: |
+      Account: 123456789014 (case tgw-versus-peering-small-fleet)
+      Region: us-east-1
+      Monthly data transfer costs (Cost Explorer, last 30 days):
+        - TransitGateway-Bytes: 5,000 GB × $0.04 (round-trip) = $200
+        - TransitGateway hourly: 3 attachments × $0.05/h × 730h =
+          $109.50
+        - Total TGW cost: $309.50/month
+      VPC topology:
+        - VPC-A, VPC-B, VPC-C in us-east-1 (all intra-region)
+        - Transit Gateway connecting all 3
+        - Full mesh traffic pattern: each VPC exchanges ~500GB/month
+          with each other VPC
+      Workload context: microservices in each VPC calling APIs in
+      the others; no centralized egress or inspection requirement.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "tgw-versus-peering-small-fleet"
+        - "peering"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: rds-multiaz-to-aurora-migration
+    description: >-
+      RDS for PostgreSQL Multi-AZ on high-write workload incurring
+      $50/month cross-AZ replication charges. Aurora would eliminate
+      these. Expected verdict: OPPORTUNITY_FOUND with Aurora
+      migration recommendation.
+    input: |
+      Account: 123456789015 (case rds-multiaz-to-aurora-migration)
+      Region: us-east-1
+      Monthly data transfer costs (Cost Explorer, last 30 days):
+        - RDS-DataTransfer: 5,000 GB × $0.01 = $50
+          (Multi-AZ synchronous replication)
+        - Other data transfer costs: minimal
+      RDS inventory:
+        - db.r6i.2xlarge Multi-AZ, PostgreSQL 15
+        - 5TB write volume per month (high-write OLTP workload)
+        - 3 read replicas (consumers in same region)
+      Workload context: e-commerce OLTP with strict ACID
+      requirements. Multi-AZ for HA. Read replicas for read scaling.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "rds-multiaz-to-aurora-migration"
+        - "Aurora"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-data-transfer
+    description: >-
+      Account with all seven data-transfer dimensions at optimal
+      config: S3 + DynamoDB Gateway Endpoints in all VPCs, workers
+      AZ-pinned to Aurora readers, CloudFront in front of S3, VPC
+      peering for 3 intra-region VPCs, Aurora Multi-AZ (free
+      replication), Direct Connect 1Gbps for 5TB/month on-prem sync.
+      Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      Account: 123456789016 (case already-optimal-data-transfer)
+      Region: us-east-1 primary; us-west-2 secondary
+      Monthly data transfer costs (Cost Explorer, last 30 days):
+        - NatGateway-Bytes: minimal (only general internet egress
+          from dev/test VPC; $15/month)
+        - DataTransfer-Regional-Bytes: minimal (workers AZ-pinned;
+          $25/month)
+        - DataTransfer-Out-Bytes: minimal (CloudFront handles S3
+          egress to viewers; $50/month on EC2 direct egress for
+          on-prem sync via DX)
+        - Cross-region: Aurora Global Database only (DR-justified;
+          priced via Aurora storage)
+        - TransitGateway-Bytes: none (peering used)
+        - RDS-DataTransfer: none (Aurora)
+        - Direct Connect: 1Gbps port $220/month + 5,000GB × $0.02
+          = $100/month outbound
+      VPC topology:
+        - 3 VPCs in us-east-1 (VPC peering, full mesh, free)
+        - 1 VPC in us-west-2 (Aurora Global DB from us-east-1)
+        - VPC Gateway Endpoints: S3 + DynamoDB in all VPCs with
+          private subnets
+        - VPC Interface Endpoints: SQS in 2 VPCs (above break-even)
+        - Workers AZ-pinned to Aurora readers per VPC
+        - Aurora Multi-AZ (storage-layer replication, free)
+        - Direct Connect 1Gbps to on-prem data center (above
+          break-even at 5TB/month sync)
+      Workload context: multi-region SaaS with active-active Aurora
+      Global Database for DR, CloudFront for global S3 content,
+      on-prem sync for hybrid analytics.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-data-transfer"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"

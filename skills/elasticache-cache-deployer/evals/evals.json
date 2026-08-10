@@ -1,0 +1,185 @@
+{
+  "skill": "elasticache-cache-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the ElastiCache Cache Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across workload types (Redis cluster mode enabled, Redis cluster mode disabled session store, simple Memcached cache, Global Datastore cross-region) and missing-prerequisite branches. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-redis-cluster-mode",
+      "name": "Production Redis cluster mode enabled with Multi-AZ + TLS + AUTH + CMK",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, cluster mode enabled + Multi-AZ + customer CMK + TLS + AUTH + allkeys-lru + snapshots",
+      "prompt": "Provision a production ElastiCache Redis cluster named \"prod-cache\" in us-east-1. We need cluster mode enabled with 3 shards (1 replica per shard for Multi-AZ failover). Traffic is mixed read/write at ~80k writes/sec sustained. Use cache.r6g.2xlarge nodes. The cluster is a general-purpose cache (data is disposable). Use customer-managed CMK alias/prod-cache-kms for encryption at rest. Enable TLS and AUTH (token in Secrets Manager). Snapshots: 7-day retention, window 03:00-05:00 UTC. Subnet group prod-cache-subnet spans 3 AZs. Security group sg-cache123 has inbound 6379 from sg-app456. Tags: Environment=production, Workload=cache. Account ID: 123456789012.",
+      "prompt_file": "prompts/production-redis-cluster-mode.md",
+      "baseline_file": "baselines/production-redis-cluster-mode.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CACHE: prod-cache\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: redis\n  [✓] Cluster mode: ENABLED (3 shards)\n  [✓] Node type: cache.r6g.2xlarge (62.34 GiB nominal; 31.17 GiB usable per shard; 93.51 GiB total usable)\n  [✓] Replicas: 1 per shard (3 total) — Multi-AZ failover\n  [✓] Multi-AZ with automatic failover: Enabled\n  [✓] Subnet group: prod-cache-subnet (3 AZs)\n  [✓] Security group: sg-cache123 (inbound 6379 from sg-app456)\n  [✓] Encryption at rest: Enabled (customer CMK alias/prod-cache-kms)\n  [✓] Encryption in transit (TLS): Enabled\n  [✓] AUTH token: Enabled (stored in Secrets Manager)\n  [✓] Parameter group: maxmemory-policy=allkeys-lru (cache semantics — disposable data)\n  [✓] Snapshot retention: 7 days (window 03:00-05:00 UTC)\n  [✓] Maintenance window: sun:05:00-sun:07:00\n  [✓] Global Datastore: Single-region (us-east-1)\n  [✓] ElastiCache Serverless: No\nVERIFICATION_COMMANDS:\n  aws elasticache describe-replication-groups --replication-group-id prod-cache\n  aws elasticache describe-cache-clusters --cache-cluster-id prod-cache-0001 --show-cache-node-info\n  aws kms describe-key --key-id alias/prod-cache-kms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-cache",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "redis",
+            "ENABLED",
+            "cache.r6g.2xlarge",
+            "Multi-AZ",
+            "allkeys-lru"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "session-store-redis-replication",
+      "name": "Session store with cluster mode disabled + noeviction + Multi-AZ",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — session store with cluster mode disabled, noeviction (sessions must NOT be silently evicted), Multi-AZ failover",
+      "prompt": "Provision an ElastiCache Redis cluster named \"prod-sessions\" in us-east-1 for a session store. Session IDs are UUIDs; writes are modest (~5k writes/sec, will not grow). Use cluster mode DISABLED with 1 primary + 1 replica for Multi-AZ failover. The maxmemory-policy must NOT evict silently (sessions would be lost) — use noeviction. cache.r6g.large nodes. TLS + AUTH enabled. Customer CMK alias/sessions-kms for encryption at rest. Snapshots 7 days, window 04:00-06:00 UTC. Subnet group prod-sessions-subnet spans 3 AZs. Security group sg-sessions inbound 6379 from sg-app. Tags: Environment=production, Workload=session-store. Account ID: 123456789012.",
+      "prompt_file": "prompts/session-store-redis-replication.md",
+      "baseline_file": "baselines/session-store-redis-replication.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CACHE: prod-sessions\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: redis\n  [✓] Cluster mode: DISABLED (single primary; write rate modest and stable)\n  [✓] Node type: cache.r6g.large (13.13 GiB nominal; 6.5 GiB usable)\n  [✓] Replicas: 1 (Multi-AZ failover)\n  [✓] Multi-AZ with automatic failover: Enabled\n  [✓] Subnet group: prod-sessions-subnet (3 AZs)\n  [✓] Security group: sg-sessions (inbound 6379 from sg-app)\n  [✓] Encryption at rest: Enabled (customer CMK alias/sessions-kms)\n  [✓] Encryption in transit (TLS): Enabled\n  [✓] AUTH token: Enabled\n  [✓] Parameter group: maxmemory-policy=noeviction (session store — NEVER silently evict)\n  [✓] Snapshot retention: 7 days (window 04:00-06:00 UTC)\n  [✓] Global Datastore: Single-region (us-east-1)\nVERIFICATION_COMMANDS:\n  aws elasticache describe-replication-groups --replication-group-id prod-sessions\n  aws kms describe-key --key-id alias/sessions-kms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-sessions",
+            "VERDICT",
+            "CHECKLIST",
+            "redis",
+            "DISABLED",
+            "noeviction",
+            "Multi-AZ"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING",
+            "allkeys-lru"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-subnet-group-and-sg",
+      "name": "Operator has not specified subnet group, security group, or AUTH token details",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — subnet group (Multi-AZ requires multi-AZ subnet group), security group (cache port inbound), and AUTH details all unspecified",
+      "prompt": "Help me create a new ElastiCache Redis cluster called \"orders-cache\" in us-east-1. I want Multi-AZ with failover and AUTH enabled. We will cache order data — should be pretty simple. Region: us-east-1, Account: 123456789012.",
+      "prompt_file": "prompts/missing-subnet-group-and-sg.md",
+      "baseline_file": "baselines/missing-subnet-group-and-sg.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "CACHE: orders-cache\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Subnet group: NOT specified — Multi-AZ requires subnet group spanning >=2 AZs\n  [✗] Security group: NOT specified — Redis needs inbound 6379 from application SG\n  [✗] AUTH token: NOT specified — AUTH requires TLS and a token (16-128 chars)\n  [✗] KMS key: NOT specified if encryption at rest required (default AWS-managed OK for dev)\nVERIFICATION_COMMANDS:\n  aws ec2 describe-subnets --query 'Subnets[*].AvailabilityZone' --output text\n  aws ec2 describe-security-groups --query 'SecurityGroups[*].[GroupId,GroupName]' --output text\n  aws kms list-aliases --query 'Aliases[?starts_with(AliasName, `alias/`)]'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "orders-cache",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "memcached-simple-cache",
+      "name": "Simple Memcached cache with cross-AZ node distribution (no failover)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Memcached dev cache with cross-az node distribution; no Multi-AZ, no snapshots, no encryption (all unsupported on Memcached)",
+      "prompt": "Provision an ElastiCache Memcached cluster named \"dev-cache\" in us-east-1. This is a simple, ephemeral key-value cache — data is disposable, cache-miss is acceptable, no failover needed, no persistence needed. We want 3 cache.r6g.large nodes distributed across AZs (cross-az mode) for AZ-spread. Subnet group dev-cache-subnet spans 3 AZs. Security group sg-dev-cache inbound 11211 from sg-dev-app. Tags: Environment=dev, Workload=cache. Account ID: 123456789012.",
+      "prompt_file": "prompts/memcached-simple-cache.md",
+      "baseline_file": "baselines/memcached-simple-cache.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CACHE: dev-cache\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: memcached\n  [✓] Cluster mode: N/A (Memcached uses multi-threading per node, no cluster mode)\n  [✓] Node type: cache.r6g.large (13.13 GiB nominal; ~11.8 GiB usable per node; 35.4 GiB total across 3 nodes)\n  [✓] Replicas: None (Memcached does NOT support replication)\n  [✓] Multi-AZ with automatic failover: N/A (Memcached does NOT support Multi-AZ failover; AZMode=cross-az distributes nodes only)\n  [✓] Subnet group: dev-cache-subnet (3 AZs)\n  [✓] Security group: sg-dev-cache (inbound 11211 from sg-dev-app)\n  [✓] Encryption at rest: N/A (Memcached does NOT support encryption)\n  [✓] Encryption in transit (TLS): N/A (Memcached does NOT support TLS)\n  [✓] AUTH token: N/A (Memcached does NOT support AUTH)\n  [✓] Parameter group: max-item-size=1MB (default), LRU eviction (Memcached default)\n  [✓] Snapshot retention: N/A (Memcached does NOT support snapshots)\n  [✓] AZ mode: cross-az (distributes 3 nodes across AZs)\nVERIFICATION_COMMANDS:\n  aws elasticache describe-cache-clusters --cache-cluster-id dev-cache --show-cache-node-info\n  aws ec2 describe-security-groups --group-ids sg-dev-cache",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "dev-cache",
+            "VERDICT",
+            "CHECKLIST",
+            "memcached",
+            "11211"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING",
+            "Multi-AZ with automatic failover: Enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "global-datastore-cross-region",
+      "name": "Redis Global Datastore with primary us-east-1 and secondary eu-west-1",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Global Datastore cross-region replication; primary cluster mode enabled; each region its own CMK",
+      "prompt": "Provision an ElastiCache Redis Global Datastore named \"prod-geo-cache\" with primary in us-east-1 and secondary in eu-west-1. Primary cluster prod-geo-cache-us-east-1 is cluster mode enabled (3 shards, 1 replica each, Multi-AZ). Secondary cluster prod-geo-cache-eu-west-1 mirrors the topology. Both use cache.r6g.2xlarge, customer CMK (alias/geo-cache-kms-us and alias/geo-cache-kms-eu respectively, each in its region). TLS + AUTH enabled everywhere. Snapshots 7 days. Subnet groups in each region span 3 AZs. Tags: Environment=production, Workload=geo-cache. Account ID: 123456789012.",
+      "prompt_file": "prompts/global-datastore-cross-region.md",
+      "baseline_file": "baselines/global-datastore-cross-region.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CACHE: prod-geo-cache (Global Datastore)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: redis\n  [✓] Cluster mode: ENABLED (3 shards in primary; required for Global Datastore)\n  [✓] Node type: cache.r6g.2xlarge in both regions\n  [✓] Replicas: 1 per shard (Multi-AZ failover in each region)\n  [✓] Multi-AZ with automatic failover: Enabled (per-region)\n  [✓] Encryption at rest: Enabled (customer CMK alias/geo-cache-kms-us in us-east-1; alias/geo-cache-kms-eu in eu-west-1)\n  [✓] Encryption in transit (TLS): Enabled (both regions)\n  [✓] AUTH token: Enabled (both regions)\n  [✓] Snapshot retention: 7 days (both regions)\n  [✓] Global Datastore: members in us-east-1 (primary, RW), eu-west-1 (secondary, RO)\n  [✓] Replication lag target: < 1 second typical\nVERIFICATION_COMMANDS:\n  aws elasticache describe-global-replication-groups --global-replication-group-id <global-id> --show-member-info\n  aws elasticache describe-replication-groups --replication-group-id prod-geo-cache-us-east-1\n  aws elasticache describe-replication-groups --replication-group-id prod-geo-cache-eu-west-1 --region eu-west-1\n  aws kms describe-key --key-id alias/geo-cache-kms-us\n  aws kms describe-key --key-id alias/geo-cache-kms-eu --region eu-west-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "VERDICT",
+            "CHECKLIST",
+            "redis",
+            "Global Datastore",
+            "us-east-1",
+            "eu-west-1"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

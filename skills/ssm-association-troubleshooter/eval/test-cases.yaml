@@ -1,0 +1,213 @@
+# Eval test cases for ssm-association-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ssm-association-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: failed-s3-access-denied
+    description: >-
+      Association shows Status=Failed with StatusMessage "AccessDenied
+      on s3:PutObject". Skill must identify the IAM root cause (instance
+      role lacks s3:PutObject on the output bucket), confirm 3-layer
+      health check passes for IAM/connectivity/agent except the S3
+      permission gap, and produce ROOT_CAUSE_FOUND with the fix CLI.
+    input: |
+      Diagnosis reference: failed-s3-access-denied
+      Account: 111111111111
+      Region: us-east-1
+      Association-id: 0123456789abcdef0123456789abcdef0123456789abcdef0
+      Association name: prod-inventory-collect
+      Instance-id: i-0abc123def456789a
+      Symptom: Failed
+
+      Recent diagnostic output:
+      - describe-association-executions Status=Failed,
+        StatusMessage="AccessDenied on s3:PutObject for arn:aws:s3:::ssm-output-prod/..."
+      - describe-instance-information: PingStatus=Active,
+        LastPingDateTime=2026-08-10T10:00:00Z, AgentVersion=3.2.1555.0,
+        IsLatestVersion=true, PlatformType=Linux
+      - simulate-principal-policy on the instance role: Denied for
+        s3:PutObject on arn:aws:s3:::ssm-output-prod/*
+
+      Emit the standard DIAGNOSIS block (SYMPTOM, ROOT_CAUSE,
+      EVIDENCE, LAYER_CHECK, FIX, VERIFICATION, VERDICT).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "failed-s3-access-denied"
+        - "VERDICT"
+        - "s3:PutObject"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: timedout-agent-unreachable
+    description: >-
+      Association shows Status=TimedOut. describe-instance-information
+      shows PingStatus=ConnectionLost. Skill must identify the 3-layer
+      failure (Layer 2 connectivity - missing VPC endpoints in private
+      subnet) as the root cause and produce ROOT_CAUSE_FOUND with the
+      VPC endpoint deployment fix.
+    input: |
+      Diagnosis reference: timedout-agent-unreachable
+      Account: 111111111111
+      Region: us-east-1
+      Association-id: 1234567890abcdef1234567890abcdef1234567890abcdef1
+      Instance-id: i-0fedcba9876543210
+      Symptom: TimedOut
+
+      Recent diagnostic output:
+      - describe-association-executions Status=TimedOut
+      - describe-instance-information: PingStatus=ConnectionLost,
+        LastPingDateTime=2026-08-09T22:00:00Z (12+ hours stale),
+        AgentVersion=3.2.1555.0
+      - ec2 describe-instances: State=running,
+        VpcId=vpc-privatesubnet-0abc, IamInstanceProfile has
+        AmazonSSMManagedInstanceCore attached
+      - ec2 describe-vpc-endpoints for vpc-privatesubnet-0abc:
+        returns only com.amazonaws.us-east-1.ssm; missing ssmmesages
+        and ec2messages endpoints.
+
+      Emit the standard DIAGNOSIS block. Identify the root cause via
+      the 3-layer health check.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "timedout-agent-unreachable"
+        - "VERDICT"
+        - "ssmmessages"
+        - "ec2messages"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: never-runs-tag-mismatch
+    description: >-
+      Association is ENABLED but never runs. Targets use
+      Key=tag:Environment,Values=prod but instances are tagged
+      with Key=env,Value=prod (lowercase key). Skill must identify
+      the tag key case-sensitivity mismatch as the root cause.
+    input: |
+      Diagnosis reference: never-runs-tag-mismatch
+      Account: 111111111111
+      Region: us-east-1
+      Association-id: 234567890abcdef234567890abcdef234567890abcdef2
+      Association name: prod-patch-baseline
+      Instance-id: i-0aaa111ccc222ddd3 (expected target)
+      Symptom: NeverRuns (no executions)
+
+      Recent diagnostic output:
+      - describe-association: State=Enabled,
+        ScheduleExpression=cron(0 2 * * ? *), NextExecutionDate is
+        in the past, Targets=[{Key:tag:Environment,Values:[prod]}]
+      - describe-association-executions: returns empty list (no runs)
+      - ec2 describe-instances for the instance: Tags show
+        Key=env (lowercase), Value=prod
+      - Instance has PingStatus=Active, IAM and connectivity are OK.
+
+      Emit the standard DIAGNOSIS block. Identify the root cause.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "never-runs-tag-mismatch"
+        - "VERDICT"
+        - "tag"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: hybrid-activation-expired
+    description: >-
+      On-prem hybrid mi-* instance is no longer appearing in SSM.
+      Activation expired. Skill must identify the expired activation
+      as the root cause and ESCALATE (requires on-host re-registration).
+    input: |
+      Diagnosis reference: hybrid-activation-expired
+      Account: 111111111111
+      Region: us-east-1
+      Instance-id: mi-0abc123def456789a (hybrid)
+      Symptom: NotManaged (instance not appearing in SSM)
+
+      Recent diagnostic output:
+      - describe-instance-information for mi-0abc123def456789a:
+        returns empty (instance not in SSM)
+      - describe-activations: shows activation
+        aabbccdd-1111-2222-3333-aabbccddeeff with IamRole
+        AmazonSSMManagedInstanceCore-Role, Expired=true,
+        ExpiryDate=2026-06-01
+      - No recent CloudTrail events for the mi-* instance.
+
+      Emit the standard DIAGNOSIS block.
+    expected_verdict: ESCALATE
+    assertions:
+      must_contain:
+        - "ESCALATE"
+        - "hybrid-activation-expired"
+        - "VERDICT"
+        - "Expired"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ROOT_CAUSE_FOUND"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: document-script-error
+    description: >-
+      Association orchestration Status=Success but per-target
+      Status=Failed with script error in S3 output. Skill must
+      identify the per-target script error as the root cause and
+      produce ROOT_CAUSE_FOUND with the document fix.
+    input: |
+      Diagnosis reference: document-script-error
+      Account: 111111111111
+      Region: us-east-1
+      Association-id: 345678901abcdef345678901abcdef345678901abcdef3
+      Association name: nightly-config-apply
+      Instance-id: i-0bbb222ddd333eee4
+      Execution-id: 11112222-3333-4444-5555-666677778888
+      Symptom: DocumentError (script fails mid-run)
+
+      Recent diagnostic output:
+      - describe-association-executions Status=Success
+        (orchestration succeeded)
+      - describe-association-execution-targets: per-target
+        Status=Failed, StatusMessage="Plugin errors occurred",
+        OutputSource.S3Url=s3://ssm-output-prod/i-0bbb222ddd333eee4/...
+      - S3 output stderr excerpt:
+        "line 42: jq: command not found"
+      - describe-document: PlatformTypes=[Linux,macOS],
+        DefaultVersion=3, association pinned to DefaultVersion=2
+      - Instance has jq NOT installed (verified via Run Command).
+
+      Emit the standard DIAGNOSIS block. Identify the root cause
+      via the document-level drill-down (Step 6).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "document-script-error"
+        - "VERDICT"
+        - "jq"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"

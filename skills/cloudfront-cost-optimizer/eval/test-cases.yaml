@@ -1,0 +1,245 @@
+# Eval test cases for cloudfront-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# DistributionId embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The decision matrix in
+# SKILL.md produces exactly the expected verdicts below.
+skill: cloudfront-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: priceclass-all-us-only-viewers
+    description: >-
+      CloudFront distribution with PriceClass_All but 98% US/EU
+      viewers. Cache hit ratio is healthy at 92%; compression is on;
+      S3 origin with OAC; WAF is appropriately sized. The single
+      opportunity is Price Class. Expected verdict: OPPORTUNITY_FOUND
+      with Price Class switch to PriceClass_100.
+    input: |
+      DistributionId: E-priceclass-all-us-only-viewers
+      Region: us-east-1 (distribution); viewers 98% US/EU per
+        CloudFront access logs (3% APAC, 1% other)
+      PriceClass: PriceClass_All
+      Origins:
+        - S3 origin with OAC: s3-prod-assets (us-east-1)
+      Default cache behavior:
+        Target origin: s3-prod-assets
+        Cache policy: CachingOptimized (TTL 31536000, minimal key)
+        Compress: true (Brotli + gzip)
+        Lambda@Edge associations: 0
+      CloudFront Functions associations: 0
+      WAF: 5 rules, ~200M requests/month
+      Shield: Standard (no Advanced)
+      Metrics (last 30 days):
+        CacheHitRate: 92%
+        Requests: 200,000,000
+        BytesDownloaded: 1,200 GB
+        OriginLatency: 80ms p50
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "priceclass-all-us-only-viewers"
+        - "PriceClass_100"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: low-cache-hit-ratio-utm-fragmentation
+    description: >-
+      CloudFront distribution with CacheHitRate 58% on what should
+      be static content. Cache policy is set to whitelist UTM query
+      string parameters for marketing attribution, fragmenting the
+      cache. Expected verdict: OPPORTUNITY_FOUND with cache policy
+      fix to drop UTMs from cache key.
+    input: |
+      DistributionId: E-low-cache-hit-ratio-utm-fragmentation
+      Region: us-east-1 (distribution); viewers 90% US/EU
+      PriceClass: PriceClass_100
+      Origins:
+        - S3 origin with OAC: s3-prod-cdn (us-east-1)
+      Default cache behavior:
+        Target origin: s3-prod-cdn
+        Cache policy: custom-utm-whitelist (TTL 86400 default,
+          query strings whitelisted: utm_source, utm_medium,
+          utm_campaign, utm_term, utm_content, version, format)
+        Origin request policy: AllViewerExceptInternal
+        Compress: true
+      WAF: 5 rules
+      Shield: Standard
+      Metrics (last 30 days):
+        CacheHitRate: 58%
+        Requests: 500,000,000
+        BytesDownloaded: 3,000 GB
+        OriginLatency: 120ms p50
+      Notes: CloudFront access logs show ~50 unique UTM combinations
+        per product page URL, each producing a separate cache entry.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "low-cache-hit-ratio-utm-fragmentation"
+        - "RECOMMENDATION"
+        - "cache policy"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: compression-off-static-assets
+    description: >-
+      CloudFront distribution serving static text assets (HTML, CSS,
+      JS) with compression disabled. Price Class is appropriate
+      (PriceClass_100 for US-only viewers), origin is S3 with OAC,
+      cache hit ratio is 88%. Expected verdict: OPPORTUNITY_FOUND
+      with compression enable recommendation (50-90% byte savings).
+    input: |
+      DistributionId: E-compression-off-static-assets
+      Region: us-east-1 (distribution); viewers 99% US
+      PriceClass: PriceClass_100
+      Origins:
+        - S3 origin with OAC: s3-static-site (us-east-1)
+      Default cache behavior:
+        Target origin: s3-static-site
+        Cache policy: CachingOptimized
+        Compress: false
+      WAF: 3 rules
+      Shield: Standard
+      Metrics (last 30 days):
+        CacheHitRate: 88%
+        Requests: 300,000,000
+        BytesDownloaded: 2,500 GB
+        OriginLatency: 95ms p50
+      Content profile: mostly text (HTML 40%, CSS 20%, JS 30%,
+      images 10%). Images already compressed.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "compression-off-static-assets"
+        - "RECOMMENDATION"
+        - "ompress"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: shield-advanced-marketing-site
+    description: >-
+      CloudFront distribution serving a marketing site (low DDoS
+      risk) with Shield Advanced enabled ($3,000/month). All other
+      dimensions are at optimal config. Expected verdict:
+      OPPORTUNITY_FOUND with Shield Advanced removal recommendation.
+    input: |
+      DistributionId: E-shield-advanced-marketing-site
+      Region: us-east-1 (distribution); viewers 95% US
+      PriceClass: PriceClass_100
+      Origins:
+        - S3 origin with OAC: s3-marketing (us-east-1)
+      Default cache behavior:
+        Target origin: s3-marketing
+        Cache policy: CachingOptimized
+        Compress: true
+      WAF: 5 rules
+      Shield: Advanced ($3,000/month on this distribution)
+      Metrics (last 30 days):
+        CacheHitRate: 94%
+        Requests: 50,000,000
+        BytesDownloaded: 400 GB
+      Workload context: corporate marketing website; no transaction
+      processing; no login; no commerce. Traffic is steady, no
+      history of DDoS.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "shield-advanced-marketing-site"
+        - "Shield"
+        - "RECOMMENDATION"
+        - "3,000"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-distribution
+    description: >-
+      CloudFront distribution with all nine cost dimensions at
+      optimal config: PriceClass_100 for 98% US/EU viewers, S3 origin
+      with OAC, cache hit ratio 94% on static content, compression
+      enabled (Brotli), CloudFront Functions (not Lambda@Edge) for
+      header manipulation, WAF appropriately sized, no Shield
+      Advanced, Security Savings Bundle evaluated and adopted.
+      Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      DistributionId: E-already-optimal-distribution
+      Region: us-east-1 (distribution); viewers 98% US/EU
+      PriceClass: PriceClass_100
+      Origins:
+        - S3 origin with OAC: s3-prod-app (us-east-1)
+      Default cache behavior:
+        Target origin: s3-prod-app
+        Cache policy: custom-minimal-key (TTL 604800 default,
+          query strings: none, cookies: none, headers: Accept,
+          Accept-Encoding)
+        Compress: true (Brotli + gzip)
+        CloudFront Functions associations: 1 viewer-request
+          (header normalization, < 1ms runtime verified)
+        Lambda@Edge associations: 0
+      WAF: 5 rules on 200M requests/month (consistent with traffic)
+      Shield: Standard (no Advanced — distribution is internal app)
+      Origin Shield: enabled, us-east-1 region (close to S3 origin)
+      CloudFront Security Savings Bundle: 1-yr commit at $5K/month
+        steady-state, 30% discount applied
+
+      Metrics (last 30 days):
+        CacheHitRate: 94%
+        Requests: 200,000,000
+        BytesDownloaded: 1,500 GB
+        OriginLatency: 75ms p50
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-distribution"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"

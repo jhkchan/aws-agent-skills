@@ -1,0 +1,47 @@
+# Eval configuration for route53-failover-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: route53-failover-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: planned-failover-weighted-ready
+    difficulty: medium
+    prompt_file: prompts/planned-failover-weighted-ready.md
+    baseline_file: baselines/planned-failover-weighted-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: emergency-failover-ttl-too-high-blocked
+    difficulty: hard
+    prompt_file: prompts/emergency-failover-ttl-too-high-blocked.md
+    baseline_file: baselines/emergency-failover-ttl-too-high-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: failback-to-primary-completed
+    difficulty: hard
+    prompt_file: prompts/failback-to-primary-completed.md
+    baseline_file: baselines/failback-to-primary-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: MODERATE
+  - id: both-records-unhealthy-blocked
+    difficulty: hard
+    prompt_file: prompts/both-records-unhealthy-blocked.md
+    baseline_file: baselines/both-records-unhealthy-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: cross-account-route53-access-denied-blocked
+    difficulty: hard
+    prompt_file: prompts/cross-account-route53-access-denied-blocked.md
+    baseline_file: baselines/cross-account-route53-access-denied-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH

@@ -1,0 +1,138 @@
+# Eval test cases for cloudtrail-gap-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudtrail-gap-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: s3-data-events-not-configured
+    description: Operator expects GetObject events in CloudTrail; trail has empty DataResources; management events flow normally
+    input: |
+      Scenario: An operator on AWS expects to see S3 GetObject events
+      in CloudTrail for audit purposes. aws cloudtrail lookup-events
+      --lookup-attributes AttributeKey=EventName,AttributeValue=GetObject
+      returns 0 results for the past 24 hours. Management events
+      (CreateBucket, PutBucketPolicy) appear normally — lookup-events
+      for CreateBucket returns 4 events. aws cloudtrail describe-trails
+      --trail-name-list corp-trail shows IsMultiRegionTrail: true,
+      IsLogging: true. aws cloudtrail get-event-selectors --trail-name
+      corp-trail returns:
+      [{"ReadWriteType":"All","IncludeManagementEvents":true,
+      "DataResources":[]}].
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "MISSING_DATA_EVENTS"
+        - "DataResources"
+        - "AWS::S3::Object"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "outage"
+
+  - id: trail-stopped-inadvertently
+    description: Trail isLogging false; operator does not remember stopping it; bucket policy and config are correct
+    input: |
+      Scenario: A CloudTrail trail named corp-trail is producing no log
+      files. aws cloudtrail get-trail-status --name corp-trail returns
+      IsLogging: false, StopLoggingTime: 2026-08-09T14:00:00Z,
+      LatestDeliveryTime: 2026-08-09T13:58:00Z. aws cloudtrail
+      describe-trails --trail-name-list corp-trail shows the config
+      looks correct (multi-region, KMS, bucket in same region). The
+      bucket policy has the canonical CloudTrail Allow statements.
+      CloudTrail event history shows a StopLogging event at 14:00Z
+      yesterday from an automated script.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "TRAIL_NOT_LOGGING"
+        - "start-logging"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: bucket-policy-missing-acl-condition
+    description: Trail IsLogging true but no delivery; bucket policy PutObject Allow lacks bucket-owner-full-control condition
+    input: |
+      Scenario: A CloudTrail trail named audit-trail claims IsLogging:
+      true (aws cloudtrail get-trail-status). No log files have landed
+      in the S3 bucket for 6 hours. aws cloudtrail describe-trails
+      shows S3BucketName: audit-logs, HomeRegion: us-east-1. aws
+      s3api get-bucket-location confirms the bucket is in us-east-1.
+      aws s3api get-bucket-policy --bucket audit-logs returns a policy
+      whose only CloudTrail statement is:
+      {"Effect":"Allow","Principal":{"Service":"cloudtrail.amazonaws.com"},
+      "Action":"s3:PutObject","Resource":"arn:aws:s3:::audit-logs/
+      AWSLogs/111111111111/CloudTrail/*"} (NO Condition requiring
+      s3:x-amz-acl: bucket-owner-full-control).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "BUCKET_POLICY_BLOCKING"
+        - "bucket-owner-full-control"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: org-trail-member-shadow-stopped
+    description: Org trail logs management account and 9 of 10 members; one member's shadow trail IsLogging false
+    input: |
+      Scenario: An AWS Organizations trail (corp-org-trail) logs
+      management account events and 9 of 10 member accounts. Member
+      account 222222222222 has no events in the org trail's S3 bucket
+      for the past day. In the management account, aws cloudtrail
+      describe-trails shows IsOrganizationTrail: true, IsLogging:
+      true. aws organizations list-accounts confirms 222222222222 is
+      ACTIVE. Using member-account credentials,
+      aws cloudtrail describe-trails --show-shadow-trails returns
+      [{Name: corp-org-trail, IsShadowTrail: true, IsLogging: false,
+      IsOrganizationTrail: true}]. CloudTrail event history in the
+      member shows a StopLogging event from an automation script
+      yesterday.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ORG_TRAIL_GAP"
+        - "shadow"
+        - "start-logging"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: insufficient-context-need-trail-name
+    description: Vague report of CloudTrail not logging without trail name, account, or specific symptom
+    input: |
+      Scenario: A user reports "my CloudTrail seems broken". They do
+      not provide a trail name, account ID, region, or the specific
+      event they expected to see. They have not run describe-trails
+      or get-trail-status.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "describe-trails"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ssm-association-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SSM Association Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "failed-s3-access-denied",
+      "name": "Association Failed: instance role lacks s3:PutObject on the output bucket — ROOT_CAUSE_FOUND",
+      "difficulty": "easy",
+      "prompt_file": "prompts/failed-s3-access-denied.md",
+      "baseline_file": "baselines/failed-s3-access-denied.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "failed-s3-access-denied", "VERDICT", "s3:PutObject"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "timedout-agent-unreachable",
+      "name": "Association TimedOut: ConnectionLost due to missing ssmmessages and ec2messages VPC endpoints — ROOT_CAUSE_FOUND via 3-layer check",
+      "difficulty": "medium",
+      "prompt_file": "prompts/timedout-agent-unreachable.md",
+      "baseline_file": "baselines/timedout-agent-unreachable.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "timedout-agent-unreachable", "VERDICT", "ssmmessages", "ec2messages"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "never-runs-tag-mismatch",
+      "name": "Association NeverRuns: tag key case mismatch (Environment vs env) — ROOT_CAUSE_FOUND",
+      "difficulty": "medium",
+      "prompt_file": "prompts/never-runs-tag-mismatch.md",
+      "baseline_file": "baselines/never-runs-tag-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "never-runs-tag-mismatch", "VERDICT", "tag"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "hybrid-activation-expired",
+      "name": "Hybrid mi-* instance NotManaged due to expired activation — ESCALATE (requires on-host re-registration)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/hybrid-activation-expired.md",
+      "baseline_file": "baselines/hybrid-activation-expired.md",
+      "expected_verdict": "ESCALATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ESCALATE", "hybrid-activation-expired", "VERDICT", "Expired"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ROOT_CAUSE_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "document-script-error",
+      "name": "Association orchestration Success but per-target Failed: script jq: command not found — ROOT_CAUSE_FOUND via S3 output drill-down",
+      "difficulty": "hard",
+      "prompt_file": "prompts/document-script-error.md",
+      "baseline_file": "baselines/document-script-error.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "document-script-error", "VERDICT", "jq"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    }
+  ]
+}

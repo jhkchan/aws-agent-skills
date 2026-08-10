@@ -1,0 +1,43 @@
+# Eval configuration for ssm-association-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ssm-association-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: failed-s3-access-denied
+    difficulty: easy
+    prompt_file: prompts/failed-s3-access-denied.md
+    baseline_file: baselines/failed-s3-access-denied.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: timedout-agent-unreachable
+    difficulty: medium
+    prompt_file: prompts/timedout-agent-unreachable.md
+    baseline_file: baselines/timedout-agent-unreachable.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: never-runs-tag-mismatch
+    difficulty: medium
+    prompt_file: prompts/never-runs-tag-mismatch.md
+    baseline_file: baselines/never-runs-tag-mismatch.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: hybrid-activation-expired
+    difficulty: hard
+    prompt_file: prompts/hybrid-activation-expired.md
+    baseline_file: baselines/hybrid-activation-expired.md
+    expected_verdict: ESCALATE
+  - id: document-script-error
+    difficulty: hard
+    prompt_file: prompts/document-script-error.md
+    baseline_file: baselines/document-script-error.md
+    expected_verdict: ROOT_CAUSE_FOUND
