@@ -1,66 +1,43 @@
 ---
 name: aurora-cost-optimizer
-description: >-
-  Optimises Amazon Aurora cluster cost across seven dimensions —
-  instance-class right-sizing for Aurora Standard (db.r6/r7 vs
-  db.t3/t4 burstable), Aurora Serverless v2 ACU min/max tuning
-  (eliminate idle ACU floor, scale to peak), Aurora I/O-Optimized
-  storage tier (flat-rate I/O for I/O-heavy workloads, 40-60% I/O
-  cost reduction vs Standard), storage and automated snapshot
-  cleanup, Global Database cross-region read-replica instance cost,
-  backtrack storage cost, Performance Insights waste detection
-  (top-SQL tuning targets that reduce instance-class requirements),
-  and Reserved Instance vs On-Demand (1-yr/3-yr commit break-even).
-  Distinguishes Aurora vs RDS for cost (Aurora slightly higher per
-  unit but better HA/performance; free Multi-AZ replication).
-  Covers Aurora Limitless Database (2024+) horizontal sharding cost
-  trade-offs. Emits OPTIMIZED, OPPORTUNITY_FOUND, or ALREADY_OPTIMAL
-  per cluster with estimated monthly savings. Use when reviewing
-  Aurora spend, tuning Serverless v2 ACU, evaluating I/O-Optimized
-  tier, or right-sizing Aurora writers/readers.
+description: Optimises Amazon Aurora cluster cost across seven dimensions — instance-class right-sizing for Aurora Standard (db.r6/r7 vs db.t3/t4 burstable), Aurora Serverless v2 ACU min/max tuning (eliminate
+  idle ACU floor, scale to peak), Aurora I/O-Optimized storage tier (flat-rate I/O for I/O-heavy workloads, 40-60% I/O cost reduction vs Standard), storage and automated snapshot cleanup, Global Database
+  cross-region read-replica instance cost, backtrack storage cost, Performance Insights waste detection (top-SQL tuning targets that reduce instance-class requirements), and Reserved Instance vs On-Demand
+  (1-yr/3-yr commit break-even). Distinguishes Aurora vs RDS for cost (Aurora slightly higher per unit but better HA/performance; free Multi-AZ replication). Covers Aurora Limitless Database (2024+) horizontal
+  sharding cost trade-offs. Emits OPTIMIZED, OPPORTUNITY_FOUND, or ALREADY_OPTIMAL per cluster with estimated monthly savings. Use when reviewing Aurora spend, tuning Serverless v2 ACU, evaluating I/O-Optimized.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline classification works from pasted cluster
-  configuration, Performance Insights summaries, and billing line
-  items. Live-account optimisation uses aws rds describe-db-clusters,
-  describe-db-instances, describe-global-clusters, describe-db-proxies,
-  aws pi describe-dimension-keys and get-resource-metrics for DBLoad
-  top-SQL, aws ce get-cost-and-usage filtered to Amazon Aurora
-  USAGE_TYPEs (Aurora:InstanceUsage, Aurora:StorageUsage,
-  Aurora:IOUsage, Aurora:ServerlessUsage), aws rds
-  describe-reserved-db-instances-offerings, and aws rds
-  describe-db-cluster-backtracks (AWS CLI v2, SSO or key-based
-  credentials). Pricing is us-east-1 published rates as of 2026;
-  re-state regional rates before producing dollar estimates for
-  other regions.
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted cluster configuration, Performance Insights summaries, and billing
+  line items. Live-account optimisation uses aws rds describe-db-clusters, describe-db-instances, describe-global-clusters, describe-db-proxies, aws pi describe-dimension-keys and get-resource-metrics for
+  DBLoad top-SQL, aws ce get-cost-and-usage filtered to Amazon Aurora USAGE_TYPEs (Aurora:InstanceUsage, Aurora:StorageUsage, Aurora:IOUsage, Aurora:ServerlessUsage), aws rds describe-reserved-db-instances-offerings,
+  and aws rds describe-db-cluster-backtracks (AWS CLI v2, SSO or key-based credentials). Pricing is us-east-1 published rates as of 2026; re-state regional rates before producing dollar estimates for other
+  regions.
 keywords:
-  - Amazon Aurora
-  - Aurora MySQL
-  - Aurora PostgreSQL
-  - Aurora Serverless v2
-  - Aurora I/O-Optimized
-  - Aurora Limitless
-  - Aurora Global Database
-  - ACU
-  - instance right-sizing
-  - Performance Insights
-  - DBLoad
-  - Reserved Instance
-  - backtrack
-  - Aurora Standard
-  - storage optimization
-  - FinOps
-  - database cost
+- Amazon Aurora
+- Aurora MySQL
+- Aurora PostgreSQL
+- Aurora Serverless v2
+- Aurora I/O-Optimized
+- Aurora Limitless
+- Aurora Global Database
+- ACU
+- instance right-sizing
+- Performance Insights
+- DBLoad
+- Reserved Instance
+- backtrack
+- Aurora Standard
+- storage optimization
+- FinOps
+- database cost
 tags:
-  - aurora
-  - databases
-  - cost-optimization
-  - finops
-  - serverless
-  - right-sizing
+- aurora
+- databases
+- cost-optimization
+- finops
+- serverless
+- right-sizing
 metadata:
   domain: aws-cloudops
   complexity: high
@@ -72,70 +49,36 @@ metadata:
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL"
-  when_to_use: >-
-    Reviewing Amazon Aurora cluster spend, right-sizing Aurora writer
-    and reader instance classes, tuning Aurora Serverless v2 ACU min
-    and max, evaluating Aurora I/O-Optimized vs Standard storage tier,
-    sizing Aurora Global Database read replicas, auditing backtrack
-    storage cost, using Performance Insights to identify waste-driving
-    SQL, deciding between On-Demand and Reserved Instances for
-    steady-state Aurora, or evaluating Aurora Limitless Database for
-    horizontal scaling workloads.
-  when_not_to_use: >-
-    RDS for MySQL/PostgreSQL/Oracle/SQL Server cost optimisation (use
-    rds-cost-optimizer — this skill is Aurora-specific), DynamoDB
-    capacity-mode optimisation (use a DynamoDB specialist), Redshift
-    cluster right-sizing, query performance tuning as the primary goal
-    (use a DBA / Performance Insights query-tuning workflow; this
-    skill uses Performance Insights only to identify cost waste), or
-    Aurora failover operations (use aurora-failover-operator).
+  verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+  when_to_use: Reviewing Amazon Aurora cluster spend, right-sizing Aurora writer and reader instance classes, tuning Aurora Serverless v2 ACU min and max, evaluating Aurora I/O-Optimized vs Standard storage
+    tier, sizing Aurora Global Database read replicas, auditing backtrack storage cost, using Performance Insights to identify waste-driving SQL, deciding between On-Demand and Reserved Instances for steady-state
+    Aurora, or evaluating Aurora Limitless Database for horizontal scaling workloads.
+  when_not_to_use: RDS for MySQL/PostgreSQL/Oracle/SQL Server cost optimisation (use rds-cost-optimizer — this skill is Aurora-specific), DynamoDB capacity-mode optimisation (use a DynamoDB specialist),
+    Redshift cluster right-sizing, query performance tuning as the primary goal (use a DBA / Performance Insights query-tuning workflow; this skill uses Performance Insights only to identify cost waste),
+    or Aurora failover operations (use aurora-failover-operator).
   activation_triggers:
-    - "optimise Aurora cost"
-    - "right-size Aurora instance"
-    - "Aurora Serverless v2 ACU"
-    - "Aurora I/O-Optimized"
-    - "Aurora Standard vs I/O-Optimized"
-    - "Aurora Reserved Instance"
-    - "Aurora Global Database cost"
-    - "Aurora backtrack cost"
-    - "Aurora vs RDS cost"
-    - "Aurora Limitless Database cost"
-    - "Aurora reader replica sizing"
-    - "Aurora storage optimization"
-    - "Aurora Performance Insights waste"
-    - "Aurora idle ACU"
-    - "Aurora FinOps review"
-  invocation_schema: >-
-    Input: either (a) an Aurora cluster identifier + live-account
-    context, (b) a cluster configuration document (engine, instance
-    classes, ACU range, storage, I/O volume, Multi-AZ, pricing model,
-    Performance Insights summary), OR (c) a fleet description for
-    batch optimisation. Output: a deterministic TARGET / VERDICT /
-    REASON / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS
-    block per cluster, where VERDICT ∈ {OPTIMIZED, OPPORTUNITY_FOUND,
-    ALREADY_OPTIMAL}.
-  invocation_example: |-
-    # Minimal valid input (offline classification):
-    Cluster: orders-prod-cluster
-    Engine: aurora-mysql (8.0)
-    Region: us-east-1
-    Instances:
-      - writer: db.r6g.2xlarge (8 vCPU, 64 GB)
-      - reader-1: db.r6g.2xlarge
-      - reader-2: db.r6g.2xlarge
-    Storage: Standard tier, 800 GB used
-    I/O (last 30 days): 18,000,000 I/O requests
-    Pricing: On-Demand (no RI)
-    CloudWatch metrics (last 30 days):
-      - writer CPUUtilization: avg=15%, max=28%
-      - reader CPUUtilization: avg=8%, max=18%
-      - DatabaseConnections (writer): avg=40, max=80
-    Performance Insights:
-      - writer DBLoad: avg=1.2, max=4.5 (low for 8 vCPU)
-      - top-SQL: 1 query = 40% of DBLoad (missing index)
-    Emit the standard optimisation block (TARGET, VERDICT, REASON,
-    RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+  - optimise Aurora cost
+  - right-size Aurora instance
+  - Aurora Serverless v2 ACU
+  - Aurora I/O-Optimized
+  - Aurora Standard vs I/O-Optimized
+  - Aurora Reserved Instance
+  - Aurora Global Database cost
+  - Aurora backtrack cost
+  - Aurora vs RDS cost
+  - Aurora Limitless Database cost
+  - Aurora reader replica sizing
+  - Aurora storage optimization
+  - Aurora Performance Insights waste
+  - Aurora idle ACU
+  - Aurora FinOps review
+  invocation_schema: 'Input: either (a) an Aurora cluster identifier + live-account context, (b) a cluster configuration document (engine, instance classes, ACU range, storage, I/O volume, Multi-AZ, pricing
+    model, Performance Insights summary), OR (c) a fleet description for batch optimisation. Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS block
+    per cluster, where VERDICT ∈ {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL}.'
+  invocation_example: "# Minimal valid input (offline classification):\nCluster: orders-prod-cluster\nEngine: aurora-mysql (8.0)\nRegion: us-east-1\nInstances:\n  - writer: db.r6g.2xlarge (8 vCPU, 64 GB)\n\
+    \  - reader-1: db.r6g.2xlarge\n  - reader-2: db.r6g.2xlarge\nStorage: Standard tier, 800 GB used\nI/O (last 30 days): 18,000,000 I/O requests\nPricing: On-Demand (no RI)\nCloudWatch metrics (last 30\
+    \ days):\n  - writer CPUUtilization: avg=15%, max=28%\n  - reader CPUUtilization: avg=8%, max=18%\n  - DatabaseConnections (writer): avg=40, max=80\nPerformance Insights:\n  - writer DBLoad: avg=1.2,\
+    \ max=4.5 (low for 8 vCPU)\n  - top-SQL: 1 query = 40% of DBLoad (missing index)\nEmit the standard optimisation block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
 ---
 
 # Aurora Cost Optimizer
