@@ -309,3 +309,81 @@ resource "aws_sqs_queue" "ht_fifo" {
   sqs_managed_sse_enabled     = true
 }
 ```
+
+## Edge cases (detailed)
+
+### FIFO queue with all messages using the same MessageGroupId
+
+A FIFO queue guarantees ordering WITHIN a `MessageGroupId` and parallelism
+ACROSS distinct `MessageGroupId`s. If every producer sends messages with
+the same `MessageGroupId` (e.g., a hardcoded constant like `"default"` or
+a tenant ID that resolves to one value), the queue degenerates to a
+single-message-in-flight serial pipeline — throughput drops to 300 TPS
+(standard FIFO) or 10 TPS per group even on a high-throughput FIFO queue.
+This silently defeats the purpose of FIFO (which is per-group parallelism,
+not global ordering) and surfaces as a backlog that looks like SQS is
+"slow".
+
+Detection: `ApproximateNumberOfMessagesNotVisible` rising while
+`NumberOfEmptyReceives` is high. Remediation: redesign the producer to
+use a sharded `MessageGroupId` (e.g., `order-{customer_id}` for
+per-customer ordering). Surface as:
+`FIFO_DEGENERATE_SINGLE_GROUP — throughput capped at <X> TPS due to
+single MessageGroupId`.
+
+### FIFO queue with deduplication scope collision after high-throughput mode change
+
+Switching a FIFO queue to high-throughput mode
+(`DeduplicationScope=messageGroup,
+FifoThroughputLimit=perMessageGroupId`) changes the deduplication window
+from queue-scoped to message-group-scoped. Messages in different groups
+that previously deduplicated against each other no longer do — duplicates
+will appear post-change.
+
+Detection: pre-change audit of producer `MessageDeduplicationId` use.
+Remediation: ensure producers set explicit `MessageDeduplicationId` based
+on payload hash, not relying on queue-level dedup scope.
+
+### Lambda event source mapping with BatchSize > 1 and ReportBatchItemFailures disabled
+
+Without partial-batch responses, a single failed message in a batch of 10
+causes all 10 to be retried — including the 9 that succeeded. Under a
+sustained poison-pill scenario, this causes the same 9 messages to be
+processed 10s of times.
+
+Remediation: enable `FunctionResponseTypes: [ReportBatchItemFailures]` on
+the event source mapping. Detection:
+`aws lambda list-event-source-mappings --function-name <name>
+--query 'EventSourceMappings[].FunctionResponseTypes'`.
+
+## Expert heuristic: visibility timeout race condition (detailed)
+
+The single most common cause of duplicate processing in SQS + Lambda
+event-source-mapping pipelines is a visibility timeout that is SHORTER
+than the consumer's actual processing time, combined with a Lambda
+function that runs longer than expected under load.
+
+**The race, step by step:**
+
+1. Lambda receives a batch of messages. Lambda timeout is 15 minutes (900s).
+2. Visibility timeout on the queue (or event source mapping) is set to
+   30s, which the operator believed was "plenty" based on p50 of 2s.
+3. Under load (CPU contention, downstream API latency, cold start),
+   actual processing time spikes to 45s p99.
+4. At T+30s, SQS makes the message visible again because no
+   `ChangeMessageVisibility` extension was sent.
+5. Another Lambda invocation receives the same message and starts
+   processing it. The original invocation is STILL running.
+6. Both invocations complete; the downstream sees the side effect twice
+   (duplicate charge, duplicate email, idempotency-key collision).
+
+**Why 6x and not 2x:** the buffer absorbs (a) Lambda cold-start delay
+(up to 5s for VPC-attached functions), (b) SDK retry backoff on downstream
+APIs (default 3 retries with exponential backoff = ~20s for AWS SDK v2),
+(c) one visibility-timeout extension via `ChangeMessageVisibility`.
+
+**Fix at deploy time:** if the operator requests visibility timeout
+< 6x the stated p99, surface as `VERDICT: PREREQUISITES_MISSING` with
+the gap: `VisibilityTimeout <N>s is below 6x p99 (<M>s). Set
+VisibilityTimeout >= <6xp99>s on the event source mapping OR reduce
+Lambda concurrency/timeout.`

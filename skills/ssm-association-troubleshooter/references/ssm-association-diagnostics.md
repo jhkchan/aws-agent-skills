@@ -193,3 +193,195 @@ aws cloudtrail lookup-events \
   --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
   --query 'Events[*].[EventTime,Username,ResourceName]' --output table
 ```
+
+## Full diagnostic CLI sequences per symptom
+
+### Step 2: Failed — full diagnostic tree
+
+```bash
+# 1. Get the most recent execution
+aws ssm describe-association-executions \
+  --association-id <association-id> \
+  --query 'Executions[0].[ExecutionId,Status,StatusMessage,ExecutionTime]' --output table
+
+# 2. Drill into per-target results
+aws ssm describe-association-execution-targets \
+  --association-id <association-id> \
+  --execution-id <execution-id> \
+  --query 'Targets[*].[Status,StatusMessage,ResourceId,OutputSource.S3Url]' --output table
+
+# 3. Fetch detailed output from S3 if OutputSource is configured
+aws s3 cp <s3-url-from-step-2> -
+
+# 4. List association versions to detect a recent parameter change
+aws ssm list-association-versions \
+  --association-id <association-id> \
+  --query 'AssociationVersions[*].[Version,Date,CreatedBy]' --output table
+```
+
+### Step 3: TimedOut — full diagnostic tree
+
+```bash
+# 1. Check the most recent execution
+aws ssm describe-association-executions \
+  --association-id <association-id> \
+  --query 'Executions[0].[ExecutionId,Status,ExecutionTime]' --output table
+
+# 2. Check instance reachability NOW (the timeout may be transient)
+aws ssm describe-instance-information \
+  --instance-information-filter-list Key=InstanceIds,ValueSet=<instance-id> \
+  --query 'InstanceInformationList[*].[PingStatus,LastPingDateTime,AgentVersion]' --output table
+
+# 3. If PingStatus is ConnectionLost/Inactive, run the 3-layer check (Step 1)
+# 4. If the instance is reachable, check command-level timeout
+aws ssm list-command-invocations \
+  --instance-id <instance-id> \
+  --query 'CommandInvocations[*].[CommandId,Status,StatusDetails,NotificationStatus]' --output table
+```
+
+### Step 4: NotManaged — full diagnostic tree
+
+```bash
+# 1. Confirm the instance exists in EC2 (and is running)
+aws ec2 describe-instances --instance-ids <instance-id> \
+  --query 'Reservations[*].Instances[*].[State.Name,LaunchTime,IamInstanceProfile.Arn]' --output table
+
+# 2. If state is running but no instance profile, that is the cause
+aws ec2 associate-iam-instance-profile \
+  --instance-id <instance-id> \
+  --iam-instance-profile Name=<profile-with-SSM-policy>
+
+# 3. If state is running with profile, check VPC endpoints
+aws ec2 describe-vpc-endpoints \
+  --filters Name=vpc-id,Values=<vpc-id> \
+  --query 'VpcEndpoints[?contains(ServiceName,`.ssm.`) || contains(ServiceName,`.ssmmessages.`) || contains(ServiceName,`.ec2messages.`)].[ServiceName,State]' --output table
+
+# 4. Check if SSM agent is running on the host (via another working instance)
+aws ssm send-command --instance-ids <reachable-instance-id> \
+  --document-name "AWS-RunShellScript" \
+  --parameters commands=["ssm-cli get-agent-connection-status --region <region>"] \
+  --query 'Command.CommandId' --output text
+
+# 5. For hybrid (mi-*) instances, check activation status
+aws ssm describe-activations --filters Key=RegistrationStatus,Values=Registered
+```
+
+### Step 5: NeverRuns — full diagnostic tree
+
+```bash
+# 1. Confirm the association is Enabled
+aws ssm describe-association \
+  --association-id <association-id> \
+  --query 'AssociationDescription.[Name,AssociationName,State,ScheduleExpression,ScheduleOffset,LastExecutionDate,NextExecutionDate]' --output table
+
+# 2. Check targets match any current instances
+aws ssm describe-association \
+  --association-id <association-id> \
+  --query 'AssociationDescription.Targets' --output table
+
+# Then verify targets actually match instances:
+aws ec2 describe-instances \
+  --filters Name=tag:<tag-key>,Values=<tag-value> \
+  --query 'Reservations[*].Instances[*].InstanceId' --output text
+
+# 3. List recent executions to confirm absence
+aws ssm describe-association-executions \
+  --association-id <association-id> \
+  --query 'Executions[*].[ExecutionId,Status,ExecutionTime]' --output table
+```
+
+### Step 6: DocumentError — full diagnostic tree
+
+```bash
+# 1. Get per-target results
+aws ssm describe-association-execution-targets \
+  --association-id <association-id> \
+  --execution-id <execution-id> \
+  --query 'Targets[*].[Status,StatusMessage,ResourceId,OutputSource.S3Url]' --output table
+
+# 2. Fetch the S3 output (the actual script stdout/stderr)
+aws s3 cp <s3-url-from-step-1> -
+
+# 3. If OutputSource is empty, check IAM permissions
+aws iam simulate-principal-policy \
+  --policy-source-arn <instance-role-arn> \
+  --action-names s3:PutObject s3:GetObject \
+  --resource-arns arn:aws:s3:::<output-bucket>/*
+
+# 4. Verify the document exists and the version matches
+aws ssm describe-document \
+  --name <document-name> \
+  --query 'Document.[LatestVersion,DefaultVersion,SchemaVersion,PlatformTypes]' --output table
+
+# 5. For Send Command-based documents, fetch the command invocation
+aws ssm get-command-invocation \
+  --command-id <command-id> --instance-id <instance-id> \
+  --query '[Status,StatusDetails,StandardOutputContent,StandardErrorContent]' --output table
+```
+
+## Appendix A — SSM agent logs and on-host diagnostics
+
+The SSM agent logs are the primary evidence for document-level failures.
+Fetch them via a working SSM session or out-of-band access.
+
+**Fetch via SSM (if the instance is reachable):**
+
+```bash
+aws ssm send-command \
+  --instance-ids <instance-id> \
+  --document-name "AWS-RunShellScript" \
+  --parameters commands=["tail -n 200 /var/log/amazon/ssm/amazon-ssm-agent.log"] \
+  --query 'Command.CommandId' --output text
+
+aws ssm get-command-invocation \
+  --command-id <command-id> --instance-id <instance-id> \
+  --query 'StandardOutputContent' --output text
+```
+
+**Diagnostic signals in the log:**
+
+| Log entry | Diagnosis |
+|---|---|
+| `Failed to load agent config` | Activation or IAM issue (Layer 1) |
+| `connection refused` to `ssm.<region>` | Network / endpoint issue (Layer 2) |
+| `EmptyInstanceID` | Instance not registered; new instance still bootstrapping |
+| `TimeoutExceeded` for a plugin | Document script hung; check `timeoutSeconds` |
+| `AccessDenied` on a service call | Instance role lacks the action |
+| `Plugin {name} crashed` | Plugin-specific bug; update the agent |
+| `no space left on device` | Disk full on the instance — common root cause |
+
+**Restart the agent (post-fix verification):**
+
+```bash
+# Linux
+sudo systemctl restart amazon-ssm-agent
+# Windows
+Restart-Service AmazonSSMAgent
+```
+
+## The 3-layer SSM health check (detailed)
+
+Before any association-specific diagnosis, run the 3-layer check.
+A failing layer invalidates all downstream diagnosis and is the root
+cause of most "association Failed" tickets:
+
+1. **IAM layer** — instance profile has `AmazonSSMManagedInstanceCore`
+   (EC2) or the activation role has it (`mi-*`). Verify via
+   `describe-instance-information` — if the instance appears, IAM is OK.
+
+2. **Connectivity layer** — instance can reach SSM endpoints
+   (`ssm.<region>`, `ec2messages.<region>`, `ssmmessages.<region>`).
+   For private subnets, verify all three VPC endpoints exist. For
+   internet-egress instances, verify the security group allows
+   HTTPS/443 outbound.
+
+3. **Agent layer** — `amazon-ssm-agent` service is running,
+   `IsLatestVersion: true` (or at least >= v2.3.12.0 for Session
+   Manager), and `PingStatus: Active` with `LastPingDateTime`
+   within the last 5-30 minutes.
+
+If all three layers pass, the issue is association-specific
+(schedule, targets, document, parameters). Move to Steps 2-6.
+
+If any layer fails, fix the layer first. Most "association Failed"
+tickets close when coverage is restored.
