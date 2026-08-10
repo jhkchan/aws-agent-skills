@@ -267,114 +267,61 @@ plan.` and `REMEDIATION: Re-fetch with aws eks describe-cluster --name
 ### Step 0: Expert knowledge — non-obvious EKS upgrade behaviors
 
 These behaviors are easy to misjudge without operational EKS upgrade
-experience. Each changes a plan if ignored:
+experience. Each changes a plan if ignored. See
+`references/upgrade-procedures.md` for the canonical end-to-end
+sequence and `references/version-compatibility.md` for add-on and
+deprecated-API matrices. Summary:
 
-- **EKS requires sequential minor-version upgrades.** You cannot skip
-  from 1.27 to 1.29 — you must upgrade to 1.28 first, then 1.29. Each
-  upgrade is a separate `update-cluster-version` call. Patch version
-  bumps (e.g., 1.28.2 -> 1.28.3) happen automatically; minor version
-  bumps are always operator-driven.
-
-- **The control plane upgrade is one-way.** Once `update-cluster-version`
-  starts, you cannot cancel it. AWS support may be able to recover a
-  failed upgrade, but there is no customer-facing rollback API. The
-  pre-checks are the safety gate.
-
-- **API server has brief unavailability during the upgrade.** Expect
-  5-15 minutes where API mutations (create/update/delete) are rejected.
-  API reads continue. Applications continue to run. Plan for the
-  mutation window; do not deploy during a control plane upgrade.
-
+- **EKS requires sequential minor-version upgrades** — cannot skip from
+  1.27 to 1.29; each minor bump is a separate `update-cluster-version`.
+- **The control plane upgrade is one-way** — no customer-facing rollback
+  API; AWS support may recover a failed upgrade. Pre-checks are the
+  safety gate. A failed upgrade leaves the cluster in `UPDATING` or
+  `FAILED`; monitor via `aws eks describe-update`.
+- **API server has 5-15 min mutation unavailability** during etcd
+  migration — API reads continue, applications keep running. Do not
+  deploy during the window.
 - **Add-ons must be compatible with BOTH current and target Kubernetes.**
-  Upgrade add-ons to a "bridge" version that supports both Kubernetes
-  versions BEFORE the control plane upgrade. Then upgrade add-ons again
-  to the latest version AFTER the control plane reaches the target. The
-  pre-upgrade add-on upgrade is the one most operators miss.
-
-- **VPC-CNI upgrade requires care — pod networking depends on it.** The
-  VPC-CNI daemonset runs on every node. An incompatible VPC-CNI on a new
-  Kubernetes version can prevent new pods from getting IP addresses
-  (pod stuck in `ContainerCreating` with `FailedCreateNetworkContainer`).
-  Always upgrade VPC-CNI before node groups.
-
-- **CoreDNS deployment replicas and config may need adjustment.** EKS
-  manages CoreDNS via the EKS add-on, but the `coredns` Deployment
-  replicas and the `Corefile` ConfigMap are user-editable. An upgrade
-  resets these to defaults if `--resolve-conflicts OVERWRITE` is used;
-  preserve customizations with `--configuration-values`.
-
-- **kube-proxy upgrade is invisible but critical.** kube-proxy programs
-  iptables/ipvs rules on each node. A version mismatch with the kubelet
-  causes subtle service-routing bugs. Always upgrade kube-proxy to match
-  the new Kubernetes version.
-
-- **Managed node group rolling update respects PDBs.** If a PDB blocks
-  eviction of a pod on the node being drained, the rolling update halts.
-  The node stays in `NotReady` until the PDB allows eviction or the
-  operator force-deletes the pod.
-
-- **Force update with surge parameters (`maxUnavailable`, `maxSurge`).**
-  `updateConfig.maxSurge: 1` means the autoscaler creates one new node
-  BEFORE draining the old one. This is faster but requires spare IP
-  capacity in the subnet and spare instance quota. `maxUnavailable: 2`
-  means drain two nodes at a time. The default is `maxUnavailable: 1`
-  (one at a time, no surge).
-
-- **Fargate pods restart on control plane upgrade.** When the control
-  plane Kubernetes version changes, Fargate drains and restarts all
-  Fargate pods to align the kubelet version. Plan for a brief restart
-  window for Fargate workloads.
-
-- **EKS Auto Mode manages node lifecycle.** When `computeConfig.enabled:
-  true`, EKS automatically provisions and upgrades nodes. The operator
-  does not run `update-nodegroup-version` — Auto Mode handles it after
-  the control plane upgrade. The operator still runs addon upgrades.
-
-- **EKS hybrid nodes are operator-upgraded.** When `remoteNetworkConfig`
-  is present, hybrid nodes attached to the cluster do NOT auto-upgrade
-  with `update-nodegroup-version`. The operator must upgrade the on-prem
-  node components (kubelet, container runtime) separately and re-attach.
-
-- **`kubent` (kubernetes-deprecation) scans for removed APIs.** Run
-  `kubent` against the cluster (or `kubectl convert --output-version`)
-  to detect workloads using APIs removed in the target version. Examples:
-  - 1.22 removed: `networking.k8s.io/v1beta1 Ingress`, `extensions/v1beta1
-    Ingress`, `policy/v1beta1 PodSecurityPolicy`.
-  - 1.25 removed: `batch/v1beta1 CronJob`, `policy/v1beta1
-    PodSecurityPolicy` (already gone), `autoscaling/v2beta1
-    HorizontalPodAutoscaler`.
-  - 1.29 removed: `flowcontrol.apiserver.k8s.io/v1beta1
-    FlowSchema/PriorityLevelConfiguration`.
-
-- **A failed `update-cluster-version` leaves the cluster in `UPDATING`
-  or `FAILED`.** AWS auto-retries transient failures. Persistent
-  failures require AWS support intervention. Monitor via
-  `aws eks describe-update`.
-
-- **`describe-update` is the progress API.** Track upgrade progress via
-  `aws eks describe-update --name <cluster> --update-id <id>`. Statuses:
-  `InProgress`, `Successful`, `Failed`, `Cancelled`.
-
-- **Addon upgrades can fail with `Conflicting` errors.** If you (or a
-  GitOps controller) edited the add-on's ConfigurationValues via kubectl,
-  an EKS add-on upgrade may conflict. Use `--resolve-conflicts OVERWRITE`
-  to let EKS win, or `--resolve-conflicts NONE` to preserve local edits
-  (upgrade may fail).
-
-- **Pod security standards changed in 1.25.** PodSecurityPolicy was
-  removed; Pod Security Admission (PSA) replaced it. Workloads relying
-  on PSP must be migrated to PSA before upgrading to 1.25+.
-
-- **EKS extended support starts after standard support ends.** Standard
-  support is ~14 months. Extended support adds $0.10/cluster-hour. After
-  extended support, AWS force-upgrades the cluster (typically to N+1).
-  Skipping upgrades triggers forced upgrades with no operator control.
-
-- **Control plane logging is essential during upgrade.** Enable all five
-  log types before upgrading. The `audit` log captures Kubernetes API
-  calls during the upgrade; `api` captures the mutation-window errors;
-  `authenticator` captures IAM-to-RBAC decisions if access entries
-  change.
+  Upgrade to a "bridge" version BEFORE the control plane, then to the
+  latest AFTER. The pre-upgrade add-on upgrade is the step most
+  operators miss.
+- **VPC-CNI upgrade is critical** — an incompatible VPC-CNI prevents
+  new pods from getting IPs (`ContainerCreating` /
+  `FailedCreateNetworkContainer`). Always upgrade VPC-CNI before node
+  groups.
+- **CoreDNS and kube-proxy need care.** `--resolve-conflicts OVERWRITE`
+  resets CoreDNS replicas and Corefile to defaults; preserve with
+  `--configuration-values`. kube-proxy mismatch causes subtle
+  service-routing bugs.
+- **Managed node group rolling update respects PDBs** — a PDB blocking
+  eviction halts the update with nodes stuck in `NotReady`.
+- **Surge parameters (`maxUnavailable`, `maxSurge`)** — `maxSurge > 0`
+  creates new nodes before draining; faster but needs spare IPs and
+  quota. Default is `maxUnavailable: 1, maxSurge: 0`.
+- **Fargate pods restart on control plane upgrade** — kubelet version
+  must align; plan for a brief restart window.
+- **EKS Auto Mode manages node lifecycle** — operator runs only control
+  plane + addon upgrades; Auto Mode aligns nodes after control plane.
+- **EKS hybrid nodes are operator-upgraded** — `remoteNetworkConfig`
+  nodes do NOT auto-upgrade; upgrade on-prem kubelet and runtime
+  separately.
+- **`kubent` scans for removed APIs** — examples: 1.22 removed
+  `networking.k8s.io/v1beta1 Ingress`, `extensions/v1beta1 Ingress`,
+  `policy/v1beta1 PodSecurityPolicy`; 1.25 removed `batch/v1beta1
+  CronJob`, `autoscaling/v2beta1 HorizontalPodAutoscaler`; 1.29 removed
+  `flowcontrol.apiserver.k8s.io/v1beta1 FlowSchema`. Full table in
+  Step 1 below.
+- **Addon upgrades can fail with `Conflicting` errors** — use
+  `--resolve-conflicts OVERWRITE` (EKS wins) or `NONE` (preserve local
+  edits, upgrade may fail) or `PRESERVE`.
+- **PodSecurityPolicy removed in 1.25** — migrate to Pod Security
+  Admission (PSA) before upgrading to 1.25+.
+- **EKS extended support** — standard support ~14 months; extended adds
+  $0.10/cluster-hour; after that, AWS force-upgrades (no operator
+  control).
+- **Enable control plane logging before upgrading** — all five log
+  types; `audit`, `api`, and `authenticator` are critical during
+  upgrade.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -535,152 +482,23 @@ ROLLBACK: <control plane CANNOT be rolled back / node group CAN be rolled back t
 NOTES: <mutation window, Fargate restart, addon caveats>
 ```
 
-### Worked example — upgrade-control-plane (1.28 -> 1.29)
+### Worked examples (see references/worked-examples.md)
 
-```text
-OPERATION: upgrade-control-plane
-VERDICT: READY
-TARGET: prod-cluster-01 (1.28 -> 1.29)
-PRE_CHECKS:
-  - [PASS] cluster status: ACTIVE
-  - [PASS] no other update in progress
-  - [PASS] target version 1.29 available in us-east-1
-  - [PASS] target is exactly N+1 from current (1.28)
-  - [PASS] VPC-CNI v1.16.0 compatible with both 1.28 and 1.29
-  - [PASS] CoreDNS v1.11.1-eksbuild.4 compatible with both 1.28 and 1.29
-  - [PASS] kube-proxy v1.28.7-minimal-1 compatible with both 1.28 and 1.29
-    (will upgrade to v1.29.x after control plane)
-  - [PASS] kubent scan clean for 1.29 (no FlowSchema v1beta1 in use)
-  - [PASS] all managed node groups at 1.28 (will upgrade after control plane)
-  - [PASS] all nodes Ready
-STEPS:
-  1. CONFIRM: About to update-cluster-version on prod-cluster-01
-     from 1.28 to 1.29 in account 111111111111 region us-east-1.
-     This will cause a 5-15 minute API mutation window (API reads
-     continue, applications keep running). ROLLBACK ADVISORY: EKS
-     control plane upgrades CANNOT be rolled back. Estimated total
-     duration: 15-30 minutes. Proceed? (yes/no)
-  2. aws eks update-cluster-version \
-       --name prod-cluster-01 \
-       --kubernetes-version 1.29 \
-       --region us-east-1
-  3. Poll until Successful:
-     aws eks describe-update --name prod-cluster-01 \
-       --update-id <update-id-from-step-2>
-  4. After control plane is 1.29, upgrade add-ons to 1.29-compatible:
-     aws eks update-addon --cluster-name prod-cluster-01 \
-       --addon-name kube-proxy --addon-version v1.29.3-minimal-1 \
-       --resolve-conflicts OVERWRITE
-     aws eks update-addon --cluster-name prod-cluster-01 \
-       --addon-name coredns --addon-version v1.11.1-eksbuild.6 \
-       --resolve-conflicts OVERWRITE
-POST_VERIFY:
-  - (pending execution)
-  - aws eks describe-cluster --name prod-cluster-01 → version 1.29
-  - kubectl get nodes -o wide → all nodes Ready, still on 1.28
-    (node group upgrade is the next operation)
-  - kubectl get pods -n kube-system → no CrashLoopBackOff
-  - kubectl get apiservices | grep False → none
-ROLLBACK: control plane CANNOT be rolled back (etcd migration is one-way)
-NOTES:
-  - Node groups are still on 1.28 — they are incompatible with the new
-    control plane. Run upgrade-nodegroup for each managed node group
-    immediately after this operation completes.
-  - Fargate pods will restart automatically to align kubelet with 1.29.
-    Plan for a brief restart window for Fargate workloads.
-  - The API server will reject mutations for 5-15 minutes during the
-    etcd migration. Do not run kubectl apply during this window.
-  - If the upgrade fails partway, AWS auto-retries transient failures.
-    Persistent failures require AWS support — the cluster may be in
-    UPDATING or FAILED state.
-```
+Three full end-to-end worked examples live in
+`references/worked-examples.md`:
 
-### Worked example — upgrade-nodegroup (rolling update)
+- **READY — upgrade-control-plane (1.28 -> 1.29).** Add-on bridge
+  versions verified; kubent scan clean; control plane one-way upgrade
+  with post-upgrade add-on refresh.
+- **READY — upgrade-nodegroup (surge strategy).** maxUnavailable: 1,
+  maxSurge: 2; subnet IP and instance quota verified; PDB check passed.
+- **BLOCKED — PDB blocks drain.** `payments-api-pdb` with
+  `minAvailable: 4` and 4 replicas (allowedDisruptions: 0); shows the
+  PDB patch and deployment scale-up remediations.
 
-```text
-OPERATION: upgrade-nodegroup
-VERDICT: READY
-TARGET: prod-cluster-01 / nodegroup: prod-ng-1 (1.28 -> 1.29)
-PRE_CHECKS:
-  - [PASS] node group status: ACTIVE
-  - [PASS] cluster control plane at 1.29 (target matches)
-  - [PASS] target node version 1.29 <= cluster version 1.29
-  - [PASS] PDB check: 2 PDBs found, both allow >= 1 disruption
-  - [PASS] subnet spare IPs: 47 available (>= maxSurge+1)
-  - [PASS] EC2 instance quota: 20 m5.large in use, 30 quota
-    (10 spare, covers maxSurge: 2)
-  - [PASS] updateConfig: maxUnavailable: 1, maxSurge: 2
-STEPS:
-  1. CONFIRM: About to update-nodegroup-version on prod-cluster-01 /
-     prod-ng-1 from 1.28 to 1.29 in account 111111111111 region
-     us-east-1. Strategy: surge (maxUnavailable: 1, maxSurge: 2). EKS
-     will create 2 new nodes on 1.29, then drain 1.28 nodes one at a
-     time. PDBs will be respected. Estimated duration: 20-30 minutes
-     (5 nodes, ~5 minutes per drain). ROLLBACK ADVISORY: node group
-     CAN be rolled back to 1.28 if the previous AMI is available.
-     Proceed? (yes/no)
-  2. aws eks update-nodegroup-version \
-       --cluster-name prod-cluster-01 \
-       --nodegroup-name prod-ng-1 \
-       --kubernetes-version 1.29 \
-       --release-version 1.29.3-20240807 \
-       --region us-east-1
-  3. Poll until Successful:
-     aws eks describe-update --name prod-cluster-01 \
-       --update-id <update-id>
-  4. Watch node replacement:
-     kubectl get nodes -w
-POST_VERIFY:
-  - (pending execution)
-  - aws eks describe-nodegroup --cluster-name prod-cluster-01 \
-      --nodegroup-name prod-ng-1 → version 1.29, status ACTIVE
-  - kubectl get nodes -l eks.amazonaws.com/nodegroup=prod-ng-1 → all
-    Ready, all at 1.29
-  - kubectl get pods --all-namespaces --field-selector \
-      spec.nodeName=<any-upgraded-node> → no CrashLoopBackOff
-ROLLBACK: node group CAN be rolled back to 1.28 if the 1.28 AMI is
-          still in the EKS AMI repository
-NOTES:
-  - The surge strategy (maxSurge: 2) creates 2 new nodes before draining,
-    so workload capacity is never below the original count. This requires
-    spare subnet IPs and instance quota.
-  - If a PDB blocks drain on a node, the upgrade halts on that node.
-    Patch the PDB to allow at least 1 disruption, then resume.
-  - DaemonSets (VPC-CNI, kube-proxy, node-exporter) are not evicted
-    during drain (--ignore-daemonsets). They will restart on the new
-    nodes automatically.
-```
-
-### Worked example — BLOCKED (PDB blocks drain)
-
-```text
-OPERATION: upgrade-nodegroup
-VERDICT: BLOCKED
-TARGET: prod-cluster-01 / nodegroup: prod-ng-1 (1.28 -> 1.29)
-PRE_CHECKS:
-  - [PASS] node group status: ACTIVE
-  - [PASS] cluster control plane at 1.29
-  - [PASS] target node version 1.29 <= cluster version 1.29
-  - [FAIL] PDB "payments-api-pdb" in namespace payments has
-    minAvailable: 4 and only 4 replicas exist. allowedDisruptions: 0.
-    Drain cannot evict any pod. The upgrade would halt on every node
-    running a payments-api pod.
-  - [PASS] subnet spare IPs: 47 available
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-ROLLBACK: (none)
-NOTES:
-  - Patch the PDB to allow at least 1 disruption before retrying:
-    kubectl patch pdb payments-api-pdb -n payments --type=json \
-      -p='[{"op":"replace","path":"/spec/minAvailable","value":3}]'
-    Then verify: kubectl get pdb payments-api-pdb -n payments \
-      -o jsonpath='{.status.disruptionsAllowed}'
-    DisruptionsAllowed should be >= 1.
-  - Alternatively, scale the deployment to 5 replicas so minAvailable: 4
-    still allows 1 disruption:
-    kubectl scale deployment payments-api -n payments --replicas=5
-  - After the upgrade, restore the PDB to its original value.
-```
+Each example demonstrates the exact PRE_CHECKS, STEPS with CONFIRM
+gate (including ROLLBACK ADVISORY), and POST_VERIFY for the verdict
+shape.
 
 ## STRICT output contract
 
@@ -763,102 +581,46 @@ NOTES:
   - The API server will reject mutations for 5-15 minutes during the etcd migration. Do not run kubectl apply during this window.
 ```
 
-## Anti-Patterns — NEVER
+## Anti-Patterns — NEVER (top 5)
 
-- NEVER skip the add-on pre-upgrade. EKS requires add-ons to be
-  compatible with BOTH the current and target Kubernetes versions
-  BEFORE the control plane upgrade. Skipping this leaves VPC-CNI /
-  CoreDNS / kube-proxy running versions incompatible with the new
-  control plane — pod networking and DNS can break cluster-wide.
+1. **NEVER skip the add-on pre-upgrade or sequence node groups before
+   the control plane.** EKS requires add-ons compatible with BOTH
+   current and target Kubernetes BEFORE the control plane, then control
+   plane, then node groups (node version must be <= control plane).
+   Skipping the addon-first step breaks VPC-CNI / CoreDNS / kube-proxy
+   compatibility cluster-wide.
 
-- NEVER execute `update-cluster-version` without confirming the operator
-  understands the upgrade is ONE-WAY. There is no customer-facing
-  rollback API. The pre-checks are the safety gate.
+2. **NEVER execute `update-cluster-version` without confirming the
+   operator understands the upgrade is ONE-WAY, and NEVER skip a minor
+   version.** There is no customer-facing rollback API (EKS does not
+   expose etcd backup/restore). Sequential minor upgrades only
+   (1.27 -> 1.28 -> 1.29); skipping returns `InvalidParameterException`.
 
-- NEVER skip a minor version. EKS requires sequential minor-version
-  upgrades (1.27 -> 1.28 -> 1.29). Attempting 1.27 -> 1.29 directly
-  returns `InvalidParameterException` or silently upgrades only to 1.28.
+3. **NEVER run `kubectl drain <node>` without `--ignore-daemonsets`
+   and `--delete-emptydir-data`, and NEVER upgrade a node group
+   without first checking PDBs.** Without the drain flags the drain
+   hangs on DaemonSets and emptyDir pods. A PDB with `minAvailable:
+   100%` (or matching replicas) blocks drain indefinitely; always
+   pre-check `kubectl get poddisruptionbudgets --all-namespaces`.
 
-- NEVER upgrade node groups BEFORE the control plane. Node group
-  versions must be <= the control plane version. A node group on 1.29
-  with a control plane on 1.28 produces kubelet-vs-apiserver schema
-  mismatches.
+4. **NEVER use `--resolve-conflicts OVERWRITE` on an EKS add-on
+   without backing up ConfigurationValues first, and NEVER use
+   `maxUnavailable: 100%` in production.** OVERWRITE replaces
+   customizations (CoreDNS replicas, Corefile, VPC-CNI env vars) with
+   EKS defaults. `maxUnavailable: 100%` drains all nodes simultaneously,
+   taking the entire workload offline.
 
-- NEVER issue `update-cluster-version` while another update is in
-  progress. EKS rejects concurrent updates with `InvalidParameterException`.
-  Always check `describe-update` first.
+5. **NEVER skip the deprecated API scan (`kubent` / `kubectl convert`)
+   or the post-upgrade `kubectl get apiservices | grep False` check.**
+   Workloads using removed APIs fail to apply after the upgrade; a
+   removed APIService can leave objects in `False` availability,
+   causing silent workload failures.
 
-- NEVER run `kubectl drain <node>` without `--ignore-daemonsets` and
-  `--delete-emptydir-data`. DaemonSets (VPC-CNI, kube-proxy) cannot be
-  evicted; without `--ignore-daemonsets` the drain hangs forever. Pods
-  using `emptyDir` for scratch storage need `--delete-emptydir-data`
-  (or `--force` to skip confirmation) to be evicted.
-
-- NEVER upgrade a node group without first checking PDBs. A PDB with
-  `minAvailable: 100%` (or matching replicas) blocks drain indefinitely.
-  The node group upgrade halts on the affected node until the PDB is
-  patched. Always pre-check `kubectl get poddisruptionbudgets
-  --all-namespaces` and compute `disruptionsAllowed` per node.
-
-- NEVER use `maxUnavailable: 100%` in a managed node group updateConfig
-  for a production cluster. It drains all nodes simultaneously, taking
-  the entire workload offline. Reserve `maxUnavailable: 100%` for
-  development clusters with redundancy elsewhere.
-
-- NEVER use `--resolve-conflicts OVERWRITE` on an EKS add-on without
-  backing up the current ConfigurationValues first. OVERWRITE replaces
-  your customizations with EKS defaults. For CoreDNS, this means
-  replicas and the Corefile ConfigMap reset to defaults — losing
-  custom stub-domains or forward configurations.
-
-- NEVER assume EKS Auto Mode requires no operator action. Auto Mode
-  manages node lifecycle, but the operator still runs addon upgrades
-  and the control plane upgrade. Auto Mode nodes align to the new
-  Kubernetes version AFTER the control plane reaches the target.
-
-- NEVER assume EKS hybrid nodes upgrade automatically. Hybrid nodes
-  attached via `remoteNetworkConfig` do NOT participate in
-  `update-nodegroup-version`. The operator must upgrade the on-prem
-  kubelet and container runtime separately and re-attach.
-
-- NEVER deploy workloads during the control plane upgrade's API mutation
-  window. API writes (create/update/delete) are rejected for 5-15
-  minutes. Reads continue. Applications continue to run, but CI/CD
-  pipelines will fail.
-
-- NEVER skip the deprecated API scan (`kubent` / `kubectl convert`).
-  Workloads using removed APIs will fail to apply after the upgrade —
-  the API server rejects them. Detect BEFORE the upgrade; convert the
-  manifest to the new API version; deploy; THEN upgrade the cluster.
-
-- NEVER assume the latest EKS AMI is automatically the right one for
-  your cluster. The AMI must match the cluster's Kubernetes minor
-  version. Specify `--release-version` explicitly when calling
-  `update-nodegroup-version` to avoid surprises.
-
-- NEVER delete a stuck node from a managed node group with `kubectl
-  delete node` while the upgrade is in progress. The EKS-managed
-  autoscaler will recreate the node, but the upgrade updateId may lose
-  track of it. Use `aws eks describe-update` and AWS support for stuck
-  managed node group upgrades.
-
-- NEVER use `kubectl drain --force` to bypass PDBs without operator
-  confirmation. `--force` deletes pods that don't tolerate the eviction
-  — including single-replica stateful workloads. Data loss is possible.
-
-- NEVER forget Fargate pods restart on control plane upgrade. The
-  kubelet version must align with the new control plane. Plan for a
-  brief restart window; Fargate pods may take 30-60 seconds to
-  reschedule.
-
-- NEVER skip post-upgrade verification of `kubectl get apiservices |
-  grep False`. A deprecated API removal can leave an APIService object
-  in `False` availability — workloads depending on it fail silently.
-
-- NEVER attempt to roll back a control plane upgrade by restoring an
-  etcd backup taken before the upgrade. EKS does not expose etcd backup
-  / restore to customers. The only recovery path for a failed control
-  plane upgrade is AWS support.
+Additional NEVER rules (concurrent updates, Auto Mode operator action,
+hybrid node upgrades, deploy during mutation window, AMI version
+selection, stuck node deletion, `--force` drain bypass, Fargate
+restart planning) appear in the FORBIDDEN output patterns section
+above and in `references/upgrade-procedures.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -870,52 +632,39 @@ NOTES:
   ADVISORY: <control plane CANNOT be rolled back / node group CAN be
   rolled back if previous AMI available / PDB patch is reversible>.
   Proceed? (yes/no)`. Do NOT execute until the operator confirms.
-
-- **Capture pre-state for rollback.** Before any upgrade:
-  `aws eks describe-cluster --name <cluster> --output json >
-  /tmp/<cluster>-pre-$(date +%s).json`, `kubectl get nodes -o wide >
-  /tmp/nodes-pre-$(date +%s).txt`, `kubectl get pods --all-namespaces
-  -o wide > /tmp/pods-pre-$(date +%s).txt`, `kubectl get
+- **Capture pre-state for rollback.** `aws eks describe-cluster --name
+  <cluster> --output json > /tmp/<cluster>-pre-$(date +%s).json`,
+  `kubectl get nodes -o wide > /tmp/nodes-pre-$(date +%s).txt`,
+  `kubectl get pods --all-namespaces -o wide >
+  /tmp/pods-pre-$(date +%s).txt`, `kubectl get
   poddisruptionbudgets --all-namespaces -o yaml >
   /tmp/pdbs-pre-$(date +%s).yaml`. The PDB capture is critical — patch
   PDBs to unblock drain, then restore them after the upgrade.
-
 - **Back up add-on ConfigurationValues before update-addon.**
   `kubectl get deployment coredns -n kube-system -o yaml >
   /tmp/coredns-preupgrade.yaml`, `kubectl get daemonset aws-node -n
   kube-system -o yaml > /tmp/vpc-cni-preupgrade.yaml`,
   `kubectl get daemonset kube-proxy -n kube-system -o yaml >
-  /tmp/kube-proxy-preupgrade.yaml`. These captures preserve
-  customizations that `--resolve-conflicts OVERWRITE` would discard.
-
+  /tmp/kube-proxy-preupgrade.yaml`.
 - **Verify add-on compatibility with both versions.**
   `aws eks describe-addon-versions --kubernetes-version <target>
   --addon-name <name>`. The add-on version must be in the
   `compatibilities` list for the target Kubernetes.
-
 - **Run kubent before the control plane upgrade.**
   `kubent --kubernetes-version <target>` or `kubectl convert
   --output-version <new-api-version> -f <manifest>`. Fix all flagged
-  resources BEFORE the upgrade — the API server will reject removed APIs
-  post-upgrade.
-
-- **Verify subnet IP capacity for surge upgrade.** Each new node in the
-  surge consumes one IP from its subnet. Use `aws ec2
+  resources BEFORE the upgrade.
+- **Verify subnet IP capacity for surge upgrade.** Use `aws ec2
   describe-subnets --subnet-ids <subnet-id> --query
   'Subnets[0].AvailableIpAddressCount'`. Reserve at least
   `maxSurge + maxUnavailable` IPs per subnet.
-
 - **Verify PDBs allow disruption.** For each PDB:
-  `kubectl get pdb <name> -n <ns> -o jsonpath='{.status.disruptionsAllowed}'`.
-  If the value is 0, drain will fail on any node running the PDB's pods.
-
-- **For Fargate-only clusters:** no node drain is needed. Fargate pods
-  restart automatically. Verify Fargate profile scheduling after the
-  upgrade.
-
-- **For EKS Auto Mode clusters:** do NOT run `update-nodegroup-version`
-  — Auto Mode manages nodes. Run only `update-cluster-version` and
-  addon upgrades; Auto Mode handles the rest.
+  `kubectl get pdb <name> -n <ns> -o
+  jsonpath='{.status.disruptionsAllowed}'`. If 0, drain will fail.
+- **Fargate-only clusters:** no node drain needed; pods restart
+  automatically. **EKS Auto Mode clusters:** do NOT run
+  `update-nodegroup-version` — run only `update-cluster-version` and
+  addon upgrades.
 
 ## Recent AWS features (2024-2026)
 

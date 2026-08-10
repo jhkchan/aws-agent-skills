@@ -163,67 +163,35 @@ all that apply into a single recommendation):**
 `(GB × $0.045) − (GB × $0.01 + $7.30 × num_AZs)`. The break-even point is
 ~**160 GB/month per AZ** of traffic to the target service.
 
-## Mindset
+## Mindset and philosophy
 
 **One-line takeaway:** Gateway endpoints (S3, DynamoDB) are free and should
-exist on every VPC that has a NAT Gateway — their absence is almost always a
-missed saving. Interface endpoints require break-even maths because they
-carry a fixed hourly cost. The decision is driven by four networking realities:
+exist on every VPC that has a NAT Gateway — their absence is a defect, not
+an optimisation opportunity. Four networking realities drive the verdict:
 
-- **Gateway endpoints are free and binary.** There is no break-even
-  calculation for S3 and DynamoDB Gateway endpoints — they cost nothing to
-  create and nothing to operate. The only reason NOT to have them is a route-
-  table or endpoint-policy constraint. If S3 or DynamoDB traffic flows through
-  a NAT Gateway and the corresponding Gateway endpoint does not exist, the
-  verdict is always OPPORTUNITY_FOUND on that dimension.
+- **Gateway endpoints are free and binary.** No break-even calculation
+  applies; the only reason not to have them is a route-table or endpoint-
+  policy constraint. Treat absence as a misconfiguration (like an open
+  security group). Recommendation is unconditional.
 
-- **Interface endpoints have a fixed cost that must be amortised.** An
-  Interface endpoint for ECR costs ~$7.30/month per AZ ($21.90/month for a
-  3-AZ VPC) plus $0.01/GB. If the workload pushes 10 GB/month to ECR through
-  NAT, the endpoint costs MORE than the NAT processing it replaces. The
-  break-even threshold (~160 GB/month per AZ) is the load-bearing gate.
+- **Interface endpoints require traffic evidence, not assumptions.** An
+  Interface endpoint carries a fixed ~$7.30/month per AZ plus $0.01/GB. Pull
+  VPC Flow Logs or Cost Explorer service-level data to quantify GB/month
+  before recommending — on a low-traffic VPC, an Interface endpoint
+  INCREASES cost. The break-even threshold (~160 GB/month per AZ) is the
+  load-bearing gate.
 
-- **Cross-AZ data transfer is the hidden tax on single-NAT topology.** A
-  single NAT Gateway in AZ-A means traffic from AZ-B and AZ-C must cross the
-  AZ boundary to reach the gateway, incurring $0.01/GB. For high-throughput
-  workloads, the cross-AZ cost can EXCEED the savings from consolidating NAT
-  Gateways. The topology decision must model both base cost AND cross-AZ
-  transfer.
+- **Cross-AZ data transfer is the hidden tax on single-NAT topology.**
+  Traffic from other AZs to a single NAT Gateway crosses the AZ boundary
+  twice ($0.01/GB each direction). For high-throughput workloads, cross-AZ
+  cost can EXCEED the base-cost saving of consolidating. Topology
+  recommendations must cite environment AND cross-AZ traffic volume.
 
 - **NAT Instance is not a drop-in replacement.** A t3.micro NAT Instance
-  costs ~$8/month flat but caps at ~1 Gbps aggregate, has no HA, and requires
-  manual failover. It is appropriate ONLY for dev/test or workloads where an
-  outage is tolerable. Production traffic on a NAT Instance is a reliability
-  incident waiting to happen.
-
-## Philosophy
-
-Four behaviours separate a senior networking FinOps engineer from a generalist:
-
-- **Gateway endpoint absence is a defect, not an optimisation opportunity.**
-  Every VPC with outbound S3 or DynamoDB traffic should have the corresponding
-  Gateway endpoint. A senior engineer treats its absence as a misconfiguration
-  (like an open security group), not as a "nice to have." The recommendation
-  is unconditional: create it.
-
-- **Interface endpoint recommendations require traffic evidence, not
-  assumptions.** Recommending an ECR Interface endpoint because "ECR traffic
-  is probably high" is a guess. Pull VPC Flow Logs (or at minimum, Cost
-  Explorer filtered by service) to quantify the GB/month before recommending.
-  An Interface endpoint on a low-traffic VPC INCREASES cost.
-
-- **Topology is environment-specific, not universal.** A 3-AZ production VPC
-  with 3 NAT Gateways is correct if cross-AZ traffic is high. The same
-  topology in a dev environment is waste. The recommendation must cite the
-  environment AND the traffic volume that justifies (or eliminates) the
-  multi-AZ topology.
-
-- **NAT Instance recommendations must carry a reliability warning.** A NAT
-  Instance is a single EC2 host with no SLA. If the underlying hardware fails,
-  all outbound traffic from the VPC stops until the instance is replaced (or
-  an Auto Scaling recovery kicks in, adding minutes of downtime). Surface
-  this explicitly — a cost saving that causes a production outage is a net
-  loss.
+  costs ~$8/month flat but caps at ~1 Gbps, has no HA, and requires manual
+  failover. Appropriate ONLY for dev/test. Production traffic on a NAT
+  Instance is a reliability incident waiting to happen — always surface the
+  reliability warning (single point of failure, no SLA).
 
 ## Pre-flight: VPC metadata gate
 
@@ -298,88 +266,30 @@ aws ec2 describe-route-tables \
 
 ### Step 0: Expert knowledge — non-obvious NAT Gateway and VPC endpoint behaviours
 
-These behaviours are easy to misjudge without operational networking experience.
-Each changes a recommendation if ignored:
+These behaviours are easy to misjudge without operational networking
+experience. Each changes a recommendation if ignored. See
+`references/expert-knowledge.md` for the full treatment. Summary:
 
-- **A Gateway endpoint does NOT have a per-GB or per-hour charge — it is
-  genuinely free.** This is the single most misunderstood VPC pricing fact.
-  The S3 and DynamoDB Gateway endpoints appear in the route table and reroute
-  traffic through the AWS network backbone instead of through the NAT Gateway.
-  There is no ENI, no hourly charge, and no data-processing fee. The only
-  "cost" is the route-table entry, which is free. If any S3 or DynamoDB
-  traffic flows through a NAT Gateway, the absence of the Gateway endpoint is
-  a guaranteed saving.
-
-- **A Gateway endpoint only affects traffic from the VPC to the service — it
-  does not affect traffic FROM S3 TO the VPC.** S3 cannot initiate a
-  connection to a private subnet; the Gateway endpoint optimises the outbound
-  (GET, PUT) direction. For event-driven architectures where S3 triggers
-  Lambda or EventBridge, the Gateway endpoint still applies to the Lambda-to-
-  S3 API calls within the VPC configuration.
-
-- **Gateway endpoints are regional.** A Gateway endpoint for S3 in us-east-1
-  does NOT cover S3 buckets in eu-west-1. If the workload accesses cross-
-  region S3 buckets, the traffic still goes through NAT (or through a
-  regional Interface endpoint + Transit Gateway). Surface cross-region S3
-  access as a finding.
-
-- **Interface endpoint pricing is per-AZ-per-hour plus per-GB.** An Interface
-  endpoint creates an ENI in EACH subnet (AZ) you specify. A 3-AZ VPC with an
-  ECR Interface endpoint in all 3 AZs pays $7.30 × 3 = $21.90/month in base
-  cost, regardless of traffic volume. Always specify the minimum set of AZs
-  that covers the workloads generating the traffic.
-
-- **The break-even threshold (~160 GB/month) is per-service, not aggregate.**
-  You cannot aggregate S3 (100 GB) + ECR (60 GB) to hit a single break-even.
-  Each Interface endpoint is a separate financial decision with its own
-  break-even. Gateway endpoints (S3, DynamoDB) are exempt because they are
-  free — always create them.
-
-- **Cross-AZ data transfer ($0.01/GB each direction) applies when a private
-  subnet in AZ-B sends traffic to a NAT Gateway in AZ-A.** The traffic
-  crosses the AZ boundary twice (to the gateway and back). For a single-NAT-
-  Gateway topology, the cross-AZ cost = `total_GB × $0.02` (both directions).
-  This can exceed the base-cost saving of consolidating from 3 to 1 gateway.
-
-- **A NAT Instance has no per-GB processing charge — it is a fixed-cost EC2
-  host.** This makes it dramatically cheaper than a NAT Gateway for high-
-  bandwidth dev/test workloads (1 TB/month through a NAT Instance costs the
-  same as 0 GB). BUT: the bandwidth is capped by the instance type (t3.micro
-  ~1 Gbps aggregate; t3.medium ~up to 5 Gbps with ENA), and the instance is a
-  single point of failure. Source/destination checks must be disabled
-  (`modify-instance-attribute --no-source-dest-check`).
-
-- **NAT Gateway does not support port forwarding.** If the workload needs
-  inbound port mapping (e.g., a legacy NAT rule), a NAT Instance with iptables
-  is required. This is an architectural constraint, not a cost decision —
-  surface it as a finding.
-
-- **Deleting a NAT Gateway does not delete its Elastic IP.** The EIP remains
-  allocated and incurs $0.005/hour ($3.65/month) until released. Always pair
-  a NAT Gateway deletion with `aws ec2 release-address` for the associated EIP.
-
-- **VPC Flow Logs capture the interface ID of the NAT Gateway ENI.** Filter
-  Flow Logs by the NAT Gateway's ENI to isolate the traffic that incurs
-  processing charges. Traffic to S3 (after the Gateway endpoint is created)
-  will NOT appear on the NAT ENI — confirming the endpoint is working.
-
-- **Gateway endpoints and Interface endpoints for the same service are
-  different constructs.** S3 has BOTH a Gateway endpoint (free) and an
-  Interface endpoint (PrivateLink, paid). For cost optimisation, always
-  prefer the Gateway endpoint for S3. The Interface endpoint is only needed
-  for cross-region access or for workloads that require a private IP for DNS
-  resolution (rare).
-
-- **Endpoint policies can restrict which resources an endpoint can access.**
-  A misconfigured endpoint policy on an S3 Gateway endpoint can silently
-  block access to legitimate buckets. Always review the endpoint policy and
-  the IAM policy together when an endpoint "doesn't work."
-
-- **A NAT Gateway in a public subnet serves private subnets in the SAME VPC.**
-  Cross-VPC NAT (via Transit Gateway or VPC peering) routes the traffic
-  through the peering connection first, then through the NAT. The data-
-  processing charge applies to the traffic as it exits the NAT, regardless of
-  the source VPC. Surface cross-VPC NAT topology as a finding.
+- **Gateway endpoints are free and regional** — no per-GB or per-hour
+  charge; cover only same-region S3/DynamoDB; only affect VPC-to-service
+  (outbound) traffic.
+- **Interface endpoint break-even is per-service, not aggregate** —
+  ~160 GB/month per AZ; each AZ adds $7.30/month base; specify only the
+  AZs that originate traffic.
+- **Cross-AZ transfer ($0.01/GB each direction) taxes single-NAT
+  topology** — model both base cost and cross-AZ transfer before
+  consolidating.
+- **NAT Instance is fixed-cost but capped and not HA** — appropriate
+  only for dev/test; requires `--no-source-dest-check`; does not support
+  port forwarding.
+- **Deleting a NAT Gateway does NOT release its Elastic IP** — always
+  pair deletion with `aws ec2 release-address` (orphan EIP = $3.65/mo).
+- **Filter VPC Flow Logs by the NAT Gateway ENI** to isolate
+  processing-charge traffic; post-endpoint traffic will not appear on
+  the NAT ENI, confirming the endpoint works.
+- **Gateway and Interface endpoints for S3 are different constructs** —
+  always prefer the free Gateway endpoint; Interface (PrivateLink) is
+  only for cross-region or private-DNS requirements.
 
 ### Step 1: Gateway endpoints for S3 and DynamoDB (FREE — always create)
 
@@ -572,127 +482,23 @@ IMPLEMENTATION:
   3. <verification command>
 ```
 
-### Worked example — production VPC with no Gateway endpoints and high S3 traffic
+### Worked examples (see references/worked-examples.md)
 
-```text
-VPC: vpc-0abc123
-VERDICT: OPPORTUNITY_FOUND
-REASON: 3-AZ production VPC with 3 NAT Gateways processing 2,400 GB/month
-  ($140.85/month). No Gateway endpoints exist — 900 GB/month of S3 traffic
-  and 200 GB/month of DynamoDB traffic are flowing through NAT (Step 1).
-  ECR traffic at 150 GB/month is below break-even for a 3-AZ Interface
-  endpoint (Step 2). Topology is correct for production (Step 3).
-RECOMMENDATION:
-  1. Create S3 Gateway Endpoint (FREE) — reroutes 900 GB/month off NAT.
-  2. Create DynamoDB Gateway Endpoint (FREE) — reroutes 200 GB/month off NAT.
-  3. Skip ECR Interface Endpoint (150 GB < 160 GB break-even for 1-AZ; well
-     below 480 GB break-even for 3-AZ).
-  4. Topology: keep 3 NAT Gateways (production, high throughput justifies
-     multi-AZ).
-SAVINGS:
-  CURRENT_MONTHLY: $140.85
-    - NAT Gateway base: 3 × $32.85 = $98.55
-    - NAT data processing: 2,400 GB × $0.045 = $108.00
-    - Total: $98.55 + $108.00 = $206.55
-    - NOTE: Cost Explorer shows $140.85 — discrepancy due to partial-month
-      data; use Cost Explorer figure as the billing baseline.
-  PROJECTED_MONTHLY: $99.60
-    - NAT Gateway base: 3 × $32.85 = $98.55 (unchanged)
-    - NAT data processing: (2,400 − 900 − 200) GB × $0.045 = 1,300 × $0.045 = $58.50
-    - Gateway endpoints: $0.00 (free)
-    - Total: $98.55 + $58.50 = $157.05
-    - Adjusted to Cost Explorer baseline ratio: $99.60
-  MONTHLY_SAVING: $49.50  (1,100 GB × $0.045 = $49.50 in data-processing savings)
-  ANNUAL_SAVING: $594.00
-  CAVEATS:
-    - Gateway endpoints are free — savings are captured in full.
-    - ECR Interface endpoint NOT recommended: 150 GB/month is below the
-      160 GB/month break-even for a single-AZ endpoint ($7.30 base).
-    - Cross-region S3 access is not covered by a regional Gateway endpoint.
-IMPLEMENTATION:
-  1. CONFIRM: About to create S3 and DynamoDB Gateway endpoints on VPC
-     vpc-0abc123 in us-east-1. These are free and reroute ~1,100 GB/month
-     off NAT. Proceed? (yes/no)
-  2. aws ec2 create-vpc-endpoint --vpc-id vpc-0abc123 \
-       --service-name com.amazonaws.us-east-1.s3 \
-       --vpc-endpoint-type Gateway \
-       --route-table-ids rtb-aaa rtb-bbb rtb-ccc
-  3. aws ec2 create-vpc-endpoint --vpc-id vpc-0abc123 \
-       --service-name com.amazonaws.us-east-1.dynamodb \
-       --vpc-endpoint-type Gateway \
-       --route-table-ids rtb-aaa rtb-bbb rtb-ccc
-  4. Verify: aws ec2 describe-vpc-endpoints --filter "Name=vpc-id,Values=vpc-0abc123"
-  5. Verify traffic drop: after 24 hours, re-query Cost Explorer for NatGateway
-     usage — expect ~$49.50/month reduction in data-processing charges.
-```
+Three full end-to-end worked examples live in
+`references/worked-examples.md`:
 
-### Worked example — already optimal production VPC
+- **OPPORTUNITY_FOUND — production VPC, no Gateway endpoints, high S3
+  traffic.** Creates S3 + DynamoDB Gateway endpoints (free); skips ECR
+  Interface endpoint (below break-even); keeps 3-AZ topology.
+- **ALREADY_OPTIMAL — production VPC with full endpoint posture.** S3
+  and DynamoDB Gateway endpoints in place; ECR Interface endpoint exists
+  in 3 AZs; topology correct.
+- **OPPORTUNITY_FOUND — non-prod VPC with redundant NAT Gateways.**
+  Creates S3 Gateway endpoint; consolidates 2 NAT Gateways to 1;
+  includes the `release-address` step for the deleted gateway's EIP.
 
-```text
-VPC: vpc-0def456
-VERDICT: ALREADY_OPTIMAL
-REASON: 3-AZ production VPC with S3 and DynamoDB Gateway endpoints in place.
-  ECR Interface endpoint exists in all 3 AZs (ECR traffic at 500 GB/month
-  exceeds the 480 GB break-even for 3-AZ). Topology is correct (production,
-  high throughput). No NAT Instance substitution (production).
-RECOMMENDATION: No changes required.
-SAVINGS:
-  CURRENT_MONTHLY: $186.00
-    - NAT Gateway base: 3 × $32.85 = $98.55
-    - NAT data processing: 1,950 GB × $0.045 = $87.75
-    - (S3/DynamoDB traffic already on Gateway endpoints — $0)
-    - (ECR traffic already on Interface endpoint — $0 NAT processing)
-  PROJECTED_MONTHLY: $186.00
-  MONTHLY_SAVING: $0.00
-  ANNUAL_SAVING: $0.00
-  CAVEATS: Posture is correct. Re-evaluate if S3/DynamoDB traffic patterns
-    change or if new AWS services are adopted that route through NAT.
-IMPLEMENTATION: None required.
-```
-
-### Worked example — non-prod VPC with redundant NAT Gateways
-
-```text
-VPC: vpc-0ghi789
-VERDICT: OPPORTUNITY_FOUND
-REASON: 2-AZ staging VPC with 2 NAT Gateways processing only 80 GB/month
-  total ($69.20/month). Cross-AZ traffic is minimal (< 30 GB/month).
-  Consolidating to a single NAT Gateway saves $32.85/month in base cost
-  with only $0.60/month in additional cross-AZ transfer (Step 3). No S3
-  Gateway endpoint exists (Step 1) — adding it reroutes 40 GB/month for free.
-RECOMMENDATION:
-  1. Create S3 Gateway Endpoint (FREE) — reroutes 40 GB/month.
-  2. Delete one NAT Gateway (consolidate to single-NAT in AZ-A).
-  3. Update route tables: point AZ-B private subnet's 0.0.0.0/0 to NAT-A.
-SAVINGS:
-  CURRENT_MONTHLY: $69.20
-    - NAT Gateway base: 2 × $32.85 = $65.70
-    - NAT data processing: 80 GB × $0.045 = $3.60
-  PROJECTED_MONTHLY: $36.15
-    - NAT Gateway base: 1 × $32.85 = $32.85
-    - NAT data processing: (80 − 40) GB × $0.045 = 40 × $0.045 = $1.80
-    - Cross-AZ transfer: 40 GB × $0.02 = $0.80
-    - Gateway endpoint: $0.00
-    - Adjusted: $35.45 (rounding to Cost Explorer baseline: $36.15)
-  MONTHLY_SAVING: $33.05
-  ANNUAL_SAVING: $396.60
-  CAVEATS:
-    - Single-NAT topology in staging is acceptable (no HA requirement).
-    - Cross-AZ transfer ($0.80/month) is negligible vs the base-cost saving.
-    - If staging traffic grows > 500 GB/month, reconsider multi-AZ.
-IMPLEMENTATION:
-  1. CONFIRM: About to create S3 Gateway endpoint and delete NAT Gateway
-     nat-bbb on VPC vpc-0ghi789. This saves ~$33/month. Proceed? (yes/no)
-  2. aws ec2 create-vpc-endpoint --vpc-id vpc-0ghi789 \
-       --service-name com.amazonaws.us-east-1.s3 \
-       --vpc-endpoint-type Gateway \
-       --route-table-ids rtb-private-a rtb-private-b
-  3. aws ec2 replace-route --route-table-id rtb-private-b \
-       --destination-cidr-block 0.0.0.0/0 --nat-gateway-id nat-aaa
-  4. aws ec2 delete-nat-gateway --nat-gateway-id nat-bbb
-  5. aws ec2 release-address --allocation-id eipalloc-bbb
-  6. Verify: aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=vpc-0ghi789"
-```
+Each example demonstrates internally consistent arithmetic, the CONFIRM
+gate, and the exact CLI sequence for the verdict shape.
 
 ## STRICT output contract
 
@@ -852,69 +658,47 @@ self-consistent:
    deletion without `release-address` for the associated EIP leaves a
    $3.65/month orphan charge.
 
-## Error handling — CLI and data-source failures
+## Error handling and edge cases (see references/troubleshooting.md)
 
-| Failure mode | Detection | Handling |
-|---|---|---|
-| `describe-nat-gateways` returns empty | `len(NatGateways) == 0` | VPC has no NAT Gateway. Verdict ALREADY_OPTIMAL. |
-| `get-cost-and-usage` returns $0 for NatGateway | Cost is 0 | Either no NAT Gateway or no traffic. Verify with `describe-nat-gateways`. |
-| VPC Flow Logs query returns empty results | `queryResults` empty | Flow Logs not enabled or querying wrong ENI. Fall back to Cost Explorer service-level data; flag Interface endpoint recommendations as MEDIUM confidence. |
-| `create-vpc-endpoint` fails with `RouteConflict` | API error | A route in the specified route table already points to a different endpoint. Remove the conflicting route first, or use a different route table. |
-| `create-vpc-endpoint` (Interface) fails with `PrivateDnsOptionsIncompatible` | API error | The VPC already has a conflicting private DNS configuration. Retry with `--no-private-dns-enabled` and surface the DNS resolution impact. |
-| `delete-nat-gateway` fails with `NatGatewayNotFound` | API error | The gateway was already deleted or is in a different region. Re-query with the correct region. |
-| `release-address` fails with `AddressInUse` | API error | The EIP is still associated with the NAT Gateway (deletion not yet complete). Wait for the NAT Gateway state to reach `deleted`, then retry. |
+CLI/data-source failure modes (e.g., `RouteConflict`,
+`PrivateDnsOptionsIncompatible`, `NatGatewayNotFound`, `AddressInUse`,
+empty Cost Explorer or Flow Logs results), remediation-procedure
+failures (ENI quota block, cross-partition S3 access, NAT replacement
+connection reset, EIP release stuck, cost/traffic reconciliation
+drift), and edge-case topologies (TGW hub-and-spoke egress,
+private-only VPCs, VPC peering) are documented in
+`references/troubleshooting.md`.
 
-## Anti-Patterns — NEVER
+## Anti-Patterns — NEVER (top 5)
 
-- NEVER recommend an Interface endpoint without quantifying the monthly
-  traffic volume. An Interface endpoint on a low-traffic VPC INCREASES cost
-  by $7.30/AZ/month. Always cite the GB/month and confirm it exceeds
-  break-even.
+1. **NEVER recommend an Interface endpoint without quantifying monthly
+   traffic volume.** An Interface endpoint on a low-traffic VPC INCREASES
+   cost by $7.30/AZ/month. Always cite GB/month and confirm it exceeds
+   break-even (~160 GB/month per AZ).
 
-- NEVER recommend a NAT Instance for a production workload. NAT Instance is
-  a single point of failure with no SLA and bandwidth caps. It is for dev/
-  test only. A cost saving that causes a production outage is a net loss.
+2. **NEVER recommend a NAT Instance for production.** NAT Instance is a
+   single point of failure with no SLA and bandwidth caps. Dev/test only.
+   A cost saving that causes a production outage is a net loss.
 
-- NEVER delete a NAT Gateway without updating the route tables FIRST. If the
-  route table still points `0.0.0.0/0` to a deleted NAT Gateway, all
-  outbound traffic from the private subnet stops. Update routes to the
-  remaining gateway before deleting.
+3. **NEVER delete a NAT Gateway without updating route tables FIRST and
+   pairing deletion with `release-address` for the EIP.** A route still
+   pointing to a deleted gateway black-holes the subnet; an unreleased
+   EIP leaks $3.65/month indefinitely.
 
-- NEVER forget to release the Elastic IP after deleting a NAT Gateway. An
-  unreleased EIP incurs $3.65/month indefinitely — a silent leak that
-  defeats the purpose of the optimisation.
+4. **NEVER recommend single-NAT topology for production with high
+   cross-AZ traffic without computing cross-AZ transfer cost.** The
+   cross-AZ charge ($0.01/GB each direction) can exceed the base-cost
+   saving of eliminating gateways.
 
-- NEVER recommend a single-NAT topology for production with high cross-AZ
-  traffic without computing the cross-AZ transfer cost. The cross-AZ charge
-  ($0.01/GB each direction) can exceed the base-cost saving of eliminating
-  gateways.
+5. **NEVER auto-apply endpoint or topology changes without the CONFIRM
+   gate, and NEVER batch VPC changes.** A wrong route-table update can
+   black-hole an entire VPC's outbound traffic; process one VPC per
+   CONFIRM gate so errors do not cascade.
 
-- NEVER assume Gateway endpoints cover cross-region S3 access. A Gateway
-  endpoint is regional; cross-region S3 traffic still goes through NAT.
-  Surface cross-region S3 access as a finding.
-
-- NEVER aggregate traffic across services to hit a single Interface endpoint
-  break-even. Each Interface endpoint is a separate financial decision.
-
-- NEVER recommend an Interface endpoint for S3 when a Gateway endpoint is
-  available. The Gateway endpoint is free; the Interface endpoint is not.
-  Only use the S3 Interface endpoint if cross-region or private-DNS
-  requirements mandate it.
-
-- NEVER create an Interface endpoint in all AZs of the VPC by default.
-  Specify only the AZs (subnets) that originate the traffic. Extra AZs add
-  $7.30/month each with no benefit.
-
-- NEVER treat VPC Flow Logs traffic as NAT processing traffic. Flow Logs
-  capture ALL traffic on the ENI, including traffic that does not incur NAT
-  processing charges. Filter to the NAT Gateway ENI specifically.
-
-- NEVER recommend a NAT Instance without confirming source/destination
-  checks are disabled. Without `--no-source-dest-check`, the instance will
-  not route traffic and the NAT function fails silently.
-
-- NEVER auto-apply endpoint or topology changes without the CONFIRM gate.
-  A wrong route-table update can black-hole an entire VPC's outbound traffic.
+Additional NEVER rules (aggregate break-even, cross-region Gateway
+coverage, S3 Interface vs Gateway, Flow Logs filtering, NAT Instance
+source/dest-check) appear in `references/expert-knowledge.md` and the
+FORBIDDEN output patterns section above.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -923,28 +707,16 @@ self-consistent:
   `release-address`, `run-instances` for NAT Instance), emit:
   `CONFIRM: About to <action> on VPC <vpc-id> in region <region>. This
   affects <consequence>. Proceed? (yes/no)`. Do NOT execute until the
-  operator confirms.
-
-- **Route-table backup before topology changes.** Before modifying routes:
-  `aws ec2 describe-route-tables --route-table-ids <rtb-id> --output json >
+  operator confirms. Do NOT batch VPC changes.
+- **Route-table backup before topology changes.** `aws ec2
+  describe-route-tables --route-table-ids <rtb-id> --output json >
   /tmp/<rtb-id>-backup-$(date +%s).json`. Route changes are atomic and
-  non-versioned — a wrong update can black-hole a subnet instantly.
-
-- **Verify NAT Gateway state before relying on it.** Ensure the remaining
-  NAT Gateway is `available` before deleting others. Deleting the only
-  available gateway leaves the VPC with no outbound path.
-
-- **Endpoint policy review.** When creating a Gateway endpoint, the default
-  policy is "full access." If the environment requires restricted S3 bucket
-  access, attach a custom endpoint policy before creating.
-
-- **Private DNS impact for Interface endpoints.** Creating an Interface
-  endpoint with `--private-dns-enabled` overrides the public DNS for the
-  service within the VPC. Verify no existing DNS configurations conflict.
-
-- **Bulk-operation safety.** For fleet-wide NAT optimisation across multiple
-  VPCs, process one VPC per CONFIRM gate. Do NOT batch VPC changes — a route-
-  table error in one VPC should not cascade to others.
+  non-versioned.
+- **Verify NAT Gateway state before relying on it.** Ensure the
+  remaining NAT Gateway is `available` before deleting others.
+- **Endpoint policy and private DNS review.** Default Gateway endpoint
+  policy is "full access"; `--private-dns-enabled` on Interface endpoints
+  overrides public DNS within the VPC. Verify no conflicts before creating.
 
 ## Recent AWS features (2024-2026)
 
@@ -969,98 +741,6 @@ self-consistent:
 - **Graviton-based NAT Instances (2024-2025):** t4g.micro NAT AMIs offer
   better price-performance than t3.micro for NAT Instance workloads.
   Consider t4g for new NAT Instance deployments.
-
-## Error handling — remediation procedure failures
-
-These branches complement the CLI/data-source table above. Each entry
-describes what to do when a step in the optimisation procedure itself
-fails — not when a CLI call errors out, but when the optimisation
-*logic* cannot proceed safely.
-
-- **If `create-vpc-endpoint` (Interface) fails with
-  `ServiceLimitExceeded` for ENIs per subnet:** The VPC has hit the
-  per-subnet ENI cap (default varies by instance type and subnet size).
-  Do NOT retry in a different AZ — the limit is account+subnet scoped.
-  Remediation: (a) request a quota increase via
-  `service-quotas request-service-quota-increase --service-code vpc
-  --quota-code L-FE5A380F`, OR (b) fall back to a Gateway endpoint for
-  S3/DynamoDB and defer the Interface endpoint until the quota is
-  approved. Surface the blocked recommendation as `VERDICT:
-  QUOTA_BLOCKED` with the quota name and current/applied values.
-
-- **If the Gateway endpoint does not cover the required S3 bucket
-  (same-region access expected but bucket is in a different partition
-  or the access path is non-S3):** Gateway endpoints only cover S3 and
-  DynamoDB in the same region and same partition. If the workload
-  accesses S3 Object Lambda, S3 access points in another account, or
-  uses SDK calls that bypass the endpoint DNS (custom endpoints,
-  Direct Connect public VIF), the Gateway endpoint silently does NOT
-  intercept the traffic. Detect by re-running the Flow Logs query
-  after endpoint creation — if NAT data-processing bytes do not drop
-  by the expected delta, the endpoint is not capturing the traffic.
-  Remediation: an Interface endpoint for `com.amazonaws.<region>.s3`
-  (covers all S3 API calls including access points), OR a route-table
-  audit for custom DNS.
-
-- **If the NAT Gateway has active connections during replacement
-  (single-NAT-to-dual-NAT migration or AZ topology change):** Existing
-  TCP connections through the old NAT Gateway will be reset when its
-  ENI is deleted. Detection: `aws ec2 describe-network-interfaces
-  --filters Name=description,Values='ELB managed NAT gateway ...'` and
-  CloudWatch `NATGateway.BytesOutToDestination`. Remediation: do NOT
-  delete the old gateway until connection count is zero. Add the new
-  gateway to the route table, wait one TTL cycle (default 350s for
-  established TCP, longer for long-lived sessions), verify new
-  connections use the new gateway via Flow Logs, then delete the old
-  one. For stateful workloads (long-lived WebSocket, RDS sessions),
-  schedule a maintenance window — connection reset is unavoidable.
-
-- **If the Elastic IP release fails after NAT Gateway deletion
-  (`InvalidAddress.AllocationInUse` or stuck in `pending`):** The EIP
-  remains associated with the now-deleted gateway ENI. Poll
-  `aws ec2 describe-addresses --public-ips <ip>` until `AssociationId`
-  is empty (can take 5-30 minutes). If still associated after 30
-  minutes, open an AWS Support case — do NOT force-disassociate, the
-  ENI cleanup is asynchronous. The EIP charge accrues during this
-  window; surface as `VERDICT: CLEANUP_PENDING` with expected
-  completion time.
-
-- **If Cost Explorer returns `NatGateway` cost but Flow Logs show no
-  matching traffic (cost/traffic delta > 20%):** Either the Flow Logs
-  query is wrong (wrong ENI filter, wrong time window) or there is a
-  second NAT Gateway in the VPC. Re-query
-  `aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=<vpc>` and
-  aggregate all gateway costs. Do NOT proceed with the recommendation
-  until the cost/traffic reconciliation is within 20%.
-
-## Edge cases
-
-- **Transit Gateway + NAT Gateway interaction.** When a VPC is attached
-  to a Transit Gateway (TGW) that routes egress through a central
-  egress VPC ("hub-and-spoke"), the spoke VPC's NAT Gateway is NOT
-  used for cross-VPC traffic — TGW routes override local `0.0.0.0/0`
-  routes for destinations reachable via TGR. Detection: query
-  `aws ec2 search-transit-gateway-routes` and look for `0.0.0.0/0` or
-  specific CIDR entries pointing to a TGW attachment. Implication: a
-  spoke NAT Gateway with low traffic may be a candidate for deletion,
-  BUT verify the egress VPC's NAT is sized for the aggregate spoke
-  traffic. The optimisation must run at the egress VPC, not the spoke.
-  Surface as a finding: `TGW_EGRESS_CENTRALIZED — spoke NAT traffic
-  low, evaluate spoke NAT removal; run optimisation on <egress-vpc>`.
-
-- **VPC with only private subnets and no internet gateway.** A NAT
-  Gateway cannot be created (requires an IGW). Such VPCs already have
-  optimal egress via Gateway endpoints for S3/DynamoDB. If non-S3
-  traffic is required, the workload must use Interface endpoints or a
-  TGW egress path. Skip NAT cost optimisation; verdict `ALREADY_OPTIMAL
-  (no NAT present, IGW not attached)`.
-
-- **NAT Gateway in a VPC peered with another VPC.** VPC peering does
-  NOT route traffic through a NAT Gateway in the peer — peering routes
-  are direct subnets. If the peer VPC has no NAT and depends on the
-  local NAT for egress, that traffic will NOT appear in local NAT Flow
-  Logs. Detection: check peering connection route tables. Surface as a
-  finding if a peer VPC's egress strategy is missing.
 
 ## Domain
 

@@ -231,3 +231,78 @@ response + more confidence.
 For a fleet of 500 standard alarms + 20 composite + 50 anomaly
 detectors, monthly cost is ~$75 — usually negligible vs. operational
 value.
+
+## Edge case: alarm stuck in ALARM after metric stops reporting
+
+When a metric was breaching and then STOPS reporting entirely (sensor
+failure, instance terminated, agent crashed mid-incident), the alarm's
+behavior depends on TreatMissingData:
+
+| TreatMissingData | Behavior when metric stops mid-breach |
+|---|---|
+| `missing` (default) | Transitions to INSUFFICIENT_DATA after next cycle — `InsufficientDataActions` fires (usually empty = silent) |
+| `breaching` | Stays in ALARM forever — missing data treated as continuing to breach |
+| `notBreaching` | Transitions to OK after next cycle — `OKActions` fires (if configured) |
+| `ignore` | Stays in ALARM forever — alarm holds its last evaluated state |
+
+**The "stuck in ALARM forever" trap:** with `TreatMissingData: breaching`
+(common for security/availability alarms), an alarm that fired legitimately
+and then lost its metric source stays in ALARM even after the underlying
+issue is resolved and the resource is terminated. On-call receives no "all
+clear" because:
+1. The metric is gone, so no OK datapoint can ever clear the breach.
+2. `OKActions` only fires on a real OK transition, not on alarm deletion.
+
+**Diagnostic steps:**
+1. `describe-alarms --alarm-names <name>` — confirm `StateValue: ALARM`
+   and `StateUpdatedTimestamp` is old (>24h).
+2. `get-metric-statistics` over last hour — if empty, the metric stopped.
+3. Check the resource: is the EC2 instance terminated? Lambda deleted?
+   ALB gone?
+
+**Fix options:**
+- If the resource is gone: `delete-alarms` — the alarm monitors nothing.
+- If the resource exists but agent/sensor is broken: fix the sensor; the
+  alarm will self-clear on the next OK datapoint.
+- To force-clear without waiting: snapshot config, then
+  `set-alarm-state --state-value OK --state-reason "manual override
+  after sensor recovery"` (use sparingly — bypasses CloudWatch evaluation).
+- Prevent recurrence: add a secondary "alarm stuck in ALARM > 24h"
+  composite alarm that fires when `StateUpdatedTimestamp` is too old.
+
+## Worked example — diagnose stuck alarm (BLOCKED)
+
+```text
+OPERATION: diagnose
+VERDICT: BLOCKED
+TARGET: api-error-rate-prod
+PRE_CHECKS:
+  - [PASS] describe-alarms returns the alarm
+  - [FAIL] Metric not publishing: get-metric-statistics on
+    AWS/ApplicationELB, HTTPCode_ELB_5XX_Count, dimensions
+    LoadBalancer=app/prod-alb/WRONG-NAME returns 0 datapoints over the
+    last 1 hour. The LoadBalancer dimension value appears to reference
+    a deleted ALB.
+  - [PASS] describe-alarm-history shows the alarm entered
+    INSUFFICIENT_DATA 6 days ago and has not transitioned since
+STEPS: (none — pre-checks failed; this is a diagnosis)
+POST_VERIFY: (none)
+STATE: INSUFFICIENT_DATA (stuck 6 days)
+NOTES:
+  - The alarm has been in INSUFFICIENT_DATA for 6 days because the
+    LoadBalancer dimension references a deleted ALB. Update the
+    dimension value to the current ALB ARN:
+    aws cloudwatch put-metric-alarm --alarm-name api-error-rate-prod \
+      --dimensions Name=LoadBalancer,Value=app/prod-alb/1234567890 \
+      [...rest of the existing config...]
+  - Verify the new ALB is publishing via:
+    aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB \
+      --metric-name HTTPCode_ELB_5XX_Count \
+      --dimensions Name=LoadBalancer,Value=app/prod-alb/1234567890 \
+      --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
+      --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+      --period 60 --statistics Sum
+  - Snapshot before update:
+    aws cloudwatch describe-alarms --alarm-names api-error-rate-prod \
+      --output json > /tmp/api-error-rate-prod-backup-$(date +%s).json
+```
