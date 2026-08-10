@@ -211,6 +211,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | dynamodb-table-deployer | amazon.nova-pro-v1:0 | 102/120 | B | 4/5 | 17.2s | 47708 |
 | dynamodb-throttling-troubleshooter | amazon.nova-pro-v1:0 | 107/120 | B | 5/5 | 9.2s | 53072 |
 | ebs-volume-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 16.0s | 35713 |
+| ebs-volume-optimizer | amazon.nova-pro-v1:0 | 106/120 | B | 5/5 | 24.1s | 67005 |
 | ec2-backup-operator | amazon.nova-pro-v1:0 | 107/120 | B | 5/5 | 8.0s | 57254 |
 | ec2-rightsizing-optimizer | amazon.nova-pro-v1:0 | 108/120 | A | 3/5 | 14.9s | 65548 |
 | ec2-security-group-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 5/5 | 11.5s | 38372 |
