@@ -1,0 +1,70 @@
+{
+  "skill": "tag-governance-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many expert\u2011level details (enforced_for syntax, case_sensitive nuance, Config required\u2011tags 5\u2011key limit, non\u2011atomic tag\u2011resources response, region\u2011scoped get\u2011resources, ABAC condition key quirks, cost\u2011allocation activation via CE API). However, the core concepts of tag policies, EventBridge, Lambda, Config rules, etc., are already known to a capable model, so a small deduction for overlap."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes a clear AWS\u2011specific workflow: enable policy type, create/attach policy, verify with a failing CreateTags call, build EventBridge rule, Lambda handler, SSM Automation document, cost\u2011allocation activation. One generic step (\u201cverify enforcement\u201d) is not tied to a concrete AWS command, costing a point."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons (missing enforced_for, case\u2011sensitivity mismatch, cascade additive behavior, cost\u2011allocation inactivity, ABAC case\u2011sensitivity, FailedResourcesMap, etc.). Missing two notable pitfalls: cross\u2011account bulk tagging without assuming roles, and IAM permission\u2011boundary conflicts that can silently block tagging."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Full front\u2011matter, clear description, when_to_use, activation_triggers, invocation_schema, and versioning. An agent can reliably decide when to invoke the skill."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses top\u2011level Mindset, quick\u2011navigation table, then detailed step\u2011by\u2011step sections. However, the initial sections are dense and contain many low\u2011level CLI snippets before the high\u2011level overview, causing some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (policy creation, bulk tag\u2011resources) are guarded by explicit confirmation prompts, backup commands, and sandbox testing guidance. One point deducted because bulk tagging across regions lacks an explicit per\u2011region confirmation or throttling\u2011back\u2011off guidance."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Step\u2011wise workflow \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Appendices), which aligns with established skill patterns."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, Lambda code, SSM document, error\u2011handling notes, and pre\u2011flight safety checks, enabling an agent to execute end\u2011to\u2011end. Deductions for missing pagination\u2011error handling in get\u2011resources, no explicit retry/back\u2011off for tag\u2011resources throttling, and the placeholder remediation still requires manual correction, reducing full automation."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 54948,
+  "latency_ms": 16486,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}

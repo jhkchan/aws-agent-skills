@@ -522,6 +522,16 @@ aws resourcegroupstaggingapi get-tag-values --key Environment
 non-empty map means some resources were not tagged (permission,
 throttling, non-existent ARN). Log and retry the failed ARNs.
 
+**Console alternative — Tag Editor:** for one-off bulk tag editing
+across regions without scripting, use the AWS Tag Editor console
+(Resource Groups & Tag Editor → Tag Editor). It supports
+region-scoped resource discovery, multi-select, and bulk add/replace/
+delete tag operations across resource types. Tag Editor is a manual
+operator tool — it is NOT automatable via API and should NOT be the
+primary mechanism for fleet-wide governance. Use it for ad-hoc
+remediation sprints or initial backfill; use the Tagging API
+(above) and Config remediation (Step 7) for ongoing automation.
+
 ### Step 5: Wire Config `required-tags` managed rule
 
 The Config managed rule `required-tags` checks that specified tag keys
