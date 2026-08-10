@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "tag-governance-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Tag Governance Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "tag-policy-org-baseline",
+      "name": "Organizations TagPolicy baseline with allowed_values and enforced_for — AUTOMATED",
+      "difficulty": "easy",
+      "prompt_file": "prompts/tag-policy-org-baseline.md",
+      "baseline_file": "baselines/tag-policy-org-baseline.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "tag-policy-org-baseline", "allowed_values", "enforced_for", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "auto-tag-on-create",
+      "name": "EventBridge + Lambda auto-tagging on EC2/S3/Lambda creation — AUTOMATED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/auto-tag-on-create.md",
+      "baseline_file": "baselines/auto-tag-on-create.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "auto-tag-on-create", "EventBridge", "Lambda", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "abac-policy-design",
+      "name": "ABAC IAM policy with aws:ResourceTag/Team matching aws:PrincipalTag/Team — AUTOMATED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/abac-policy-design.md",
+      "baseline_file": "baselines/abac-policy-design.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "abac-policy-design", "aws:ResourceTag", "aws:PrincipalTag", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "bulk-remediation-config-ssm",
+      "name": "Config required-tags + custom SSM Automation remediation for missing tags — AUTOMATED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/bulk-remediation-config-ssm.md",
+      "baseline_file": "baselines/bulk-remediation-config-ssm.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "bulk-remediation-config-ssm", "required-tags", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "manual-gap-billing-activation",
+      "name": "Cost allocation tag activation on legacy account without CE API access — MANUAL_STEP_REQUIRED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/manual-gap-billing-activation.md",
+      "baseline_file": "baselines/manual-gap-billing-activation.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "manual-gap-billing-activation", "VERDICT", "GAP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    }
+  ]
+}

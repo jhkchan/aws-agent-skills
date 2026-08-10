@@ -1,0 +1,179 @@
+# Eval test cases for tag-governance-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: tag-governance-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: tag-policy-org-baseline
+    description: >-
+      Standard Organizations TagPolicy baseline covering required tags
+      (Environment, Owner, Project, CostCenter) with allowed_values and
+      enforced_for on EC2, S3, Lambda. The skill should produce an
+      AUTOMATED output with the TagPolicy JSON template and the CLI
+      create-policy snippet.
+    input: |
+      Design reference: tag-policy-org-baseline
+      Organization ID: o-xxxxxxx
+      Root ID: r-xxxx
+      Region: us-east-1
+
+      Requirement: enforce required tags on all production resources.
+      Required tags: Environment, Owner, Project, CostCenter.
+      Environment allowed_values: dev, staging, prod.
+      Target resource types: EC2 instances, S3 buckets, Lambda functions,
+      RDS DB instances.
+
+      Emit the standard GOVERNANCE block (SCOPE, STRATEGY, POLICY,
+      AUTOMATION, COMPLIANCE, VERDICT, GAP, TEMPLATE).
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "tag-policy-org-baseline"
+        - "allowed_values"
+        - "enforced_for"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: auto-tag-on-create
+    description: >-
+      EventBridge + Lambda auto-tagging pipeline that stamps Owner and
+      Environment tags on EC2, S3, and Lambda resources at creation
+      based on the creator IAM identity and account map. The skill
+      should produce an AUTOMATED output with the Lambda handler
+      pattern and the EventBridge rule.
+    input: |
+      Design reference: auto-tag-on-create
+      Account: 111111111111
+      Region: us-east-1
+
+      Requirement: auto-tag resources on creation.
+      On EC2 RunInstances, S3 CreateBucket, Lambda CreateFunction:
+      stamp Owner (from userIdentity ARN), CreatorARN, Environment
+      (from account map), CreatedVia=auto-tagger.
+
+      Emit the standard GOVERNANCE block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "auto-tag-on-create"
+        - "EventBridge"
+        - "Lambda"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: abac-policy-design
+    description: >-
+      ABAC IAM policy design using aws:ResourceTag/Team matching
+      aws:PrincipalTag/Team for team-scoped S3 and EC2 access. The
+      skill should produce an AUTOMATED output with the IAM policy
+      JSON, principal-tag verification, and case-sensitivity warning.
+    input: |
+      Design reference: abac-policy-design
+      Account: 111111111111
+      Region: us-east-1
+
+      Requirement: team-scoped access via ABAC.
+      IAM principals are tagged with Team.
+      S3 buckets and EC2 instances are tagged with Team.
+      Policy must allow access only when resource Team matches
+      principal Team. Use aws:ResourceTag/Team and
+      aws:PrincipalTag/Team condition keys.
+
+      Emit the standard GOVERNANCE block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "abac-policy-design"
+        - "aws:ResourceTag"
+        - "aws:PrincipalTag"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: bulk-remediation-config-ssm
+    description: >-
+      Config required-tags rule detects missing tags, custom SSM
+      Automation runbook adds placeholder tags, Config re-evaluates
+      and the resource flips COMPLIANT. The skill should produce an
+      AUTOMATED workflow with the Config rule, the custom SSM
+      document, and the remediation configuration.
+    input: |
+      Design reference: bulk-remediation-config-ssm
+      Account: 111111111111
+      Region: us-east-1
+
+      Requirement: auto-remediate missing required tags.
+      Config rule required-tags-core detects EC2 instances missing
+      Environment, Owner, Project, CostCenter.
+      Custom SSM Automation runbook should add placeholder tags
+      (Environment=unknown, Owner=platform-team, CostCenter=cc-9999).
+      Config re-evaluates and resource flips COMPLIANT.
+      SSM service role ARN: arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole
+
+      Emit the standard GOVERNANCE block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "bulk-remediation-config-ssm"
+        - "required-tags"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: manual-gap-billing-activation
+    description: >-
+      Cost allocation tag activation on a legacy account that does NOT
+      support ce update-cost-allocation-tags-status. The skill should
+      classify MANUAL_STEP_REQUIRED and cite the Billing console path
+      as the gap.
+    input: |
+      Design reference: manual-gap-billing-activation
+      Account: 222222222222 (legacy payer, pre-2020)
+      Region: us-east-1
+
+      Requirement: activate cost allocation tags for Cost Explorer
+      dimension reporting.
+      Tag keys to activate: Environment, Owner, Project, CostCenter.
+      Attempted: aws ce update-cost-allocation-tags-status -- returned
+      AccessDenied (IAM policy restricts the API on this payer).
+      All resources are already tagged correctly.
+
+      Emit the standard GOVERNANCE block.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "manual-gap-billing-activation"
+        - "VERDICT"
+        - "GAP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
