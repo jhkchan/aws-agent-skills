@@ -811,6 +811,69 @@ AccessDenied patterns and their fixes.
 
 AWS CloudOps / IAM Security & Access Control Diagnostics.
 
+## Expert heuristic: the "works for admin but not for me" pattern
+
+When the root user or an administrator with `Action: "*", Resource: "*"`
+can perform an operation but a specific IAM identity cannot, the cause
+is almost always in the IAM identity's own policy stack — not the
+resource or the service. Root and admin effective permissions are the
+union of `*`, so any deny must live below them in the evaluation chain
+(identity-based, boundary, session, or an SCP that explicitly Denies).
+
+**Diagnostic shortcut — simulate the identity directly:**
+
+```bash
+aws iam simulate-principal-policy \
+  --policy-source-arn <user-or-role-arn> \
+  --action-names <denied-action> \
+  --resource-arns <target-arn> \
+  --eval-decision SHAPE \
+  --output json
+```
+
+The simulator walks identity-based + boundary + session policies
+together and returns `allowed`, `implicitDeny`, or `explicitDeny`. If
+the admin simulator returns `allowed` but the identity returns
+`implicitDeny`, the missing statement is in the identity-based or
+boundary layer. If `explicitDeny`, hunt for the Deny statement in the
+identity-based or boundary policy — a session policy cannot Deny.
+
+**Common root causes for this pattern:**
+1. Identity-based policy missing the specific action or resource ARN.
+2. Permissions boundary attached but not granting the action.
+3. SCP at the OU or account level (SCPs still apply to admins only if
+   they explicitly Deny — an explicit-Deny SCP blocks admins too).
+4. Session policy injected by federation scoping the role down.
+
+## Edge case: STS session policy scoping
+
+When a principal assumes a role via `sts:AssumeRole` with a session
+policy (`--policy-arns` or `--policy`), the session's effective
+permissions are the INTERSECTION of the role's identity-based policy
+AND the session policy:
+
+```
+effective = role_policy ∩ session_policy
+```
+
+A session policy can only NARROW permissions — never widen. The most
+common failure pattern: a CI/CD system assumes a deployment role and
+injects a session policy scoping the session to a single S3 prefix; a
+later pipeline step that writes to a different prefix fails with
+AccessDenied even though the role's identity-based policy Allows it.
+
+**Diagnosis:**
+- CloudTrail `userIdentity.sessionContext.sessionIssuer` reveals the
+  session policy presence.
+- The session policy itself is NOT visible in the role's policy list —
+  it lives in the assume-role request parameters.
+- Re-run `sts:AssumeRole` without `--policy-arns` to confirm the role
+  policy alone is sufficient.
+
+**Fix:** widen the session policy (not the role policy) to include the
+additional prefix, OR drop the session policy if the role's identity-
+based policy is already correctly scoped.
+
 ## AWS documentation
 
 - **AWS IAM User Guide — Policy evaluation logic** — https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html

@@ -891,6 +891,280 @@ MIGRATION_STEPS:
   database per CONFIRM gate. Do NOT batch database modifications — a right-
   size error on one database should not cascade to others.
 
+## Right-sizing decision tree
+
+Route a right-sizing recommendation through this tree before modifying
+any instance class. It prevents false-positive downsizes on
+memory-pressured databases and identifies Aurora Serverless v2 candidates.
+
+```
+Is CPUUtilization < 20% sustained (14+ day window)?
+├── YES → Is FreeableMemory > 50% of total instance memory?
+│   ├── YES → OPPORTUNITY_FOUND (downsize).
+│   │         Downsize 1-2 instance classes. Verify Performance Insights
+│   │         DBLoad is not dominated by a single query first.
+│   └── NO → Memory is constrained despite low CPU. Do NOT downsize.
+│            The database is likely spending time on memory management
+│            (buffer eviction, sort spills to disk). Investigate query
+│            patterns or buffer pool tuning before right-sizing.
+└── NO → Is CPUUtilization > 70% sustained?
+    ├── YES → OPPORTUNITY_FOUND (upsize or tune queries).
+    │         Check Performance Insights: if DBLoad is dominated by 1-2
+    │         SQL statements, optimise the queries FIRST, then re-evaluate.
+    │         If DBLoad is evenly distributed, upsize the instance class.
+    └── NO → CPU is in the 20-70% range (healthy utilisation).
+        └── Is FreeableMemory > 50% AND DatabaseConnections < 10 avg?
+            ├── YES → Consider Aurora Serverless v2 if the workload is
+            │         variable (sporadic connections, bursty traffic).
+            │         For fixed workloads, the instance is correctly
+            │         sized — proceed to pricing model (Step 3).
+            └── NO → Instance is correctly sized. Proceed to pricing
+                      model (Step 3) or storage optimisation (Step 5).
+```
+
+Post-tree overrides:
+
+| Condition | Override |
+|---|---|
+| Performance Insights not enabled | Cannot verify DBLoad. Mark right-size as MEDIUM confidence (CloudWatch only). Recommend enabling PI before executing the downsize. |
+| DatabaseConnections = 0 for 7+ days | Override: skip right-sizing. The database is an idle-deletion candidate (Step 1). Deleting saves 100% vs 30-50% from downsizing. |
+| Instance has read replicas | See Error handling — read replicas below. Downsize replicas first, then primary. |
+| DBInstanceStatus = `modifying` | A modification is already in progress. Wait for completion before right-sizing. |
+
+## Worked example — right-size + Reserved Instance (68% saving)
+
+This example walks through the complete workflow: analyse metrics,
+identify over-provisioning via the decision tree, right-size, add
+pricing-model optimisation, calculate savings, and provide migration steps.
+
+**Database profile:**
+- DB Instance: `db-prod-checkout-db`
+- Engine: PostgreSQL 15
+- Instance class: db.r5.2xlarge (8 vCPU, 64 GB RAM)
+- Multi-AZ: Yes (production)
+- Storage: 300 GB gp3
+- Pricing: On-Demand
+- Region: us-east-1
+
+**Metrics (30-day CloudWatch + Performance Insights):**
+- CPUUtilization: avg 8%, max 22%
+- FreeableMemory: avg 52 GB (of 64 GB = 81% free)
+- DatabaseConnections: avg 45, max 80
+- Performance Insights DBLoad: avg 0.3, max 1.2 (low for 8 vCPUs)
+
+**Step 1 — Analyse current cost:**
+```
+Current compute (Multi-AZ On-Demand):
+  db.r5.2xlarge: ~$1.027/hour per instance x 2 (Multi-AZ) x 730 hours
+  = $1,499.42/month
+
+Current storage:
+  300 GB gp3 x $0.08/GB = $24.00/month
+
+Current total: $1,523.42/month ($18,281.04/year)
+```
+
+**Step 2 — Route through the right-sizing decision tree:**
+- CPUUtilization < 20% sustained? YES (8% avg) → continue.
+- FreeableMemory > 50%? YES (81% free) → OPPORTUNITY_FOUND (downsize).
+- PI DBLoad is low (0.3 avg vs 8 vCPUs) → confirms the workload is not
+  capacity-constrained. Safe to downsize.
+
+**Step 3 — Determine the target instance class:**
+- Current: db.r5.2xlarge (8 vCPU, 64 GB)
+- CPU at 8% on 8 vCPUs → effective usage ~0.64 vCPU
+- FreeableMemory 52 GB → actual usage ~12 GB
+- Target: db.r5.large (2 vCPU, 16 GB) — 4x smaller, comfortably handles
+  the current workload with headroom for the 45 avg connections.
+
+**Step 4 — Add pricing-model optimisation:**
+The database is steady-state production (24/7). A 1-year Standard RI
+(No Upfront) captures ~40% off On-Demand. Stack with the right-size.
+
+**Step 5 — Calculate projected cost:**
+```
+Projected compute (Multi-AZ + 1yr RI):
+  db.r5.large On-Demand: ~$0.548/hour per instance x 2 (Multi-AZ) x 730
+  = $800.08/month
+  With 1yr RI (40% off): $800.08 x 0.60 = $480.05/month
+
+Projected storage: $24.00/month (unchanged)
+
+Projected total: $504.05/month ($6,048.60/year)
+```
+
+**Step 6 — Savings summary:**
+```
+Monthly saving: $1,523.42 - $504.05 = $1,019.37 (66.9%)
+Annual saving: $12,232.44
+```
+
+**Step 7 — Emit the output block:**
+```text
+TARGET: db-prod-checkout-db
+VERDICT: OPPORTUNITY_FOUND
+REASON: db.r5.2xlarge PostgreSQL Multi-AZ at 8% CPU and 81% FreeableMemory
+  over 30 days is significantly oversized (Step 2). PI DBLoad confirms the
+  workload is not capacity-constrained. Right-sizing to db.r5.large plus a
+  1yr Standard RI captures 66.9% monthly saving ($1,019.37/month).
+RECOMMENDATION:
+  Current: postgres db.r5.2xlarge Multi-AZ 300GB gp3 at On-Demand
+  Proposed: postgres db.r5.large Multi-AZ 300GB gp3 at 1yr Standard RI
+  Dimensions: right-size (r5.2xlarge to r5.large), pricing model
+    (On-Demand to 1yr RI)
+  Confidence: HIGH — 30 days of CloudWatch + PI data, CPU at 8% with 81%
+    free memory, DBLoad negligible, PostgreSQL supports the target class.
+ESTIMATED_SAVINGS:
+  Current monthly: $1,523.42
+    compute: 2 x $1.027 x 730 = $1,499.42
+    storage: 300 x $0.08 = $24.00
+  Projected monthly: $504.05
+    compute: 2 x $0.548 x 730 x 0.60 (1yr RI) = $480.05
+    storage: 300 x $0.08 = $24.00
+  Monthly saving: $1,019.37 (66.9%)
+  Annual saving: $12,232.44
+  Assumptions: 730h/month, us-east-1 pricing, 1yr Standard RI No Upfront
+    at 40% discount, storage unchanged, workload steady-state.
+MIGRATION_STEPS:
+  1. Take a pre-change manual snapshot:
+     aws rds create-db-snapshot --db-instance-identifier db-prod-checkout-db
+       --db-snapshot-identifier pre-rightsize-$(date +%s)
+  2. Modify the instance class (brief downtime via Multi-AZ failover):
+     aws rds modify-db-instance --db-instance-identifier db-prod-checkout-db
+       --db-instance-class db.r5.large --apply-immediately
+  3. Monitor CPUUtilization and FreeableMemory for 7 days post-change.
+     Roll back if CPU > 80% or FreeableMemory < 20%.
+  4. After 7 days of stable operation, purchase a 1yr Standard RI:
+     aws rds describe-reserved-db-instances-offerings
+       --db-instance-class db.r5.large --duration 31536000
+       --offering-type "No Upfront" --multi-az
+     aws rds purchase-reserved-db-instances-offering
+       --reserved-db-instances-offering-id <offering-id>
+       --reserved-db-instance-id ri-r5-large-1yr
+  5. Verify RI coverage:
+     aws rds describe-reserved-db-instances --status active
+CONFIRM: Before modifying the instance class, emit and await:
+  "CONFIRM: About to modify-db-instance db-prod-checkout-db to
+   db.r5.large in us-east-1. Multi-AZ failover causes ~2-5 min downtime.
+   Monthly saving $1,019.37 (66.9%). Proceed? (yes/no)"
+```
+
+## Error handling — replica and Multi-AZ constraints
+
+These constraints affect right-sizing recommendations when the database
+topology includes read replicas or Multi-AZ standby instances. Failing to
+account for these produces recommendations that break replication or
+underestimate cost impact.
+
+### Read replicas — downsize primary breaks replicas
+
+**Problem:** RDS read replicas should run the same instance class as (or
+larger than) the primary for replication stability. Downsizing the
+primary WITHOUT first downsizing the replicas can cause replication lag
+or errors. Downsizing the primary below the largest replica's class is
+not supported and will be rejected by the RDS API.
+
+**Detection:**
+```bash
+# List all read replicas of the primary
+aws rds describe-db-instances --output json | \
+  jq '.DBInstances[] | select(.ReadReplicaSourceDBInstanceIdentifier == "<primary-id>")
+  | {DBInstanceIdentifier, DBInstanceClass, Status}'
+```
+
+**Resolution path:**
+1. Identify all read replicas of the primary.
+2. Plan the downsize sequence: downsize replicas FIRST, then the primary.
+3. Each replica downsize requires its own modification and brief downtime.
+4. After each replica downsize, verify replication lag is within acceptable
+   bounds (`ReplicaLag` < 5 seconds) before proceeding to the next.
+5. For Aurora: read replicas are Aurora Replicas within the cluster.
+   Downsizing the Aurora writer does NOT automatically downsize readers —
+   each reader instance must be modified separately.
+6. If any replica serves a latency-sensitive read workload, verify it can
+   handle the smaller instance class before downsizing (check its own
+   CloudWatch metrics independently).
+
+**Example migration sequence:**
+```
+Primary: db.r5.2xlarge (Multi-AZ, $1,499/month compute)
+Replica 1: db.r5.2xlarge (Single-AZ, $750/month compute)
+Replica 2: db.r5.2xlarge (Single-AZ, $750/month compute)
+
+Downsize sequence (all to db.r5.large):
+  1. Modify Replica 1 to db.r5.large, verify ReplicaLag < 5s for 24h
+  2. Modify Replica 2 to db.r5.large, verify ReplicaLag < 5s for 24h
+  3. Modify Primary to db.r5.large (Multi-AZ failover, ~5 min downtime)
+  4. Verify replication health for 7 days
+  5. Purchase RIs for all three instances at the new class
+```
+
+**Recommendation adjustment:** When read replicas exist, the
+MIGRATION_STEPS must include per-replica modifications and verification
+gates. The total saving includes ALL instances (primary + all replicas),
+not just the primary.
+
+### Multi-AZ — both instances change simultaneously
+
+**Problem:** When you modify a Multi-AZ RDS instance class, AWS performs
+the modification by first updating the standby, then failing over to it,
+then updating the old primary (now the new standby). Both instances end
+up on the new class. This has three implications:
+
+1. The cost change applies to BOTH instances (primary + standby).
+2. There is a brief failover during the modification (30 seconds to
+   3 minutes of connection disruption).
+3. The RI coverage must account for BOTH instances.
+
+**Detection:**
+```bash
+# Check if Multi-AZ is enabled
+aws rds describe-db-instances --db-instance-identifier <id> --output json | \
+  jq '.DBInstances[0] | {MultiAZ, DBInstanceClass, DBSubnetGroup}'
+```
+
+**Resolution path:**
+
+1. **Cost impact is doubled.** A Multi-AZ downsize saves on BOTH the
+   primary and standby instances. Always compute savings as
+   `2 x (old_hourly - new_hourly) x 730`. The headline saving in the
+   output block should reflect this doubled amount.
+
+2. **RI sizing for Multi-AZ.** When purchasing an RI for a Multi-AZ
+   database, you need RI coverage for the primary instance. The standby
+   is a separate billed instance. Use:
+   `aws rds describe-reserved-db-instances-offerings --multi-az` to find
+   Multi-AZ RI offerings that cover both instances under a single
+   reservation. Alternatively, purchase two standard (non-Multi-AZ)
+   Regional RIs to cover each instance independently.
+
+3. **Downtime planning.** The failover causes a brief connection drop
+   (30s to 3min). Applications with connection retry logic recover
+   automatically. Schedule the modification during a maintenance window.
+   Warn the operator in the CONFIRM gate.
+
+4. **Aurora exception.** Aurora does NOT charge extra for Multi-AZ (6
+   copies across 3 AZs is included in the storage cost). Aurora writer
+   and reader instances are billed individually, but there is no standby
+   surcharge. This constraint applies to RDS for PostgreSQL/MySQL/Oracle/
+   SQL Server, not to Aurora.
+
+**Example cost computation:**
+```
+Multi-AZ db.r5.2xlarge On-Demand:
+  Primary:  db.r5.2xlarge at $1.027/hr x 730 = $749.71/month
+  Standby:  db.r5.2xlarge at $1.027/hr x 730 = $749.71/month
+  Total compute: $1,499.42/month
+
+After downsize to db.r5.large Multi-AZ + 1yr RI:
+  Primary:  db.r5.large at $0.548/hr x 730 x 0.60 = $240.02/month
+  Standby:  db.r5.large at $0.548/hr x 730 x 0.60 = $240.02/month
+  Total compute: $480.05/month
+
+Saving: $1,019.37/month (68.0%)
+RI action: purchase Multi-AZ RI for db.r5.large to cover both instances.
+```
+
 ## Recent AWS features (2024-2026)
 
 - **Aurora Serverless v2 (expanded 2024-2025):** Now supports 0.5-128 ACU per

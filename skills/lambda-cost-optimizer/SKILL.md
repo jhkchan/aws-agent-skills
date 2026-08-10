@@ -1417,6 +1417,336 @@ missing Duration metric is the highest-risk misclassification.
 2. Recommend quarterly Power Tuning re-runs (workload duration drifts).
 3. Re-evaluate if invocation pattern changes significantly.
 
+## Memory optimization decision tree
+
+Route a memory recommendation through this tree BEFORE running Power
+Tuning. It ranks candidates by dollar impact and prevents wasted tuning
+effort on low-volume functions where the saving is negligible.
+
+```
+Is Invocations > 1M/day?
+├── YES → High-impact candidate. Prioritise this function first.
+│   └── Is Duration > 3 s AND Memory < 512 MB?
+│       ├── YES → Likely CPU-bound at low memory.
+│       │         INCREASE memory (U-curve expected).
+│       │         Power Tuning typically finds optimum at 1024-3008 MB.
+│       │         Action: run Power Tuning; expect an upsize recommendation
+│       │         with a positive cost saving.
+│       └── NO → Is Duration < 500 ms AND Memory > 1024 MB?
+│           ├── YES → Memory is over-provisioned relative to workload.
+│           │         DECREASE memory.
+│           │         Action: run Power Tuning; expect a downsize
+│           │         recommendation with modest cost saving.
+│           └── NO → Memory is near-optimal for current workload shape.
+│                     Run Power Tuning to confirm; expect minor tuning.
+│                     Focus optimisation on architecture (ARM64) or
+│                     invocation frequency instead.
+└── NO → Low-volume function (< 1M invocations/day).
+         Dollar impact of memory tuning is negligible (typically < $5/month).
+         Skip deep tuning. Focus on architecture (ARM64, 20% compute discount)
+         or duration reduction instead. Re-evaluate if volume grows.
+```
+
+Post-tree overrides (these ALWAYS take precedence over the tree output):
+
+| Condition | Override |
+|---|---|
+| Lambda Insights `memory_used` > 80% sustained | Do NOT downsize regardless of tree output. The function is near its memory ceiling; an upsize may be required for stability, not just cost. |
+| Compute Optimizer finding = `Underprovisioned` | Tree output is overridden. The function is memory-starved; upsize is mandatory. |
+| Function deploys via container image (`PackageType: Image`) | Power Tuning still works but package-size signal is opaque. Proceed with tree but mark confidence MEDIUM. See Error handling — container images below. |
+| Function runtime is `provided.al2` (custom) | U-curve shape depends on the custom runtime's CPU/memory behaviour. Always Power Tune; never guess from the tree alone. |
+
+## Error handling — operational edge cases
+
+These scenarios go beyond CLI failures (covered above) and address
+situations where the optimisation workflow itself breaks down. Each
+includes detection logic and a concrete fallback path.
+
+### CloudWatch metrics are missing or incomplete
+
+| Scenario | Detection | Action |
+|---|---|---|
+| Duration Datapoints empty for entire window | `len(Datapoints) == 0` | The function has zero invocations in the window. Check whether a trigger is configured (`list-event-source-mappings`). If intentionally dormant, emit ALREADY_OPTIMAL with note "dormant — no cost optimization applicable." If trigger exists but no invocations, the upstream source may be misconfigured — surface as BLOCKED. |
+| Invocations present but Duration absent | Invocations Sum > 0, Duration Datapoints empty | Rare CloudWatch propagation issue. Re-query with `--period 3600`. If still absent, fall back to a timed `aws lambda invoke` and extrapolate. Mark recommendation LOW confidence. |
+| Memory utilization (Lambda Insights) absent | `list-metrics` returns no LambdaInsights metrics | Lambda Insights extension is not installed. Install the `AWS-Lambda-Insights-Extension` Layer. Until installed, Power Tuning is the only memory signal; mark Memory recommendation MEDIUM confidence. |
+| Metrics window < 14 days | Datapoints span < 14 days | Workload may reflect atypical load (deploy week, incident). Emit NEED_MORE_INFO; wait for 14+ days of representative data before recommending. |
+| CloudWatch API throttling | Exit code non-zero, stderr contains "Throttling" | Retry with exponential backoff (`--max-attempts 5`). If still failing, fall back to a 7-day window and flag as LOW confidence. |
+
+### Compute Optimizer has no recommendations
+
+| Scenario | Detection | Action |
+|---|---|---|
+| Enrollment status `Inactive` | `get-enrollment-status` returns `Inactive` | Compute Optimizer is not enabled for the account. Enable it: `aws compute-optimizer update-enrollment-status --status Active`. Until enabled, proceed with CloudWatch + Power Tuning only. |
+| Enrollment `Active` but no Lambda findings returned | `lambdaFunctionRecommendations` array empty | Either the function is already `Optimized` (no findings) or Compute Optimizer has not yet analyzed it (analysis runs every 24h). Cross-check `lastRefreshTimestamp`; if > 30 days old, treat as stale and rely on Power Tuning. |
+| `AccessDeniedException` on `compute-optimizer:*` | API error | The IAM role lacks Compute Optimizer permissions. Add `compute-optimizer:GetLambdaFunctionRecommendations`. Proceed without cross-check; surface the gap. |
+
+### Function uses container image deployment
+
+Lambda functions deployed from a container image (`PackageType: Image`)
+require adjusted optimisation workflow:
+
+| Behaviour | Impact on optimisation |
+|---|---|
+| `CodeSize` is opaque (container layers) | Cannot assess package-size impact on cold start. Use InitDuration metric directly instead. |
+| Lambda Layers are NOT supported | Cannot recommend Layer-based package optimisation. The container image IS the deployment package. |
+| ARM64 migration requires multi-arch build | The container image must be built for `linux/arm64` (e.g., `docker buildx build --platform linux/arm64`). An x86-only image will fail on arm64 Lambda. |
+| Memory tuning still applies | Power Tuning works identically — it adjusts the memory configuration regardless of deployment type. Run it normally. |
+
+**Detection:**
+```bash
+aws lambda get-function-configuration --function-name <name> --output json | \
+  jq '{PackageType: .PackageType, ImageUri: .Code.ImageUri}'
+```
+
+If `PackageType: Image`, adjust the recommendation:
+1. Run Power Tuning normally (memory tuning applies to container functions).
+2. Skip any Lambda Layers recommendation.
+3. For ARM64 migration, require a multi-arch container build before recommending.
+4. For package-size optimisation, recommend multi-stage Docker builds and `docker image prune` instead of Layers.
+
+## Worked example — end-to-end optimisation ($500/month function)
+
+This example walks through the complete workflow: analyse metrics,
+identify waste via the decision tree, run Power Tuning, calculate
+savings, and provide migration steps.
+
+**Function profile:**
+- Function: `order-enrichment-api`
+- Runtime: Python 3.12
+- Memory: 128 MB
+- Architecture: x86_64
+- Trigger: API Gateway (latency-sensitive)
+- Duration: 5000 ms avg, 6200 ms p95
+- Invocations: 47,000,000/month
+- Errors: 0.01% (within SLO)
+- Region: us-east-1, On-Demand pricing
+
+**Step 1 — Analyse current cost:**
+```
+Current compute: 47M × 5.0 s × (128/1024) GB × $0.0000166667
+                = 47,000,000 × 5.0 × 0.125 × $0.0000166667
+                = $489.58/month
+
+Current requests: 47M × $0.0000002 = $9.40/month
+
+Current total: $498.98/month ($5,987.76/year)
+```
+
+**Step 2 — Route through the memory decision tree:**
+- Invocations > 1M/day? YES (47M/month = 1.57M/day) → high-impact candidate.
+- Duration > 3 s AND Memory < 512 MB? YES (5.0 s, 128 MB) → CPU-bound at
+  low memory. Expect Power Tuning to recommend an upsize.
+
+**Step 3 — Run Power Tuning:**
+Results across [128, 256, 512, 1024, 2048, 3008] MB:
+- 128 MB: 5000 ms, $0.00001042/invocation
+- 256 MB: 2800 ms, $0.00001167/invocation
+- 512 MB: 950 ms, $0.00000792/invocation — U-curve minimum (cheapest)
+- 1024 MB: 520 ms, $0.00000867/invocation
+- 2048 MB: 380 ms, $0.00001267/invocation
+- 3008 MB: 350 ms, $0.00001751/invocation
+
+`cheapest` = 512 MB at $0.00000792/invocation.
+
+**Step 4 — Cross-check ARM64 compatibility:**
+Python 3.12 with pure-Python dependencies (requests, psycopg2-binary with
+arm64 wheels) → ARM64 is LOW risk. Apply simultaneously with memory change.
+
+**Step 5 — Calculate projected cost:**
+```
+Projected compute (512 MB, 950 ms, ARM64):
+  47M × 0.95 s × (512/1024) GB × $0.0000166667 × 0.80 (ARM 20% off)
+  = 47,000,000 × 0.95 × 0.5 × $0.0000166667 × 0.80
+  = $297.67/month
+
+Projected requests: 47M × $0.0000002 = $9.40/month (unchanged)
+
+Projected total: $307.07/month ($3,684.84/year)
+```
+
+**Step 6 — Savings summary:**
+```
+Monthly saving: $498.98 - $307.07 = $191.91 (38.5%)
+Annual saving: $2,302.92
+Latency improvement: p95 drops from 6200 ms to ~1100 ms (82% reduction)
+```
+
+**Step 7 — Emit the output block:**
+```text
+TARGET: order-enrichment-api
+VERDICT: OPPORTUNITY_FOUND
+REASON: Python function at 128 MB averaging 5000 ms is CPU-bound (Power
+  Tuning U-curve minimum at 512 MB where duration drops to 950 ms).
+  Combined with ARM64 migration, compute cost drops 38.5%. The function
+  is invoked 47M times/month, so the per-invocation saving compounds to
+  $191.91/month. p95 latency also drops 82% (6200 ms to ~1100 ms).
+RECOMMENDATION:
+  Current: 128 MB at 5000 ms avg, x86_64, on-demand
+  Proposed: 512 MB at 950 ms avg, arm64, on-demand
+  Dimensions changed: memory (Step 1) + architecture (Step 5)
+  Confidence: HIGH — Power Tuning measured the U-curve empirically;
+    Python 3.12 fully supports arm64; all dependencies have arm64 wheels.
+ESTIMATED_SAVINGS:
+  Current monthly: $498.98
+    compute: 47,000,000 x 5.0 x 0.125 x $0.0000166667 = $489.58
+    requests: 47,000,000 x $0.0000002 = $9.40
+  Projected monthly: $307.07
+    compute: 47,000,000 x 0.95 x 0.5 x $0.0000166667 x 0.80 = $297.67
+    requests: 47,000,000 x $0.0000002 = $9.40
+  Monthly saving: $191.91 (38.5%)
+  Annual saving: $2,302.92
+  Assumptions: 47M invocations/month, us-east-1 pricing, ARM 20% compute
+    discount, Power Tuning duration projections, request fee unchanged.
+MIGRATION_STEPS:
+  1. Run Power Tuning to confirm the U-curve:
+     aws stepfunctions start-execution --state-machine-arn <arn>
+       --input '{"lambda":{"resource":"arn:aws:lambda:us-east-1:<acct>:function:order-enrichment-api","payload":{},"num":50},"power":{"values":[128,256,512,1024,2048,3008],"parallelInvocation":true}}'
+  2. Verify ARM64 dependency compatibility:
+     pip install --platform aarch64 --only-binary=:all: requests psycopg2-binary
+  3. Update memory and architecture together:
+     aws lambda update-function-configuration
+       --function-name order-enrichment-api
+       --memory-size 512 --architectures arm64
+  4. Publish a version and test via staging alias:
+     aws lambda publish-version --function-name order-enrichment-api
+     aws lambda update-alias --function-name order-enrichment-api
+       --name staging --function-version <new-version>
+  5. Verify p95 latency and error rate for 7 days via CloudWatch.
+  6. Cutover production alias:
+     aws lambda update-alias --function-name order-enrichment-api
+       --name prod --function-version <new-version>
+CONFIRM: Before updating, emit and await:
+  "CONFIRM: About to update-function-configuration on order-enrichment-api
+   (128 MB x86 to 512 MB arm64). Monthly saving $191.91 (38.5%); p95 latency
+   improvement 82% (6200 ms to ~1100 ms). Proceed? (yes/no)"
+```
+
+## Edge cases — production scenarios
+
+### Provisioned concurrency on sporadic traffic
+
+**Scenario:** A function has 10 provisioned concurrency configured but
+receives 0.5 invocations/minute on average (sporadic batch report requests).
+
+**Problem:** Provisioned concurrency charges for idle execution time
+regardless of invocations. At 10 concurrent executions at 1 GB each:
+```
+Idle cost = 10 x 1.0 GB x 730 hours x 3600 s/h x $0.000015
+          = $394.20/month
+```
+Over 99% of provisioned execution time is idle. This is the #1 Lambda
+cost waste pattern.
+
+**Resolution:**
+1. Verify traffic is genuinely sporadic: pull 30-day
+   `ConcurrentExecutions`. If p99 < 3, the provisioned value is far
+   above need.
+2. Check whether cold-start latency is customer-visible. For batch and
+   report functions, cold starts are typically acceptable.
+3. If cold starts are acceptable, remove provisioned concurrency:
+   `aws lambda delete-provisioned-concurrency-config --function-name <name> --qualifier <alias>`.
+4. If some warm capacity is needed for latency SLO, switch to Application
+   Auto Scaling with target tracking on `ProvisionedConcurrencyUtilization`
+   metric instead of a fixed value. This scales down during idle periods.
+
+**Cost impact:** Removing 10 provisioned concurrency at 1 GB saves
+approximately $394/month.
+
+### ARM64 incompatibility — native libraries
+
+**Scenario:** A Python function uses `numpy`, `scipy`, or a custom C
+extension compiled for x86_64. ARM64 migration is recommended by the
+skill, but the function fails at runtime after migration.
+
+**Problem:** Native libraries compiled for x86_64 do not run on arm64.
+Lambda provides no transparent emulation. The function will fail with
+`InvalidParameterValueException` at deployment (if the zip contains
+x86-only binaries) or with runtime errors (segfault, ImportError) after
+migration.
+
+**Detection before migration:**
+```bash
+# Check for native dependencies (Python) — verify arm64 wheels exist
+pip install --platform aarch64 --only-binary=:all: <package-name>
+# If this fails, the package has no arm64 wheel and needs recompilation
+
+# Check Lambda deployment package architecture
+aws lambda get-function-configuration --function-name <name> | \
+  jq '.Architectures'
+```
+
+**Resolution:**
+1. Identify all native dependencies (C extensions, shared objects, JNI).
+2. For Python: verify arm64 wheel availability. Common problem packages:
+   `pycrypto` (replace with `pycryptodome`), legacy `numpy` (upgrade to
+   1.20+ which ships arm64 wheels), custom Cython extensions (recompile).
+3. For Java: verify JNI libraries have arm64 builds. If unavailable,
+   compile from source or keep x86_64.
+4. For Go: recompile with `GOARCH=arm64 GOOS=linux`.
+5. For .NET: verify native interop libraries have arm64 variants.
+6. If a critical dependency has no arm64 support, do NOT migrate. Keep
+   x86_64 and document the specific blocking dependency.
+
+**Cost impact of NOT migrating:** The function forgoes the 20% ARM64
+compute discount. Surface this as a finding with the specific blocking
+dependency named, so the operator can prioritise dependency remediation.
+
+### ESM batch size impact on total cost
+
+**Scenario:** An SQS-triggered function processes messages with batch
+size 10. Increasing to batch size 1000 reduces invocation count by 99%.
+However, per-invocation duration increases because the function processes
+more messages per invocation.
+
+**Problem:** Batch-size tuning has a non-linear cost curve. The invocation
+count drops linearly with batch size, but per-invocation duration rises.
+The net saving depends on whether duration scales sub-linearly
+(I/O-bound, amortised setup) or linearly (CPU-bound, proportional work).
+
+**Worked math (1M messages/hour, 50 ms processing per message):**
+```
+Batch size 10:
+  Invocations/hour: 1,000,000 / 10 = 100,000
+  Duration per invocation: 10 x 50 ms = 500 ms = 0.5 s
+  Compute: 100,000 x 0.5 x memory_GB x $0.0000166667
+  Requests: 100,000 x $0.0000002
+
+Batch size 100:
+  Invocations/hour: 1,000,000 / 100 = 10,000
+  Duration per invocation: 100 x 50 ms = 5000 ms = 5.0 s
+  Compute: 10,000 x 5.0 x memory_GB x $0.0000166667
+  Requests: 10,000 x $0.0000002
+
+  Request fee saving: 90% (100,000 to 10,000 invocations)
+  Compute saving: 0% (100,000 x 0.5 = 10,000 x 5.0 = same GB-seconds)
+  Net: saves ONLY on request fee, not compute, for CPU-bound workloads.
+
+Batch size 1000:
+  Invocations/hour: 1,000,000 / 1000 = 1,000
+  Duration per invocation: 1000 x 50 ms = 50,000 ms = 50 s
+  PROBLEM: 50 s exceeds typical Lambda timeout (default 3 s, max 15 min).
+  Batch size 1000 is INFEASIBLE without also increasing timeout to 60+ s.
+```
+
+**Resolution:**
+1. Calculate the optimal batch size where invocation-count saving is not
+   eaten by per-invocation duration increase.
+2. Verify the function timeout accommodates the longer per-batch duration:
+   `timeout >= batch_size x per_message_processing_time + safety_margin`.
+3. Ensure the function handles partial batch failures:
+   `FunctionResponseTypes: ["ReportBatchItemFailures"]` for SQS.
+4. Monitor `IteratorAge` (Kinesis/DynamoDB) or `ApproximateAgeOfOldestMessage`
+   (SQS) for 7 days after the change. If rising, the function cannot keep
+   up — reduce batch size or increase parallelism.
+5. For CPU-bound workloads (duration scales linearly with batch size),
+   the saving is ONLY on the request fee — compute cost is unchanged.
+   For I/O-bound workloads (duration scales sub-linearly due to amortised
+   HTTP setup), compute cost also drops.
+
+**Cost impact:** For I/O-bound workloads, batch size 10 to 100 typically
+saves 80-90% on request fees and 10-30% on compute. For CPU-bound
+workloads, only the request fee saving applies (compute is neutral).
+
 ## Recent AWS features (2024-2026)
 
 - **Lambda SnapStart expansion (2024-2025):** Originally Java-only,

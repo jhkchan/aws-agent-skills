@@ -780,6 +780,80 @@ NOTES:
 
 AWS CloudOps / DynamoDB Backup, Restore & Disaster Recovery.
 
+## Expert heuristic: backup cost vs table cost
+
+DynamoDB on-demand backups are billed at ~$0.10/GB-month for the
+stored backup size — separately from and in addition to the table's
+own storage cost. Backup cost scales LINEARLY with both table size and
+retention count, which makes long-term backup retention in DynamoDB
+the #1 DynamoDB cost surprise.
+
+**Worked example — 1 TB table, daily backups, 30-day retention:**
+- Table storage (Standard): 1 TB × $0.25/GB-month = $250/month.
+- 30 backups × 1 TB × $0.10/GB-month = 30 TB-month × $0.10 = **$3,000/month**.
+- Backups cost 12× the table itself.
+
+**Decision rule — when to keep backups in DynamoDB vs S3:**
+
+| Retention | Table size | Recommendation |
+|---|---|---|
+| <= 35 days | Any | Use PITR ($0.20/GB-month on change volume) — no separate backup management needed |
+| 35-90 days | < 100 GB | On-demand backups in DynamoDB — simplicity outweighs cost |
+| 35-90 days | >= 100 GB | S3 export via `export-table-to-point-in-time` — Parquet in S3 is ~95% cheaper |
+| > 90 days | Any | ALWAYS use S3 export. Move to S3 Glacier Flexible Retrieval for compliance archives |
+
+**S3 export cost model (2026):**
+- One-time export: ~$0.008/GB read from DynamoDB + S3 storage
+  ($0.023/GB Standard, $0.0036/GB Glacier Flexible Retrieval).
+- 1 TB exported to Glacier: $8 export + $3.60/month storage — vs
+  $100/month for a single DynamoDB backup.
+- Incremental export (2024+) reduces repeat-export cost by ~90%.
+
+**Action:** when an operator asks for "more backups" or "longer
+retention" on a DynamoDB table, ALWAYS compute the backup-storage cost
+and surface S3 export as the alternative. A blanket "keep 30 days of
+daily backups" on a 500 GB table is a $1,500/month decision.
+
+## Edge case: PITR restore and GSI rebuild cost
+
+`restore-table-to-point-in-time` and `restore-table-from-backup` copy
+the GSI/LSI DEFINITIONS from the source — but the GSI data is rebuilt
+as base-table data streams in. For large tables with many GSIs, this
+creates two operational surprises:
+
+1. **The restored table is not immediately queryable via GSIs.** Index
+   status transitions `CREATING` → `BUILDING` → `ACTIVE`. Queries
+   against a BUILDING GSI return stale or empty results. Monitor via
+   `describe-table --query 'Table.GlobalSecondaryIndexes[*].{name:IndexName,status:IndexStatus}'`.
+2. **The rebuild consumes write capacity on the restored table.** For
+   PROVISIONED-mode restores, the rebuild burns the new table's
+   provisioned WCU — if the operator copied the source's modest WCU,
+   the rebuild takes hours-to-days. For PAY_PER_REQUEST restores, the
+   rebuild bills at on-demand rates (~5x provisioned) — a 1 TB table
+   with 3 GSIs can cost ~$1,000+ in rebuild write charges alone.
+
+**Edge case — selective restore (2024+) and AWS Backup cross-region
+restore may NOT recreate GSIs at all.** The selective-restore
+projection filter and certain AWS Backup restore paths create the base
+table only; GSI definitions must be added manually post-restore via
+`update-table`. Plan for a manual GSI recreation step in the runbook.
+
+**Diagnostic:** if a restored table appears to have no GSIs, run
+`describe-table` and inspect `GlobalSecondaryIndexes`. If empty, add
+each GSI manually:
+
+```bash
+aws dynamodb update-table \
+  --table-name <restored-table> \
+  --attribute-definitions AttributeName=pk,AttributeType=S AttributeName=sk1,AttributeType=S \
+  --global-secondary-index-updates '[{"Create":{"IndexName":"gsi1","KeySchema":[{"AttributeName":"pk"},{"AttributeName":"sk1"}],"Projection":{"ProjectionType":"ALL"},"ProvisionedThroughput":{"ReadCapacityUnits":10,"WriteCapacityUnits":10}}}]'
+```
+
+**Fix:** for large tables, restore with `--billing-mode-override
+PAY_PER_REQUEST` to let the rebuild consume whatever capacity it
+needs, then switch to PROVISIONED once GSIs are ACTIVE and autoscaling
+is registered.
+
 ## AWS documentation
 
 - **Amazon DynamoDB Developer Guide** — https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Welcome.html

@@ -100,6 +100,35 @@ provisioning procedure, explains why each default matters, and emits a
 READY_TO_DEPLOY checklist verifying every configuration item against the
 bucket's actual state.
 
+## Quick reference: provisioning summary (10 steps at a glance)
+
+Detailed reasoning for each step's ordering is in the "Reasoning
+framework" and "S3 configuration dependency graph" sections below.
+The concise checklist for quick orientation:
+
+| Step | Action | Reversible? | Key risk if skipped |
+|---|---|---|---|
+| 1 | Block Public Access (account + bucket) | Yes | data leak window |
+| 2 | Default encryption (SSE-S3 or SSE-KMS) | Yes | unencrypted objects |
+| 3 | Object Ownership = BucketOwnerEnforced | Yes* | ACL-based exposure |
+| 4 | Versioning (+ optional MFA Delete) | Yes | no recovery from overwrite |
+| 5 | Bucket policy (HTTPS + SSE enforcement) | Yes | insecure uploads |
+| 6 | Access logging + CloudTrail data events | Yes | no audit trail |
+| 7 | Lifecycle rules | Yes | cost bloat |
+| 8 | Replication (optional CRR/SRR) | Yes | no DR |
+| 9 | Verification (all configs confirmed) | — | silent failures |
+| 10 | Emit READY_TO_DEPLOY checklist | — | — |
+
+\* BucketOwnerEnforced is reversible but existing ACL-based access breaks
+silently and immediately on enable — audit before flipping.
+
+**Critical ordering constraints:** BPA before any object upload;
+encryption before any object upload; versioning before lifecycle and
+replication; replication last (depends on all prior steps). Full
+rationale in the dependency graph below. Full bucket-policy JSON
+templates live in `references/bucket-policy-examples.md` — only summary
+tables are shown inline to keep the procedure scannable.
+
 ## Activation keywords
 
 create S3 bucket, provision S3, secure bucket, S3 deployment, block public
@@ -213,6 +242,120 @@ bucket's actual state rather than trusting the API response.
   is not enough.
 - Removing the last KMS key referenced by a bucket policy is
   irreversible — encrypted objects become cryptographically unreadable.
+
+## Expert heuristic: BPA timing window
+
+The most dangerous period in an S3 bucket's lifecycle is the gap between
+bucket creation and BPA enablement. This is when most real-world data
+leaks occur — not from persistent misconfiguration, but from a race
+condition during initial setup.
+
+**The window:**
+
+```text
+T0: Bucket created (no public-access protection yet)
+T1: Default encryption set
+T2: Bucket policy attached
+T3: BPA enabled at bucket level
+
+Gap: T0 → T3 — bucket exists with NO public-access protection
+```
+
+**Why this matters in practice:**
+- Internet scanners (GrayhatWarfare, Censys, Shodan) enumerate new S3
+  buckets within **2-5 minutes** of creation. If any object is uploaded
+  during T0 to T3, it is discoverable.
+- A concurrent process (CI/CD pipeline, Lambda function) may upload
+  objects to the bucket before BPA is enabled, creating a window even
+  when the provisioning script is sequential.
+- A bucket policy with `Principal: "*"` attached BEFORE BPA is enabled
+  creates a public-access window even if the policy is later corrected.
+
+**CloudFormation race condition:** when using CloudFormation, BPA is
+applied as a SEPARATE resource (`AWS::S3::BucketPublicAccessBlock`) that
+is created AFTER the `AWS::S3::Bucket` resource reaches
+`CREATE_COMPLETE`. There is a real window where the bucket exists but
+BPA is not yet enforced. To eliminate it:
+
+```yaml
+BucketPublicAccessBlock:
+  Type: AWS::S3::BucketPublicAccessBlock
+  Properties:
+    Bucket: !Ref MyBucket
+    BlockPublicAcls: true
+    IgnorePublicAcls: true
+    BlockPublicPolicy: true
+    RestrictPublicBuckets: true
+
+BucketPolicy:
+  Type: AWS::S3::BucketPolicy
+  Properties:
+    Bucket: !Ref MyBucket
+    PolicyDocument: ...
+  DependsOn: BucketPublicAccessBlock   # enforce order
+```
+
+**Terraform:** use `aws_s3_bucket_public_access_block` as a separate
+resource and add `depends_on = [aws_s3_bucket_public_access_block.my]`
+on any resource that uploads objects.
+
+**Account-level BPA is the real fix:** if account-level BPA is enabled
+BEFORE any bucket is created in the account, the window is zero — all
+new buckets inherit the account-level setting at creation time. Make
+account-level BPA a one-time account bootstrap step, not a per-bucket
+step. This eliminates the race entirely.
+
+## Expert heuristic: SSE-KMS Bucket Keys cost model
+
+When using SSE-KMS with cross-account or high-throughput access, Bucket
+Keys are not a "nice to have" — they are the difference between a $1K/year
+and a $1M/year KMS bill.
+
+**Without Bucket Keys:**
+
+```text
+Every GET  → 1x kms:Decrypt call         ($0.03 / 10k)
+Every PUT  → 1x kms:GenerateDataKey call ($0.03 / 10k)
+Every HEAD → 1x kms:Decrypt call (if SSE-KMS object)
+
+At 10M GETs/day without Bucket Keys:
+  KMS cost = 10,000,000 / 10,000 * $0.03 = $3,000/day = $1,095,000/year
+```
+
+**With Bucket Keys enabled:**
+
+```text
+S3 negotiates ONE data key per bucket (time-limited, reused ~3 min).
+KMS calls drop by ~99% — only 1x kms:GenerateDataKey every ~3 min.
+
+At 10M GETs/day with Bucket Keys:
+  KMS calls = ~480/day (1 every 3 min)
+  KMS cost  = 480 / 10,000 * $0.03 = $0.0014/day = ~$0.52/year
+```
+
+The 99% reduction is real and documented. The nuance a baseline model
+misses is the **cross-account amplification**: when a bucket is accessed
+by principals in OTHER AWS accounts (cross-account replication, shared
+data lake, analytics pipeline), each cross-account access without Bucket
+Keys requires a KMS call in the KEY-OWNING account. This means:
+
+1. The KMS quota (5,500-10,000 req/s region default) is shared across ALL
+   cross-account readers — a single hot bucket can throttle KMS for the
+   entire account.
+2. The KMS cost is billed to the key owner, not the accessor. A data lake
+   bucket accessed by 50 downstream accounts generates 50x the KMS calls
+   with no way to charge back.
+
+**Enable Bucket Keys on:**
+- Any SSE-KMS bucket with more than 1,000 reads/day
+- ANY bucket with cross-account access (no exceptions)
+- Replication source and destination buckets (replication doubles KMS calls)
+
+**Do NOT enable Bucket Keys on:**
+- Buckets where you need per-request KMS audit in CloudTrail (Bucket Keys
+  reduce the audit granularity to per-bucket, not per-request).
+- Buckets with per-object KMS keys (different CMK per object) — Bucket
+  Keys require a bucket-level default key.
 
 ## Prerequisites (verify before provisioning)
 

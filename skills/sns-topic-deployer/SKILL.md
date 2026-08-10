@@ -820,6 +820,125 @@ aws sns publish \
   or `**VERDICT**` for the literal `VERDICT:` label silently breaks
   downstream deployment pipelines and assertion-based evals.
 
+## Subscription troubleshooting decision tree
+
+Use this tree after `publish` returns success but a subscriber reports
+missing messages. Read top-to-bottom; **first match wins**. Every branch
+ends in a single CLI command that confirms or rules out the cause.
+
+```
+START: A publish succeeded (`MessageId` returned) but a subscriber
+       reports no message. Which subscriber type?
+
+├── HTTP / HTTPS endpoint
+│   ├── Is the subscription ARN in PendingConfirmation?
+│   │   ├── YES → Endpoint never confirmed the SubscriptionConfirmation
+│   │   │         token (3-day expiry). Fix: re-subscribe, then have the
+│   │   │         endpoint GET the SubscribeURL programmatically.
+│   │   │         aws sns get-subscription-attributes --subscription-arn <arn>
+│   │   │         → look for "Status": "PendingConfirmation"
+│   │   └── NO  → Did the endpoint return 2xx within 15s for the message?
+│   │       ├── NO (4xx/5xx or timeout) → SNS retries for 4 hours (100,010
+│   │       │   attempts) then drops. Check delivery-failure logs:
+│   │       │   aws logs filter-log-events --log-group-name sns/us-east-1/111111111111/order-events/Failure
+│   │       │   → look for providerResponse (403, 500, timeout)
+│   │       │   ├── 403 → endpoint auth rejected the SNS POST. Fix the
+│   │       │   │        endpoint's signature/header validation.
+│   │       │   ├── 404 → wrong endpoint URL. Re-subscribe with correct URL.
+│   │       │   ├── 500 → endpoint crashed. Inspect endpoint logs; add a
+│   │       │   │        subscription DLQ so the message survives retries.
+│   │       │   └── timeout → endpoint too slow. SNS times out at 15s;
+│   │       │            offload work to a queue and return 200 immediately.
+│   │       └── YES (2xx within 15s) but subscriber still reports missing
+│   │           → message was acked but not processed by the endpoint.
+│   │           This is an endpoint-side bug, not SNS. Check delivery-SUCCESS
+│   │           logs to confirm SNS delivered; the loss is downstream.
+│
+├── Lambda subscriber
+│   ├── Is the subscription ARN in PendingConfirmation? (rare — same-account
+│   │   Lambda auto-confirms, but cross-account does not)
+│   │   └── YES → confirm from the subscriber account:
+│   │           aws sns confirm-subscription --topic-arn <topic> --token <token>
+│   ├── Did the Lambda invocation fail? (async invocation, 2 retries)
+│   │   ├── YES → check the Lambda on-failure destination:
+│   │   │   aws lambda get-event-source-mapping --function-name <fn>
+│   │   │   → if no on-failure destination configured, the message is lost
+│   │   │     after 2 retries. Fix: configure on-failure to an SQS DLQ.
+│   │   └── NO  → Lambda received the message but did not process it. Check
+│   │           CloudWatch Logs for the function; this is an application bug.
+│   └── Are messages duplicated at the Lambda?
+│       └── YES → likely a retry storm (each async failure triggers 2 retries
+│                 on top of SNS's own retry for HTTP). Use an SQS subscription
+│                 with a Lambda event-source mapping instead — SQS provides
+│                 visibility-timeout dedup; direct SNS-to-Lambda does not.
+│
+├── SQS subscriber
+│   ├── Is the subscription Status "PendingConfirmation"?
+│   │   └── YES → cross-account SQS subscription requires manual confirm.
+│   │           The SQS queue policy must already grant SNS SendMessage, or
+│   │           confirm-subscription will succeed but no message will arrive.
+│   ├── Is the queue empty but SNS shows delivery success?
+│   │   ├── Check the queue KMS key: does it grant SNS kms:GenerateDataKey*?
+│   │   │   aws kms get-key-policy --key-id <queue-key> --policy-name default
+│   │   │   → if missing, SNS cannot encrypt the SendMessage payload;
+│   │   │     messages are silently dropped after SNS's internal retry.
+│   │   ├── Check the queue policy: does it grant SNS sqs:SendMessage?
+│   │   │   aws sqs get-queue-attributes --queue-url <url> --attribute-names Policy
+│   │   │   → missing Condition aws:SourceArn → SNS cannot deliver.
+│   │   └── Check filter policy: is a non-matching attribute dropping it?
+│   │       aws sns get-subscription-attributes --subscription-arn <arn>
+│   │       → FilterPolicy on a non-existent attribute silently drops.
+│   └── Are messages duplicated in the queue?
+│       └── Multiple subscriptions from the same queue to the same topic.
+│           aws sns list-subscriptions-by-topic --topic-arn <arn>
+│           → de-duplicate; SNS does not prevent duplicate subscriptions.
+│
+├── Mobile push (application protocol)
+│   ├── Endpoint is disabled? SNS disables endpoints after a token rejection.
+│   │   aws sns get-endpoint-attributes --endpoint-arn <arn>
+│   │   → "Enabled": "false" → re-register the device token with
+│   │     create-platform-endpoint and update the application.
+│   └── Token valid but no delivery? Check the platform credential:
+│       APNS cert expiry, FCM server-key rotation. Test with a direct
+│       publish to the endpoint ARN, not via the topic.
+│
+└── Email subscriber
+    ├── Status is PendingConfirmation?
+    │   └── Recipient never clicked the SubscribeURL in the confirmation
+    │         email (3-day expiry). Re-subscribe; the user must click the
+    │         link — there is no programmatic way to force-confirm an email
+    │         subscription without the token.
+    └── Confirmed but not delivered?
+        └── Email deliverability issue (spam folder, bounce). Check SES
+            bounce/complaint metrics if SNS emails route through SES.
+```
+
+**Quick triage sequence** (run when the subscriber type is unknown):
+
+```bash
+# 1. Was the message published?
+aws sns get-topic-attributes --topic-arn <arn> \
+  --query 'Attributes.DeliveryStatusSr.Notification'
+
+# 2. Is the subscription confirmed?
+aws sns list-subscriptions-by-topic --topic-arn <arn> \
+  --query 'Subscriptions[?Endpoint==`<endpoint>`].{Status:SubscriptionArn}'
+
+# 3. Did SNS attempt delivery? (delivery logging must be enabled)
+aws logs filter-log-events \
+  --log-group-name sns/<region>/<account>/<topic>/Failure \
+  --filter-pattern <message-id>
+
+# 4. Is there a subscription DLQ catching the failures?
+aws sns get-subscription-attributes --subscription-arn <arn> \
+  --query 'Attributes.RedrivePolicy'
+```
+
+If step 3 shows no delivery attempt, the message never reached SNS
+(publish failed silently, or a filter policy dropped it before delivery).
+If step 3 shows delivery attempts with errors, follow the protocol-specific
+branch above.
+
 ## Pre-flight safety checks (run before any deployment CLI)
 
 - **Confirm the topic name is available:**
@@ -903,6 +1022,69 @@ aws sns publish \
 - **DisplayName is required for SMS delivery.** SNS requires a
   `DisplayName` for SMS protocol subscriptions. Without it, SMS delivery
   fails.
+
+- **FIFO topic with a non-FIFO SQS subscriber (subscription is rejected).**
+  SNS enforces protocol compatibility at subscribe time. A FIFO topic
+  (`*.fifo`) ONLY accepts SQS FIFO queue subscribers (`*.fifo` queue with
+  `FifoQueue=true` attribute). Subscribing a Standard SQS queue, HTTP/HTTPS
+  endpoint, Lambda function, or email address to a FIFO topic returns
+  `InvalidParameter` and the subscription is never created. **Detection:**
+  `aws sns subscribe` returns
+  `InvalidParameter: Subscription to FIFO topic requires FIFO SQS queue`.
+  **Fix:** either (a) convert the subscriber to a FIFO queue
+  (`aws sqs create-queue --queue-name orders.fifo --attributes FifoQueue=true`),
+  or (b) if you need Lambda/HTTP/email subscribers, switch the TOPIC to
+  Standard and preserve ordering downstream by fanning out to a per-consumer
+  FIFO queue with a Lambda event-source mapping. The second pattern is the
+  only way to get "FIFO topic + Lambda processing" — SNS does not support
+  it natively.
+
+- **Cross-account subscription with SSE-KMS (both key policies required).**
+  When the SNS topic uses a customer-managed CMK and a subscriber lives in
+  a different account, messages are encrypted at the topic with the topic
+  account's key. The subscriber must decrypt at delivery time. This fails
+  silently — messages publish successfully but never appear in the
+  subscriber's queue. **Both** key policies must be in place: (a) the TOPIC
+  account's CMK must grant the subscriber account `kms:Decrypt` and
+  `kms:GenerateDataKey*`; (b) if the subscriber queue also uses SSE-KMS,
+  the subscriber's CMK must grant the SNS service principal
+  `kms:GenerateDataKey*` so SNS can encrypt the message body on the
+  `SendMessage` call. **Detection:** publish a test message and check the
+  subscriber queue — empty queue after a successful publish with no
+  CloudWatch delivery-failure log indicates a KMS decrypt failure. **Fix:**
+  add the cross-account statement below to the TOPIC account's CMK key
+  policy, then verify with a test publish.
+  ```json
+  {
+    "Sid": "Allow cross-account SNS subscribers",
+    "Effect": "Allow",
+    "Principal": { "AWS": "arn:aws:iam::222222222222:root" },
+    "Action": ["kms:Decrypt", "kms:GenerateDataKey*"],
+    "Resource": "*",
+    "Condition": {
+      "StringEquals": { "kms:ViaService": "sns.us-east-1.amazonaws.com" }
+    }
+  }
+  ```
+
+- **Fanout to 100+ SQS queues (high-fanout topology).** A single SNS topic
+  can fan out to up to 12,500,000 subscriptions per topic (soft quota), but
+  operational limits bite well before that. Three failure modes appear at
+  ~100+ SQS subscribers: (a) **topic policy size cap (30 KiB)** — listing
+  every subscriber ARN in the resource policy exceeds the limit; use IAM
+  identity-based policies on the subscriber side and keep the topic policy
+  to a permissive `Principal: "*" + Condition: aws:SourceAccount`
+  statement; (b) **CloudWatch delivery-log volume** — at 100 subscribers ×
+  1,000 msg/sec, the SNS delivery-feedback log writes 100K events/sec and
+  drives up Logs cost; sample the feedback role or scope it to
+  failure-only; (c) **per-subscription KMS throttle** — every encrypted
+  delivery is a `GenerateDataKey` call against the topic's CMK; 100+
+  concurrent pushes can hit the shared CMK rate limit. **Fix:** use a
+  customer-managed CMK with a higher request quota (request a quota bump
+  via AWS Support), or split the fanout into a topic-of-topics hierarchy
+  (regional fanout topics subscribed to a global topic) to distribute the
+  KMS load. See the **Worked example: multi-protocol topic** for a
+  concrete 4-protocol fanout, then scale the pattern horizontally.
 
 ## Output format — MANDATORY literal labels
 

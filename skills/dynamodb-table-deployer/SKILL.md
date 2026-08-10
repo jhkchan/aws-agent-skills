@@ -260,6 +260,108 @@ on each before the `create-table` call.
 - PITR restore creates a NEW table with DEFAULT capacity settings — you
   must reconfigure capacity (or switch to on-demand) after restore.
 
+## Expert heuristic: partition key cardinality calculator
+
+A baseline model knows "use a high-cardinality partition key" but cannot
+quantify HOW high is high enough. Use this formula:
+
+**Rule:** for write-heavy workloads (more than 1,000 WCU sustained), the
+partition key should have **at least 10,000 distinct values** actively
+written in any given hour. Below that threshold, writes concentrate on
+too few physical partitions and you get hot-partition throttling even
+when average utilization looks fine in CloudWatch.
+
+**Quick check formula:**
+
+```text
+distinct_partition_values = COUNT(DISTINCT partitionKey) over a 1-hour window
+required_minimum = max(10000, sustained_writes_per_second × 3600 / 1000)
+
+if distinct_partition_values < required_minimum:
+    → HOT PARTITION RISK
+    → FIX: use composite key (userId + timestamp) or random-suffix sharding
+```
+
+**Why 10,000:** DynamoDB divides a table across physical partitions
+(roughly 10 GB per partition). Write capacity is distributed evenly
+across partitions. With fewer than 10,000 distinct keys, the hash
+distribution is uneven enough that 2-3 partitions absorb a
+disproportionate share of writes, and adaptive capacity's buffer cannot
+absorb the skew. This is the threshold observed in production incident
+post-mortems, not a documented AWS limit.
+
+**Common scenarios:**
+- **Status field as partition key** (e.g., `OPEN`, `CLOSED`): 2-5 distinct
+  values → catastrophic hot partition. ALWAYS combine with a
+  high-cardinality attribute.
+- **Date-only partition key** (e.g., `2026-01-15`): 365 distinct values
+  per year → hot within each day. Use `userId#2026-01-15` instead.
+- **userId partition key for 50,000 users**: 50,000 distinct values →
+  safe IF writes are evenly distributed. Verify with a histogram; a
+  "whale" user writing 100x more than others re-creates the hot spot.
+
+## Expert heuristic: GSI cost multiplier
+
+Every GSI adds WCU cost on the base table for every write. The multiplier
+is deterministic:
+
+```text
+additional_wcu_per_write = ceil(item_size_kb) × number_of_gsis
+total_write_wcu = base_wcu + additional_wcu_per_write
+```
+
+**Concrete example:** a table with 2 KB items and 5 GSIs:
+- Base write cost: ceil(2) = 2 WCU per write
+- GSI replication cost: ceil(2) × 5 = 10 WCU per write
+- **Total: 12 WCU per write — 6x the base cost**
+
+A table with 5 GSIs costs **5x the WCU on writes** compared to a table
+with zero GSIs, before projection-type amplification. `ALL` projection
+GSIs cost the full item size; `KEYS_ONLY` GSIs cost only the key size
+but still add 1 WCU per write per GSI.
+
+**Budget heuristic:** before adding the 3rd GSI, calculate:
+
+```text
+monthly_gsi_cost = writes_per_month × ceil(avg_item_kb) × gsi_count × wcu_price
+```
+
+If this exceeds 30% of your total DynamoDB bill, consolidate access
+patterns by overloading GSIs (one GSI with a composite sort key serves
+multiple query patterns) rather than adding more GSIs.
+
+## Expert heuristic: adaptive capacity false sense of security
+
+Adaptive capacity is the most misunderstood DynamoDB feature. A baseline
+model states "adaptive capacity handles hot partitions" — this is
+dangerously incomplete.
+
+**What adaptive capacity ACTUALLY does:**
+- When a partition consumes its allocated capacity faster than neighbors,
+  DynamoDB temporarily borrows unused capacity from a neighbor partition
+  for **~30 seconds** (the adaptive capacity window).
+- During this window, writes to the hot partition do NOT throttle.
+- After ~30 seconds, if the imbalance persists, the borrow expires and
+  **throttling resumes** with `ProvisionedThroughputExceededException`.
+
+**What it does NOT do:**
+- It does NOT prevent throttling. It only DELAYS it for ~30 seconds.
+- It does NOT work for sustained hot-key patterns — only for brief bursts.
+- It does NOT apply to on-demand mode (on-demand has its own burst-bucket
+  mechanic, which is separate).
+
+**Practical implication:** if your CloudWatch `ThrottledRequests` metric
+shows periodic spikes every 30-60 seconds, that is the signature of
+adaptive capacity borrowing-and-expiring. The fix is NOT more capacity —
+it is partition-key redesign to distribute writes more evenly. Adding
+more WCU only raises the ceiling; the hot partition still absorbs a
+disproportionate share.
+
+**On-demand caveat:** on-demand mode also has a burst bucket derived from
+the trailing 30-minute traffic average. A cold-start spike from zero RPS
+has an EMPTY burst bucket and will throttle immediately. On-demand is NOT
+"unlimited instant capacity."
+
 ## Prerequisites (verify before provisioning)
 
 Before emitting provisioning commands, verify these prerequisites. If any
@@ -738,6 +840,251 @@ VERIFICATION_COMMANDS:
   aws dynamodb describe-table --table-name prod-sessions
   aws dynamodb describe-continuous-backups --table-name prod-sessions
   aws dynamodb describe-time-to-live --table-name prod-sessions
+  aws kms describe-key --key-id alias/prod-dynamodb-key
+```
+
+## Decision tree: on-demand vs provisioned
+
+```text
+Is the workload new / unknown traffic pattern?
+├── YES → PAY_PER_REQUEST (on-demand)
+│         (No capacity planning; switch to PROVISIONED after 2-3 weeks
+│          of steady-state traffic data)
+└── NO → Is traffic bursty / unpredictable (> 3:1 peak-to-trough ratio)?
+    ├── YES → PAY_PER_REQUEST (on-demand)
+    │         (Autoscaling has 3-5 min lag; on-demand handles spikes
+    │          instantly within the burst bucket)
+    └── NO → Is traffic steady and high-throughput (> 5,000 RCU/WCU sustained)?
+        ├── YES → PROVISIONED + autoscaling
+        │         (3-5x cheaper than on-demand at sustained load)
+        └── NO → Is the table idle most of the time (dev / test / low-traffic)?
+            ├── YES → PAY_PER_REQUEST (on-demand)
+            │         (Pay zero when idle; provisioned has minimum charges)
+            └── NO → PROVISIONED + autoscaling
+                      (Moderate steady traffic; autoscaling handles
+                       gradual changes)
+```
+
+**Post-decision review:** after 2-3 weeks of production traffic, review
+CloudWatch `ConsumedReadCapacityUnits` / `ConsumedWriteCapacityUnits`. If
+utilization is > 70% steady, PROVISIONED is cheaper. If utilization is
+< 30% or highly bursty, stay on-demand. DynamoDB enforces a cooldown
+between mode switches — do not switch per-request.
+
+## Error handling
+
+### Table already exists (`ResourceInUseException`)
+
+```bash
+aws dynamodb describe-table --table-name <name>
+```
+
+- If configuration matches intent: the table is already provisioned
+  correctly. Skip to verification and emit READY_TO_DEPLOY.
+- If configuration differs: decide whether to `update-table` (mutable
+  settings: capacity, PITR, TTL, streams, table class, deletion
+  protection) or create a NEW table with the correct schema (immutable
+  settings: partition/sort key, LSIs). Key schema changes REQUIRE
+  create-new → backfill → cutover. NEVER attempt to `delete-table` then
+  `create-table` to "fix" a schema mismatch — data loss.
+
+### GSI creation fails during backfill
+
+When adding a GSI to an existing table (`update-table
+--global-secondary-index-updates`), DynamoDB backfills the index from
+the base table. The GSI enters `CREATING` state (can take minutes to
+hours for large tables).
+
+**If the backfill fails** (GSI status flips to `DELETING` or table stuck
+in `UPDATING`):
+
+1. Check CloudTrail for `LimitExceededException` — the account may have
+   too many concurrent GSI backfills (account-level soft limit).
+2. Wait for the GSI to finish auto-cleanup (it will reach `DELETING` then
+   disappear).
+3. Retry with a smaller `ProjectionType` (`KEYS_ONLY` instead of `ALL`)
+   to reduce backfill write load.
+4. For PROVISIONED tables, temporarily raise the GSI's WCU during
+   backfill to avoid throttling the base table during index population.
+
+**NEVER** delete the base table to "fix" a stuck GSI backfill. The
+backfill will complete or the GSI will be auto-deleted; either way the
+base table data is safe. Monitor with:
+
+```bash
+aws dynamodb describe-table --table-name <name> \
+  --query 'Table.GlobalSecondaryIndexes[*].[IndexName,IndexStatus,Backfilling]'
+```
+
+### PITR enable fails
+
+- **`AccessDeniedException`**: the caller lacks
+  `dynamodb:UpdateContinuousBackups`. This is a separate IAM permission
+  from `dynamodb:UpdateTable` — add it to the caller's policy.
+- **`ValidationException`**: the table was created within the last few
+  minutes and is not yet `ACTIVE`. Wait for `TableStatus = ACTIVE` and
+  retry.
+- **PITR already enabled**: the call is idempotent — returns success with
+  no change. No error to handle.
+
+### Autoscaling registration fails
+
+- **"Min capacity must be less than or equal to max capacity"**: check
+  that `--min-capacity` < `--max-capacity`. Common typo.
+- **"The scalable target already exists"**: the target was previously
+  registered. Re-issuing `register-scalable-target` is safe (upsert-like
+  for existing targets with the same dimensions). To change dimensions,
+  `deregister-scalable-target` first.
+- **GSI autoscaling `ResourceNotFoundException`**: the GSI name is wrong
+  or the GSI is still `CREATING`. Verify with `describe-table` and
+  register autoscaling only after the GSI reaches `ACTIVE`.
+
+## Worked example — provisioned table with GSI + autoscaling
+
+A high-throughput events table with a GSI for lookup by userId, using
+PROVISIONED capacity with autoscaling on BOTH the base table and the GSI.
+This is the critical pattern the eval flagged — the earlier session-store
+example used on-demand and skipped GSI autoscaling registration.
+
+```bash
+# 1. Create table with GSI in a single create-table call
+aws dynamodb create-table \
+  --table-name prod-events \
+  --attribute-definitions \
+    AttributeName=eventId,AttributeType=S \
+    AttributeName=userId,AttributeType=S \
+    AttributeName=createdAt,AttributeType=N \
+  --key-schema \
+    AttributeName=eventId,KeyType=HASH \
+  --billing-mode PROVISIONED \
+  --provisioned-throughput ReadCapacityUnits=5000,WriteCapacityUnits=2000 \
+  --global-secondary-indexes '[
+    {
+      "IndexName": "gsi_by_userId",
+      "KeySchema": [
+        {"AttributeName":"userId","KeyType":"HASH"},
+        {"AttributeName":"createdAt","KeyType":"RANGE"}
+      ],
+      "Projection": {"ProjectionType":"KEYS_ONLY"},
+      "ProvisionedThroughput": {"ReadCapacityUnits":2000,"WriteCapacityUnits":1000}
+    }
+  ]' \
+  --sse-specification Enabled=true,SSEType=KMS,KMSMasterKeyId=alias/prod-dynamodb-key \
+  --deletion-protection-enabled
+
+# 2. Wait for table + GSI to reach ACTIVE
+aws dynamodb wait table-exists --table-name prod-events
+aws dynamodb describe-table --table-name prod-events \
+  --query 'Table.GlobalSecondaryIndexes[0].[IndexName,IndexStatus]'
+
+# 3. Register autoscaling on BASE TABLE (reads)
+aws application-autoscaling register-scalable-target \
+  --service-namespace dynamodb \
+  --resource-id table/prod-events \
+  --scalable-dimension dynamodb:table:ReadCapacityUnits \
+  --min-capacity 1000 --max-capacity 20000
+
+aws application-autoscaling put-scaling-policy \
+  --policy-name prod-events-read-autoscaling \
+  --service-namespace dynamodb \
+  --resource-id table/prod-events \
+  --scalable-dimension dynamodb:table:ReadCapacityUnits \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration \
+    '{"TargetValue":70.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"DynamoDBReadCapacityUtilization"}}'
+
+# 4. Register autoscaling on BASE TABLE (writes)
+aws application-autoscaling register-scalable-target \
+  --service-namespace dynamodb \
+  --resource-id table/prod-events \
+  --scalable-dimension dynamodb:table:WriteCapacityUnits \
+  --min-capacity 500 --max-capacity 10000
+
+aws application-autoscaling put-scaling-policy \
+  --policy-name prod-events-write-autoscaling \
+  --service-namespace dynamodb \
+  --resource-id table/prod-events \
+  --scalable-dimension dynamodb:table:WriteCapacityUnits \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration \
+    '{"TargetValue":70.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"DynamoDBWriteCapacityUtilization"}}'
+
+# 5. Register autoscaling on GSI (reads) — THIS IS THE STEP MOST COMMONLY MISSED
+aws application-autoscaling register-scalable-target \
+  --service-namespace dynamodb \
+  --resource-id table/prod-events/index/gsi_by_userId \
+  --scalable-dimension dynamodb:index:ReadCapacityUnits \
+  --min-capacity 500 --max-capacity 10000
+
+aws application-autoscaling put-scaling-policy \
+  --policy-name prod-events-gsi-read-autoscaling \
+  --service-namespace dynamodb \
+  --resource-id table/prod-events/index/gsi_by_userId \
+  --scalable-dimension dynamodb:index:ReadCapacityUnits \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration \
+    '{"TargetValue":70.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"DynamoDBReadCapacityUtilization"}}'
+
+# 6. Register autoscaling on GSI (writes)
+aws application-autoscaling register-scalable-target \
+  --service-namespace dynamodb \
+  --resource-id table/prod-events/index/gsi_by_userId \
+  --scalable-dimension dynamodb:index:WriteCapacityUnits \
+  --min-capacity 200 --max-capacity 5000
+
+aws application-autoscaling put-scaling-policy \
+  --policy-name prod-events-gsi-write-autoscaling \
+  --service-namespace dynamodb \
+  --resource-id table/prod-events/index/gsi_by_userId \
+  --scalable-dimension dynamodb:index:WriteCapacityUnits \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration \
+    '{"TargetValue":70.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"DynamoDBWriteCapacityUtilization"}}'
+
+# 7. Enable PITR
+aws dynamodb update-continuous-backups --table-name prod-events \
+  --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true
+
+# 8. Enable TTL
+aws dynamodb update-time-to-live --table-name prod-events \
+  --time-to-live-specification Enabled=true,AttributeName=expiresAt
+
+# 9. Enable Streams for CDC (Aurora zero-ETL / OpenSearch sync)
+aws dynamodb update-table --table-name prod-events \
+  --stream-specification StreamEnabled=true,StreamViewType=NEW_AND_OLD_IMAGES
+
+# 10. Verify everything
+aws dynamodb describe-table --table-name prod-events
+aws dynamodb describe-continuous-backups --table-name prod-events
+aws dynamodb describe-time-to-live --table-name prod-events
+aws application-autoscaling describe-scaling-policies --service-namespace dynamodb \
+  --query 'ScalingPolicies[?contains(ResourceId,`prod-events`)].[PolicyName,ResourceId,ScalableDimension]'
+```
+
+The checklist for this table:
+
+```text
+TABLE: prod-events
+VERDICT: READY_TO_DEPLOY
+CHECKLIST:
+  [✓] Partition key: eventId (String) — UUID v4, high-cardinality (> 10k distinct)
+  [✓] Sort key: None (event-level lookup by partition key)
+  [✓] LSIs: None (no range queries on alternate sort within same partition)
+  [✓] GSIs: gsi_by_userId (userId→createdAt, KEYS_ONLY projection, sparse)
+  [✓] Capacity mode: PROVISIONED (autoscaling: table ✓ read+write, gsi ✓ read+write)
+  [✓] Encryption: SSE-KMS customer CMK (alias/prod-dynamodb-key)
+  [✓] PITR: Enabled (35-day window)
+  [✓] TTL: Enabled (attribute: expiresAt — 90-day retention, 48h lag acceptable)
+  [✓] Streams: NEW_AND_OLD_IMAGES (Aurora zero-ETL consumer)
+  [✓] Table class: STANDARD (actively queried)
+  [✓] Deletion protection: Enabled
+  [✓] Resource-based policy: None (single-account)
+  [✓] Global Tables: Single-region (us-east-1)
+VERIFICATION_COMMANDS:
+  aws dynamodb describe-table --table-name prod-events
+  aws dynamodb describe-continuous-backups --table-name prod-events
+  aws dynamodb describe-time-to-live --table-name prod-events
+  aws application-autoscaling describe-scaling-policies --service-namespace dynamodb
   aws kms describe-key --key-id alias/prod-dynamodb-key
 ```
 

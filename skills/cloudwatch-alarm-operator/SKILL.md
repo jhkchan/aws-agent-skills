@@ -952,6 +952,98 @@ NOTES:
 
 AWS CloudOps / CloudWatch Alarm Lifecycle & Observability Operations.
 
+## Expert heuristic: INSUFFICIENT_DATA vs ALARM
+
+INSUFFICIENT_DATA does NOT mean "the value is zero" or "the metric is
+healthy." It means **the metric is not being reported at all** — the
+alarm has no data to evaluate. Operators routinely misread
+INSUFFICIENT_DATA as "everything is fine" when it actually means
+"monitoring is broken."
+
+**Diagnostic decision tree:**
+
+```
+INSUFFICIENT_DATA
+   ├─ Is the metric published at all?
+   │    ├─ NO → Sensor failure (most common)
+   │    │         • EC2: is the instance running? is the CloudWatch agent installed?
+   │    │         • Lambda: is the function being invoked?
+   │    │         • Custom metric: is the PUT-metric-data call succeeding?
+   │    │         • RDS: is the instance in AVAILABLE state (not stopped)?
+   │    │
+   │    └─ YES → Check alarm config
+   │              • Namespace case-sensitive? (AWS/EC2 vs aws/ec2)
+   │              • Dimension name/value case-sensitive?
+   │              • Period < native publishing interval?
+   │              • EvaluationPeriods window has not accumulated enough data yet?
+```
+
+**Per-service INSUFFICIENT_DATA root causes:**
+
+| Service / metric | What to check when INSUFFICIENT_DATA appears |
+|---|---|
+| `AWS/EC2 CPUUtilization` | Instance running? Detailed monitoring enabled (60s) vs basic (300s)? Period matches? |
+| `CWAgent mem_used_percent` | CloudWatch agent running on the instance? `ImageId` and `ObjectType` dimensions match agent config? |
+| `AWS/Lambda Errors/Throttles` | Function being invoked at all? Function name spelled correctly? |
+| `AWS/SQS ApproximateNumberOfMessagesVisible` | Queue name correct? Queue in the same region? |
+| `AWS/ApplicationELB HTTPCode_ELB_5XX_Count` | ALB exists? `LoadBalancer` dimension value matches current ALB ARN (not a deleted one)? |
+| Custom namespace | `put-metric-data` calls succeeding (check CloudTrail)? Namespace spelled correctly (case-sensitive)? |
+
+**Fix — set TreatMissingData based on metric semantics:**
+- `breaching` — for availability / heartbeat metrics where missing
+  data IS the alert (e.g., a "metric stopped reporting" alarm).
+- `notBreaching` — for utilization metrics where missing data means
+  the resource is gone (e.g., CPU on a stopped instance).
+- `ignore` — for metrics where missing data is expected periodically
+  (e.g., queue depth outside business hours).
+
+ALWAYS pair the TreatMissingData choice with an
+`InsufficientDataActions` SNS target so the monitoring black hole
+itself triggers an alert.
+
+## Edge case: alarm stuck in ALARM after the metric stops reporting
+
+When a metric was breaching and then STOPS reporting entirely (sensor
+failure, instance terminated, agent crashed mid-incident), the alarm's
+behavior depends on TreatMissingData — and the wrong choice leaves the
+alarm in ALARM state indefinitely:
+
+| TreatMissingData | Behavior when metric stops mid-breach |
+|---|---|
+| `missing` (default) | Transitions to INSUFFICIENT_DATA after the next evaluation cycle — `InsufficientDataActions` fires (usually empty = silent) |
+| `breaching` | Stays in ALARM forever — the missing data is treated as continuing to breach |
+| `notBreaching` | Transitions to OK after the next cycle — `OKActions` fires (if configured) |
+| `ignore` | Stays in ALARM forever — the alarm holds its last evaluated state |
+
+**The "stuck in ALARM forever" trap:** with `TreatMissingData: breaching`
+(common for security / availability alarms), an alarm that fired
+legitimately and then lost its metric source stays in ALARM even after
+the underlying issue is resolved and the resource is terminated.
+On-call receives no "all clear" because:
+1. The metric is gone, so no OK datapoint can ever clear the breach.
+2. `OKActions` only fires on a real OK transition, not on alarm
+   deletion.
+
+**Diagnostic:**
+1. `describe-alarms --alarm-names <name>` — confirm `StateValue: ALARM`
+   and `StateUpdatedTimestamp` is old (>24h).
+2. `get-metric-statistics` over the last hour — if empty, the metric
+   stopped.
+3. Check the resource: is the EC2 instance terminated? Is the Lambda
+   function deleted? Is the ALB gone?
+
+**Fix:**
+- If the resource is gone: `delete-alarms` — the alarm is monitoring
+  nothing.
+- If the resource exists but the agent/sensor is broken: fix the
+  sensor, the alarm will self-clear on the next OK datapoint.
+- To force-clear without waiting: snapshot the config, then
+  `set-alarm-state --state-value OK --state-reason "manual override
+  after sensor recovery"` (use sparingly — this bypasses CloudWatch's
+  evaluation).
+- Prevent recurrence: add a secondary "alarm stuck in ALARM > 24h"
+  composite alarm that fires when `StateUpdatedTimestamp` is too old.
+
 ## AWS documentation
 
 - **Amazon CloudWatch User Guide** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html

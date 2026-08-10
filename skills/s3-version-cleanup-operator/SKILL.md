@@ -800,6 +800,94 @@ NOTES:
 
 AWS CloudOps / S3 Storage Cost Optimization & Compliance Retention.
 
+## Expert heuristic: NoncurrentVersionExpiration vs NewerNoncurrentVersions
+
+These two lifecycle rule actions are NOT interchangeable — confusing
+them is the #1 S3 version cleanup mistake. They answer DIFFERENT
+questions:
+
+| Rule action | Question it answers | Behavior |
+|---|---|---|
+| `NoncurrentVersionExpiration` with `NoncurrentDays: N` | "How OLD should a noncurrent version be before it's deleted?" | Deletes ALL noncurrent versions older than N days from when they BECAME noncurrent. Keeps every version newer than N days — could be 1, could be 1,000. |
+| `NewerNoncurrentVersions` with `N: M` | "How many recent noncurrent versions should I keep?" | Keeps only the M most recent noncurrent versions. Deletes the rest regardless of age. |
+
+**Why you should use BOTH (defense in depth):**
+- `NewerNoncurrentVersions: 3` keeps the 3 most recent versions
+  regardless of age — useful for "undo" but allows unlimited growth
+  if versions become noncurrent slowly.
+- `NoncurrentVersionExpiration: 90` deletes versions older than 90
+  days regardless of count — useful for "compliance retention window"
+  but allows 1,000 versions in the first 90 days.
+- COMBINED: keep the 3 most recent versions, AND expire anything
+  older than 90 days. Whichever condition triggers first wins. This
+  caps cost AND preserves recent history.
+
+**Worked example — log bucket with hourly overwrites:**
+
+```json
+{
+  "ID": "version-cleanup-defense-in-depth",
+  "Status": "Enabled",
+  "Filter": { "Prefix": "logs/" },
+  "NoncurrentVersionExpiration": { "NoncurrentDays": 90 },
+  "NoncurrentVersionTransition": [
+    { "NoncurrentDays": 30, "StorageClass": "STANDARD_IA" },
+    { "NoncurrentDays": 60, "StorageClass": "GLACIER_INSTANT_RETRIEVAL" }
+  ],
+  "NewerNoncurrentVersions": 3
+}
+```
+
+**Common mistake:** operators add `NewerNoncurrentVersions: 3` thinking
+it "expires" old versions. It does NOT — it keeps the 3 NEWEST, but
+versions outside the top 3 are NOT deleted unless a separate
+`NoncurrentVersionExpiration` rule also matches. The bucket continues
+to bill for all older versions until `NoncurrentVersionExpiration`
+fires.
+
+**Common mistake (inverse):** operators add `NoncurrentVersionExpiration:
+90` thinking it "keeps only the last 90 days." It does — but for a
+high-frequency overwrite pattern, 90 days can mean thousands of
+versions. Add `NewerNoncurrentVersions: N` to cap the absolute count.
+
+## Edge case: S3 Batch Operations DeleteObjectVersion is NOT free
+
+S3 Batch Operations charges **~$1.00 per million objects processed**,
+regardless of operation type. A version-cleanup Batch Operations job
+that deletes 1 billion noncurrent versions costs **$1,000** —
+sometimes more than the storage savings from the cleanup itself.
+
+**Cost-comparison table (2026 us-east-1):**
+
+| Cleanup scenario | Object count | Batch Operations cost | Storage saved (monthly) | Payback period |
+|---|---|---|---|---|
+| Small cleanup | 1M versions | $1.00 | $23 (1 TB Standard) | 1.3 months |
+| Medium cleanup | 100M versions | $100 | $230 (10 TB Standard) | 13 days |
+| Large cleanup | 1B versions | $1,000 | $2,300 (100 TB Standard) | 13 days |
+| Very large cleanup | 10B versions | $10,000 | $23,000 (1 PB Standard) | 13 days |
+
+**Hidden costs beyond the per-million fee:**
+1. **Manifest generation:** paginating `list-object-versions` for a
+   billion-version bucket takes hours of API calls. Prefer S3 Inventory
+   (daily or weekly CSV snapshots, free with S3).
+2. **Partial-failure handling:** Batch Operations reports per-object
+   failures in a CSV report. Object Lock Compliance-mode and
+   legal-hold ON objects fail per-object — the job continues but does
+   NOT delete those versions. Plan a second pass for failures.
+3. **Re-runs:** if the job fails partway, the partial deletes are
+   NOT refunded. Budget for at least one re-run.
+
+**Decision rule:**
+- If lifecycle rules can achieve the same outcome within an acceptable
+  timeframe (24-48 hours of processing lag), use lifecycle rules
+  (free).
+- Reserve Batch Operations for: (a) immediate one-time cleanup that
+  cannot wait for lifecycle processing, (b) selective deletes matching
+  a manifest that lifecycle rules cannot express.
+- ALWAYS compute the per-million cost before launching a Batch
+  Operations job. Surface the cost in the operation plan as
+  `ESTIMATED_BATCH_COST`.
+
 ## AWS documentation
 
 - **Amazon S3 User Guide** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html

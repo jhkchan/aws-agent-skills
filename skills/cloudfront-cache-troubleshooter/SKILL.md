@@ -939,6 +939,82 @@ canonical command script per cache issue category.
 
 AWS CloudOps / CloudFront CDN Caching, Cache Policy, and Edge Performance.
 
+## Expert heuristic: cache key normalization
+
+CloudFront normalizes some request attributes before hashing them into
+the cache key, but NOT others. Misjudging which is which produces
+mysterious cache-key variation that looks like a bug but is by design:
+
+| Attribute | Normalized? | Effect |
+|---|---|---|
+| HTTP method | YES — lowercased | `GET` and `get` share a cache entry |
+| URL path | Case-sensitive (no normalization) | `/Foo` and `/foo` are DIFFERENT cache entries |
+| Header NAMES in cache key | NOT normalized | `Accept-Encoding: gzip` and `accept-encoding: gzip` create DIFFERENT cache entries |
+| Header VALUES in cache key | NOT normalized | `gzip` and `GZIP` create different cache entries |
+| Query string parameter names | NOT normalized | `?foo=1` and `?Foo=1` are different cache entries |
+| Cookie names in cache key | NOT normalized | `Session` and `session` cookies create different entries |
+
+**The header-name case trap.** A viewer sending `Accept-Encoding: gzip`
+and another sending `accept-encoding: gzip` produce TWO cache entries
+even though semantically they request the same compression. Browsers
+are inconsistent about header-name case — Safari has historically sent
+`Accept-encoding` (lowercase 'e') while Chrome sends `Accept-Encoding`.
+A cache policy that whitelists `Accept-Encoding` then fragments the
+cache across browser populations.
+
+**Diagnostic:**
+- Inspect `cs-accept-encoding` and other `cs-*` fields in CloudFront
+  access logs for case variation across requests to the same URL.
+- If the cache policy whitelists a header, ALL distinct case variants
+  of that header name create distinct cache entries.
+
+**Fix:**
+- Prefer the managed `AllViewerExceptReservedHeader` policy — it
+  normalizes header handling and includes only the headers CloudFront
+  needs for routing and compression.
+- For custom policies, normalize header names at the origin or via a
+  Lambda@Edge `origin-request` function before the cache lookup.
+- Avoid including case-varying headers (`Accept`, `Accept-Language`) in
+  the cache key unless the origin truly negotiates on them.
+
+## Edge case: Lambda@Edge response modification invalidates the cache entry
+
+A Lambda@Edge function on the `viewer-response` or `origin-response`
+event runs AFTER CloudFront has computed the cache key. The function
+can modify the response headers, body, or status code — but those
+modifications apply to the cached response. A function that mutates
+the response per-request produces a response that does NOT match the
+cache key's expected content for subsequent requests.
+
+**Failure patterns:**
+- A `viewer-response` function adding `Set-Cookie` with a unique trace
+  ID per request taints the cached object — every viewer sees a
+  different Set-Cookie value for the "same" cache entry.
+- An `origin-response` function stripping `Age` or rewriting
+  `Cache-Control: no-store` rewrites the cached response, producing
+  inconsistent caching behavior for the same URL.
+- A function that mutates the response body (e.g., HTML rewriting)
+  bakes that mutation into the cached entry — subsequent hits serve
+  the mutated body even to viewers that did not trigger the mutation.
+
+**Diagnostic:**
+- If hit ratio is near zero but the cache policy and origin headers
+  look correct, inspect every Lambda@Edge function on the behavior.
+- Detach the function temporarily and observe whether hit ratio
+  recovers — the fastest causal test.
+- CloudFront access logs show `x-edge-result-type: Miss` even though
+  the same URL is being requested repeatedly.
+
+**Fix:**
+- Move per-request response-header mutations (trace IDs, nonces) into
+  a `viewer-response` function that ALSO sets `Cache-Control: private`
+  so the variation is not cached at the edge.
+- Never generate per-request unique values in an `origin-response`
+  function — those taint the cached object for all subsequent viewers.
+- Separate cacheable content from per-viewer mutations using two cache
+  behaviors: one cached (origin response untouched), one uncached
+  (`CachingDisabled`, per-viewer mutation allowed).
+
 ## AWS documentation
 
 - **Amazon CloudFront Developer Guide** — https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html
