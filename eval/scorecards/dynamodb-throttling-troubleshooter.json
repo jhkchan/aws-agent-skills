@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides a detailed decision tree, specific thresholds (5\u2011minute burst window, >10% traffic on a single key, <100 distinct values for hot\u2011key detection) and precise RCU/WCU consumption formulas, which extend beyond generic knowledge. However it omits explicit numeric limits for burst exhaustion, lacks guidance on DynamoDB auto\u2011scaling policies, and does not cover newer edge\u2011case features such as per\u2011partition on\u2011demand burst limits, preventing a perfect score."
+      "justification": "Adds concrete expert details (5\u2011minute burst window, 10% traffic threshold for hot partitions, ~100 distinct values rule, exact GSI hot\u2011key propagation) and a full decision\u2011tree ordering, but the majority of the content restates well\u2011known DynamoDB best\u2011practice material rather than novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (per\u2011GSI throttled\u2011requests check, contributor\u2011insights enablement, exact CLI commands), yet a few steps are generic like \u201ccheck CloudWatch\u201d without a strict sequence, leaving some ambiguity in the diagnostic flow."
+      "justification": "Provides AWS\u2011specific procedures: precise CLI commands, Contributor Insights usage, per\u2011GSI metric collection, and a step\u2011by\u2011step diagnostic mindset. Some steps are generic (e.g., \"check CloudWatch\") and could be tighter to the DynamoDB context."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list contains concrete pitfalls (e.g., never raise capacity for hot partitions) with clear reasoning, but it omits several common anti\u2011patterns such as on\u2011demand burst\u2011limit throttling and IAM permission mis\u2011configurations, reducing its completeness."
+      "justification": "Provides a thorough NEVER list with concrete reasoning (e.g., never raise capacity for hot partitions without distribution analysis, never ignore per\u2011GSI metrics). Missing a few anti\u2011patterns such as ignoring on\u2011demand cost implications and auto\u2011scaling pitfalls, so points are deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter, activation triggers, invocation schema, and clear WHEN\u2011TO\u2011USE/WHEN\u2011NOT\u2011TO\u2011USE sections are all present and well\u2011defined, enabling reliable activation of the skill."
+      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are present. The invocation schema is written in prose rather than a strict JSON schema, which could hinder reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference \u2192 detailed steps \u2192 deep dive), yet the initial sections are dense and contain many tables and commands, risking cognitive overload before the agent knows which path to follow."
+      "justification": "Uses layered sections (quick reference, stepwise process, deep remediation) so an agent can skim first. However, the initial sections are dense and may overload the reader before the core decision tree is reached."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations (e.g., update\u2011table, switch to on\u2011demand) are presented with verification steps and post\u2011apply monitoring, while analytical steps remain open, showing good calibration to task fragility. Minor omission: no explicit safety flag or dry\u2011run suggestion for the CLI commands."
+      "justification": "Destructive actions (update\u2011table) are accompanied by warnings and short\u2011term vs long\u2011term remediation paths, matching the fragility of capacity changes. Lacks an explicit \"NEVER run update\u2011table without backup\" rule, a small safety gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick Reference \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Remediation), making the structure easy to follow."
+      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process \u2192 Output format \u2192 Anti\u2011patterns \u2192 Remediation) that aids comprehension. Structure is consistent throughout."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a complete decision tree, concrete CLI examples, and output format, enabling an agent to act. However, edge cases such as on\u2011demand burst\u2011limit throttling, multi\u2011region tables, or missing IAM permissions are not addressed, which could cause execution failures."
+      "justification": "Provides working CLI commands, a deterministic decision tree, output format, and multiple worked examples, enabling an agent to execute the skill. Lacks explicit handling for auto\u2011scaling tables and a few edge\u2011case scenarios, so it falls short of a perfect score."
     }
   ],
-  "total_score": 107,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 53072,
-  "latency_ms": 9194,
+  "token_count": 51384,
+  "latency_ms": 12827,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

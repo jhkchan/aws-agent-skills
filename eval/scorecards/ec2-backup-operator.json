@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides many expert\u2011level details (snapshot chain reference\u2011counting, vault\u2011lock mode nuances, cross\u2011account KMS requirements, FSR cost, archive restore latency, etc.) that go beyond a generic model. However, a capable model already knows most of these basics and the skill omits newer features such as the EBS Recycling Bin and a complete list of opt\u2011in regions, so full marks are not earned."
+      "justification": "Provides many expert details (snapshot\u2011chain reference counting, vault\u2011lock mode nuances, cross\u2011account KMS requirements, FSR cost, archive restore latency) that go beyond basic documentation, but a portion of the content simply restates well\u2011known AWS docs without adding new decision trees or thresholds, so it falls short of a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: ordered pre\u2011checks, exact CLI flag choices, confirm\u2011gate workflow, and per\u2011operation planning. One point deducted because some steps (e.g., generic \"run wait command\") are not uniquely AWS\u2011specific."
+      "justification": "Provides AWS\u2011specific pre\u2011flight ordering, exact CLI flag choices, and a mandatory CONFIRM gate. The only shortfall is the generic \u201ccheck IAM permissions\u201d phrasing without a concrete AWS\u2011IAM policy\u2011validation procedure (e.g., simulate\u2011policy\u2011eval), which prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., deleting snapshots referenced by AMIs, assuming vault\u2011lock equals WORM). Missing a few common pitfalls such as IAM role drift, pagination throttling, and the need to disable FSR before delete, so two points are deducted."
+      "justification": "Provides a comprehensive NEVER list with concrete reasoning (e.g., deleting a snapshot referenced by an AMI bricks launches, vault\u2011lock mode misconceptions, cost\u2011hidden FSR billing, archive tier misuse for DR). The list is detailed and experience\u2011driven; only a minor omission of a few edge\u2011case pitfalls (e.g., bulk snapshot creation limits) prevents a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter is complete (name, description, version, keywords, activation triggers, invocation schema). The description of WHEN to invoke is present but could be clearer; the schema field is named \"invocation_schema\" instead of a dedicated \"activation_schema\", leading to a minor deduction."
+      "justification": "Front\u2011matter is complete and the description outlines WHAT, WHEN, and KEYWORDS. However, the activation_triggers list is long and includes some overlapping phrases, and the invocation_schema does not explicitly define error\u2011handling fields (e.g., a schema for malformed JSON), leaving a slight ambiguity for reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process, output format, examples). However, the document is dense and critical safety rules (confirm gate, NEVER list) are buried deep, causing cognitive overload for a first\u2011time reader. Two points deducted."
+      "justification": "Content is layered: quick reference first, then mindset, pre\u2011flight, process, output format, anti\u2011patterns, and worked examples. However the initial sections are dense, causing some cognitive overload before the agent reaches the concise top\u2011level instructions."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly guarded by pre\u2011checks and a mandatory CONFIRM gate, while creative tasks (policy creation) allow flexibility. One point deducted because the skill does not enforce a dry\u2011run mode for delete\u2011snapshot operations, leaving a small freedom gap."
+      "justification": "Destructive actions are tightly constrained by pre\u2011checks and a mandatory CONFIRM gate, while planning\u2011only tasks (e.g., generating a DLM policy) are left flexible. No over\u2011constrained rules for creative operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns). Slightly ad\u2011hoc ordering of sections prevents a perfect score."
+      "justification": "Follows a recognizable structure (metadata \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns \u2192 examples) that aligns with other well\u2011crafted skills, aiding comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI sequences, decision trees, and verification steps; the model output examples are correct. Missing handling for API throttling, pagination edge\u2011cases, and the newer Recycling Bin feature, and no explicit error\u2011recovery flow, resulting in a two\u2011point deduction."
+      "justification": "Provides working CLI sequences, decision trees, error handling, and concrete examples that an agent can execute. Missing explicit handling for bulk operations or rate\u2011limit back\u2011off scenarios, but overall the skill is executable and reliable."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 57254,
-  "latency_ms": 8007,
+  "token_count": 57290,
+  "latency_ms": 22787,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

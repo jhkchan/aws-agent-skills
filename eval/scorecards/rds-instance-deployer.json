@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides genuine expert knowledge not commonly known by a baseline model: immutable\u2011after\u2011creation settings (encryption, backtrack, serverless v2 scaling), precise capacity\u2011planning formulas (buffer cache % of memory, per\u2011connection memory), decision thresholds (min capacity 0.5 vs 2\u20114 for production), and nuanced cross\u2011region KMS requirements. Some content merely restates AWS docs (engine list, generic instance\u2011class families), hence a small deduction."
+      "justification": "Provides many expert\u2011level specifics (immutability of encryption, backtrack window limits, Serverless v2 scaling bounds, global DB topology, blue/green workflow, LTES, DSQL, detailed dependency table). Missing newer best\u2011practices such as IAM DB authentication, RDS Proxy considerations, and storage\u2011type cost/IOPS trade\u2011offs, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific provisioning workflow with exact ordering (subnet group \u2192 SG \u2192 encryption \u2192 parameter/option groups \u2192 Multi\u2011AZ \u2192 cluster topology). Includes concrete CLI commands and dependency graph. The first step (engine selection) is generic, but overall procedure is highly specific."
+      "justification": "Defines a clear AWS\u2011specific provisioning order (subnet group \u2192 SG \u2192 encryption \u2192 multi\u2011AZ \u2192 backups \u2192 monitoring \u2192 parameter/option groups \u2192 Aurora\u2011only features). Procedure is concrete and uses exact CLI flags. Lacks a dedicated step for cross\u2011region KMS key creation when building Global Databases, which would make the process fully AWS\u2011specific."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a robust NEVER list with concrete reasons (encryption immutability, backup\u2011retention\u20110 destruction, SG 0.0.0.0/0, etc.). Missing are warnings about using default parameter groups in production and about snapshot\u2011retention considerations for cross\u2011region replication, so the anti\u2011pattern coverage is strong but not exhaustive."
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never add encryption later, never use 0 backup retention). Missing anti\u2011patterns around credential handling (hard\u2011coded passwords, not using Secrets Manager) and omission of IAM DB authentication pitfalls, which reduces completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, activation keywords, invocation contract, and output format are well defined. Missing an explicit \"trigger\" field in the metadata (e.g., a regex or structured trigger) that would make automated activation more reliable, hence a one\u2011point deduction."
+      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and provides exhaustive keywords and activation triggers. Output format is precisely defined with required literal labels, ensuring reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill presents a large amount of information up front (mindset, dependency graph, full tables) before the concise 10\u2011step procedure, which can cause cognitive overload. Critical rules are later (NEVER list), but the initial bulk is heavier than ideal."
+      "justification": "Information is layered (high\u2011level overview \u2192 mindset \u2192 dependency graph \u2192 prerequisites \u2192 step\u2011by\u2011step \u2192 anti\u2011patterns \u2192 output format \u2192 examples). However the skill is long and some critical rules (e.g., NEVER list) are buried deep, creating some cognitive load for a quick lookup."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (encryption, deletion protection) are tightly constrained with explicit prerequisite checks and immutable\u2011setting warnings. Slight looseness: deletion protection is suggested but not enforced in the checklist, leaving room for accidental omission."
+      "justification": "Destructive actions (encryption, deletion protection) are gated by explicit prerequisites and immutable\u2011property warnings. Creative sections (IaC skeleton generation) are left flexible. Slight over\u2011flexibility: deletion protection is optional rather than enforced before traffic, but overall well calibrated."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (metadata \u2192 mindset \u2192 reasoning \u2192 prerequisites \u2192 steps \u2192 anti\u2011patterns \u2192 output format \u2192 examples). Not tied to a named industry pattern (e.g., \"Mindset\u2011Navigation\u2011Philosophy\"), so one point off."
+      "justification": "Follows a recognizable skill pattern (metadata \u2192 activation \u2192 contract \u2192 mindset \u2192 reasoning \u2192 prerequisites \u2192 procedure \u2192 anti\u2011patterns \u2192 output format \u2192 examples). Structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Produces a ready\u2011to\u2011deploy checklist and full CLI command set that an agent can execute. However, edge cases such as cross\u2011region KMS key validation, engine\u2011specific quirks for Oracle/SQL\u202fServer, and handling of failed prerequisite checks are not fully fleshed out, leading to a modest deduction."
+      "justification": "Provides a ready\u2011to\u2011deploy checklist and working CLI commands that match the defined output format. Some edge cases are not covered (e.g., IAM DB authentication, RDS Proxy, optional storage\u2011type flags). A few commands omit required flags for Serverless v2 (missing --engine-mode provisioned) and lack handling for optional features, limiting full practical coverage."
     }
   ],
-  "total_score": 107,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 54820,
-  "latency_ms": 18527,
+  "grade": "A",
+  "token_count": 55159,
+  "latency_ms": 18611,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

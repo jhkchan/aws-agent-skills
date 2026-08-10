@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 18,
       "max": 20,
-      "justification": "The skill provides many specific AWS nuances (severity scale mapping, quarantine\u2011SG pre\u2011provision, memory\u2011capture ordering, cross\u2011account role pattern, kill\u2011switch implementations). However a large portion restates well\u2011known AWS documentation and does not introduce a truly novel decision\u2011tree or quantitative threshold beyond the common GuardDuty >=7 rule, so the delta is not maximal."
+      "justification": "Provides many specific, non\u2011obvious details (GuardDuty vs Security Hub severity scales, quarantine SG provisioning, memory\u2011capture ordering, cross\u2011account role pattern, SSM step timeout overrides, task\u2011token approval pattern). However, a portion of the content restates standard AWS documentation without novel insight, so full 20 is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill conveys expert mindset (latency vs blast radius) and AWS\u2011specific procedures (EventBridge pattern, Step Functions Choice before actions, SSM document usage). Some steps are generic (e.g., \"check IAM role\" without an AWS\u2011specific verification flow, missing explicit SSM\u2011agent version check), which prevents a perfect score."
+      "justification": "Delivers an AWS\u2011specific decision tree, exact ordering of kill\u2011switch, Step Functions Choice state, SSM document usage, and IAM least\u2011privilege patterns. One point deducted because some procedural language remains generic (e.g., \"check security\") rather than fully concrete AWS API sequences."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "A thorough NEVER list with concrete reasons is present (kill\u2011switch, no auto\u2011delete, least\u2011privilege, idempotency, etc.). The only shortfall is the omission of an explicit warning about the misuse of Step Functions Wait states (although mentioned later), leaving one anti\u2011pattern without a dedicated rationale."
+      "justification": "Contains a thorough NEVER list with concrete reasons (kill\u2011switch, no auto\u2011delete, scoped IAM, idempotency, etc.). Slight deduction for omitting a few niche pitfalls (e.g., misuse of EventBridge global bus latency) that would strengthen the anti\u2011pattern coverage."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter, description, when_to_use, activation_triggers, and a detailed JSON invocation schema are all present. The activation triggers list is extensive but somewhat vague (e.g., \"automate incident response\" could match many intents), and the spec does not mark the kill\u2011switch as a required field, which reduces precision."
+      "justification": "Front\u2011matter, description, when_to_use, activation_triggers, and a detailed JSON invocation schema are present. Missing a concrete example of a full invocation payload and the 'when_not_to_use' section is brief, reducing reliability of activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The document uses a top\u2011level overview with a navigation table and then dives into details, which is good. However critical safety rules (kill\u2011switch, idempotency) are buried deep in long sections, causing potential cognitive overload for a quick\u2011look agent."
+      "justification": "The skill layers information well (summary, quick navigation, deep sections). A small amount of cognitive overload remains because large JSON snippets (Step Functions definition) are placed early, which could be deferred to a reference section."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained (kill\u2011switch, manual approval, test\u2011account requirement). Nonetheless, the example that produces a MANUAL_STEP_REQUIRED verdict still mentions a termination action, indicating the calibration could be stricter for irreversible steps."
+      "justification": "Calibrates tightly for destructive actions (kill\u2011switch, manual override, idempotency). One point deducted because the kill\u2011switch description could emphasize testing its failure mode more explicitly for high\u2011risk deletions."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Decision Tree \u2192 Detailed sections). The inclusion of large raw JSON blocks (Step Functions definition) slightly breaks the textual pattern, but overall the structure is coherent."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Decision Tree \u2192 Detailed Sections). Slight deduction because the layout mixes ad\u2011hoc lists (e.g., recent\u2011features table) with the core pattern, making the overall structure marginally less uniform."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "An agent could follow the decision tree, run the CLI snippets, and emit the prescribed output format. Missing are concise decision matrices for choosing between Lambda, Step Functions, and SSM, and explicit error\u2011handling examples for missing resources (e.g., GuardDuty finding for a terminated instance)."
+      "justification": "Provides actionable CLI commands, decision trees, output format, and safety checks; model outputs demonstrate correct usage. Deducted for missing explicit error\u2011handling branches for some edge cases (e.g., missing instance, region\u2011specific failures) and for not supplying a ready\u2011to\u2011run CloudFormation template reference."
     }
   ],
-  "total_score": 107,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 57462,
-  "latency_ms": 14856,
+  "grade": "A",
+  "token_count": 55975,
+  "latency_ms": 4946,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 14,
       "max": 20,
-      "justification": "Adds genuine expert knowledge: OSI\u2011layered diagnostic tree, silent\u2011failure cases (overlapping CIDRs, cross\u2011VPC SG references), NACL stateless return\u2011path requirement, VPC DNS flag interactions, TGW propagation nuances, PrivateLink endpoint\u2011service health checks, and concrete CLI probes. This depth exceeds what a generic model already knows."
+      "justification": "The skill compiles many known AWS VPC networking facts (OSI ordering, NACL statelessness, SG cross\u2011VPC reference limits, overlapping CIDR silent failure, endpoint policy independence, TGW propagation details). These are largely information a senior engineer already knows; the skill adds only modest synthesis (e.g., a concrete decision tree) rather than novel thresholds or exclusive expert tricks."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Transfers AWS\u2011specific mindset and procedures (OSI ordering, exact CLI commands per layer, Reachability Analyzer usage). Minor loss: some steps (e.g., \"run nc -vz\") are generic OS\u2011level checks rather than AWS\u2011specific, and the decision tree is described in prose rather than a formal algorithm."
+      "justification": "The skill conveys expert mindset (OSI\u2011first, never guess, treat destination as innocent) and a detailed AWS\u2011specific procedure (pre\u2011flight context gathering, step\u2011by\u2011step probes, Reachability Analyzer usage). Some steps are generic (e.g., \"run nc -vz\" or generic \"check SGs\") and a few AWS\u2011specific nuances (like prefix\u2011list ordering) are omitted, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a thorough NEVER list with concrete reasoning (e.g., SG reference cross\u2011VPC, overlapping CIDRs, NACL directionality). Missing: anti\u2011patterns around NAT gateway mis\u2011configurations, IAM permission failures for CLI calls, and pagination/ throttling pitfalls. Hence a small deduction."
+      "justification": "A thorough NEVER list is provided with concrete reasoning (e.g., SG references across VPCs, NACL statelessness, overlapping CIDRs, DNS flag, endpoint policy independence). However, a few anti\u2011patterns are generic (e.g., \"never expand CIDR to 0.0.0.0/0\") and the list omits some subtle pitfalls such as prefix\u2011list precedence or Route\u00a053 Resolver firewall interactions, so it falls short of full marks."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, invocation_schema, and example are all present and detailed. Slight issue: activation_triggers are overly exhaustive, risking false activation, and the invocation_schema mixes optional and required fields in a way that could be ambiguous for an agent."
+      "justification": "Frontmatter is complete, description, activation triggers, invocation schema, and a minimal example are present, enabling reliable activation. The \"when_to_use\" narrative is slightly verbose, but still meets spec."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Content is layered (Quick start \u2192 Mindset \u2192 Process \u2192 Deep reference), but critical rules and anti\u2011patterns are buried deep, leading to cognitive overload for a first\u2011time user. The initial sections contain a large amount of detail before the core decision tree, reducing optimal progressive disclosure."
+      "justification": "The document layers information (Quick start \u2192 Mindset \u2192 Philosophy \u2192 detailed step\u2011by\u2011step \u2192 anti\u2011patterns \u2192 remediation). Nonetheless, the initial sections are dense and contain many details that could overload an agent before it reaches the deeper layers, slightly violating optimal progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Calibration is strong: read\u2011only probes first, explicit CONFIRM gates before any state\u2011changing CLI, and clear guidance on batch limits. Minor gap: no explicit check for required IAM permissions before suggesting a state\u2011changing command, which could cause failed operations in a restricted environment."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts, read\u2011only probes are emphasized first, and the skill calibrates freedom appropriately for fragile operations (e.g., SG/NACL changes, TGW propagation). Creative tasks are not over\u2011constrained, achieving full marks."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "The skill follows a clear, repeatable pattern (Quick\u2011Start \u2192 Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011Patterns \u2192 References), making it easy to recognize and navigate."
+      "justification": "The skill follows a recognizable structure (Quick start, Mindset, Philosophy, Process, Anti\u2011patterns, Remediation, Deep reference) consistent with other CloudOps skills. Minor deviation is the length and depth of the Philosophy section, but overall the pattern is clear."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI commands, output format, and worked examples that an agent can follow. Minor gaps: intermittent failure handling is only briefly mentioned, and region/partition handling is not explicitly covered, which could cause edge\u2011case failures."
+      "justification": "Provides a concrete decision tree, exact AWS CLI commands, output format, and worked examples, enabling an agent to execute the troubleshooting end\u2011to\u2011end. Some edge cases (e.g., intermittent failures, custom prefix\u2011list ordering) are not fully covered, preventing a perfect score."
     }
   ],
-  "total_score": 107,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 66612,
-  "latency_ms": 24191,
+  "token_count": 67042,
+  "latency_ms": 16193,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5
