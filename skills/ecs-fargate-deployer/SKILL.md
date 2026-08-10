@@ -88,7 +88,7 @@ metadata:
 
 An AWS CloudOps agent skill that deploys Amazon ECS services on the
 Fargate serverless compute engine with correct production defaults. The
-skill walks the operator through a 13-step deployment procedure, explains
+skill walks the operator through a 10-step deployment procedure, explains
 why each default matters, and emits a READY_TO_DEPLOY checklist verifying
 every configuration item.
 

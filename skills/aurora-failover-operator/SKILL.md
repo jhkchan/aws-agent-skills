@@ -53,6 +53,7 @@ metadata:
   family: Databases
   task_type: operate
   skill_class: capability
+  lifecycle_status: active
   verdict_shape: "READY | BLOCKED | COMPLETED"
   when_to_use: >-
     Planning or executing an Aurora cluster failover (automatic, planned, or

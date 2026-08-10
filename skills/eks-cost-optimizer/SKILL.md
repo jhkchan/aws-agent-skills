@@ -58,6 +58,7 @@ metadata:
   family: Compute
   task_type: optimize
   skill_class: capability
+  lifecycle_status: active
   verdict_shape: "OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL"
   when_to_use: >-
     Right-sizing EKS managed node groups for cost, evaluating Fargate vs EC2

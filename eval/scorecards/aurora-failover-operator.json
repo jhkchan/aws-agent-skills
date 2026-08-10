@@ -1,0 +1,70 @@
+{
+  "skill": "aurora-failover-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides concrete expert details not usually known to a generic model: specific replica\u2011lag threshold (30\u202fs), exact pre\u2011check priority order, timing baselines for automatic vs. planned failover, recent feature changes (2024\u20112026), and nuanced global\u2011DB split\u2011brain risks. Deductions for occasional over\u2011generalizations (e.g., \u201cRDS Proxy always survives failover\u201d) and lack of explicit IAM permission handling."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedure flow: ordered pre\u2011checks, exact CLI commands with flags, CONFIRM gate, wait commands, post\u2011verification steps, and special handling for global DB and failback. One point deducted for a few generic health\u2011check mentions that could be more AWS\u2011specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Robust NEVER list with concrete pitfalls (no healthy reader, Global DB misuse, DNS cache, split\u2011brain, proxy misuse) and clear reasoning for each. One point deducted for missing anti\u2011patterns around IAM permissions and snapshot\u2011based recovery edge cases."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, schema, and example are all present. The only minor gap is the absence of a dedicated \"activation_conditions\" field; activation_triggers serve the purpose but the spec expects a clearer boolean condition."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered well (quick reference \u2192 mindset \u2192 process \u2192 anti\u2011patterns). Some sections (e.g., the full pre\u2011flight checklist) are dense, causing a slight cognitive overload for first\u2011time readers."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive operations are tightly constrained: mandatory CONFIRM gate, exhaustive pre\u2011checks, BLOCKED/READY/COMPLETED states, and explicit safety warnings. Creative tasks (planning) are given appropriate flexibility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable pattern (overview \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 heuristics \u2192 anti\u2011patterns), matching established skill structures."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides actionable CLI steps, decision tree, and worked examples, enabling an agent to execute. Deductions for inconsistencies: verdict_shape lists only READY|BLOCKED|COMPLETED but the text mentions a VERDICT: ERROR; missing explicit error handling and rollback guidance; limited guidance on handling CLI failures or IAM permission errors."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 46622,
+  "latency_ms": 15452,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

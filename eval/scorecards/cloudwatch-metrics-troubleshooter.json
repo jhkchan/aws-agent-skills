@@ -1,0 +1,70 @@
+{
+  "skill": "cloudwatch-metrics-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete expert heuristics (list\u2011metrics before get\u2011metric\u2011statistics, EMF silent\u2011drop detection, high\u2011resolution quota limits, cross\u2011account sharing needing configuration on both sides) and a detailed decision tree, but most content restates documented AWS behavior rather than introducing brand\u2011new concepts."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific troubleshooting order (list\u2011metrics \u2192 compare dimensions \u2192 verify emission \u2192 adjust alarm period) and supplies exact CLI commands. Some steps (e.g., \"verify resource exists\") are generic and not uniquely AWS\u2011specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a thorough NEVER list with concrete reasoning (e.g., never conclude a metric is missing without list\u2011metrics, never assume INSUFFICIENT_DATA means broken, never rely on logs alone for EMF failures). The only shortfall is that some warnings could cite more quantitative thresholds (e.g., exact period limits) but overall the anti\u2011patterns are strong."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata, activation triggers, invocation schema). Description clearly states WHAT the skill does, WHEN to invoke, and provides KEYWORDS. Minor weakness: the 'entry_point' flag is false without explanation, but activation triggers are sufficient for reliable invocation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a top\u2011level quick reference table and then expands into step\u2011by\u2011step diagnostics, but the document front\u2011loads a large amount of detail (full decision tree, edge\u2011case notes) which could overwhelm an agent before it knows which path to follow."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom precisely for a diagnostic task: forbids assumptions, requires quoted evidence, disallows preambles, and tightly constrains destructive actions. No over\u2011constrained steps for creative tasks, matching fragility of CloudWatch operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process steps \u2192 Strict output contract). Structure is coherent and aids comprehension; only minor ad\u2011hoc phrasing in some headings prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a complete decision tree, concrete CLI snippets, and a strict output contract that agents can follow. Missing are explicit handling of pagination, CLI error handling, and region mismatches, which could cause execution failures in edge cases."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 50214,
+  "latency_ms": 27319,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

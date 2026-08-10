@@ -1,0 +1,70 @@
+{
+  "skill": "stepfunctions-execution-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill repeats many well\u2011documented Step Functions concepts (error names, basic retry semantics) without introducing truly novel decision thresholds or exclusive expert heuristics; the added value is mainly aggregation rather than new knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are solid but occasionally generic (e.g., \"check logs\" before IAM simulation) and lack a strictly ordered AWS\u2011specific workflow for every failure mode; the ordering of IAM simulation vs. resource\u2011policy check could be more explicit."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a comprehensive NEVER list with concrete reasoning, but omits a few niche pitfalls (e.g., JSONata\u2011specific Runtime errors) that a senior engineer would expect."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Front\u2011matter, description, activation triggers, invocation schema, verdict shape and when\u2011to\u2011use are all present and well\u2011formed; the skill can be reliably discovered and invoked."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document front\u2011loads a large amount of detail (quick reference, edge cases, recent features) before the core decision tree, which can cause cognitive overload; critical rules are sometimes buried deep in the text."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Generally matches specificity to task fragility, but destructive commands (e.g., update\u2011state\u2011machine) are presented without explicit safety guards or confirmation steps, leaving a slight over\u2011freedom for high\u2011impact actions."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows a clear, recognizable structure (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process steps \u2192 Output contract \u2192 Worked example), aiding comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a decision tree, concrete CLI commands, and a strict output contract that an agent can follow. Minor gaps: some evidence examples omit exact quoting of `cause` fields, and the skill assumes required IAM permissions without checking them first."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 51195,
+  "latency_ms": 10363,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "s3-replication-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill supplies a detailed decision tree (priority\u2011ordered pre\u2011checks, full\u2011replacement replication API nuance, multi\u2011destination rule merging, batch\u2011replicate manifest fields, RTC SLA specifics, replica\u2011modification sync requirements, cross\u2011account bucket\u2011policy condition key, ObjectOwnership nuances, Object Lock ordering, etc.) that goes well beyond generic S3 replication knowledge a baseline model would have."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "It codifies expert AWS\u2011specific procedures: capture pre\u2011state before any put\u2011bucket\u2011replication, merge existing rules (full\u2011replace API), enforce a CONFIRM gate, verify IAM role permission chains, KMS key\u2011policy checks, and post\u2011verification sentinel object tests. The only shortfall is the invocation_schema is described in prose rather than a concrete JSON schema."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (full\u2011replace API, false\u2011green rule, delete\u2011marker assumptions, cross\u2011account bucket\u2011policy requirement, etc.). Does not call out the anti\u2011pattern of relying on the default S3\u2011managed KMS key without explicit policy grants, which can cause silent failures."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and includes a rich keyword list and activation triggers. Invocation schema is defined and matches the output contract."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "The document layers information: a quick reference table, then Mindset, Pre\u2011flight, Process, Output contract, Anti\u2011Patterns, and deep heuristics. Critical rules (pre\u2011checks, confirm gate) are presented early; detailed tables and examples are deferred to later sections, avoiding cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive operations (add\u2011rule, update\u2011rule, enable\u2011rtc, batch\u2011replicate, cross\u2011account config) are tightly constrained by mandatory pre\u2011checks, a CONFIRM gate, and pre\u2011state capture. Diagnostic or read\u2011only operations are left unconstrained, matching their low fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a clear, repeatable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Safety checks), making the skill easy to parse."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, exact output contract, and worked examples for each operation, enabling an agent to execute end\u2011to\u2011end. Gaps: the invocation_schema lacks a formal schema, the contract does not define handling of malformed input (the skill mentions VERDICT: ERROR but the contract only allows READY/BLOCKED/COMPLETED), and some edge cases (e.g., handling of pagination errors, IAM role trust policy validation) are not explicitly covered."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 51978,
+  "latency_ms": 10872,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
