@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 18,
       "max": 20,
-      "justification": "The skill compiles detailed thresholds, cost tables, and a decision tree that an experienced engineer may already know; it restates known AWS documentation rather than delivering truly novel expert insight."
+      "justification": "Provides deep, AWS\u2011specific lifecycle expertise (minimum\u2011duration charges, 128\u202fKB IA surcharge, monitoring fee, transition day counting, object\u2011size gating, Intelligent\u2011Tiering nuances, Glacier retrieval costs) that a generic model would not know. Minor gap: references to external pricing matrix without including it."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow: pre\u2011flight metadata gates, ordered dimension checks, exact CLI commands, backup/rollback steps, and a priority order for opportunity dimensions. Some steps (e.g., \"list\u2011objects\u2011v2\" pagination) are generic and could be more tightly tied to S3 lifecycle nuances, preventing a perfect score."
+      "justification": "Provides a clear AWS\u2011specific workflow (pre\u2011flight, step\u2011wise optimisation, rollback, confirmation gate) and concrete CLI commands. One point is deducted because a few steps (e.g., generic \u201cVerify\u201d commands) are not uniquely AWS\u2011oriented."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., IA for <128\u202fKB objects, minimum\u2011duration charges, conflating Expiration with NoncurrentVersionExpiration, Glacier retrieval cost traps, Intelligent\u2011Tiering monitoring fee, directory bucket limitations). Only minor gaps such as limited discussion of legal\u2011hold interactions prevent a perfect rating."
+      "justification": "Extensive NEVER list with concrete reasoning (IA small\u2011object surcharge, minimum\u2011duration, multipart leaks, etc.). One point is deducted for omitting a few niche anti\u2011patterns such as the cost of S3 Batch Operations back\u2011fill or the subtle CRR storage\u2011class propagation edge case."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description explains WHAT, WHEN, and KEYWORDS, and activation triggers and invocation schema are provided. The \"when_to_use\" field is embedded in metadata rather than a dedicated top\u2011level spec, making the trigger definition slightly less explicit."
+      "justification": "Complete front\u2011matter, clear description, when\u2011to\u2011use, activation triggers, and invocation schema. The only shortfall is the absence of an explicit \u201cexample invocation\u201d field, which would make activation even more reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document is long and dense; while sections are separated, critical rules (e.g., anti\u2011patterns) are buried deep, causing some cognitive overload before the agent sees the most important constraints."
+      "justification": "Information is layered (quick reference, decision tree, detailed steps, error handling). However, the initial sections are dense, causing some cognitive overload before the concise top\u2011level summary appears."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions (put\u2011bucket\u2011lifecycle\u2011configuration) are gated by an explicit CONFIRM step, state backup, and detailed rollback procedure. Creative analysis steps are left open but appropriately unconstrained. The only shortfall is reliance on an external pricing matrix file for cost estimates, which adds a small uncertainty."
+      "justification": "Destructive actions (put\u2011bucket\u2011lifecycle\u2011configuration) are tightly constrained with mandatory CONFIRM, pre\u2011flight state capture, rollback procedure, and rate\u2011limit guidance. Calibration matches task fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern: overview, quick reference, decision tree, mindset, pre\u2011flight, stepwise process, anti\u2011patterns, edge\u2011case handling, rollback, and implementation. The ordering of some sections (e.g., anti\u2011patterns interleaved with edge cases) is slightly ad\u2011hoc, preventing a perfect score."
+      "justification": "Follows a coherent, recognizable structure (What it does, Quick reference, Decision tree, Mindset, Process, Anti\u2011patterns, Edge\u2011cases, Error handling, Rollback)."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 10,
       "max": 15,
-      "justification": "Provides working CLI examples, error\u2011handling tables, and verification steps, but sample outputs contain unrealistic numbers and unit errors, indicating ambiguity in calculations and potential misuse by an agent."
+      "justification": "Provides concrete CLI commands, JSON payloads, and verification steps, enabling an agent to act. Yet the sample model outputs contain arithmetic mismatches and violate the verdict\u2011consistency rules (e.g., OPPORTUNITY_FOUND with $0 savings), showing ambiguity in the skill\u2019s enforcement of those rules. Missing explicit validation steps for savings calculations reduces practical reliability."
     }
   ],
-  "total_score": 101,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 74633,
-  "latency_ms": 18423,
+  "grade": "A",
+  "token_count": 74901,
+  "latency_ms": 18213,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

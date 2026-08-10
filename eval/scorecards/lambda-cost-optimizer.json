@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 16,
       "max": 20,
-      "justification": "The skill provides many concrete numbers (e.g., 1769\u202fMB\u202f=\u202f1\u202fvCPU, $0.0000166667/GB\u2011second, 20\u202f% ARM64 discount) and detailed break\u2011even formulas that a generic model would not know. However, a large portion restates well\u2011known AWS documentation (memory\u2011CPU coupling, basic cost formula, Power Tuning usage) without adding new insight such as real\u2011world thresholds, case studies, or proprietary heuristics. The missing expert delta is a decision tree for when to prefer up\u2011size vs down\u2011size beyond the generic \"run Power Tuning\" step."
+      "justification": "Adds concrete expert details (CPU\u2011memory coupling 1769\u202fMB\u202f=\u202f1\u202fvCPU, exact $0.0000166667/GB\u2011second rate, 20\u202f% ARM64 discount, precise provisioned\u2011concurrency break\u2011even formulas, Power Tuning cost column, batch\u2011size limits, SnapStart support matrix). However, much of the content restates publicly documented AWS pricing and best\u2011practice concepts that a capable model already knows, so full marks are not justified."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The skill encodes an AWS\u2011specific workflow: pre\u2011flight data gate, ordered steps (memory \u2192 concurrency \u2192 duration \u2192 frequency \u2192 architecture), exact CLI commands for each operation, and a decision tree for provisioned concurrency. The procedures are highly specific to Lambda, though a few steps (\"check security\") are generic, preventing a perfect score."
+      "justification": "The skill provides an AWS\u2011specific workflow (Power Tuning deployment, break\u2011even math for provisioned concurrency, batch\u2011size tuning) and a clear step order. However, several procedures are generic (e.g., \"check latency SLO\", \"run Power Tuning before assuming\"), and the decision tree for provisioned concurrency mixes generic traffic\u2011consistency checks with vague thresholds (\"CV < 0.5\") without concrete numeric guidance."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "A thorough NEVER list is provided with concrete reasoning (e.g., never change memory without Power Tuning evidence, never enable provisioned concurrency on sporadic traffic, never recommend SnapStart for non\u2011Java runtimes). The list could be expanded with more IAM\u2011permission pitfalls and container\u2011image nuances, so it falls just short of full credit."
+      "justification": "A comprehensive NEVER list is present with concrete reasons (e.g., never recommend memory change without Power Tuning evidence, never enable SnapStart for non\u2011Java runtimes). The only shortfall is the omission of pitfalls related to IAM permission failures for Compute Optimizer and Lambda Insights, and the lack of a specific warning for container\u2011image functions."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, the description clearly states WHAT the skill does, WHEN to invoke, and includes rich keywords and activation triggers. The only minor gap is the absence of an explicit regional pricing matrix (the skill says to re\u2011state rates but does not embed them), which prevents a perfect score."
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and a detailed invocation schema are all present and well\u2011formed. The activation_triggers list is overly exhaustive, which could cause accidental invocation on loosely related prompts, slightly weakening reliability."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers information (quick start, mindset, detailed steps, anti\u2011patterns, safety checks) and provides a navigation table. However, the top\u2011level sections are dense and some critical rules (e.g., CONFIRM gate) are buried deep, causing potential cognitive overload for an agent."
+      "justification": "Information is layered: quick start \u2192 mindset \u2192 detailed steps \u2192 edge cases \u2192 anti\u2011patterns. Critical rules are not buried, but the document is long and some sections (e.g., full CLI scripts) could overwhelm a first\u2011time agent, warranting a small penalty."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by explicit CONFIRM prompts, batch limits, and safety checks (e.g., version publishing before alias changes). The calibration is well\u2011matched to the fragility of Lambda operations, with only a slight deduction for the occasional permissive wording (e.g., \"run Power Tuning before assuming 128\u202fMB is cheapest\" could be stricter)."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts, and the level of detail matches task fragility (tight constraints for memory changes, concurrency removal; more freedom for analysis). Slight deduction for not explicitly limiting batch\u2011size increases that could cause timeout violations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure: quick navigation \u2192 mindset/philosophy \u2192 decision matrix \u2192 step\u2011by\u2011step process \u2192 anti\u2011patterns \u2192 safety checks. This coherent pattern aids comprehension, earning near\u2011max credit."
+      "justification": "Follows a recognizable pattern (overview \u2192 quick navigation \u2192 mindset \u2192 philosophy \u2192 decision matrix \u2192 pre\u2011flight \u2192 stepwise process \u2192 anti\u2011patterns \u2192 safety checks \u2192 remediation). Minor ad\u2011hoc ordering of some sections prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 11,
       "max": 15,
-      "justification": "The skill supplies concrete CLI commands, decision trees, and error\u2011handling tables, enabling an agent to act. However, the worked examples contain arithmetic errors and contradictory savings calculations (e.g., showing zero cost change but still labeling OPPORTUNITY_FOUND). These errors would cause an agent to emit misleading recommendations, violating the zero\u2011saving rule and reducing practical reliability."
+      "justification": "Provides actionable CLI commands, decision trees, and worked examples, enabling an agent to execute the skill. However, the model output examples contain contradictory cost calculations (e.g., zero savings yet OPPORTUNITY_FOUND) and arithmetic errors, indicating a risk of mis\u2011classification. These gaps lower practical reliability."
     }
   ],
-  "total_score": 100,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 85104,
-  "latency_ms": 12681,
+  "token_count": 84683,
+  "latency_ms": 13772,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

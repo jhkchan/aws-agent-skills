@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides deep, expert\u2011level specifics not usually known by a generic model: exact pre\u2011check ordering, compatibility matrix requirements (add\u2011on must be compatible with BOTH current and target versions), sequential minor\u2011version upgrade rule, surge capacity IP\u2011quota check, detailed deprecated\u2011API tables, cost/time baselines, and nuanced behaviours of Fargate, Auto Mode, hybrid nodes, and access entries. Minor gaps: no explicit IAM permission checklist beyond a brief mention, and Karpenter handling is only hinted."
+      "justification": "Provides many expert details (sequential minor\u2011version rule, add\u2011on compatibility for both current and target, IP\u2011capacity check for surge, PDB disruption math), but a portion restates common AWS/EKS knowledge and lacks a full decision tree for multi\u2011step upgrades (e.g., handling a failed control\u2011plane upgrade and fallback paths)."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: exact CLI command order, mandatory CONFIRM gate, pre\u2011state capture, polling describe\u2011update, and explicit handling of PDBs and surge parameters. The only shortfall is a few generic steps (e.g., \u201ccheck IAM role\u201d) that are not uniquely AWS\u2011specific."
+      "justification": "Encodes the correct AWS\u2011specific upgrade order and pre\u2011check flow, but some procedural steps are generic (e.g., \u201ccapture pre\u2011state\u201d without concrete file names for every artifact, no explicit IAM\u2011role verification beyond a brief mention)."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., why skipping add\u2011on upgrades breaks networking, why maxUnavailable\u202f=\u202f100% is dangerous). Missing are warnings about IAM permission pitfalls and AWS API rate\u2011limit errors, which would round out the anti\u2011pattern coverage."
+      "justification": "Contains a solid NEVER list with concrete reasons, yet omits several common pitfalls such as forgetting to pause Cluster Autoscaler during node\u2011group upgrades or handling add\u2011on configuration\u2011value conflicts beyond the generic OVERWRITE warning."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Complete frontmatter, clear description, when_to_use, activation_triggers, and invocation_schema. Description tells WHAT, WHEN, and KEYWORDS. Slight deduction for the invocation_schema being informal prose rather than a strict JSON schema, which could affect reliable activation."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers and invocation_schema are present, but the invocation_schema is described only in prose (no JSON schema) and the activation list is overly verbose, which could hinder reliable automated triggering."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns, then deep examples. Critical rules appear early; details are on demand. No overload. One point off for a few long tables that could be moved to references."
+      "justification": "The skill layers information (quick reference, mindset, process, anti\u2011patterns) but front\u2011loads a large amount of detail before the concise quick\u2011reference section, creating potential cognitive overload for an agent that needs only the top\u2011level verdict."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained with mandatory CONFIRM gates, pre\u2011check blocking, and capacity validation for surge upgrades. Creative tasks (e.g., planning) are not over\u2011constrained. Minor gap: no explicit calibration for hybrid\u2011node upgrades where the operator must act outside AWS CLI."
+      "justification": "Destructive actions are gated by a mandatory CONFIRM prompt and include safety checks (IP capacity, PDB, quota). However, the addon\u2011upgrade path lacks an explicit pre\u2011check for configuration\u2011value conflicts and does not bound maxSurge values, leaving a small freedom gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Anti\u2011Patterns \u2192 Output format) that aids comprehension. Slightly ad\u2011hoc naming of sections (e.g., \u201c\u00a7 Quick reference\u201d) prevents a perfect pattern score."
+      "justification": "Follows a recognizable structure (What it does, Quick navigation, Mindset, Process, Anti\u2011Patterns, Output format) but mixes custom sections (e.g., \u201cPre\u2011flight safety\u201d and \u201cRecent AWS features\u201d) that deviate slightly from a canonical pattern, making it marginally ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides actionable CLI sequences, output templates, and worked examples, enabling an agent to execute upgrades. Lacks explicit error\u2011handling branches for failed CLI calls (e.g., describe\u2011update failures, add\u2011on conflict errors) and does not specify fallback or retry logic, which limits full practical usability."
+      "justification": "Provides concrete CLI commands, decision branches and verification steps, yet the invocation schema is not machine\u2011parseable, error handling for AWS CLI failures or pagination issues is only mentioned in passing, and examples assume success without fallback logic."
     }
   ],
-  "total_score": 106,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 50565,
-  "latency_ms": 11878,
+  "token_count": 51467,
+  "latency_ms": 14819,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

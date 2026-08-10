@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 16,
       "max": 20,
-      "justification": "The skill compiles extensive AWS documentation into a decision tree, but most of the content (latency windows, bucket\u2011policy statements, KMS permissions, CLI commands) is already known to a capable model. It adds limited novel insight beyond restating known facts."
+      "justification": "The skill compiles extensive AWS\u2011specific details (latency windows, bucket\u2011owner\u2011full\u2011control condition, Insights baseline period, shadow\u2011trail start\u2011logging, cost impact of data events) that a senior CloudOps engineer would find useful, but most of this information is already documented in AWS guides. It does not introduce novel decision thresholds (e.g., exact latency numbers for data\u2011event delivery) or cover newer failure modes such as CloudTrail Lake federation errors or cross\u2011account KMS encryption nuances, limiting the delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific troubleshooting flow: capture signal \u2192 map to category \u2192 check get\u2011trail\u2011status before event selectors \u2192 verify bucket policy, KMS, org\u2011trail shadow status, then remediate. The order (status \u2192 selectors \u2192 bucket/KMS) reflects real CloudTrail diagnostics. Only minor generic advice (\"ask user for info\") prevents a perfect score."
+      "justification": "Procedures are clearly AWS\u2011specific and follow a logical order (describe\u2011trails \u2192 get\u2011trail\u2011status \u2192 bucket policy \u2192 KMS policy \u2192 event selectors). However some steps are generic (e.g., \"run lookup\u2011events\" without specifying pagination or error handling) and the ordering between bucket\u2011policy and KMS\u2011policy checks is not explicitly mandated, leaving room for sub\u2011optimal troubleshooting flow."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a comprehensive NEVER list with specific reasoning for each pitfall (e.g., never assume outage, never confuse describe\u2011trails with get\u2011trail\u2011status, never enable all S3 data events without cost warning, never delete a trail as first fix). Each anti\u2011pattern is justified with real\u2011world consequences."
+      "justification": "A thorough \"NEVER\" list is provided with concrete reasoning for each pitfall (e.g., never assume a CloudTrail outage, never ignore the distinction between describe\u2011trails and get\u2011trail\u2011status, never enable data events without cost warning). The only shortfall is the absence of a few additional anti\u2011patterns such as never overlooking AWS Health alerts for CloudTrail service incidents."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, metadata). The description clearly states WHAT the skill does, WHEN to invoke, and provides activation_triggers and an invocation_schema. Output format is precisely defined."
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The only shortfall is the lack of an explicit \u201cwhen NOT to invoke\u201d clause, which would make activation criteria completely unambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (activation \u2192 mindset \u2192 quick reference \u2192 detailed steps), but the document is long and some critical rules (e.g., bucket\u2011policy ACL condition) are buried deep, causing potential cognitive overload for quick triage."
+      "justification": "The document front\u2011loads a large amount of detail (mindset, quick reference, full decision tree) before the agent reaches the actionable steps, which can cause cognitive overload; therefore 2 points are deducted."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (start\u2011logging, bucket\u2011policy changes) are tightly constrained with explicit commands and verification steps, while analytical steps remain flexible. Minor omission: no explicit guard against running start\u2011logging on an already\u2011active trail."
+      "justification": "Destructive actions such as modifying bucket policies or starting/stopping logging are presented with direct CLI commands and no safety prompts or confirmation steps, which is risky for fragile operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process \u2192 Output), but the layout mixes custom sections (e.g., Quick navigation) with the standard pattern, making it slightly ad\u2011hoc."
+      "justification": "The skill follows a clear, repeatable pattern (Activation \u2192 Mindset \u2192 Quick Reference \u2192 Process \u2192 Output) that aligns with established troubleshooting skill templates, making it easy to comprehend and reuse."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, decision tree, and output example, enabling an agent to execute the skill. Some commands are outdated (e.g., get\u2011insight\u2011selectors vs newer list\u2011insights\u2011selectors) and cross\u2011account bucket\u2011policy edge cases are not fully covered, which could cause execution gaps."
+      "justification": "The decision tree, command snippets, and output format enable an agent to act, yet edge cases such as cross\u2011account bucket ownership, KMS key region mismatches, or missing IAM permissions are not fully addressed, and verification commands assume the CLI is pre\u2011installed and configured."
     }
   ],
-  "total_score": 107,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 60297,
-  "latency_ms": 14711,
+  "token_count": 59751,
+  "latency_ms": 19378,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

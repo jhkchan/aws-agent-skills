@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill aggregates known IAM evaluation order and common gotchas, but it does not introduce truly novel decision thresholds or exclusive expert heuristics that a senior CloudOps engineer could not already find in official docs or community articles. The content largely restates existing knowledge rather than delivering new, unexpected insight."
+      "justification": "Provides a detailed six\u2011layer evaluation tree, concrete condition\u2011key examples, and an 8\u2011item root\u2011cause catalog that a senior CloudOps engineer would find new. Missing deeper coverage of newer Access Analyzer validation steps and IAM Identity Center session\u2011policy nuances, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides a solid AWS\u2011specific decision tree and step\u2011by\u2011step CLI procedures, but the SCP\u2011gathering step omits explicit guidance on the order of root \u2192 OU \u2192 account policies, leaving a slight ambiguity in the exact procedure."
+      "justification": "Encodes AWS\u2011specific diagnostic order (SCP \u2192 resource \u2192 identity \u2192 boundary \u2192 session \u2192 service\u2011linked) and exact CLI commands. Lacks an explicit step for VPC endpoint policy verification, which is a notable AWS\u2011specific procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a comprehensive NEVER list with concrete reasons, yet several items are phrased generically (e.g., \"NEVER add wildcard Allow\" without a specific why) and omits a few common pitfalls such as over\u2011reliance on Access Analyzer findings, reducing the overall depth."
+      "justification": "Provides a thorough NEVER list with concrete pitfalls (wildcard Allow, assuming identity\u2011policy is the only cause, ignoring VPC endpoint policies, etc.) and clear reasoning why each is dangerous. Missing only a few niche anti\u2011patterns (e.g., IAM policy size limits), so one point is deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter includes description, activation triggers, and invocation schema, but the schema is described only in prose (no JSON schema or strict field definitions). This makes reliable automated activation less certain."
+      "justification": "Frontmatter includes all required fields, description, when_to_use, activation_triggers, and a textual invocation_schema. The skill description fully explains WHAT it does, WHEN to invoke, and KEYWORDS."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 14,
       "max": 15,
-      "justification": "The skill layers information well (activation \u2192 quick reference \u2192 process \u2192 edge cases), but the quick\u2011reference table packs many error\u2011type mappings that could overload the initial read."
+      "justification": "Top\u2011level sections give concise activation and quick reference; deeper details (process, edge cases, remediation) are layered later. Slight overload in the long Process section prevents a perfect score."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 15,
       "max": 15,
-      "justification": "The skill is purely diagnostic; it never performs destructive changes and requires explicit confirmation before any remediation step. Constraints are tight for fragile operations (e.g., requiring CloudTrail or simulator output before declaring ROOT_CAUSE_FOUND) and generous where creativity is needed (e.g., brainstorming remediation)."
+      "justification": "Diagnostic steps are tightly constrained (require CloudTrail or simulator before proceeding) and never perform destructive changes. Freedom is well\u2011calibrated to the fragility of IAM troubleshooting."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable structure (Activation, Mindset, Process, Output), but the mixture of tables, narrative, and markdown headings makes the pattern somewhat ad\u2011hoc rather than a strict, repeatable template."
+      "justification": "Follows a clear, repeatable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process \u2192 Output \u2192 Commands \u2192 Edge cases \u2192 Anti\u2011Patterns \u2192 Remediation), matching established troubleshooting skill structures."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI commands, and output format, but assumes the agent has CLI access and proper credentials without fallback for offline scenarios, and the output format is described in free\u2011form text rather than a strict machine\u2011parseable schema, which could hinder automated consumption."
+      "justification": "Provides a deterministic decision tree, concrete CLI commands, and a worked example, enabling an agent to act. Lacks a machine\u2011parseable invocation schema and omits guidance for pagination or permission errors when running CLI commands."
     }
   ],
-  "total_score": 107,
+  "total_score": 112,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 49179,
-  "latency_ms": 16184,
+  "grade": "A",
+  "token_count": 50894,
+  "latency_ms": 14389,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

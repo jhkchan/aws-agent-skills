@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill supplies concrete, non\u2011trivial data such as exact service limits (300 rules per bus, 5 targets per rule, 185 default retries, 14\u2011day DLQ retention), recent feature distinctions (Scheduler vs legacy cron rules, Pipes vs Rules, global endpoints), and a decision\u2011tree for choosing between Rules, Pipes, and Scheduler. However a large portion restates standard documentation without novel insight, so the delta is strong but not maximal."
+      "justification": "The skill provides many expert details (DLQ requirement, lambda:AddPermission, EventPattern limits, InputTransformer per\u2011target, bus\u2011policy nuances, quota numbers, Scheduler vs rule trade\u2011offs, global\u2011endpoint replication, schema\u2011registry quirks). However it omits some of the newest nuances such as the exact IAM role requirements for EventBridge Scheduler, the detailed rate\u2011limit handling for API destinations, and the latest Pipe enhancements for self\u2011managed Kafka/MSK, which a senior engineer would expect."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill outlines an AWS\u2011specific workflow: test pattern \u2192 create DLQ \u2192 put\u2011targets \u2192 add Lambda permission \u2192 verify bus policy, with explicit pre\u2011flight safety gates. Some steps (e.g., \"verify DLQ exists\") are generic cloud\u2011ops checks, preventing a perfect score."
+      "justification": "The skill outlines a clear AWS\u2011specific workflow (pattern vs schedule fork, target wiring, DLQ/Retry, cross\u2011account bus policy, archive/replay, global endpoints). The only shortfall is the Scheduler provisioning procedure: it mentions Scheduler as preferred but does not detail the required IAM role creation and permission scope, leaving a small procedural gap."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., missing DLQ leads to silent loss, Lambda needs AddPermission, default bus misuse). Some warnings are generic (\u201cnever assume single\u2011delivery\u201d) and could cite more quantitative impact, but overall the anti\u2011patterns are specific and experience\u2011driven."
+      "justification": "A thorough NEVER list with concrete reasons is provided, yet it omits a few common pitfalls (e.g., Scheduler IAM role mis\u2011configuration, rule\u2011name length limits, cost impact of archives), preventing a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers and invocation schema are present. Slightly weak is the lack of an explicit version\u2011compatibility matrix for runtime environments, costing one point."
+      "justification": "Full front\u2011matter, clear description, explicit WHEN\u2011TO\u2011USE, activation triggers, and a well\u2011defined invocation schema. An agent can reliably decide when to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document is organized into Mindset, Quick navigation, step\u2011by\u2011step sections, anti\u2011patterns, and appendices, which helps layer information. Nevertheless, the initial sections contain a dense amount of detail that could overwhelm an agent before it reaches the concise top\u2011level summary."
+      "justification": "The document is well\u2011structured but loads a large amount of detail early (the entire Mindset and Quick navigation sections before the step\u2011by\u2011step guide). Critical safety checks and anti\u2011patterns are buried deep, which can cause cognitive overload for a first\u2011time user."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are guarded by explicit confirmation prompts and pre\u2011flight checks, while creative decisions (e.g., choosing Scheduler vs Rules) are given flexible decision trees. A minor gap is that cross\u2011account routing could benefit from tighter default constraints (e.g., mandatory org\u2011ID condition)."
+      "justification": "The skill tightly constrains fragile actions (confirmation gate, pre\u2011flight checks, mandatory DLQ, retry limits). It lacks explicit constraints for destructive operations such as rule deletion or archive removal, which could be risky if left unconstrained."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 10,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (Mindset \u2192 Navigation \u2192 Process steps \u2192 Anti\u2011patterns \u2192 Appendices), matching established CloudOps skill patterns."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Navigation \u2192 Step\u2011by\u2011step Process \u2192 Anti\u2011Patterns \u2192 Appendices \u2192 Decision Trees. This coherent structure aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, CLI snippets, output format, and worked examples, enabling an agent to execute deployments. However, there are concrete syntax errors (malformed JSON in the S3 example, inconsistent cron syntax) and contradictory statements about global endpoint behavior that could cause execution failures."
+      "justification": "Provides decision trees, CLI snippets, output format, and worked examples, enabling an agent to execute the plan. Missing are explicit error\u2011handling steps for CLI failures, detailed validation of cross\u2011region target ARNs, and a concrete recipe for handling events larger than 256\u202fKB (beyond a brief mention)."
     }
   ],
-  "total_score": 104,
+  "total_score": 110,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 52386,
-  "latency_ms": 21669,
+  "grade": "A",
+  "token_count": 52693,
+  "latency_ms": 17312,
   "assertions_passed": false,
   "assertions_passed_count": 1,
   "assertions_failed_count": 4

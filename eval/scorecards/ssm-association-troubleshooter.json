@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 14,
       "max": 20,
-      "justification": "The skill contains many expert details (3\u2011layer health check, VPC endpoint requirements, legacy policy differences, cron syntax quirks, hybrid activation nuances) that a generic model would not automatically know. However, a portion of the content merely restates well\u2011known AWS documentation (e.g., basic CLI commands, standard status meanings) and does not introduce a novel decision threshold or a unique heuristic, so full marks are not awarded."
+      "justification": "The skill largely restates known SSM troubleshooting knowledge (3\u2011layer health check, CLI commands, common error messages). It does not introduce a novel decision threshold, heuristic, or previously undocumented exception that a senior CloudOps engineer would learn for the first time."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and ordered (run 3\u2011layer health check first, then symptom\u2011specific trees). A small deduction is made because some steps are generic \"run a CLI command\" without deeper AWS\u2011only reasoning (e.g., no explicit mention of IAM trust relationships or SSM service\u2011side throttling handling)."
+      "justification": "Provides an AWS\u2011specific, ordered procedure (IAM \u2192 Connectivity \u2192 Agent \u2192 association). However, it omits a concrete, AWS\u2011native procedure for handling rate\u2011limiting or command\u2011concurrency limits, which are common in SSM operations."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is extensive and explains why each pitfall is harmful. It loses points for a few items lacking concrete reasoning (e.g., concurrent\u2011command limit warning does not explain the transient nature) and for omitting some common anti\u2011patterns such as over\u2011broad IAM policies or forgetting to rotate activation codes."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never treat Success as script success, never assume PingStatus Active means health). However, some anti\u2011patterns lack explicit mitigation steps (e.g., \u201cNever assume a fresh instance is unmanaged\u201d could cite a wait\u2011time), so it falls short of full marks."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is present and includes description, when_to_use, activation_triggers, and invocation_schema. The activation_triggers list is overly broad, and the when_to_use paragraph, while detailed, is somewhat verbose, making reliable automated activation less crisp. No explicit version compatibility field beyond a free\u2011text note."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are well defined. The activation_triggers list is extensive but includes a few redundant entries (e.g., both \"association never runs\" and \"association not running\"), which could cause ambiguous activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (mindset \u2192 navigation \u2192 steps \u2192 appendices) but the initial sections already contain a large amount of detail, which can cause cognitive overload before the user knows which symptom they have. A more staged reveal (e.g., only show the 3\u2011layer check until a symptom is selected) would be ideal."
+      "justification": "The skill layers information (Mindset \u2192 Quick navigation \u2192 Steps \u2192 Appendices) but the initial sections are dense, presenting many tables and detailed notes before the core decision tree, risking cognitive overload for an agent that needs quick triggers."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (update\u2011association, start\u2011associations\u2011once, IAM policy changes) are gated by safety\u2011check reminders and a mandatory CONFIRM prompt. One point is deducted because the examples sometimes omit the explicit CONFIRM step, leaving a slight inconsistency in enforcement."
+      "justification": "Destructive actions (update\u2011association, start\u2011associations\u2011once) are gated by explicit confirmation prompts and safety notes about blast radius. The only minor gap is the lack of an automated rollback suggestion for policy changes."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (mindset, navigation table, stepwise decision tree, output format, anti\u2011patterns, safety checks, appendices). The pattern is coherent, but the mixture of tables, free\u2011text, and code blocks feels a bit ad\u2011hoc rather than a single, clean template."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Steps \u2192 Appendices \u2192 Anti\u2011Patterns). The structure is clear, though the mixture of tables and free\u2011form text occasionally breaks the uniformity."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI snippets, decision trees, and worked examples, enabling an agent to act. Missing are explicit error\u2011handling branches for CLI failures, handling of multiple target instances in a single diagnosis, and guidance for rate\u2011limiting back\u2011off. These gaps reduce the ability to execute flawlessly in all edge cases."
+      "justification": "Provides concrete decision trees, CLI snippets, output format, and worked examples that an agent could execute. Some branches (e.g., fetching S3 output when URL is missing) lack fallback guidance, and the hybrid activation path assumes on\u2011host access without offering an alternative remote method."
     }
   ],
-  "total_score": 106,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49600,
-  "latency_ms": 21286,
+  "token_count": 49111,
+  "latency_ms": 14797,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

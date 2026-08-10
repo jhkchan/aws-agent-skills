@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Provides many concrete details (policy IDs, exact CLI queries, decision tree, root\u2011cause catalog) that a generic model would not list, but some content merely restates well\u2011known CloudFront concepts and includes placeholder IDs, so it does not reach full expert novelty."
+      "justification": "The skill consolidates many expert details (e.g., exact managed policy IDs, x\u2011edge\u2011result\u2011type meanings, recent 2024\u20112026 features) that a senior CloudOps engineer would find useful, but most of this information is already documented in AWS docs or known to a capable model. It does not introduce a novel decision matrix or a previously undocumented threshold, so the delta is solid but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill outlines an AWS\u2011specific diagnostic flow and exact CLI commands, yet several steps (e.g., \"run curl -I\", \"check logs\") are generic and not uniquely CloudFront\u2011oriented, losing a few points for lack of tighter AWS\u2011focused procedure ordering."
+      "justification": "Offers an AWS\u2011specific diagnostic flow (origin header check \u2192 cache\u2011policy TTL \u2192 cache\u2011key inspection \u2192 WAF/Lambda@Edge) and concrete CLI commands. The ordering of WAF vs Lambda@Edge checks could be clearer, leading to a minor deduction."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never include User\u2011Agent, never set MaxTTL < MinTTL). Misses a couple of common pitfalls such as forgetting to enable access logging or handling pagination for list\u2011commands, so points are deducted."
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never include User\u2011Agent, never use Cookies: all). Missing a few common pitfalls such as never using \"all\" query strings for static assets and no explicit warning about `Cache-Control: private` misuse."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete and the description clearly states WHAT, WHEN, and KEYWORDS. The only shortfall is the absence of an explicit \"type\" field and a slight redundancy between activation_triggers and the Activation section, preventing a perfect score."
+      "justification": "Front\u2011matter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The only shortfall is the lack of an explicit `entry_point: true` flag, which could affect automated activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick reference \u2192 detailed steps \u2192 deep references). However, the initial sections are dense and present many details up\u2011front, causing some cognitive overload."
+      "justification": "The skill layers top\u2011level quick reference, detailed step\u2011by\u2011step walk, and deep references, but the initial sections are dense and may overload the agent before it knows which part to use."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates specificity for fragile actions (e.g., waits for distribution deployment, warns before updating policies). Does not explicitly limit updates to a single cache behavior, leaving a small risk of over\u2011broad changes."
+      "justification": "Calibrates well for a diagnostic task: it asks for required inputs before proceeding. For destructive actions (e.g., creating an invalidation) it does not explicitly require user confirmation, which is a slight over\u2011freedom."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (activation, mindset, process, output format, anti\u2011patterns, remediation). Minor inconsistency: anti\u2011pattern list is embedded rather than a separate, clearly labeled module, preventing a perfect rating."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Process \u2192 Output format \u2192 Anti\u2011patterns \u2192 Remediation). The layout is slightly ad\u2011hoc rather than a formally defined template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, working CLI examples, and clear output format, enabling an agent to act. However, edge cases such as distributions with multiple cache behaviors, missing access\u2011log configuration, or SDK\u2011only environments are not fully addressed, leading to a small deduction."
+      "justification": "Provides a complete decision tree, working CLI examples, and output format, enabling an agent to act. Lacks guidance for cases where access logs are disabled or CLI pagination is needed, and does not enforce safety checks for invalidation commands."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 55401,
-  "latency_ms": 19496,
+  "token_count": 55013,
+  "latency_ms": 13624,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

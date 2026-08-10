@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 13,
+      "score": 16,
       "max": 20,
-      "justification": "The skill aggregates many known AWS SNS concepts (FIFO restrictions, KMS policies, delivery\u2011logging roles) but does not introduce truly novel expert insight; most information can be found in official docs. The only added value is the collation of recent 2024\u20112026 feature notes, which is modest."
+      "justification": "The skill compiles many AWS\u2011specific details (attribute names, ordering constraints, KMS policy examples, FIFO dedup rules) that a generic model may not recall, but most of the information is already documented in official guides. It does not introduce truly novel insights such as undocumented limits, performance thresholds, or undocumented edge\u2011case behaviours, so a modest deduction is warranted."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific deployment order (topic type \u2192 KMS \u2192 access policy \u2192 logging \u2192 filter \u2192 DLQ) and provides exact CLI commands for each step. A few procedures are described generically (e.g., \"verify IAM permissions\") rather than with precise AWS checks, costing a point."
+      "justification": "Procedures are largely AWS\u2011specific (e.g., create\u2011topic, set\u2011topic\u2011attributes, subscription order), yet some steps are phrased generically like \"run pre\u2011flight checks\" without enumerating the exact AWS CLI calls or IAM checks, leaving a small gap in concrete, repeatable workflow."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., wildcard Subscribe, missing .fifo suffix). However, it omits a few common pitfalls such as forgetting the CloudWatch Logs resource policy for delivery logging, and the list could be better prioritized."
+      "justification": "Extensive NEVER list with concrete pitfalls (FIFO topic without .fifo, wildcard Subscribe, AWS\u2011managed key for cross\u2011account, missing delivery logging, MessageBody filter without JSON, etc.) and clear reasons why each is dangerous. Deducted 1 point because it omits a specific anti\u2011pattern about using \"Principal: *\" on sns:Publish without a strong condition."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Complete frontmatter, clear description, activation keywords, explicit invocation contract, and mandatory output format with literal labels. All required metadata present and unambiguous."
+      "justification": "Full frontmatter, clear description, activation keywords, when\u2011to\u2011use, and a strict output\u2011format contract with literal labels. Deducted 1 point because the \"when to invoke\" section could be more precise about edge\u2011case triggers (e.g., does not explicitly list version\u2011specific feature gating)."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "The document is dense; many detailed tables and code snippets appear before the core checklist, creating cognitive overload. A more layered approach (summary first, then deep dives) would improve discoverability."
+      "justification": "The document is richly layered with navigation tables, but critical anti\u2011pattern warnings and some prerequisite checks are buried deep in the text, causing initial cognitive overload for an agent that must parse the whole file before reaching the essential rules."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Constraints are well\u2011calibrated for creation tasks (e.g., strict FIFO subscriber rules). Yet the skill does not explicitly restrict optional destructive actions (topic deletion) or over\u2011constrain creative scenarios like custom message\u2011structure publishing."
+      "justification": "Destructive actions (topic creation, policy setting) are guarded by pre\u2011flight safety checks, yet the skill does not enforce an explicit confirmation step before issuing irreversible CLI commands, leaving a small risk of accidental execution."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable taxonomy (frontmatter, navigation, reasoning, steps, anti\u2011patterns, verification). The pattern is consistent throughout the skill."
+      "justification": "The skill follows a recognizable structure (frontmatter, navigation, contract, steps, anti\u2011patterns, output format), but it deviates slightly from a strict template (e.g., missing an explicit input schema section), making the pattern marginally ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides end\u2011to\u2011end CLI commands, verification steps, and decision trees, enabling an agent to execute the deployment. Lacks explicit handling of missing prerequisite prompts in the checklist (only generic [INPUT NEEDED]) and some edge\u2011case guidance (e.g., SMS, topic\u2011policy size limit) is thin, leading to a small deduction."
+      "justification": "The skill provides concrete CLI snippets, decision trees, and verification commands, enabling an agent to act. However, it does not show how to emit a PREREQUISITES_MISSING verdict or handle CLI failures gracefully, which limits full end\u2011to\u2011end usability."
     }
   ],
-  "total_score": 101,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 76301,
-  "latency_ms": 15699,
+  "token_count": 77492,
+  "latency_ms": 25471,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3
