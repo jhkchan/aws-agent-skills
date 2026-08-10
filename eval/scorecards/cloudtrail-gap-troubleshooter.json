@@ -1,0 +1,70 @@
+{
+  "skill": "cloudtrail-gap-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 14,
+      "max": 20,
+      "justification": "The skill compiles extensive AWS documentation into a decision tree, but most of the content (latency windows, bucket\u2011policy statements, KMS permissions, CLI commands) is already known to a capable model. It adds limited novel insight beyond restating known facts."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific troubleshooting flow: capture signal \u2192 map to category \u2192 check get\u2011trail\u2011status before event selectors \u2192 verify bucket policy, KMS, org\u2011trail shadow status, then remediate. The order (status \u2192 selectors \u2192 bucket/KMS) reflects real CloudTrail diagnostics. Only minor generic advice (\"ask user for info\") prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Contains a comprehensive NEVER list with specific reasoning for each pitfall (e.g., never assume outage, never confuse describe\u2011trails with get\u2011trail\u2011status, never enable all S3 data events without cost warning, never delete a trail as first fix). Each anti\u2011pattern is justified with real\u2011world consequences."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, metadata). The description clearly states WHAT the skill does, WHEN to invoke, and provides activation_triggers and an invocation_schema. Output format is precisely defined."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (activation \u2192 mindset \u2192 quick reference \u2192 detailed steps), but the document is long and some critical rules (e.g., bucket\u2011policy ACL condition) are buried deep, causing potential cognitive overload for quick triage."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (start\u2011logging, bucket\u2011policy changes) are tightly constrained with explicit commands and verification steps, while analytical steps remain flexible. Minor omission: no explicit guard against running start\u2011logging on an already\u2011active trail."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable structure (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process \u2192 Output), but the layout mixes custom sections (e.g., Quick navigation) with the standard pattern, making it slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, decision tree, and output example, enabling an agent to execute the skill. Some commands are outdated (e.g., get\u2011insight\u2011selectors vs newer list\u2011insights\u2011selectors) and cross\u2011account bucket\u2011policy edge cases are not fully covered, which could cause execution gaps."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 60297,
+  "latency_ms": 14711,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

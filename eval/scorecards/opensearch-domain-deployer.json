@@ -1,0 +1,70 @@
+{
+  "skill": "opensearch-domain-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many expert heuristics (shard sizing, heap\u2011to\u2011storage ratio, dedicated master sizing, immutable config graph) that go beyond a baseline model, but omits cost\u2011model details for Serverless OCU pricing and lacks concrete cross\u2011cluster search configuration guidance, leaving some expert knowledge out."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific decision trees and ordering (encryption before data, VPC before clients, Multi\u2011AZ before scaling). However, it only mentions verifying KMS key policy in a generic way and does not give a concrete step\u2011by\u2011step verification procedure for that critical prerequisite."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough \"NEVER\" list with specific reasons (public access, missing encryption, over\u2011sharding, etc.). Misses a warning about the common pitfall of forgetting to grant the OpenSearch service principal permission in the snapshot repository IAM role trust policy."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter, description, keywords, activation contract, and output format are all present and well\u2011defined. The only shortfall is the lack of an explicit \"when NOT to invoke\" clause in the front\u2011matter (it is only in the narrative), preventing a perfect score."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The document is well\u2011sectioned (Mindset, Quick navigation, Heuristics, Procedure, NEVER, Output), but the sheer volume of detail up front can overload an agent. Critical rules (e.g., immutable settings) are buried deep, requiring extra navigation before they can be applied."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom tightly for destructive actions (domain creation) with constraints (multiple\u2011of\u20113 nodes, encryption immutable). Slightly under\u2011constrained for Serverless updates, where the skill does not explicitly limit mutable parameters, leading to a minor deduction."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Navigation \u2192 Heuristics \u2192 Procedure \u2192 NEVER \u2192 Output), but the ordering mixes narrative and procedural sections, making the pattern slightly ad\u2011hoc rather than a clean, canonical template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "The model output produces a correct checklist for managed clusters, and the provisioning commands are functional. However, the serverless example deviates from the mandated output format (adds fields like \"Collection type\" and omits the exact VERIFICATION_COMMANDS block), violating the strict contract. This inconsistency reduces practical usability."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 72120,
+  "latency_ms": 13861,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}

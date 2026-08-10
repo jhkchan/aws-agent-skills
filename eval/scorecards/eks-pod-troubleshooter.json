@@ -1,0 +1,70 @@
+{
+  "skill": "eks-pod-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many AWS\u2011specific details (ECR auth, node\u2011role IAM actions, Karpenter NodePool, cgroup v2 nuances) that a generic model may not know, but the core decision tree largely restates standard Kubernetes troubleshooting without novel thresholds or proprietary heuristics, so the genuine delta is limited."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are detailed and follow a logical order, but several steps are generic Kubernetes actions (e.g., \"run kubectl top nodes\", \"watch rollout\") rather than uniquely AWS\u2011centric decision ordering, so the mindset is not fully specialized."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "The NEVER list is extensive and well\u2011reasoned, covering many common pitfalls. A minor deduction for a few anti\u2011patterns lacking deeper explanation (e.g., why raising memory limits without checking node\u2011level OOM can be harmful)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are present and clear. Activation triggers include some overly broad phrases that could cause false positives, preventing a perfect score."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document front\u2011loads a large amount of detail (full decision tree, tables, anti\u2011patterns) before the concise top\u2011level summary, which can overload the agent. Critical rules are buried later rather than presented up\u2011front."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill calibrates freedom well for diagnostic commands, but remediation steps sometimes prescribe a single method (e.g., always patching a Deployment) without offering alternative safe paths, slightly over\u2011constraining the agent."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The overall structure follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Step\u2011by\u2011step process \u2192 Anti\u2011patterns \u2192 Remediation). The \"Quick navigation\" list feels a bit ad\u2011hoc, preventing a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "An agent can follow the decision tree and produce correct output, but the skill lacks explicit fallback procedures for missing logs/events due to RBAC or event TTL, and does not address how to handle clusters without metrics\u2011server, leaving edge cases unhandled."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 57893,
+  "latency_ms": 17184,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

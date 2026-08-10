@@ -1,0 +1,70 @@
+{
+  "skill": "kms-key-rotation-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many expert details (exact pre\u2011check order, multi\u2011region replica rules, custom key store state requirements, on\u2011demand rotation feature, cost breakdown, failure\u2011mode table). However, most of this information is publicly documented; the skill does not reveal a novel decision tree or undocumented threshold that a senior engineer would learn for the first time."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedural flow: deterministic pre\u2011check gate, confirm\u2011gate before any state\u2011changing CLI, capture of pre\u2011state files, post\u2011verification checklist, and exact CLI flag usage. Only minor omission is the lack of a step for invoking `rotate-key-on-demand` in the manual\u2011rotation path."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., why enabling on a replica fails, why disabling old keys too early is unsafe). One point deducted because the list could include a specific warning about using `rotate-key-on-demand` vs scheduled rotation, which is only hinted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. Vague: activation_triggers are keyword strings rather than precise intent patterns, and the schema does not enforce required fields, which could lead to ambiguous invocation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns, and examples. Critical rules are not buried, and the top\u2011level sections give just\u2011enough context."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions (enable/disable rotation, key enable/disable) are tightly constrained by mandatory CONFIRM gates and exhaustive pre\u2011checks. Non\u2011destructive planning tasks retain flexibility, matching task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (overview, mindset, pre\u2011flight, process, output, anti\u2011patterns). Minor deduction because the pattern mixes Markdown tables and free\u2011form text, making automated parsing slightly harder."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Model outputs demonstrate correct formatting, decision branches, and handling of blocked/ready/completed cases. Missing edge\u2011case handling for on\u2011demand rotation and for cross\u2011region primary/replica verification steps reduces completeness."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 45796,
+  "latency_ms": 4588,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

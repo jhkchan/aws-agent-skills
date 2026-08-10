@@ -1,0 +1,70 @@
+{
+  "skill": "ssm-association-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill contains many expert details (3\u2011layer health check, VPC endpoint requirements, legacy policy differences, cron syntax quirks, hybrid activation nuances) that a generic model would not automatically know. However, a portion of the content merely restates well\u2011known AWS documentation (e.g., basic CLI commands, standard status meanings) and does not introduce a novel decision threshold or a unique heuristic, so full marks are not awarded."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific and ordered (run 3\u2011layer health check first, then symptom\u2011specific trees). A small deduction is made because some steps are generic \"run a CLI command\" without deeper AWS\u2011only reasoning (e.g., no explicit mention of IAM trust relationships or SSM service\u2011side throttling handling)."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER list is extensive and explains why each pitfall is harmful. It loses points for a few items lacking concrete reasoning (e.g., concurrent\u2011command limit warning does not explain the transient nature) and for omitting some common anti\u2011patterns such as over\u2011broad IAM policies or forgetting to rotate activation codes."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is present and includes description, when_to_use, activation_triggers, and invocation_schema. The activation_triggers list is overly broad, and the when_to_use paragraph, while detailed, is somewhat verbose, making reliable automated activation less crisp. No explicit version compatibility field beyond a free\u2011text note."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (mindset \u2192 navigation \u2192 steps \u2192 appendices) but the initial sections already contain a large amount of detail, which can cause cognitive overload before the user knows which symptom they have. A more staged reveal (e.g., only show the 3\u2011layer check until a symptom is selected) would be ideal."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (update\u2011association, start\u2011associations\u2011once, IAM policy changes) are gated by safety\u2011check reminders and a mandatory CONFIRM prompt. One point is deducted because the examples sometimes omit the explicit CONFIRM step, leaving a slight inconsistency in enforcement."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable structure (mindset, navigation table, stepwise decision tree, output format, anti\u2011patterns, safety checks, appendices). The pattern is coherent, but the mixture of tables, free\u2011text, and code blocks feels a bit ad\u2011hoc rather than a single, clean template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI snippets, decision trees, and worked examples, enabling an agent to act. Missing are explicit error\u2011handling branches for CLI failures, handling of multiple target instances in a single diagnosis, and guidance for rate\u2011limiting back\u2011off. These gaps reduce the ability to execute flawlessly in all edge cases."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 49600,
+  "latency_ms": 21286,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

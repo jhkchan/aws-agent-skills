@@ -1,0 +1,70 @@
+{
+  "skill": "cloudfront-cost-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many specific numbers (e.g., PriceClass_100 saves 20\u201140%, Origin Shield $0.0125/GB, Lambda@Edge $0.60/M + compute) and concrete decision matrices, which go beyond generic knowledge. However, some pricing details are restated from public docs and not updated for 2026 price changes, limiting the delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Outlines an AWS\u2011specific workflow (pre\u2011flight data gate, step\u2011by\u2011step optimization, validation, one\u2011dimension\u2011per\u2011deploy). The procedure is largely specific, but the metric\u2011pull steps are generic (e.g., \"pull CloudWatch metrics\") without emphasizing region\u2011specific nuances (CloudWatch CloudFront metrics are only in us-east-1)."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains an extensive NEVER list with concrete reasoning (e.g., never switch PriceClass without viewer geography, never enable Origin Shield on low\u2011traffic S3 origins). Missing a explicit anti\u2011pattern about double\u2011compressing already compressed assets, which would be a useful safeguard."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Front\u2011matter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, metadata, activation_triggers, invocation_schema, example). The description clearly states WHAT the skill does, WHEN to invoke, and provides reliable KEYWORDS. No missing or malformed sections."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections (Quick start, Mindset, Philosophy, Steps, Process, Error handling). However, the Quick start bullet list already contains many detailed levers, which may overload the top layer before deeper sections are consulted."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: recommendations are non\u2011destructive, include mandatory CONFIRM gates, one\u2011dimension\u2011per\u2011deploy rule, and explicit break\u2011even calculations for costly actions (Origin Shield, Shield Advanced). No over\u2011constrained creative tasks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The document follows a recognizable pattern (Quick\u2011Start \u2192 Mindset \u2192 Philosophy \u2192 Reference \u2192 Pre\u2011flight \u2192 Process Steps \u2192 Error Handling \u2192 Anti\u2011Patterns \u2192 Navigation), making it easy to navigate and understand."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, decision matrices, output format, and validation steps, enabling an agent to execute the skill end\u2011to\u2011end. Some commands omit placeholders for required values (e.g., missing ETag handling guidance) and lack pagination/error\u2011retry details for large fleets, which could hinder flawless automation."
+    }
+  ],
+  "total_score": 112,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 72815,
+  "latency_ms": 9839,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

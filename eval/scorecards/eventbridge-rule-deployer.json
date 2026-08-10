@@ -1,0 +1,70 @@
+{
+  "skill": "eventbridge-rule-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill supplies concrete, non\u2011trivial data such as exact service limits (300 rules per bus, 5 targets per rule, 185 default retries, 14\u2011day DLQ retention), recent feature distinctions (Scheduler vs legacy cron rules, Pipes vs Rules, global endpoints), and a decision\u2011tree for choosing between Rules, Pipes, and Scheduler. However a large portion restates standard documentation without novel insight, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill outlines an AWS\u2011specific workflow: test pattern \u2192 create DLQ \u2192 put\u2011targets \u2192 add Lambda permission \u2192 verify bus policy, with explicit pre\u2011flight safety gates. Some steps (e.g., \"verify DLQ exists\") are generic cloud\u2011ops checks, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., missing DLQ leads to silent loss, Lambda needs AddPermission, default bus misuse). Some warnings are generic (\u201cnever assume single\u2011delivery\u201d) and could cite more quantitative impact, but overall the anti\u2011patterns are specific and experience\u2011driven."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers and invocation schema are present. Slightly weak is the lack of an explicit version\u2011compatibility matrix for runtime environments, costing one point."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document is organized into Mindset, Quick navigation, step\u2011by\u2011step sections, anti\u2011patterns, and appendices, which helps layer information. Nevertheless, the initial sections contain a dense amount of detail that could overwhelm an agent before it reaches the concise top\u2011level summary."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are guarded by explicit confirmation prompts and pre\u2011flight checks, while creative decisions (e.g., choosing Scheduler vs Rules) are given flexible decision trees. A minor gap is that cross\u2011account routing could benefit from tighter default constraints (e.g., mandatory org\u2011ID condition)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows a recognizable structure (Mindset \u2192 Navigation \u2192 Process steps \u2192 Anti\u2011patterns \u2192 Appendices), matching established CloudOps skill patterns."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides decision trees, CLI snippets, output format, and worked examples, enabling an agent to execute deployments. However, there are concrete syntax errors (malformed JSON in the S3 example, inconsistent cron syntax) and contradictory statements about global endpoint behavior that could cause execution failures."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 52386,
+  "latency_ms": 21669,
+  "assertions_passed": false,
+  "assertions_passed_count": 1,
+  "assertions_failed_count": 4
+}

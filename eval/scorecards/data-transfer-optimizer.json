@@ -1,0 +1,70 @@
+{
+  "skill": "data-transfer-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Adds concrete expert knowledge not typically known by a generic model: precise pricing numbers, break\u2011even formulas for NAT Gateway, Interface Endpoints, Direct Connect, decision matrices per dimension, and specific AWS service usage\u2011type mappings. This constitutes genuine delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: exact CLI sequences for Cost Explorer, VPC inventory, step\u2011wise analysis order, confirmation gates, and per\u2011dimension remediation actions. Only minor generic advice (e.g., \"check cost\") reduces it from perfect."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Provides a thorough NEVER list with specific pitfalls (e.g., routing before endpoint creation, AZ\u2011pinning without failover, TGW over\u2011use, DX commitment below break\u2011even) and clear reasoning for each, meeting the highest standard."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, metadata, activation_triggers, invocation_schema, invocation_example). Description clearly states WHAT the skill does, WHEN to invoke, and KEYWORDS for activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Top\u2011level Quick Start gives concise actionable bullets; deeper technical details, tables, and safety checks are placed in later sections, preventing overload. Slight deduction because some large tables appear early, adding modest cognitive load."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive operations are tightly constrained: mandatory CONFIRM gates, route\u2011table snapshots, one\u2011dimension\u2011per\u2011maintenance\u2011window, batch limits. Creative analysis steps remain flexible, matching task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable pattern (Quick start \u2192 Mindset \u2192 Philosophy \u2192 Process steps \u2192 Verdict semantics \u2192 Safety checks \u2192 Remediation \u2192 References), aiding comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, step\u2011by\u2011step migration steps, verification queries, and error\u2011handling guidance, enabling an agent to act. Deducted for lack of a ready\u2011made CUR parsing script and occasional vague thresholds (e.g., \"if NAT >30%\" without exact numeric rule)."
+    }
+  ],
+  "total_score": 114,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 75706,
+  "latency_ms": 15653,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}
