@@ -1,0 +1,181 @@
+{
+  "skill": "opensearch-domain-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the OpenSearch Domain Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across workload types (managed cluster Multi-AZ, Serverless vector search, dedicated master large cluster with UltraWarm/cold storage, dev single-node, missing prerequisites). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-managed-cluster-multiaz",
+      "name": "Production managed cluster with Multi-AZ + dedicated masters + FGAC",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, managed cluster + Multi-AZ (3-zone) + customer CMK + VPC + FGAC + dedicated masters",
+      "prompt": "Provision a production OpenSearch Service domain named \"prod-search\" in us-east-1. Workload is a search application with ~500 GB of indices, latency-sensitive (p99 < 100ms). Use managed cluster with 6 data nodes (r6g.2xlarge.search) across 3 AZs with 3 dedicated master nodes (c6g.large.search). EBS gp3 100GB per node. Customer-managed CMK alias/prod-opensearch-kms for encryption at rest. VPC-only access — subnets subnet-0aaa/0bbb/0ccc, security group sg-search123 inbound 443 from sg-app456. FGAC with IAM master user (role arn:aws:iam::123456789012:role/opensearch-master). Automated snapshots 14 day retention. Engine OpenSearch 2.11. Tags: Environment=production, Workload=search. Account ID: 123456789012.",
+      "prompt_file": "prompts/production-managed-cluster-multiaz.md",
+      "baseline_file": "baselines/production-managed-cluster-multiaz.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DOMAIN: prod-search\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Deployment type: managed cluster\n  [✓] Instance type: r6g.2xlarge.search (data nodes)\n  [✓] Instance count: 6 data nodes (2 per AZ × 3 AZs)\n  [✓] Multi-AZ (3-zone): Enabled (us-east-1a/b/c)\n  [✓] Dedicated master nodes: 3 × c6g.large.search (mandatory for latency-sensitive production)\n  [✓] Storage: EBS gp3 100GB per node (600 GB cluster capacity; ~510 GB usable at 85% watermark)\n  [✓] Encryption at rest: Enabled (customer CMK alias/prod-opensearch-kms)\n  [✓] Encryption in transit (TLS): Enabled (Policy-Min-TLS-1-2-2019-07)\n  [✓] Network access: VPC-only (subnets: subnet-0aaa/0bbb/0ccc, SG: sg-search123 port 443 from sg-app456)\n  [✓] Fine-grained access control (FGAC): IAM master user (arn:aws:iam::123456789012:role/opensearch-master)\n  [✓] Shard count rule: 30-50 GB per shard applied (17 shards for 500 GB indices)\n  [✓] Replica count: 1 (tolerates 1 node loss per shard; Multi-AZ places replica in different AZ)\n  [✓] Automated snapshots: Enabled (retention 14 days)\n  [✓] UltraWarm: Disabled (workload is search, not time-series)\n  [✓] Cold storage: Disabled\n  [✓] OpenSearch Serverless: No\nVERIFICATION_COMMANDS:\n  aws opensearch describe-domain --domain-name prod-search\n  aws opensearch describe-domain-config --domain-name prod-search\n  aws ec2 describe-security-groups --group-ids sg-search123\n  aws kms describe-key --key-id alias/prod-opensearch-kms\n  aws iam get-role --role-name opensearch-master",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-search",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "managed cluster",
+            "r6g.2xlarge.search",
+            "Multi-AZ",
+            "dedicated master",
+            "VPC"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "serverless-vector-search",
+      "name": "Serverless vector search collection for k-NN similarity search (RAG)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — OpenSearch Serverless VECTORSEARCH collection; VPC-only; customer CMK; IAM Identity Center auth",
+      "prompt": "Provision an OpenSearch Serverless vector search collection named \"prod-vectors\" in us-east-1 for RAG / generative AI similarity search. Vector dimensions: 1536 (OpenAI ada-002). About 10M vectors. VPC-only access via VPC endpoint vpce-0aaa. Customer CMK alias/vector-kms. IAM Identity Center for auth. Tags: Environment=production, Workload=vector-search. Account ID: 123456789012.",
+      "prompt_file": "prompts/serverless-vector-search.md",
+      "baseline_file": "baselines/serverless-vector-search.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DOMAIN: prod-vectors (Serverless collection)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Deployment type: OpenSearch Serverless\n  [✓] Collection type: VECTORSEARCH (k-NN similarity search)\n  [✓] Vector dimensions: 1536 (OpenAI ada-002)\n  [✓] Vector count: ~10M vectors\n  [✓] Network access: VPC-only (VPC endpoint vpce-0aaa)\n  [✓] Encryption at rest: Enabled (customer CMK alias/vector-kms)\n  [✓] Auth: IAM Identity Center\n  [✓] Capacity management: auto-scaling (no instance type, no shard count to user)\n  [✓] Shard count rule: 1 shard per OCU (Serverless vector search over-sharding dilutes graph)\n  [✓] Replica count: 1 (HA within Serverless)\n  [✓] UltraWarm: N/A (Serverless does NOT support UltraWarm)\n  [✓] Cold storage: N/A (Serverless does NOT support cold storage)\n  [✓] Dedicated master nodes: N/A (Serverless manages automatically)\nVERIFICATION_COMMANDS:\n  aws opensearchserverless batch-get-collection --names prod-vectors\n  aws opensearchserverless get-security-policy --name prod-vectors-encryption --type encryption\n  aws opensearchserverless get-security-policy --name prod-vectors-network --type network\n  aws kms describe-key --key-id alias/vector-kms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-vectors",
+            "VERDICT",
+            "CHECKLIST",
+            "VECTORSEARCH",
+            "Serverless"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-vpc-and-kms",
+      "name": "Operator has not specified VPC subnets, security group, KMS key ARN, or master IAM role",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — VPC subnets, security group, KMS key ARN, and master IAM role all required for production-grade domain",
+      "prompt": "Help me create a new OpenSearch domain called \"logs-search\" in us-east-1. I want it to be production-grade — encryption at rest, VPC-only access, fine-grained access control. We will index application logs. Region: us-east-1, Account: 123456789012.",
+      "prompt_file": "prompts/missing-vpc-and-kms.md",
+      "baseline_file": "baselines/missing-vpc-and-kms.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "DOMAIN: logs-search\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] VPC subnets: NOT specified — Multi-AZ requires 3 subnets in different AZs\n  [✗] Security group: NOT specified — OpenSearch needs inbound 443 from application SG\n  [✗] KMS key ARN: NOT specified if customer CMK required (default AWS-managed OK for dev)\n  [✗] Master IAM role: NOT specified — FGAC requires a master user (IAM role ARN or Cognito user pool ID)\n  [✗] Workload details: data size, query pattern, ingest rate — drives instance type, shard count, replica count\nVERIFICATION_COMMANDS:\n  aws ec2 describe-subnets --query 'Subnets[*].[SubnetId,AvailabilityZone]' --output text\n  aws ec2 describe-security-groups --query 'SecurityGroups[*].[GroupId,GroupName]' --output text\n  aws kms list-aliases --query 'Aliases[?starts_with(AliasName, `alias/`)]'\n  aws iam list-roles --query 'Roles[?contains(RoleName, `opensearch`) || contains(RoleName, `master`)].RoleName' --output text",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "logs-search",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dedicated-master-large-cluster",
+      "name": "Large production cluster with UltraWarm + cold storage for log analytics",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — large managed cluster with 12 data nodes, 3 dedicated masters, UltraWarm, cold storage, manual snapshots to S3",
+      "prompt": "Provision a large production OpenSearch domain named \"prod-logs\" in us-east-1 for log analytics. ~5 TB of hot logs, ~20 TB of warm logs (last 90 days), ~50 TB of cold logs (1 year retention). Use managed cluster with 12 data nodes (r6g.4xlarge.search) Multi-AZ across 3 AZs. 3 dedicated master nodes (c6g.2xlarge.search). UltraWarm 6 nodes (ultrawarm1.medium.search). Cold storage enabled. Customer CMK alias/logs-kms. VPC-only — subnets subnet-0aaa/0bbb/0ccc, SG sg-logs-search inbound 443 from sg-fluent-bit. FGAC with IAM master user role arn:aws:iam::123456789012:role/logs-master. Manual snapshots to s3://logs-snapshots-prod via role arn:aws:iam::123456789012:role/logs-snapshot. Tags: Environment=production, Workload=log-analytics. Account ID: 123456789012.",
+      "prompt_file": "prompts/dedicated-master-large-cluster.md",
+      "baseline_file": "baselines/dedicated-master-large-cluster.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DOMAIN: prod-logs\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Deployment type: managed cluster\n  [✓] Instance type: r6g.4xlarge.search (data nodes)\n  [✓] Instance count: 12 data nodes (4 per AZ × 3 AZs — multiple of 3 for Multi-AZ)\n  [✓] Multi-AZ (3-zone): Enabled\n  [✓] Dedicated master nodes: 3 × c6g.2xlarge.search (mandatory for 12-data-node cluster; more CPU for cluster-state)\n  [✓] Storage: EBS gp3 per node (size sized to 5 TB hot / 12 nodes = ~416 GB per node; rounded up with 15% free-space watermark)\n  [✓] Encryption at rest: Enabled (customer CMK alias/logs-kms)\n  [✓] Encryption in transit (TLS): Enabled (Policy-Min-TLS-1-2-2019-07)\n  [✓] Network access: VPC-only (subnets: subnet-0aaa/0bbb/0ccc, SG: sg-logs-search port 443 from sg-fluent-bit)\n  [✓] FGAC: IAM master user (arn:aws:iam::123456789012:role/logs-master)\n  [✓] Shard count rule: 30 GB per shard (write-heavy logs); ~170 shards for 5 TB hot data\n  [✓] Replica count: 1 (Multi-AZ places replica in different AZ)\n  [✓] Automated snapshots: Enabled\n  [✓] Manual snapshot repository: registered (S3 bucket logs-snapshots-prod, role arn:aws:iam::123456789012:role/logs-snapshot)\n  [✓] UltraWarm: Enabled (6 × ultrawarm1.medium.search) for last 90 days warm tier (~20 TB)\n  [✓] Cold storage: Enabled (1-year retention, ~50 TB; recall takes minutes-hours)\n  [✓] ISM policy: hot → warm (after 7 days) → cold (after 90 days) → delete (after 365 days)\n  [✓] OpenSearch Serverless: No\nVERIFICATION_COMMANDS:\n  aws opensearch describe-domain --domain-name prod-logs\n  aws opensearch describe-domain-config --domain-name prod-logs\n  aws ec2 describe-security-groups --group-ids sg-logs-search\n  aws kms describe-key --key-id alias/logs-kms\n  aws iam get-role --role-name logs-master\n  aws iam get-role --role-name logs-snapshot\n  aws s3api head-bucket --bucket logs-snapshots-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-logs",
+            "VERDICT",
+            "CHECKLIST",
+            "UltraWarm",
+            "cold storage",
+            "12",
+            "dedicated master"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dev-t3-single-node",
+      "name": "Small dev/test domain with t3.small.search single node (no Multi-AZ)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — small dev domain with t3.small.search, 1 node, public access acceptable for dev, AWS-managed KMS",
+      "prompt": "Provision a small dev OpenSearch domain named \"dev-search\" in us-east-1 for testing search features. Use t3.small.search with 1 node (no Multi-AZ needed for dev). EBS gp3 10GB. Public access is fine for dev (with strong FGAC — IAM master user arn:aws:iam::123456789012:role/dev-search-master). AWS-managed KMS for encryption at rest. Engine OpenSearch 2.11. Tags: Environment=dev, Workload=test. Account: 123456789012.",
+      "prompt_file": "prompts/dev-t3-single-node.md",
+      "baseline_file": "baselines/dev-t3-single-node.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DOMAIN: dev-search\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Deployment type: managed cluster\n  [✓] Instance type: t3.small.search (dev / test — NOT for production)\n  [✓] Instance count: 1 data node (no Multi-AZ; acceptable for dev)\n  [✓] Multi-AZ (3-zone): Disabled (dev environment)\n  [✓] Dedicated master nodes: None (single-node cluster; not required)\n  [✓] Storage: EBS gp3 10GB per node\n  [✓] Encryption at rest: Enabled (AWS-managed KMS — acceptable for dev)\n  [✓] Encryption in transit (TLS): Enabled (Policy-Min-TLS-1-2-2019-07)\n  [✓] Network access: Public (acceptable for dev with strong FGAC; NOT for production)\n  [✓] Fine-grained access control (FGAC): IAM master user (arn:aws:iam::123456789012:role/dev-search-master)\n  [✓] Shard count rule: 1 shard (small dataset; do NOT over-shard)\n  [✓] Replica count: 0 (single-node dev cluster; NO HA)\n  [✓] Automated snapshots: Enabled (default 1-day retention)\n  [✓] UltraWarm: Disabled (not needed for dev)\n  [✓] Cold storage: Disabled\n  [✓] OpenSearch Serverless: No\nVERIFICATION_COMMANDS:\n  aws opensearch describe-domain --domain-name dev-search\n  aws opensearch describe-domain-config --domain-name dev-search\n  aws iam get-role --role-name dev-search-master",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "dev-search",
+            "VERDICT",
+            "CHECKLIST",
+            "t3.small.search"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

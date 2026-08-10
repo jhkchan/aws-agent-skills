@@ -1,11 +1,10 @@
 ---
 name: cloudfront-cost-optimizer
-description: Optimizes CloudFront distribution costs across nine independent cost dimensions — Price Class (PriceClass_100 vs PriceClass_200 vs PriceClass_All, where PriceClass_100 saves 20-40% when viewers
-  are US/EU-only), cache hit ratio (target > 90% for static content via longer TTLs and minimal cache key), origin choice (S3 origin + OAC is cheapest because S3-to-CloudFront data transfer is free in most
-  regions; custom origins behind ALB/EC2 incur $0.02/GB same-region egress), compression (free feature, reduces data-transfer-out 50-90% via gzip/Brotli), Origin Shield ($0.0125/GB but cuts origin load
-  95%+ when multiple edge locations fetch the same objects), CloudFront Functions ($1/M invocations, lightweight header/URL rewrites) vs Lambda@Edge ($0.60/M + compute time, heavyweight logic), security
-  stack cost (WAF $5/rule/month + $1/M requests, Shield Standard free, Shield Advanced $3,000/month only for DDoS-prone workloads), the full data-transfer cost matrix (CloudFront-to-viewer $0.085-0.25/GB
-  by edge region;.
+description: Optimizes CloudFront distribution costs across nine cost dimensions — Price Class (PriceClass_100 vs PriceClass_200 vs PriceClass_All, where PriceClass_100 saves 20-40% when viewers
+  are US/EU-only), cache hit ratio (target >90% for static content via longer TTLs and minimal cache key), origin choice (S3 + OAC is cheapest; custom origins incur $0.02/GB egress), compression (free,
+  50-90% byte savings via Brotli/gzip), Origin Shield ($0.0125/GB, cuts origin load 95%+), CloudFront Functions ($1/M) vs Lambda@Edge ($0.60/M + compute), security cost (WAF $5/rule + $1/M req, Shield
+  Standard free, Shield Advanced $3K/mo), data-transfer matrix, and impact estimation. Emits OPPORTUNITY_FOUND with per-dimension savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing CloudFront
+  bills, triaging data-transfer charges, choosing Functions vs Lambda@Edge, or evaluating Origin Shield break-even.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

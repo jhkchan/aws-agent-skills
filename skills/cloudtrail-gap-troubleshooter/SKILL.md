@@ -1,11 +1,22 @@
 ---
 name: cloudtrail-gap-troubleshooter
-description: Diagnoses AWS CloudTrail logging gaps and missing events — events missing from a trail (data events vs management events, multi-region trail misconfiguration), a trail not logging at all (stopped
-  trail, S3 bucket policy not allowing CloudTrail write, trail inadvertently deleted), log delivery delayed beyond the expected 5-15 minute window (CloudTrail Lake vs S3 delivery differences, org trail
-  aggregation lag), CloudTrail Insights not detecting anomalies (Insights disabled, no dedicated S3 prefix, baseline period not yet elapsed), and cross-account / organization trails not logging for member
-  accounts (delegated admin misconfiguration, member-account bucket policy). Emits a deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with the specific failure category and evidence
-  from describe-trails / get-trail-status / lookup-events / list-insights-selectors / get-bucket-policy. Use when a CloudTrail trail is silent, events are missing from CloudTrail Lake or the S3 delivery,
-  Insights is not.
+description: >-
+  Diagnoses AWS CloudTrail logging gaps and missing events. Covers
+  events missing because data events (S3/Lambda/DynamoDB) were never
+  configured, multi-region scope mismatches, trails that report
+  IsLogging true but never deliver (S3 bucket policy missing
+  bucket-owner-full-control, KMS key policy missing the cloudtrail
+  principal, explicit deny), silently stopped trails (inadvertent
+  stop-logging, IaC that omitted start-logging), delayed delivery
+  beyond the 5-15 minute window, CloudTrail Insights not firing
+  (selectors missing or 7-day baseline not elapsed), and org trails
+  that miss specific member accounts (member shadow trail stopped,
+  delegated-admin confusion, member left org). Emits a deterministic
+  verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with evidence
+  from describe-trails, get-trail-status, get-event-selectors,
+  lookup-events, list-insights-selectors, and get-bucket-policy. Use
+  when a trail is silent, events are missing, Insights is not firing,
+  or a member account is not being logged by the org trail.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

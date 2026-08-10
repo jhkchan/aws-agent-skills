@@ -1,0 +1,47 @@
+# Eval configuration for cloudtrail-gap-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudtrail-gap-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: s3-data-events-not-configured
+    difficulty: medium
+    prompt_file: prompts/s3-data-events-not-configured.md
+    baseline_file: baselines/s3-data-events-not-configured.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: MISSING_DATA_EVENTS
+  - id: trail-stopped-inadvertently
+    difficulty: easy
+    prompt_file: prompts/trail-stopped-inadvertently.md
+    baseline_file: baselines/trail-stopped-inadvertently.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: TRAIL_NOT_LOGGING
+  - id: bucket-policy-missing-acl-condition
+    difficulty: hard
+    prompt_file: prompts/bucket-policy-missing-acl-condition.md
+    baseline_file: baselines/bucket-policy-missing-acl-condition.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: BUCKET_POLICY_BLOCKING
+  - id: org-trail-member-shadow-stopped
+    difficulty: hard
+    prompt_file: prompts/org-trail-member-shadow-stopped.md
+    baseline_file: baselines/org-trail-member-shadow-stopped.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: ORG_TRAIL_GAP
+  - id: insufficient-context-need-trail-name
+    difficulty: easy
+    prompt_file: prompts/insufficient-context-need-trail-name.md
+    baseline_file: baselines/insufficient-context-need-trail-name.md
+    expected_verdict: NEED_MORE_INFO

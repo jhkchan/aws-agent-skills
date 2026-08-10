@@ -1,11 +1,10 @@
 ---
 name: data-transfer-optimizer
-description: 'Optimizes AWS data transfer costs across seven independent cost dimensions — the #2 surprise bill driver after NAT Gateways. Covers cross-AZ transfer ($0.01/GB each direction, $0.02/GB round
-  trip — optimize by keeping processing in the same AZ as the data source), cross-region transfer ($0.02-0.09/GB by route — optimize via CloudFront for global content delivery with free S3-to-CF egress,
-  VPC peering for ≤ 4 VPCs in-region which is free vs Transit Gateway at $0.02/GB, S3 Cross-Region Replication only for DR/compliance not for cost savings), internet egress ($0.09/GB first 10TB tiered lower
-  — optimize via CloudFront where viewers pay edge-to-browser and you pay S3-to-CloudFront free, S3 Multi-Region Access Points for nearest-region routing, Direct Connect for committed high-volume bandwidth),
-  NAT Gateway data processing ($0.045/GB — optimize via FREE VPC Gateway endpoints for S3/DynamoDB and Interface endpoints at $0.01/GB that avoid NAT charges), VPC peering (free intra-region) vs Transit
-  Gateway.'
+description: Optimizes AWS data transfer costs across seven dimensions — cross-AZ transfer ($0.01/GB each direction; pin consumers to data-source AZ), cross-region transfer ($0.02-0.09/GB; use CloudFront
+  for global viewers, VPC peering for intra-region, S3 CRR only for DR), internet egress ($0.09/GB first 10TB; optimize via CloudFront with free S3-to-CF egress, S3 Multi-Region Access Points, Direct
+  Connect), NAT Gateway data processing ($0.045/GB; route S3/DynamoDB via FREE VPC Gateway Endpoints), VPC peering (free intra-region) vs Transit Gateway ($0.02/GB), RDS Multi-AZ ($0.01/GB) vs Aurora
+  (free replication), and Direct Connect break-even math. Emits OPPORTUNITY_FOUND with per-dimension savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when triaging surprise data-transfer bills, auditing CUR
+  USAGE_TYPE line items, deciding peering vs TGW, or sizing Direct Connect.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

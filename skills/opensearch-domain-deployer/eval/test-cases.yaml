@@ -1,0 +1,168 @@
+# Eval test cases for opensearch-domain-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across workload types
+# (managed cluster Multi-AZ, Serverless vector search, dedicated
+# master large cluster, dev single-node, missing prerequisites).
+skill: opensearch-domain-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: production-managed-cluster-multiaz
+    description: >-
+      Provision a production managed OpenSearch cluster with 6 data
+      nodes Multi-AZ (3-zone), 3 dedicated master nodes, customer CMK,
+      VPC-only, FGAC with IAM master user, automated snapshots. Expects
+      READY_TO_DEPLOY with all checklist items verified.
+    input: |
+      Provision a production OpenSearch Service domain named
+      "prod-search" in us-east-1. Workload is a search application with
+      ~500 GB of indices, latency-sensitive (p99 < 100ms). Use managed
+      cluster with 6 data nodes (r6g.2xlarge.search) across 3 AZs with
+      3 dedicated master nodes (c6g.large.search). EBS gp3 100GB per
+      node. Customer-managed CMK alias/prod-opensearch-kms for
+      encryption at rest. VPC-only access — subnets subnet-0aaa/0bbb/
+      0ccc, security group sg-search123 inbound 443 from sg-app456.
+      FGAC with IAM master user (role arn:aws:iam::123456789012:role/
+      opensearch-master). Automated snapshots 14 day retention.
+      Engine OpenSearch 2.11. Tags: Environment=production,
+      Workload=search. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-search"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "managed cluster"
+        - "r6g.2xlarge.search"
+        - "Multi-AZ"
+        - "dedicated master"
+        - "VPC"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: serverless-vector-search
+    description: >-
+      Provision an OpenSearch Serverless vector search collection for
+      k-NN similarity search. Expects READY_TO_DEPLOY with
+      Serverless-specific patterns.
+    input: |
+      Provision an OpenSearch Serverless vector search collection
+      named "prod-vectors" in us-east-1 for RAG / generative AI
+      similarity search. Vector dimensions: 1536 (OpenAI ada-002).
+      About 10M vectors. VPC-only access via VPC endpoint vpce-0aaa.
+      Customer CMK alias/vector-kms. IAM Identity Center for auth.
+      Tags: Environment=production, Workload=vector-search.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-vectors"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VECTORSEARCH"
+        - "Serverless"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-vpc-and-kms
+    description: >-
+      Operator requests a production OpenSearch domain but has not
+      specified VPC subnets, security group, KMS key ARN, or master
+      IAM role. Expects PREREQUISITES_MISSING with specific gaps cited.
+    input: |
+      Help me create a new OpenSearch domain called "logs-search" in
+      us-east-1. I want it to be production-grade — encryption at rest,
+      VPC-only access, fine-grained access control. We will index
+      application logs. Region: us-east-1, Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "logs-search"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: dedicated-master-large-cluster
+    description: >-
+      Provision a large production managed cluster with 12 data nodes,
+      3 dedicated masters, UltraWarm for time-series logs, cold storage
+      for long-term retention. Expects READY_TO_DEPLOY with UltraWarm
+      + cold storage in the checklist.
+    input: |
+      Provision a large production OpenSearch domain named
+      "prod-logs" in us-east-1 for log analytics. ~5 TB of hot logs,
+      ~20 TB of warm logs (last 90 days), ~50 TB of cold logs (1 year
+      retention). Use managed cluster with 12 data nodes
+      (r6g.4xlarge.search) Multi-AZ across 3 AZs. 3 dedicated master
+      nodes (c6g.2xlarge.search). UltraWarm 6 nodes
+      (ultrawarm1.medium.search). Cold storage enabled. Customer CMK
+      alias/logs-kms. VPC-only — subnets subnet-0aaa/0bbb/0ccc, SG
+      sg-logs-search inbound 443 from sg-fluent-bit. FGAC with IAM
+      master user role arn:aws:iam::123456789012:role/logs-master.
+      Manual snapshots to s3://logs-snapshots-prod via role
+      arn:aws:iam::123456789012:role/logs-snapshot. Tags:
+      Environment=production, Workload=log-analytics.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-logs"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "UltraWarm"
+        - "cold storage"
+        - "12"
+        - "dedicated master"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: dev-t3-single-node
+    description: >-
+      Provision a small dev/test OpenSearch domain with t3.small.search
+      single node, no Multi-AZ, no dedicated masters. Expects
+      READY_TO_DEPLOY with dev-tier specifications.
+    input: |
+      Provision a small dev OpenSearch domain named "dev-search" in
+      us-east-1 for testing search features. Use t3.small.search with
+      1 node (no Multi-AZ needed for dev). EBS gp3 10GB. Public access
+      is fine for dev (with strong FGAC — IAM master user
+      arn:aws:iam::123456789012:role/dev-search-master). AWS-managed
+      KMS for encryption at rest. Engine OpenSearch 2.11.
+      Tags: Environment=dev, Workload=test. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "dev-search"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "t3.small.search"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
