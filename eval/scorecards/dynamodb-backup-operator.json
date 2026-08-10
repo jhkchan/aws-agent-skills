@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 17,
       "max": 20,
-      "justification": "The skill aggregates many known DynamoDB backup/restore facts and adds some recent feature notes (selective restore projection, incremental export, Vault Lock), but the bulk of the content restates information a competent model already knows. No novel decision tree or threshold beyond what is publicly documented."
+      "justification": "The skill supplies concrete expert knowledge not usually present in a generic model: exact pre\u2011check priority order, cost\u2011time baselines for 2026 pricing, recent feature nuances (selective restore projection, Vault Lock modes, incremental export), and a decision tree for cross\u2011region/cross\u2011account restores. However it omits deeper details on cross\u2011account role trust policies and the exact IAM trust relationship required for AWS Backup cross\u2011account restores, which a senior engineer would expect."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and detailed, but the ordering is sometimes generic (e.g., \"run pre\u2011checks\" without a per\u2011operation checklist) and rollback steps are only hinted at, not fully codified."
+      "justification": "Procedures are AWS\u2011specific and follow a disciplined flow: deterministic pre\u2011checks, CONFIRM gate, exact CLI commands, polling, and post\u2011verification checklist. The only shortfall is a generic \u201ccapture pre\u2011state for audit\u201d step that could be more detailed (e.g., which specific attributes to record)."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons. Misses a specific anti\u2011pattern about forgetting to disable DeletionProtection before deleting the source table after cut\u2011over."
+      "justification": "The NEVER list is extensive and explains why each pitfall is dangerous (e.g., new\u2011table surprise, missing autoscaling, PITR disabled). It misses a couple of common anti\u2011patterns such as failing to increase provisioned throughput for large restores (which can cause massive rebuild latency) and neglecting to adjust IAM resource policies that reference the original table ARN."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, activation triggers, and invocation schema are present, but the invocation schema is vague \u2013 it does not define the exact JSON field names, required keys, or data types, which could hinder reliable activation."
+      "justification": "Frontmatter includes description, keywords, activation triggers, and an invocation schema. The \u2018when to use\u2019 narrative is solid, but the wording could be tighter; a few trigger phrases are overlapping and the description of exact invocation conditions is slightly vague."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference, mindset, process, examples) but the main body front\u2011loads a large amount of detail before the concise quick\u2011reference, creating potential cognitive overload for first\u2011time readers."
+      "justification": "The skill layers information: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns. Nonetheless the \u201cStep\u202f0: Expert knowledge\u201d block and the long cost table are presented early, adding cognitive load before the core decision flow."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained with pre\u2011checks and a mandatory CONFIRM gate. However, the skill does not specify timeout or abort handling for long\u2011running polls, leaving a slight freedom\u2011calibration gap."
+      "justification": "Destructive operations are tightly constrained with mandatory CONFIRM gates and exhaustive pre\u2011checks; creative tasks (e.g., cost analysis) are left open. Calibration matches task fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (overview, mindset, pre\u2011flight, process, output, anti\u2011patterns). The quick\u2011navigation table is not referenced later, making the structure marginally ad\u2011hoc."
+      "justification": "The document follows a clear, repeatable pattern (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns), making it instantly recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides executable CLI sequences, pre\u2011checks, and verification steps, but lacks explicit error\u2011handling branches for common CLI failures (e.g., ResourceInUseException, throttling) and does not outline a rollback procedure if a step fails."
+      "justification": "Provides concrete CLI sequences, polling loops, and verification steps; an agent could execute the plan. Missing are explicit error\u2011handling branches (e.g., how to recover from a failed poll or a ResourceInUseException) and a concise decision tree for selecting the correct operation based on input parameters."
     }
   ],
-  "total_score": 103,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 44041,
-  "latency_ms": 8473,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "grade": "A",
+  "token_count": 47165,
+  "latency_ms": 9942,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

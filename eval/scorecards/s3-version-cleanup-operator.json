@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides many expert details (e.g., lifecycle PUT replaces config, Object Lock compliance irrevocability, Batch Operations cost), but it does not deliver a decisive decision tree that tells the operator when to prefer lifecycle rules versus immediate batch delete based on cost vs latency thresholds, nor does it expose nuanced limits such as maximum manifest size or API rate\u2011limit considerations that a senior CloudOps engineer would expect."
+      "justification": "The skill supplies concrete, up\u2011to\u2011date cost numbers (e.g., $0.023/GB\u2011month, $1 per million Batch Operations objects) and a detailed decision tree for pre\u2011checks, merging lifecycle JSON, and handling Object Lock modes. These specifics go beyond generic knowledge, but many of the facts (e.g., that lifecycle PUT replaces the whole config) are already widely known to experienced CloudOps engineers, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill outlines a solid AWS\u2011specific procedure (pre\u2011flight checks, confirm gate, merge lifecycle JSON, post\u2011verification). However it omits explicit steps for cross\u2011account IAM validation and for handling MFADelete (how to inject the MFA token into the CLI), which are essential for fragile operations."
+      "justification": "Encodes AWS\u2011specific procedures (merge existing lifecycle config, confirm gate, post\u2011verification steps). The merge step is mentioned but not broken down into an explicit algorithm for conflict resolution, leaving a slight procedural gap."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is concrete and explains why each pitfall is dangerous. It still misses a few common anti\u2011patterns, such as unintentionally conflicting with Intelligent\u2011Tiering rules or creating delete markers instead of deleting versions, and does not give the rationale for those omissions."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never overwrite lifecycle without reading existing rules, never delete in Compliance mode). Missing a few common pitfalls such as IAM policy vs. bucket\u2011policy conflicts and why Intelligent\u2011Tiering may be a bad fit for versioned data."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are present and generally well\u2011formed. The activation triggers are overly verbose and the invocation schema lacks a concrete JSON example showing required fields, which could cause unreliable activation."
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. The invocation schema is described in prose rather than a strict JSON schema, which could cause ambiguous parsing by an agent. Hence a small deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers information (quick reference, mindset, pre\u2011flight, process, output, anti\u2011patterns) but some sections (e.g., the full cost table and exhaustive rule list) are dense and appear early, creating cognitive overload. A tighter top\u2011level summary before the deep dive would improve progressive disclosure."
+      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns). Nonetheless, the opening sections are dense and repeat many details, causing some cognitive overload before the core actionable steps."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly gated with CONFIRM prompts and exhaustive pre\u2011checks, matching the fragility of the tasks. The only shortfall is the absence of explicit limits for large\u2011scale batch jobs (e.g., maximum manifest size, cost\u2011cap warnings) that would further calibrate freedom for high\u2011risk scenarios."
+      "justification": "Destructive actions are gated by a CONFIRM prompt and extensive pre\u2011checks, matching the fragility of the task. The skill does not explicitly require inclusion of the MFA token when MFADelete is enabled, a minor calibration omission."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Safety). Minor inconsistency in section naming (mix of \"\u00a7\" symbols and plain headings) prevents a perfectly uniform pattern."
+      "justification": "Follows a recognizable pattern (mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns). Minor inconsistency in mixing tables and narrative blocks prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI examples, decision trees, and verification steps, enabling an agent to execute the plan. Lacks guidance for handling pagination errors, API throttling, and fallback actions if a Batch Operations job fails partially, which are real\u2011world edge cases."
+      "justification": "Provides concrete CLI commands, decision flow, and worked examples that an agent could execute. Lacks explicit error\u2011handling for API failures, pagination limits, and edge cases such as zero noncurrent versions or partial Batch Operations failures."
     }
   ],
-  "total_score": 103,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45893,
-  "latency_ms": 27302,
+  "token_count": 48529,
+  "latency_ms": 7589,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

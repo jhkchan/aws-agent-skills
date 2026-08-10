@@ -838,6 +838,97 @@ Is there a managed SSM runbook for the resource/finding?
   avoid surprise upgrades when AWS ships a new managed-runbook
   version.
 
+## Expert heuristic: remediation blast radius
+
+Auto-remediation is the highest-leverage and highest-risk Config
+feature. A single misconfigured `RemediationConfiguration` with
+`Automatic: true` can revoke IAM credentials in use, detach security
+groups from production instances, or terminate EC2 — across an entire
+account or OU — within minutes of being enabled.
+
+**The rule (non-negotiable):**
+
+> ALWAYS test auto-remediation in a non-production account first, and
+> scope every `RemediationConfiguration` with an explicit
+> `ResourceType` filter. Never enable `Automatic: true` against an
+> unbounded resource population in production on first contact.
+
+**Why this rule exists:** AWS Config rules evaluate ALL resources of
+the matched type in the rule's scope. A periodic rule with
+`Scope: {ComplianceResourceTypes: ["AWS::EC2::SecurityGroup"]}` and
+an automatic remediation that revokes 0.0.0.0/0 ingress will fire on
+every matching SG in the account — including the one fronting your
+production RDS — within one evaluation cycle. There is no dry-run
+mode for `Automatic: true`.
+
+**Concrete scoping techniques:**
+
+| Technique | Mechanism | Blast-radius limit |
+|---|---|---|
+| `ResourceType` filter in `RemediationConfiguration` | `--remediation-configurations Parameters.ResourceType` | Restricts remediation to one resource type per config |
+| Conformance pack with `Parameters` resource-id allowlist | `SSMParameter` input bound to a static list | Only listed resource IDs are remediated |
+| Config rule scoped by tag | `Scope.TagKey` + `Scope.TagValue` on the rule itself | Only resources with the matching tag are evaluated NON_COMPLIANT |
+| Account-level isolation | Deploy the conformance pack only to a non-production account | Zero production exposure until promotion |
+| Change Manager gate | Route runbook through SSM Change Manager approval | Human approval per execution, not per config |
+
+**Pre-production validation protocol (3-cycle rule):**
+
+1. **Cycle 1 — MANUAL in non-prod:** Deploy the rule + remediation
+   config with `Automatic: false`. Trigger
+   `start-remediation-execution` manually on at least 3 sample
+   NON_COMPLIANT resources. Verify all 3 succeed AND the resource
+   flips to COMPLIANT in Config within 1 evaluation cycle.
+2. **Cycle 2 — AUTOMATIC in non-prod:** Flip `Automatic: true`. Plant
+   3 deliberately NON_COMPLIANT resources (test buckets, test SGs on
+   stopped instances). Verify all 3 are remediated within
+   `MaximumAutomaticAttempts × RetryAttemptSeconds` (default 30 min)
+   with no false positives on adjacent resources.
+3. **Cycle 3 — MANUAL in prod:** Promote the config to production
+   with `Automatic: false`. Monitor for 1 week of false-positive
+   NON_COMPLIANT evaluations. If zero false positives, flip to
+   `Automatic: true`. If any false positive, refine the rule scope
+   and re-run Cycle 2.
+
+**Conformance pack scoping pattern (recommended for fleet rollout):**
+
+```yaml
+# Conformance pack with explicit resource scope per remediation
+Resources:
+  S3PublicAccessRemediation:
+    Type: AWS::Config::RemediationConfiguration
+    Properties:
+      ConfigRuleName: s3-bucket-public-read-prohibited
+      TargetType: SSM_DOCUMENT
+      TargetId: AWS-DisableS3BucketPublicAccess
+      Automatic: false  # Flip to true only after Cycle 2 validation
+      MaximumAutomaticAttempts: 3
+      RetryAttemptSeconds: 600
+      Parameters:
+        S3BucketName:
+          ResourceValue:
+            Value: RESOURCE_ID
+        AutomationAssumeRole:
+          StaticValue:
+            Values:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole"
+```
+
+**Detection of blast-radius breach post-deploy:** CloudWatch alarm on
+`SSM Automation Executions Failed` > N in 5 minutes (suggests a bad
+config rolling out account-wide). Also alarm on
+`Config.ComplianceNonCompliantResources` increasing by > N% in one
+evaluation cycle (suggests the rule scope is too broad). Both alarms
+should page the on-call and trigger an EventBridge rule that flips
+`Automatic` to `false` on the offending config via
+`describe-remediation-configurations` + `delete-remediation-configuration` + `put-remediation-configurations` with `Automatic: false`.
+
+**Surface in the output:** for any recommended auto-remediation,
+include `BLAST_RADIUS: <scope>` (e.g., `account-wide`,
+`tag-scoped:env=prod`, `conformance-pack-scoped`) and
+`VALIDATION_STATUS: <pre-prod-cycle-1 | pre-prod-cycle-2 |
+prod-manual | prod-automatic>`. If `VALIDATION_STATUS` is not
+`prod-automatic`, do NOT mark the recommendation as deployable.
+
 ## Domain
 
 AWS CloudOps / Governance Automation — Config-driven remediation.

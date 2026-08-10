@@ -1386,6 +1386,122 @@ aws logs filter-log-events \
 | Delivery logs not appearing in CloudWatch | Missing CloudWatch Logs resource policy | Add resource policy granting SNS `logs:CreateLogStream` + `logs:PutLogEvents` |
 | FIFO duplicate delivery | `ContentBasedDeduplication=false` and publisher omits DeduplicationId | Enable ContentBasedDeduplication, or ensure publishers send MessageDeduplicationId |
 
+### Per-protocol subscription error-handling
+
+Each SNS subscription protocol has distinct failure semantics. The table
+below covers the dominant failure mode, the recommended retry/backoff
+strategy, and the dead-letter target for each protocol. **Read this
+together with the Subscription troubleshooting decision tree** — the tree
+diagnoses where messages are dropping; this table configures what happens
+when they do.
+
+#### HTTP / HTTPS
+
+- **Retry budget:** SNS retries for up to 4 hours (100,010 attempts) with
+  exponential backoff (immediate → 1s → 5s → 10s → ... → minutes).
+- **Failure detection:** endpoint returns 4xx/5xx, times out at >15s, or
+  refuses the connection.
+- **Required mitigation:** attach a **subscription-level DLQ** via
+  `RedrivePolicy` on the subscription. After SNS exhausts its retry budget,
+  the original message lands in the DLQ — without one, the message is
+  silently dropped.
+- **Recommended backoff on the endpoint side:** return HTTP 429 (Too Many
+  Requests) under load — SNS interprets 429 as "back off" and slows
+  delivery. Returning 500 triggers the same retry but signals a permanent
+  failure pattern. Avoid returning 200 to a message you cannot process —
+  SNS will not retry it; instead fail fast and let the DLQ catch it.
+- **Signature validation:** if the endpoint validates the SNS signature,
+  ensure it accepts both `SignatureVersion=1` and `SignatureVersion=2`.
+  Mismatch is the most common cause of spurious 403 responses.
+
+```bash
+aws sns set-subscription-attributes \
+  --subscription-arn <https-sub-arn> \
+  --attribute-name RedrivePolicy \
+  --attribute-value '{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:111111111111:order-https-dlq"}'
+```
+
+#### Lambda
+
+- **Retry budget:** Lambda async invocation retries **2 times** on top of
+  SNS delivery. SNS considers delivery successful once Lambda acks the
+  async invocation; function-level failures are retried by Lambda, not SNS.
+- **Failure detection:** function throws an exception, times out (>15 min
+  default), or returns an error response.
+- **Required mitigation:** configure **Lambda on-failure destination**
+  (SQS/SNS/EventBridge), NOT the SNS subscription DLQ. The subscription
+  DLQ only catches SNS-to-Lambda delivery failures (rare — usually KMS or
+  resource-policy issues). Function failures are handled by Lambda's own
+  async-failure config.
+- **Duplicate invocations:** SNS-to-Lambda does NOT deduplicate. Lambda
+  async retries can deliver the same message 3 times (1 + 2 retries). For
+  exactly-once semantics, use an SQS subscription with a Lambda
+  event-source mapping — SQS provides visibility-timeout-based dedup.
+
+```bash
+# Configure Lambda on-failure destination (run in the Lambda account)
+aws lambda put-function-event-invoke-config \
+  --function-name order-handler \
+  --maximumretry-attempts 2 \
+  --destination-config '{"OnFailure":{"Destination":"arn:aws:sqs:us-east-1:222222222222:lambda-failure-dlq"}}'
+```
+
+#### SQS
+
+- **Retry budget:** SNS delivers once; SQS visibility-timeout and redrive
+  policy handle downstream retries. The SNS retry budget does NOT apply.
+- **Failure detection:** queue remains empty after a successful publish
+  with delivery-success logged — usually a KMS decrypt failure or queue
+  policy issue.
+- **Required mitigation:** configure the **SQS DLQ** via the queue's
+  RedrivePolicy (`deadLetterTargetArn` + `maxReceiveCount`), NOT the SNS
+  subscription DLQ. The SNS subscription DLQ catches SNS-side delivery
+  failures; the SQS DLQ catches consumer-side processing failures. They
+  operate at different layers and are both needed for full coverage.
+- **Message retention:** SQS retains messages for 4 days by default
+  (configurable up to 14 days). Set `MessageRetentionPeriod` to match the
+  recovery SLA — a 1-day retention on a queue that drains hourly loses
+  messages during an outage.
+
+```bash
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-queue \
+  --attributes '{"RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:111111111111:order-sqs-dlq\",\"maxReceiveCount\":\"5\"}", "MessageRetentionPeriod":"1209600"}'
+```
+
+#### Mobile push (application)
+
+- **Retry budget:** SNS retries per platform policy. APNS retries
+  immediately; FCM uses exponential backoff. Failed endpoints are
+  auto-disabled by SNS after the platform rejects the token.
+- **Failure detection:** endpoint shows `Enabled=false` in
+  `get-endpoint-attributes`. Delivery-failure logs show the platform
+  response (e.g., `BadDeviceToken`, `Unregistered`).
+- **Required mitigation:** subscribe mobile push endpoints via a topic
+  (not just direct `publish --target-arn`) and attach a subscription DLQ.
+  The DLQ captures delivery failures so you can re-register the device and
+  replay. Direct-push failures are silent — there is no DLQ for direct
+  `publish --target-arn`.
+- **Token lifecycle:** device tokens rotate. Set up a periodic job to
+  re-call `create-platform-endpoint` with fresh tokens from the app. An
+  endpoint with a stale token is permanently disabled by SNS after a few
+  delivery failures.
+
+#### Email / Email-JSON
+
+- **Retry budget:** none. SNS sends once; if the receiving SMTP server
+  rejects, the message is lost.
+- **Failure detection:** check SES bounce/complaint metrics if SNS email
+  is routed through SES; otherwise there is no SNS-side failure telemetry.
+- **Required mitigation:** none at the SNS layer. For reliable
+  notifications, prefer SQS or HTTPS subscriptions and trigger email via a
+  downstream consumer. Treat SNS email as a best-effort human-notification
+  channel only.
+- **Confirmation required:** every email subscription requires the
+  recipient to click the SubscribeURL in the confirmation email within 3
+  days. There is no programmatic bypass for email subscriptions without
+  the token.
+
 ## References
 
 - `references/topic-configuration-guide.md` — deep reference on topic type

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 14,
       "max": 20,
-      "justification": "The skill compiles many known AWS VPC networking facts (OSI ordering, NACL statelessness, SG cross\u2011VPC reference limits, overlapping CIDR silent failure, endpoint policy independence, TGW propagation details). These are largely information a senior engineer already knows; the skill adds only modest synthesis (e.g., a concrete decision tree) rather than novel thresholds or exclusive expert tricks."
+      "justification": "The skill largely restates well\u2011known AWS VPC troubleshooting concepts (OSI ordering, SG/NACL behavior, peering quirks) without introducing novel decision thresholds, heuristics, or previously undocumented edge\u2011case handling. It adds organization but no genuine expert knowledge beyond what a capable model already knows."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill conveys expert mindset (OSI\u2011first, never guess, treat destination as innocent) and a detailed AWS\u2011specific procedure (pre\u2011flight context gathering, step\u2011by\u2011step probes, Reachability Analyzer usage). Some steps are generic (e.g., \"run nc -vz\" or generic \"check SGs\") and a few AWS\u2011specific nuances (like prefix\u2011list ordering) are omitted, preventing a perfect score."
+      "justification": "Encodes an AWS\u2011specific diagnostic mindset: OSI\u2011ordered probing, exact CLI commands per layer, pre\u2011flight safety checks, and a decision\u2011tree that mirrors senior VPC engineer reasoning. Only minor generic steps (e.g., \"run nc\") prevent a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "A thorough NEVER list is provided with concrete reasoning (e.g., SG references across VPCs, NACL statelessness, overlapping CIDRs, DNS flag, endpoint policy independence). However, a few anti\u2011patterns are generic (e.g., \"never expand CIDR to 0.0.0.0/0\") and the list omits some subtle pitfalls such as prefix\u2011list precedence or Route\u00a053 Resolver firewall interactions, so it falls short of full marks."
+      "justification": "Provides a comprehensive NEVER list with concrete reasoning for each pitfall (e.g., never declare ROOT_CAUSE_FOUND without a failing probe, never assume SG references work cross\u2011VPC, never skip NACL bidirectional checks). One point deducted for omission of anti\u2011patterns around pagination or region\u2011specific edge cases."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, activation triggers, invocation schema, and a minimal example are present, enabling reliable activation. The \"when_to_use\" narrative is slightly verbose, but still meets spec."
+      "justification": "Frontmatter is complete and the description clearly states WHAT the skill does, WHEN to invoke, and provides rich keywords. Activation triggers are overly exhaustive, which could cause spurious activation, so one point is deducted."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers information (Quick start \u2192 Mindset \u2192 Philosophy \u2192 detailed step\u2011by\u2011step \u2192 anti\u2011patterns \u2192 remediation). Nonetheless, the initial sections are dense and contain many details that could overload an agent before it reaches the deeper layers, slightly violating optimal progressive disclosure."
+      "justification": "The skill is organized into layers (quick start, mindset, philosophy, detailed steps, deep reference) which aids progressive disclosure, but the initial sections are dense and contain a large amount of information, causing some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by explicit CONFIRM prompts, read\u2011only probes are emphasized first, and the skill calibrates freedom appropriately for fragile operations (e.g., SG/NACL changes, TGW propagation). Creative tasks are not over\u2011constrained, achieving full marks."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts, which is good. However, the skill does not prescribe batch limits for bulk remediation (e.g., modifying many SG rules) and therefore leaves a gap for safe scaling of state\u2011changing commands."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (Quick start, Mindset, Philosophy, Process, Anti\u2011patterns, Remediation, Deep reference) consistent with other CloudOps skills. Minor deviation is the length and depth of the Philosophy section, but overall the pattern is clear."
+      "justification": "The document follows a recognizable structure (quick start \u2192 mindset \u2192 philosophy \u2192 process \u2192 anti\u2011patterns \u2192 remediation), but the mixture of headings deviates from a single, canonical pattern (e.g., the common \"Problem \u2192 Diagnosis \u2192 Remediation\" template), making it slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a concrete decision tree, exact AWS CLI commands, output format, and worked examples, enabling an agent to execute the troubleshooting end\u2011to\u2011end. Some edge cases (e.g., intermittent failures, custom prefix\u2011list ordering) are not fully covered, preventing a perfect score."
+      "justification": "Provides a concrete decision tree, working CLI examples, and output format, enabling an agent to execute the skill. However, the invocation_schema is loosely defined (no strict JSON schema), pagination and region handling are not addressed, and some edge\u2011case error handling is missing."
     }
   ],
   "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 67042,
-  "latency_ms": 16193,
+  "token_count": 67261,
+  "latency_ms": 9272,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5
