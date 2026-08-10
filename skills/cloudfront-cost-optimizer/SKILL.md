@@ -52,6 +52,7 @@ metadata:
   family: Networking
   task_type: optimize
   skill_class: capability
+  lifecycle_status: active
   verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
   when_to_use: Optimizing CloudFront distribution costs, reviewing Price Class against viewer geography, raising cache hit ratio, choosing between S3 origin and custom origin, evaluating Origin Shield break-even,
     deciding between CloudFront Functions and Lambda@Edge, sizing the WAF rule budget, or building a monthly CloudFront cost projection.

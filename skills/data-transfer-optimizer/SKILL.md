@@ -47,6 +47,7 @@ metadata:
   family: FinOps
   task_type: optimize
   skill_class: capability
+  lifecycle_status: active
   verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
   when_to_use: Optimizing AWS data transfer costs, triaging a surprise data-transfer bill, auditing CUR data-transfer line items, deciding between VPC peering and Transit Gateway, evaluating NAT Gateway
     alternatives (Gateway/Interface endpoints), sizing a Direct Connect commitment, evaluating S3 Multi-Region Access Points, or building a monthly data-transfer cost projection.

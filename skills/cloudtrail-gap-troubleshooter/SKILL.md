@@ -9,7 +9,7 @@ description: >-
   principal, explicit deny), silently stopped trails (inadvertent
   stop-logging, IaC that omitted start-logging), delayed delivery
   beyond the 5-15 minute window, CloudTrail Insights not firing
-  (selectors missing or 7-day baseline not elapsed), and org trails
+  (selectors missing, baseline not elapsed), and org trails
   that miss specific member accounts (member shadow trail stopped,
   delegated-admin confusion, member left org). Emits a deterministic
   verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with evidence
