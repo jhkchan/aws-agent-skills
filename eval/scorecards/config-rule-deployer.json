@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 17,
       "max": 20,
-      "justification": "Most of the content restates AWS Config documentation (limits, evaluation behavior, CLI syntax). The skill does not introduce truly novel heuristics or decision trees that a senior CloudOps engineer couldn't derive from existing docs."
+      "justification": "Adds several non\u2011obvious expert details (exact limits, priority order of pre\u2011checks, decision\u2011tree for stale compliance, proactive rule mechanics, evaluation\u2011lag numbers) that go beyond a generic model's knowledge, but also restates many standard AWS Config facts without new insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (pre\u2011check order, CONFIRM gate, snapshot before change) but some steps are generic (e.g., \"run pre\u2011checks\") and the ordering of IAM permission verification is not fully detailed. No explicit handling of pagination or multi\u2011region context."
+      "justification": "Encodes AWS\u2011specific workflow: ordered pre\u2011flight checks, mandatory CONFIRM gate, snapshot before mutation, forced evaluation, and post\u2011verify steps. Minor omission of error\u2011handling procedures (e.g., pagination, retry logic) keeps it from perfect."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is concrete and explains why each pitfall is bad, yet it omits several common traps such as cross\u2011region SSM document mismatches, the need to request a limit increase for >150 rules, and race conditions when deleting rules."
+      "justification": "Provides a concrete NEVER list with specific reasons (recorder stopped, missing Lambda permission, auto\u2011remediation assumptions, etc.). Misses a few additional pitfalls such as forgetting to set a rule INACTIVE before deletion or handling API throttling."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter and activation triggers are present, but the trigger list is overly broad and could cause false activations. The invocation_schema is narrative rather than a strict JSON schema, leaving ambiguity for the agent."
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present, giving an agent clear when to invoke. The \"when to use\" section is a bit verbose and could be tighter, but overall compliance is solid."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill presents a lot of detail early (full pre\u2011check list, limits, anti\u2011patterns) before the core \"quick reference\". Critical safety rules (CONFIRM gate) are buried in later sections, increasing cognitive load."
+      "justification": "Information is layered (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 patterns \u2192 output contract). Some redundancy and a large initial block of text could cause cognitive overload, preventing perfect progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive operations are guarded by a CONFIRM gate and extensive pre\u2011checks, which is appropriate. However, rule\u2011name validation is only a length check; a tighter regex constraint could further reduce risk."
+      "justification": "Destructive operations are tightly constrained by pre\u2011checks and a mandatory CONFIRM gate, while planning\u2011only tasks remain flexible. Calibration matches task fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "The document follows a recognizable layout (What it does, Quick navigation, Mindset, Process, Anti\u2011Patterns, Output contract) but the ordering is slightly ad\u2011hoc and does not fully match a canonical pattern template."
+      "justification": "Follows a clear, recognizable structure (quick reference, mindset, pre\u2011flight, process, patterns, output contract, anti\u2011patterns), matching established skill patterns."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 11,
       "max": 15,
-      "justification": "Provides working CLI examples, exact output template, and step\u2011by\u2011step plan. Lacks explicit error\u2011handling branches, pagination for list calls, region fallback logic, and guidance for API throttling or retry strategies, which limits real\u2011world execution robustness."
+      "justification": "Provides concrete CLI commands, pre\u2011check flow, and output format that an agent could execute. However, there are factual errors (e.g., proactive rule step uses put-organization-config-rule instead of the correct CloudFormation hook workflow) and missing error handling for API failures, pagination, and region/account discovery, reducing real\u2011world usability."
     }
   ],
-  "total_score": 100,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46207,
-  "latency_ms": 11493,
+  "token_count": 46939,
+  "latency_ms": 17078,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

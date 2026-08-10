@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill introduces genuine expert knowledge not typically recalled by a generic model: a detailed decision tree for Standard vs FIFO selection, the rule that VisibilityTimeout must be >= 6\u00d7 consumer p99 processing time, workload\u2011specific maxReceiveCount recommendations, explicit high\u2011throughput FIFO configuration (FifoThroughputLimit and DeduplicationScope), and the nuanced impact of DLQ type mismatches. These concrete thresholds and ordering rules constitute real delta."
+      "justification": "Adds concrete expert thresholds (e.g., visibility timeout >= 6\u00d7 p99, maxReceiveCount ranges per workload, high\u2011throughput FIFO attribute settings) and a decision matrix that a generic model would not know. Some content merely restates AWS docs, preventing a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "The skill transfers expert AWS\u2011specific procedures: a strict 10\u2011step deployment order, pre\u2011flight safety checks, exact CLI commands for each attribute, and a reasoning framework that explains why each step matters. The procedures are specific to SQS (e.g., create DLQ before redrive policy, set visibility on the event\u2011source mapping) rather than generic cloud\u2011ops advice."
+      "justification": "Encodes AWS\u2011specific ordering (queue type \u2192 DLQ \u2192 redrive \u2192 visibility \u2192 encryption \u2192 policy) and provides exact CLI steps. A few procedures (e.g., \"verify IAM permissions\") are described generically rather than with precise AWS calls."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "A comprehensive NEVER list is provided with concrete reasoning (e.g., never use a Standard DLQ for a FIFO source, never set maxReceiveCount=1, never enable short polling, never use wildcard Principal without conditions). The list is specific and explains the failure mode, but it could include a few more rare pitfalls (e.g., policy size limit) to reach full marks."
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., FIFO DLQ mismatch, visibility timeout < processing time, wildcard policy without condition). Could be richer on KMS key\u2011policy pitfalls, but overall very strong."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description, keywords, triggers, and a precise output contract are all present. The only minor gap is that the \"when_to_use\" paragraph could be more succinct for automated trigger detection."
+      "justification": "Frontmatter includes description, triggers, keywords, and a detailed \"when_to_use\" block. Missing a formal schema for activation and the activation keywords are only listed in prose, which could cause ambiguous triggering."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Content is layered via navigation table, sections, and optional details, allowing agents to skim or dive deeper. However, the initial long navigation table and extensive prose may overload the agent before it knows which part to read, preventing a perfect score."
+      "justification": "Uses top\u2011level summary, quick\u2011navigation table, and deep sections, keeping the initial cognitive load low. The quick\u2011navigation table is dense, and some deep details (e.g., full CLI reference files) are external, requiring extra lookup."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (queue creation, policy changes) are guarded by pre\u2011flight checks, explicit \"never\" rules, and clear constraints (e.g., visibility\u2011timeout must meet 6\u00d7 p99). Slightly less calibration for cross\u2011region or multi\u2011account edge cases."
+      "justification": "Destructive actions (queue creation) are gated by prerequisite checks and a strict output contract. No explicit confirmation prompt is required, which leaves a small freedom gap for accidental runs."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows the recognized CloudOps skill pattern: frontmatter, quick navigation, activation keywords, invocation contract, reasoning framework, step\u2011by\u2011step procedure, anti\u2011patterns, output format, and error handling. Structure is coherent and recognizable."
+      "justification": "Follows a recognizable pattern: invocation contract \u2192 reasoning framework \u2192 prerequisites \u2192 step\u2011by\u2011step procedure \u2192 anti\u2011patterns \u2192 output format. Section titles are slightly ad\u2011hoc but the overall structure is clear."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, decision trees, and error\u2011handling branches. Nonetheless, the model output examples reveal gaps: some checklists omit mandatory long\u2011polling entries, treat optional fields as N/A when they are required, and do not always enforce the strict output contract (e.g., missing required \"Message retention\" line). These execution gaps lower usability."
+      "justification": "Provides decision trees, ready\u2011to\u2011copy CLI commands, error\u2011handling table, and verification steps, enabling an agent to execute the skill. References to external markdown files are not included, and cross\u2011account KMS permission handling could be more explicit."
     }
   ],
-  "total_score": 106,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 58067,
-  "latency_ms": 10032,
+  "token_count": 42383,
+  "latency_ms": 12863,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

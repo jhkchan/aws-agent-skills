@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert knowledge: N+1 minor\u2011version rule, IP\u2011capacity check for surge upgrades, explicit addon\u2011compatibility matrix (must be compatible with both current and target), PDB disruption calculation, and detailed pre\u2011check priority list. Most of this detail is not in a generic model's baseline knowledge, though some points restate official docs."
+      "justification": "Adds deep expert knowledge: exact upgrade ordering (add\u2011ons \u2192 control plane \u2192 node groups), concrete version\u2011compatibility matrices, deprecated\u2011API tables, cost/time baselines, recent AWS features (Auto Mode, Hybrid Nodes, Access Entries, Pod Identity). Missing: detailed IAM\u2011role permission checks, cross\u2011account considerations, Karpenter\u2011specific upgrade handling."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: exact upgrade order (addons \u2192 control plane \u2192 node groups), mandatory CONFIRM gate, precise CLI flags, pagination handling, and IAM\u2011role check. Only minor generic steps (e.g., \"ensure IAM role has permissions\") reduce it from perfect."
+      "justification": "Provides AWS\u2011specific procedures: precise CLI flags, confirm\u2011gate workflow, pre\u2011check priority list, and post\u2011verification steps. Weakness: some steps are generic (e.g., \"run kubent\" without version flag) and no explicit fallback plan for a failed control\u2011plane upgrade."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Robust NEVER list with concrete reasons (e.g., PDB blocks, maxUnavailable\u202f=\u202f100%, add\u2011on incompatibility, skipping minor version). Lacks a few common pitfalls such as missing IAM permissions for EKS actions or neglecting region/account detection, so points are deducted."
+      "justification": "Contains a concrete NEVER list with specific reasons (add\u2011on sequencing, one\u2011way control\u2011plane upgrade, PDB drain blocking, resolve\u2011conflicts handling, deprecated\u2011API scan). Lacks anti\u2011patterns around IAM permission errors and pagination pitfalls beyond a brief mention."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata, activation_triggers, invocation_schema). Description clearly states WHAT, WHEN, and KEYWORDS. Minor issue: activation triggers list many synonyms but does not include a generic \"upgrade\" intent that some agents might use, causing a slight ambiguity."
+      "justification": "Full frontmatter, clear description of WHAT it does, WHEN to invoke, exhaustive keyword list, activation triggers, and a precise invocation schema. No missing or vague elements."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Content is layered: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns. However, the Quick reference table packs many detailed thresholds that could overload a first\u2011time reader, slightly violating pure progressive disclosure."
+      "justification": "Information is layered (quick reference, mindset, pre\u2011flight, process, output format). Critical safety rules (e.g., rollback advisory) are repeated deep in the document, and the size of the skill may overload an agent before it reaches the needed section."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained (mandatory CONFIRM, pre\u2011check gating, IP\u2011capacity and quota verification for surge, PDB checks). Creative planning steps are left open (e.g., operator can choose rolling vs surge). No over\u2011constraining of non\u2011state\u2011changing tasks."
+      "justification": "Destructive operations are tightly constrained with confirm gates, version\u2011skip checks, and capacity validation. Some flexibility remains (e.g., surge parameters are not bounded by explicit limits) and IAM\u2011role validation is only mentioned generically."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output format \u2192 Anti\u2011Patterns). The structure is consistent with other CloudOps skills, though the section titles vary slightly from a strict template."
+      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns). Structure is coherent, though section naming is slightly ad\u2011hoc rather than a standard template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Agent can execute the plan: all CLI commands are fully populated, decision tree is explicit, and rollback capture is defined. However placeholders like <update-id-from-step-2> require runtime substitution, and there is no detailed error\u2011handling or retry logic for failed AWS CLI calls, which limits real\u2011world usability."
+      "justification": "Provides decision trees, concrete CLI commands, example outputs, and error\u2011handling notes. Missing: explicit handling of pagination errors, detailed remediation steps for failed CLI calls, and some placeholders remain (e.g., <update-id-from-step-2>) requiring runtime substitution."
     }
   ],
-  "total_score": 105,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 53284,
-  "latency_ms": 9182,
+  "token_count": 44654,
+  "latency_ms": 14802,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

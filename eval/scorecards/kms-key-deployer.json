@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 13,
       "max": 20,
-      "justification": "Provides specific thresholds (deletion window 7\u201130 days), on\u2011demand rotation, multi\u2011region replication steps, CloudHSM custom store procedures, and concrete anti\u2011pattern reasons \u2013 beyond generic KMS knowledge \u2013 but largely restates AWS documentation without a novel decision tree."
+      "justification": "Adds concrete thresholds (deletion window 7\u201130 days, automatic rotation only for SYMMETRIC_DEFAULT, on\u2011demand rotation, recent 2024\u20112026 feature notes) that a generic model may not enumerate, but the bulk of the content restates standard AWS documentation rather than novel expert insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific ordering (spec \u2192 policy \u2192 admin \u2192 users \u2192 alias \u2192 rotation \u2192 multi\u2011region \u2192 custom store \u2192 deletion) and detailed CLI sequences, yet includes generic checks like \u201cverify IAM permissions\u201d that are not uniquely AWS\u2011specific."
+      "justification": "Provides a detailed 10\u2011step AWS\u2011specific provisioning workflow, exact CLI commands, policy JSON, multi\u2011region replication, and CloudHSM custom key store steps, demonstrating expert procedural thinking."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (break\u2011glass, avoid kms:* grants, avoid lockout, avoid direct >4\u202fKB encryption, etc.), but a few items lack deeper explanation (e.g., brief rationale for never granting kms:* to non\u2011root)."
+      "justification": "Contains a thorough \"NEVER\" section with concrete pitfalls (e.g., missing root break\u2011glass, granting kms:* to non\u2011root, mixing admin and user roles) and explicit reasons why each is dangerous, reflecting real\u2011world experience."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter includes all required fields, clear description, when_to_use, keywords, and activation list; the output contract is precisely defined. No missing or vague activation triggers."
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, dependencies, metadata, when_to_use). The output contract, activation keywords, and trigger list are clearly defined."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Uses layered sections, quick navigation, and deep reference files, keeping the checklist concise. The initial sections contain extensive tables that add some cognitive load, preventing a perfect score."
+      "justification": "The skill is well\u2011structured with a quick\u2011navigation table and layered sections (reasoning, prerequisites, procedure, anti\u2011patterns, heuristics, etc.). However, the initial sections are dense and may overload an agent before it reaches the concise checklist, leading to a slight deduction."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (deletion) are described with required window and irreversible warning, but the skill does not enforce tight constraints in the output contract, leaving some freedom for risky commands."
+      "justification": "Calibrates freedom well: destructive actions (deletion) are tightly constrained, rotation is auto\u2011enabled only for eligible keys, and custom\u2011store steps require explicit cluster checks. Slight weakness: it does not enforce the 30\u2011day window programmatically, only as a recommendation."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a coherent, recognized pattern (frontmatter \u2192 navigation \u2192 output contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011pattern \u2192 heuristics \u2192 safety checks \u2192 references)."
+      "justification": "Follows the documented CloudOps deployer pattern (frontmatter, navigation, activation, strict output contract, reasoning, procedure, anti\u2011patterns, heuristics, references). Structure is coherent and recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 9,
       "max": 15,
-      "justification": "The model output adheres to the strict checklist format and is executable. Nonetheless, the HMAC example lists wrong IAM actions for users, and the administrator marker list omits some lifecycle permissions (e.g., kms:DisableKey, kms:CancelKeyDeletion). These inaccuracies would cause real\u2011world errors, so usability is penalized."
+      "justification": "Model output violates the strict contract: it adds a prose explanation after the checklist, includes incorrect IAM actions for HMAC keys (e.g., kms:GenerateDataKey, kms:Verify, kms:Sign), and repeats \"Key users\" lines with region annotations that are not part of the required format. These errors reduce confidence that an agent can execute the skill reliably."
     }
   ],
-  "total_score": 104,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49138,
-  "latency_ms": 14839,
+  "token_count": 50453,
+  "latency_ms": 15613,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

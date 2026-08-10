@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 13,
+      "score": 14,
       "max": 20,
-      "justification": "The skill restates many well\u2011known AWS S3 concepts (versioning, lifecycle actions, Object Lock modes) that a competent model already knows. It does add some concrete numbers (2026 storage\u2011cost rates, $1 per million Batch Operations objects, exact MFADelete impact) and a specific pre\u2011check priority order, which constitute modest expert delta, but the majority is a re\u2011packaging of public documentation rather than novel decision trees or thresholds."
+      "justification": "The skill repeats many well\u2011known S3 facts (e.g., storage rates, that lifecycle PUT replaces config) that a competent model already knows. It adds some useful specifics (cost\u2011per\u2011GB numbers, exact priority order of pre\u2011checks, and a concise decision tree), but the novel content is limited and not a deep expert\u2011only insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedure flow (pre\u2011flight checks, merge\u2011then\u2011PUT lifecycle, confirm gate, batch\u2011job creation). However, the MFADelete handling is only mentioned as a check, not a concrete step for injecting the MFA token, leaving a procedural gap for that fragile operation."
+      "justification": "Provides an AWS\u2011specific procedure flow (pre\u2011flight checks, merge\u2011then\u2011PUT, confirm gate, post\u2011verification). However, several steps are generic (e.g., \u201cverify caller has permissions\u201d) and lack AWS\u2011specific nuance such as required IAM policy syntax or handling MFADelete token injection."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., PUT replaces lifecycle, compliance mode blocks deletions). Missing a few nuanced anti\u2011patterns such as Intelligent\u2011Tiering rule conflicts and cross\u2011region replication pitfalls, which reduces completeness."
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never replace lifecycle without merging, never delete in Compliance mode). It omits a few common pitfalls such as cross\u2011account IAM delegation and handling of pagination limits, reducing completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The only shortfall is that the invocation schema is described in prose rather than a strict JSON schema, which could hinder reliable automated parsing."
+      "justification": "Front\u2011matter is complete and activation triggers are listed, but the triggers are verbose and some are overlapping, which could cause ambiguous activation. The description is thorough but could be tighter for reliable invocation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers information (quick reference, mindset, pre\u2011flight, process, output format) effectively. Nonetheless, the initial sections are dense and include many tables that may overload an agent before it knows which part to read first."
+      "justification": "The document layers information: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns. Critical safety rules (CONFIRM gate) appear in the process section rather than upfront, causing slight cognitive overload for a first\u2011time reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained by mandatory CONFIRM gates and exhaustive pre\u2011checks. The only minor issue is the lack of explicit constraints for cross\u2011account bucket access (IAM vs bucket policy) which could allow an over\u2011permissive plan in that scenario."
+      "justification": "Destructive actions are tightly constrained with a mandatory CONFIRM gate, pre\u2011checks, and post\u2011verification. Minor shortfall: the Batch Operations example leaves placeholders (e.g., <JobId>) and does not fully detail manifest creation, leaving a small freedom gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns). Slight deviation: the 'Quick navigation' table mixes navigation with content, making the overall structure marginally less canonical."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns). Some headings (e.g., \u201c\u00a7 Quick reference\u201d) feel ad\u2011hoc, but overall the structure is coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision trees, and worked examples that an agent could execute. Missing handling for MFADelete token injection, cross\u2011account role assumption, and error\u2011handling branches for partial failures in Batch Operations, which could cause execution gaps."
+      "justification": "Provides actionable CLI commands, decision trees, and worked examples. The Batch Operations example contains a malformed JSON payload (Objects list syntax) and placeholder values that would cause execution errors, indicating incomplete practical guidance."
     }
   ],
-  "total_score": 102,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 52201,
-  "latency_ms": 13427,
+  "token_count": 40958,
+  "latency_ms": 8534,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

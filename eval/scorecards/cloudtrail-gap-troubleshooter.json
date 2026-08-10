@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 12,
       "max": 20,
-      "justification": "The skill compiles a comprehensive decision tree, exact bucket\u2011policy JSON, KMS policy requirements, and the 7\u2011day Insights baseline\u2014useful for a senior engineer\u2014but most of this information is already present in AWS documentation and a capable model could generate it; the skill adds limited truly novel insight."
+      "justification": "The skill largely restates standard CloudTrail troubleshooting knowledge (event selectors, bucket policies, logging status) that a senior CloudOps engineer already knows. It does not introduce a novel decision matrix, quantitative thresholds, or previously undocumented edge\u2011case handling that would constitute a true knowledge delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific diagnostic order (isLogging \u2192 bucket policy \u2192 KMS \u2192 event selectors) and concrete CLI commands, but occasional phrasing remains generic (e.g., \u201ccheck bucket policy\u201d) without always specifying the exact JSON fields to inspect."
+      "justification": "Provides a clear AWS\u2011specific reasoning flow (management vs data events, dual health signals, multi\u2011region vs single\u2011region) and concrete CLI steps, but some procedures are generic (e.g., \"check bucket policy\") and the exact ordering of KMS vs bucket checks is not fully specified."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with clear reasoning (e.g., never assume an outage, never ignore isLogging). Only minor omission: no explicit warning about enabling Insights on data events, which is a known pitfall."
+      "justification": "Includes a solid NEVER list with concrete reasons (outage assumption, mixing describe\u2011trails with get\u2011trail\u2011status, etc.), yet omits other common pitfalls such as cross\u2011region bucket latency, IAM policy conflicts, and pagination errors."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter is complete and the description outlines WHAT, WHEN, and KEYWORDS. The \u2018when_to_use\u2019 paragraph is a bit verbose and could be tighter, leading to a small deduction."
+      "justification": "Front\u2011matter is complete, activation triggers and invocation schema are defined, and a detailed output contract is provided. However, the spec lacks an explicit \"when NOT to use\" clause and some activation triggers are overlapping/verbose, preventing a perfect score."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill layers information (activation \u2192 mindset \u2192 quick reference \u2192 detailed steps) but the quick\u2011reference table and the full decision tree are dense, causing some cognitive overload before the core rules are reached."
+      "justification": "Information is layered effectively (activation \u2192 mindset \u2192 quick reference \u2192 step\u2011by\u2011step diagnostics). Some sections (full command reference) are dense but do not overwhelm the top\u2011level flow."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (start\u2011logging, bucket\u2011policy edits) are presented with concrete commands but without explicit safety guards (e.g., confirmation prompts or \u2018only run if isLogging is false\u2019 checks), so the calibration is slightly loose for fragile operations."
+      "justification": "Destructive actions (start\u2011logging, bucket\u2011policy edits) are presented with cautions (cost warning, verification steps). Nevertheless, the skill does not require explicit user confirmation before issuing mutating commands, leaving a small safety gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Activation, Mindset, Quick Reference, Process, Output Format) that aids comprehension, though the pattern is custom rather than a widely\u2011adopted standard."
+      "justification": "Follows a recognizable pattern (Activation, Mindset, Quick Reference, Process, Output format). A few ad\u2011hoc headings break the otherwise clean structure."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI snippets, and a strict output template. Some commands lack region flags or full source arguments (e.g., `aws s3 cp s3://my-bucket/test .`), and edge\u2011case handling (cross\u2011account buckets, IAM permission errors) is not fully covered."
+      "justification": "Provides a usable decision tree, concrete CLI examples, and a strict output template. Lacks guidance for handling API errors, pagination, or region mismatches, which could cause execution failures in edge cases."
     }
   ],
-  "total_score": 103,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 61776,
-  "latency_ms": 16912,
+  "token_count": 40260,
+  "latency_ms": 13733,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

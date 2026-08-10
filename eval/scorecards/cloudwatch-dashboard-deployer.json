@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides many specific, up\u2011to\u2011date details (widget caps, exact role name CloudWatch-CrossAccountSharingRole, cost of custom metrics, EMF v2, recent 2024\u20112026 feature timeline, decision tree for empty widgets) that go beyond generic CloudWatch knowledge, but most of these facts are documented and a well\u2011trained model could retrieve them, so not a perfect 20."
+      "justification": "The skill provides many concrete limits and procedures, but it lacks a senior\u2011engineer\u2011level decision tree for choosing widget types (e.g., when to prefer metric\u2011math vs raw metric, cost\u2011impact thresholds for high\u2011cardinality custom metrics). That missing expert guidance reduces the delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Defines AWS\u2011specific procedures: pre\u2011check ordering, snapshot before put\u2011dashboard, mandatory CONFIRM gate, cross\u2011account role verification, metric\u2011math ID conventions, and region handling. Lacks a few minor procedural nuances (e.g., explicit pagination handling for list\u2011dashboards) preventing full marks."
+      "justification": "Defines an AWS\u2011specific workflow: pre\u2011flight checks in a precise order, snapshot before PutDashboard, confirm gate, post\u2011verify steps. Procedure is thorough but could mention explicit rollback steps beyond snapshot."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., missing sharing role causes silent empty widgets, hard\u2011coding instance IDs breaks fleet changes). Lacks a few niche pitfalls such as region mismatches in widget properties and API throttling mitigation."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., missing cross\u2011account role, empty metric widgets, overlapping positions). Lacks a few edge anti\u2011patterns such as avoiding high\u2011cardinality custom metrics without aggregation."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and includes a rich keyword list and activation triggers. Slight deduction for the 'invocation_schema' being a free\u2011form paragraph rather than a strict JSON schema."
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and includes exhaustive keywords, activation triggers, and invocation schema. No missing fields."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, patterns, output contract, anti\u2011patterns. No overload at top level, but some sections (e.g., long expert heuristics) could be moved to references, so not perfect."
+      "justification": "The skill layers information well, but the initial \"Quick reference\" table packs many rows and could overload an agent before it knows the specific operation type. Slightly too much front\u2011loading costs one point."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained (snapshot, CONFIRM gate, full pre\u2011checks) while creative dashboard design is left flexible. Minor deduction because the variable syntax ($INSTANCE_ID vs ${INSTANCE_ID}) is inconsistent, slightly loosening constraints."
+      "justification": "Destructive actions (put\u2011dashboard, delete) are tightly constrained with confirm gate and snapshot; creative planning steps are left flexible. Calibration matches task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (overview, quick navigation, mindset, pre\u2011flight, process, patterns, output contract, anti\u2011patterns). Structure is coherent, only loses one point for occasional ad\u2011hoc formatting (tables mixed with free text)."
+      "justification": "Follows the established CloudOps skill pattern (quick reference, mindset, pre\u2011flight, process, patterns, output contract, anti\u2011patterns, safety). Structure is coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Model outputs demonstrate the skill can be used end\u2011to\u2011end: correct VERDICT block, CONFIRM gate, full CLI command, and post\u2011verify steps. Small issues: variable syntax inconsistency ($INSTANCE_ID vs ${INSTANCE_ID}) and some pre\u2011check items omitted from the output (e.g., widget\u2011count check not listed), which could cause ambiguity in real use."
+      "justification": "Provides concrete CLI examples, decision tree, and a strict output contract that an agent can follow. Lacks guidance for handling CLI errors, transient metric\u2011statistics failures, and large DashboardBody payloads (>256\u202fKB). No fallback or retry strategy is described."
     }
   ],
-  "total_score": 105,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 44858,
-  "latency_ms": 11540,
+  "grade": "A",
+  "token_count": 45281,
+  "latency_ms": 15080,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

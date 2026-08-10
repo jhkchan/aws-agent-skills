@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 18,
       "max": 20,
-      "justification": "Adds concrete expert details not usually known by a generic model: exact Fargate CPU/memory combination matrix, capacity\u2011provider strategy syntax, IAM policy JSON snippets, recent 2024\u20112026 feature list, and heuristic sizing rules. Some content merely restates documentation, hence a modest deduction."
+      "justification": "Provides deep, specific expert knowledge not commonly known: exact CPU/memory combo table, full IAM policy JSON for execution and task roles, capacity\u2011provider strategy syntax, Spot interruption handling, EFA requirements, AZ rebalancing flag, recent 2024\u20112026 feature list, and precise CLI sequences. The only minor gap is omission of a few niche edge\u2011cases (e.g., Service Connect details), so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific deployment ordering (task definition \u2192 roles \u2192 cluster \u2192 networking \u2192 ALB \u2192 service \u2192 autoscaling) and precise capacity\u2011provider steps. A few procedural notes are generic (e.g., \u201cverify permissions\u201d) resulting in a small loss."
+      "justification": "Encodes a clear AWS\u2011specific 10\u2011step deployment workflow, ordered reasoning, and decision heuristics (CPU sizing, AZ spread, capacity\u2011provider blend). Procedures are concrete and AWS\u2011centric. Slight deduction for lacking an explicit rollback verification step after deployment."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Comprehensive NEVER list with concrete reasons (e.g., never use :latest, never combine roles, never target_type=instance). Omits warnings about mismatched ALB vs container health checks and about deploying into the default VPC, reducing completeness."
+      "justification": "Contains a thorough NEVER list with specific reasons, but omits a few common pitfalls (e.g., forgetting to pin platformVersion, overlooking ECS Exec audit concerns) and therefore lacks complete coverage."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when\u2011to\u2011use, keywords, activation list, and strict output contract are all present. The frontmatter does not include an explicit \"output format\" field, a minor omission."
+      "justification": "Frontmatter, description, when\u2011to\u2011use, and activation keywords are present, but the frontmatter does not explicitly list the activation keywords field required for reliable triggering; they are only in a separate section, causing a minor compliance gap."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick navigation \u2192 detailed sections), but the skill front\u2011loads a large amount of dense content before the core output contract, which can cause cognitive overload for an agent."
+      "justification": "Content is layered with quick navigation, high\u2011level sections, and deep reference files. However, the main document is dense; some readers may experience cognitive overload before reaching the deeper reference links."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (service creation) are tightly constrained by the mandatory output contract. However, the skill does not explicitly forbid using the legacy launch\u2011type API with FARGATE_SPOT, leaving a small freedom gap."
+      "justification": "Destructive actions (service creation, IAM role changes) are tightly constrained by the output contract and explicit forbidden patterns. Creative tasks (heuristic sizing) are given appropriate flexibility. One point deducted for not explicitly limiting the capacity\u2011provider weight range."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows the established CloudOps deployer pattern with clear taxonomy (frontmatter, navigation, contract, reasoning, procedure, anti\u2011patterns, heuristics, references)."
+      "justification": "Follows the established CloudOps skill pattern (frontmatter \u2192 navigation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 heuristics \u2192 safety checks \u2192 output format), making the structure recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 9,
+      "score": 11,
       "max": 15,
-      "justification": "Model output emits multiple checklist blocks separated by '---', violating the strict single\u2011block contract. Automation expecting one block would fail, indicating a practical usability gap."
+      "justification": "The example outputs obey the strict label contract, but the response bundles multiple checklist blocks separated by \u2018---\u2019, which violates the \u2018no extra sections after VERIFICATION_COMMANDS\u2019 rule. Additionally, the \u201cLoad balancer \u2014 None\u201d line deviates from the required format, risking automation breakage."
     }
   ],
-  "total_score": 103,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49819,
-  "latency_ms": 14013,
+  "token_count": 50131,
+  "latency_ms": 18176,
   "assertions_passed": false,
-  "assertions_passed_count": 1,
-  "assertions_failed_count": 4
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
 }

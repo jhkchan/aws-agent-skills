@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 13,
+      "score": 14,
       "max": 20,
-      "justification": "The skill mostly restates well\u2011known AWS Lambda cost facts (memory\u2011CPU coupling, ARM64 discount, request fee) that a capable model already knows. The only genuine delta are a few specific numbers (1769\u202fMB\u202f=\u202f1\u202fvCPU, 20\u202f% ARM64 discount) and a hand\u2011crafted break\u2011even formula, which are useful but not enough for a high score."
+      "justification": "Most content restates publicly documented facts (memory\u2011CPU ratio, cost formula, SnapStart, ARM64 discount). Only a few original thresholds (e.g., provisioned\u2011concurrency idle cost $394/month, CV < 0.5 for traffic consistency) provide genuine delta, so the skill falls short of full expert novelty."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: Power Tuning deployment via SAR, exact CLI sequences for data gathering, step\u2011by\u2011step memory, concurrency, and architecture adjustments, and a clear decision\u2011tree mindset. Some steps are generic (e.g., \"check latency SLO\") but overall the procedures are tightly tied to Lambda."
+      "justification": "Provides many AWS\u2011specific CLI steps and decision trees, but several procedures are generic (e.g., \"check latency\" without concrete SLO values, \"monitor duration\" without a defined monitoring window). The mindset is solid but not fully exhaustive."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is extensive and well\u2011reasoned, but it omits a few common pitfalls such as \"NEVER enable SnapStart for non\u2011Java runtimes\" and \"NEVER increase batch size without handling ReportBatchItemFailures for SQS\". These missing items reduce the completeness."
+      "justification": "Includes a useful top\u20115 NEVER list with reasoning, yet it omits other common pitfalls such as IAM permission failures, version\u2011alias safety, and concurrency throttling. The anti\u2011pattern coverage is good but not comprehensive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete (name, description, version, author, license, keywords, tags, metadata, activation triggers, invocation schema, example). The description clearly states WHAT the skill does and WHEN to invoke. Slight weakness: the \"when_to_use\" field is a long paragraph rather than a concise trigger list, which could affect reliable activation."
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are all present and well\u2011structured. Minor ambiguity in the long list of activation triggers could affect reliable triggering."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers information: quick start, mindset, philosophy, quick reference, pre\u2011flight gate, detailed steps, impact estimation, output format, anti\u2011patterns, safety checks. However, some sections (e.g., the extensive Quick Reference table) dump many details up front, creating some cognitive overload."
+      "justification": "The skill layers information (quick start \u2192 mindset \u2192 detailed steps) but the Quick\u2011start section packs several formulas and rules that could overload the initial read. A more granular top\u2011level summary would improve progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (memory update, architecture change, provisioned\u2011concurrency removal) are gated by explicit CONFIRM prompts and pre\u2011flight safety checks. The calibration matches task fragility well. Only minor gap: the skill does not enforce a hard limit on batch updates (more than 5 functions) in the main body, though it appears in anti\u2011patterns."
+      "justification": "Destructive actions (e.g., deleting provisioned concurrency) are gated by a CONFIRM prompt and safety checks, showing good calibration. However, it does not explicitly require an IAM\u2011permission pre\u2011check, leaving a small over\u2011freedom gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a coherent pattern (frontmatter \u2192 purpose \u2192 navigation \u2192 mindset \u2192 philosophy \u2192 reference \u2192 process steps \u2192 impact \u2192 output contract \u2192 anti\u2011patterns \u2192 safety \u2192 remediation \u2192 decision tree \u2192 edge cases). The structure is recognizable and aids comprehension."
+      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns), but the mixture of tables, narrative, and code blocks feels ad\u2011hoc rather than a single, clean template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 8,
+      "score": 9,
       "max": 15,
-      "justification": "Provides many CLI commands, decision trees, and example output blocks, but several worked examples contain arithmetic errors and contradictory statements (e.g., a memory upsize showing $5,416.67 current cost vs $551.67 projected cost, or cost\u2011neutral memory upsize still labeled OPPORTUNITY_FOUND). These inconsistencies would cause an agent to mis\u2011classify or emit invalid savings, violating the strict output contract."
+      "justification": "Examples contain arithmetic inconsistencies (e.g., compute + request totals not matching reported monthly cost, missing idle provisioned\u2011concurrency cost), incorrect \"Dimensions checked\" formatting, and ambiguous savings calculations. These errors would cause an agent to emit wrong or non\u2011balanced output, violating the strict contract."
     }
   ],
-  "total_score": 95,
+  "total_score": 99,
   "max_score": 120,
   "grade": "B",
-  "token_count": 90045,
-  "latency_ms": 6732,
+  "token_count": 42528,
+  "latency_ms": 16059,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0
