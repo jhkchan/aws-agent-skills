@@ -777,13 +777,13 @@ the next run.
   Different failure modes from Spark; this skill covers Spark only.
 - **Glue Schema Registry (2023-2024):** Avro/Protobuf/JSON schemas
   enforced at the DynamicFrame layer. Schema mismatch now also fires
-  from the registry, not just the catalog.
+  from the registry.
 - **Glue flexible execution class (2024):** Lower-cost DPUs with
   potential preemption. A FAILED run on flexible execution may be
   preemption — check ErrorMessage for `FLEX_EXECUTION_PREEMPTED` before
   diagnosing.
-- **Glue Data Quality (2023-2024):** Separate service from ETL jobs;
-  route Data Quality rule failures to that service.
+- **Glue Data Quality (2023-2024):** Separate service; route Data
+  Quality rule failures there, not to this skill.
 
 ## Domain
 

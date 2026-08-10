@@ -1,0 +1,70 @@
+{
+  "skill": "wafv2-web-acl-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill provides many concrete AWS\u2011specific details (priority numbers, aggregate\u2011key matrix, recent 2024\u20112026 feature list, exact resource\u2011policy snippets). However, a large portion restates information that a competent CloudOps model already knows (e.g., basic scope vs regional distinction, generic rule\u2011type definitions). The net delta is valuable but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (scope selection, managed\u2011rule ordering, logging destination setup, association commands). A few steps are generic (\"verify IAM permissions\", \"confirm target resource exists\") and could be tighter to the WAFv2 workflow."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "The NEVER list enumerates concrete pitfalls with clear reasoning (e.g., wrong scope, allow\u2011list priority, aggregate\u2011key misuse). One minor omission: it does not explain why enabling ATP without a login path silently does nothing, leaving a small gap."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, and a strict output contract are present. The \"when_to_use\" section is adequate, but trigger conditions rely heavily on keyword matching; a more formal activation predicate would improve reliability."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The document layers information (quick navigation, then deep sections) but the core checklist format and many detailed tables are presented early, creating cognitive load. Critical rules (e.g., NEVER list) could be hidden behind a reference link to better respect progressive disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (Web ACL creation) are guarded by extensive prerequisite checks and a mandatory checklist. However, the skill does not explicitly forbid accidental deletion or recreation of an existing ACL, leaving a small freedom\u2011calibration gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (frontmatter \u2192 navigation \u2192 activation \u2192 output contract \u2192 reasoning \u2192 procedure). The ordering of sections is slightly ad\u2011hoc (e.g., \"Recent AWS features\" appears after the procedure) but overall the pattern is clear."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, priority tables, and a ready\u2011to\u2011deploy checklist. Model output examples are syntactically correct. Missing edge\u2011case handling for unavailable managed rule groups (subscription not active) and for missing IP\u2011set ARNs reduces completeness."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 43752,
+  "latency_ms": 12976,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

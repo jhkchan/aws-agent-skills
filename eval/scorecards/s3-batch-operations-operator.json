@@ -1,0 +1,70 @@
+{
+  "skill": "s3-batch-operations-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many concrete thresholds, recent feature notes, and a detailed failure\u2011mode table, but a sizable portion restates official documentation (e.g., IAM permission list, rate\u2011control limits) without adding a novel decision matrix or unique heuristic that a senior CloudOps engineer would not already know."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers an AWS\u2011specific step\u2011by\u2011step flow (pre\u2011checks, CONFIRM gate, CLI sequence) and operation\u2011specific grant checks, yet some procedures are generic phrasing like \u201crun pre\u2011checks\u201d and omit a dedicated verification of the role\u2019s trust policy before job creation."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., header rows in CSV, missing Lambda principal), but misses a few high\u2011impact anti\u2011patterns such as never using the maximum priority value and does not always explain the underlying AWS service behavior for each pitfall."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description outlines WHAT, WHEN, and KEYWORDS, and activation triggers are listed. However, the activation_triggers field is a free\u2011form list rather than a strict schema, and the when_to_use paragraph could be tighter for reliable automated activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns) but the initial sections are dense, causing cognitive overload before the core safety rules are reached. Some deep technical references could be deferred to an appendix."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained with pre\u2011checks and a mandatory CONFIRM gate, yet the cancel\u2011job operation lacks an extra safeguard (e.g., double\u2011confirm or explicit impact warning) that would match its high fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (What it does, navigation table, mindset, process, anti\u2011patterns, output contract), but the ordering of sections (quick reference before mindset) feels slightly ad\u2011hoc, preventing a perfectly clean pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides executable CLI snippets, decision trees, and sample outputs, enabling an agent to act. Missing coverage of some edge cases (cross\u2011region manifests, pagination of inventory listings, handling of create\u2011job API errors) reduces robustness."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 50061,
+  "latency_ms": 13648,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "ec2-instance-recovery-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides concrete, up\u2011to\u2011date AWS\u2011specific knowledge not usually in a generic model: decision matrix linking SystemStatus vs InstanceStatus to stop/start vs reboot, exact ordering of pre\u2011flight checks, ASG process\u2011suspend commands, Capacity Reservation re\u2011binding API, placement\u2011group capacity check, cost\u2011time baselines (2026), and recent features such as EC2 automatic recovery, Serial Console enablement, and Fast Snapshot Restore. However much of the content restates well\u2011known AWS docs, so not a full 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures (pre\u2011flight CLI sequence, suspend ASG processes, confirm gate, post\u2011verification steps). One point deducted because a few steps (e.g., \u201ccapture pre\u2011state\u201d) are generic best\u2011practice rather than uniquely AWS\u2011specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with reasons (instance\u2011store loss, ASG health\u2011check suspension, double\u2011recover, etc.). Missing are anti\u2011patterns for using the EC2 Serial Console without enabling it first and a warning that `--no-reboot` should never be used for production AMIs beyond forensic snapshots."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are present. The activation triggers include some vague entries (e.g., \"instance unreachable\") that could cause unreliable invocation, and the \"when_to_use\" paragraph is long and not sharply scoped."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns). Nevertheless, the quick\u2011reference table and the extensive pre\u2011flight checklist front\u2011load many details, risking cognitive overload before the operator knows which section to consult."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by a mandatory CONFIRM prompt and extensive pre\u2011checks. The only shortfall is that the enable\u2011recovery\u2011alarm operation does not explicitly repeat the CONFIRM requirement, leaving a tiny gap for an unrestricted state\u2011changing command."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns). Section headings are mostly consistent, but the mix of markdown tables and narrative occasionally breaks the uniform structure."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, decision matrix, and worked examples that an agent could execute. Lacks explicit handling of pagination for fleet\u2011wide pre\u2011flight audits and does not detail error handling for malformed JSON beyond a generic VERDICT: ERROR block."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 42507,
+  "latency_ms": 11117,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}
