@@ -694,6 +694,132 @@ IMPLEMENTATION:
   6. Verify: aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=vpc-0ghi789"
 ```
 
+## STRICT output contract
+
+The rules below are hard constraints. Violating any one produces an
+arithmetic contradiction or a misclassification that breaks downstream
+FinOps automation. Self-check EVERY emitted block against these rules
+before returning the response.
+
+### Required output structure
+
+Every response MUST be a single block per VPC using these literal
+labels, in this order. Do NOT substitute markdown headings, camelCase,
+or bold variants.
+
+```text
+VPC: <vpc-id>
+VERDICT: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+REASON: <1-2 sentences citing the highest-leverage dimension and step number>
+RECOMMENDATION:
+  <list of endpoint-creation and topology-change actions>
+SAVINGS:
+  CURRENT_MONTHLY: $<amount>    ← MUST show base + data-processing subtotals
+  PROJECTED_MONTHLY: $<amount>
+  MONTHLY_SAVING: $<amount>     ← MUST equal CURRENT − PROJECTED, 2 decimals
+  ANNUAL_SAVING: $<amount>      ← MUST equal MONTHLY × 12
+  CAVEATS: <break-even assumptions, reliability warnings>
+IMPLEMENTATION:
+  1. <create-vpc-endpoint / delete-nat-gateway / replace-route CLI command>
+  2. <verification command>
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER emit `VERDICT: OPPORTUNITY_FOUND` with
+   `MONTHLY_SAVING: $0.00`.** If every dimension nets zero saving, the
+   verdict MUST be `ALREADY_OPTIMAL`. An `OPPORTUNITY_FOUND` block with
+   a zero savings line is a direct contradiction.
+
+2. **NEVER show a savings figure where `CURRENT_MONTHLY −
+   PROJECTED_MONTHLY` does not equal `MONTHLY_SAVING`.** Round both
+   sides to 2 decimal places. If they differ, fix the arithmetic before
+   emitting — do NOT append an "Adjusted to Cost Explorer baseline" or
+   "rounding" reconciliation that masks the mismatch.
+
+3. **NEVER recommend an Interface endpoint without citing the GB/month
+   traffic volume AND the break-even threshold (~160 GB/month per AZ).**
+   The RECOMMENDATION line MUST state: `<service>: <X> GB/month vs
+   <break-even> GB/month break-even for <N>-AZ`. An Interface endpoint
+   on traffic below break-even INCREASES cost — that is a negative
+   saving and MUST NOT appear as `OPPORTUNITY_FOUND`.
+
+4. **NEVER include Gateway endpoint (S3, DynamoDB) costs on the cost
+   side of the SAVINGS equation.** Gateway endpoints are free — $0
+   hourly, $0 per-GB. Their absence from a VPC with S3/DynamoDB NAT
+   traffic is always `OPPORTUNITY_FOUND` with the full redirected-GB
+   dollar amount captured as saving.
+
+5. **NEVER recommend a NAT Instance without the reliability warning in
+   CAVEATS.** The warning MUST include: "single point of failure, no
+   SLA, not suitable for production." A NAT Instance recommendation
+   without this caveat is non-compliant.
+
+6. **NEVER emit a "NOTE: discrepancy due to partial-month data" or
+   "Adjusted to Cost Explorer baseline ratio" line that reconciles
+   arithmetic errors.** If Cost Explorer shows a different figure than
+   the computed subtotal, use the Cost Explorer figure as
+   `CURRENT_MONTHLY` and recompute `PROJECTED_MONTHLY` from it
+   proportionally. The two MUST reconcile without a narrative patch.
+
+7. **NEVER recommend deleting a NAT Gateway without pairing the
+   deletion with `aws ec2 release-address` for the associated EIP.**
+   An unreleased EIP incurs $3.65/month indefinitely — the
+   IMPLEMENTATION block MUST include the release-address step.
+
+8. **NEVER aggregate traffic across services to hit a single Interface
+   endpoint break-even.** Each Interface endpoint is a separate
+   financial decision with its own break-even. S3 (100 GB) + ECR (60
+   GB) does NOT justify an ECR endpoint at 160 GB.
+
+### Perfect example output — OPPORTUNITY_FOUND with verified math
+
+Every field below is internally consistent. Copy this shape exactly.
+
+```text
+VPC: vpc-0abc123
+VERDICT: OPPORTUNITY_FOUND
+REASON: 3-AZ production VPC with 3 NAT Gateways processing 2,400 GB/month.
+  No Gateway endpoints exist — 900 GB/month S3 + 200 GB/month DynamoDB
+  flow through NAT (Step 1). ECR at 150 GB/month is below 160 GB/AZ
+  break-even (Step 2, skipped). Topology correct for production (Step 3).
+RECOMMENDATION:
+  1. Create S3 Gateway Endpoint (FREE) — reroutes 900 GB/month off NAT.
+  2. Create DynamoDB Gateway Endpoint (FREE) — reroutes 200 GB/month.
+  3. Skip ECR Interface Endpoint: 150 GB < 160 GB break-even for 1-AZ.
+  4. Topology: keep 3 NAT Gateways (production, high throughput).
+SAVINGS:
+  CURRENT_MONTHLY: $206.55
+    NAT base: 3 × $32.85 = $98.55
+    NAT data processing: 2,400 GB × $0.045 = $108.00
+  PROJECTED_MONTHLY: $157.05
+    NAT base: 3 × $32.85 = $98.55 (unchanged)
+    NAT data processing: 1,300 GB × $0.045 = $58.50
+    Gateway endpoints: $0.00 (free)
+  MONTHLY_SAVING: $49.50
+    ($206.55 − $157.05 = $49.50 ✓)
+    (1,100 GB × $0.045 = $49.50 ✓)
+  ANNUAL_SAVING: $594.00
+  CAVEATS:
+    - Gateway endpoints are free — savings captured in full.
+    - ECR Interface endpoint NOT recommended: below break-even.
+    - Cross-region S3 access not covered by regional Gateway endpoint.
+IMPLEMENTATION:
+  1. CONFIRM: Create S3 + DynamoDB Gateway endpoints on vpc-0abc123. Proceed?
+  2. aws ec2 create-vpc-endpoint --vpc-id vpc-0abc123 --service-name com.amazonaws.us-east-1.s3 --vpc-endpoint-type Gateway --route-table-ids rtb-aaa rtb-bbb rtb-ccc
+  3. aws ec2 create-vpc-endpoint --vpc-id vpc-0abc123 --service-name com.amazonaws.us-east-1.dynamodb --vpc-endpoint-type Gateway --route-table-ids rtb-aaa rtb-bbb rtb-ccc
+  4. Verify: aws ec2 describe-vpc-endpoints --filter "Name=vpc-id,Values=vpc-0abc123"
+  5. After 24h, re-query Cost Explorer — expect ~$49.50/mo reduction.
+```
+
+**Self-check before emit:**
+- [ ] `CURRENT_MONTHLY − PROJECTED_MONTHLY == MONTHLY_SAVING` (2 decimals)?
+- [ ] `MONTHLY_SAVING × 12 == ANNUAL_SAVING`?
+- [ ] Every Interface endpoint recommendation cites GB/month vs break-even?
+- [ ] NAT Instance recommendation includes reliability warning?
+- [ ] NAT Gateway deletion paired with `release-address`?
+- [ ] No "adjusted" or "discrepancy" reconciliation lines?
+
 ## Verdict consistency rules (prevent misclassification)
 
 The skill MUST emit verdicts that are mathematically and logically

@@ -720,6 +720,114 @@ REMEDIATION:
      > 90%.
 ```
 
+## STRICT output contract
+
+This section codifies the exact output shape the eval harness asserts
+against. Every invocation MUST produce output that matches this
+contract or the response is rejected. The labels are case-sensitive
+all-caps keywords — no markdown styling, no lowercase variants.
+
+### Required output structure
+
+Every response MUST be a single block with these literal labels, in
+this order:
+
+```text
+DISTRIBUTION: <distribution ID or domain>
+VERDICT: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+ROOT_CAUSE: <cache issue name> — <specific root cause>
+CACHE_ISSUE: <ORIGIN_NO_CACHE | ORIGIN_NO_STORE | CACHE_POLICY_TOO_NARROW |
+              CACHE_KEY_BLOAT | TTL_TOO_SHORT | STALE_NO_INVALIDATION |
+              ORIGIN_HEADER_OVERRIDE | LAMBDA_EDGE_MUTATION | WAF_BLOCK |
+              COMPRESSION_CACHE_KEY | ORIGIN_ERROR | UNKNOWN>
+EVIDENCE:
+  - <signal source>: <observed value>
+  - <signal source>: <observed value>
+  - <signal source>: <observed value>
+ROOT_CAUSE_CATALOG: #<N>
+REMEDIATION:
+  1. <specific config change with CLI command>
+  2. <verification command>
+  3. <post-apply monitoring>
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER diagnose without checking the x-cache header first — it
+   tells you Hit/Miss/Error immediately.** A ROOT_CAUSE_FOUND verdict
+   without an EVIDENCE row citing the observed `x-cache` value (from
+   `curl -I` or access logs) is rejected. The x-cache header is the
+   ground truth for cache behavior; diagnosing without it is guessing.
+
+2. **NEVER blame the cache policy without checking origin Cache-Control
+   headers — the origin header overrides the policy.** A
+   ROOT_CAUSE_FOUND that cites `CACHE_POLICY_TOO_NARROW` or
+   `TTL_TOO_SHORT` without an EVIDENCE row showing the origin's actual
+   `Cache-Control` header (from `curl -I` directly to the origin) is
+   rejected. The origin header dominates unless the policy explicitly
+   overrides it.
+
+3. **NEVER suggest invalidation without checking if the content is
+   actually stale — `/*` invalidations are expensive ($0.005/path).**
+   A REMEDIATION that recommends `aws cloudfront create-invalidation
+   --paths "/*"` without first confirming the content is stale (TTL
+   not expired, origin updated) is a hard failure. Always prefer
+   path-specific invalidations over `/*`; reserve `/*` for full-site
+   updates only.
+
+4. **NEVER output ROOT_CAUSE_FOUND without citing specific EVIDENCE
+   from curl, logs, or policy inspection.** A verdict without at least
+   two EVIDENCE rows — each naming the signal source and the observed
+   value — is rejected. "Based on experience" or "likely cause" are
+   not evidence; cite headers, log fields, or CLI output.
+
+5. **NEVER confuse `no-cache` with `no-store`.** `no-cache` allows
+   caching but requires revalidation on every request (RefreshHit /
+   RefreshMiss); `no-store` prohibits caching entirely. A
+   ROOT_CAUSE_FOUND that mislabels a `no-cache` origin header as
+   `ORIGIN_NO_STORE` is rejected. The CACHE_ISSUE value must match
+   the actual header semantics.
+
+6. **NEVER substitute lowercase or markdown-styled labels for the
+   literal all-caps `DISTRIBUTION:`, `VERDICT:`, `ROOT_CAUSE:`,
+   `CACHE_ISSUE:`, `EVIDENCE:`, `ROOT_CAUSE_CATALOG:`,
+   `REMEDIATION:`.** The eval harness pattern-matches on the exact
+   labels.
+
+### Perfect example output
+
+```text
+DISTRIBUTION: E1A2B3C4D5 (d123.cloudfront.net)
+VERDICT: ROOT_CAUSE_FOUND
+ROOT_CAUSE: ORIGIN_NO_STORE — the origin returns "Cache-Control: no-store"
+  on all responses, which instructs CloudFront never to cache.
+CACHE_ISSUE: ORIGIN_NO_STORE
+EVIDENCE:
+  - curl -I https://origin.example.com/api/data: response includes
+    "Cache-Control: no-store"
+  - curl -I https://d123.cloudfront.net/api/data: "x-cache: Miss from
+    cloudfront" on every request; "Age: 0"
+  - get-cache-policy: CachePolicyId is CachingOptimized
+    (658327ea-f89d-4fab-a63d-7e88639e58f6), MinTTL=1, DefaultTTL=86400
+    — the policy is correct; the origin header overrides it
+  - CloudFront access logs: x-edge-result-type "Miss" on 100% of requests
+    to /api/data/*
+ROOT_CAUSE_CATALOG: #1 (origin sends no-store)
+REMEDIATION:
+  1. Update the origin to send Cache-Control: public, max-age=3600 for
+     cacheable API responses. For an S3 origin:
+     aws s3api copy-object --bucket my-bucket --key api/data.json \
+       --copy-source my-bucket/api/data.json \
+       --cache-control "public, max-age=3600" \
+       --metadata-directive REPLACE
+  2. Verify the origin header:
+     curl -sI https://origin.example.com/api/data | grep -i cache-control
+     Expect: "Cache-Control: public, max-age=3600"
+  3. Request via CloudFront twice; the second request should show
+     "x-cache: Hit from cloudfront":
+     curl -sI https://d123.cloudfront.net/api/data | grep -i x-cache
+```
+
 ## Diagnostic command reference
 
 ```bash

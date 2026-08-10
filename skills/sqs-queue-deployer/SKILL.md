@@ -1001,6 +1001,104 @@ VERIFICATION_COMMANDS:
   aws sqs receive-message --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-events --wait-time-seconds 5
 ```
 
+## STRICT output contract
+
+This section codifies the exact output shape the eval harness asserts
+against. Every invocation MUST produce output that matches this
+contract or the response is rejected. The labels are case-sensitive
+all-caps keywords — no markdown styling, no lowercase variants.
+
+### Required output structure
+
+Every response MUST be a single block with these literal labels, in
+this order, as the first lines of the response (no preamble, no prose,
+no disclaimers):
+
+```text
+QUEUE: <name>
+VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
+CHECKLIST:
+  [✓|✗]          Queue type — Standard | FIFO (.fifo suffix)
+  [✓|✗]          Dead-letter queue — <dlq-name> (Standard|FIFO, <retention>-day retention)
+  [✓|✗]          Redrive policy — maxReceiveCount=<N>
+  [✓|✗]          Visibility timeout — <N>s (>= <consumer> p99 of <M>s)
+  [✓|✗]          Message retention — <N> days (<seconds>s)
+  [✓|✗]          Long polling — ReceiveMessageWaitTimeSeconds=<N>
+  [✓|✗]          Encryption — SSE-SQS | SSE-KMS (<key-arn>)
+  [OPTIONAL]     Access policy — <pattern>
+  [OPTIONAL]     FIFO dedup — ContentBasedDeduplication=<true|false>
+  [OPTIONAL]     High-throughput FIFO — N/A | Enabled
+  [OPTIONAL]     Lambda partial batch responses — ReportBatchItemFailures
+VERIFICATION_COMMANDS:
+  aws sqs get-queue-attributes --queue-url <url> --attribute-names All
+  aws sqs get-queue-attributes --queue-url <url> --attribute-names RedrivePolicy
+  aws sqs get-queue-attributes --queue-url <url> --attribute-names SqsManagedSseEnabled
+  aws sqs send-message --queue-url <url> --message-body '{"test": true}'
+  aws sqs receive-message --queue-url <url> --wait-time-seconds 5
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER recommend a FIFO DLQ for a Standard queue — DLQ type must
+   match source queue type.** SQS silently drops redriven messages on
+   a type mismatch. The DLQ checklist entry must explicitly state the
+   type: "Standard DLQ" for a Standard source, "FIFO DLQ (.fifo)" for
+   a FIFO source. A mismatch is a hard failure.
+
+2. **NEVER set visibility timeout < expected processing time — rule:
+   visibility timeout >= 6x p99 processing time.** A checklist entry
+   that states "Visibility timeout — 30s" without citing the
+   consumer's p99 and confirming 30s >= 6x p99 is rejected. Always
+   show the math: "60s (>= Lambda p99 of 8s)".
+
+3. **NEVER omit the redrive policy configuration when a DLQ is
+   specified.** A checklist that lists a DLQ but has no `[✓] Redrive
+   policy — maxReceiveCount=<N>` row is incomplete. The DLQ exists
+   but is not wired to the source queue — messages will never be
+   redriven.
+
+4. **NEVER output READY_TO_DEPLOY without verifying long polling is
+   enabled (`ReceiveMessageWaitTimeSeconds` > 0).** Short polling
+   (0 seconds) incurs per-request billing on empty receives. The
+   checklist entry must cite a value between 1 and 20; a value of 0
+   or a missing entry is a hard failure for production queues.
+
+5. **NEVER substitute lowercase or markdown-styled labels for the
+   literal all-caps `QUEUE:`, `VERDICT:`, `CHECKLIST:`,
+   `VERIFICATION_COMMANDS:`.** The eval harness pattern-matches on the
+   exact labels; `**Verdict**`, `### Verdict`, `Queue:` are all
+   silently rejected.
+
+6. **NEVER preface the checklist with prose, headings, or
+   disclaimers.** The `QUEUE:` line must be the first line of the
+   response. Any preamble ("Here is your deployment checklist...")
+   breaks assertion-based evals that expect the label at byte offset 0.
+
+### Perfect example output
+
+```text
+QUEUE: order-events
+VERDICT: READY_TO_DEPLOY
+CHECKLIST:
+  [✓]      Queue type — Standard (at-least-once, unlimited TPS)
+  [✓]      Dead-letter queue — order-events-dlq (Standard, 14-day retention)
+  [✓]      Redrive policy — maxReceiveCount=5
+  [✓]      Visibility timeout — 60s (>= Lambda p99 of 8s)
+  [✓]      Message retention — 4 days (345600s)
+  [✓]      Long polling — ReceiveMessageWaitTimeSeconds=20
+  [✓]      Encryption — SSE-SQS (SqsManagedSseEnabled=true)
+  [✓]      Access policy — S3 notification pattern (Principal:* + aws:SourceArn)
+  [OPTIONAL] FIFO dedup — N/A (Standard queue)
+  [OPTIONAL] High-throughput FIFO — N/A (Standard queue)
+  [✓]      Lambda partial batch responses — ReportBatchItemFailures
+VERIFICATION_COMMANDS:
+  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-events --attribute-names All
+  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-events --attribute-names RedrivePolicy
+  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-events --attribute-names SqsManagedSseEnabled
+  aws sqs send-message --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-events --message-body '{"test": true}'
+  aws sqs receive-message --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-events --wait-time-seconds 5
+```
+
 ## Error-handling branches
 
 | Error | Cause | Fix |

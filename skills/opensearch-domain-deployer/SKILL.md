@@ -1026,6 +1026,117 @@ VERIFICATION_COMMANDS:
   aws iam get-role --role-name opensearch-master
 ```
 
+## STRICT output contract
+
+This section codifies the exact output shape the eval harness asserts
+against. Every invocation MUST produce output that matches this
+contract or the response is rejected. The labels are case-sensitive
+all-caps keywords — no markdown styling, no lowercase variants.
+
+### Required output structure
+
+Every response MUST be a single block with these literal labels, in
+this order, as the first lines of the response (no preamble, no prose,
+no disclaimers):
+
+```text
+DOMAIN: <domain-or-collection-name>
+VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
+CHECKLIST:
+  [✓|✗] Deployment type: managed cluster | serverless
+  [✓|✗] Instance type: <family>.<size>.search (data nodes)
+  [✓|✗] Instance count: <N> data nodes (multiple of 3 for Multi-AZ)
+  [✓|✗] Multi-AZ (3-zone): Enabled | Disabled
+  [✓|✗] Dedicated master nodes: <N> × <family>.<size>.search | None
+  [✓|✗] Storage: EBS <type> <size>GB | instance-store NVMe
+  [✓|✗] Encryption at rest: Enabled (customer CMK <key-arn> | AWS-managed) | Disabled
+  [✓|✗] Encryption in transit (TLS): Enabled (Policy-Min-TLS-1-2-2019-07) | Disabled
+  [✓|✗] Network access: VPC-only (subnets: <ids>, SG: <sg-id> port 443) | Public (IP allowlist)
+  [✓|✗] Fine-grained access control (FGAC): IAM master user (<role-arn>) | Cognito (<pool-id>) | Disabled
+  [✓|✗] Master user: IAM role <arn> | Cognito user <username>
+  [✓|✗] Shard count rule: 30-50 GB per shard applied
+  [✓|✗] Replica count: <N> (tolerates <N> node losses)
+  [✓|✗] Automated snapshots: Enabled (retention <N> days)
+  [✓|✗] Manual snapshot repository: registered (S3 bucket <name>, role <arn>) | None
+  [✓|✗] UltraWarm: Enabled (<N> × <type>) | Disabled
+  [✓|✗] Cold storage: Enabled | Disabled
+  [✓|✗] OpenSearch Serverless: Yes (collection type <type>) | No
+VERIFICATION_COMMANDS:
+  aws opensearch describe-domain --domain-name <name>
+  aws opensearch describe-domain-config --domain-name <name>
+  aws ec2 describe-security-groups --group-ids <sg-id>
+  aws kms describe-key --key-id <cmk-id>
+  aws iam get-role --role-name <master-role>
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER output READY_TO_DEPLOY without listing every checklist item
+   with [✓] or [✗].** Every row in the CHECKLIST block must appear
+   with an explicit status marker. A checklist with missing rows is
+   incomplete and breaks downstream provisioning pipelines that count
+   items — the eval harness asserts a minimum row count.
+
+2. **NEVER omit the instance type recommendation — the checklist must
+   specify the exact instance type (e.g., r6g.large.search).** A vague
+   entry like "Instance type: TBD" or "Instance type: memory-optimized"
+   is rejected. Always cite the full `.search`-suffixed type from the
+   r6g/r7g/c6g/m6g/i3 families.
+
+3. **NEVER recommend public access for production — VPC-only is the
+   production default.** A READY_TO_DEPLOY verdict with "Network
+   access: Public" for a production domain is a hard failure. Only
+   dev / test domains may use public access, and the checklist entry
+   must explicitly note "dev/test only" in that case.
+
+4. **NEVER emit a checklist without the encryption-at-rest status.**
+   Encryption at rest is immutable after creation — omitting it from
+   the checklist leaves the operator blind to a one-way door decision
+   that cannot be reversed without a full domain migration and reindex.
+
+5. **NEVER substitute lowercase or markdown-styled labels for the
+   literal all-caps `DOMAIN:`, `VERDICT:`, `CHECKLIST:`,
+   `VERIFICATION_COMMANDS:`.** The eval harness pattern-matches on the
+   exact labels; `**Verdict**`, `### Verdict`, `Domain:` are all
+   silently rejected.
+
+6. **NEVER preface the checklist with prose, headings, or
+   disclaimers.** The `DOMAIN:` line must be the first line of the
+   response. Any preamble ("Here is your deployment checklist...")
+   breaks assertion-based evals that expect the label at byte offset 0.
+
+### Perfect example output
+
+```text
+DOMAIN: prod-search
+VERDICT: READY_TO_DEPLOY
+CHECKLIST:
+  [✓] Deployment type: managed cluster
+  [✓] Instance type: r6g.2xlarge.search (data nodes)
+  [✓] Instance count: 6 data nodes (2 per AZ × 3 AZs)
+  [✓] Multi-AZ (3-zone): Enabled (us-east-1a/b/c)
+  [✓] Dedicated master nodes: 3 × c6g.large.search (1 per AZ)
+  [✓] Storage: EBS gp3 100GB per node (600 GB cluster capacity)
+  [✓] Encryption at rest: Enabled (customer CMK alias/prod-opensearch-kms)
+  [✓] Encryption in transit (TLS): Enabled (Policy-Min-TLS-1-2-2019-07)
+  [✓] Network access: VPC-only (subnets: subnet-0aaa/0bbb/0ccc, SG: sg-search123 port 443)
+  [✓] Fine-grained access control (FGAC): IAM master user (arn:aws:iam::123456789012:role/opensearch-master)
+  [✓] Master user: IAM role arn:aws:iam::123456789012:role/opensearch-master
+  [✓] Shard count rule: 30 GB per shard applied (17 shards for 500 GB indices)
+  [✓] Replica count: 1 (tolerates 1 node loss per shard)
+  [✓] Automated snapshots: Enabled (retention 14 days)
+  [✓] Manual snapshot repository: registered (S3 bucket opensearch-snapshots-prod, role arn:aws:iam::123456789012:role/opensearch-snapshot)
+  [✓] UltraWarm: Disabled (workload is search, not time-series)
+  [✓] Cold storage: Disabled
+  [✓] OpenSearch Serverless: No
+VERIFICATION_COMMANDS:
+  aws opensearch describe-domain --domain-name prod-search
+  aws opensearch describe-domain-config --domain-name prod-search
+  aws ec2 describe-security-groups --group-ids sg-search123
+  aws kms describe-key --key-id alias/prod-opensearch-kms
+  aws iam get-role --role-name opensearch-master
+```
+
 ## Decision tree: managed cluster vs Serverless
 
 ```text

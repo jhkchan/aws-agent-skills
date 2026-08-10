@@ -680,6 +680,128 @@ NOTES:
        when h-primary has been Healthy for >= 2 consecutive intervals.
 ```
 
+## STRICT output contract
+
+This section codifies the exact output shape the eval harness asserts
+against. Every invocation MUST produce output that matches this
+contract or the response is rejected. The labels are case-sensitive
+all-caps keywords — no markdown styling, no lowercase variants.
+
+### Required output structure
+
+Every response MUST be a single block with these literal labels, in
+this order:
+
+```text
+OPERATION: <planned-failover | emergency-failover | failback | create-health-check | update-health-check | diagnose-failover | update-routing>
+VERDICT: READY | BLOCKED | COMPLETED
+TARGET: <fqdn> (hosted zone: <id>, routing policy: <policy>)
+PRE_CHECKS:
+  - [PASS|FAIL|WARN|INFO] <check description>
+STEPS:
+  1. <CONFIRM gate prompt>
+  2. <CLI command or change-batch JSON with all fields populated>
+  3. <wait / monitoring command>
+POST_VERIFY:
+  - [PASS|FAIL] <verification description>
+NOTES: <TTL, propagation estimate, monitoring, caveats>
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER output READY without verifying the health check status
+   (get-health-check-status).** The health check observation status
+   is the single most critical pre-check — a READY verdict without an
+   explicit `[PASS] Health check <id> Status: Healthy|Unhealthy` row
+   in PRE_CHECKS is rejected. The status must come from
+   `get-health-check-status`, not `get-health-check` (which returns
+   config, not runtime state).
+
+2. **NEVER recommend a TTL > 300 for failover scenarios — low TTL
+   (60s) is required for fast failover.** A plan that emits a
+   failover record with TTL > 300 and does not include a TTL-lowering
+   step first is a hard failure. For emergency failover with existing
+   TTL > 60s, the plan MUST include Phase 1 (lower TTL) before Phase 2
+   (topology swap).
+
+3. **NEVER confuse weighted routing with failover routing — weighted
+   shifts traffic gradually, failover is binary.** A plan that uses
+   `Failover: PRIMARY/SECONDARY` records for a canary deployment, or
+   uses `WeightedRoutingPolicy` for an automatic failover, is
+   misclassified. The OPERATION label and the record routing policy
+   must be consistent.
+
+4. **NEVER emit STEPS without a CONFIRM gate preceding any
+   state-changing CLI command.** Every STEPS block that includes
+   `change-resource-record-sets`, `create-health-check`,
+   `update-health-check`, or `delete-health-check` MUST have a
+   `CONFIRM: About to <operation>...` prompt as the first step.
+   Auto-executing without the gate is a hard failure.
+
+5. **NEVER omit POST_VERIFY verification commands — a failover is
+   COMPLETED only after `test-dns-answer` confirms the new IP.** A
+   verdict of COMPLETED without `[PASS] test-dns-answer returns
+   <new-IP>` in POST_VERIFY is rejected. INSYNC from the API is not
+   sufficient — recursive resolvers cache up to TTL.
+
+6. **NEVER submit a change-batch that UPSERTs only one record of a
+   failover pair.** PRIMARY and SECONDARY must be in the SAME
+   `change-resource-record-sets` batch — splitting them creates a
+   window where neither record is in a consistent state.
+
+### Perfect example output
+
+```text
+OPERATION: planned-failover
+VERDICT: READY
+TARGET: api.example.com (hosted zone: Z2ABCDEFGHIJK, routing policy: weighted)
+PRE_CHECKS:
+  - [PASS] Hosted zone Z2ABCDEFGHIJK exists, not deleted
+  - [PASS] Weighted records found:
+    api.example.com A SetIdentifier=blue  Weight=100  Value=10.0.0.10
+    api.example.com A SetIdentifier=green Weight=0    Value=10.0.1.10
+  - [PASS] Green endpoint 10.0.1.10 reachable on port 443 (TCP probe OK)
+  - [PASS] Green health check h-abcdef1234 Status: Healthy
+  - [PASS] Current TTL: 60s (acceptable for fast failover)
+  - [PASS] Cross-account IAM: operator role authorized in zone account
+  - [PASS] CloudWatch alarm api-example-failover exists on
+    AWS/Route53 HealthCheckStatus
+STEPS:
+  1. CONFIRM: About to flip weighted routing on api.example.com in
+     hosted zone Z2ABCDEFGHIJK (account 111111111111, global Route 53).
+     Blue weight 100->0; Green weight 0->100. Traffic will shift from
+     10.0.0.10 (blue) to 10.0.1.10 (green). DNS propagation bounded by
+     60s TTL. Proceed? (yes/no)
+  2. aws route53 change-resource-record-sets \
+       --hosted-zone-id Z2ABCDEFGHIJK \
+       --change-batch '{
+         "Changes": [
+           {"Action":"UPSERT","ResourceRecordSet":{
+             "Name":"api.example.com.","Type":"A",
+             "SetIdentifier":"blue","Weight":0,
+             "TTL":60,"ResourceRecords":[{"Value":"10.0.0.10"}],
+             "HealthCheckId":"h-blue123"}},
+           {"Action":"UPSERT","ResourceRecordSet":{
+             "Name":"api.example.com.","Type":"A",
+             "SetIdentifier":"green","Weight":100,
+             "TTL":60,"ResourceRecords":[{"Value":"10.0.1.10"}],
+             "HealthCheckId":"h-abcdef1234"}}
+         ]
+       }'
+  3. Capture ChangeInfo.Id; poll:
+     aws route53 get-change --id <change-id>
+     until Status: INSYNC (typically 5-30 seconds).
+POST_VERIFY:
+  - (pending execution)
+NOTES:
+  - DNS propagation: up to 60s for cached recursive resolvers (TTL).
+    Uncached resolvers see the new answer within seconds of INSYNC.
+  - Rollback: re-run the same change-batch with weights inverted
+    (blue=100, green=0). Keep the rollback command ready.
+  - Watch the application error-rate dashboard for 2x TTL post-change
+    (120s) to catch a bad green deployment before declaring COMPLETED.
+```
+
 ## Anti-Patterns — NEVER
 
 - NEVER submit an emergency failover change-batch without first lowering

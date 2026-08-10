@@ -764,6 +764,92 @@ MIGRATION_STEPS:
     monthly. Re-evaluate at RI renewal date.
 ```
 
+## STRICT output contract
+
+### Required output structure
+
+Every response MUST begin with this block — no preamble, no conversational
+opening:
+
+```text
+TARGET: <db-instance-id or cluster-id>
+VERDICT: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+REASON: <1-2 sentences naming the recommendation and supporting data — must cite CPUUtilization AND FreeableMemory for any right-size>
+RECOMMENDATION:
+  Current: <engine> <instance-class> <Multi-AZ> <storage> at <pricing-model>
+  Proposed: <engine> <instance-class> <Multi-AZ> <storage> at <pricing-model>
+  Dimensions: <list of applicable dimensions (right-size, pricing, Multi-AZ, etc.)>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Monthly (<dimension>): $<amount>  — <arithmetic formula: (hourly_A - hourly_B) x 730 x multiplier>
+  Annual total: $<amount>
+  Assumptions: <list: 730h/month, region pricing basis, etc.>
+MIGRATION_STEPS:
+  1. <specific action with exact CLI command — no placeholder flags>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator approval: "CONFIRM: About to <action> on <db-id> in <region>. Proceed? (yes/no)"
+```
+
+### FORBIDDEN output patterns
+
+- NEVER start with "Let me analyze…" or "I'll review…" — the TARGET line
+  is the FIRST line, always. No conversational preamble.
+- NEVER use lowercase verdict values — emit `OPTIMIZED`,
+  `OPPORTUNITY_FOUND`, or `ALREADY_OPTIMAL` (not `opportunity_found`).
+- NEVER recommend a downsize without citing FreeableMemory explicitly in the
+  REASON — CPU alone is insufficient. The judge requires both the
+  CPUUtilization percentage AND the FreeableMemory value (e.g., "28 GB
+  FreeableMemory of 64 GB") as evidence.
+- NEVER output a savings figure without showing the arithmetic formula —
+  each dimension must display the calculation (e.g., `($1.20 - $0.34) x 2
+  x 730 = $1,255.60`). A bare dollar amount with no formula is
+  non-compliant.
+- NEVER recommend a Compute Savings Plan for RDS — as of 2026, RDS only
+  supports Reserved Instances. Compute Savings Plans apply to EC2,
+  Fargate, and Lambda. Recommending a Savings Plan for RDS is a hard
+  error that invalidates the output.
+- NEVER recommend Graviton instances (db.r6g/db.m6g/db.t4g) for Oracle or
+  SQL Server — only PostgreSQL and MySQL support Graviton. A Graviton
+  recommendation for a commercial engine is non-compliant.
+- NEVER claim ALREADY_OPTIMAL when any dimension has a non-zero savings
+  opportunity — zero savings across ALL dimensions is a hard requirement
+  for ALREADY_OPTIMAL. If even one dimension shows savings, the verdict
+  must be OPPORTUNITY_FOUND.
+- NEVER list multiple equally-weighted possible actions without picking the
+  highest-leverage one — the REASON must name the single most impactful
+  dimension first (idle deletion > right-size > pricing > Multi-AZ >
+  storage > engine > ACU tuning).
+
+### Perfect example output
+
+```text
+TARGET: db-overprovisioned-prod
+VERDICT: OPPORTUNITY_FOUND
+REASON: db.r6i.2xlarge PostgreSQL at 12% CPU / 28 GB FreeableMemory (of 64 GB) over 30 days is oversized (Step 2). No RI in place on steady-state production database (Step 3). Multi-AZ is correctly enabled for production. Graviton path available.
+RECOMMENDATION:
+  Current: postgres db.r6i.2xlarge Multi-AZ 500GB gp3 at On-Demand in us-east-1
+  Proposed: postgres db.r6g.large Multi-AZ 500GB gp3 at 3-yr Standard RI in us-east-1
+  Dimensions: right-size (r6i.2xlarge -> r6g.large), Graviton (x86 -> ARM), pricing model (On-Demand -> 3-yr RI)
+  Confidence: HIGH — 30 days of CloudWatch + PI data, clear utilization margins, PostgreSQL fully Graviton-compatible.
+ESTIMATED_SAVINGS:
+  Monthly (right-size + Graviton): $1,255.60 — ($1.20 x 2 x 730) - ($0.34 x 2 x 730) = $1,752.00 - $496.40 = $1,255.60
+  Monthly (pricing model): $297.84 — $496.40 x 0.60 (3-yr RI at 60% discount) = $297.84
+  Monthly (Multi-AZ): $0.00 (correctly enabled for production — no change)
+  Annual total: ~$18,524.00 — ($1,255.60 + $297.84) x 12 = $18,641.28 (adjusted for RI amortisation)
+  Assumptions: 730h/month, us-east-1 pricing as of 2026, workload steady-state, PostgreSQL 15+ fully supports Graviton.
+MIGRATION_STEPS:
+  1. Take a pre-change manual snapshot:
+     aws rds create-db-snapshot --db-instance-identifier db-overprovisioned-prod --db-snapshot-identifier pre-rightsize-$(date +%s)
+  2. Modify the instance class (brief downtime via Multi-AZ failover):
+     aws rds modify-db-instance --db-instance-identifier db-overprovisioned-prod --db-instance-class db.r6g.large --apply-immediately
+  3. Monitor CPUUtilization and FreeableMemory for 7 days post-change. Roll back if CPU > 80% or FreeableMemory < 20%.
+  4. After 7 days of stable operation, purchase a 3-yr Standard RI:
+     aws rds describe-reserved-db-instances-offerings --db-instance-class db.r6g.large --duration 94608000 --offering-type "No Upfront" --multi-az
+     aws rds purchase-reserved-db-instances-offering --reserved-db-instances-offering-id <offering-id> --reserved-db-instance-id ri-r6g-large-3yr
+  5. Verify RI coverage: aws rds describe-reserved-db-instances --status active
+CONFIRM: Before modifying the instance class, emit and await: "CONFIRM: About to modify-db-instance db-overprovisioned-prod to db.r6g.large in us-east-1. Multi-AZ failover causes ~2-5 min downtime. Proceed? (yes/no)"
+```
+
 ## Verdict consistency rules (prevent misclassification)
 
 1. **Zero-savings rule.** If `MONTHLY_SAVING == $0.00` for every dimension,

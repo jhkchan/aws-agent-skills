@@ -799,6 +799,79 @@ NOTES:
       --output json > /tmp/api-error-rate-prod-backup-$(date +%s).json
 ```
 
+## STRICT output contract
+
+### Required output structure
+
+Every response MUST begin with this block — no preamble, no conversational
+opening:
+
+```text
+OPERATION: <create | tune | composite | anomaly | diagnose>
+VERDICT: READY | BLOCKED | COMPLETED
+TARGET: <alarm-name>
+PRE_CHECKS:
+  - [PASS] <check description>
+  - [FAIL] <check description> — <reason>
+STEPS:
+  1. CONFIRM: About to <operation> on alarm <name> in account <account> region <region>. This will <consequence>. Proceed? (yes/no)
+  2. <exact CLI command with every flag populated — no placeholders>
+POST_VERIFY:
+  - [PASS] <verification description>
+  - [FAIL] <verification description> — <reason>
+STATE: <OK | ALARM | INSUFFICIENT_DATA | pending>
+NOTES: <TreatMissingData rationale — must state breaching|notBreaching|ignore and why; detection lag; action wiring caveats>
+```
+
+### FORBIDDEN output patterns
+
+- NEVER start with "Let me analyze…" or "I'll investigate…" — the VERDICT
+  block is the FIRST line, always. No conversational preamble.
+- NEVER use lowercase verdict values — emit `READY`, `BLOCKED`, or
+  `COMPLETED` (not `ready`, `blocked`, `completed`).
+- NEVER omit PRE_CHECKS — every pre-check run must appear with `[PASS]` or
+  `[FAIL]` and a specific reason for each failure. An empty PRE_CHECKS block
+  is non-compliant.
+- NEVER emit TreatMissingData as "missing" (the default) — always choose
+  `breaching`, `notBreaching`, or `ignore` and state the rationale in NOTES.
+  "missing" is a silent-blind-spot anti-pattern, not a valid choice.
+- NEVER list a CLI command with placeholder flags (e.g., `--dimensions
+  <dims>`) in a READY plan — every flag must be populated with actual values
+  from the input data.
+- NEVER omit the CONFIRM gate as the first STEPS entry for any
+  state-changing operation (create, tune, composite, anomaly).
+- NEVER claim COMPLETED without every POST_VERIFY line showing `[PASS]`.
+- NEVER diagnose an INSUFFICIENT_DATA alarm without quoting the
+  `get-metric-statistics` result that proves whether the metric is
+  publishing — the evidence must include the datapoint count or range.
+
+### Perfect example output
+
+```text
+OPERATION: create
+VERDICT: READY
+TARGET: ec2-cpu-high-prod-web-1
+PRE_CHECKS:
+  - [PASS] Namespace AWS/EC2, MetricName CPUUtilization valid
+  - [PASS] Dimensions InstanceId=i-0123456789abcdef0 returns datapoints (Average ~45% over last 1h)
+  - [PASS] Period 300 >= metric native 60s (detailed monitoring)
+  - [PASS] DatapointsToAlarm 1 <= EvaluationPeriods 1
+  - [PASS] Threshold 80 achievable (current Average ~45%, max ~72%)
+  - [PASS] AlarmActions SNS arn:aws:sns:us-east-1:111111111111:on-call-critical exists and has subscriptions
+  - [PASS] 1 ARN <= 5 cap per category
+  - [PASS] TreatMissingData notBreaching explicit (CPU gap = instance likely stopped = not a CPU problem)
+STEPS:
+  1. CONFIRM: About to put-metric-alarm ec2-cpu-high-prod-web-1 in account 111111111111 region us-east-1. This will CREATE a new alarm that fires SNS on-call-critical when CPU > 80% for 5 min. Estimated detection lag: ~5 min. Proceed? (yes/no)
+  2. aws cloudwatch put-metric-alarm --alarm-name ec2-cpu-high-prod-web-1 --namespace AWS/EC2 --metric-name CPUUtilization --dimensions Name=InstanceId,Value=i-0123456789abcdef0 --statistic Average --period 300 --evaluation-periods 1 --datapoints-to-alarm 1 --threshold 80 --comparison-operator GreaterThanThreshold --treat-missing-data notBreaching --alarm-actions arn:aws:sns:us-east-1:111111111111:on-call-critical --ok-actions arn:aws:sns:us-east-1:111111111111:on-call-info
+POST_VERIFY:
+  - (pending execution)
+  - describe-alarms returns the alarm with StateValue INSUFFICIENT_DATA (initial) transitioning to OK after first evaluation cycle
+STATE: pending — will be INSUFFICIENT_DATA for the first ~5 min
+NOTES:
+  - Detection lag: Period(300) x DatapointsToAlarm(1) = 5 min from first breach to ALARM transition.
+  - TreatMissingData notBreaching: if the instance stops and CPU metrics stop, the alarm stays in OK (correct — stopped instance is not a CPU problem).
+```
+
 ## Anti-Patterns — NEVER do these things
 
 - NEVER leave TreatMissingData as the default "missing" for production

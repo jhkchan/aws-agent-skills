@@ -682,6 +682,87 @@ NOTES:
   - After the upgrade, restore the PDB to its original value.
 ```
 
+## STRICT output contract
+
+### Required output structure
+
+Every response MUST begin with this block — no preamble, no conversational
+opening:
+
+```text
+OPERATION: <pre-upgrade-check | upgrade-control-plane | upgrade-nodegroup | upgrade-addon | post-upgrade-verify>
+VERDICT: READY | BLOCKED | COMPLETED
+TARGET: <cluster-name> (node group: <name> / addon: <name>)
+PRE_CHECKS:
+  - [PASS] <check description>
+  - [FAIL] <check description> — <reason>
+STEPS:
+  1. CONFIRM: About to <operation> on <target> in account <account> region <region>. This will <consequence>. ROLLBACK ADVISORY: <statement>. Proceed? (yes/no)
+  2. <exact CLI command with every flag populated — no placeholders>
+  3. <progress-check command: aws eks describe-update ...>
+POST_VERIFY:
+  - [PASS] <verification description>
+  - [FAIL] <verification description> — <reason>
+ROLLBACK: <control plane CANNOT be rolled back / node group CAN be rolled back to <previous-ami>>
+NOTES: <mutation window duration, Fargate restart advisory, addon caveats>
+```
+
+### FORBIDDEN output patterns
+
+- NEVER start with "Let me analyze…" or "I'll investigate…" — the VERDICT
+  block is the FIRST line, always. No conversational preamble.
+- NEVER use lowercase verdict values — emit `READY`, `BLOCKED`, or
+  `COMPLETED` (not `ready`, `blocked`, `completed`).
+- NEVER omit the ROLLBACK line — the judge requires an explicit rollback
+  statement for every operation, even read-only pre-upgrade-check.
+- NEVER omit the ROLLBACK ADVISORY inside the CONFIRM gate text — control
+  plane upgrades are one-way and this must be stated in the CONFIRM prompt
+  itself, not buried in NOTES.
+- NEVER list a CLI command with placeholder flags (e.g.,
+  `--kubernetes-version <ver>`) in a READY plan — every flag must be
+  populated with actual values from the cluster configuration input.
+- NEVER suggest or sequence node group upgrades before the control plane —
+  the AWS-mandated order (addons -> control plane -> node groups) must be
+  reflected in the STEPS and NOTES.
+- NEVER omit the CONFIRM gate as the first STEPS entry for any
+  state-changing operation. A STEPS block that starts with a raw CLI command
+  (no CONFIRM) is non-compliant.
+- NEVER claim COMPLETED without every POST_VERIFY line showing `[PASS]`.
+
+### Perfect example output
+
+```text
+OPERATION: upgrade-control-plane
+VERDICT: READY
+TARGET: prod-cluster-01 (1.28 -> 1.29)
+PRE_CHECKS:
+  - [PASS] cluster status: ACTIVE
+  - [PASS] no other update in progress
+  - [PASS] target version 1.29 available in us-east-1
+  - [PASS] target is exactly N+1 from current (1.28)
+  - [PASS] VPC-CNI v1.16.0 compatible with both 1.28 and 1.29
+  - [PASS] CoreDNS v1.11.1-eksbuild.4 compatible with both 1.28 and 1.29
+  - [PASS] kube-proxy v1.28.7-minimal-1 compatible with both 1.28 and 1.29
+  - [PASS] kubent scan clean for 1.29 (no FlowSchema v1beta1 in use)
+  - [PASS] all managed node groups at 1.28
+  - [PASS] all nodes Ready
+STEPS:
+  1. CONFIRM: About to update-cluster-version on prod-cluster-01 from 1.28 to 1.29 in account 111111111111 region us-east-1. This will cause a 5-15 minute API mutation window (API reads continue, applications keep running). ROLLBACK ADVISORY: EKS control plane upgrades CANNOT be rolled back — etcd migration is one-way. Estimated total duration: 15-30 minutes. Proceed? (yes/no)
+  2. aws eks update-cluster-version --name prod-cluster-01 --kubernetes-version 1.29 --region us-east-1
+  3. Poll until Successful: aws eks describe-update --name prod-cluster-01 --update-id <update-id-from-step-2>
+POST_VERIFY:
+  - (pending execution)
+  - aws eks describe-cluster --name prod-cluster-01 -> version 1.29
+  - kubectl get nodes -o wide -> all nodes Ready, still on 1.28 (node group upgrade is next)
+  - kubectl get pods -n kube-system -> no CrashLoopBackOff
+  - kubectl get apiservices | grep False -> none
+ROLLBACK: control plane CANNOT be rolled back (etcd migration is one-way)
+NOTES:
+  - Node groups are still on 1.28 — run upgrade-nodegroup for each managed node group immediately after this operation completes.
+  - Fargate pods will restart automatically to align kubelet with 1.29. Plan for a brief restart window.
+  - The API server will reject mutations for 5-15 minutes during the etcd migration. Do not run kubectl apply during this window.
+```
+
 ## Anti-Patterns — NEVER
 
 - NEVER skip the add-on pre-upgrade. EKS requires add-ons to be

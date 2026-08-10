@@ -1127,6 +1127,133 @@ MIGRATION_STEPS:
   Do NOT optimize based on assumed metrics.
 ```
 
+## STRICT output contract
+
+The rules below are hard constraints. Violating any one produces a
+misclassification or an arithmetic contradiction that breaks downstream
+FinOps automation. Self-check EVERY emitted block against these rules
+before returning the response.
+
+### Required output structure
+
+Every response MUST be a single block using these literal labels, in this
+order. Do NOT substitute markdown headings, camelCase, or bold variants.
+
+```text
+TARGET: <function-name>
+VERDICT: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <memory> MB at <avg duration> ms, <architecture>, <concurrency>
+  Proposed: <memory> MB at <projected duration> ms, <architecture>, <concurrency>
+  Dimensions changed: <memory | concurrency | duration | frequency | architecture | placement>
+  Dimensions checked: <list ALL six, each ✓ (no finding) or → (finding)>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Current monthly: $<amount>    ← MUST show compute + requests subtotals
+  Projected monthly: $<amount>
+  Monthly saving: $<amount>     ← MUST equal Current − Projected, 2 decimals
+  Annual saving: $<amount>      ← MUST equal Monthly × 12
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: <confirmation prompt text>
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER emit `VERDICT: OPPORTUNITY_FOUND` with `Monthly saving: $0.00`.**
+   If every dimension nets zero cost delta, the verdict MUST be
+   `ALREADY_OPTIMAL`. A cost-neutral latency improvement is surfaced in
+   REASON as a latency delta, NOT as a dollar saving. Mixing the two
+   is the #1 D8 misclassification.
+
+2. **NEVER show savings math that does not balance.**
+   `Current monthly − Projected monthly` MUST equal `Monthly saving`,
+   rounded to 2 decimal places. If the subtraction does not match, fix
+   the arithmetic before emitting — do NOT append a "NOTE: adjusted" or
+   "discrepancy due to" reconciliation line.
+
+3. **NEVER emit a "WAIT — recompute", "Hmm, let me redo", or
+   "corrected:" scratch line in the output.** Finalize the math before
+   emitting. Self-correction trails visible in the output block signal
+   unreliable arithmetic to the operator and the eval harness.
+
+4. **NEVER recommend a memory change without citing the Power Tuning
+   result or Compute Optimizer finding that triggered it.** A memory
+   recommendation based on "this feels too low" is non-compliant. The
+   REASON line MUST name the evidence source (Power Tuning U-curve,
+   Compute Optimizer `Overprovisioned`/`Underprovisioned`).
+
+5. **NEVER omit a dimension from the RECOMMENDATION block.** The
+   `Dimensions checked` line MUST list all six dimensions (memory,
+   concurrency, duration, frequency, architecture, placement), each
+   marked ✓ (evaluated, no finding) or → (finding, action recommended).
+   Omitting a dimension implies it was not evaluated.
+
+6. **NEVER present a cost-neutral or cost-increasing memory upsize as
+   "cost savings."** If the U-curve minimum costs the same per
+   invocation as the current setting, surface the latency improvement
+   explicitly and set `Monthly saving: $0.00` with the verdict
+   `ALREADY_OPTIMAL` (or `OPPORTUNITY_FOUND` ONLY if a different
+   dimension has a positive saving).
+
+7. **NEVER round intermediate formula steps differently from the final
+   figure.** Compute each term at full precision, then round only the
+   displayed result to 2 decimals. A sub-total that rounds to $541.67
+   while the final uses $541.66 is an arithmetic inconsistency.
+
+### Perfect example output — OPPORTUNITY_FOUND with verified math
+
+Every field below is internally consistent. Copy this shape exactly.
+
+```text
+TARGET: order-enrichment-api
+VERDICT: OPPORTUNITY_FOUND
+REASON: Python function at 128 MB averaging 5000 ms is CPU-bound (Power
+  Tuning U-curve minimum at 512 MB where duration drops to 950 ms).
+  Combined with ARM64 migration (20% compute discount), monthly compute
+  drops 38.5%. Invocations are 47M/month so the per-invocation saving
+  compounds.
+RECOMMENDATION:
+  Current: 128 MB at 5000 ms avg, x86_64, on-demand
+  Proposed: 512 MB at 950 ms avg, arm64, on-demand
+  Dimensions changed: memory (Step 1) + architecture (Step 5)
+  Dimensions checked: memory → (upsize)  concurrency ✓ (no provisioned)
+    duration ✓ (Power Tuning covers)  frequency ✓ (API Gateway, no ESM)
+    architecture → (x86 to arm64)  placement ✓ (950 ms well under 15 min)
+  Confidence: HIGH — Power Tuning measured the U-curve empirically;
+    Python 3.12 fully supports arm64; all deps have arm64 wheels.
+ESTIMATED_SAVINGS:
+  Current monthly: $498.98
+    compute: 47,000,000 × 5.0 × 0.125 × $0.0000166667 = $489.58
+    requests: 47,000,000 × $0.0000002 = $9.40
+  Projected monthly: $307.07
+    compute: 47,000,000 × 0.95 × 0.5 × $0.0000166667 × 0.80 = $297.67
+    requests: 47,000,000 × $0.0000002 = $9.40
+  Monthly saving: $191.91
+    ($498.98 − $307.07 = $191.91 ✓)
+  Annual saving: $2,302.92
+MIGRATION_STEPS:
+  1. Run Power Tuning to confirm the U-curve:
+     aws stepfunctions start-execution --state-machine-arn <arn> --input '{...}'
+  2. Update memory and architecture together:
+     aws lambda update-function-configuration --function-name order-enrichment-api --memory-size 512 --architectures arm64
+  3. Publish a version and test via staging alias:
+     aws lambda publish-version --function-name order-enrichment-api
+  4. Monitor Duration and Errors for 7 days post-change.
+CONFIRM: About to update-function-configuration on order-enrichment-api
+  (128 MB x86 → 512 MB arm64). Monthly saving $191.91 (38.5%); p95 latency
+  improvement ~82%. Proceed? (yes/no)
+```
+
+**Self-check before emit:**
+- [ ] `Current monthly − Projected monthly == Monthly saving` (2 decimals)?
+- [ ] `Monthly saving × 12 == Annual saving`?
+- [ ] All six dimensions listed in `Dimensions checked`?
+- [ ] Every `→` dimension has a corresponding MIGRATION_STEPS entry?
+- [ ] No scratch/recompute text in the block?
+
 ## Verdict semantics — reconciling the verdict_shape
 
 The `verdict_shape` metadata declares three primary verdicts. Two

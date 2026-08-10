@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds genuine expert knowledge such as decision trees for FIFO vs Standard, maxReceiveCount tuning tables, and the visibility\u2011timeout >=6\u00d7 p99 rule. However, large portions restate standard AWS documentation (e.g., basic attribute defaults, cost of SSE\u2011SQS) and omit deeper cost analysis or rare edge\u2011case defaults, so it does not achieve full novelty."
+      "justification": "Provides many specific thresholds (e.g., visibility timeout >= 6\u00d7 p99), detailed maxReceiveCount tables, and high\u2011throughput FIFO attribute combos that a typical model would not enumerate, but a large portion of the content (basic SQS attribute names, standard defaults) merely restates public documentation, so full 20 is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Offers a clear AWS\u2011specific deployment order and step\u2011by\u2011step CLI commands, but the cross\u2011account KMS key policy procedure could be more granular (explicit step list), preventing a perfect score."
+      "justification": "Outlines a precise AWS\u2011specific deployment order and decision trees, but the IAM permission verification step is generic and lacks a concrete procedure for generating the required policy JSON, leaving a gap in the end\u2011to\u2011end AWS\u2011specific workflow."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a comprehensive NEVER list with concrete reasons (e.g., mismatched FIFO DLQ, maxReceiveCount=1, wildcard principals), yet omits a warning about the 64\u202fKiB queue\u2011policy size limit, so not flawless."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., mismatched FIFO/DLQ types, maxReceiveCount=1, wildcard principals), yet omits a specific warning about the 64\u202fKiB queue\u2011policy size limit and does not explicitly call out the danger of using `purge-queue` as a remediation, reducing completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, and when_to_use are well\u2011filled, and the output format is clearly defined. Activation triggers are embedded in free\u2011text rather than a distinct, machine\u2011readable field, and the contract lacks a formal schema, leaving a small ambiguity for automated activation."
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS, and the invocation contract with literal output labels is unambiguous and matches the required verdict shape."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Information is layered with quick navigation and detailed sections, yet some dense blocks (latest SQS features, workload matrix) overload the top level; deeper references could be used more consistently."
+      "justification": "Information is layered effectively (quick navigation \u2192 detailed sections), but the \"Latest SQS features\" block is dense and could overload the initial read, suggesting a minor breach of optimal progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (queue creation, DLQ linking) are guarded by extensive pre\u2011flight checks, but the skill only warns against `purge-queue` without enforcing a hard prohibition, leaving a minor freedom\u2011calibration gap."
+      "justification": "Destructive actions (queue creation) are gated by extensive pre\u2011flight checks, yet the skill does not require an explicit confirmation step before issuing `aws sqs create-queue`, leaving a small risk of accidental resource creation."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable skill pattern (frontmatter \u2192 navigation \u2192 reasoning \u2192 step\u2011by\u2011step procedure \u2192 anti\u2011patterns \u2192 output format). The mixture of tables and prose is slightly ad\u2011hoc but still coherent."
+      "justification": "Follows a coherent, recognized skill pattern (frontmatter \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 safety checks \u2192 output format \u2192 error handling), making the structure instantly recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, decision trees, error\u2011handling branches, and verification commands, enabling an agent to execute the deployment. Deductions for hard\u2011coded region (us-east-1) and lack of guidance for updating an existing queue (immutable FIFO) which could cause runtime failures."
+      "justification": "Provides working CLI commands, decision trees, and error\u2011handling branches, but lacks guidance for updating an existing queue, handling multi\u2011region deployments, and automated quota\u2011limit detection, which could cause execution gaps in real\u2011world scenarios."
     }
   ],
-  "total_score": 107,
+  "total_score": 110,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 55643,
-  "latency_ms": 8004,
+  "grade": "A",
+  "token_count": 55496,
+  "latency_ms": 10768,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

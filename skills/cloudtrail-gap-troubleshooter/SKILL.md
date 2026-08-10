@@ -820,6 +820,78 @@ REMEDIATION:
      concern.
 ```
 
+## STRICT output contract
+
+### Required output structure
+
+Every response MUST begin with this block — no preamble, no conversational
+opening:
+
+```text
+INCIDENT: <account> / <trail-name> — <symptom>
+VERDICT: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+ROOT_CAUSE: <MISSING_DATA_EVENTS | TRAIL_NOT_LOGGING | DELIVERY_DELAYED | INSIGHTS_DISABLED | ORG_TRAIL_GAP | MULTI_REGION_GAP | BUCKET_POLICY_BLOCKING> — <one-sentence specific failing config element>
+EVIDENCE:
+  - describe-trails: <quoted field value from output>
+  - get-trail-status: <quoted field value from output>
+  - get-event-selectors: <quoted field value from output, or "not fetched">
+  - get-bucket-policy: <quoted field value, or "not applicable">
+  - lookup-events: <result count or sample event>
+ROOT_CAUSE_CATALOG: #<N>
+REMEDIATION:
+  1. <exact CLI command or policy edit>
+  2. <verification command>
+  3. <post-apply monitoring step>
+```
+
+### FORBIDDEN output patterns
+
+- NEVER start with "Let me analyze…" or "I'll investigate…" — the INCIDENT
+  line is the FIRST line, always. No conversational preamble.
+- NEVER use lowercase verdict values — emit `ROOT_CAUSE_FOUND`,
+  `NEED_MORE_INFO`, or `ESCALATE` (not `root_cause_found`).
+- NEVER omit EVIDENCE — the judge requires direct quotes from
+  `describe-trails`, `get-trail-status`, or `get-event-selectors` output.
+  Paraphrasing is not acceptable; quote the actual field value (e.g.,
+  `"DataResources":[]`, not "no data resources").
+- NEVER suggest multiple possible root causes without picking one —
+  `ROOT_CAUSE_FOUND` requires exactly ONE category and ONE specific config
+  element. If you cannot pick one, emit `NEED_MORE_INFO`.
+- NEVER declare ROOT_CAUSE_FOUND without referencing BOTH `describe-trails`
+  AND `get-trail-status` in EVIDENCE — a correctly-configured trail can be
+  silently stopped. Evidence from only one API is insufficient.
+- NEVER omit the ROOT_CAUSE_CATALOG number — reference the specific catalog
+  entry (#1 through #12) that matches the diagnosis.
+- NEVER confuse management events with data events in the ROOT_CAUSE —
+  GetObject, PutItem, and Invoke are data events; CreateBucket and
+  RunInstances are management events. Stating the wrong event type is a
+  hard error that invalidates the diagnosis.
+- NEVER declare ROOT_CAUSE_FOUND for a MISSING_DATA_EVENTS diagnosis without
+  quoting the `get-event-selectors` output showing empty `DataResources` —
+  the evidence must include the actual selector JSON.
+
+### Perfect example output
+
+```text
+INCIDENT: 111111111111 / corp-trail — operator expects GetObject events for audit; lookup-events returns zero GetObject events for any S3 bucket
+VERDICT: ROOT_CAUSE_FOUND
+ROOT_CAUSE: MISSING_DATA_EVENTS — trail's event selectors do not include S3 DataResources; only management events are logged
+EVIDENCE:
+  - describe-trails: corp-trail IsMultiRegionTrail: true, IsLogging: true (trail is healthy)
+  - get-trail-status: IsLogging: true, LatestDeliveryTime: 2026-08-10T14:22:00Z (delivery is working)
+  - get-event-selectors: [{"ReadWriteType":"All","IncludeManagementEvents":true,"DataResources":[]}]  (empty DataResources = no data events configured)
+  - get-bucket-policy: not applicable (delivery is working; bucket policy is not the issue)
+  - lookup-events AttributeKey=EventName,AttributeValue=GetObject: 0 results in last 24h
+  - lookup-events AttributeKey=EventName,AttributeValue=CreateBucket: 4 results in last 24h (management events flowing; data events absent)
+ROOT_CAUSE_CATALOG: #1 (data events not configured)
+REMEDIATION:
+  1. Add an S3 data event selector to the trail:
+     aws cloudtrail put-event-selectors --trail-name corp-trail --event-selectors '[{"ReadWriteType":"All","IncludeManagementEvents":true,"DataResources":[{"Type":"AWS::S3::Object","Values":["arn:aws:s3"]}]}]'
+  2. Verify by making a test S3 read and checking lookup-events in 5-15 minutes:
+     aws s3 cp s3://my-bucket/test . && aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=GetObject --start-time $(date -u -v-20M +%Y-%m-%dT%H:%M:%SZ)
+  3. Monitor S3 bucket size — adding data events significantly increases CloudTrail log volume and cost. Consider scoping to specific buckets via advanced-event-selectors if cost is a concern.
+```
+
 ## Expert heuristic — "Data events vs management events"
 
 The single most common "missing events" complaint is a data event

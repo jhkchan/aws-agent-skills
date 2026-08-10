@@ -1096,6 +1096,110 @@ CONFIRM: Before modifying the endpoint policy, emit and await
   operator approval.
 ```
 
+## STRICT output contract
+
+This contract is mandatory. The Output format template above is the
+authoritative structure; the rules below disambiguate the failure
+modes that score D8=13 on this skill. Violating any rule is a
+misdiagnosis.
+
+### Required output structure
+
+Every diagnosis MUST emit this exact block, with all fields populated
+(no empty fields, no omitted sections, no reordering):
+
+```text
+TARGET: <source → destination pair, including IPs / subnets / VPCs>
+VERDICT: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+REASON: <1-2 sentences naming the failed layer and the failing probe>
+LAYER: <one of the 18 LAYER enum values — never blank, never prose>
+EVIDENCE:
+  - <observed symptom — error string or behaviour>
+  - <failing probe — command and its output that confirms the cause>
+  - <passing probes — layers ruled out, with the probe that ruled them out>
+REMEDIATION:
+  1. <specific action with CLI command>
+  2. <verification command after the fix>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <id> in <region>. Proceed?
+  (yes/no)"
+```
+
+Verdict-specific rules:
+- `ROOT_CAUSE_FOUND` → LAYER is one of the 18 enum values; EVIDENCE
+  includes a failing probe whose output positively confirms the cause
+  (not a process of elimination); REMEDIATION is actionable CLI.
+- `NEED_MORE_INFO` → LAYER is `UNKNOWN` or the best candidate; EVIDENCE
+  lists the missing input (source ID, destination ID, port, protocol,
+  region) and the next probe to run once it is supplied.
+- `ESCALATE` → LAYER is the suspected AWS-side category; REASON cites
+  the AWS Health event ARN or the carrier/out-of-band signal.
+
+### FORBIDDEN output patterns
+
+1. NEVER skip the NACL check — NACLs are stateless, both inbound AND
+   outbound rules needed for ephemeral ports 1024-65535. A diagnosis
+   that omits `describe-network-acls` for both source and destination
+   subnets is incomplete, even if a SG rule matches.
+2. NEVER assume a Security Group reference works cross-VPC — SG
+   references (`sg-xxx`) only resolve within the same VPC or a peered
+   VPC with peering in the route table, not via Transit Gateway. A
+   cross-VPC SG reference via TGW is silently ignored.
+3. NEVER declare ROOT_CAUSE_FOUND without a failing probe that matches
+   the symptom. "It must be the SG" by process of elimination is
+   forbidden — cite the `describe-security-groups` or `nc -vz` output
+   that positively confirms the drop.
+4. NEVER skip the OSI order for timeout symptoms. The probe order is
+   DNS (L7) → routing (L3) → SG (L4) → NACL (L4) → cross-VPC plumbing
+   → port reachability → application. A diagnosis that checks the SG
+   before the route table and concludes "SG is fine" missed that the
+   SYN never reached the SG evaluation.
+5. NEVER treat VPC peering as transitive. Peering between A-B and B-C
+   does NOT allow A to reach C via B — transit requires Transit
+   Gateway. A diagnosis that suggests "add a peering route through
+   VPC-B" is wrong.
+6. NEVER assume overlapping VPC CIDRs will route via peering. They are
+   a silent failure: the `pcx-xxx` route appears in the table but
+   packets do not deliver. A diagnosis that lists peering Active +
+   route present as "passing" without comparing the two VPC CIDRs is
+   incomplete.
+7. NEVER assume the VPC endpoint policy matches the IAM policy. The
+   endpoint policy is an independent layer that can deny actions IAM
+   allows. A diagnosis that clears IAM without bypassing the endpoint
+   to verify has not ruled out `ENDPOINT_POLICY`.
+
+### Perfect example output
+
+```text
+TARGET: i-app (10.0.1.10, subnet-aaa, vpc-source) → i-db
+  (172.16.1.10, subnet-bbb, vpc-target) on tcp/5432
+VERDICT: ROOT_CAUSE_FOUND
+REASON: The destination SG sg-db has no inbound rule matching the
+  source CIDR 10.0.1.0/24 on port 5432 — the SYN is dropped at the
+  instance's security group (Step 2e).
+LAYER: SG_INBOUND
+EVIDENCE:
+  - Symptom: application on i-app (10.0.1.10) reports "Operation
+    timed out" connecting to i-db (172.16.1.10:5432). nc -vz hangs.
+  - Probe: aws ec2 describe-security-groups --group-ids sg-db returns
+    inbound rules allowing 172.16.0.0/16 on 5432 only — no rule
+    matches 10.0.1.0/24 (source VPC CIDR).
+  - Passing: route table for subnet-aaa has pcx-aaa route to
+    172.16.0.0/16; route table for subnet-bbb has pcx-aaa route back
+    to 10.0.0.0/16; peering pcx-aaa is Active; VPC CIDRs do not
+    overlap; NACL on both subnets allows inbound 5432 AND outbound
+    ephemeral 1024-65535 (verified in both directions).
+REMEDIATION:
+  1. Add an inbound rule to sg-db for the source CIDR on tcp/5432:
+     aws ec2 authorize-security-group-ingress --group-id sg-db \
+       --protocol tcp --port 5432 --cidr 10.0.1.0/24
+  2. Verify from the source: nc -vz 172.16.1.10 5432 (should succeed
+     within 1s).
+CONFIRM: Before authorizing the SG ingress, emit and await:
+  "CONFIRM: About to authorize-security-group-ingress on sg-db in
+   us-east-1 for 10.0.1.0/24 on tcp/5432. Proceed? (yes/no)"
+```
+
 ## Anti-Patterns — NEVER
 
 - NEVER declare ROOT_CAUSE_FOUND without a failing probe that matches

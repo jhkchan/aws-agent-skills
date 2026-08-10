@@ -719,6 +719,117 @@ ESCALATION_PATH: On-prem / edge-device operator must run on the host:
   (requires sudo / admin on the host). Cannot be done from the AWS side.
 ```
 
+## STRICT output contract
+
+This contract is mandatory. The Output format template above is the
+authoritative structure; the rules below disambiguate the failure
+modes that score D8=13 on this skill. Violating any rule is a
+misdiagnosis.
+
+### Required output structure
+
+Every diagnosis MUST emit this exact block, with all fields populated
+(no empty fields, no omitted sections, no reordering):
+
+```text
+DIAGNOSIS: <reference>
+ASSOCIATION: <association-id or name>
+INSTANCE: <instance-id or "multiple-targets">
+SYMPTOM: Failed | TimedOut | NotManaged | NeverRuns | DocumentError
+ROOT_CAUSE: <specific cause cited — never "unknown" for ROOT_CAUSE_FOUND>
+EVIDENCE:
+  - <diagnostic signal 1 — API field + value that confirms the cause>
+  - <diagnostic signal 2 — secondary corroboration>
+LAYER_CHECK:
+  - IAM: <PASS | FAIL — reason>          # mandatory, never omit
+  - Connectivity: <PASS | FAIL — reason> # mandatory, never omit
+  - Agent: <PASS | FAIL — reason>        # mandatory, never omit
+FIX:
+  - <action 1 with CLI snippet>
+VERIFICATION:
+  - <command to confirm fix + expected value>
+VERDICT: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+NEXT_STEP: <if NEED_MORE_INFO, the specific next diagnostic command>
+ESCALATION_PATH: <if ESCALATE, the recommended path; "None" otherwise>
+```
+
+Verdict-specific rules:
+- `ROOT_CAUSE_FOUND` → ROOT_CAUSE names a single specific cause; EVIDENCE
+  cites at least one failing API signal; FIX is actionable CLI, not prose.
+- `NEED_MORE_INFO` → ROOT_CAUSE is "Pending diagnosis — <what is known>";
+  NEXT_STEP cites the exact next command to run (not a category).
+- `ESCALATE` → ESCALATION_PATH names the recipient (AWS Support, on-prem
+  operator) and the out-of-band action required from them.
+
+### FORBIDDEN output patterns
+
+1. NEVER diagnose without checking SSM agent status first — the agent
+   must be 'Online' (`PingStatus: Active` with recent `LastPingDateTime`)
+   for any association to work. A diagnosis that skips the LAYER_CHECK
+   Agent line is invalid.
+2. NEVER confuse association status 'Failed' with instance not being
+   managed — Failed means the document ran but returned non-zero, not
+   that SSM can't reach the instance. NotManaged is a different symptom
+   (Step 4); do not blend them into one verdict.
+3. NEVER treat association `Status: Success` as proof the document script
+   succeeded — `Success` means orchestration started; per-target
+   `Status: Failed` (in `describe-association-execution-targets`) is
+   where the script error lives. A diagnosis that cites association
+   `Status: Success` as evidence of script success is wrong.
+4. NEVER emit `VERDICT: ROOT_CAUSE_FOUND` with an empty or stub
+   LAYER_CHECK block. All three layers (IAM, Connectivity, Agent) must
+   show PASS or FAIL with a concrete reason — even when the failure is
+   association-specific, the layers were checked and passed.
+5. NEVER output `VERDICT: NEED_MORE_INFO` without a `NEXT_STEP` that
+   names a specific diagnostic command (CLI invocation or log path).
+   Generic phrases like "investigate further" or "check the agent" are
+   not acceptable — cite the exact command.
+6. NEVER use `ec2 describe-instances` for `mi-*` hybrid instances. They
+   are not EC2 resources and the API returns nothing; route the diagnosis
+   through `describe-instance-information` and `describe-activations`.
+7. NEVER treat `AWS-ApplyPatchBaseline` `Operation=Scan` reporting
+   `NON_COMPLIANT` as a failure — Scan records compliance; it does NOT
+   install patches. A "failing" Scan is correctly identifying missing
+   patches, not an association error.
+
+### Perfect example output
+
+```text
+DIAGNOSIS: patch-association-prod
+ASSOCIATION: 0123456789abcdef0123456789abcdef0123456789abcdef0
+INSTANCE: i-0abc123def456789a
+SYMPTOM: Failed
+ROOT_CAUSE: Instance role lacks s3:PutObject on the S3 output bucket;
+            association execution failed writing command output.
+EVIDENCE:
+  - describe-association-executions Status=Failed,
+    StatusMessage="AccessDenied on s3:PutObject for
+    arn:aws:s3:::ssm-output-prod/..."
+  - simulate-principal-policy returned Denied for s3:PutObject on
+    arn:aws:s3:::ssm-output-prod/*
+LAYER_CHECK:
+  - IAM: FAIL — instance role has AmazonSSMManagedInstanceCore but NOT
+    s3:PutObject on ssm-output-prod
+  - Connectivity: PASS — PingStatus Active, agent reachable
+  - Agent: PASS — IsLatestVersion true, AgentVersion 3.2.1555.0
+FIX:
+  - Add an inline policy granting s3:PutObject on the output bucket:
+    aws iam put-role-policy --role-name <instance-role> \
+      --policy-name SsmOutputPut \
+      --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::ssm-output-prod/*"}]}'
+  - Re-run the association:
+    aws ssm start-associations-once \
+      --association-ids 0123456789abcdef0123456789abcdef0123456789abcdef0
+VERIFICATION:
+  - aws ssm describe-association-executions \
+      --association-id 0123456789abcdef0123456789abcdef0123456789abcdef0 \
+      --query 'Executions[0].Status'
+  - Expect: Success
+VERDICT: ROOT_CAUSE_FOUND
+NEXT_STEP: None
+ESCALATION_PATH: None
+```
+
 ## Anti-Patterns — NEVER do these things
 
 - NEVER diagnose an association without first running the 3-layer

@@ -1150,6 +1150,141 @@ VERIFICATION_COMMANDS:
   aws sns publish --topic-arn arn:aws:sns:us-east-1:111111111111:order-events --message '{"test": true}'
 ```
 
+## STRICT output contract
+
+The rules below are hard constraints. Violating any one produces a
+checklist that looks deployable but contains a silent configuration
+defect (unconfirmed subscription, cross-account KMS failure, invisible
+delivery drops). Self-check EVERY emitted block before returning.
+
+### Required output structure
+
+Every response MUST be the checklist block below — nothing before it,
+nothing after `VERIFICATION_COMMANDS`. The labels are case-sensitive
+all-caps keywords. Do NOT substitute `Verdict`, `**VERDICT**`,
+`### Verdict`, or any markdown variant.
+
+```text
+TOPIC: <topic-name>
+VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
+CHECKLIST:
+  [✓|✗|OPTIONAL]      Topic type — Standard | FIFO
+  [✓|✗]               Encryption — SSE-KMS (key, same-account | cross-account)
+  [✓|✗]               Access policy — <pattern: S3 notification | cross-account | IAM-only>
+  [✓|✗]               Subscriptions — <count> active (<protocols>)
+  [✓|✗]               Delivery logging — <protocols> failure (role: <role-arn>)
+  [✓|✗|OPTIONAL]      Filter policy — <summary> | N/A
+  [✓|✗|OPTIONAL]      Subscription DLQ — <dlq-arn> | N/A
+  [✓|✗|OPTIONAL]      FIFO dedup — ContentBasedDeduplication=<true|false> | N/A
+  [✓|✗|OPTIONAL]      Mobile push — <platform ARNs> | N/A
+VERIFICATION_COMMANDS:
+  <one command per [✓] item>
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER emit `VERDICT: READY_TO_DEPLOY` without showing ALL checklist
+   items.** Every REQUIRED row (Topic type, Encryption, Access policy,
+   Subscriptions, Delivery logging) MUST appear with `[✓]` or `[✗]`.
+   Every OPTIONAL row MUST appear with `[✓]`, `[✗]`, or `[OPTIONAL]`.
+   Omitting a row implies it was not evaluated.
+
+2. **NEVER mark Encryption `[✓]` for a cross-account topic using
+   `alias/aws/sns` (AWS-managed key).** The AWS-managed key only allows
+   the owning account to decrypt — cross-account SQS subscribers
+   silently fail to decrypt messages. For cross-account, the checklist
+   MUST show a customer-managed CMK with the subscriber accounts granted
+   `kms:Decrypt` + `kms:GenerateDataKey*`.
+
+3. **NEVER mark Delivery logging `[✓]` without confirming BOTH the
+   feedback role ARN AND the CloudWatch Logs resource policy.** SNS
+   silently fails to write logs if either side is missing. The
+   checklist line MUST cite both: `(role: <arn> + CW Logs resource
+   policy granted)`. A `[✓]` citing only the role is an unverified
+   claim.
+
+4. **NEVER mark Subscriptions `[✓]` if any subscription is in
+   `PendingConfirmation` status.** Pending subscriptions do NOT receive
+   messages. The checklist MUST show `(N active, M pending)` and if M >
+   0, the item is `[✗]` with a note citing the unconfirmed endpoint.
+
+5. **NEVER emit `VERDICT: PREREQUISITES_MISSING` without citing each
+   specific gap.** Every `[✗]` MUST have a one-line reason: `[✗] KMS
+   key ARN not provided — supply customer-managed CMK for cross-account
+   decryption`. A bare `[✗]` is non-compliant.
+
+6. **NEVER mark a FIFO topic `[✓]` without the `.fifo` suffix in the
+   topic name AND confirmation that all subscribers are SQS FIFO
+   queues.** FIFO topics reject HTTP, email, Lambda, and mobile push
+   subscriptions. If non-SQS subscribers are requested on a FIFO topic,
+   mark `[✗]` with: `FIFO topic requires SQS FIFO subscribers only`.
+
+7. **NEVER omit the Filter policy row or silently drop it.** If no
+   filter is needed, mark `[OPTIONAL] Filter policy — N/A (no filtering
+   needed)`. Dropping the row implies it was not evaluated.
+
+8. **NEVER deviate from the literal labels `TOPIC:`, `VERDICT:`,
+   `CHECKLIST:`, `VERIFICATION_COMMANDS:`.** Substituting `Verdict`,
+   `**VERDICT**`, `### Verdict`, or any markdown variant silently breaks
+   downstream deployment pipelines and assertion-based evals.
+
+### Perfect example output — READY_TO_DEPLOY (Standard topic, same-account)
+
+Every field below is complete and verifiable. Copy this shape exactly.
+
+```text
+TOPIC: order-events
+VERDICT: READY_TO_DEPLOY
+CHECKLIST:
+  [✓]      Topic type — Standard (best-effort ordering, unlimited TPS)
+  [✓]      Encryption — SSE-KMS (alias/aws/sns, same-account)
+  [✓]      Access policy — S3 notification pattern (Principal:* + aws:SourceArn: order-uploads)
+  [✓]      Subscriptions — 2 active (SQS: order-queue [Confirmed], Lambda: order-handler [Confirmed])
+  [✓]      Delivery logging — SQS failure + Lambda failure (role: arn:aws:iam::111111111111:role/SNSDeliveryFeedback + CW Logs resource policy granted)
+  [✓]      Filter policy — event_type: ["order_created"] on SQS subscription (MessageAttributes scope)
+  [OPTIONAL] Subscription DLQ — N/A (SQS has own DLQ)
+  [OPTIONAL] FIFO dedup — N/A (Standard topic)
+  [OPTIONAL] Mobile push — N/A (no mobile subscribers)
+VERIFICATION_COMMANDS:
+  aws sns get-topic-attributes --topic-arn arn:aws:sns:us-east-1:111111111111:order-events --query 'Attributes.FifoTopic'
+  aws sns get-topic-attributes --topic-arn arn:aws:sns:us-east-1:111111111111:order-events --query 'Attributes.KmsMasterKeyId'
+  aws sns get-topic-attributes --topic-arn arn:aws:sns:us-east-1:111111111111:order-events --query 'Attributes.Policy'
+  aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:111111111111:order-events
+  aws sns get-topic-attributes --topic-arn arn:aws:sns:us-east-1:111111111111:order-events --query 'Attributes.SQSFailureFeedbackRoleArn'
+  aws sns get-subscription-attributes --subscription-arn <sqs-sub-arn> --query 'Attributes.FilterPolicy'
+```
+
+### Perfect example output — PREREQUISITES_MISSING
+
+```text
+TOPIC: order-events-cross-account
+VERDICT: PREREQUISITES_MISSING
+CHECKLIST:
+  [✓]      Topic type — Standard (cross-account fan-out, no ordering requirement)
+  [✗]      Encryption — alias/aws/sns selected but cross-account subscriber in account 222222222222 needs kms:Decrypt — supply customer-managed CMK with cross-account key policy
+  [✓]      Access policy — Cross-account publisher (Principal: account 222222222222, Action: sns:Publish)
+  [✗]      Subscriptions — 0 active: SQS queue arn in account 222222222222 not yet subscribed — subscribe the cross-account queue and confirm from the subscriber account
+  [✗]      Delivery logging — CloudWatch role SNSDeliveryFeedback not found — create IAM role with trust policy for sns.amazonaws.com + logs:PutLogEvents
+  [OPTIONAL] Filter policy — N/A (no filtering needed)
+  [OPTIONAL] Subscription DLQ — N/A (SQS has own DLQ)
+  [OPTIONAL] FIFO dedup — N/A (Standard topic)
+  [OPTIONAL] Mobile push — N/A (no mobile subscribers)
+VERIFICATION_COMMANDS:
+  aws kms describe-key --key-id alias/my-sns-cross-account-key
+  aws kms get-key-policy --key-id alias/my-sns-cross-account-key --policy-name default
+  aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:111111111111:order-events-cross-account
+  aws iam get-role --role-name SNSDeliveryFeedback
+```
+
+**Self-check before emit:**
+- [ ] All 9 checklist rows present (REQUIRED + OPTIONAL)?
+- [ ] Cross-account topic uses customer-managed CMK (not alias/aws/sns)?
+- [ ] Delivery logging cites BOTH role ARN AND CW Logs resource policy?
+- [ ] No subscription in PendingConfirmation marked as active?
+- [ ] FIFO topic has `.fifo` suffix and only SQS FIFO subscribers?
+- [ ] Every `[✗]` cites the specific gap and what the operator must provide?
+- [ ] Literal labels used exactly (no markdown variants)?
+
 ## Worked example: multi-protocol topic
 
 This example walks a realistic topic (`order-events`) with four

@@ -817,6 +817,145 @@ VERIFICATION_COMMANDS:
   <copy-pasteable verification commands>
 ```
 
+## STRICT output contract
+
+The rules below are hard constraints. Violating any one produces a
+checklist that looks complete but contains a silent misconfiguration.
+Self-check EVERY emitted block against these rules before returning.
+
+### Required output structure
+
+Every response MUST be a single block using these literal labels, in
+this order. Do NOT preface with prose, headings, or disclaimers.
+
+```text
+BUCKET: <bucket-name>
+VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
+CHECKLIST:
+  [✓|✗] Block Public Access (account-level): all 4 settings True
+  [✓|✗] Block Public Access (bucket-level): all 4 settings True
+  [✓|✗] Default encryption: SSE-S3 | SSE-KMS (<key-arn>)
+  [✓|✗] Object Ownership: BucketOwnerEnforced
+  [✓|✗] Versioning: Enabled (MFA Delete: Enabled|Disabled)
+  [✓|✗] Bucket policy: HTTPS-enforce + SSE-enforce
+  [✓|✗] Access logging: Enabled (target: <log-bucket>)
+  [✓|✗] CloudTrail data events: Enabled
+  [✓|✗] Lifecycle rules: <rule-summary> | None (optional)
+  [✓|✗] Replication: CRR→<dest> | SRR→<dest> | None
+VERIFICATION_COMMANDS:
+  <copy-pasteable verification commands — one per [✓] item>
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER emit `VERDICT: READY_TO_DEPLOY` without showing ALL 10
+   checklist items.** Every item MUST appear with a status marker:
+   `[✓]` (applied and verified), `[✗]` (not applied or misconfigured),
+   or `[OPTIONAL]` (not needed for this workload). Omitting a row
+   implies it was not evaluated.
+
+2. **NEVER mark an item `[✓]` without a corresponding verification
+   command in `VERIFICATION_COMMANDS`.** If the checklist says
+   `[✓] Access logging: Enabled`, the VERIFICATION_COMMANDS block MUST
+   include the `aws s3api get-bucket-logging --bucket <BUCKET>` command
+   that confirms it. A `[✓]` with no verification command is an
+   unverified claim.
+
+3. **NEVER mark Block Public Access as `[✓]` without confirming BOTH
+   account-level AND bucket-level (all 4 settings each).** The
+   checklist has two separate BPA rows for this reason. Marking only
+   one `[✓]` and omitting the other is a non-compliant output.
+
+4. **NEVER mark Access logging as `[✓]` without verifying the log
+   target bucket's policy grants `logging.s3.amazonaws.com`
+   `s3:PutObject`.** With `BucketOwnerEnforced` on the log target, ACL
+   grants silently fail — S3 returns HTTP 200 but delivers zero logs.
+   The REASON for `[✓]` must cite the policy grant, not just "logging
+   enabled."
+
+5. **NEVER mark Lifecycle rules as `[✓]` if versioning is `[✗]`.**
+   `NoncurrentVersion*` lifecycle rules silently no-op without
+   versioning — the API returns success but no objects transition. If
+   versioning is `[✗]`, lifecycle MUST also be `[✗]` with a note
+   citing the dependency.
+
+6. **NEVER mark Replication as `[✓]` without confirming versioning on
+   BOTH source AND destination buckets.** Replication requires
+   versioning on both sides. Additionally, the replication IAM role
+   must exist with `s3:ReplicateObject` + KMS decrypt permissions.
+
+7. **NEVER emit `VERDICT: PREREQUISITES_MISSING` without citing the
+   specific gap.** Each `[✗]` item MUST have a one-line reason:
+   `[✗] KMS key ARN not provided — operator must supply CMK ARN for
+   SSE-KMS`. A bare `[✗]` with no explanation is non-compliant.
+
+8. **NEVER mark Default encryption as `[✓] SSE-KMS` without
+   `BucketKeyEnabled: true` on high-throughput buckets.** Without
+   Bucket Keys, every PutObject triggers a `kms:GenerateDataKey` call
+   ($0.03/10k + latency). The checklist MUST note Bucket Key status
+   when SSE-KMS is selected.
+
+### Perfect example output — READY_TO_DEPLOY
+
+Every field below is complete and verifiable. Copy this shape exactly.
+
+```text
+BUCKET: prod-order-data
+VERDICT: READY_TO_DEPLOY
+CHECKLIST:
+  [✓] Block Public Access (account-level): all 4 settings True
+  [✓] Block Public Access (bucket-level): all 4 settings True
+  [✓] Default encryption: SSE-KMS (alias/prod-s3-key, BucketKeyEnabled: true)
+  [✓] Object Ownership: BucketOwnerEnforced
+  [✓] Versioning: Enabled (MFA Delete: Disabled)
+  [✓] Bucket policy: HTTPS-enforce (DenyInsecureTransport) + SSE-enforce (DenyUnEncryptedObjectUploads)
+  [✓] Access logging: Enabled (target: s3-access-logs-prod, policy grants logging.s3.amazonaws.com)
+  [✓] CloudTrail data events: Enabled (trail: management-events, ReadWriteType: All)
+  [✓] Lifecycle rules: Standard→IA(30d)→GLACIER(90d), NoncurrentExpiration(90d), AbortMultipart(7d)
+  [✓] Replication: CRR→prod-order-data-dr (us-west-2, versioning confirmed on destination)
+VERIFICATION_COMMANDS:
+  aws s3control get-public-access-block --account-id 111111111111
+  aws s3api get-public-access-block --bucket prod-order-data
+  aws s3api get-bucket-encryption --bucket prod-order-data
+  aws s3api get-bucket-ownership-controls --bucket prod-order-data
+  aws s3api get-bucket-versioning --bucket prod-order-data
+  aws s3api get-bucket-policy --bucket prod-order-data
+  aws s3api get-bucket-logging --bucket prod-order-data
+  aws cloudtrail get-event-selectors --trail-name management-events
+  aws s3api get-bucket-lifecycle-configuration --bucket prod-order-data
+  aws s3api get-bucket-replication --bucket prod-order-data
+```
+
+### Perfect example output — PREREQUISITES_MISSING
+
+```text
+BUCKET: prod-order-data
+VERDICT: PREREQUISITES_MISSING
+CHECKLIST:
+  [✓] Block Public Access (account-level): all 4 settings True
+  [✓] Block Public Access (bucket-level): all 4 settings True
+  [✗] Default encryption: SSE-KMS selected but KMS key ARN not provided — operator must supply CMK ARN
+  [✓] Object Ownership: BucketOwnerEnforced
+  [✓] Versioning: Enabled (MFA Delete: Disabled)
+  [✓] Bucket policy: HTTPS-enforce + SSE-enforce
+  [✗] Access logging: log target bucket s3-access-logs-prod does not exist — create target bucket first
+  [✗] CloudTrail data events: trail management-events not found — verify trail name and region
+  [OPTIONAL] Lifecycle rules: None (not requested for this workload)
+  [✗] Replication: replication IAM role not provided — create role with s3:ReplicateObject + kms:Decrypt
+VERIFICATION_COMMANDS:
+  aws kms list-aliases --query 'Aliases[?AliasName==`alias/prod-s3-key`]'
+  aws s3api head-bucket --bucket s3-access-logs-prod
+  aws cloudtrail describe-trails --query 'trailList[?Name==`management-events`]'
+  aws iam get-role --role-name s3-replication-role
+```
+
+**Self-check before emit:**
+- [ ] All 10 checklist rows present (no omitted items)?
+- [ ] Every `[✓]` has a matching verification command?
+- [ ] BPA shows two separate rows (account + bucket)?
+- [ ] No `[✓]` on Lifecycle if Versioning is `[✗]`?
+- [ ] Every `[✗]` cites the specific gap and what the operator must provide?
+
 ## Recent AWS features
 
 - **S3 Express One Zone (directory buckets)**: Single-AZ, lowest latency

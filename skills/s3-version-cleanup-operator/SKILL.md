@@ -623,6 +623,122 @@ NOTES:
     future accumulation.
 ```
 
+## STRICT output contract
+
+This contract is mandatory. The Output format template above is the
+authoritative structure; the rules below disambiguate the failure
+modes that score D8=13 on this skill. Violating any rule produces a
+plan that is unsafe to execute.
+
+### Required output structure
+
+Every operation MUST emit this exact block, with all fields populated
+(no empty fields, no omitted sections, no reordering):
+
+```text
+OPERATION: <configure-lifecycle | batch-delete-versions | estimate-savings | audit-versions>
+VERDICT: READY | BLOCKED | COMPLETED
+TARGET: <bucket-name>
+PRE_CHECKS:
+  - [PASS] <check description>
+  - [FAIL] <check description> — <reason>
+STEPS:
+  1. <CLI command with flags populated>
+  2. <wait/poll command>
+POST_VERIFY:
+  - [PASS] <verification description>
+  - [FAIL] <verification description> — <reason>
+ESTIMATED_SAVINGS: <$X/month (computed from N versions × avg size × rate)>
+NOTES: <compliance caveats, Object Lock implications, cleanup timeline>
+```
+
+Verdict-specific rules:
+- `BLOCKED` → at least one PRE_CHECKS line shows `[FAIL]` with a
+  concrete reason; STEPS is `(none — pre-checks failed)`; no
+  state-changing CLI is emitted.
+- `READY` → all PRE_CHECKS show `[PASS]`; STEPS begins with the
+  CONFIRM gate prompt before any state-changing CLI; POST_VERIFY is
+  `(pending execution)`; ESTIMATED_SAVINGS cites the storage math.
+- `COMPLETED` → all POST_VERIFY show `[PASS]`; STEPS reflects what
+  was actually executed; ESTIMATED_SAVINGS is the realised (not
+  estimated) savings if measurable.
+
+### FORBIDDEN output patterns
+
+1. NEVER recommend NoncurrentVersionExpiration without checking Object
+   Lock — Compliance mode makes versions immutable regardless of
+   lifecycle rules. A READY plan that did not run
+   `get-object-lock-configuration` and confirm the mode is invalid.
+2. NEVER suggest put-bucket-lifecycle-configuration as a merge — it
+   REPLACES the entire configuration. Always read-merge-write: call
+   `get-bucket-lifecycle-configuration`, merge the new rules into the
+   existing JSON, then PUT the merged payload. A STEPS entry that PUTs
+   only the new rules is a data-loss bug.
+3. NEVER conflate `Expiration` (current version) with
+   `NoncurrentVersionExpiration` (noncurrent versions). `Expiration`
+   creates a delete marker on versioned buckets; it does NOT remove
+   old versions. A STEPS entry using the wrong action cleans up
+   nothing.
+4. NEVER emit `VERDICT: READY` without the CONFIRM gate as the first
+   STEPS item. State-changing CLIs (lifecycle PUT, `delete-objects`,
+   `create-job`) require explicit operator approval before execution;
+   emitting the CLI without the CONFIRM prompt is a violation.
+5. NEVER attempt to delete objects with `LegalHold: ON`. Legal hold
+   overrides all lifecycle and Object Lock settings. A batch-delete
+   plan that did not sample `get-object-legal-hold` is incomplete —
+   per-object failures will occur silently mid-job.
+6. NEVER output `VERDICT: BLOCKED` without enumerating each failed
+   PRE_CHECK with a `[FAIL]` line and a reason. A bare "BLOCKED —
+   pre-checks failed" with no itemised failures is not actionable.
+7. NEVER assume lifecycle rules apply in real time. S3 processes
+   rules asynchronously within 24 hours of eligibility. A COMPLETED
+   verdict that claims immediate cost reduction without the 24-48h
+   verification window is misleading.
+
+### Perfect example output
+
+```text
+OPERATION: configure-lifecycle
+VERDICT: READY
+TARGET: s3://prod-logs-bucket
+PRE_CHECKS:
+  - [PASS] Bucket exists in us-east-1 account 111111111111
+  - [PASS] Versioning Status: Enabled
+  - [PASS] MFADelete: Disabled (no MFA required)
+  - [PASS] ObjectLockEnabled: Disabled (no Compliance/Governance
+    retention — NoncurrentVersionExpiration is safe)
+  - [PASS] Existing lifecycle rules captured (3 rules: current-version
+    transition, current-version expiration on logs/ prefix,
+    abort-multipart-upload 7d) via get-bucket-lifecycle-configuration
+  - [PASS] New rules MERGED into existing config (not replacing) —
+    PUT payload contains all 5 rules
+  - [PASS] BucketKeyEnabled: true (no KMS optimization gap)
+  - [PASS] Caller has s3:PutLifecycleConfiguration
+STEPS:
+  1. CONFIRM: About to put-bucket-lifecycle-configuration on
+     s3://prod-logs-bucket in account 111111111111 region us-east-1.
+     This will ADD NoncurrentVersionExpiration (NoncurrentDays: 90)
+     and NoncurrentVersionTransition (STANDARD_IA at 30d, GIR at 90d)
+     to the existing 3 rules. Existing rules preserved in the merged
+     payload. Estimated monthly savings: $312/month. Proceed? (yes/no)
+  2. aws s3api put-bucket-lifecycle-configuration \
+       --bucket prod-logs-bucket \
+       --lifecycle-configuration file:///tmp/prod-logs-bucket-merged-lifecycle.json
+  3. aws s3api get-bucket-lifecycle-configuration \
+       --bucket prod-logs-bucket --output json
+POST_VERIFY:
+  - (pending execution)
+ESTIMATED_SAVINGS: $312/month (13.5 TB noncurrent × $0.023/GB-month;
+  after transition to IA + GIR: $95/month; net savings $217/month)
+NOTES:
+  - Lifecycle rules apply within 24 hours of eligibility. Allow 24-48
+    hours for the first noncurrent versions to transition/expire.
+  - The existing 3 rules are PRESERVED in the merged config — verified
+    by reading the post-PUT lifecycle configuration in Step 3.
+  - For immediate cleanup of versions already older than 90d, use S3
+    Batch Operations (separate operation).
+```
+
 ## Anti-Patterns — NEVER
 
 - NEVER execute `put-bucket-lifecycle-configuration` without first
