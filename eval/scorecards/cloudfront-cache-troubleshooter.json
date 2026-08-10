@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 17,
       "max": 20,
-      "justification": "Provides specific managed cache\u2011policy IDs, recent feature notes and a detailed decision tree, which a generic model may not know. However several IDs (e.g., CachingDisabled) are duplicated/placeholder and some information merely restates common CloudFront knowledge, limiting the true expert delta."
+      "justification": "The skill supplies concrete expert artifacts not usually known to a generic model: a full symptom\u2011to\u2011cause decision tree, specific managed cache\u2011policy IDs, exact CLI query filters, a root\u2011cause catalog with numbered entries, and precise thresholds (e.g., 100% Miss \u2192 CACHE_MISS_ALWAYS). However, many statements restate standard CloudFront documentation, so it does not achieve the absolute maximum."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 12,
+      "score": 14,
       "max": 15,
-      "justification": "Offers a clear AWS\u2011specific diagnostic walk and ordered CLI commands, but omits procedures for selecting the correct cache behavior when a distribution has multiple behaviors and relies on generic steps like \"run curl -I\" without AWS\u2011specific nuance (e.g., handling pagination of list\u2011distributions)."
+      "justification": "The procedure is AWS\u2011specific: it mandates capturing distribution ID, x\u2011edge\u2011result\u2011type, origin headers, then follows a numbered diagnostic walk with exact AWS CLI commands. The only shortfall is occasional generic advice like \"check logs\" without tying it to a particular AWS service or command."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 15,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete pitfalls (e.g., never include User\u2011Agent in cache key, never assume no\u2011store can be overridden) and explains why each is harmful, meeting the full requirement."
+      "justification": "Contains a solid NEVER list with reasoning (e.g., never include User\u2011Agent, never use /* invalidation), but misses some anti\u2011patterns such as ignoring Origin Shield metrics, overlooking response\u2011headers\u2011policy interactions, and the header\u2011name case\u2011sensitivity trap."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, metadata, when_to_use, when_not_to_use, activation_triggers, invocation_schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides reliable activation triggers."
+      "justification": "Frontmatter, description, activation triggers, invocation schema, and detailed when\u2011to\u2011use/when\u2011not\u2011to\u2011use sections are present and well\u2011formed. Minor deficiency: the invocation schema is prose rather than a strict JSON schema, which could affect automated parsing."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered into sections (Activation, Mindset, Quick reference, Process, Anti\u2011patterns, Remediation), but the initial sections are dense and many low\u2011level CLI details are presented up front, causing some cognitive overload before the core decision tree is reached."
+      "justification": "The skill layers information: a brief activation block, a one\u2011line mindset summary, a quick\u2011reference table, then deep dive steps. However, the initial sections are dense and some critical rules (e.g., NEVER statements) are buried deep, causing slight cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (updating distribution config, creating invalidations) are accompanied by warnings about waiting for deployment and verification steps, showing good calibration. Creative tasks (diagnosing) are left relatively open, which is appropriate. Minor gap: no explicit guard against running update\u2011distribution without an ETag check in automated pipelines."
+      "justification": "Destructive actions (invalidations) are guarded by checks and path\u2011specific recommendations; creative tasks have ample freedom. Slight deduction because the skill still suggests running `aws cloudfront update-distribution` without explicitly requiring a lock or ETag verification in every case."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (Activation \u2192 Mindset \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Remediation). Minor ordering inconsistency (anti\u2011patterns after remediation) prevents a perfect score."
+      "justification": "Follows a recognizable structure (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process \u2192 Mapping \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Remediation). The pattern is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI commands and output format, but lacks handling for pagination, region selection, error handling of AWS CLI failures, and guidance when multiple cache behaviors exist. The \"ROOT_CAUSE_CATALOG\" reference is ambiguous without a mapping table, which could confuse an agent."
+      "justification": "Provides actionable CLI commands, decision tree, and concrete output examples, enabling an agent to execute the skill. Missing handling for edge cases like distributions with multiple cache behaviors or missing access logs, which could cause execution failures."
     }
   ],
-  "total_score": 103,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 56418,
-  "latency_ms": 19057,
+  "token_count": 59103,
+  "latency_ms": 13956,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

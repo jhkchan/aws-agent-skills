@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides many concrete thresholds (CPU <30%, FreeableMemory >50%, ACU cost model, gp3 free IOPS, Graviton4 pricing) that a generic model would not know, but a large portion restates well\u2011known best\u2011practice facts; the core novelty is limited to a few specific numbers, so 3 points are deducted."
+      "justification": "Provides many concrete thresholds (CPU <30% + FreeableMemory >50%, ACU floor calculations, Multi-AZ cost multiplier) and up\u2011to\u2011date 2026 pricing, which a generic model would not know, but some of the guidance (e.g., \u201cmonitor for 7 days\u201d) is generic and does not constitute novel expert insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Includes AWS\u2011specific procedures (snapshot before modify, Multi\u2011AZ failover flow, RI purchase steps, CLI ordering). One point deducted because some steps are generic (e.g., \"monitor for 7 days\") and lack explicit AWS maintenance\u2011window guidance."
+      "justification": "Encodes AWS\u2011specific procedures: exact CLI pre\u2011flight steps, ordered decision tree, snapshot\u2011before\u2011modify, RI purchase flow, and Multi\u2011AZ modification nuances. A few steps (e.g., \u201cmonitor for 7 days\u201d) are generic, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a thorough NEVER list with concrete reasoning (e.g., never downsize without FreeableMemory, never recommend Compute Savings Plans for RDS). Missing explicit anti\u2011pattern for missing PI IAM permissions and for overlooking burstable\u2011instance credit exhaustion, so two points are deducted."
+      "justification": "Contains a thorough NEVER list with concrete reasoning (no Savings Plans for RDS, no Graviton for Oracle/SQL Server, avoid downsize without FreeableMemory). Missing a specific anti\u2011pattern about recommending RI for highly variable workloads without a fallback, and the list could be tighter."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation schema are present. However, the description of activation triggers is overly long and some triggers overlap, making reliable activation slightly ambiguous; also entry_point is false, which could hinder automated pipelines. Two points deducted."
+      "justification": "Full front\u2011matter, clear description, keywords, activation triggers, invocation schema, and a concrete example. The only shortfall is a missing explicit version field in the activation\u2011trigger list (e.g., no \u201cmin_version\u201d guard), which prevents strict runtime gating."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information (overview, quick reference, detailed steps, decision tree, anti\u2011patterns) but critical safety rules (CONFIRM gate, snapshot requirement) appear deep in the document, causing potential cognitive overload for an agent. Three points deducted for front\u2011loading too much detail before the essential guardrails."
+      "justification": "Top\u2011level overview, quick\u2011reference table, then deeper sections (mindset, philosophy, pre\u2011flight, process, decision tree, anti\u2011patterns, error handling). However the long cost\u2011baseline tables and extensive markdown blocks add cognitive load before the core decision tree, slightly violating optimal layering."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained with mandatory CONFIRM, snapshot, and maintenance\u2011window advice. Minor deduction because the skill does not specify timeout or automated rollback mechanisms for failed modifications."
+      "justification": "Destructive actions (deletion, modification) are tightly gated with CONFIRM and app\u2011team verification. Creative actions (engine migration) are presented as strategic findings, not forced. Slight deduction because bulk\u2011fleet optimisation guidance is brief and could benefit from tighter constraints."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (metadata, what\u2011it\u2011does, mindset, philosophy, pre\u2011flight, process steps, decision tree, anti\u2011patterns, error handling). Slight deduction for occasional ad\u2011hoc ordering of sections (e.g., anti\u2011patterns after error handling)."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011Patterns \u2192 Error Handling \u2192 Decision Tree). The inclusion of large cost tables and example blocks interrupts the flow, making the structure slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 9,
       "max": 15,
-      "justification": "Provides decision trees, CLI commands, savings formulas, and migration steps, enabling an agent to act. Deductions for arithmetic errors in the multi\u2011AZ example (negative saving before correction) and for the lack of an explicit read\u2011replica downsize sequence in the main workflow (only mentioned later)."
+      "justification": "Provides concrete CLI commands and formulas, but the example outputs contain errors (e.g., inconsistent savings calculation in the Multi\u2011AZ removal example, mismatched monthly saving vs. formula) and the ALREADY_OPTIMAL example violates the required output contract (missing RECOMMENDATION block). These gaps reduce confidence that an agent could execute the skill flawlessly."
     }
   ],
-  "total_score": 105,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 62319,
-  "latency_ms": 23607,
+  "token_count": 67728,
+  "latency_ms": 28194,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

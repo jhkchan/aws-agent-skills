@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides concrete expert data (break\u2011even ~160\u202fGB/ month per AZ, exact NAT Gateway base $32.85/mo, Interface endpoint $7.30 per AZ, NAT Instance $8.47/mo) and nuanced cross\u2011AZ transfer cost calculations that a generic model would not know. However, most of the pricing information is publicly documented and the skill merely restates it; it omits regional rate tables and newer NAT Instance options (e.g., t4g) that would add genuine delta."
+      "justification": "Provides specific, expert-level details such as the ~160\u202fGB/month break-even threshold per AZ for Interface endpoints, exact pricing breakdowns, cross\u2011AZ transfer cost modeling, and nuanced NAT Instance considerations that go beyond generic model knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The procedure is AWS\u2011specific: exact CLI commands, pre\u2011flight checks, route\u2011table backup, confirmation gate, and ordering of dimensions (gateway \u2192 interface \u2192 topology \u2192 instance). Some steps are generic (e.g., \u201crun pre\u2011flight\u201d) and could be more prescriptive about which AWS calls to make in what order, so full marks are withheld."
+      "justification": "Provides a fully AWS\u2011specific workflow: pre\u2011flight CLI inventory, cost\u2011explorer split, VPC Flow Logs filtering by NAT ENI, step\u2011wise optimisation (gateway endpoints \u2192 interface endpoints \u2192 topology \u2192 NAT instance), mandatory CONFIRM gate, route\u2011table backup, and release\u2011address step. Only minor generic phrasing (e.g., \"check security\") prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "A thorough NEVER list is present with concrete reasoning (e.g., never create an Interface endpoint without traffic evidence, never use NAT Instance in production, never delete a NAT gateway without updating routes). The only minor gap is the lack of an explicit warning about forgetting to adjust endpoint policies when creating Gateway endpoints."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., unreleased EIP, single\u2011point\u2011of\u2011failure NAT Instance), but omits a few common pitfalls such as forgetting to disable source\u2011dest\u2011check on NAT Instances."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, description, keywords, activation triggers, invocation schema, and example are all present and well\u2011formed. The activation_triggers list is extensive, which could cause over\u2011triggering, but overall the specification is solid."
+      "justification": "Front\u2011matter is complete, description clearly states WHAT, WHEN, and KEYWORDS, activation triggers are exhaustive, and invocation schema/example are provided. Slightly vague phrasing in \"when_not_to_use\" could be tighter, thus a one\u2011point deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (overview \u2192 quick reference \u2192 detailed steps \u2192 deep references). Still, the skill front\u2011loads a large amount of detail before the concise quick\u2011reference table, creating some cognitive overload. Deducted 2 points."
+      "justification": "The skill layers high\u2011level overview, detailed step\u2011by\u2011step logic, and deep references, but the initial sections are dense and may overload the agent before it knows which part to invoke."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (create/delete endpoints, delete NAT gateways) are gated by explicit CONFIRM prompts and pre\u2011flight safety checks, matching the fragility of the operations. A slight deduction for allowing bulk processing without explicit batch\u2011size limits."
+      "justification": "Destructive actions (delete NAT, release EIP) are gated by CONFIRM prompts and route\u2011table backups, yet the guidance does not explicitly require verifying the remaining NAT is \"available\" before deletion, leaving a small safety gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (What it does \u2192 Quick reference \u2192 Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011patterns \u2192 Error handling \u2192 Edge cases). The structure aids comprehension, earning near\u2011max."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Philosophy \u2192 Process \u2192 Output) but mixes ad\u2011hoc sections (e.g., recent\u2011features table) that break the strict structural flow."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 10,
       "max": 15,
-      "justification": "Provides decision trees, CLI examples, and error\u2011handling tables, enabling an agent to act. Nonetheless, the sample model outputs contain arithmetic inconsistencies (e.g., CURRENT_MONTHLY vs PROJECTED_MONTHLY mismatches, negative savings not flagged) and violate the defined consistency rules, indicating gaps that would hinder reliable execution."
+      "justification": "Model output shows defects: a forbidden \"Adjusted\" line in the multi\u2011AZ NAT example violates the strict output contract, and the NAT\u2011Instance substitution example contains an inconsistent savings breakdown (the arithmetic does not match the described GB savings). These gaps reduce practical reliability."
     }
   ],
   "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 56098,
-  "latency_ms": 20014,
+  "token_count": 60460,
+  "latency_ms": 29290,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

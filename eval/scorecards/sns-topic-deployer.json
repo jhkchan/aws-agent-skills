@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 15,
       "max": 20,
-      "justification": "The skill compiles many AWS\u2011specific details (attribute names, ordering constraints, KMS policy examples, FIFO dedup rules) that a generic model may not recall, but most of the information is already documented in official guides. It does not introduce truly novel insights such as undocumented limits, performance thresholds, or undocumented edge\u2011case behaviours, so a modest deduction is warranted."
+      "justification": "Provides concrete decision trees (FIFO vs Standard, KMS cross\u2011account policy, ordering of steps) and specific thresholds (300\u202fTPS, 5\u2011minute dedup window). However much of the content restates standard AWS docs; a senior engineer would only gain a few nuanced tips, not a full new methodology."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Procedures are largely AWS\u2011specific (e.g., create\u2011topic, set\u2011topic\u2011attributes, subscription order), yet some steps are phrased generically like \"run pre\u2011flight checks\" without enumerating the exact AWS CLI calls or IAM checks, leaving a small gap in concrete, repeatable workflow."
+      "justification": "Encodes AWS\u2011specific ordering (topic type \u2192 KMS \u2192 access policy \u2192 logging \u2192 filters \u2192 DLQ) and exact CLI commands. Some procedures are generic (e.g., \u201cverify prerequisites\u201d) and lack deeper reasoning about IAM vs resource\u2011based policies."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Extensive NEVER list with concrete pitfalls (FIFO topic without .fifo, wildcard Subscribe, AWS\u2011managed key for cross\u2011account, missing delivery logging, MessageBody filter without JSON, etc.) and clear reasons why each is dangerous. Deducted 1 point because it omits a specific anti\u2011pattern about using \"Principal: *\" on sns:Publish without a strong condition."
+      "justification": "The NEVER list is extensive and explains why each pattern is bad (e.g., wildcard Subscribe, AWS\u2011managed key for cross\u2011account). However it omits warnings about wildcard Principal in Publish policies and does not mention SNS message\u2011size limits, reducing completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Full frontmatter, clear description, activation keywords, when\u2011to\u2011use, and a strict output\u2011format contract with literal labels. Deducted 1 point because the \"when to invoke\" section could be more precise about edge\u2011case triggers (e.g., does not explicitly list version\u2011specific feature gating)."
+      "justification": "Frontmatter, description, keywords, and activation triggers are present. The description could be clearer on exact invocation triggers and includes only two explicit \u201cdo NOT invoke\u201d cases; a more exhaustive when\u2011to\u2011use section would improve compliance."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document is richly layered with navigation tables, but critical anti\u2011pattern warnings and some prerequisite checks are buried deep in the text, causing initial cognitive overload for an agent that must parse the whole file before reaching the essential rules."
+      "justification": "The skill provides a top\u2011level quick\u2011navigation table and many detailed sections before the core checklist, which can overload the agent with information early. A tighter top\u2011down layering (summary first, then deep references) would be preferable."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (topic creation, policy setting) are guarded by pre\u2011flight safety checks, yet the skill does not enforce an explicit confirmation step before issuing irreversible CLI commands, leaving a small risk of accidental execution."
+      "justification": "Destructive actions (topic creation, policy changes) are guarded by pre\u2011flight checks, but the skill does not enforce a hard confirmation of topic\u2011name uniqueness or require explicit user consent before issuing CLI commands, leaving some freedom too open."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (frontmatter, navigation, contract, steps, anti\u2011patterns, output format), but it deviates slightly from a strict template (e.g., missing an explicit input schema section), making the pattern marginally ad\u2011hoc."
+      "justification": "The skill follows the documented taxonomy (frontmatter, navigation, contract, reasoning, etc.) consistently, but the final References section is appended without a clear navigation anchor, a minor deviation from the pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "The skill provides concrete CLI snippets, decision trees, and verification commands, enabling an agent to act. However, it does not show how to emit a PREREQUISITES_MISSING verdict or handle CLI failures gracefully, which limits full end\u2011to\u2011end usability."
+      "justification": "Provides working CLI snippets, decision trees, and verification commands. Some commands contain placeholders (e.g., <sqs-sub-arn>) without guidance on how to obtain them, and the checklist example omits explicit verification of the CloudWatch Logs resource policy, which could cause silent failures."
     }
   ],
-  "total_score": 104,
+  "total_score": 102,
   "max_score": 120,
   "grade": "B",
-  "token_count": 77492,
-  "latency_ms": 25471,
+  "token_count": 84556,
+  "latency_ms": 17531,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

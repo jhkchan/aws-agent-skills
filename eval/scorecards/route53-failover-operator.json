@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds genuine expert knowledge: decision\u2011tree ordering of pre\u2011checks, concrete TTL thresholds (60\u202fs vs 300\u202fs), up\u2011to\u2011date cost figures, recent AWS features (EnableSNI, CloudWatch\u2011alarm\u2011based health checks, insulated checks, RAM\u2011shared hosted zones, CidrRoutingConfig) and nuanced failure\u2011mode tables that a baseline model would not enumerate."
+      "justification": "Provides many specific, expert\u2011level details (TTL thresholds, cost breakdowns, exact pre\u2011check ordering, recent 2024\u20112026 feature flags, calculated\u2011check insulation) that go beyond a generic model's knowledge, but a few items (e.g., cost numbers, basic health\u2011check concepts) are already widely known, so full 20 is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific mindset (TTL\u2011bound failover, false\u2011healthy trap) and a step\u2011by\u2011step procedure: pre\u2011flight CLI sequence, exact change\u2011batch JSON, confirm\u2011gate, rollback capture, polling for INSYNC, and post\u2011verification. The only minor shortfall is a generic \u201ccapture pre\u2011state\u201d note that could be more AWS\u2011specific (e.g., include IAM role session name)."
+      "justification": "Encodes AWS\u2011specific mindset (TTL\u2011bound failover, false\u2011healthy trap) and a detailed procedure: pre\u2011flight validation, confirm gate, capture pre\u2011state, atomic UPSERT batch, polling get\u2011change until INSYNC, and post\u2011verification with test\u2011dns\u2011answer and dig. Only minor generic steps (e.g., \u201crun a TCP probe\u201d) prevent a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (TTL too high, missing secondary, split change\u2011batch, etc.) and explains why each is dangerous. Misses a specific warning about forgetting to assume the cross\u2011account role before the IAM grant check."
+      "justification": "Provides a thorough NEVER list with concrete reasons (TTL >\u202f300\u202fs, single health check, missing secondary, cross\u2011account grant, etc.). Some entries are phrased generically (\u201cNever trust a single health check\u201d) and lack explicit failure\u2011mode examples, so full credit is withheld."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata). The description clearly states WHAT the skill does, WHEN to invoke, and provides activation triggers and an invocation schema that an agent can parse reliably."
+      "justification": "Front\u2011matter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. The activation list is exhaustive but the spec lacks an explicit \"when NOT to invoke\" clause, making the trigger definition slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output format \u2192 examples \u2192 anti\u2011patterns). However, the pre\u2011flight section is dense and front\u2011loads many CLI details before the high\u2011level overview, causing some cognitive overload."
+      "justification": "The skill layers information: quick reference, mindset, pre\u2011flight, process, output contract, examples, anti\u2011patterns. However, the initial sections are dense and contain many tables, which may overload the reader before they know which part to use. Slight deduction for not enough top\u2011level summarisation."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained: mandatory CONFIRM gate, exhaustive pre\u2011checks, TTL sanity checks, cross\u2011account IAM verification, and rollback capture. Creative tasks (e.g., routing\u2011policy selection) are left open, matching their lower fragility."
+      "justification": "Calibrates freedom precisely: destructive actions are gated by CONFIRM, TTL\u2011lowering steps are mandatory for emergency failover, rollback capture is required, and creative tasks (diagnose) are left unconstrained. No over\u2011 or under\u2011constraining observed."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (frontmatter \u2192 what\u2011it\u2011does \u2192 quick navigation \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output format \u2192 anti\u2011patterns \u2192 safety checklist), making the skill easy to parse and reuse."
+      "justification": "Follows a clear, recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns). The structure aligns with established skill templates."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI commands, JSON change\u2011batches, verification steps, and rollback instructions, enabling an agent to execute the plan end\u2011to\u2011end. Lacks explicit error\u2011handling for AWS CLI failures (rate\u2011limit, pagination errors beyond the brief note) and does not detail fallback when a change\u2011batch returns a non\u2011INSYNC status after a timeout."
+      "justification": "Provides decision trees, concrete CLI examples, and a strict output contract that an agent can follow. Lacks explicit error\u2011handling for AWS CLI failures, pagination edge\u2011cases, and rate\u2011limit back\u2011off guidance, which could cause execution gaps."
     }
   ],
-  "total_score": 111,
+  "total_score": 109,
   "max_score": 120,
   "grade": "A",
-  "token_count": 52331,
-  "latency_ms": 32810,
+  "token_count": 56613,
+  "latency_ms": 10750,
   "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }

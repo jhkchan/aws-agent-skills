@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides many specific thresholds (e.g., visibility timeout >= 6\u00d7 p99), detailed maxReceiveCount tables, and high\u2011throughput FIFO attribute combos that a typical model would not enumerate, but a large portion of the content (basic SQS attribute names, standard defaults) merely restates public documentation, so full 20 is not earned."
+      "justification": "The skill introduces genuine expert knowledge not typically recalled by a generic model: a detailed decision tree for Standard vs FIFO selection, the rule that VisibilityTimeout must be >= 6\u00d7 consumer p99 processing time, workload\u2011specific maxReceiveCount recommendations, explicit high\u2011throughput FIFO configuration (FifoThroughputLimit and DeduplicationScope), and the nuanced impact of DLQ type mismatches. These concrete thresholds and ordering rules constitute real delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Outlines a precise AWS\u2011specific deployment order and decision trees, but the IAM permission verification step is generic and lacks a concrete procedure for generating the required policy JSON, leaving a gap in the end\u2011to\u2011end AWS\u2011specific workflow."
+      "justification": "The skill transfers expert AWS\u2011specific procedures: a strict 10\u2011step deployment order, pre\u2011flight safety checks, exact CLI commands for each attribute, and a reasoning framework that explains why each step matters. The procedures are specific to SQS (e.g., create DLQ before redrive policy, set visibility on the event\u2011source mapping) rather than generic cloud\u2011ops advice."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., mismatched FIFO/DLQ types, maxReceiveCount=1, wildcard principals), yet omits a specific warning about the 64\u202fKiB queue\u2011policy size limit and does not explicitly call out the danger of using `purge-queue` as a remediation, reducing completeness."
+      "justification": "A comprehensive NEVER list is provided with concrete reasoning (e.g., never use a Standard DLQ for a FIFO source, never set maxReceiveCount=1, never enable short polling, never use wildcard Principal without conditions). The list is specific and explains the failure mode, but it could include a few more rare pitfalls (e.g., policy size limit) to reach full marks."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS, and the invocation contract with literal output labels is unambiguous and matches the required verdict shape."
+      "justification": "Front\u2011matter is complete, description, keywords, triggers, and a precise output contract are all present. The only minor gap is that the \"when_to_use\" paragraph could be more succinct for automated trigger detection."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered effectively (quick navigation \u2192 detailed sections), but the \"Latest SQS features\" block is dense and could overload the initial read, suggesting a minor breach of optimal progressive disclosure."
+      "justification": "Content is layered via navigation table, sections, and optional details, allowing agents to skim or dive deeper. However, the initial long navigation table and extensive prose may overload the agent before it knows which part to read, preventing a perfect score."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (queue creation) are gated by extensive pre\u2011flight checks, yet the skill does not require an explicit confirmation step before issuing `aws sqs create-queue`, leaving a small risk of accidental resource creation."
+      "justification": "Destructive actions (queue creation, policy changes) are guarded by pre\u2011flight checks, explicit \"never\" rules, and clear constraints (e.g., visibility\u2011timeout must meet 6\u00d7 p99). Slightly less calibration for cross\u2011region or multi\u2011account edge cases."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a coherent, recognized skill pattern (frontmatter \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 safety checks \u2192 output format \u2192 error handling), making the structure instantly recognizable."
+      "justification": "Follows the recognized CloudOps skill pattern: frontmatter, quick navigation, activation keywords, invocation contract, reasoning framework, step\u2011by\u2011step procedure, anti\u2011patterns, output format, and error handling. Structure is coherent and recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides working CLI commands, decision trees, and error\u2011handling branches, but lacks guidance for updating an existing queue, handling multi\u2011region deployments, and automated quota\u2011limit detection, which could cause execution gaps in real\u2011world scenarios."
+      "justification": "Provides working CLI snippets, decision trees, and error\u2011handling branches. Nonetheless, the model output examples reveal gaps: some checklists omit mandatory long\u2011polling entries, treat optional fields as N/A when they are required, and do not always enforce the strict output contract (e.g., missing required \"Message retention\" line). These execution gaps lower usability."
     }
   ],
-  "total_score": 110,
+  "total_score": 106,
   "max_score": 120,
-  "grade": "A",
-  "token_count": 55496,
-  "latency_ms": 10768,
+  "grade": "B",
+  "token_count": 58067,
+  "latency_ms": 10032,
   "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }
