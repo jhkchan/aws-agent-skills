@@ -1,0 +1,70 @@
+{
+  "skill": "apigateway-5xx-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds genuine expert knowledge: a detailed error\u2011code\u2011driven decision tree, exact 29\u202fs/30\u202fs integration timeout limits, mapping of 502/504/503/500 to specific backend layers, nuanced handling of Lambda timeout vs integration timeout, account\u2011level concurrency mapping to 502, VPC\u202fLink health checks, usage\u2011plan vs stage throttling distinctions, and recent feature notes (VPC Lattice, SnapStart). Most of this granularity is beyond a generic model\u2019s baseline."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (order of probes, exact CLI commands, deployment confirmation) and convey expert thinking. However some steps are generic (e.g., \u201ccheck CloudWatch metrics\u201d) and the ordering for verifying a new deployment after config changes is not explicitly called out, resulting in a small loss."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "The NEVER list is extensive, concrete, and explains why each pitfall is harmful (e.g., confusing 502 vs 504, assuming Lambda was invoked). Only a minor vagueness remains around \u201cenable access logs\u201d without a precise verification command, costing one point."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS, activation triggers are exhaustive, and invocation_schema defines input and deterministic output. The only shortfall is the lack of an explicit versioning scheme in the schema (e.g., JSON schema) which would make activation more reliable."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered structure: Quick start \u2192 Mindset \u2192 Philosophy \u2192 Navigation \u2192 detailed steps \u2192 anti\u2011patterns \u2192 safety checks \u2192 remediation. However, the initial sections are dense and some critical rules (e.g., NEVER list) appear later, causing potential cognitive overload for a first\u2011time user."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom perfectly: all destructive commands are gated by explicit CONFIRM prompts, read\u2011only probes are mandated first, and safety checks warn about side effects (e.g., Lambda timeout reduction). No over\u2011constraining of creative tasks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable pattern (Mindset \u2192 Philosophy \u2192 Process \u2192 Output \u2192 Anti\u2011patterns \u2192 Safety \u2192 Remediation) that aligns with established CloudOps skill templates."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, decision tree, and concrete output format; agents can execute the skill end\u2011to\u2011end. Minor gaps: no explicit handling when access logs are disabled, limited guidance for HTTP API v2 timeout configuration, and some jq filters assume specific JSON shapes, which could cause failures in edge cases."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 54610,
+  "latency_ms": 21352,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "stepfunctions-statemachine-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many non\u2011obvious, expert\u2011level details (cost formulas, exact durability limits, default timeout/heartbeat behavior, distributed\u2011map concurrency caps, RedriveExecution feature, recent 2024\u20112026 service\u2011integration patterns, idempotency implications for Express, etc.) that go beyond a generic model's baseline knowledge. Minor gap: does not explicitly call out the 256\u202fKB payload limit for Express (only implied)."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes a clear AWS\u2011specific workflow: Mindset framing, ten\u2011step ordered process, pre\u2011flight gate, role\u2011trust verification, cost\u2011estimate, and deployment\u2011command checklist. Procedure is concrete and AWS\u2011centric. Slight deduction for a small ambiguity in the ordering of \u201clogging vs tracing\u201d steps for Express vs Standard."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Contains a comprehensive \u201cNEVER\u201d list with concrete pitfalls (e.g., never use .waitForTaskToken on Express, never omit Retry\u202f+\u202fCatch, never grant Action:\"*\", never rely on default MaxConcurrency, etc.) and explains why each is dangerous."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete and well\u2011formed (name, description, version, author, license, compatibility, keywords, tags, metadata, activation triggers, invocation schema). Description clearly states WHAT the skill does, WHEN to invoke, and provides exhaustive keywords for reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Layers information effectively: high\u2011level Mindset \u2192 Quick reference table \u2192 Pre\u2011flight gate \u2192 detailed ten\u2011step Process \u2192 Output format \u2192 Verification \u2192 Anti\u2011patterns \u2192 References. Minor deduction because the Quick reference table repeats many details that could be deferred to the Process section, adding slight cognitive load."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom precisely: destructive actions (create\u2011state\u2011machine, IAM role changes) are gated by explicit confirmation prompts, cost estimates, and pre\u2011flight validation; creative design steps (ASL drafting) are left open. No over\u2011constrained or under\u2011constrained sections."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable AWS deployment skill pattern (Mindset \u2192 Navigation \u2192 Process \u2192 Output \u2192 Verification \u2192 Anti\u2011patterns \u2192 References), making it easy to parse and reuse."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a ready\u2011to\u2011use output template, concrete CLI command sequences, decision trees, and error\u2011handling checklists. The model output examples demonstrate successful execution. Slight deduction for missing explicit guidance on handling definition updates vs creates (e.g., when to use update\u2011state\u2011machine) and for not covering JSON\u2011Schema validation integration."
+    }
+  ],
+  "total_score": 115,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 63461,
+  "latency_ms": 19394,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

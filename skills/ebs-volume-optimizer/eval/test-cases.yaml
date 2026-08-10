@@ -1,0 +1,241 @@
+# Eval test cases for ebs-volume-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# VolumeId embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: ebs-volume-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: gp2-to-gp3-migration
+    description: >-
+      gp2 500 GB volume attached to a PostgreSQL primary. BurstBalance
+      chronically low. gp3 is 20% cheaper with better baseline IOPS.
+      Expected verdict: OPPORTUNITY_FOUND with gp2 → gp3 migration.
+    input: |
+      VolumeId: vol-gp2-to-gp3-migration
+      VolumeType: gp2
+      Size: 500 GB
+      Region: us-east-1
+      IOPS: 1500 (baseline for gp2 at this size)
+      Throughput: N/A (gp2)
+      Attached instance: i-prod-db-01 (m5.2xlarge, PostgreSQL primary)
+
+      Metrics (last 30 days):
+        - VolumeReadOps + VolumeWriteOps: avg 250/s, max 400/s
+        - VolumeQueueLength: avg 0.2, max 0.8
+        - VolumeReadBytes + VolumeWriteBytes: avg 8 MB/s, max 15 MB/s
+        - BurstBalance: avg 15%, min 0% (chronically depleted during
+          peak hours — performance throttling observed)
+
+      Snapshot policy: no DLM or AWS Backup configured
+      FSR: not enabled
+
+      Workload context: PostgreSQL primary database on an m5.2xlarge.
+      Burst credit exhaustion causing intermittent I/O throttle during
+      peak hours. gp3 baseline 3000 IOPS would resolve this.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "gp2-to-gp3-migration"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "gp3"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: io1-overprovisioned-to-gp3
+    description: >-
+      io1 1000 GB volume with 10000 provisioned IOPS but consuming only
+      avg 1200 IOPS (12% utilization). gp3 baseline 3000 IOPS provides
+      2.5x headroom. Expected verdict: OPPORTUNITY_FOUND with io1 → gp3.
+    input: |
+      VolumeId: vol-io1-overprovisioned-to-gp3
+      VolumeType: io1
+      Size: 1000 GB
+      Region: us-east-1
+      IOPS: 10000 (provisioned)
+      Attached instance: i-app-server-02 (m5.xlarge)
+
+      Metrics (last 30 days):
+        - VolumeConsumedReadWriteOps: avg 1200/s, max 1800/s
+        - VolumeQueueLength: avg 0.1, max 0.3
+        - VolumeReadBytes + VolumeWriteBytes: avg 12 MB/s, max 20 MB/s
+
+      Snapshot policy: DLM with 7-day retention (snapshots governed)
+      FSR: not enabled
+
+      Workload context: application server data volume. I/O is modest
+      and well below the 10000 provisioned IOPS. m5.xlarge is Nitro-based
+      so gp3 is fully supported.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "io1-overprovisioned-to-gp3"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "gp3"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: snapshot-accumulation-cleanup
+    description: >-
+      gp3 volume (already optimal type) with 145 snapshots and no DLM
+      policy. 90 snapshots older than 90 days with 0 restores. Expected
+      verdict: OPPORTUNITY_FOUND with snapshot governance + Archive.
+    input: |
+      VolumeId: vol-snapshot-accumulation-cleanup
+      VolumeType: gp3
+      Size: 500 GB
+      Region: us-east-1
+      IOPS: 3000 (baseline, free)
+      Throughput: 125 MB/s (baseline, free)
+      Attached instance: i-analytics-01 (r5.large)
+
+      Metrics (last 30 days):
+        - VolumeReadOps + VolumeWriteOps: avg 180/s, max 300/s
+        - VolumeQueueLength: avg 0.05, max 0.2
+        - BurstBalance: N/A (gp3 has no burst credits)
+
+      Snapshot inventory:
+        - Total snapshots: 145
+        - Average snapshot size: 500 GB
+        - Total snapshot storage: ~72,500 GB
+        - No DLM or AWS Backup policy
+        - 90 snapshots older than 90 days (0 restores in 90 days)
+        - 55 snapshots from the last 90 days
+
+      FSR: not enabled
+
+      Workload context: analytics data volume. Volume type is already
+      gp3 (optimal). The cost waste is entirely in snapshot accumulation.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "snapshot-accumulation-cleanup"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "snapshot"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-gp3-volume
+    description: >-
+      gp3 200 GB volume with baseline IOPS/throughput, right-sized
+      (170 GB actual data = 85%), governed by 7-day DLM policy, no FSR.
+      Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      VolumeId: vol-already-optimal-gp3-volume
+      VolumeType: gp3
+      Size: 200 GB
+      Region: us-east-1
+      IOPS: 3000 (baseline)
+      Throughput: 125 MB/s (baseline)
+      Attached instance: i-web-server-01 (t3.medium)
+
+      Metrics (last 30 days):
+        - VolumeReadOps + VolumeWriteOps: avg 120/s, max 200/s
+        - VolumeQueueLength: avg 0.02, max 0.1
+        - Actual data on volume: 170 GB (85% utilization)
+
+      Snapshot inventory:
+        - Total snapshots: 7 (daily DLM policy, 7-day retention)
+        - Total snapshot storage: ~1,400 GB (7 × 200 GB incremental)
+        - DLM policy: ENABLED, 7-day daily retention
+
+      FSR: not enabled
+
+      Workload context: web server root volume. Volume type is gp3
+      (optimal). IOPS and throughput are at baseline (no extra cost).
+      Size is well-matched to actual data. Snapshots are governed.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      REMOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-gp3-volume"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: gp3-iops-rightsizing
+    description: >-
+      gp3 800 GB volume with 8000 provisioned IOPS but consuming only
+      avg 1500 IOPS (19% utilization). Reducing to baseline 3000 IOPS
+      saves $25/month. Expected verdict: OPPORTUNITY_FOUND with IOPS
+      right-sizing.
+    input: |
+      VolumeId: vol-gp3-iops-rightsizing
+      VolumeType: gp3
+      Size: 800 GB
+      Region: us-east-1
+      IOPS: 8000 (provisioned — above 3000 baseline)
+      Throughput: 125 MB/s (baseline)
+      Attached instance: i-cache-server-01 (r6i.large)
+
+      Metrics (last 30 days):
+        - VolumeConsumedReadWriteOps: avg 1500/s, max 2200/s
+        - VolumeQueueLength: avg 0.05, max 0.2
+        - VolumeReadBytes + VolumeWriteBytes: avg 10 MB/s, max 18 MB/s
+
+      Snapshot policy: DLM with 14-day retention (snapshots governed)
+      FSR: not enabled
+
+      Workload context: Redis cache server data volume. I/O is modest
+      and well below the 8000 provisioned IOPS. gp3 baseline 3000 IOPS
+      provides 1.36x headroom over the max consumed (2200). Throughput
+      is at baseline (no extra throughput cost).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "gp3-iops-rightsizing"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "IOPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"

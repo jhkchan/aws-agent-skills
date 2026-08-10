@@ -57,6 +57,7 @@ metadata:
   family: Storage
   task_type: troubleshoot
   skill_class: capability
+  lifecycle_status: active
   verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
   when_to_use: Diagnosing an S3 403 Access Denied on GetObject, PutObject, or ListBucket, debugging cross-account S3 access failures, investigating a presigned URL that returns AccessDenied, finding the
     cause of unexpected public S3 access, validating BPA hierarchy interaction (account-level vs bucket-level), or determining why a KMS-encrypted object cannot be read by an otherwise-authorized principal.

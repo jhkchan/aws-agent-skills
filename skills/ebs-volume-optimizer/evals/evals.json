@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ebs-volume-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EBS Volume Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "gp2-to-gp3-migration",
+      "name": "gp2 500 GB volume with chronic BurstBalance depletion — migrate to gp3",
+      "difficulty": "medium",
+      "prompt_file": "prompts/gp2-to-gp3-migration.md",
+      "baseline_file": "baselines/gp2-to-gp3-migration.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "gp2-to-gp3-migration", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "gp3"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "io1-overprovisioned-to-gp3",
+      "name": "io1 1000 GB volume with 10000 provisioned IOPS but only 1200 consumed — migrate to gp3",
+      "difficulty": "hard",
+      "prompt_file": "prompts/io1-overprovisioned-to-gp3.md",
+      "baseline_file": "baselines/io1-overprovisioned-to-gp3.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "io1-overprovisioned-to-gp3", "RECOMMENDATION", "ESTIMATED_SAVINGS", "gp3"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "snapshot-accumulation-cleanup",
+      "name": "gp3 volume (optimal type) with 145 snapshots and no DLM policy — snapshot cleanup + Archive",
+      "difficulty": "hard",
+      "prompt_file": "prompts/snapshot-accumulation-cleanup.md",
+      "baseline_file": "baselines/snapshot-accumulation-cleanup.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "snapshot-accumulation-cleanup", "RECOMMENDATION", "ESTIMATED_SAVINGS", "snapshot"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-gp3-volume",
+      "name": "gp3 200 GB volume, baseline IOPS, right-sized, 7-day DLM, no FSR — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-gp3-volume.md",
+      "baseline_file": "baselines/already-optimal-gp3-volume.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-gp3-volume", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "gp3-iops-rightsizing",
+      "name": "gp3 800 GB volume with 8000 provisioned IOPS but only 1500 consumed — reduce IOPS to baseline",
+      "difficulty": "medium",
+      "prompt_file": "prompts/gp3-iops-rightsizing.md",
+      "baseline_file": "baselines/gp3-iops-rightsizing.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "gp3-iops-rightsizing", "RECOMMENDATION", "ESTIMATED_SAVINGS", "IOPS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

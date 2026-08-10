@@ -4,7 +4,7 @@ description: 'Optimises AWS Lambda function cost across six dimensions: memory t
   per-GB-second rate), provisioned concurrency right-sizing (on-demand vs provisioned break-even math), duration reduction (SnapStart for Java, lazy init, connection reuse, package trim), invocation-frequency
   analysis (SQS/Kinesis/DynamoDB Streams batch size and batch window tuning), architecture migration (ARM64 Graviton2 is 20% cheaper; Fargate for >15-min workloads; Step Functions for orchestration chains),
   and Lambda Layers. Uses AWS Lambda Power Tuning (open-source Step Functions) to empirically find the cost-optimal memory, reads Compute Optimizer Lambda findings, and projects monthly savings. Emits OPPORTUNITY_FOUND
-  with specific recommendation and estimated savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing Lambda spend, planning a memory tuning sweep, sizing provisioned concurrency, or a serverless.'
+  with specific recommendation and estimated savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing Lambda spend, planning a memory tuning sweep, sizing provisioned concurrency, or a FinOps review.'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

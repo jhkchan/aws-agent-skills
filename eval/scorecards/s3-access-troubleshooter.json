@@ -1,0 +1,70 @@
+{
+  "skill": "s3-access-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill consolidates deep expert knowledge (BPA hierarchy, ARN\u2011shape traps, KMS cross\u2011account chain, VPC endpoint policy, CloudFront OAC, Access Point nuances, MRAP, Object Lock modes) that a generic model would not enumerate in a single, ordered decision tree. However, it does not fully integrate newer 2024\u20112026 features such as S3 Access Grants or the directory\u2011bucket authentication model into the core diagnostic flow, leaving a modest gap."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill encodes expert AWS\u2011specific procedures: a pre\u2011flight ARN\u2011shape gate, exact CLI commands for each policy layer, and a deterministic step\u2011by\u2011step decision tree. Some steps are phrased generically (e.g., \"Read bucket policy\" without specifying JSON keys to inspect), which slightly reduces the procedural precision."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "A thorough NEVER list is provided with concrete reasoning for each pitfall (ARN shape, KMS separation, BPA, etc.). The list does not mention other common traps such as IAM permission boundaries, SCPs, or forgetting to disable S3 Access Grants, leaving a gap in anti\u2011pattern coverage."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter includes name, description, version, author, license, compatibility, keywords, tags, and rich metadata (when_to_use, activation_triggers, invocation_schema). The description clearly states purpose and activation conditions. Minor deficiency: the invocation_schema is prose rather than a strict JSON schema, which could affect reliable parsing."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information well (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Commands \u2192 Edge cases). Nonetheless, the early sections are dense and contain many details that could overload the agent before the core decision tree, so a slight deduction is warranted."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "All diagnostic steps are read\u2011only (CLI get\u2011 commands, simulators). No destructive actions are permitted without explicit remediation steps, matching the fragility of S3 access troubleshooting."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Commands \u2192 Edge Cases \u2192 Anti\u2011Patterns \u2192 Remediation), which aligns with established CloudOps skill templates."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a concrete decision tree, exact CLI commands, output template, and worked examples, enabling an agent to act. Lacks explicit error\u2011handling for CLI failures and does not cover S3 Access Grants or permission\u2011boundary failures, which could cause execution gaps."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 54581,
+  "latency_ms": 11977,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

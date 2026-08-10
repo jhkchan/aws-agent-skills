@@ -1,0 +1,43 @@
+# Eval configuration for ebs-volume-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ebs-volume-optimizer
+snapshot_date: "2026-08-09"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: gp2-to-gp3-migration
+    difficulty: medium
+    prompt_file: prompts/gp2-to-gp3-migration.md
+    baseline_file: baselines/gp2-to-gp3-migration.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: io1-overprovisioned-to-gp3
+    difficulty: hard
+    prompt_file: prompts/io1-overprovisioned-to-gp3.md
+    baseline_file: baselines/io1-overprovisioned-to-gp3.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: snapshot-accumulation-cleanup
+    difficulty: hard
+    prompt_file: prompts/snapshot-accumulation-cleanup.md
+    baseline_file: baselines/snapshot-accumulation-cleanup.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: already-optimal-gp3-volume
+    difficulty: easy
+    prompt_file: prompts/already-optimal-gp3-volume.md
+    baseline_file: baselines/already-optimal-gp3-volume.md
+    expected_verdict: ALREADY_OPTIMAL
+  - id: gp3-iops-rightsizing
+    difficulty: medium
+    prompt_file: prompts/gp3-iops-rightsizing.md
+    baseline_file: baselines/gp3-iops-rightsizing.md
+    expected_verdict: OPPORTUNITY_FOUND

@@ -65,6 +65,7 @@ metadata:
   family: AppIntegration
   task_type: deploy
   skill_class: capability
+  lifecycle_status: active
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   when_to_use: Provisioning a new Step Functions state machine, choosing between Standard and Express workflow types, designing an ASL definition with service integrations (Lambda, DynamoDB, SQS, ECS, Glue,
     Bedrock), configuring Retry/Catch error handling, building a Distributed Map for large-scale fan-out, scoping the IAM execution role to specific resource ARNs, choosing between sync (.sync) and callback
