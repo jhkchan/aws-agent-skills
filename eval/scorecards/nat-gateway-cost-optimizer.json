@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides concrete, non\u2011trivial expert data (e.g., 160\u202fGB/month per AZ break\u2011even threshold, $7.30 per\u2011AZ hourly cost for Interface endpoints, mandatory Elastic IP release after NAT deletion, cross\u2011AZ transfer cost formula, and Graviton\u2011based NAT Instance pricing). However, most of these facts are already documented in AWS pricing guides and a capable model could retrieve them, so the net delta is limited."
+      "justification": "Provides expert\u2011level specifics not usually known to a generic model: a concrete break\u2011even traffic threshold (~160\u202fGB/month per AZ) for Interface endpoints, exact per\u2011hour and per\u2011GB pricing for NAT Gateways, Interface endpoints, and Elastic IPs, and nuanced behaviours such as cross\u2011region S3 limitations, ENI quota impacts, and hidden EIP orphan charges. These details constitute genuine delta beyond baseline knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific decision matrix (gateway endpoint first, then interface endpoint break\u2011even, then topology, then NAT instance) and concrete CLI sequences for each remediation step. Includes pre\u2011flight validation commands and safety checks. The procedure for route\u2011table updates is generic (\u201cupdate route tables\u201d) and could list exact AWS CLI flags, which prevents a perfect score."
+      "justification": "Encodes AWS\u2011specific workflow: pre\u2011flight CLI checks, traffic\u2011break\u2011even calculations, topology decision matrix, and step\u2011by\u2011step remediation commands. Procedures are concrete and ordered, though a few steps (e.g., \"run CLI\") are generic and could be tighter."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never create Interface endpoints without traffic quantification, never use NAT Instance in production, never delete NAT without updating routes). Slight deduction for the absence of an explicit warning about forgetting to attach a restrictive endpoint policy when creating Gateway endpoints."
+      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., never create Interface endpoints below break\u2011even, never use NAT Instance in production, never delete a NAT Gateway without updating routes). Only minor weakness: the list could include a few more edge\u2011cases (e.g., quota limits) but overall very strong."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, includes description, when_to_use, activation_triggers, invocation_schema, and a valid example. The only shortfall is that the invocation_schema does not explicitly define the exact JSON field names for the output block, leaving a slight ambiguity for automated agents."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, invocation_schema, and example are all present and well\u2011formed. The activation triggers are extensive but some are overly verbose, which could cause unreliable activation; thus a small deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers top\u2011level summary, quick reference, detailed process, and deep technical notes. However, the initial sections are dense, presenting many numbers and tables before the user knows whether they need that depth, causing potential cognitive overload."
+      "justification": "The skill layers information: high\u2011level overview, quick reference table, detailed mindset/philosophy, then step\u2011by\u2011step process, then deep anti\u2011pattern and error\u2011handling sections. However, the initial \u201cWhat this skill does\u201d section already contains many details that could be deferred, causing slight cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly gated with CONFIRM prompts, route\u2011table backups, and EIP release steps. Creative tasks (e.g., recommending Interface endpoints) are left flexible, matching task fragility perfectly."
+      "justification": "Destructive actions (deleting NAT Gateways, releasing EIPs) are gated by explicit CONFIRM prompts, route\u2011table backups, and state checks. Creative recommendations (endpoint creation) are constrained by traffic thresholds. Only minor over\u2011constraint: the skill forces a full confirmation even for harmless free Gateway endpoint creation."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does, Quick reference, Mindset, Philosophy, Pre\u2011flight, Process, Output format, Anti\u2011patterns). The structure is consistent and aids comprehension; only a tiny deviation is the intermixing of cost tables inside the philosophy section, which slightly breaks the clean pattern."
+      "justification": "Follows a recognizable pattern (What \u2192 Quick reference \u2192 Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011patterns \u2192 Error handling). The structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 10,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI commands, error\u2011handling table, and worked examples. However several example blocks contain arithmetic inconsistencies (e.g., CURRENT_MONTHLY $140.85 vs summed $206.55, PROJECTED_MONTHLY adjustments) and mismatched savings calculations, which could mislead an agent executing the skill. These errors reduce practical reliability."
+      "justification": "Provides actionable CLI commands, decision matrices, and verification steps, enabling an agent to execute the optimisation. However, the sample output contains arithmetic inconsistencies (e.g., CURRENT_MONTHLY $140.85 vs. calculated $206.55, mismatched PROJECTED_MONTHLY adjustments) that violate the SAVINGS arithmetic rule. These errors could cause mis\u2011calculations and undermine trust in the skill."
     }
   ],
-  "total_score": 105,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 51016,
-  "latency_ms": 9754,
+  "token_count": 54031,
+  "latency_ms": 12420,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

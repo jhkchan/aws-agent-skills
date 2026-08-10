@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 18,
+      "score": 15,
       "max": 20,
-      "justification": "Provides many concrete, up\u2011to\u2011date numbers (gp3 baseline 3000 IOPS + 125\u202fMB/s, gp3 caps 16k IOPS, pricing per GB/IOPS, 50% consumption threshold, burst\u2011balance rule, FSR $0.06/h per AZ, Snapshot Archive 75% cheaper, etc.) that go beyond generic model knowledge."
+      "justification": "Provides many concrete numbers (gp3 baseline 3000 IOPS/125\u202fMB\u202fs, gp3 caps 16k IOPS/1\u202fGB\u202fs, FSR $0.06/h per AZ, Snapshot Archive 75% cheaper) and decision thresholds (e.g., <50% IOPS utilization, 14\u201130\u202fday window). However, most of these facts are already documented in AWS guides; the skill does not introduce novel heuristics or region\u2011specific pricing beyond us\u2011east\u20111, so it lacks full expert delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides detailed AWS\u2011specific procedures (pre\u2011modification snapshot, pending\u2011modification check, CLI steps). However, some steps are generic (e.g., \"monitor for 7 days\" without concrete metric thresholds) which prevents a perfect score."
+      "justification": "Encodes AWS\u2011specific workflow: pre\u2011modification snapshot, check for pending modifications, online modify\u2011volume, wait for completion, verify IOPS/throughput, monitor metrics. Procedure is detailed and ordered. Deduct 1 point because the model output omitted the explicit pending\u2011modification check step."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with solid reasoning, but a few warnings lack explicit quantitative justification (e.g., multi\u2011attach without naming specific cluster\u2011aware file systems)."
+      "justification": "Provides an extensive NEVER list with concrete reasons (e.g., never migrate io1\u2192gp3 if max IOPS within 20% of gp3 cap, never delete snapshots without replacement, never enable multi\u2011attach without cluster\u2011aware FS). Slight deduction for not tying every anti\u2011pattern directly to a specific step in the output."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter is complete and the description, activation triggers, and invocation schema are present. Minor issue: the \"when_to_use\" narrative lives in metadata rather than a dedicated top\u2011level field, making activation slightly less deterministic."
+      "justification": "Frontmatter includes name, description, version, author, license, compatibility, keywords, tags, metadata, activation triggers, and invocation schema with example. Missing a formal JSON schema definition for the input and a concise \"when to invoke\" summary, leading to a small deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The skill layers information well (quick start \u2192 detailed steps). Yet the Quick\u2011Start section lists four headline rules plus a pricing table, which adds some cognitive load before the deeper sections, reducing the ideal progressive disclosure."
+      "justification": "Uses sections, quick navigation, and layered detail (quick start \u2192 mindset \u2192 steps \u2192 anti\u2011patterns). However, the initial part is dense with tables and long prose before the concise quick\u2011start, causing some cognitive overload; thus a moderate deduction."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (volume downsizing, snapshot deletion) are guarded by safety checks and confirmation prompts. The schema, however, does not enforce a constraint that prevents automatic downsizing, leaving a small freedom\u2011calibration gap."
+      "justification": "Calibrates tightly for destructive actions (mandatory CONFIRM, pre\u2011snapshot, pending\u2011mod check) and leaves flexibility for analysis tasks. Misses an explicit batch\u2011size limit for fleet operations, so one point is deducted."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable structure (front\u2011matter, purpose, navigation, mindset, steps, anti\u2011patterns, safety, remediation). The Mindset/Philosophy sections are lengthy and could be more succinctly organized, preventing a perfect pattern score."
+      "justification": "Follows a clear pattern: frontmatter, overview, quick navigation, stepwise process, anti\u2011patterns, error handling, edge cases, verdict semantics, and output format. Minor ad\u2011hoc ordering of some tables prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 13,
       "max": 15,
-      "justification": "Generally actionable with concrete CLI commands, decision matrix, and examples. However, the gp3 IOPS right\u2011sizing example miscalculates current monthly cost ($104 vs correct $89) and the snapshot\u2011cleanup example contains inconsistent snapshot counts, reducing reliability for an agent."
+      "justification": "Model output demonstrates end\u2011to\u2011end usable CLI commands and savings calculations. However, it omits the pending\u2011modification check and batch\u2011size safety limit, and does not always surface the anti\u2011pattern warnings in the output, leading to a small deduction."
     }
   ],
-  "total_score": 106,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 67005,
-  "latency_ms": 24116,
+  "token_count": 70315,
+  "latency_ms": 8795,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0
