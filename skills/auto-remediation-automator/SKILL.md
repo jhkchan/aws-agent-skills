@@ -780,20 +780,26 @@ TEMPLATE: (custom SSM document — see Step 6)
   then execute. A direct automatic remediation without approval is
   an unsafe destructive action.
 
-## Appendix A — Common managed SSM Automation runbooks
+## Appendix A — Common managed SSM Automation runbooks (summary)
 
-| Runbook | Purpose | Reversible |
+The most-used AWS-managed runbooks for Config-driven remediation. The
+default for any new remediation should be a managed runbook (no custom
+document to maintain).
+
+| Pattern | Example runbooks | Reversible |
 |---|---|---|
-| `AWS-DisableS3BucketPublicAccess` | Block public access on S3 bucket | Yes |
-| `AWS-EnableS3BucketEncryption` | Apply SSE-KMS or SSE-S3 | Yes |
-| `AWS-EnableS3BucketVersioning` | Enable S3 versioning | Yes |
-| `AWS-IAMRevokeUnusedAccessKey` | Deactivate unused IAM access key | Yes (reactivate) |
-| `AWS-AttachIAMManagedPolicy` | Attach a managed policy | Yes (detach) |
-| `AWS-EnableCloudTrailLogging` | Resume CloudTrail logging | Yes |
-| `AWS-EnableConfigRule` | Re-enable a Config rule | Yes |
-| `AWS-RestartEC2Instance` | Restart stopped EC2 | Yes |
-| `AWS-UpdateLinuxAmi` | Patch and update Linux AMI | Partial — pin to known-good AMI for rollback |
-| `AWS-AttachEBSVolume` | Attach EBS | Yes (detach) |
+| S3 public-access / encryption / versioning | `AWS-DisableS3BucketPublicAccess`, `AWS-EnableS3BucketEncryption`, `AWS-EnableS3BucketVersioning` | Yes |
+| IAM key / policy | `AWS-IAMRevokeUnusedAccessKey`, `AWS-AttachIAMManagedPolicy` | Yes (reactivate / detach) |
+| Logging / Config restart | `AWS-EnableCloudTrailLogging`, `AWS-EnableConfigRule` | Yes |
+| EC2 / EBS state | `AWS-RestartEC2Instance`, `AWS-AttachEBSVolume` | Yes (state-affecting) |
+| AMI patching | `AWS-UpdateLinuxAmi` | Partial — pin known-good AMI for rollback |
+
+For the full table (input parameters, Config rule pairings, safety
+profiles, and execution role requirements), see
+**references/ssm-automation-runbooks.md**. Always cross-reference the
+runbook's parameter list with your `put-remediation-configurations`
+payload — `ResourceValue: RESOURCE_ID` must match a parameter the
+runbook actually accepts.
 
 ## Appendix B — Decision tree (which workflow pattern)
 

@@ -1150,6 +1150,228 @@ VERIFICATION_COMMANDS:
   aws sns publish --topic-arn arn:aws:sns:us-east-1:111111111111:order-events --message '{"test": true}'
 ```
 
+## Worked example: multi-protocol topic
+
+This example walks a realistic topic (`order-events`) with four
+subscription protocols — HTTPS webhook, SQS queue, Lambda function, and
+mobile push (APNS) — covering the per-protocol configuration each needs.
+The topic is a Standard topic in us-east-1 with SSE-KMS using a
+customer-managed CMK (because the Lambda function lives in a different
+account).
+
+### Step-by-step configuration
+
+```bash
+# === Step 1: Create the topic (Standard — we have HTTP + Lambda + mobile) ===
+aws sns create-topic --name order-events
+# Returns: arn:aws:sns:us-east-1:111111111111:order-events
+
+# === Step 2: Enable SSE-KMS with a customer-managed CMK (cross-account Lambda) ===
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --attribute-name KmsMasterKeyId \
+  --attribute-value alias/my-sns-key
+# The CMK key policy MUST grant account 222222222222 (Lambda owner):
+#   kms:Decrypt + kms:GenerateDataKey* with kms:ViaService = sns.us-east-1.amazonaws.com
+
+# === Step 3: Subscribe HTTPS webhook (intra-account) ===
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --protocol https \
+  --notification-endpoint https://api.example.com/sns/order-webhook \
+  --return-subscription-arn
+# Subscription is created in PendingConfirmation. The endpoint MUST
+# handle the SubscriptionConfirmation POST by calling ConfirmSubscription
+# with the embedded token (or by GETting the SubscribeURL). Until then,
+# no messages are delivered to the webhook.
+
+# Programmatic confirmation (server-side, from the webhook's confirm handler):
+TOKEN=$(curl -s https://api.example.com/sns/latest-token)
+aws sns confirm-subscription \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --token $TOKEN \
+  --authenticate-on-unsubscribe
+
+# === Step 4: Subscribe SQS queue (intra-account, with KMS) ===
+# Pre-req: the queue must exist and grant SNS SendMessage.
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-queue \
+  --attributes '{"Policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sns.amazonaws.com\"},\"Action\":\"sqs:SendMessage\",\"Resource\":\"arn:aws:sqs:us-east-1:111111111111:order-queue\",\"Condition\":{\"ArnEquals\":{\"aws:SourceArn\":\"arn:aws:sns:us-east-1:111111111111:order-events\"}}}]}"}'
+
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --protocol sqs \
+  --notification-endpoint arn:aws:sqs:us-east-1:111111111111:order-queue \
+  --return-subscription-arn
+# Same-account SQS auto-confirms. Status is immediately Confirmed.
+
+# === Step 5: Subscribe cross-account Lambda function (account 222222222222) ===
+# Pre-req: the Lambda resource-based policy must grant SNS lambda:InvokeFunction.
+# Run this in the Lambda account (222222222222):
+aws lambda add-permission \
+  --function-name order-handler \
+  --statement-id AllowSNSInvoke \
+  --action lambda:InvokeFunction \
+  --principal sns.amazonaws.com \
+  --source-arn arn:aws:sns:us-east-1:111111111111:order-events
+
+# Back in the topic account (111111111111):
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --protocol lambda \
+  --notification-endpoint arn:aws:lambda:us-east-1:222222222222:function:order-handler \
+  --return-subscription-arn
+# Cross-account Lambda subscriptions do NOT auto-confirm. The Lambda
+# account must confirm:
+#   aws sns confirm-subscription --topic-arn <arn> --token <token>
+
+# === Step 6: Configure filter policies on the SQS + Lambda subscriptions ===
+SQS_SUB_ARN=$(aws sns list-subscriptions-by-topic \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --query 'Subscriptions[?Endpoint==`arn:aws:sqs:us-east-1:111111111111:order-queue`].SubscriptionArn' \
+  --output text)
+
+# SQS gets only order_created events scoped to us- region
+aws sns set-subscription-attributes \
+  --subscription-arn $SQS_SUB_ARN \
+  --attribute-name FilterPolicy \
+  --attribute-value '{"event_type": ["order_created"], "region": [{"prefix": "us-"}]}'
+
+# Lambda gets order_created AND order_shipped (no region filter)
+LAMBDA_SUB_ARN=$(aws sns list-subscriptions-by-topic \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --query 'Subscriptions[?Endpoint==`arn:aws:lambda:us-east-1:222222222222:function:order-handler`].SubscriptionArn' \
+  --output text)
+
+aws sns set-subscription-attributes \
+  --subscription-arn $LAMBDA_SUB_ARN \
+  --attribute-name FilterPolicy \
+  --attribute-value '{"event_type": ["order_created", "order_shipped"]}'
+
+# === Step 7: Attach subscription DLQs to the HTTPS + Lambda subscriptions ===
+# SQS has its own DLQ; Lambda should use on-failure destinations. Only the
+# HTTPS subscription needs a subscription-level DLQ here.
+HTTPS_SUB_ARN=$(aws sns list-subscriptions-by-topic \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --query 'Subscriptions[?Endpoint==`https://api.example.com/sns/order-webhook`].SubscriptionArn' \
+  --output text)
+
+aws sns set-subscription-attributes \
+  --subscription-arn $HTTPS_SUB_ARN \
+  --attribute-name RedrivePolicy \
+  --attribute-value '{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:111111111111:order-https-dlq"}'
+
+# === Step 8: Configure mobile push (APNS) subscriber ===
+# Pre-req: platform application already created in account 111111111111
+aws sns create-platform-endpoint \
+  --platform-application-arn arn:aws:sns:us-east-1:111111111111:app/APNS/MyAppAPNS \
+  --token <device-token> \
+  --custom-user-data '{"userId": "customer-67890"}'
+# Returns: arn:aws:sns:us-east-1:111111111111:endpoint/APNS/MyAppAPNS/abcd1234
+# Note: mobile push subscribers are NOT subscribed to a topic directly via
+# `aws sns subscribe`. Instead, publish with --target-arn for direct push,
+# OR use a topic + a separate application fanout. To route topic messages
+# to mobile, publish with --message-structure json and include the APNS key.
+# This example keeps mobile push as a direct endpoint alongside the topic.
+
+# === Step 9: Enable delivery status logging (HTTP + Lambda + SQS failure) ===
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --attribute-name HTTPSuccessFeedbackRoleArn \
+  --attribute-value arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --attribute-name HTTPFailureFeedbackRoleArn \
+  --attribute-value arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --attribute-name LambdaFailureFeedbackRoleArn \
+  --attribute-value arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --attribute-name SQSFailureFeedbackRoleArn \
+  --attribute-value arn:aws:iam::111111111111:role/SNSDeliveryFeedback
+# IMPORTANT: also add the CloudWatch Logs resource policy granting SNS
+# logs:CreateLogStream + logs:PutLogEvents. Without it, SNS silently fails
+# to write logs even with the feedback role configured.
+
+# === Step 10: Test publish (exercises all protocols) ===
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --subject "Order Created" \
+  --message '{"orderId": "ORD-12345", "customerId": "CUST-67890", "total": 99.95}' \
+  --message-attributes '{"event_type": {"DataType": "String", "StringValue": "order_created"}, "region": {"DataType": "String", "StringValue": "us-east-1"}}'
+# Returns: MessageId. This message should:
+#  - hit the HTTPS webhook (filter matches order_created + us- prefix)
+#  - land in the SQS queue (filter matches order_created + us- prefix)
+#  - invoke the cross-account Lambda (filter matches order_created)
+# Mobile push is direct-publish only in this topology.
+```
+
+### Verification
+
+```bash
+# Confirm all subscriptions are Confirmed (no PendingConfirmation)
+aws sns list-subscriptions-by-topic \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:order-events \
+  --query 'Subscriptions[].{Endpoint:Endpoint,Status:SubscriptionArn}'
+
+# Verify delivery logs are populated after the test publish
+aws logs filter-log-events \
+  --log-group-name sns/us-east-1/111111111111/order-events/Failure \
+  --log-stream-names $(aws logs describe-log-streams \
+    --log-group-name sns/us-east-1/111111111111/order-events/Failure \
+    --query 'logStreams[*].logStreamName' --output text)
+
+# Verify the SQS queue received the message
+aws sqs receive-message --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-queue \
+  --max-number-of-messages 10
+
+# Verify the cross-account Lambda was invoked (in account 222222222222)
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/order-handler \
+  --filter-pattern ORD-12345
+```
+
+### Per-protocol outcome summary
+
+| Protocol | Subscription ARN | Filter | DLQ | Delivery logging |
+|---|---|---|---|---|
+| HTTPS webhook | `arn:aws:sns:...:order-events:abc-def` (Confirmed) | `event_type: order_created`, `region: us-*` | order-https-dlq | success + failure |
+| SQS queue | `arn:aws:sns:...:order-events:ghi-jkl` (Confirmed) | `event_type: order_created`, `region: us-*` | (SQS own DLQ) | failure only |
+| Lambda (cross-account) | `arn:aws:sns:...:order-events:mno-pqr` (Confirmed by 222222222222) | `event_type: [order_created, order_shipped]` | (Lambda on-failure dest) | failure only |
+| Mobile push (APNS) | `arn:aws:sns:...:endpoint/APNS/MyAppAPNS/abcd1234` (direct endpoint) | N/A (direct publish) | N/A | failure only |
+
+### Per-protocol retry and dead-letter behavior
+
+| Protocol | Retry policy | Failure mode | Dead-letter target |
+|---|---|---|---|
+| HTTP/HTTPS | SNS retries for 4 hours (100,010 attempts) with exponential backoff (immediate, then seconds, then minutes) | Endpoint returns 4xx/5xx or times out (>15s) | **Subscription DLQ** (RedrivePolicy on the subscription) — captures the original message after SNS's retry budget is exhausted |
+| Lambda (async) | Lambda retries **2 times** on top of SNS delivery — SNS succeeds on Lambda ack, Lambda retries the function | Function throws an exception or times out | **Lambda on-failure destination** (SQS/SNS/EventBridge configured on the function, not the SNS subscription) — the SNS subscription DLQ is NOT invoked for Lambda failures |
+| SQS | SNS delivers once; SQS visibility-timeout and redrive policy handle downstream retries | Queue full, KMS decrypt failure, or queue policy missing `sqs:SendMessage` for SNS | **SQS DLQ** (configured on the queue via RedrivePolicy, not the SNS subscription) — use the SQS DLQ, not an SNS subscription DLQ, for SQS subscribers |
+| Email/Email-JSON | One delivery attempt, no retry | Bounce, complaint, or pending confirmation | None — email is fire-and-forget |
+| Mobile push (application) | SNS retries per platform policy (APNS: immediate retry; FCM: exponential backoff) | Token expired, endpoint disabled, platform credential invalid | **Subscription DLQ** if the endpoint is subscribed via topic; otherwise message is dropped after retries |
+
+### Edge-case callouts for this topology
+
+- **Cross-account Lambda KMS decrypt:** the Lambda function in account
+  222222222222 must have a role policy granting `kms:Decrypt` on the topic
+  CMK (`alias/my-sns-key` in account 111111111111). Without it, the
+  invocation succeeds but the function receives an opaque ciphertext body.
+- **Filter policy on HTTPS subscription:** if the webhook cannot tolerate
+  `order_shipped` events (only `order_created`), scope the filter at the
+  subscription, not the topic. Topic-level filters do not exist.
+- **Mobile push is direct-publish, not topic-subscribed:** in this example
+  the mobile endpoint receives messages via `publish --target-arn`, not via
+  the topic. To fan out topic messages to mobile, use a separate Lambda
+  subscriber that calls `publish --target-arn <mobile-endpoint>` for each
+  relevant message.
+- **PendingConfirmation on the HTTPS subscription:** if the webhook does
+  not handle `SubscriptionConfirmation` programmatically, the subscription
+  stays PendingConfirmation for 3 days and then expires. Re-subscribing
+  generates a new token. There is no programmatic way to force-confirm an
+  HTTPS subscription without the token from SNS.
+
 ## Error-handling branches
 
 | Error | Cause | Fix |
