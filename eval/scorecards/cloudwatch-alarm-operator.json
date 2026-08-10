@@ -1,0 +1,70 @@
+{
+  "skill": "cloudwatch-alarm-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete, non\u2011obvious expert details such as the 512\u2011character limit on composite Rule expressions, the 100\u2011alarm reference cap, the ~15\u2011minute warm\u2011up requirement for anomaly detection, high\u2011resolution alarm cost implications, and the 5\u2011ARN per action category limit\u2014information a generic model would not reliably know."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, ordered pre\u2011check list, mandatory CONFIRM gate, snapshot before mutation, and post\u2011verification steps. Deducted 1 point because IAM permission verification is mentioned only generically (\u201crole holds cloudwatch:PutMetricAlarm\u201d) rather than a concrete step (e.g., calling sts get\u2011caller\u2011identity)."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., default TreatMissingData, DatapointsToAlarm > EvaluationPeriods). Deducted 2 points for omitting anti\u2011patterns around AWS CLI rate\u2011limit errors and for not providing explicit remediation steps when a CLI command fails."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. Deducted 1 point because the \"when to invoke\" paragraph is somewhat vague and lacks concrete conditional examples (e.g., \"use when metric variance > X%\")."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (quick reference, mindset, pre\u2011flight, process, patterns, output, anti\u2011patterns). However, the Quick reference table packs many rules, which can overload the top layer; a clearer separation of critical rules from examples would improve progressive disclosure. Deducted 2 points."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained (confirm gate, backup snapshot) while creative tasks (e.g., anomaly\u2011detector warm\u2011up) are given flexibility. Deducted 1 point because composite alarm creation allows any Rule expression as long as length \u2264 512, but does not enforce complexity limits that could cause fragile logic."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 patterns \u2192 output \u2192 anti\u2011patterns). Slight deduction for an ad\u2011hoc heading order (e.g., \"Common alarm patterns\" inserted between process and output) that deviates from a strict canonical pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, verification steps, and worked examples that an agent could execute. Deducted 2 points because error\u2011handling branches (what to do on non\u2011zero CLI exit, pagination edge cases, retry logic) are mentioned only in passing and not integrated into the decision flow."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 49617,
+  "latency_ms": 8202,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

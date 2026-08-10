@@ -1,0 +1,70 @@
+{
+  "skill": "eks-upgrade-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides genuine expert knowledge such as the strict N+1 minor\u2011version rule, IP\u2011address capacity checks for surge upgrades, dual\u2011compatibility add\u2011on version matrix, detailed deprecated\u2011API tables, and a concrete decision tree for pre\u2011checks. However, a portion restates well\u2011known AWS documentation (e.g., basic upgrade sequence) and thus does not earn the full 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: exact order (add\u2011ons \u2192 control plane \u2192 node groups), mandatory CONFIRM gate, pre\u2011state capture, polling via describe\u2011update, and precise CLI flags. Missing a dedicated IAM\u2011role permission checklist, so deduct one point."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., add\u2011on incompatibility, PDB blocks, maxUnavailable\u202f=\u202f100%). Some entries could be stronger by adding real\u2011world failure examples or quantitative impact (e.g., expected downtime when skipping add\u2011on upgrade)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. The invocation schema is described in prose but does not include a concrete JSON schema example, leading to a two\u2011point deduction."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns). However, the quick\u2011reference table already contains many detailed thresholds, which puts a moderate amount of detail up front rather than deferring it to deeper sections."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained: mandatory CONFIRM gate, pre\u2011check gating, IP\u2011capacity and PDB validation, and explicit rollback advisories. Creative planning tasks are left open. One point deducted for not explicitly limiting the freedom of the offline classification path (e.g., no guidance on when to refuse planning)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (What it does, Quick navigation, Mindset, Pre\u2011flight, Process, Output format, Anti\u2011Patterns). Minor inconsistency in naming (e.g., mixing \"\u00a7\" symbols) makes it slightly ad\u2011hoc, costing one point."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides decision trees, concrete CLI commands, example outputs, and error\u2011handling notes. Missing are explicit retry/back\u2011off strategies for AWS CLI failures, pagination edge\u2011case handling beyond a brief mention, and detailed IAM permission error guidance."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 50957,
+  "latency_ms": 16631,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

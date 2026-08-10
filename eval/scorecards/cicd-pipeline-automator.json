@@ -1,0 +1,70 @@
+{
+  "skill": "cicd-pipeline-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many specific, expert-level details (cross\u2011account IAM pieces, exact KMS key policy, V1 vs V2 nuances, concrete CLI snippets). Missing newer features such as CodePipeline compute runners, multi\u2011region artifact handling, and a concise decision tree for choosing IaC tool, so not a perfect delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Clearly articulates expert mindset and step\u2011by\u2011step AWS\u2011specific procedures (pre\u2011flight checks, stage ordering, cross\u2011account design). Lacks an explicit decision flow for selecting CloudFormation vs CDK vs Terraform based on constraints, which would make the procedure fully complete."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never use GitHub v1, never share pipeline and action roles). Omits a few common anti\u2011patterns such as over\u2011permissive pipeline role and using the default VPC, so not absolutely exhaustive."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The output format is described but lacks an explicit machine\u2011readable schema (e.g., JSON schema) and versioning of the response format."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, patterns, anti\u2011patterns). However, the initial sections are dense and front\u2011load many details before the concise quick reference, causing some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are guarded by pre\u2011flight safety checks and a confirmation gate, but the skill does not explicitly enforce a confirmation step for the most irreversible operation (pipeline deletion), leaving a slight calibration gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Patterns \u2192 Output \u2192 Anti\u2011Patterns \u2192 Diagnostics). Minor ad\u2011hoc ordering (e.g., Patterns before Output) prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides concrete templates, CLI snippets, and decision branches, enabling an agent to act. However, several CloudFormation snippets contain syntax errors (missing spaces after !Ref/!GetAtt, malformed YAML), no handling of pagination for list commands, and no guidance for large artifact sizes or multi\u2011region pipelines. Output format is plain text rather than strict JSON, reducing machine reliability."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 54077,
+  "latency_ms": 16398,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

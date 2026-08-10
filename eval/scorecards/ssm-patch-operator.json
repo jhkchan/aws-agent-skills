@@ -1,0 +1,70 @@
+{
+  "skill": "ssm-patch-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many expert\u2011level nuggets (e.g., ApproveAfterDays counts from patch release, PatchGroup tag case\u2011sensitivity, AND vs OR in baseline rules, NoReboot semantics, rate\u2011control necessity). However it omits guidance on SSM Agent version compatibility per OS, does not detail the manual cross\u2011region baseline replication steps beyond \u201cexport/import\u201d, and lacks a concrete note on SSM document versioning pitfalls (e.g., $LATEST vs $DEFAULT)."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Clearly articulates the safety\u2011first mindset, ordered pre\u2011checks, CONFIRM gate, snapshot capture, and step\u2011by\u2011step CLI plan. Lacks an explicit procedure for handling a failed send\u2011command (retry policy, rollback beyond snapshot), which is a standard AWS\u2011specific remediation step."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., NoReboot does not prevent kernel reboot, wrong Patch Group tag, fleet\u2011wide Install without rate\u2011control). Lacks a specific anti\u2011pattern about using $LATEST document versions, which can cause drift."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. The specification could be tighter on \u201cwhen NOT to invoke\u201d (e.g., explicitly forbid execution on stopped instances) and on required IAM permission sets."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns) so the agent sees only needed detail. The OS\u2011by\u2011OS matrix and extensive tables are a bit dense, causing some cognitive load before deeper sections."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained with mandatory CONFIRM gate, pre\u2011checks, snapshot, and rate\u2011control. Creative tasks (baseline authoring) also have safety checks. Calibration matches task fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a clear, repeatable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011patterns \u2192 Safety). Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, confirmation prompts, and post\u2011verification steps, enabling an agent to execute end\u2011to\u2011end. Missing explicit error\u2011handling branches for command failures, pagination handling for large fleets, and a detailed retry/back\u2011off plan for eventual\u2011consistency delays."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 48540,
+  "latency_ms": 15185,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

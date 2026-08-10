@@ -1,0 +1,70 @@
+{
+  "skill": "event-driven-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many non\u2011obvious specifics: exact retry defaults (185 attempts, 24\u202fh), DLQ mandatory rule, ordering per\u2011partition semantics, detailed circular\u2011dependency detection checklist, global\u2011endpoint failover syntax, precise EventBridge limits (10 entries per PutEvents, 256\u202fKB per entry), and concrete decision trees. This is information a senior CloudOps engineer would learn, not just restated documentation."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific workflow: bus selection \u2192 pattern \u2192 target \u2192 retry/DLQ \u2192 idempotency \u2192 circular\u2011dependency check \u2192 Pipes \u2192 Scheduler \u2192 global endpoints \u2192 audit. The order is exact and reflects real\u2011world practice. Only a minor deduction for occasional generic phrasing like \u201ccheck security\u201d."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons, yet omits a few common pitfalls such as cost\u2011impact of long\u2011retention archives and least\u2011privilege bus\u2011policy design, which would strengthen the anti\u2011pattern section."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT the skill does, WHEN to invoke, and provides a rich keyword list and activation triggers. The invocation schema is explicit, enabling reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Step\u2011by\u2011step process \u2192 Appendices). However the initial sections are dense, causing some cognitive overload before reaching actionable steps."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (put\u2011rule, put\u2011targets, create\u2011pipe) are gated by a mandatory confirmation prompt and strict DLQ/idempotency requirements, but the calibration lacks explicit constraints for global\u2011endpoint replication (e.g., mandatory rule parity check) which would tighten fragile multi\u2011region operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Step\u2011by\u2011step \u2192 Appendices \u2192 Anti\u2011Patterns) that aids comprehension, though the pattern is slightly ad\u2011hoc because the ordering of Appendices A\u2011C is not consistently referenced throughout the steps."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, decision trees, and error\u2011handling checks, enabling an agent to execute the skill. Missing edge\u2011case guidance for cross\u2011account bus policies, large payload handling (>256\u202fKB), and API\u2011destination credential rotation reduces completeness."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 44835,
+  "latency_ms": 13589,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
