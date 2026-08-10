@@ -1,0 +1,70 @@
+{
+  "skill": "aurora-cost-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides concrete formulas (e.g., I/O\u2011Optimized break\u2011even = storage_GB\u202f\u00d7\u202f0.4\u202fM I/O) and specific pricing numbers, but many statements (CPU thresholds, ACU cost $0.12/h) are generic knowledge a senior engineer already knows, so the delta is not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a detailed, AWS\u2011specific workflow (data\u2011gate, Cost Explorer reconciliation, step\u2011by\u2011step right\u2011sizing, RI evaluation) that goes beyond generic \"check metrics\" advice. However, some procedures (e.g., \"Validate input\" or \"Watch CPU for 24h\") are generic and not tied to Aurora\u2011specific failure modes, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never switch I/O\u2011Optimized without break\u2011even calc, never drop Serverless min\u2011capacity below SLA). The list is specific and experience\u2011driven, but it could include a few more edge\u2011cases (e.g., never downsize a writer below the failover promotion size)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, invocation schema and example are all present and well\u2011formed. The only minor gap is the lack of an explicit \"when_to_use\" field in the frontmatter (it appears in metadata instead), preventing a flawless 15."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers high\u2011level purpose, quick\u2011start, mindset, then deep step\u2011by\u2011step logic, which is good. However, the initial sections (quick start, mindset) already contain many detailed tables and formulas, causing some cognitive overload before the reader reaches the concise process steps."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated (CONFIRM, snapshot, one\u2011dimension\u2011per\u2011window, batch limit of 3 clusters). Creative tasks are given enough leeway. The only shortfall is the lack of an explicit \u201cmax\u2011runtime\u201d or timeout for long\u2011running CLI operations, which could leave a fragile window open."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (description \u2192 mindset \u2192 quick reference \u2192 pre\u2011flight \u2192 ordered steps \u2192 anti\u2011patterns \u2192 navigation). The structure is coherent, but the naming of sections (e.g., mixing \"Quick start\" with \"Mindset\" and \"Quick reference\") is slightly ad\u2011hoc, costing one point."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 8,
+      "max": 15,
+      "justification": "The model output examples violate the strict output contract: missing several required sub\u2011fields in RECOMMENDATION (instance\u2011class, ACU range, Global DB, backtrack), inconsistent ESTIMATED_SAVINGS categories, and use of tildes (~) instead of concrete numbers. These gaps show that an agent could produce non\u2011conforming blocks, indicating the skill\u2019s guidance is insufficiently precise for reliable execution."
+    }
+  ],
+  "total_score": 100,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 46425,
+  "latency_ms": 20761,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}
