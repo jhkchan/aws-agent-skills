@@ -1,0 +1,265 @@
+# Eval test cases for s3-version-cleanup-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-version-cleanup-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: lifecycle-merge-no-replace
+    description: >-
+      Operator wants to add NoncurrentVersionExpiration to a versioned
+      bucket that ALREADY has 3 lifecycle rules (current-version
+      transition + expiration + abort-multipart). The skill must read
+      existing rules, merge the new rule, and PUT the merged config.
+      Pre-checks pass; plan should produce READY with the merge-not-
+      replace warning and the estimated monthly savings.
+    input: |
+      Operation: configure-lifecycle
+      Bucket: prod-logs-bucket
+      Region: us-east-1
+      Account: 111111111111
+      New rule intent: keep 3 most recent noncurrent versions; expire
+        the rest; transition kept versions to STANDARD_IA at 30d and
+        GLACIER_IR at 90d.
+
+      Bucket metadata:
+        aws s3api get-bucket-versioning:
+          Status: Enabled
+          MFADelete: Disabled
+        aws s3api get-object-lock-configuration:
+          ObjectLockEnabled: (not configured)
+        aws s3api get-bucket-encryption:
+          ServerSideEncryptionConfiguration:
+            Rules:
+              - ApplyServerSideEncryptionByDefault:
+                  SSEAlgorithm: aws:kms
+                BucketKeyEnabled: true
+        aws s3api get-bucket-lifecycle-configuration:
+          Rules:
+            - ID: current-version-tier-to-ia
+              Status: Enabled
+              Filter: {Prefix: ""}
+              Transitions: [{Days: 30, StorageClass: STANDARD_IA}]
+            - ID: current-version-expire-365d
+              Status: Enabled
+              Filter: {Prefix: "temp/"}
+              Expiration: {Days: 365}
+            - ID: abort-multipart-7d
+              Status: Enabled
+              Filter: {Prefix: ""}
+              AbortIncompleteMultipartUpload: {DaysAfterInitiation: 7}
+
+      Storage Lens sample:
+        NoncurrentVersionCount: 540,000
+        NoncurrentVersionStorageBytes: 13.5 TB
+
+      Caller IAM: has s3:GetLifecycleConfiguration + s3:PutLifecycleConfiguration.
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, ESTIMATED_SAVINGS, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-logs-bucket"
+        - "put-bucket-lifecycle-configuration"
+        - "VERDICT"
+        - "NoncurrentVersionExpiration"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: object-lock-compliance-blocked
+    description: >-
+      Operator wants to immediately delete 10,000 noncurrent versions
+      via S3 Batch Operations, but the bucket has Object Lock in
+      Compliance mode with 5-year default retention. The manifest
+      contains in-retention versions. Pre-checks must BLOCK and surface
+      that Compliance mode is irrevocable; recommend the lifecycle
+      transition path instead.
+    input: |
+      Operation: batch-delete-versions
+      Bucket: compliance-archive-bucket
+      Region: us-east-1
+      Account: 111111111111
+      Manifest: 10,000 noncurrent versions from S3 Inventory snapshot
+        2026-08-08. 4,287 of these are within the 5-year retention
+        window.
+
+      Bucket metadata:
+        aws s3api get-bucket-versioning:
+          Status: Enabled
+        aws s3api get-object-lock-configuration:
+          ObjectLockEnabled: Enabled
+          Rule:
+            DefaultRetention:
+              Mode: COMPLIANCE
+              Years: 5
+        aws s3api get-bucket-lifecycle-configuration:
+          (no rules configured)
+
+      Caller IAM: has s3control:CreateJob, s3:DeleteObjectVersion,
+        iam:PassRole.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "COMPLIANCE"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "retention"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "create-job"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: legal-hold-blocks-batch-delete
+    description: >-
+      Operator wants to immediately delete 1,000 noncurrent versions
+      via S3 Batch Operations. Bucket is versioned, no Object Lock,
+      but 12 of the manifest objects have LegalHold: ON. Pre-checks
+      must surface this finding and produce a partial plan (the 988
+      non-held objects can be deleted; the 12 held objects must be
+      released first).
+    input: |
+      Operation: batch-delete-versions
+      Bucket: litigation-hold-bucket
+      Region: us-east-1
+      Account: 111111111111
+      Manifest: 1,000 noncurrent versions. Legal-hold sampling found
+        12 objects with LegalHold: ON.
+
+      Bucket metadata:
+        aws s3api get-bucket-versioning:
+          Status: Enabled
+        aws s3api get-object-lock-configuration:
+          ObjectLockEnabled: (not configured)
+        Sample get-object-legal-hold (1000 objects sampled):
+          12 objects: LegalHold Status: ON
+          988 objects: LegalHold Status: OFF
+
+      Caller IAM: has s3control:CreateJob, s3:DeleteObjectVersion,
+        iam:PassRole.
+
+      Emit the standard VERDICT block. Plan should either BLOCK
+      entirely or surface the partial path with explicit warning.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "LegalHold"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: batch-ops-immediate-cleanup-ready
+    description: >-
+      Operator wants to immediately clean up 2.5M noncurrent versions
+      on a staging bucket. Versioning enabled, no Object Lock, no
+      legal holds (sampled), S3 Inventory configured, caller has full
+      permissions. Pre-checks pass; plan should produce READY with the
+      create-job CLI, the $2.50 cost estimate, and the post-verify
+      describe-job step.
+    input: |
+      Operation: batch-delete-versions
+      Bucket: staging-uploads-bucket
+      Region: us-east-1
+      Account: 111111111111
+      Manifest: 2,500,000 noncurrent versions via S3 Inventory
+        (2026-08-08 snapshot, manifest.json in manifest-bucket)
+
+      Bucket metadata:
+        aws s3api get-bucket-versioning:
+          Status: Enabled
+          MFADelete: Disabled
+        aws s3api get-object-lock-configuration:
+          ObjectLockEnabled: (not configured)
+        aws s3api get-bucket-encryption:
+          BucketKeyEnabled: true
+        Sample get-object-legal-hold (1000 objects): all OFF
+
+      Caller IAM: has s3control:CreateJob, s3:DeleteObjectVersion,
+        iam:PassRole on the execution role.
+
+      Estimated noncurrent bytes: 35 TB (~$825/month at Standard rate)
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "staging-uploads-bucket"
+        - "create-job"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: lifecycle-verified-completed
+    description: >-
+      Lifecycle configuration has been applied successfully and 48
+      hours have passed. S3 Storage Lens shows noncurrent bytes
+      dropping. Post-verification should pass and emit COMPLETED with
+      the observed savings.
+    input: |
+      Operation: configure-lifecycle (post-verification after apply)
+      Bucket: prod-logs-bucket
+      Region: us-east-1
+      Account: 111111111111
+
+      Lifecycle PUT result (already executed):
+        aws s3api put-bucket-lifecycle-configuration \
+          --bucket prod-logs-bucket \
+          --lifecycle-configuration file:///tmp/prod-logs-bucket-merged.json
+        Result: HTTP 200 OK
+
+      Post-apply checks (48 hours later):
+        aws s3api get-bucket-lifecycle-configuration:
+          Rules: [
+            {ID: current-version-tier-to-ia, Status: Enabled},   # preserved
+            {ID: current-version-expire-365d, Status: Enabled},  # preserved
+            {ID: abort-multipart-7d, Status: Enabled},           # preserved
+            {ID: version-cleanup-3-rule, Status: Enabled,        # new
+             NoncurrentVersionTransition: [...],
+             NoncurrentVersionExpiration: {NewerNoncurrentVersions: 3}}
+          ]
+        S3 Storage Lens (48h after apply):
+          NoncurrentVersionCount: 540,000 -> 412,000 (-24%)
+          NoncurrentVersionStorageBytes: 13.5 TB -> 9.8 TB (-27%)
+        AWS Cost Explorer (3 days post-apply):
+          S3 cost for prod-logs-bucket trending down ~$80/week
+
+      Original lifecycle rules (current-version-tier-to-ia,
+      current-version-expire-365d, abort-multipart-7d) are all
+      preserved in the post-PUT config.
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "prod-logs-bucket"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "NoncurrentVersion"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

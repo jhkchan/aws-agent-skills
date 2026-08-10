@@ -1,0 +1,43 @@
+# Eval configuration for lambda-cost-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: lambda-cost-optimizer
+snapshot_date: "2026-08-09"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: memory-upsize-u-curve
+    difficulty: medium
+    prompt_file: prompts/memory-upsize-u-curve.md
+    baseline_file: baselines/memory-upsize-u-curve.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: provisioned-concurrency-removal
+    difficulty: hard
+    prompt_file: prompts/provisioned-concurrency-removal.md
+    baseline_file: baselines/provisioned-concurrency-removal.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: arm64-migration-opportunity
+    difficulty: medium
+    prompt_file: prompts/arm64-migration-opportunity.md
+    baseline_file: baselines/arm64-migration-opportunity.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: already-optimal-function
+    difficulty: easy
+    prompt_file: prompts/already-optimal-function.md
+    baseline_file: baselines/already-optimal-function.md
+    expected_verdict: ALREADY_OPTIMAL
+  - id: esm-batch-size-tuning
+    difficulty: hard
+    prompt_file: prompts/esm-batch-size-tuning.md
+    baseline_file: baselines/esm-batch-size-tuning.md
+    expected_verdict: OPPORTUNITY_FOUND

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "alb-5xx-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ALB 5xx Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "503-wrong-health-check-path",
+      "name": "ALB target group health check path /health 404s while app serves on /healthz — all targets unhealthy, 503",
+      "difficulty": "medium",
+      "prompt_file": "prompts/503-wrong-health-check-path.md",
+      "baseline_file": "baselines/503-wrong-health-check-path.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "TARGET_HEALTH_CHECK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "wrong-health-check-path", "TARGET_HEALTH_CHECK", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "LAYER: TARGET_SG_BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "502-target-sg-blocks-alb",
+      "name": "Target SG allows ALB on health-check port 80 but NOT forward port 443 — 502 BadGateway",
+      "difficulty": "hard",
+      "prompt_file": "prompts/502-target-sg-blocks-alb.md",
+      "baseline_file": "baselines/502-target-sg-blocks-alb.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "TARGET_SG_BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "target-sg-blocks-alb", "TARGET_SG_BLOCKED", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: TARGET_HEALTH_CHECK", "LAYER: TARGET_INVALID_RESPONSE"]
+        }
+      ]
+    },
+    {
+      "id": "504-idle-timeout-exceeded",
+      "name": "Report endpoint takes 75-90s, exceeds ALB idle timeout 60s — 504 GatewayTimeout",
+      "difficulty": "medium",
+      "prompt_file": "prompts/504-idle-timeout-exceeded.md",
+      "baseline_file": "baselines/504-idle-timeout-exceeded.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "TARGET_TIMEOUT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "idle-timeout-exceeded", "TARGET_TIMEOUT", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: TARGET_HEALTH_CHECK"]
+        }
+      ]
+    },
+    {
+      "id": "502-target-invalid-response",
+      "name": "Target application crashes HTTP worker mid-response — intermittent 502 with Target.InvalidResponse",
+      "difficulty": "hard",
+      "prompt_file": "prompts/502-target-invalid-response.md",
+      "baseline_file": "baselines/502-target-invalid-response.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "TARGET_INVALID_RESPONSE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "target-invalid-response", "TARGET_INVALID_RESPONSE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: TARGET_HEALTH_CHECK", "LAYER: TARGET_SG_BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "503-targets-draining-stuck",
+      "name": "All old targets draining, new targets in initial state — 503 ServiceUnavailable",
+      "difficulty": "medium",
+      "prompt_file": "prompts/503-targets-draining-stuck.md",
+      "baseline_file": "baselines/503-targets-draining-stuck.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "DEREGISTRATION_STUCK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "targets-draining-stuck", "DEREGISTRATION_STUCK", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: TARGET_HEALTH_CHECK", "LAYER: TARGET_NONE_HEALTHY"]
+        }
+      ]
+    }
+  ]
+}

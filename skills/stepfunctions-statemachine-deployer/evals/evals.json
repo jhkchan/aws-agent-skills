@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "stepfunctions-statemachine-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Step Functions State Machine Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "standard-lambda-orchestration",
+      "name": "Standard workflow orchestrating Lambda + DynamoDB with Retry/Catch and scoped role — ready to deploy",
+      "difficulty": "easy",
+      "prompt_file": "prompts/standard-lambda-orchestration.md",
+      "baseline_file": "baselines/standard-lambda-orchestration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["VERDICT", "READY_TO_DEPLOY", "STANDARD", "TimeoutSeconds", "Retry", "Catch", "states.amazonaws.com"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "PREREQUISITES_MISSING", "AdministratorAccess", "Action: \"*\""]
+        }
+      ]
+    },
+    {
+      "id": "express-sync-api-gateway",
+      "name": "Express sync workflow fronting API Gateway with full error handling and logging — ready to deploy",
+      "difficulty": "medium",
+      "prompt_file": "prompts/express-sync-api-gateway.md",
+      "baseline_file": "baselines/express-sync-api-gateway.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["VERDICT", "READY_TO_DEPLOY", "EXPRESS", "includeExecutionData", "aws-sdk", "idempotent"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "PREREQUISITES_MISSING", "waitForTaskToken"]
+        }
+      ]
+    },
+    {
+      "id": "distributed-map-s3-batch",
+      "name": "Standard workflow with Distributed Map reading CSV from S3, ItemBatcher, ToleratedFailurePercentage — ready to deploy",
+      "difficulty": "hard",
+      "prompt_file": "prompts/distributed-map-s3-batch.md",
+      "baseline_file": "baselines/distributed-map-s3-batch.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["VERDICT", "READY_TO_DEPLOY", "Distributed", "ItemReader", "ItemBatcher", "MaxConcurrency", "ToleratedFailurePercentage"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "PREREQUISITES_MISSING", "Inline Map"]
+        }
+      ]
+    },
+    {
+      "id": "missing-iam-role-trust",
+      "name": "Deployment spec without an existing execution role or trust policy — must emit PREREQUISITES_MISSING",
+      "difficulty": "easy",
+      "prompt_file": "prompts/missing-iam-role-trust.md",
+      "baseline_file": "baselines/missing-iam-role-trust.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["VERDICT", "PREREQUISITES_MISSING", "role", "trust"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "READY_TO_DEPLOY", "create-state-machine"]
+        }
+      ]
+    },
+    {
+      "id": "express-timeout-exceeds-cap",
+      "name": "Express workflow with a Task TimeoutSeconds beyond the 5-min Express cap — must flag and emit PREREQUISITES_MISSING",
+      "difficulty": "hard",
+      "prompt_file": "prompts/express-timeout-exceeds-cap.md",
+      "baseline_file": "baselines/express-timeout-exceeds-cap.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["VERDICT", "PREREQUISITES_MISSING", "5 min", "STANDARD"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

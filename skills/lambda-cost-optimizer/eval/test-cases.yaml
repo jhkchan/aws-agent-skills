@@ -1,0 +1,258 @@
+# Eval test cases for lambda-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# FunctionName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: lambda-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: memory-upsize-u-curve
+    description: >-
+      Node.js function at 128 MB averaging 5200 ms duration, 50M
+      invocations/month. CPU-bound (image thumbnail generation). Power
+      Tuning shows U-curve minimum at 1024 MB where duration drops to
+      650 ms. Expected verdict: OPPORTUNITY_FOUND with memory upsize.
+    input: |
+      FunctionName: fn-memory-upsize-u-curve
+      Runtime: nodejs20.x
+      MemorySize: 128 MB
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: on-demand (no provisioned concurrency)
+
+      Metrics (last 30 days):
+        - Duration avg: 5200 ms, p95: 6100 ms
+        - Invocations: 50,000,000/month
+        - Errors: 12,000 (0.024%)
+        - Memory utilization: avg 38 MB (30% of 128 MB)
+
+      Compute Optimizer finding: Overprovisioned (memory)
+      Memory recommendation options:
+        - rank: 1, memorySize: 1024, projectedUtilization: within bounds
+        - rank: 2, memorySize: 2048, projectedUtilization: within bounds
+
+      Power Tuning result:
+        - Tested: [128, 256, 512, 1024, 2048, 3008]
+        - Cheapest (cost-optimal): 1024 MB at 650 ms avg
+        - Fastest: 3008 MB at 410 ms avg
+        - URL: https://lambda-power-tuning.show/#example
+
+      Workload context: image thumbnail generation (CPU-bound). Node.js
+      with Sharp library. Steady-state 24/7.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "memory-upsize-u-curve"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "1024"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: provisioned-concurrency-removal
+    description: >-
+      Function with 10 provisioned concurrency configured but receiving
+      < 1 invocation/minute (sporadic batch reports). 99% of provisioned
+      execution time is idle. Expected verdict: OPPORTUNITY_FOUND with
+      provisioned concurrency removal.
+    input: |
+      FunctionName: fn-provisioned-concurrency-removal
+      Runtime: python3.12
+      MemorySize: 1024 MB
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: provisioned concurrency (10 concurrent executions)
+
+      Metrics (last 30 days):
+        - Duration avg: 2400 ms, p95: 2800 ms
+        - Invocations: 25,920/month (avg 0.6/min)
+        - ConcurrentExecutions: avg 0.4, p50 0, p95 2, p99 3
+        - Errors: 0
+        - Memory utilization: avg 340 MB (33% of 1024 MB)
+
+      Provisioned concurrency config:
+        - provisionedConcurrentExecutions: 10
+        - allocatedProvisionedConcurrentExecutions: 10
+
+      Compute Optimizer finding: NotOptimized (insufficient data for
+      concurrency recommendation)
+
+      Workload context: batch report generator triggered by manual API
+      calls. Sporadic usage (a few reports per day). Latency is not
+      customer-facing (internal batch job).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "provisioned-concurrency-removal"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "provisioned concurrency"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: arm64-migration-opportunity
+    description: >-
+      Python function on x86_64 that is ARM-compatible (pure Python +
+      Pillow with arm64 wheel). Already at Power Tuning optimum memory.
+      Expected verdict: OPPORTUNITY_FOUND with ARM64 migration.
+    input: |
+      FunctionName: fn-arm64-migration-opportunity
+      Runtime: python3.12
+      MemorySize: 2048 MB
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: on-demand (no provisioned concurrency)
+
+      Metrics (last 30 days):
+        - Duration avg: 480 ms, p95: 620 ms
+        - Invocations: 20,000,000/month
+        - Errors: 45 (0.000225%)
+        - Memory utilization: avg 680 MB (33% of 2048 MB)
+
+      Compute Optimizer finding: Optimized (memory is right-sized)
+
+      Power Tuning result:
+        - Cheapest (cost-optimal): 2048 MB at 480 ms avg
+        - Current memory IS the Power Tuning optimum
+
+      Workload context: image processing (resize, format conversion)
+      using Pillow (PIL). Pillow has aarch64 wheels available on PyPI.
+      No native C extensions beyond Pillow. No JNI. Pure Python +
+      Pillow only.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "arm64-migration-opportunity"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "arm64"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-function
+    description: >-
+      Node.js function at Power Tuning optimum memory, already on arm64,
+      on-demand, duration well within SLO. No optimization dimension has
+      positive savings. Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      FunctionName: fn-already-optimal-function
+      Runtime: nodejs20.x
+      MemorySize: 512 MB
+      Architecture: arm64
+      Region: us-east-1
+      Pricing: on-demand (no provisioned concurrency)
+
+      Metrics (last 30 days):
+        - Duration avg: 45 ms, p95: 82 ms
+        - Invocations: 10,000,000/month
+        - Errors: 3 (0.00003%)
+        - Memory utilization: avg 180 MB (35% of 512 MB)
+
+      Compute Optimizer finding: Optimized
+
+      Power Tuning result:
+        - Cheapest (cost-optimal): 512 MB at 45 ms avg
+        - Current memory IS the Power Tuning optimum
+
+      Workload context: webhook receiver via API Gateway. Simple JSON
+      validation and S3 put. Already on arm64. On-demand (no provisioned
+      concurrency). Duration well within 200 ms p95 SLO.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-function"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: esm-batch-size-tuning
+    description: >-
+      SQS-triggered function with default batch size (10) processing a
+      high-volume queue (1M messages/hour). Duration scales sub-linearly
+      with batch size. Expected verdict: OPPORTUNITY_FOUND with batch
+      size increase.
+    input: |
+      FunctionName: fn-esm-batch-size-tuning
+      Runtime: nodejs20.x
+      MemorySize: 512 MB
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: on-demand
+
+      Metrics (last 30 days):
+        - Duration avg: 120 ms, p95: 180 ms (for batch of 10)
+        - Invocations: 730,000,000/month
+        - Errors: 1,500 (0.0002%)
+        - Memory utilization: avg 210 MB (41% of 512 MB)
+
+      Event Source Mapping:
+        - EventSourceArn: arn:aws:sqs:us-east-1:<acct>:high-volume-queue
+        - BatchSize: 10 (default)
+        - MaximumBatchingWindowInSeconds: 0 (default)
+        - FunctionResponseTypes: ["ReportBatchItemFailures"]
+
+      Queue metrics:
+        - Messages sent: ~1,000,000/hour (730M/month)
+        - Average message size: 4 KB
+
+      Workload context: SQS message normalizer. Each invocation
+      processes a batch of 10 messages, does a DB upsert per message.
+      DB upsert is amortized — batch of 50 takes ~350 ms (not 600 ms).
+      FunctionResponseTypes is set for partial batch failure.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "esm-batch-size-tuning"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "batch"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"

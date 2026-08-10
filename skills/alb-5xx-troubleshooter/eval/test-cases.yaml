@@ -1,0 +1,286 @@
+# Eval test cases for alb-5xx-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per failure layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The error-code-driven ordering in SKILL.md
+# produces exactly the expected verdicts below.
+skill: alb-5xx-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: 503-wrong-health-check-path
+    description: >-
+      ALB target group health check path /health returns 404; the
+      application serves health on /healthz. All targets marked
+      unhealthy. Clients receive 503. Expected layer:
+      TARGET_HEALTH_CHECK.
+    input: |
+      Symptom: clients of ALB prod-web-alb receive 503
+      ServiceUnavailable on all paths. All targets in the tg-web target
+      group are unhealthy. The application was recently updated and the
+      health endpoint moved from /health to /healthz.
+
+      Load balancer: arn:aws:elasticloadbalancing:us-east-1:111:
+        load-balancer/app/prod-web-alb/abc123
+      Type: application (ALB)
+      Scheme: internet-facing
+      Target group: tg-web (arn ends in /target-group/tg-web/def456)
+      TargetType: instance
+      aws elbv2 describe-target-health tg-web:
+        - Target i-web-1: State unhealthy,
+          Reason Target.FailedHealthChecks
+        - Target i-web-2: State unhealthy,
+          Reason Target.FailedHealthChecks
+      aws elbv2 describe-target-groups tg-web:
+        HealthCheckPath: /health
+        HealthCheckPort: 8080
+        Matcher.HttpCode: 200
+      Direct curl from a bastion:
+        curl http://<target-ip>:8080/health → HTTP 404
+        curl http://<target-ip>:8080/healthz → HTTP 200
+      Target SG sg-target-web: allows sg-alb-prod on tcp/8080 (correct).
+      ALB idle timeout: 60s.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "wrong-health-check-path"
+        - "TARGET_HEALTH_CHECK"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+        - "LAYER: TARGET_SG_BLOCKED"
+
+  - id: 502-target-sg-blocks-alb
+    description: >-
+      ALB returns 502. Target SG allows sg-alb-prod on tcp/80 (the
+      health check port) but NOT on tcp/443 (the target group forward
+      port). Health checks pass but actual requests fail. Expected
+      layer: TARGET_SG_BLOCKED.
+    input: |
+      Symptom: clients of ALB prod-api-alb receive 502 BadGateway on
+      all requests. ALB access logs show error_reason:
+      Target.ConnectionFailed for all requests. The target group tg-api
+      forwards on port 443 but the health check uses port 80.
+
+      Load balancer: arn:aws:elasticloadbalancing:us-east-1:111:
+        load-balancer/app/prod-api-alb/ghi789
+      Type: application (ALB)
+      Scheme: internet-facing
+      Target group: tg-api (arn ends in /target-group/tg-api/jkl012)
+      TargetType: instance
+      aws elbv2 describe-target-health tg-api:
+        - Target i-api-1: State healthy
+        - Target i-api-2: State healthy
+      aws elbv2 describe-target-groups tg-api:
+        Port: 443 (the forward port)
+        HealthCheckPort: 80
+        HealthCheckPath: /health
+        Matcher.HttpCode: 200
+      aws ec2 describe-security-groups sg-target-api:
+        Inbound: tcp/80 from sg-alb-prod
+        (NO rule for tcp/443)
+      ALB SG sg-alb-prod: attached to prod-api-alb.
+      ALB access logs (S3): error_reason: Target.ConnectionFailed on
+        every request; target:port shows i-api-x:443.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "target-sg-blocks-alb"
+        - "TARGET_SG_BLOCKED"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: TARGET_HEALTH_CHECK"
+        - "LAYER: TARGET_INVALID_RESPONSE"
+
+  - id: 504-idle-timeout-exceeded
+    description: >-
+      ALB returns 504 on POST /reports/generate. Target takes 75-90s to
+      respond. ALB idle timeout is 60s (default). Access logs show
+      error_reason: Target.Timeout. Expected layer: TARGET_TIMEOUT.
+    input: |
+      Symptom: clients of ALB prod-reports-alb receive 504
+      GatewayTimeout on POST /reports/generate after exactly 60 seconds.
+      The report-generation endpoint takes 75-90 seconds to complete.
+
+      Load balancer: arn:aws:elasticloadbalancing:us-east-1:111:
+        load-balancer/app/prod-reports-alb/mno345
+      Type: application (ALB)
+      Scheme: internet-facing
+      Target group: tg-reports (arn ends in /target-group/tg-reports/pqr678)
+      aws elbv2 describe-load-balancer-attributes prod-reports-alb:
+        idle_timeout.timeout_seconds: 60
+        deregistration_delay.timeout_seconds: 300
+      aws elbv2 describe-target-health tg-reports:
+        - Target i-reports-1: State healthy
+        - Target i-reports-2: State healthy
+      ALB access logs (S3) on failing requests:
+        target_processing_time: 60.0
+        error_reason: Target.Timeout
+        target_status_code: - (no response received)
+      CloudWatch TargetResponseTime: Maximum 60.0s (capped at the
+        idle timeout).
+      Direct curl from a bastion:
+        time curl -X POST http://<target-ip>:8080/reports/generate
+          → returns in 82 seconds (target succeeds when given time).
+      Target SG sg-target-reports: allows sg-alb-reports on tcp/8080.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "idle-timeout-exceeded"
+        - "TARGET_TIMEOUT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: TARGET_HEALTH_CHECK"
+
+  - id: 502-target-invalid-response
+    description: >-
+      ALB returns 502. Target application returns malformed HTTP
+      (truncated response, connection reset mid-stream). Access logs
+      show error_reason: Target.InvalidResponse. Targets are marked
+      healthy (health check passes). Expected layer:
+      TARGET_INVALID_RESPONSE.
+    input: |
+      Symptom: clients of ALB prod-app-alb receive 502 BadGateway
+      intermittently. The target application occasionally crashes the
+      HTTP server process mid-response, returning a truncated HTTP
+      response. ALB access logs show error_reason:
+      Target.InvalidResponse.
+
+      Load balancer: arn:aws:elasticloadbalancing:us-east-1:111:
+        load-balancer/app/prod-app-alb/stu901
+      Type: application (ALB)
+      Scheme: internet-facing
+      Target group: tg-app (arn ends in /target-group/tg-app/vwx234)
+      aws elbv2 describe-target-health tg-app:
+        - Target i-app-1: State healthy
+        - Target i-app-2: State healthy
+      aws elbv2 describe-target-groups tg-app:
+        Port: 8080
+        HealthCheckPath: /health
+        HealthCheckPort: 8080
+        Matcher.HttpCode: 200
+      Target SG sg-target-app: allows sg-alb-app on tcp/8080.
+      ALB access logs (S3) on failing requests:
+        error_reason: Target.InvalidResponse
+        target_status_code: - (no valid HTTP status received)
+        target_processing_time: 0.5-2.0s
+      Direct curl from a bastion (multiple times):
+        - 1st request: curl: (18) transfer closed with outstanding
+          read data remaining (truncated response)
+        - 2nd request: HTTP/1.1 200 OK (success — intermittent)
+        - 3rd request: curl: (56) Recv failure: Connection reset by
+          peer
+      Application logs on i-app-1: segfault in the HTTP server worker
+        process at the matching timestamps.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "target-invalid-response"
+        - "TARGET_INVALID_RESPONSE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: TARGET_HEALTH_CHECK"
+        - "LAYER: TARGET_SG_BLOCKED"
+
+  - id: 503-targets-draining-stuck
+    description: >-
+      ALB returns 503. All targets in the target group are in draining
+      state from a recent deployment. Deregistration delay is 600s
+      (raised from the default 300s). New targets were not registered
+      before the old ones were deregistered. Expected layer:
+      DEREGISTRATION_STUCK.
+    input: |
+      Symptom: clients of ALB prod-deploy-alb receive 503
+      ServiceUnavailable starting at 14:30 UTC after a deployment. All
+      old targets were deregistered simultaneously; new targets are
+      still in initial state. The deployment script deregistered the
+      old targets before registering the new ones.
+
+      Load balancer: arn:aws:elasticloadbalancing:us-east-1:111:
+        load-balancer/app/prod-deploy-alb/yz567
+      Type: application (ALB)
+      Scheme: internet-facing
+      Target group: tg-deploy (arn ends in /target-group/tg-deploy/abc890)
+      aws elbv2 describe-target-health tg-deploy:
+        - Target i-old-1: State draining
+        - Target i-old-2: State draining
+        - Target i-new-1: State initial
+        - Target i-new-2: State initial
+      aws elbv2 describe-target-group-attributes tg-deploy:
+        deregistration_delay.timeout_seconds: 600
+        slow_start.duration_seconds: 0
+      Target group health check:
+        HealthCheckPath: /health
+        HealthCheckIntervalSeconds: 30
+        HealthyThresholdCount: 5
+        (time to healthy for new targets: 5 * 30s = 150s)
+      ALB access logs: no target_status_code on any request during
+        the failure window; target:port field is "-".
+      CloudWatch HealthyHostCount: 0 during the failure window.
+      CloudWatch UnHealthyHostCount: 0 (draining targets are not
+        counted as unhealthy).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "targets-draining-stuck"
+        - "DEREGISTRATION_STUCK"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: TARGET_HEALTH_CHECK"
+        - "LAYER: TARGET_NONE_HEALTHY"

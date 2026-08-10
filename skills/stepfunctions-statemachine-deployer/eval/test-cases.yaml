@@ -1,0 +1,136 @@
+# Eval test cases for stepfunctions-statemachine-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: stepfunctions-statemachine-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: standard-lambda-orchestration
+    description: Standard workflow orchestrating Lambda + DynamoDB with Retry/Catch and scoped role — ready to deploy
+    input: |
+      Scenario: Deploy a Standard Step Functions state machine named
+      "order-pipeline" in us-east-1 (account 111111111111). It orchestrates:
+      1) ValidateOrder Lambda (timeout 30s), 2) DynamoDB UpdateItem on
+      OrdersTable, 3) ChargePayment Lambda (timeout 60s), 4) Succeed. The
+      execution role "order-pipeline-sfn-role" exists with a trust policy
+      for states.amazonaws.com. ChargePayment needs Retry on
+      Lambda.ServiceException (3 attempts, 2s, 2.0 backoff) and a Catch
+      routing to PaymentErrorHandler. DynamoDB needs Retry on
+      DynamoDB.ProvisionedThroughputExceededException (5 attempts, 5s
+      backoff). Output a full deployment plan.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "STANDARD"
+        - "VERDICT"
+        - "TimeoutSeconds"
+        - "Retry"
+        - "Catch"
+        - "states.amazonaws.com"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "PREREQUISITES_MISSING"
+        - "AdministratorAccess"
+
+  - id: express-sync-api-gateway
+    description: Express sync workflow fronting API Gateway with full error handling and logging — ready to deploy
+    input: |
+      Scenario: Deploy an Express sync Step Functions state machine named
+      "checkout-express" to back API Gateway. Workflow: ValidateCart Lambda
+      (30s), ChargePayment Lambda (60s, with Retry on
+      Lambda.ServiceException + Catch States.ALL → PaymentErrorHandler),
+      UpdateOrderRecord via aws-sdk:dynamodb:updateItem (30s, Retry on
+      DynamoDB.ProvisionedThroughputExceededException). The role
+      "checkout-sfn-role" exists with trust policy for
+      states.amazonaws.com. Total expected runtime < 30s. Output a full
+      deployment plan.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "EXPRESS"
+        - "VERDICT"
+        - "includeExecutionData"
+        - "level=ALL"
+        - "aws-sdk"
+        - "idempotent"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"
+        - "X-Ray"
+        - "waitForTaskToken"
+
+  - id: distributed-map-s3-batch
+    description: Standard workflow with Distributed Map reading CSV from S3, ItemBatcher, ToleratedFailurePercentage — ready to deploy
+    input: |
+      Scenario: Deploy a Standard state machine "etl-pipeline" that uses a
+      Distributed Map to process a CSV file (10M rows) from
+      s3://my-dataset/input/2026-08.csv. Each batch should have up to 500
+      items via ItemBatcher. MaxConcurrency 1000. ToleratedFailurePercentage
+      0.5%. The batch Lambda "ProcessBatchFn" has timeout 300s with Retry
+      on Lambda.ServiceException (5 attempts, 5s, 2.0 backoff) and Catch
+      States.ALL → BatchFail. The role "etl-sfn-role" exists with trust
+      for states.amazonaws.com and S3 GetObject on my-dataset bucket.
+      Output a full deployment plan.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Distributed"
+        - "ItemReader"
+        - "ItemBatcher"
+        - "MaxConcurrency"
+        - "ToleratedFailurePercentage"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"
+        - "Inline Map"
+
+  - id: missing-iam-role-trust
+    description: Deployment spec without an existing execution role or trust policy — must emit PREREQUISITES_MISSING
+    input: |
+      Scenario: Operator wants to deploy a state machine
+      "reporting-workflow" but has not yet created the execution role.
+      They mention a role NAME "reporting-sfn-role" but no role ARN.
+      Workflow type STANDARD, definition has 4 Lambda Tasks each with
+      Retry and Catch and TimeoutSeconds. Output a deployment plan.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "role"
+        - "trust"
+      must_not_contain:
+        - "READY_TO_DEPLOY"
+        - "Error:"
+        - "I cannot"
+        - "create-state-machine"
+
+  - id: express-timeout-exceeds-cap
+    description: Express workflow with a Task TimeoutSeconds beyond 5-min Express cap — must flag and emit PREREQUISITES_MISSING
+    input: |
+      Scenario: Operator wants to deploy an Express workflow
+      "long-running-express" that includes an ECS runTask.sync Task with
+      TimeoutSeconds 600 (10 minutes) to wait for a long batch job. The
+      rest of the workflow takes ~30 seconds. They explicitly chose
+      Express for cost reasons. Output a deployment plan.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "5 min"
+        - "STANDARD"
+      must_not_contain:
+        - "READY_TO_DEPLOY"
+        - "Error:"
+        - "I cannot"

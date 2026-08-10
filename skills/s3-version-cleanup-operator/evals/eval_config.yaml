@@ -1,0 +1,48 @@
+# Eval configuration for s3-version-cleanup-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: s3-version-cleanup-operator
+snapshot_date: "2026-08-09"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: lifecycle-merge-no-replace
+    difficulty: hard
+    prompt_file: prompts/lifecycle-merge-no-replace.md
+    baseline_file: baselines/lifecycle-merge-no-replace.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: object-lock-compliance-blocked
+    difficulty: hard
+    prompt_file: prompts/object-lock-compliance-blocked.md
+    baseline_file: baselines/object-lock-compliance-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: legal-hold-blocks-batch-delete
+    difficulty: medium
+    prompt_file: prompts/legal-hold-blocks-batch-delete.md
+    baseline_file: baselines/legal-hold-blocks-batch-delete.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: batch-ops-immediate-cleanup-ready
+    difficulty: medium
+    prompt_file: prompts/batch-ops-immediate-cleanup-ready.md
+    baseline_file: baselines/batch-ops-immediate-cleanup-ready.md
+    expected_verdict: READY
+    expected_risk: LOW
+  - id: lifecycle-verified-completed
+    difficulty: easy
+    prompt_file: prompts/lifecycle-verified-completed.md
+    baseline_file: baselines/lifecycle-verified-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: LOW

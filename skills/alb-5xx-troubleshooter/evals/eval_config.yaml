@@ -1,0 +1,48 @@
+# Eval configuration for alb-5xx-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: alb-5xx-troubleshooter
+snapshot_date: "2026-08-09"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: 503-wrong-health-check-path
+    difficulty: medium
+    prompt_file: prompts/503-wrong-health-check-path.md
+    baseline_file: baselines/503-wrong-health-check-path.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: TARGET_HEALTH_CHECK
+  - id: 502-target-sg-blocks-alb
+    difficulty: hard
+    prompt_file: prompts/502-target-sg-blocks-alb.md
+    baseline_file: baselines/502-target-sg-blocks-alb.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: TARGET_SG_BLOCKED
+  - id: 504-idle-timeout-exceeded
+    difficulty: medium
+    prompt_file: prompts/504-idle-timeout-exceeded.md
+    baseline_file: baselines/504-idle-timeout-exceeded.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: TARGET_TIMEOUT
+  - id: 502-target-invalid-response
+    difficulty: hard
+    prompt_file: prompts/502-target-invalid-response.md
+    baseline_file: baselines/502-target-invalid-response.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: TARGET_INVALID_RESPONSE
+  - id: 503-targets-draining-stuck
+    difficulty: medium
+    prompt_file: prompts/503-targets-draining-stuck.md
+    baseline_file: baselines/503-targets-draining-stuck.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: DEREGISTRATION_STUCK

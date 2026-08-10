@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "dynamodb-backup-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DynamoDB Backup Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "pitr-restore-pitr-disabled",
+      "name": "PITR restore request — PointInTimeRecoveryStatus DISABLED (BLOCKED pre-check)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/pitr-restore-pitr-disabled.md",
+      "baseline_file": "baselines/pitr-restore-pitr-disabled.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "PointInTimeRecoveryStatus", "VERDICT", "PRE_CHECKS", "update-continuous-backups"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "restore-table-to-point-in-time", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "pitr-restore-in-window",
+      "name": "PITR restore request on a table with PITR enabled and restore time inside the 35-day window (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/pitr-restore-in-window.md",
+      "baseline_file": "baselines/pitr-restore-in-window.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod-orders-table-pitr-2026-08-09", "restore-table-to-point-in-time", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "restore-table-from-backup", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "snapshot-restore-backup-creating",
+      "name": "Snapshot-style restore request where the backup ARN is CREATING (BLOCKED pre-check)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/snapshot-restore-backup-creating.md",
+      "baseline_file": "baselines/snapshot-restore-backup-creating.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "BackupStatus", "CREATING", "VERDICT", "describe-backup"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "restore-table-from-backup --target-table-name", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "on-demand-backup-create-ready",
+      "name": "On-demand backup create on an ACTIVE table (READY, stored in DynamoDB service)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/on-demand-backup-create-ready.md",
+      "baseline_file": "baselines/on-demand-backup-create-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-backup", "prod-orders-table-pre-migration-2026-08-09", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "restore-table", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "snapshot-restore-verified-completed",
+      "name": "Snapshot restore executed and post-verification passed (COMPLETED with side-config re-apply checklist)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/snapshot-restore-verified-completed.md",
+      "baseline_file": "baselines/snapshot-restore-verified-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "prod-orders-table-restored-2026-08-09", "VERDICT", "POST_VERIFY", "connection"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

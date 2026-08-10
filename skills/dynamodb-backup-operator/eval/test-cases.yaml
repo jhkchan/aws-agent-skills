@@ -1,0 +1,224 @@
+# Eval test cases for dynamodb-backup-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: dynamodb-backup-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: pitr-restore-pitr-disabled
+    description: >-
+      PITR restore request on a production DynamoDB table where
+      PointInTimeRecoveryStatus is DISABLED. Pre-checks must BLOCK before
+      any CLI executes, and surface the update-continuous-backups
+      remediation plus the on-demand backup fallback.
+    input: |
+      Operation: pitr-restore
+      Source: prod-orders-table
+      Target table name: prod-orders-table-pitr-2026-08-09
+      Restore time: 2026-08-09T10:00:00Z
+      Reason: bad migration applied at 10:05 UTC, need to rewind to 10:00 UTC
+
+      Source table metadata (aws dynamodb describe-table):
+        TableName: prod-orders-table
+        TableStatus: ACTIVE
+        BillingModeSummary.BillingMode: PROVISIONED
+        ProvisionedThroughput: {ReadCapacityUnits: 5000, WriteCapacityUnits: 2000}
+        TableSizeBytes: 80 GB
+        SSEDescription.SSEType: KMS
+        GlobalSecondaryIndexes: [gsi-order-status, gsi-customer-id]
+        DeletionProtectionEnabled: true
+
+      Continuous backups (aws dynamodb describe-continuous-backups):
+        ContinuousBackupsStatus: ENABLED
+        PointInTimeRecoveryDescription:
+          PointInTimeRecoveryStatus: DISABLED
+
+      Manual backups (aws dynamodb list-backups --backup-type USER):
+        [
+          {"BackupArn": "arn:aws:dynamodb:us-east-1:111111111111:table/prod-orders-table/backup/01708888888888-weekly",
+           "BackupStatus": "AVAILABLE", "BackupCreationDateTime": "2026-08-04T03:00:00Z"}
+        ]
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, TABLE_ARN, NOTES).
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "PointInTimeRecoveryStatus"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "update-continuous-backups"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "restore-table-to-point-in-time"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: pitr-restore-in-window
+    description: >-
+      PITR restore request on a table with PITR enabled and a restore
+      time inside the 35-day window. All pre-checks pass; plan should
+      produce READY with the restore-table-to-point-in-time CLI and the
+      new-table/connection-string caveat.
+    input: |
+      Operation: pitr-restore
+      Source: prod-orders-table
+      Target table name: prod-orders-table-pitr-2026-08-09
+      Restore time: 2026-08-09T10:00:00Z
+      Reason: bad migration applied at 10:05 UTC
+
+      Source table metadata:
+        TableName: prod-orders-table
+        TableStatus: ACTIVE
+        BillingModeSummary.BillingMode: PROVISIONED
+        SSEDescription.SSEType: KMS
+        SSEDescription.KMSMasterKeyArn: arn:aws:kms:us-east-1:111111111111:key/prod-key
+
+      Continuous backups:
+        ContinuousBackupsStatus: ENABLED
+        PointInTimeRecoveryDescription:
+          PointInTimeRecoveryStatus: ENABLED
+          EarliestRestorableDateTime: 2026-07-05T00:00:00Z
+          LatestRestorableDateTime: 2026-08-09T10:59:30Z
+
+      Target name check: prod-orders-table-pitr-2026-08-09 does not exist
+      KMS key check: arn:aws:kms:us-east-1:111111111111:key/prod-key is accessible
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-orders-table-pitr-2026-08-09"
+        - "restore-table-to-point-in-time"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "restore-table-from-backup"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: snapshot-restore-backup-creating
+    description: >-
+      Snapshot-style restore request where the referenced backup ARN is
+      in CREATING state (not yet AVAILABLE). Pre-checks must BLOCK and
+      instruct the operator to wait for AVAILABLE.
+    input: |
+      Operation: snapshot-restore
+      Source backup ARN: arn:aws:dynamodb:us-east-1:111111111111:table/prod-orders-table/backup/01709999999999-migrating
+      Target table name: prod-orders-table-restored-2026-08-09
+
+      Backup check (aws dynamodb describe-backup):
+        BackupArn: arn:aws:dynamodb:us-east-1:111111111111:table/prod-orders-table/backup/01709999999999-migrating
+        BackupStatus: CREATING
+        BackupCreationDateTime: 2026-08-09T11:00:00Z
+        BackupSizeBytes: 0
+
+      Target name check: prod-orders-table-restored-2026-08-09 does not exist
+      Caller IAM: has dynamodb:RestoreTableFromBackup on the backup ARN
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "BackupStatus"
+        - "CREATING"
+        - "VERDICT"
+        - "describe-backup"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "restore-table-from-backup --target-table-name"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: on-demand-backup-create-ready
+    description: >-
+      On-demand backup create request on an ACTIVE table. All pre-checks
+      pass; plan should produce READY with the create-backup CLI, a
+      unique backup name, and the explicit note that the backup is stored
+      in DynamoDB service (NOT S3).
+    input: |
+      Operation: create-backup
+      Source table: prod-orders-table
+      Backup name: prod-orders-table-pre-migration-2026-08-09
+
+      Source table metadata:
+        TableName: prod-orders-table
+        TableStatus: ACTIVE
+        TableSizeBytes: 80 GB
+
+      Existing backups (aws dynamodb list-backups --backup-type USER):
+        [
+          {"BackupName": "prod-orders-table-weekly-2026-08-04",
+           "BackupStatus": "AVAILABLE"}
+        ]
+      No backup with name "prod-orders-table-pre-migration-2026-08-09" exists.
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-backup"
+        - "prod-orders-table-pre-migration-2026-08-09"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "restore-table"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: snapshot-restore-verified-completed
+    description: >-
+      Snapshot-style restore has been executed successfully and all
+      post-verification checks pass. The skill should emit COMPLETED
+      with the new table ARN, the side-config re-apply checklist
+      (autoscaling, alarms, streams, TTL, IAM), and the connection-
+      string update step.
+    input: |
+      Operation: snapshot-restore (post-verification after execution)
+      Source backup: arn:aws:dynamodb:us-east-1:111111111111:table/prod-orders-table/backup/01708888888888-weekly
+      Target table: prod-orders-table-restored-2026-08-09
+
+      Restore execution result (already executed):
+        aws dynamodb restore-table-from-backup \
+          --target-table-name prod-orders-table-restored-2026-08-09 \
+          --backup-arn arn:aws:dynamodb:us-east-1:111111111111:table/prod-orders-table/backup/01708888888888-weekly
+        Result: TableArn=arn:aws:dynamodb:us-east-1:111111111111:table/prod-orders-table-restored-2026-08-09,
+          TableStatus=ACTIVE
+
+      Post-execution checks (all passed):
+        aws dynamodb describe-table --table-name prod-orders-table-restored-2026-08-09:
+          TableStatus: ACTIVE
+          ItemCount: 4827193
+        Source backup ItemCount at backup time: 4,827,193
+        GSI status: gsi-order-status=ACTIVE, gsi-customer-id=ACTIVE
+        Sentinel get-item: GetItem(prod-orders-table-restored, id=sentinel-001) returns the expected record
+
+      Original table prod-orders-table is still ACTIVE and unchanged.
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "prod-orders-table-restored-2026-08-09"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "connection"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

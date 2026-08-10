@@ -1,0 +1,179 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "sqs-queue-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-09",
+  "description": "Structured eval definitions for the SQS Queue Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across queue types (Standard, FIFO, high-throughput FIFO) and prerequisite failure branches (DLQ type mismatch, missing KMS key). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "standard-queue-with-dlq",
+      "name": "Standard queue with DLQ, long polling, SSE-SQS, S3 notification access policy",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — full checklist with DLQ, long polling, SSE-SQS, S3 access policy",
+      "prompt": "Deploy a production SQS queue named \"order-events\" in us-east-1. It receives messages from an S3 bucket \"order-uploads\" via S3 Event Notification. A Lambda function \"order-processor\" consumes the queue. The Lambda p99 processing time is about 8 seconds. Use a DLQ named \"order-events-dlq\" with maxReceiveCount=5 and 14-day retention. Enable SSE-SQS encryption. Long polling. Account: 111111111111.",
+      "prompt_file": "prompts/standard-queue-with-dlq.md",
+      "baseline_file": "baselines/standard-queue-with-dlq.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QUEUE: order-events\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Queue type — Standard (at-least-once, unlimited TPS)\n  [✓]      Dead-letter queue — order-events-dlq (Standard, 14-day retention)\n  [✓]      Redrive policy — maxReceiveCount=5\n  [✓]      Visibility timeout — 60s (>= Lambda p99 of 8s)\n  [✓]      Message retention — 4 days (345600s)\n  [✓]      Long polling — ReceiveMessageWaitTimeSeconds=20\n  [✓]      Encryption — SSE-SQS (SqsManagedSseEnabled=true)\n  [✓]      Access policy — S3 notification pattern (Principal:* + aws:SourceArn)\n  [✓]      Lambda partial batch responses — ReportBatchItemFailures\nVERIFICATION_COMMANDS:\n  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-events --attribute-names All\n  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-events --attribute-names RedrivePolicy\n  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/order-events --attribute-names SqsManagedSseEnabled",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "order-events",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "SSE-SQS",
+            "ReceiveMessageWaitTimeSeconds"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fifo-dlq-type-mismatch",
+      "name": "FIFO queue with Standard DLQ — type mismatch deployment blocker",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — DLQ type must match source queue type",
+      "prompt": "Deploy a FIFO SQS queue named \"payment-events.fifo\" in us-east-1. It needs a DLQ. The existing DLQ \"payment-events-dlq\" is a Standard queue (not FIFO). maxReceiveCount=10. ContentBasedDeduplication=true. Visibility timeout 120s. SSE-SQS encryption. Account: 111111111111.",
+      "prompt_file": "prompts/fifo-dlq-type-mismatch.md",
+      "baseline_file": "baselines/fifo-dlq-type-mismatch.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "QUEUE: payment-events.fifo\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Queue type — FIFO (exactly-once, per-group ordering)\n  [✗]      Dead-letter queue — payment-events-dlq is Standard; FIFO source requires a FIFO DLQ. Create payment-events-dlq.fifo.\n  [✓]      Visibility timeout — 120s\n  [✓]      ContentBasedDeduplication — true\n  [✓]      Encryption — SSE-SQS\nVERIFICATION_COMMANDS:\n  aws sqs get-queue-attributes --queue-url <dlq-url> --attribute-names FifoQueue",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "payment-events.fifo",
+            "VERDICT",
+            "CHECKLIST",
+            "FIFO"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "high-throughput-fifo",
+      "name": "High-throughput FIFO queue with per-message-group throughput, Lambda partial batch responses",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — high-throughput FIFO + partial batch responses",
+      "prompt": "Deploy a high-throughput FIFO SQS queue named \"bulk-orders.fifo\" in us-east-1. It needs 1500 TPS throughput. Use per-message-group throughput limit and message-group dedup scope. DLQ \"bulk-orders-dlq.fifo\" with maxReceiveCount=10 and 14-day retention. Lambda consumer \"bulk-processor\" with partial batch responses (ReportBatchItemFailures). Visibility timeout 300s. SSE-SQS encryption. Account: 111111111111.",
+      "prompt_file": "prompts/high-throughput-fifo.md",
+      "baseline_file": "baselines/high-throughput-fifo.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QUEUE: bulk-orders.fifo\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Queue type — FIFO (high-throughput, 1500 TPS)\n  [✓]      High-throughput FIFO — FifoThroughputLimit=perMessageGroupId, DeduplicationScope=messageGroup\n  [✓]      Dead-letter queue — bulk-orders-dlq.fifo (FIFO, 14-day retention)\n  [✓]      Redrive policy — maxReceiveCount=10\n  [✓]      Visibility timeout — 300s\n  [✓]      ContentBasedDeduplication — true\n  [✓]      Long polling — ReceiveMessageWaitTimeSeconds=20\n  [✓]      Encryption — SSE-SQS\n  [✓]      Lambda partial batch responses — ReportBatchItemFailures\nVERIFICATION_COMMANDS:\n  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/bulk-orders.fifo --attribute-names All\n  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/bulk-orders.fifo --attribute-names FifoThroughputLimit,DeduplicationScope",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "bulk-orders.fifo",
+            "VERDICT",
+            "CHECKLIST",
+            "high-throughput",
+            "FifoThroughputLimit",
+            "ReportBatchItemFailures"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sse-kms-missing-key",
+      "name": "SSE-KMS queue with non-existent KMS key alias — deployment blocker",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — KMS key does not exist",
+      "prompt": "Deploy a production SQS queue named \"secure-events\" in us-east-1. Use SSE-KMS encryption with key alias \"alias/sqs-secure-key\". The key alias does not exist yet. Standard queue with DLQ \"secure-events-dlq\", maxReceiveCount=5. Long polling. Visibility timeout 60s. Account: 111111111111.",
+      "prompt_file": "prompts/sse-kms-missing-key.md",
+      "baseline_file": "baselines/sse-kms-missing-key.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "QUEUE: secure-events\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Queue type — Standard\n  [✗]      Encryption — SSE-KMS key alias/sqs-secure-key does not exist. Create the key or switch to SSE-SQS.\n  [✓]      Dead-letter queue — secure-events-dlq\nVERIFICATION_COMMANDS:\n  aws kms describe-key --key-id alias/sqs-secure-key",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "secure-events",
+            "VERDICT",
+            "CHECKLIST",
+            "KMS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-sse-kms",
+      "name": "Cross-account SQS with SSE-KMS — queue policy + KMS key policy both configured",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — cross-account with SSE-KMS, both policies verified",
+      "prompt": "Deploy a production SQS queue named \"shared-events\" in us-east-1. Account 222222222222 needs to send and receive messages from this queue. Use SSE-KMS encryption with key alias \"alias/shared-sqs-key\" (key exists, policy grants the foreign account kms:Decrypt). DLQ \"shared-events-dlq\" with maxReceiveCount=5 and 14-day retention. Long polling. Visibility timeout 30s. Account: 111111111111.",
+      "prompt_file": "prompts/cross-account-sse-kms.md",
+      "baseline_file": "baselines/cross-account-sse-kms.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QUEUE: shared-events\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Queue type — Standard\n  [✓]      Dead-letter queue — shared-events-dlq (Standard, 14-day retention)\n  [✓]      Redrive policy — maxReceiveCount=5\n  [✓]      Visibility timeout — 30s\n  [✓]      Long polling — ReceiveMessageWaitTimeSeconds=20\n  [✓]      Encryption — SSE-KMS (alias/shared-sqs-key)\n  [✓]      Access policy — cross-account (222222222222 SendMessage + ReceiveMessage)\n  [✓]      KMS key policy — grants 222222222222 kms:Decrypt + kms:GenerateDataKey*\nVERIFICATION_COMMANDS:\n  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/shared-events --attribute-names All\n  aws kms get-key-policy --key-id alias/shared-sqs-key --policy-name default",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-events",
+            "VERDICT",
+            "CHECKLIST",
+            "SSE-KMS",
+            "cross-account",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

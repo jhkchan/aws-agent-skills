@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-version-cleanup-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Version Cleanup Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "lifecycle-merge-no-replace",
+      "name": "Add NoncurrentVersionExpiration to a bucket with existing lifecycle rules (READY, merge-not-replace)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/lifecycle-merge-no-replace.md",
+      "baseline_file": "baselines/lifecycle-merge-no-replace.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod-logs-bucket", "put-bucket-lifecycle-configuration", "VERDICT", "NoncurrentVersionExpiration"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "object-lock-compliance-blocked",
+      "name": "Batch delete on Object Lock Compliance-mode bucket within retention window (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/object-lock-compliance-blocked.md",
+      "baseline_file": "baselines/object-lock-compliance-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "COMPLIANCE", "VERDICT", "PRE_CHECKS", "retention"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "create-job", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "legal-hold-blocks-batch-delete",
+      "name": "Batch delete on a bucket where 12 of 1000 manifest objects have LegalHold ON (BLOCKED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/legal-hold-blocks-batch-delete.md",
+      "baseline_file": "baselines/legal-hold-blocks-batch-delete.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "LegalHold", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "batch-ops-immediate-cleanup-ready",
+      "name": "Batch Operations immediate cleanup on a clean versioned staging bucket (READY, $2.50 cost estimate)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/batch-ops-immediate-cleanup-ready.md",
+      "baseline_file": "baselines/batch-ops-immediate-cleanup-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "staging-uploads-bucket", "create-job", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "lifecycle-verified-completed",
+      "name": "Lifecycle config applied, Storage Lens shows noncurrent bytes dropping (COMPLETED with observed savings)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/lifecycle-verified-completed.md",
+      "baseline_file": "baselines/lifecycle-verified-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "prod-logs-bucket", "VERDICT", "POST_VERIFY", "NoncurrentVersion"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

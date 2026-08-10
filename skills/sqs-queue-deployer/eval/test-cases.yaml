@@ -1,0 +1,142 @@
+# Eval test cases for sqs-queue-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across queue types (Standard, FIFO, high-throughput FIFO)
+# and prerequisite failure branches (DLQ type mismatch, missing KMS key).
+skill: sqs-queue-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: standard-queue-with-dlq
+    description: >-
+      Deploy a Standard SQS queue with a DLQ, long polling, SSE-SQS
+      encryption, visibility timeout, and S3 notification access policy.
+      Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a production SQS queue named "order-events" in us-east-1.
+      It receives messages from an S3 bucket "order-uploads" via S3 Event
+      Notification. A Lambda function "order-processor" consumes the queue.
+      The Lambda p99 processing time is about 8 seconds. Use a DLQ named
+      "order-events-dlq" with maxReceiveCount=5 and 14-day retention. Enable
+      SSE-SQS encryption. Long polling. Account: 111111111111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "order-events"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "SSE-SQS"
+        - "ReceiveMessageWaitTimeSeconds"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: fifo-dlq-type-mismatch
+    description: >-
+      Deploy a FIFO queue with a Standard DLQ (type mismatch). Expects
+      PREREQUISITES_MISSING because the DLQ type must match the source.
+    input: |
+      Deploy a FIFO SQS queue named "payment-events.fifo" in us-east-1.
+      It needs a DLQ. The existing DLQ "payment-events-dlq" is a Standard
+      queue (not FIFO). maxReceiveCount=10. ContentBasedDeduplication=true.
+      Visibility timeout 120s. SSE-SQS encryption. Account: 111111111111.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "payment-events.fifo"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "FIFO"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: high-throughput-fifo
+    description: >-
+      Deploy a high-throughput FIFO queue with per-message-group
+      throughput, dedup, DLQ, and Lambda partial batch responses. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Deploy a high-throughput FIFO SQS queue named "bulk-orders.fifo" in
+      us-east-1. It needs 1500 TPS throughput. Use per-message-group
+      throughput limit and message-group dedup scope. DLQ "bulk-orders-dlq.fifo"
+      with maxReceiveCount=10 and 14-day retention. Lambda consumer
+      "bulk-processor" with partial batch responses (ReportBatchItemFailures).
+      Visibility timeout 300s. SSE-SQS encryption. Account: 111111111111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "bulk-orders.fifo"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "high-throughput"
+        - "FifoThroughputLimit"
+        - "ReportBatchItemFailures"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: sse-kms-missing-key
+    description: >-
+      Deploy an SQS queue with SSE-KMS encryption but the KMS key alias
+      does not exist. Expects PREREQUISITES_MISSING due to missing KMS key.
+    input: |
+      Deploy a production SQS queue named "secure-events" in us-east-1.
+      Use SSE-KMS encryption with key alias "alias/sqs-secure-key". The
+      key alias does not exist yet. Standard queue with DLQ
+      "secure-events-dlq", maxReceiveCount=5. Long polling. Visibility
+      timeout 60s. Account: 111111111111.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "secure-events"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "KMS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: cross-account-sse-kms
+    description: >-
+      Deploy an SQS queue with SSE-KMS for cross-account access. A foreign
+      account 222222222222 needs to send and receive messages. Expects
+      READY_TO_DEPLOY with KMS key policy and queue policy both configured.
+    input: |
+      Deploy a production SQS queue named "shared-events" in us-east-1.
+      Account 222222222222 needs to send and receive messages from this
+      queue. Use SSE-KMS encryption with key alias "alias/shared-sqs-key"
+      (key exists, policy grants the foreign account kms:Decrypt). DLQ
+      "shared-events-dlq" with maxReceiveCount=5 and 14-day retention.
+      Long polling. Visibility timeout 30s. Account: 111111111111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-events"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "SSE-KMS"
+        - "cross-account"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

@@ -1,0 +1,235 @@
+# Eval test cases for apigateway-5xx-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per failure layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The error-code-driven ordering in SKILL.md
+# produces exactly the expected verdicts below.
+skill: apigateway-5xx-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: 502-lambda-proxy-malformed-response
+    description: >-
+      REST API Lambda proxy integration. Clients receive 502 BadGateway
+      with "Malformed Lambda proxy response" in the access log. The
+      Lambda function returns a bare object without statusCode.
+      Expected layer: BACKEND_RESPONSE_FORMAT.
+    input: |
+      Symptom: clients of API abc123 (stage prod) receive 502
+      BadGateway on POST /orders. API Gateway access log shows
+      integrationErrorMessage: "Execution failed due to configuration:
+      Malformed Lambda proxy response." Lambda function orders-handler
+      was deployed 30 minutes ago with a new response shape.
+
+      API id: abc123 (REST API, v1)
+      Stage: prod
+      Integration: AWS_PROXY (Lambda proxy)
+      Lambda function: orders-handler
+      Lambda CloudWatch logs: no Runtime.LogError; function reports
+      "Completed in 245ms" at the matching timestamps.
+      Access log integrationStatus: 502 for failing requests.
+      Lambda Invocations metric: spikes matching the 5xxError spikes.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "502-lambda-proxy-malformed-response"
+        - "BACKEND_RESPONSE_FORMAT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+        - "LAYER: BACKEND_LAMBDA_ERROR"
+
+  - id: 504-timeout-mismatch-lambda-too-high
+    description: >-
+      REST API Lambda proxy. Clients receive 504 GatewayTimeout exactly
+      29 seconds after the request. Lambda Timeout is configured at 60s.
+      Function Duration metric shows 45000ms. Expected layer:
+      TIMEOUT_MISMATCH.
+    input: |
+      Symptom: clients of API def456 (stage prod) receive 504
+      GatewayTimeout on GET /reports after exactly 29 seconds. The
+      reports-handler function was recently changed to run a heavier
+      query.
+
+      API id: def456 (REST API, v1)
+      Stage: prod
+      Integration: AWS_PROXY (Lambda proxy)
+      Lambda function: reports-handler
+      aws lambda get-function-configuration reports-handler:
+        Timeout: 60
+        MemorySize: 512
+        Runtime: nodejs20.x
+      Lambda Duration metric: Maximum 45000ms during the failure window.
+      Lambda Errors metric: zero (no Runtime.LogError).
+      API Gateway Latency metric: Maximum 29000ms.
+      Access log integrationErrorMessage: "Execution failed due to a
+      timeout error" on failing requests.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "timeout-mismatch-lambda-too-high"
+        - "TIMEOUT_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: BACKEND_LAMBDA_ERROR"
+
+  - id: 503-stage-throttle-exceeded
+    description: >-
+      REST API Lambda proxy. Clients receive 503 ServiceUnavailable
+      during a marketing campaign traffic spike. Stage rateLimit is 100
+      rps; traffic peaked at 1000 rps. Lambda was never invoked during
+      the throttle window. Expected layer: THROTTLE_STAGE.
+    input: |
+      Symptom: clients of API ghi789 (stage prod) receive 503
+      ServiceUnavailable starting at 14:00 UTC during a marketing
+      campaign. No 502 or 504 errors reported. The backend Lambda
+      function is healthy.
+
+      API id: ghi789 (REST API, v1)
+      Stage: prod
+      Integration: AWS_PROXY (Lambda proxy)
+      aws apigateway get-stage abc123/prod methodSettings:
+        */throttling/rateLimit: 100
+        */throttling/burstLimit: 200
+      CloudWatch Count metric: Sum 300000 in the 14:00-14:05 window
+        (1000 rps average).
+      CloudWatch 5XXError metric: Sum 250000 in the same window.
+      Lambda Invocations metric: does NOT spike during the failure
+        window (only 50000 invocations vs 300000 requests).
+      Lambda Throttles metric: zero.
+      No usage plan is associated with the stage.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "stage-throttle-exceeded"
+        - "THROTTLE_STAGE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: THROTTLE_CONCURRENCY"
+        - "LAYER: THROTTLE_USAGE_PLAN"
+
+  - id: 502-vpclink-unhealthy-target
+    description: >-
+      REST API VPC Link integration. Clients receive 502 BadGateway.
+      The NLB target group behind the VPC Link has zero healthy targets.
+      No Lambda is involved. Expected layer: BACKEND_VPC_LINK.
+    input: |
+      Symptom: clients of API jkl012 (stage prod) receive 502
+      BadGateway on all requests to /internal-api. The integration is a
+      VPC Link to an NLB in a private VPC.
+
+      API id: jkl012 (REST API, v1)
+      Stage: prod
+      Integration: VPC_LINK (vpcl-aaa111)
+      VPC Link state: AVAILABLE
+      NLB target group tg-internal:
+        aws elbv2 describe-target-health returns:
+          - Target: i-backend-1, State: unhealthy,
+            Reason: Target.FailedHealthChecks
+          - Target: i-backend-2, State: unhealthy,
+            Reason: Target.FailedHealthChecks
+      No Lambda function is configured for this API.
+      Access log integrationStatus: 502 with integrationErrorMessage:
+        "Execution failed due to a backend error".
+      CloudTrail: no Lambda Invoke events for this API.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "vpclink-unhealthy-target"
+        - "BACKEND_VPC_LINK"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: BACKEND_LAMBDA_ERROR"
+        - "LAYER: BACKEND_RESPONSE_FORMAT"
+
+  - id: 502-lambda-runtime-error
+    description: >-
+      REST API Lambda proxy. Clients receive 502 BadGateway. Lambda logs
+      show Runtime.LogError with a stack trace caused by a missing
+      environment variable. Function executed but crashed before
+      returning. Expected layer: BACKEND_LAMBDA_ERROR.
+    input: |
+      Symptom: clients of API mno345 (stage prod) receive 502
+      BadGateway on GET /users/{id} after the last deployment. The
+      Lambda function was updated to read a TABLE_NAME environment
+      variable that was not set in the function configuration.
+
+      API id: mno345 (REST API, v1)
+      Stage: prod
+      Integration: AWS_PROXY (Lambda proxy)
+      Lambda function: users-handler
+      Lambda CloudWatch logs (matching timestamps):
+        "ERROR: ReferenceError: process.env.TABLE_NAME is undefined"
+        "Runtime.LogError: ..." with full stack trace.
+        "Task timed out" is NOT present.
+      Lambda Invocations metric: spikes matching 5xxError.
+      Lambda Errors metric: spikes matching 5xxError.
+      Access log integrationErrorMessage: "Malformed Lambda proxy
+        response" (Lambda returned no proxy response because it crashed).
+      aws lambda invoke with test payload returns:
+        FunctionError: "Unhandled"
+        Payload: {"errorMessage": "TABLE_NAME is not defined", ...}
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "lambda-runtime-error"
+        - "BACKEND_LAMBDA_ERROR"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: BACKEND_RESPONSE_FORMAT"

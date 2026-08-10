@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "lambda-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Lambda Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "memory-upsize-u-curve",
+      "name": "Node.js function at 128 MB, CPU-bound, Power Tuning optimum at 1024 MB — memory upsize",
+      "difficulty": "medium",
+      "prompt_file": "prompts/memory-upsize-u-curve.md",
+      "baseline_file": "baselines/memory-upsize-u-curve.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "memory-upsize-u-curve", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "1024"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "provisioned-concurrency-removal",
+      "name": "Python function with 10 provisioned concurrency but <1 req/min sporadic traffic — remove provisioned concurrency",
+      "difficulty": "hard",
+      "prompt_file": "prompts/provisioned-concurrency-removal.md",
+      "baseline_file": "baselines/provisioned-concurrency-removal.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "provisioned-concurrency-removal", "RECOMMENDATION", "ESTIMATED_SAVINGS", "provisioned concurrency"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "arm64-migration-opportunity",
+      "name": "Python function on x86_64, Pillow has arm64 wheel, already at Power Tuning optimum — ARM64 migration",
+      "difficulty": "medium",
+      "prompt_file": "prompts/arm64-migration-opportunity.md",
+      "baseline_file": "baselines/arm64-migration-opportunity.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "arm64-migration-opportunity", "RECOMMENDATION", "ESTIMATED_SAVINGS", "arm64"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-function",
+      "name": "Node.js function at Power Tuning optimum, already arm64, on-demand, healthy duration — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-function.md",
+      "baseline_file": "baselines/already-optimal-function.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-function", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "esm-batch-size-tuning",
+      "name": "SQS-triggered function with default batch size 10 on a high-volume queue — batch size increase",
+      "difficulty": "hard",
+      "prompt_file": "prompts/esm-batch-size-tuning.md",
+      "baseline_file": "baselines/esm-batch-size-tuning.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "esm-batch-size-tuning", "RECOMMENDATION", "ESTIMATED_SAVINGS", "batch"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

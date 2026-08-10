@@ -1,0 +1,123 @@
+# Eval test cases for s3-access-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-access-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: getobject-arn-shape-wrong
+    description: GetObject AccessDenied because identity policy has s3:GetObject on bucket ARN instead of object ARN
+    input: |
+      Scenario: A Lambda function in account 111111111111 (role
+      arn:aws:iam::111111111111:role/app-lambda) calls s3:GetObject on
+      arn:aws:s3:::prod-data/report.csv (same account). The Lambda role's
+      identity policy grants s3:GetObject on
+      arn:aws:s3:::prod-data (no /* suffix). No bucket policy Deny
+      statements. No KMS encryption. BPA not blocking (caller is
+      authenticated). AccessDenied on GetObject.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "object ARN"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "NEED_MORE_INFO"
+        - "KMS"
+
+  - id: cross-account-kms-decrypt
+    description: Cross-account GetObject on SSE-KMS object — KMS key policy missing caller role
+    input: |
+      Scenario: A Lambda in account 111111111111 (role
+      arn:aws:iam::111111111111:role/app-lambda) calls s3:GetObject on
+      arn:aws:s3:::prod-data/report.csv in account 222222222222. The
+      object is encrypted with customer-managed KMS key
+      arn:aws:kms:us-east-1:222222222222:key/abc123. The Lambda role's
+      identity policy has s3:GetObject on arn:aws:s3:::prod-data/* AND
+      kms:Decrypt on the key ARN. The bucket policy in account 2222 has
+      Principal.AWS listing the Lambda role ARN with Action s3:GetObject
+      on arn:aws:s3:::prod-data/*. The KMS key policy in account 2222
+      lists only account-222 roles in Principal.AWS. AccessDenied.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "KMS"
+        - "VERDICT"
+        - "cross-account"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "NEED_MORE_INFO"
+        - "bucket ARN"
+
+  - id: listbucket-arn-shape-wrong
+    description: ListBucket AccessDenied because identity policy has s3:ListBucket on object ARN instead of bucket ARN
+    input: |
+      Scenario: An operator (arn:aws:iam::111111111111:user/dev) calls
+      aws s3 ls s3://internal-docs/ and gets AccessDenied. Their IAM
+      identity policy grants s3:ListBucket on
+      arn:aws:s3:::internal-docs/* (the object ARN, with the /* suffix).
+      No bucket policy Deny. BPA not blocking. The error message names
+      s3:ListBucket as the denied action.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "VERDICT"
+        - "bucket ARN"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "KMS"
+
+  - id: putobject-sse-enforcement-deny
+    description: PutObject AccessDenied because bucket policy denies PutObject without SSE-KMS header
+    input: |
+      Scenario: A service in account 111111111111 uploads to
+      arn:aws:s3:::finance-logs/tx-2026-08.csv via aws s3api put-object
+      without any SSE header. The bucket policy has a Deny on
+      s3:PutObject when
+      s3:x-amz-server-side-encryption != aws:kms. The caller's identity
+      policy grants s3:PutObject on arn:aws:s3:::finance-logs/* and
+      kms:GenerateDataKey on the bucket's KMS key. AccessDenied.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "VERDICT"
+        - "SSE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "NEED_MORE_INFO"
+        - "object ARN"
+
+  - id: insufficient-context-need-more-info
+    description: Bare AccessDenied report without CloudTrail or policy details — must request more info
+    input: |
+      Scenario: A user reports "I am getting AccessDenied when uploading
+      to my S3 bucket." They provide the bucket name but not the calling
+      principal, the action, the resource key, the encryption status,
+      any policy documents, or a CloudTrail event. No further context.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "CloudTrail"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"
