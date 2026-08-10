@@ -1,0 +1,181 @@
+{
+  "skill": "kms-key-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the KMS Key Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across key specs (symmetric AES-256, RSA_4096 signing, HMAC_256, multi-Region) and prerequisite failure branches (missing root break-glass). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "symmetric-data-encryption",
+      "name": "Production symmetric AES-256 CMK for data encryption with rotation",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — symmetric CMK, separated admins/users, rotation, alias",
+      "prompt": "Provision a customer-managed KMS key for production data encryption in us-east-1. Alias: alias/payments-cmk. Workload: encrypt EBS volumes, S3 objects, and Secrets Manager secrets for the payments service. Key administrators: the kms-admin IAM role. Key users: the payments-svc IAM role. Enable annual automatic rotation. Deletion window: 30 days. Tags: Environment=production, Application=payments. Account: 123456789012.",
+      "prompt_file": "prompts/symmetric-data-encryption.md",
+      "baseline_file": "baselines/symmetric-data-encryption.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KEY: alias/payments-cmk\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Key spec — SYMMETRIC_DEFAULT (AES-256-GCM)\n  [✓]      Key usage — ENCRYPT_DECRYPT\n  [✓]      Origin — AWS_KMS\n  [✓]      Key administrators — arn:aws:iam::123456789012:role/kms-admin (lifecycle actions only, no Encrypt/Decrypt)\n  [✓]      Key users — arn:aws:iam::123456789012:role/payments-svc (Encrypt, Decrypt, GenerateDataKey)\n  [✓]      Root account break-glass — arn:aws:iam::123456789012:root (kms:*)\n  [✓]      Automatic rotation — enabled (annual)\n  [✓]      Alias — alias/payments-cmk\n  [✓]      Deletion window — 30 days\n  [✓]      Tags — Environment=production, Application=payments\nVERIFICATION_COMMANDS:\n  aws kms describe-key --key-id alias/payments-cmk\n  aws kms get-key-rotation-status --key-id alias/payments-cmk\n  aws kms get-key-policy --key-id alias/payments-cmk --policy-name default\n  aws kms list-resource-tags --key-id alias/payments-cmk",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "alias/payments-cmk",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "SYMMETRIC_DEFAULT",
+            "automatic rotation"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-root-break-glass",
+      "name": "Key policy omits the account root break-glass — deployment blocker",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — root break-glass required",
+      "prompt": "Provision a customer-managed KMS key in us-east-1. Alias: alias/audit-cmk. The intended key policy grants kms:Encrypt, kms:Decrypt, kms:GenerateDataKey*, and kms:* (admin) to the audit-team IAM role, but does NOT include the account root as a break-glass principal. Workload: encrypt audit logs in S3. Deletion window: 7 days. Account: 123456789012.",
+      "prompt_file": "prompts/missing-root-break-glass.md",
+      "baseline_file": "baselines/missing-root-break-glass.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "KEY: alias/audit-cmk\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Key spec — SYMMETRIC_DEFAULT (AES-256-GCM)\n  [✓]      Key usage — ENCRYPT_DECRYPT\n  [✗]      Root account break-glass — MISSING. The key policy does not grant arn:aws:iam::123456789012:root kms:*. Without root break-glass, an accidental policy misconfiguration permanently locks everyone out — AWS support cannot recover the CMK. Add the root statement as the first policy statement.\n  [✓]      Key administrators — arn:aws:iam::123456789012:role/audit-team\n  [✓]      Key users — arn:aws:iam::123456789012:role/audit-team\n  [✓]      Deletion window — 7 days (consider increasing to 30 for production)\nVERIFICATION_COMMANDS:\n  aws kms get-key-policy --key-id alias/audit-cmk --policy-name default\n  aws kms describe-key --key-id alias/audit-cmk",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "alias/audit-cmk",
+            "VERDICT",
+            "CHECKLIST",
+            "break-glass"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rsa-code-signing",
+      "name": "RSA_4096 signing key for AWS Signer",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — RSA_4096 SIGN_VERIFY, no auto-rotation",
+      "prompt": "Provision a customer-managed KMS key for code signing in us-east-1. Alias: alias/code-signing-cmk. The key will be used by AWS Signer to sign Lambda deployment packages. Key spec: RSA_4096. Key usage: SIGN_VERIFY. Key administrators: kms-admin role. Key users: the signer-service IAM role. Deletion window: 30 days. Tags: Environment=production, Application=code-signing. Account: 123456789012.",
+      "prompt_file": "prompts/rsa-code-signing.md",
+      "baseline_file": "baselines/rsa-code-signing.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KEY: alias/code-signing-cmk\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Key spec — RSA_4096\n  [✓]      Key usage — SIGN_VERIFY\n  [✓]      Origin — AWS_KMS\n  [✓]      Key administrators — arn:aws:iam::123456789012:role/kms-admin (lifecycle actions only)\n  [✓]      Key users — arn:aws:iam::123456789012:role/signer-service (Sign, Verify)\n  [✓]      Root account break-glass — arn:aws:iam::123456789012:root (kms:*)\n  [✓]      Automatic rotation — not supported for asymmetric keys (manual rotation documented)\n  [✓]      Alias — alias/code-signing-cmk\n  [✓]      Deletion window — 30 days\n  [✓]      Tags — Environment=production, Application=code-signing\nVERIFICATION_COMMANDS:\n  aws kms describe-key --key-id alias/code-signing-cmk\n  aws kms get-key-policy --key-id alias/code-signing-cmk --policy-name default\n  aws kms list-aliases --key-id alias/code-signing-cmk\n  aws kms list-resource-tags --key-id alias/code-signing-cmk",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "alias/code-signing-cmk",
+            "VERDICT",
+            "CHECKLIST",
+            "RSA_4096",
+            "SIGN_VERIFY",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-region-with-replicas",
+      "name": "Multi-Region symmetric CMK with replicas for DR",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — multi-Region primary + replicas in us-west-2 + eu-west-1",
+      "prompt": "Provision a multi-Region customer-managed KMS key for cross-Region disaster recovery in us-east-1. Alias: alias/dr-cmk (primary). Replicate to us-west-2 and eu-west-1. Workload: encrypt DynamoDB global tables data. Key spec: SYMMETRIC_DEFAULT. Key administrators: kms-admin role. Key users: the dr-service IAM role (in each Region). Deletion window: 30 days. Tags: Environment=production, Application=dr. Account: 123456789012.",
+      "prompt_file": "prompts/multi-region-with-replicas.md",
+      "baseline_file": "baselines/multi-region-with-replicas.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KEY: alias/dr-cmk\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Key spec — SYMMETRIC_DEFAULT (AES-256-GCM)\n  [✓]      Key usage — ENCRYPT_DECRYPT\n  [✓]      Multi-Region — primary in us-east-1, replicas in us-west-2 and eu-west-1\n  [✓]      Key administrators — arn:aws:iam::123456789012:role/kms-admin\n  [✓]      Key users — arn:aws:iam::123456789012:role/dr-service (in us-east-1, us-west-2, eu-west-1)\n  [✓]      Root account break-glass — arn:aws:iam::123456789012:root (kms:*)\n  [✓]      Automatic rotation — NOT supported for multi-Region keys (manual rotation required)\n  [✓]      Replica policies — independent per Region; sync dr-service role in each Region's key policy\n  [✓]      Alias — alias/dr-cmk (primary), alias/dr-cmk (per-Region replica aliases)\n  [✓]      Deletion window — 30 days\n  [✓]      Tags — Environment=production, Application=dr\nVERIFICATION_COMMANDS:\n  aws kms describe-key --key-id alias/dr-cmk --region us-east-1\n  aws kms describe-key --key-id alias/dr-cmk --region us-west-2\n  aws kms describe-key --key-id alias/dr-cmk --region eu-west-1\n  aws kms get-key-policy --key-id alias/dr-cmk --policy-name default --region us-east-1\n  aws kms list-resource-tags --key-id alias/dr-cmk --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "alias/dr-cmk",
+            "VERDICT",
+            "CHECKLIST",
+            "multi-Region",
+            "us-west-2",
+            "eu-west-1",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hmac-jwt-signing",
+      "name": "HMAC_256 key for JWT signing",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — HMAC_256 GENERATE_VERIFY_MAC, manual rotation",
+      "prompt": "Provision a customer-managed KMS key for JWT signing in us-east-1. Alias: alias/jwt-signing-cmk. Workload: sign and verify JWTs issued by the auth service. Key spec: HMAC_256. Key usage: GENERATE_VERIFY_MAC. Key administrators: kms-admin role. Key users: the auth-svc IAM role. Deletion window: 30 days. Tags: Environment=production, Application=auth. Account: 123456789012.",
+      "prompt_file": "prompts/hmac-jwt-signing.md",
+      "baseline_file": "baselines/hmac-jwt-signing.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KEY: alias/jwt-signing-cmk\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Key spec — HMAC_256\n  [✓]      Key usage — GENERATE_VERIFY_MAC\n  [✓]      Origin — AWS_KMS\n  [✓]      Key administrators — arn:aws:iam::123456789012:role/kms-admin (lifecycle actions only)\n  [✓]      Key users — arn:aws:iam::123456789012:role/auth-svc (GenerateMac, VerifyMac)\n  [✓]      Root account break-glass — arn:aws:iam::123456789012:root (kms:*)\n  [✓]      Automatic rotation — not supported for HMAC keys (manual rotation documented)\n  [✓]      Alias — alias/jwt-signing-cmk\n  [✓]      Deletion window — 30 days\n  [✓]      Tags — Environment=production, Application=auth\nVERIFICATION_COMMANDS:\n  aws kms describe-key --key-id alias/jwt-signing-cmk\n  aws kms get-key-policy --key-id alias/jwt-signing-cmk --policy-name default\n  aws kms list-aliases --key-id alias/jwt-signing-cmk\n  aws kms list-resource-tags --key-id alias/jwt-signing-cmk",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "alias/jwt-signing-cmk",
+            "VERDICT",
+            "CHECKLIST",
+            "HMAC_256",
+            "GENERATE_VERIFY_MAC",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

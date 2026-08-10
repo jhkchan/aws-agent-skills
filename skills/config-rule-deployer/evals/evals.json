@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "config-rule-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the AWS Config Rule Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "deploy-managed-s3-rule-ready",
+      "name": "Deploy managed Config rule s3-bucket-public-read-prohibited — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/deploy-managed-s3-rule-ready.md",
+      "baseline_file": "baselines/deploy-managed-s3-rule-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "s3-bucket-public-read-prohibited", "put-config-rule", "VERDICT", "CONFIRM", "S3_BUCKET_PUBLIC_READ_PROHIBITED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-custom-lambda-rule-ready",
+      "name": "Deploy custom Lambda Config rule for EC2 tag enforcement — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-custom-lambda-rule-ready.md",
+      "baseline_file": "baselines/deploy-custom-lambda-rule-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "ec2-required-tags", "put-config-rule", "VERDICT", "CUSTOM_LAMBDA", "config.amazonaws.com"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-conformance-pack-ready",
+      "name": "Deploy CIS AWS Foundations conformance pack with 5 managed rules — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-conformance-pack-ready.md",
+      "baseline_file": "baselines/deploy-conformance-pack-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "cis-aws-foundations-benchmark", "put-conformance-pack", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-org-rule-prereqs-missing",
+      "name": "Organization config rule blocked — attempting deployment from member account, not management account (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-org-rule-prereqs-missing.md",
+      "baseline_file": "baselines/deploy-org-rule-prereqs-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "management account", "222222222222", "VERDICT", "organization"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-proactive-rule-ready",
+      "name": "Deploy proactive Config rule as CloudFormation hook for S3 public read prevention — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-proactive-rule-ready.md",
+      "baseline_file": "baselines/deploy-proactive-rule-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "proactive-s3-public-read-block", "VERDICT", "CONFIRM", "CloudFormation"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    }
+  ]
+}

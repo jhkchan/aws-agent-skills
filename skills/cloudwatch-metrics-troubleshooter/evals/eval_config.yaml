@@ -1,0 +1,47 @@
+# Eval configuration for cloudwatch-metrics-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudwatch-metrics-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: cw-wrong-namespace-ecs-vs-ec2
+    difficulty: medium
+    prompt_file: prompts/cw-wrong-namespace-ecs-vs-ec2.md
+    baseline_file: baselines/cw-wrong-namespace-ecs-vs-ec2.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: METRIC_NOT_APPEARING
+  - id: cw-wrong-statistic-sum-vs-average
+    difficulty: medium
+    prompt_file: prompts/cw-wrong-statistic-sum-vs-average.md
+    baseline_file: baselines/cw-wrong-statistic-sum-vs-average.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: METRIC_VALUE_UNEXPECTED
+  - id: cw-insufficient-data-period-mismatch
+    difficulty: hard
+    prompt_file: prompts/cw-insufficient-data-period-mismatch.md
+    baseline_file: baselines/cw-insufficient-data-period-mismatch.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: INSUFFICIENT_DATA_ALARM
+  - id: cw-emf-missing-aws-field
+    difficulty: hard
+    prompt_file: prompts/cw-emf-missing-aws-field.md
+    baseline_file: baselines/cw-emf-missing-aws-field.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: CUSTOM_METRIC_NOT_ARRIVING
+  - id: cw-vague-report-need-namespace
+    difficulty: easy
+    prompt_file: prompts/cw-vague-report-need-namespace.md
+    baseline_file: baselines/cw-vague-report-need-namespace.md
+    expected_verdict: NEED_MORE_INFO

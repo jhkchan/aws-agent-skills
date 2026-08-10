@@ -1,0 +1,173 @@
+# Eval test cases for ecs-fargate-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across workload types (public API, queue worker, ML
+# inference) and prerequisite failure branches (target_type=instance,
+# missing NAT Gateway).
+skill: ecs-fargate-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-api-alb-autoscale
+    description: >-
+      Deploy a production ECS Fargate public API service with ALB,
+      target_type=ip, deployment circuit breaker with rollback,
+      container health check, target-tracking auto-scaling on CPU,
+      separate execution role and task role, and Secrets Manager
+      secret injection. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a production ECS Fargate service named "payments-api-prod"
+      in cluster "payments-prod" in us-east-1. Container image:
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/payments-api:1.2.3.
+      Container port 8080 with health check GET /healthz. Task size:
+      0.5 vCPU / 1024 MB. Desired count: 3 across subnets subnet-aaa,
+      subnet-bbb in different AZs with security group sg-payments-api.
+      ALB target group tg-payments-api (target_type=ip). Deployment
+      circuit breaker enabled with rollback. Minimum healthy percent
+      100%, maximum 200%. Execution role payments-exec with ECR +
+      Secrets Manager + CloudWatch Logs permissions. Task role
+      payments-task with DynamoDB + S3 scoped. Secret DB_PASSWORD from
+      secretsmanager:payments/db. Logging to CloudWatch
+      /ecs/payments-api with 30-day retention. Auto-scaling target
+      tracking 60% CPU, min 3 max 12. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "payments-api-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "circuit breaker"
+        - "target_type=ip"
+        - "60%"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: wrong-target-type-instance
+    description: >-
+      Deploy an ECS Fargate service with target_type=instance in the
+      ALB target group. Expects PREREQUISITES_MISSING — Fargate
+      requires target_type=ip.
+    input: |
+      Deploy an ECS Fargate service named "internal-api-prod" in
+      cluster "apps-prod" in us-east-1. Container image:
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/internal-api:v2.0.
+      Container port 3000. Task size 0.25 vCPU / 512 MB. Desired
+      count: 2. ALB target group tg-internal-api with target_type=
+      instance. Subnets subnet-priv-a, subnet-priv-b. Security group
+      sg-internal-api. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "internal-api-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "target_type=ip"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: fargate-no-nat-gateway
+    description: >-
+      Deploy a Fargate service to private subnets with no NAT Gateway.
+      The task pulls from ECR and needs AWS SDK calls (DynamoDB).
+      Expects PREREQUISITES_MISSING — NAT Gateway or VPC endpoints
+      required for image pull and SDK calls.
+    input: |
+      Deploy an ECS Fargate service named "report-worker-prod" in
+      cluster "workers-prod" in us-east-1. Container image:
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/report-worker:v1.5.
+      The task runs in private subnets subnet-priv-a, subnet-priv-b
+      (no NAT Gateway configured, no VPC endpoints). The application
+      makes DynamoDB API calls. Task size 1 vCPU / 2048 MB. Desired
+      count 2. Execution role exists. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "report-worker-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "NAT Gateway"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: fargate-spot-blended
+    description: >-
+      Deploy a stateless queue consumer with a Fargate / Fargate Spot
+      blended capacity provider strategy. Expects READY_TO_DEPLOY with
+      base=2 on FARGATE and FARGATE_SPOT weight 1.
+    input: |
+      Deploy a stateless ECS Fargate SQS queue consumer service named
+      "email-worker-prod" in cluster "workers-prod" in us-east-1.
+      Image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/email-worker:v3.1.
+      Container port 8080 with health check GET /healthz. Task size
+      0.5 vCPU / 1024 MB. Desired count 6 with capacity provider
+      strategy: base=2 on FARGATE, weight 3 on FARGATE, weight 1 on
+      FARGATE_SPOT. Subnets subnet-priv-a, subnet-priv-b. Security
+      group sg-email-worker. Execution role email-exec with ECR +
+      Secrets Manager + logs. Task role email-task with SQS + SES
+      scoped. Deployment circuit breaker enabled. Logging to
+      /ecs/email-worker with 14-day retention. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "email-worker-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "FARGATE_SPOT"
+        - "circuit breaker"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ml-inference-arm64
+    description: >-
+      Deploy a production ML inference Fargate service on ARM64
+      (Graviton) with FireLens logging and 4 vCPU / 16 GB sizing.
+      Expects READY_TO_DEPLOY with ARM64 architecture noted.
+    input: |
+      Deploy a production ECS Fargate ML inference service named
+      "image-tagger-prod" in cluster "ml-prod" in us-east-1. Image:
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/image-tagger:v4.0-arm64.
+      Architecture ARM64 (Graviton). Container port 8500 with health
+      check GET /healthz (startPeriod 120 for model warmup). Task size
+      4 vCPU / 16 GB. Desired count 2 across subnet-priv-a,
+      subnet-priv-b. ALB target group tg-image-tagger (target_type=ip).
+      Deployment circuit breaker enabled. Execution role tagger-exec.
+      Task role tagger-task with S3 GetObject on models bucket. Use
+      FireLens log routing via aws-for-fluent-bit sidecar to CloudWatch
+      /ecs/image-tagger with 60-day retention. Auto-scaling target
+      tracking 70% CPU, min 2 max 6. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "image-tagger-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "ARM64"
+        - "FireLens"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

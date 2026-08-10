@@ -1,0 +1,43 @@
+# Eval configuration for eks-cost-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: eks-cost-optimizer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: node-group-overprovisioned-downsize
+    difficulty: medium
+    prompt_file: prompts/node-group-overprovisioned-downsize.md
+    baseline_file: baselines/node-group-overprovisioned-downsize.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: fargate-vs-ec2-scheduling-mismatch
+    difficulty: medium
+    prompt_file: prompts/fargate-vs-ec2-scheduling-mismatch.md
+    baseline_file: baselines/fargate-vs-ec2-scheduling-mismatch.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: bin-packing-requests-limits-waste
+    difficulty: hard
+    prompt_file: prompts/bin-packing-requests-limits-waste.md
+    baseline_file: baselines/bin-packing-requests-limits-waste.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: spot-node-group-missing-pdb
+    difficulty: hard
+    prompt_file: prompts/spot-node-group-missing-pdb.md
+    baseline_file: baselines/spot-node-group-missing-pdb.md
+    expected_verdict: NEED_MORE_INFO
+  - id: already-optimal-karpenter-savings-plan
+    difficulty: easy
+    prompt_file: prompts/already-optimal-karpenter-savings-plan.md
+    baseline_file: baselines/already-optimal-karpenter-savings-plan.md
+    expected_verdict: ALREADY_OPTIMAL

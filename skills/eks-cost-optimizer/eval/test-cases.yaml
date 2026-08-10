@@ -1,0 +1,241 @@
+# Eval test cases for eks-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# cluster/node-group name embeds the test-case id so the model naturally
+# echoes it (avoids assertion-token mismatch).
+skill: eks-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: node-group-overprovisioned-downsize
+    description: >-
+      m5.2xlarge managed node group (4 nodes) with full Container Insights
+      metrics over 30 days. Node CPU avg 12%, Memory avg 25%. Pod
+      requests/usage ratio 1.4x (healthy). Graviton-compatible workload.
+      On-Demand pricing. Expected verdict: OPPORTUNITY_FOUND with downsize +
+      Karpenter + pricing-model recommendations.
+    input: |
+      Cluster: prod-cluster-node-group-overprovisioned-downsize
+      Region: us-east-1
+      Node group: prod-general-purpose
+      Instance type: m5.2xlarge
+      Desired size: 4 nodes (min 3, max 10)
+      Capacity type: ON_DEMAND
+      Autoscaler: Cluster Autoscaler
+
+      Utilization (Container Insights, last 30 days):
+        - node_cpu_utilization: avg=12%, max=20%
+        - node_memory_utilization: avg=25%, max=35%
+        - Average pods per node: 8 (allocatable capacity ~28 pods)
+
+      Bin-packing analysis (kubectl top):
+        - Pod requests/usage ratio: 1.4x (healthy)
+        - CPU requests per pod: 1000m, actual usage: 700m avg
+
+      Pricing: On-Demand (no Savings Plan)
+      Workload: mixed microservices (Java 17, Python, Go), multi-arch
+      Docker images available (arm64 manifest entries present).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "node-group-overprovisioned-downsize"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "Karpenter"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: fargate-vs-ec2-scheduling-mismatch
+    description: >-
+      Dev cluster with 3 On-Demand m5.large nodes running 6 dev pods at low
+      density (2 pods/node). No DaemonSets, no privileged pods. Sporadic
+      usage pattern. Expected verdict: OPPORTUNITY_FOUND with Fargate
+      migration recommendation.
+    input: |
+      Cluster: dev-cluster-fargate-vs-ec2-scheduling-mismatch
+      Region: us-east-1
+      Node group: dev-nodegroup
+      Instance type: m5.large
+      Desired size: 3 nodes (min 1, max 5)
+      Capacity type: ON_DEMAND
+
+      Utilization (Container Insights, last 30 days):
+        - node_cpu_utilization: avg=5%, max=10%
+        - node_memory_utilization: avg=8%, max=15%
+        - Pods per node: 2 (very low density)
+
+      Pod details:
+        - 6 pods total, each requesting 0.5 vCPU + 1 GB
+        - No DaemonSets in use
+        - No privileged pods
+        - Sporadic usage (dev environment, idle nights/weekends)
+
+      Pricing: On-Demand
+      Workload: dev/test microservices, Python and Node.js, no ARM
+      dependencies.
+
+      Emit the standard optimization block.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "fargate-vs-ec2-scheduling-mismatch"
+        - "Fargate"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: bin-packing-requests-limits-waste
+    description: >-
+      m5.xlarge node group (6 nodes) where pods request 4 vCPU each but use
+      only 0.5 vCPU avg (requests/usage ratio 8x). Nodes appear "full" from
+      scheduler perspective (requests exhausted) but actual CPU is 15%.
+      Expected verdict: OPPORTUNITY_FOUND with bin-packing fix as the
+      primary recommendation before node right-sizing.
+    input: |
+      Cluster: prod-cluster-bin-packing-requests-limits-waste
+      Region: us-east-1
+      Node group: prod-services-ng
+      Instance type: m5.xlarge
+      Desired size: 6 nodes (min 4, max 12)
+      Capacity type: ON_DEMAND
+      Autoscaler: Cluster Autoscaler
+
+      Utilization (Container Insights, last 30 days):
+        - node_cpu_utilization: avg=15%, max=25%
+        - node_memory_utilization: avg=30%, max=40%
+
+      Bin-packing analysis (kubectl top + kubectl describe):
+        - Pod CPU requests: 4000m per pod (8 pods per node)
+        - Actual CPU usage: 500m avg per pod
+        - Requests/usage ratio: 8.0x (severe waste)
+        - Scheduler sees nodes as "full" (32 vCPU requested per node)
+        - Memory requests: 8 GB per pod, actual usage: 2 GB
+
+      Pricing: On-Demand
+      Workload: Java 17 microservices, no Graviton images yet.
+
+      Emit the standard optimization block.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "bin-packing-requests-limits-waste"
+        - "requests"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: spot-node-group-missing-pdb
+    description: >-
+      Cluster wants to add a Spot node group for cost savings but no
+      PodDisruptionBudget exists for any deployment. Spot readiness check
+      fails. Expected verdict: NEED_MORE_INFO (cannot recommend Spot
+      without PDB + graceful drain).
+    input: |
+      Cluster: prod-cluster-spot-node-group-missing-pdb
+      Region: us-east-1
+      Node group: prod-on-demand-ng
+      Instance type: m5.2xlarge
+      Desired size: 4 nodes (min 3, max 8)
+      Capacity type: ON_DEMAND
+
+      Utilization (Container Insights, last 30 days):
+        - node_cpu_utilization: avg=40%, max=55%
+        - node_memory_utilization: avg=50%, max=65%
+
+      Bin-packing: requests/usage ratio 1.5x (healthy)
+      Pod density: 15 pods/node (good)
+
+      Request: evaluate Spot node group for this workload to reduce cost.
+
+      Safety check results:
+        - PodDisruptionBudget: NONE FOUND (kubectl get pdb returns empty)
+        - AWS Node Termination Handler: NOT INSTALLED
+        - terminationGracePeriodSeconds: 30s (default)
+        - Multi-AZ: yes (3 AZs)
+        - Stateful workloads: 2 Deployments use emptyDir for temp data
+
+      Pricing: On-Demand (no Savings Plan)
+
+      Emit the standard optimization block.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "spot-node-group-missing-pdb"
+        - "PodDisruptionBudget"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: ALREADY_OPTIMAL"
+
+  - id: already-optimal-karpenter-savings-plan
+    description: >-
+      Production cluster already running Karpenter with consolidation
+      enabled, Spot for fault-tolerant workloads, On-Demand baseline
+      covered by 3-year Compute Savings Plan. Pod requests tuned via VPA
+      (ratio 1.3x). Node utilization healthy (55% CPU, 62% Memory).
+      Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      Cluster: prod-cluster-already-optimal-karpenter-savings-plan
+      Region: us-east-1
+      Node provisioning: Karpenter v0.37
+      Consolidation: WhenEmptyOrUnderutilized
+      Capacity mix: 60% Spot (m7i.xlarge, m6i.xlarge, c7i.xlarge),
+        40% On-Demand baseline
+      Autoscaler: Karpenter
+
+      Utilization (Container Insights, last 30 days):
+        - node_cpu_utilization: avg=55%, max=68%
+        - node_memory_utilization: avg=62%, max=75%
+        - Spot interruption rate: 0.3% (low)
+
+      Bin-packing:
+        - Requests/usage ratio: 1.3x (VPA-managed, tuned)
+        - Pod density: 12 pods/node (healthy)
+
+      Pricing: 3-year Compute Savings Plan covering 100% of On-Demand
+      baseline. Fargate not in use (workloads need DaemonSets).
+      Workload: mixed stateful (PostgreSQL, Redis) and stateless services.
+      No Graviton path (x86 SIMD dependencies in some services).
+
+      Emit the standard optimization block.
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-karpenter-savings-plan"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"

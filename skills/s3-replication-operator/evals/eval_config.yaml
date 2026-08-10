@@ -1,0 +1,47 @@
+# Eval configuration for s3-replication-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: s3-replication-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: add-rule-crr-kms-rtc-ready
+    difficulty: medium
+    prompt_file: prompts/add-rule-crr-kms-rtc-ready.md
+    baseline_file: baselines/add-rule-crr-kms-rtc-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: diagnose-not-replicating-destination-versioning-off-blocked
+    difficulty: hard
+    prompt_file: prompts/diagnose-not-replicating-destination-versioning-off-blocked.md
+    baseline_file: baselines/diagnose-not-replicating-destination-versioning-off-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: cross-account-dest-bucket-policy-missing-blocked
+    difficulty: hard
+    prompt_file: prompts/cross-account-dest-bucket-policy-missing-blocked.md
+    baseline_file: baselines/cross-account-dest-bucket-policy-missing-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: batch-replicate-existing-objects-ready
+    difficulty: hard
+    prompt_file: prompts/batch-replicate-existing-objects-ready.md
+    baseline_file: baselines/batch-replicate-existing-objects-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: delete-marker-replication-completed
+    difficulty: hard
+    prompt_file: prompts/delete-marker-replication-completed.md
+    baseline_file: baselines/delete-marker-replication-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: MODERATE

@@ -1,0 +1,178 @@
+{
+  "skill": "ecs-fargate-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the ECS Fargate Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across workload types (public API, queue worker, ML inference, ARM64/Graviton) and prerequisite failure branches (target_type=instance, missing NAT Gateway). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "public-api-alb-autoscale",
+      "name": "Production public API with ALB, circuit breaker, auto-scaling, separate roles",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — full checklist with ALB, circuit breaker, auto-scaling",
+      "prompt": "Deploy a production ECS Fargate service named \"payments-api-prod\" in cluster \"payments-prod\" in us-east-1. Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/payments-api:1.2.3. Container port 8080 with health check GET /healthz. Task size: 0.5 vCPU / 1024 MB. Desired count: 3 across subnets subnet-aaa, subnet-bbb in different AZs with security group sg-payments-api. ALB target group tg-payments-api (target_type=ip). Deployment circuit breaker enabled with rollback. Minimum healthy percent 100%, maximum 200%. Execution role payments-exec with ECR + Secrets Manager + CloudWatch Logs permissions. Task role payments-task with DynamoDB + S3 scoped. Secret DB_PASSWORD from secretsmanager:payments/db. Logging to CloudWatch /ecs/payments-api with 30-day retention. Auto-scaling target tracking 60% CPU, min 3 max 12. Account: 123456789012.",
+      "prompt_file": "prompts/public-api-alb-autoscale.md",
+      "baseline_file": "baselines/public-api-alb-autoscale.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: payments-api-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Cluster — payments-prod (Fargate capacity provider)\n  [✓]      Task definition — payments-api (0.5 vCPU / 1024 MB)\n  [✓]      Container — 123456789012.dkr.ecr.us-east-1.amazonaws.com/payments-api:1.2.3\n  [✓]      Container health check — GET /healthz (30s interval, 5s timeout, 3 retries)\n  [✓]      Networking — awsvpc, subnets subnet-aaa/subnet-bbb, sg-payments-api\n  [✓]      Load balancer — ALB tg-payments-api:8080 (target type ip)\n  [✓]      Desired count — 3 (across 2 AZs)\n  [✓]      Deployment circuit breaker — enabled with rollback\n  [✓]      Minimum healthy percent — 100% / Maximum percent — 200%\n  [✓]      Execution role — payments-exec (ECR + Secrets Manager + logs)\n  [✓]      Task role — payments-task (DynamoDB + S3 scoped)\n  [✓]      Secrets — DB_PASSWORD from secretsmanager:payments/db\n  [✓]      Logging — awslogs → CloudWatch /ecs/payments-api, retention 30 days\n  [✓]      Auto-scaling — target tracking 60% CPU, min 3 / max 12\nVERIFICATION_COMMANDS:\n  aws ecs describe-services --cluster payments-prod --services payments-api-prod\n  aws ecs describe-task-definition --task-definition payments-api\n  aws elbv2 describe-target-groups --target-group-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-payments-api/abc\n  aws logs describe-log-groups --log-group-name-prefix /ecs/payments-api\n  aws application-autoscaling describe-scaling-policies --service-namespace ecs --resource-id service/payments-prod/payments-api-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "payments-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "circuit breaker",
+            "target_type=ip",
+            "60%"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wrong-target-type-instance",
+      "name": "target_type=instance on Fargate — deployment blocker",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — Fargate requires target_type=ip",
+      "prompt": "Deploy an ECS Fargate service named \"internal-api-prod\" in cluster \"apps-prod\" in us-east-1. Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/internal-api:v2.0. Container port 3000. Task size 0.25 vCPU / 512 MB. Desired count: 2. ALB target group tg-internal-api with target_type=instance. Subnets subnet-priv-a, subnet-priv-b. Security group sg-internal-api. Account: 123456789012.",
+      "prompt_file": "prompts/wrong-target-type-instance.md",
+      "baseline_file": "baselines/wrong-target-type-instance.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SERVICE: internal-api-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Cluster — apps-prod (Fargate capacity provider)\n  [✓]      Container — 123456789012.dkr.ecr.us-east-1.amazonaws.com/internal-api:v2.0\n  [✗]      Load balancer — ALB target_type=instance is INCOMPATIBLE with Fargate. Recreate the target group with target_type=ip.\n  [✓]      Networking — awsvpc, subnets subnet-priv-a/subnet-priv-b, sg-internal-api\nVERIFICATION_COMMANDS:\n  aws elbv2 describe-target-groups --target-group-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-internal-api/abc",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "internal-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "target_type=ip"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fargate-no-nat-gateway",
+      "name": "Fargate in private subnets without NAT Gateway or VPC endpoints",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — NAT Gateway or VPC endpoints required",
+      "prompt": "Deploy an ECS Fargate service named \"report-worker-prod\" in cluster \"workers-prod\" in us-east-1. Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/report-worker:v1.5. The task runs in private subnets subnet-priv-a, subnet-priv-b (no NAT Gateway configured, no VPC endpoints). The application makes DynamoDB API calls. Task size 1 vCPU / 2048 MB. Desired count 2. Execution role exists. Account: 123456789012.",
+      "prompt_file": "prompts/fargate-no-nat-gateway.md",
+      "baseline_file": "baselines/fargate-no-nat-gateway.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SERVICE: report-worker-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Cluster — workers-prod (Fargate capacity provider)\n  [✓]      Container — 123456789012.dkr.ecr.us-east-1.amazonaws.com/report-worker:v1.5\n  [✓]      Networking — awsvpc, subnets subnet-priv-a/subnet-priv-b\n  [✗]      Networking — NAT Gateway (or VPC endpoints) REQUIRED for image pull from ECR and DynamoDB API calls. Without NAT Gateway, the task cannot pull the image or reach AWS service endpoints.\nVERIFICATION_COMMANDS:\n  aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=vpc-xxx\n  aws ec2 describe-vpc-endpoints --filter Name=vpc-id,Values=vpc-xxx",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "report-worker-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "NAT Gateway"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fargate-spot-blended",
+      "name": "Stateless queue consumer with Fargate + Fargate Spot blend",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — capacity-provider strategy with base=2 FARGATE",
+      "prompt": "Deploy a stateless ECS Fargate SQS queue consumer service named \"email-worker-prod\" in cluster \"workers-prod\" in us-east-1. Image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/email-worker:v3.1. Container port 8080 with health check GET /healthz. Task size 0.5 vCPU / 1024 MB. Desired count 6 with capacity provider strategy: base=2 on FARGATE, weight 3 on FARGATE, weight 1 on FARGATE_SPOT. Subnets subnet-priv-a, subnet-priv-b. Security group sg-email-worker. Execution role email-exec with ECR + Secrets Manager + logs. Task role email-task with SQS + SES scoped. Deployment circuit breaker enabled. Logging to /ecs/email-worker with 14-day retention. Account: 123456789012.",
+      "prompt_file": "prompts/fargate-spot-blended.md",
+      "baseline_file": "baselines/fargate-spot-blended.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: email-worker-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Cluster — workers-prod (Fargate + Fargate Spot capacity providers)\n  [✓]      Task definition — email-worker (0.5 vCPU / 1024 MB)\n  [✓]      Container — 123456789012.dkr.ecr.us-east-1.amazonaws.com/email-worker:v3.1\n  [✓]      Container health check — GET /healthz (30s interval, 5s timeout, 3 retries)\n  [✓]      Networking — awsvpc, subnets subnet-priv-a/subnet-priv-b, sg-email-worker\n  [✓]      Desired count — 6 (base 2 FARGATE + 4 weighted across FARGATE/FARGATE_SPOT)\n  [✓]      Capacity provider strategy — FARGATE base=2 weight=3, FARGATE_SPOT weight=1\n  [✓]      Deployment circuit breaker — enabled with rollback\n  [✓]      Execution role — email-exec (ECR + Secrets Manager + logs)\n  [✓]      Task role — email-task (SQS + SES scoped)\n  [✓]      Logging — awslogs → CloudWatch /ecs/email-worker, retention 14 days\nVERIFICATION_COMMANDS:\n  aws ecs describe-services --cluster workers-prod --services email-worker-prod\n  aws ecs describe-task-definition --task-definition email-worker\n  aws logs describe-log-groups --log-group-name-prefix /ecs/email-worker",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "email-worker-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "FARGATE_SPOT",
+            "circuit breaker",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ml-inference-arm64",
+      "name": "Production ML inference service on ARM64/Graviton with FireLens",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — ARM64, FireLens sidecar, 4 vCPU/16GB sizing",
+      "prompt": "Deploy a production ECS Fargate ML inference service named \"image-tagger-prod\" in cluster \"ml-prod\" in us-east-1. Image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/image-tagger:v4.0-arm64. Architecture ARM64 (Graviton). Container port 8500 with health check GET /healthz (startPeriod 120 for model warmup). Task size 4 vCPU / 16 GB. Desired count 2 across subnet-priv-a, subnet-priv-b. ALB target group tg-image-tagger (target_type=ip). Deployment circuit breaker enabled. Execution role tagger-exec. Task role tagger-task with S3 GetObject on models bucket. Use FireLens log routing via aws-for-fluent-bit sidecar to CloudWatch /ecs/image-tagger with 60-day retention. Auto-scaling target tracking 70% CPU, min 2 max 6. Account: 123456789012.",
+      "prompt_file": "prompts/ml-inference-arm64.md",
+      "baseline_file": "baselines/ml-inference-arm64.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: image-tagger-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Cluster — ml-prod (Fargate capacity provider)\n  [✓]      Task definition — image-tagger (4 vCPU / 16 GB, ARM64)\n  [✓]      Container — 123456789012.dkr.ecr.us-east-1.amazonaws.com/image-tagger:v4.0-arm64\n  [✓]      Container health check — GET /healthz (30s, 5s timeout, 3 retries, startPeriod 120s)\n  [✓]      Networking — awsvpc, subnets subnet-priv-a/subnet-priv-b\n  [✓]      Load balancer — ALB tg-image-tagger:8500 (target type ip)\n  [✓]      Desired count — 2 (across 2 AZs)\n  [✓]      Deployment circuit breaker — enabled with rollback\n  [✓]      Execution role — tagger-exec (ECR + FireLens logs)\n  [✓]      Task role — tagger-task (S3 GetObject on models bucket)\n  [✓]      Logging — FireLens (aws-for-fluent-bit) → CloudWatch /ecs/image-tagger, retention 60 days\n  [✓]      Auto-scaling — target tracking 70% CPU, min 2 / max 6\nVERIFICATION_COMMANDS:\n  aws ecs describe-services --cluster ml-prod --services image-tagger-prod\n  aws ecs describe-task-definition --task-definition image-tagger\n  aws elbv2 describe-target-groups --names tg-image-tagger\n  aws logs describe-log-groups --log-group-name-prefix /ecs/image-tagger\n  aws application-autoscaling describe-scaling-policies --service-namespace ecs --resource-id service/ml-prod/image-tagger-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "image-tagger-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "ARM64",
+            "FireLens",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

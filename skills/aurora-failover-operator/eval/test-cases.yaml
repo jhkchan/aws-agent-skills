@@ -1,0 +1,240 @@
+# Eval test cases for aurora-failover-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per failover pattern. Each case's
+# cluster name embeds the test-case id so the model naturally echoes it.
+skill: aurora-failover-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: planned-failover-promote-replica-ready
+    description: >-
+      Aurora MySQL Multi-AZ cluster with 1 writer and 2 readers. Planned
+      failover to promote a specific replica in a different AZ. All
+      pre-checks pass: cluster available, target replica healthy,
+      AuroraReplicaLag 8ms, no Global DB, RDS Proxy healthy. Expected
+      verdict: READY with the failover CLI sequence and CONFIRM gate.
+    input: |
+      Cluster: prod-orders-cluster-planned-failover-promote-replica-ready
+      Region: us-east-1
+      Operation: planned-failover
+      Target replica to promote: prod-orders-node-2
+
+      Cluster configuration:
+        - Engine: aurora-mysql
+        - DBClusterStatus: available
+        - MultiAZ: true
+        - Writer: prod-orders-node-1 (us-east-1a)
+        - Readers: prod-orders-node-2 (us-east-1b), prod-orders-node-3 (us-east-1c)
+        - GlobalClusterIdentifier: (empty)
+        - ActivityStreamStatus: stopped
+        - StorageEncrypted: true
+
+      Instance details:
+        - prod-orders-node-2: status=available, AuroraReplicaLag=8ms
+
+      RDS Proxy: prod-orders-proxy
+        - Target group health: HEALTHY
+        - Application connects via proxy endpoint
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, PRE_CHECKS,
+      STEPS, POST_VERIFY, WRITER_ENDPOINT, CONNECTION_NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "planned-failover-promote-replica-ready"
+        - "failover-db-cluster"
+        - "CONFIRM"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: unplanned-failover-no-healthy-replica-blocked
+    description: >-
+      Aurora MySQL cluster where the primary is unreachable and the only
+      reader is in 'creating' status (not yet available). No healthy
+      replica to promote. Expected verdict: BLOCKED with remediation
+      guidance.
+    input: |
+      Cluster: prod-checkout-cluster-unplanned-failover-no-healthy-replica-blocked
+      Region: us-east-1
+      Operation: unplanned-failover
+
+      Cluster configuration:
+        - Engine: aurora-mysql
+        - DBClusterStatus: available
+        - Writer: prod-checkout-node-1 (us-east-1a) — UNREACHABLE
+          (health check failing for 60s)
+        - Readers: prod-checkout-node-2 (us-east-1b) — status=creating
+          (recently launched, not yet available)
+
+      Instance details:
+        - prod-checkout-node-1: status=available but unreachable
+          (writer endpoint health check failed)
+        - prod-checkout-node-2: status=creating (not yet promoted-capable)
+
+      No other readers available.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "unplanned-failover-no-healthy-replica-blocked"
+        - "PRE_CHECKS"
+        - "reader"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: automatic-failover-multi-az-completed
+    description: >-
+      Aurora PostgreSQL Multi-AZ cluster where automatic failover was
+      triggered by Aurora (writer health check failure). Failover completed
+      and all post-verification checks passed. Expected verdict: COMPLETED
+      with writer endpoint info and DNS cache flush notes.
+    input: |
+      Cluster: prod-inventory-cluster-automatic-failover-multi-az-completed
+      Region: us-east-1
+      Operation: automatic (failover already completed)
+
+      Cluster configuration (post-failover):
+        - Engine: aurora-postgresql
+        - DBClusterStatus: available
+        - MultiAZ: true
+        - Writer: prod-inventory-node-2 (us-east-1b) — promoted at
+          2026-08-07T10:03:12Z
+        - Readers: prod-inventory-node-1 (us-east-1a, AuroraReplicaLag=12ms),
+          prod-inventory-node-3 (us-east-1c, AuroraReplicaLag=8ms)
+
+      Failover event:
+        - Detection: 2026-08-07T10:02:15Z (node-1 health check failure)
+        - Promotion: 2026-08-07T10:03:12Z (node-2 promoted)
+        - Duration: 57 seconds
+
+      RDS Proxy: prod-inventory-proxy (target group HEALTHY on node-2)
+
+      Post-failover verification results:
+        - Writer endpoint resolves to node-2: PASS
+        - SELECT @@innodb_read_only returns 0 (read-write): PASS
+        - Reader endpoint load-balances node-1 + node-3: PASS
+        - AuroraReplicaLag < 100ms on all readers: PASS
+
+      Emit the standard VERDICT block with COMPLETED and post-verify.
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "automatic-failover-multi-az-completed"
+        - "POST_VERIFY"
+        - "WRITER_ENDPOINT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: global-db-failover-blocked-writer-role
+    description: >-
+      Aurora MySQL cluster that is the WRITER in an Aurora Global Database.
+      Operator requests a standalone failover-db-cluster, but the cluster
+      is a Global DB writer — must use failover-global-cluster instead.
+      Expected verdict: BLOCKED with guidance to use managed global
+      failover.
+    input: |
+      Cluster: prod-global-primary-global-db-failover-blocked-writer-role
+      Region: us-east-1
+      Operation: planned-failover (operator requests
+        failover-db-cluster)
+
+      Cluster configuration:
+        - Engine: aurora-mysql
+        - DBClusterStatus: available
+        - Writer: prod-global-node-1 (us-east-1a)
+        - Readers: prod-global-node-2 (us-east-1b)
+        - GlobalClusterIdentifier: prod-global-cluster (WRITER role)
+        - Global cluster members:
+          - us-east-1: prod-global-primary (WRITER)
+          - eu-west-1: prod-global-secondary (READER)
+
+      Cross-region replication lag: AuroraGlobalDBReplicationLag = 0.4s
+
+      The operator wants to failover within us-east-1 to promote
+      prod-global-node-2. However, this cluster is the primary of a
+      Global Database.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "global-db-failover-blocked-writer-role"
+        - "Global"
+        - "failover-global-cluster"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: failback-to-original-primary-ready
+    description: >-
+      Aurora MySQL cluster that previously failed over (node-1 was writer,
+      now node-2 is writer). Operator wants to failback to node-1. All
+      pre-checks pass: node-1 is available as reader, AuroraReplicaLag
+      10ms, no Global DB. Expected verdict: READY.
+    input: |
+      Cluster: prod-orders-cluster-failback-to-original-primary-ready
+      Region: us-east-1
+      Operation: failback (promote original writer back)
+
+      Cluster configuration (post-failover, before failback):
+        - Engine: aurora-mysql
+        - DBClusterStatus: available
+        - MultiAZ: true
+        - Current Writer: prod-orders-node-2 (us-east-1b)
+          (promoted during planned failover 2 hours ago)
+        - Readers: prod-orders-node-1 (us-east-1a, AuroraReplicaLag=10ms,
+          originally the writer), prod-orders-node-3 (us-east-1c)
+
+      Failback target: prod-orders-node-1 (original writer)
+
+      Pre-check results:
+        - prod-orders-node-1 status: available
+        - prod-orders-node-1 AuroraReplicaLag: 10ms (< 30s)
+        - prod-orders-node-2 (current writer) status: available
+        - GlobalClusterIdentifier: empty
+        - ActivityStreamStatus: stopped
+        - RDS Proxy: prod-orders-proxy (target group HEALTHY)
+
+      Reason for failback: AZ maintenance window completed; prefer
+      node-1 in us-east-1a as writer for latency optimization.
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "failback-to-original-primary-ready"
+        - "failover-db-cluster"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"

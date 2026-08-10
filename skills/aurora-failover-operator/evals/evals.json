@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "aurora-failover-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Aurora Failover Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "planned-failover-promote-replica-ready",
+      "name": "Planned Aurora failover — all pre-checks pass, promote specific replica in different AZ",
+      "difficulty": "medium",
+      "prompt_file": "prompts/planned-failover-promote-replica-ready.md",
+      "baseline_file": "baselines/planned-failover-promote-replica-ready.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "planned-failover-promote-replica-ready", "failover-db-cluster", "CONFIRM", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "unplanned-failover-no-healthy-replica-blocked",
+      "name": "Unplanned failover — primary unreachable, only reader in 'creating' status (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/unplanned-failover-no-healthy-replica-blocked.md",
+      "baseline_file": "baselines/unplanned-failover-no-healthy-replica-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "unplanned-failover-no-healthy-replica-blocked", "PRE_CHECKS", "reader"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "automatic-failover-multi-az-completed",
+      "name": "Automatic Aurora failover completed and all post-verification checks passed (COMPLETED)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/automatic-failover-multi-az-completed.md",
+      "baseline_file": "baselines/automatic-failover-multi-az-completed.md",
+      "expected_verdict": "COMPLETED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "automatic-failover-multi-az-completed", "POST_VERIFY", "WRITER_ENDPOINT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "global-db-failover-blocked-writer-role",
+      "name": "Standalone failover-db-cluster on Global DB writer — must use failover-global-cluster (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/global-db-failover-blocked-writer-role.md",
+      "baseline_file": "baselines/global-db-failover-blocked-writer-role.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "global-db-failover-blocked-writer-role", "Global", "failover-global-cluster"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "failback-to-original-primary-ready",
+      "name": "Failback to original primary after planned failover — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/failback-to-original-primary-ready.md",
+      "baseline_file": "baselines/failback-to-original-primary-ready.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "failback-to-original-primary-ready", "failover-db-cluster", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

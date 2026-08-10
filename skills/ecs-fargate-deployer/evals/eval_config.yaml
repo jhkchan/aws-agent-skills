@@ -1,0 +1,48 @@
+# Eval configuration for ecs-fargate-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: ecs-fargate-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: public-api-alb-autoscale
+    difficulty: hard
+    prompt_file: prompts/public-api-alb-autoscale.md
+    baseline_file: baselines/public-api-alb-autoscale.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: wrong-target-type-instance
+    difficulty: medium
+    prompt_file: prompts/wrong-target-type-instance.md
+    baseline_file: baselines/wrong-target-type-instance.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: fargate-no-nat-gateway
+    difficulty: hard
+    prompt_file: prompts/fargate-no-nat-gateway.md
+    baseline_file: baselines/fargate-no-nat-gateway.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: fargate-spot-blended
+    difficulty: hard
+    prompt_file: prompts/fargate-spot-blended.md
+    baseline_file: baselines/fargate-spot-blended.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: ml-inference-arm64
+    difficulty: hard
+    prompt_file: prompts/ml-inference-arm64.md
+    baseline_file: baselines/ml-inference-arm64.md
+    expected_verdict: READY_TO_DEPLOY

@@ -1,0 +1,39 @@
+# Eval configuration for aurora-failover-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+skill_name: aurora-failover-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: planned-failover-promote-replica-ready
+    difficulty: medium
+    prompt_file: prompts/planned-failover-promote-replica-ready.md
+    baseline_file: baselines/planned-failover-promote-replica-ready.md
+    expected_verdict: READY
+  - id: unplanned-failover-no-healthy-replica-blocked
+    difficulty: hard
+    prompt_file: prompts/unplanned-failover-no-healthy-replica-blocked.md
+    baseline_file: baselines/unplanned-failover-no-healthy-replica-blocked.md
+    expected_verdict: BLOCKED
+  - id: automatic-failover-multi-az-completed
+    difficulty: easy
+    prompt_file: prompts/automatic-failover-multi-az-completed.md
+    baseline_file: baselines/automatic-failover-multi-az-completed.md
+    expected_verdict: COMPLETED
+  - id: global-db-failover-blocked-writer-role
+    difficulty: hard
+    prompt_file: prompts/global-db-failover-blocked-writer-role.md
+    baseline_file: baselines/global-db-failover-blocked-writer-role.md
+    expected_verdict: BLOCKED
+  - id: failback-to-original-primary-ready
+    difficulty: medium
+    prompt_file: prompts/failback-to-original-primary-ready.md
+    baseline_file: baselines/failback-to-original-primary-ready.md
+    expected_verdict: READY

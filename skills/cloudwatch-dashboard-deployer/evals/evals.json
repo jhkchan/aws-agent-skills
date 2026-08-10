@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-dashboard-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Dashboard Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "deploy-ec2-ops-dashboard-ready",
+      "name": "Deploy EC2 operational dashboard with metric widgets and variables — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/deploy-ec2-ops-dashboard-ready.md",
+      "baseline_file": "baselines/deploy-ec2-ops-dashboard-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-ec2-ops", "put-dashboard", "VERDICT", "CONFIRM", "INSTANCE_ID"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-log-insights-dashboard-ready",
+      "name": "Deploy dashboard with CloudWatch Logs Insights widgets for Lambda error analysis — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-log-insights-dashboard-ready.md",
+      "baseline_file": "baselines/deploy-log-insights-dashboard-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-lambda-errors", "put-dashboard", "VERDICT", "limit 100"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-metric-math-dashboard-ready",
+      "name": "Deploy metric math dashboard for ALB 5xx error rate — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-metric-math-dashboard-ready.md",
+      "baseline_file": "baselines/deploy-metric-math-dashboard-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-alb-error-rate", "put-dashboard", "VERDICT", "m1/m2"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-cross-account-dashboard-prereqs-missing",
+      "name": "Cross-account dashboard blocked — CloudWatch-CrossAccountSharingRole missing in staging account (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-cross-account-dashboard-prereqs-missing.md",
+      "baseline_file": "baselines/deploy-cross-account-dashboard-prereqs-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "CloudWatch-CrossAccountSharingRole", "333333333333", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-slo-dashboard-ready",
+      "name": "Deploy SLO burn-rate dashboard using Application Signals metrics — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-slo-dashboard-ready.md",
+      "baseline_file": "baselines/deploy-slo-dashboard-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-slo-burn-rate", "put-dashboard", "VERDICT", "ApplicationSignals"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    }
+  ]
+}

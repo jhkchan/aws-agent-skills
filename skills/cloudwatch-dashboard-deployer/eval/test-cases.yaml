@@ -1,0 +1,300 @@
+# Eval test cases for cloudwatch-dashboard-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-dashboard-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: deploy-ec2-ops-dashboard-ready
+    description: >-
+      Deploy a standard EC2 operational dashboard with CPU, memory, and
+      network widgets using dashboard variables. Metric is publishing,
+      dimensions are correct, IAM permissions verified. All pre-checks
+      pass; plan should produce READY_TO_DEPLOY with the put-dashboard
+      CLI, CONFIRM gate, and the widget verification caveat.
+    input: |
+      Operation: create
+      Dashboard name: prod-ec2-ops
+      Region: us-east-1
+      Account: 111111111111
+      Widgets:
+        - type: metric
+          title: CPU Utilization
+          namespace: AWS/EC2
+          metric: CPUUtilization
+          dimensions: InstanceId=${INSTANCE_ID}
+          statistic: Average
+          period: 300
+          position: x=0, y=0, w=12, h=6
+        - type: metric
+          title: Memory Utilization
+          namespace: CWAgent
+          metric: mem_used_percent
+          dimensions: InstanceId=${INSTANCE_ID}
+          statistic: Average
+          period: 300
+          position: x=12, y=0, w=12, h=6
+        - type: metric
+          title: Network Traffic
+          namespace: AWS/EC2
+          metrics: NetworkIn, NetworkOut
+          dimensions: InstanceId=${INSTANCE_ID}
+          statistic: Sum
+          period: 300
+          position: x=0, y=6, w=24, h=3
+      Dashboard variable: INSTANCE_ID
+
+      Metric checks (already performed by caller):
+        aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
+          --metric-name CPUUtilization \
+          --dimensions Name=InstanceId,Value=i-0123456789abcdef0 \
+          --start-time 2026-08-10T09:00:00Z --end-time 2026-08-10T10:00:00Z \
+          --period 300 --statistics Average:
+          datapoints: 60 (Average ~45%, Maximum 72%)
+        aws cloudwatch get-metric-statistics --namespace CWAgent \
+          --metric-name mem_used_percent \
+          --dimensions Name=InstanceId,Value=i-0123456789abcdef0 \
+          --start-time 2026-08-10T09:00:00Z --end-time 2026-08-10T10:00:00Z \
+          --period 300 --statistics Average:
+          datapoints: 60 (Average ~62%)
+        aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
+          --metric-name NetworkIn \
+          --dimensions Name=InstanceId,Value=i-0123456789abcdef0 \
+          --start-time 2026-08-10T09:00:00Z --end-time 2026-08-10T10:00:00Z \
+          --period 300 --statistics Sum:
+          datapoints: 60
+
+      Emit the standard VERDICT block (DASHBOARD, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, WIDGETS, SHARING, NOTES).
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-ec2-ops"
+        - "put-dashboard"
+        - "VERDICT"
+        - "CONFIRM"
+        - "INSTANCE_ID"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-log-insights-dashboard-ready
+    description: >-
+      Deploy a dashboard with CloudWatch Logs Insights widgets for Lambda
+      error analysis. The log groups exist and are receiving events. All
+      pre-checks pass; plan should produce READY_TO_DEPLOY.
+    input: |
+      Operation: create
+      Dashboard name: prod-lambda-errors
+      Region: us-east-1
+      Account: 111111111111
+      Widgets:
+        - type: log
+          title: Lambda Errors (5-min buckets)
+          query: "SOURCE '/aws/lambda/prod-checkout' | fields @timestamp, @message | filter @message like /ERROR/ | stats count() by bin(5m) | sort @timestamp desc | limit 100"
+          position: x=0, y=0, w=24, h=6
+        - type: log
+          title: Top Error Messages
+          query: "SOURCE '/aws/lambda/prod-checkout' | filter @message like /ERROR/ | stats count() as errorCount by @message | sort errorCount desc | limit 10"
+          position: x=0, y=6, w=24, h=6
+
+      Log group checks:
+        aws logs describe-log-groups --log-group-name-prefix /aws/lambda/prod-checkout:
+          OK (logGroup: /aws/lambda/prod-checkout, storedBytes: 524288000)
+        Log events received in last hour: 1,247
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-lambda-errors"
+        - "put-dashboard"
+        - "VERDICT"
+        - "limit 100"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-metric-math-dashboard-ready
+    description: >-
+      Deploy a dashboard using metric math to compute ALB 5xx error rate
+      (errors / total requests * 100). Both metrics are publishing. All
+      pre-checks pass; plan should produce READY_TO_DEPLOY.
+    input: |
+      Operation: create
+      Dashboard name: prod-alb-error-rate
+      Region: us-east-1
+      Account: 111111111111
+      Widgets:
+        - type: metric
+          title: ALB 5xx Error Rate (%)
+          metric_math:
+            m1: AWS/ApplicationELB, HTTPCode_ELB_5XX_Count, Sum, LoadBalancer=app/prod-alb/1234567890
+            m2: AWS/ApplicationELB, RequestCount, Sum, LoadBalancer=app/prod-alb/1234567890
+            e1: m1/m2*100
+          period: 60
+          position: x=0, y=0, w=24, h=6
+
+      Metric checks:
+        aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB \
+          --metric-name HTTPCode_ELB_5XX_Count \
+          --dimensions Name=LoadBalancer,Value=app/prod-alb/1234567890 \
+          --start-time 2026-08-10T09:00:00Z --end-time 2026-08-10T10:00:00Z \
+          --period 60 --statistics Sum:
+          datapoints: 60 (Sum ~12/min)
+        aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB \
+          --metric-name RequestCount \
+          --dimensions Name=LoadBalancer,Value=app/prod-alb/1234567890 \
+          --start-time 2026-08-10T09:00:00Z --end-time 2026-08-10T10:00:00Z \
+          --period 60 --statistics Sum:
+          datapoints: 60 (Sum ~5000/min)
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-alb-error-rate"
+        - "put-dashboard"
+        - "VERDICT"
+        - "m1/m2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-cross-account-dashboard-prereqs-missing
+    description: >-
+      Attempt to deploy a cross-account dashboard monitoring EC2 CPU
+      across dev (222222222222) and staging (333333333333) accounts.
+      The CloudWatch-CrossAccountSharingRole does NOT exist in the
+      staging account. Pre-checks should produce PREREQUISITES_MISSING.
+    input: |
+      Operation: create
+      Dashboard name: cross-account-ec2-ops
+      Region: us-east-1
+      Account: 111111111111 (monitoring/sharing account)
+      Cross-account: true
+      Source accounts:
+        - 222222222222 (dev)
+        - 333333333333 (staging)
+      Widgets:
+        - type: metric
+          title: Dev Account CPU
+          namespace: AWS/EC2
+          metric: CPUUtilization
+          account_id: 222222222222
+          dimensions: InstanceId=i-0123456789abcdef0
+          statistic: Average
+          period: 300
+          position: x=0, y=0, w=12, h=6
+        - type: metric
+          title: Staging Account CPU
+          namespace: AWS/EC2
+          metric: CPUUtilization
+          account_id: 333333333333
+          dimensions: InstanceId=i-0abcdef1234567890
+          statistic: Average
+          period: 300
+          position: x=12, y=0, w=12, h=6
+
+      Cross-account role checks:
+        aws iam get-role --role-name CloudWatch-CrossAccountSharingRole \
+          --profile dev-account:
+          OK (role exists, trust policy allows 111111111111)
+        aws iam get-role --role-name CloudWatch-CrossAccountSharingRole \
+          --profile staging-account:
+          NoSuchEntity (role does not exist in staging account)
+
+      Metric checks (from monitoring account):
+        aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
+          --metric-name CPUUtilization \
+          --dimensions Name=InstanceId,Value=i-0123456789abcdef0 \
+          --start-time 2026-08-10T09:00:00Z --end-time 2026-08-10T10:00:00Z \
+          --period 300 --statistics Average:
+          datapoints: 60 (dev account — sharing role exists)
+        aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
+          --metric-name CPUUtilization \
+          --dimensions Name=InstanceId,Value=i-0abcdef1234567890 \
+          --start-time 2026-08-10T09:00:00Z --end-time 2026-08-10T10:00:00Z \
+          --period 300 --statistics Average:
+          datapoints: 0 (staging account — sharing role missing, metrics not visible)
+
+      Emit the standard VERDICT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "CloudWatch-CrossAccountSharingRole"
+        - "333333333333"
+        - "VERDICT"
+        - "cross-account"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: deploy-slo-dashboard-ready
+    description: >-
+      Deploy an SLO burn-rate dashboard using CloudWatch Application
+      Signals metrics. The service is auto-discovered, SLO exists, and
+      ConsumedRAT/RequestedRAT metrics are publishing. All pre-checks
+      pass; plan should produce READY_TO_DEPLOY.
+    input: |
+      Operation: create
+      Dashboard name: prod-slo-burn-rate
+      Region: us-east-1
+      Account: 111111111111
+      Widgets:
+        - type: metric
+          title: SLO Burn Rate — Checkout Availability
+          namespace: AWS/ApplicationSignals
+          metric_math:
+            m1: AWS/ApplicationSignals, ConsumedRAT, Sum, ServiceName=checkout-service, SLO=checkout-availability-slo
+            m2: AWS/ApplicationSignals, RequestedRAT, Sum, ServiceName=checkout-service, SLO=checkout-availability-slo
+            e1: m1/m2
+          period: 300
+          position: x=0, y=0, w=24, h=6
+          annotations:
+            horizontal:
+              - label: Fast burn (2h), value: 14.4
+              - label: Slow burn (6h), value: 6.0
+        - type: text
+          title: SLO Runbook
+          markdown: "# SLO Burn Rate Dashboard\n**SLO**: 99.9% availability (30-day window)\n**Fast burn**: page immediately if burn rate > 14.4x\n**Slow burn**: create ticket if burn rate > 6.0x for 1h\n**Runbook**: [Incident Response](https://runbooks.example.com/slo)"
+          position: x=0, y=6, w=24, h=2
+
+      Metric checks:
+        aws cloudwatch get-metric-statistics --namespace AWS/ApplicationSignals \
+          --metric-name ConsumedRAT \
+          --dimensions Name=ServiceName,Value=checkout-service Name=SLO,Value=checkout-availability-slo \
+          --start-time 2026-08-10T09:00:00Z --end-time 2026-08-10T10:00:00Z \
+          --period 300 --statistics Sum:
+          datapoints: 12
+        aws cloudwatch get-metric-statistics --namespace AWS/ApplicationSignals \
+          --metric-name RequestedRAT \
+          --dimensions Name=ServiceName,Value=checkout-service Name=SLO,Value=checkout-availability-slo \
+          --start-time 2026-08-10T09:00:00Z --end-time 2026-08-10T10:00:00Z \
+          --period 300 --statistics Sum:
+          datapoints: 12
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-slo-burn-rate"
+        - "put-dashboard"
+        - "VERDICT"
+        - "ApplicationSignals"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"

@@ -1,0 +1,144 @@
+# Eval test cases for cloudwatch-metrics-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-metrics-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cw-wrong-namespace-ecs-vs-ec2
+    description: Operator queries AWS/EC2 CPUUtilization for an ECS service; the metric actually lives under AWS/ECS with ClusterName + ServiceName dimensions
+    input: |
+      Scenario: An operator is looking for CPU utilization for an ECS
+      service "api" on cluster "prod-app". They query CloudWatch with
+      Namespace "AWS/EC2", MetricName "CPUUtilization", Dimensions
+      Name=ClusterName,Value=prod-app Name=ServiceName,Value=api, Period
+      60, Statistic Average. get-metric-statistics returns an empty
+      Datapoints array. list-metrics --namespace AWS/EC2
+      --metric-name CPUUtilization returns metrics with dimension
+      InstanceId only (no ClusterName, no ServiceName). list-metrics
+      --namespace AWS/ECS --metric-name CPUUtilization returns metrics
+      with dimensions ClusterName=prod-app, ServiceName=api. The ECS
+      cluster has Container Insights enabled and runningCount=12.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "METRIC_NOT_APPEARING"
+        - "AWS/ECS"
+        - "AWS/EC2"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "PutMetricData"
+
+  - id: cw-wrong-statistic-sum-vs-average
+    description: Operator expects average request latency but queries Sum; value is 10x expectation
+    input: |
+      Scenario: An operator has a custom metric "Latency" under
+      namespace "MyApp/API". The metric emits one data point per
+      request with the latency in milliseconds as the Value. The
+      operator queries get-metric-statistics with Namespace
+      "MyApp/API", MetricName "Latency", Statistic "Sum", Period 60,
+      over the last 5 minutes and sees values around 5000-8000 (ms
+      total across all requests in the minute). They expected the
+      average latency per request, around 50-80 ms. Trying Statistic
+      "Average" on the same parameters returns values in the 50-80 ms
+      range. SampleCount over the same window returns values around
+      100 (i.e., 100 requests per minute).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "METRIC_VALUE_UNEXPECTED"
+        - "Average"
+        - "Sum"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: cw-insufficient-data-period-mismatch
+    description: Alarm stuck in INSUFFICIENT_DATA because Period is finer than the metric's 5-minute emission cadence
+    input: |
+      Scenario: A CloudWatch alarm named "LowHeartbeat" is persistently
+      in INSUFFICIENT_DATA state. describe-alarms shows Namespace
+      "MyApp/Health", MetricName "Heartbeat", Dimensions
+      Name=ServiceName,Value=worker, Period 60, EvaluationPeriods 5,
+      Statistic Sum, Threshold 1, ComparisonOperator
+      GreaterThanOrEqualToThreshold, TreatMissingData "missing". The
+      emitter writes one Heartbeat data point every 5 minutes (it
+      polls a health endpoint on a 5-minute schedule). get-metric-
+      statistics with the alarm's exact parameters over the last 15
+      minutes returns 3 data points (one per 5-minute emission). The
+      alarm's evaluation window of 5 minutes x 5 = 5 minutes sees at
+      most 1 data point, which is below EvaluationPeriods=5.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "INSUFFICIENT_DATA_ALARM"
+        - "Period"
+        - "EvaluationPeriods"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: cw-emf-missing-aws-field
+    description: Custom metric never arrives because the EMF blob is missing the _aws.CloudWatchMetrics directive
+    input: |
+      Scenario: A Lambda function "worker-fn" emits an EMF blob per
+      invocation to log group /aws/lambda/worker-fn. The operator
+      expects a metric "JobsProcessed" under namespace "MyApp/Worker"
+      but list-metrics returns nothing under that namespace. CloudTrail
+      shows no PutMetricData calls (Lambda uses EMF, not PutMetricData
+      directly). filter-log-events on /aws/lambda/worker-fn returns
+      recent log entries like:
+      { "timestamp": 1691616000000, "JobsProcessed": 42,
+        "ServiceName": "worker" }
+      The blob has NO "_aws" field, NO "CloudWatchMetrics" array. The
+      Lambda uses the Powertools for AWS Lambda (TypeScript) Metrics
+      utility but the developer forgot to call metrics.flush() or
+      equivalent, so the EMF directive was not attached.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "CUSTOM_METRIC_NOT_ARRIVING"
+        - "_aws"
+        - "CloudWatchMetrics"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: cw-vague-report-need-namespace
+    description: Vague report of missing CloudWatch metric without namespace, metric name, or dimensions
+    input: |
+      Scenario: A user reports "my CloudWatch metric is missing, the
+      dashboard is empty." They do not provide the namespace, the
+      metric name, the dimensions, the resource, or the expected vs
+      observed value.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "list-metrics"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

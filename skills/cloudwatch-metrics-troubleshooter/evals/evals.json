@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-metrics-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Metrics Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cw-wrong-namespace-ecs-vs-ec2",
+      "name": "Operator queries AWS/EC2 for an ECS service CPU — metric actually under AWS/ECS with ClusterName + ServiceName",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cw-wrong-namespace-ecs-vs-ec2.md",
+      "baseline_file": "baselines/cw-wrong-namespace-ecs-vs-ec2.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "METRIC_NOT_APPEARING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "METRIC_NOT_APPEARING", "AWS/ECS", "AWS/EC2", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "PutMetricData"]
+        }
+      ]
+    },
+    {
+      "id": "cw-wrong-statistic-sum-vs-average",
+      "name": "Operator expects average latency but queries Sum — value 10x expectation",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cw-wrong-statistic-sum-vs-average.md",
+      "baseline_file": "baselines/cw-wrong-statistic-sum-vs-average.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "METRIC_VALUE_UNEXPECTED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "METRIC_VALUE_UNEXPECTED", "Average", "Sum", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "cw-insufficient-data-period-mismatch",
+      "name": "Alarm INSUFFICIENT_DATA because Period 60 is finer than the 5-minute emission cadence",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cw-insufficient-data-period-mismatch.md",
+      "baseline_file": "baselines/cw-insufficient-data-period-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "INSUFFICIENT_DATA_ALARM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "INSUFFICIENT_DATA_ALARM", "Period", "EvaluationPeriods", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "cw-emf-missing-aws-field",
+      "name": "Custom metric not arriving because EMF blob is missing the _aws.CloudWatchMetrics directive",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cw-emf-missing-aws-field.md",
+      "baseline_file": "baselines/cw-emf-missing-aws-field.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "CUSTOM_METRIC_NOT_ARRIVING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "CUSTOM_METRIC_NOT_ARRIVING", "_aws", "CloudWatchMetrics", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "cw-vague-report-need-namespace",
+      "name": "Vague report of missing CloudWatch metric — request namespace + metric name + list-metrics output",
+      "difficulty": "easy",
+      "prompt_file": "prompts/cw-vague-report-need-namespace.md",
+      "baseline_file": "baselines/cw-vague-report-need-namespace.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "list-metrics"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

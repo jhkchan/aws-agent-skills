@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-replication-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Replication Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "add-rule-crr-kms-rtc-ready",
+      "name": "Add CRR rule with SSE-KMS source + RTC enabled (all pre-checks pass, READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/add-rule-crr-kms-rtc-ready.md",
+      "baseline_file": "baselines/add-rule-crr-kms-rtc-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod-logs-source-us-east-1", "prod-logs-dr-eu-west-1", "put-bucket-replication", "VERDICT", "PRE_CHECKS", "ReplicationTime", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "diagnose-not-replicating-destination-versioning-off-blocked",
+      "name": "Diagnose CRR broken — destination bucket versioning OFF (BLOCKED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/diagnose-not-replicating-destination-versioning-off-blocked.md",
+      "baseline_file": "baselines/diagnose-not-replicating-destination-versioning-off-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "versioning", "put-bucket-versioning", "VERDICT", "PRE_CHECKS", "Enabled"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-dest-bucket-policy-missing-blocked",
+      "name": "Diagnose cross-account replication — destination bucket policy missing s3:x-amz-source-account (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-dest-bucket-policy-missing-blocked.md",
+      "baseline_file": "baselines/cross-account-dest-bucket-policy-missing-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "AccessDenied", "put-bucket-policy", "VERDICT", "cross-account", "s3:x-amz-source-account"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "batch-replicate-existing-objects-ready",
+      "name": "Plan S3 Batch Operations replication job for existing objects (READY)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/batch-replicate-existing-objects-ready.md",
+      "baseline_file": "baselines/batch-replicate-existing-objects-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-job", "S3ReplicateObject", "VERDICT", "PRE_CHECKS", "Inventory", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "delete-marker-replication-completed",
+      "name": "Enable delete-marker replication on existing rule and verify (COMPLETED with round-trip)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/delete-marker-replication-completed.md",
+      "baseline_file": "baselines/delete-marker-replication-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "DeleteMarkerReplication", "delete marker", "VERDICT", "POST_VERIFY", "Enabled"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+# Eval configuration for stepfunctions-execution-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: stepfunctions-execution-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: sfn-runtime-invalid-jsonpath
+    difficulty: hard
+    prompt_file: prompts/sfn-runtime-invalid-jsonpath.md
+    baseline_file: baselines/sfn-runtime-invalid-jsonpath.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: RUNTIME_ERROR
+  - id: sfn-task-timeout-lambda-sync
+    difficulty: medium
+    prompt_file: prompts/sfn-task-timeout-lambda-sync.md
+    baseline_file: baselines/sfn-task-timeout-lambda-sync.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: TASK_TIMEOUT
+  - id: sfn-permission-cross-account-sts
+    difficulty: hard
+    prompt_file: prompts/sfn-permission-cross-account-sts.md
+    baseline_file: baselines/sfn-permission-cross-account-sts.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: PERMISSION_DENIED
+  - id: sfn-retry-exhausted-dynamodb
+    difficulty: medium
+    prompt_file: prompts/sfn-retry-exhausted-dynamodb.md
+    baseline_file: baselines/sfn-retry-exhausted-dynamodb.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_root_cause_category: RETRY_EXHAUSTED
+  - id: sfn-vague-report-need-execution-arn
+    difficulty: easy
+    prompt_file: prompts/sfn-vague-report-need-execution-arn.md
+    baseline_file: baselines/sfn-vague-report-need-execution-arn.md
+    expected_verdict: NEED_MORE_INFO

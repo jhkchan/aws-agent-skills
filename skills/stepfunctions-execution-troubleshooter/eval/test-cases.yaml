@@ -1,0 +1,137 @@
+# Eval test cases for stepfunctions-execution-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: stepfunctions-execution-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: sfn-runtime-invalid-jsonpath
+    description: Standard workflow States.Runtime because Parameters references a JSONPath that does not exist in the input payload
+    input: |
+      Scenario: A Step Functions Standard workflow execution fails
+      with error "States.Runtime". The failing state is named
+      "EnrichOrder". describe-execution shows cause "An error
+      occurred while executing the state 'EnrichOrder'." The
+      StateEntered event in get-execution-history shows the input to
+      EnrichOrder was: { "orderId": "ord-123", "customerId":
+      "cust-9" }. describe-state-machine for the EnrichOrder state
+      shows Parameters: { "OrderId.$": "$.order.orderId",
+      "Customer.$": "$.customerId" }. The upstream EmitOrder state
+      uses ResultPath: "$" so its output IS the execution input.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "RUNTIME_ERROR"
+        - "$.order.orderId"
+        - "$.orderId"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "redrive"
+
+  - id: sfn-task-timeout-lambda-sync
+    description: States.Timeout because Lambda function duration exceeds the Task state TimeoutSeconds
+    input: |
+      Scenario: A Step Functions Standard workflow execution fails
+      with error "States.Timeout" on the InvokeTransform Task state.
+      describe-state-machine for InvokeTransform shows
+      TimeoutSeconds: 60, Resource:
+      "arn:aws:states:::lambda:invoke". The Lambda function
+      "transform-fn" has Timeout: 120 (2 minutes) and CloudWatch Logs
+      show recent invocations averaging 85-95 seconds. The state has
+      no Retry block. describe-execution stopDate minus startDate for
+      the failed execution shows the InvokeTransform state ran for
+      exactly 60.0 seconds before failing.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "TASK_TIMEOUT"
+        - "TimeoutSeconds"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "redrive"
+
+  - id: sfn-permission-cross-account-sts
+    description: States.Permission because state machine role in account A cannot assume the cross-account role in account B
+    input: |
+      Scenario: A Step Functions Standard workflow in account
+      111111111111 fails on the QueryForeignResource state with
+      error "States.Permission" and cause "is not authorized to
+      perform: sts:AssumeRole on resource
+      arn:aws:iam::222222222222:role/foreign-resource-role".
+      describe-state-machine shows the QueryForeignResource state
+      uses Resource:
+      "arn:aws:states:::aws-sdk:dynamodb:getItem" with Parameters
+      pointing at a table in account 222222222222 via the assumed
+      role. aws iam simulate-principal-policy on the state machine
+      role arn:aws:iam::111111111111:role/sfn-role for
+      sts:AssumeRole on the foreign-resource-role ARN returns
+      implicitDeny.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "PERMISSION_DENIED"
+        - "sts:AssumeRole"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: sfn-retry-exhausted-dynamodb
+    description: Execution fails after Retry MaxAttempts is exhausted on a DynamoDB ProvisionedThroughputExceededException
+    input: |
+      Scenario: A Step Functions Standard workflow execution fails.
+      The WriteToDynamo Task state has Retry: [{ErrorEquals:
+      ["States.TaskFailed"], IntervalSeconds: 2, MaxAttempts: 3,
+      BackoffRate: 2.0}]. get-execution-history shows 4 TaskFailed
+      events for WriteToDynamo (initial attempt + 3 retries), each
+      with cause containing "ProvisionedThroughputExceededException".
+      The state has no Catch block. The execution failed terminally
+      after roughly 14 seconds (2 + 4 + 8 = 14s of backoff).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "RETRY_EXHAUSTED"
+        - "MaxAttempts"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: sfn-vague-report-need-execution-arn
+    description: Vague report of Step Functions failure without execution ARN, state machine ARN, or error string
+    input: |
+      Scenario: A user reports "my Step Functions workflow is broken,
+      executions keep failing." They mention the workflow is called
+      "order-pipeline" in us-east-1 but do not provide an execution
+      ARN, an error string, a failing state name, or whether it is
+      Standard or Express.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "describe-execution"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

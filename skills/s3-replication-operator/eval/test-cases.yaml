@@ -1,0 +1,305 @@
+# Eval test cases for s3-replication-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-replication-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: add-rule-crr-kms-rtc-ready
+    description: >-
+      Operator wants to add a new cross-region replication rule to an
+      existing bucket. Source bucket in us-east-1 with SSE-KMS (CMK),
+      destination in eu-west-1 with SSE-KMS (CMK). All pre-checks pass:
+      versioning on both, IAM role has ReplicateObject/ReplicateDelete +
+      KMS decrypt on source + KMS encrypt on destination, destination
+      key policy grants the role, ObjectOwnership is BucketOwnerEnforced.
+      RTC enabled (15 min SLA). Plan should produce READY with the
+      put-bucket-replication CLI (full-replacement merged config) and a
+      CONFIRM gate.
+    input: |
+      Operation: add-rule
+      Source: prod-logs-source-us-east-1 (us-east-1, account 111111111111)
+      Destination: prod-logs-dr-eu-west-1 (eu-west-1, account 111111111111)
+      Filter: prefix "logs/"
+      RTC: enabled (15 min SLA)
+
+      Source bucket versioning (aws s3api get-bucket-versioning):
+        Status: Enabled
+
+      Destination bucket versioning:
+        Status: Enabled
+
+      Destination ObjectOwnership:
+        ObjectOwnership: BucketOwnerEnforced
+
+      Source encryption (aws s3api get-bucket-encryption):
+        SSE-KMS, key arn:aws:kms:us-east-1:111111111111:key/source-cmk
+
+      Destination encryption:
+        SSE-KMS, key arn:aws:kms:eu-west-1:111111111111:key/dest-cmk
+
+      Existing replication config (aws s3api get-bucket-replication):
+        Role: arn:aws:iam::111111111111:role/s3-repl-role
+        Rules:
+          - ID: existing-rule-app
+            Status: Enabled
+            Priority: 1
+            Filter: {Prefix: "app/"}
+            Destination: {Bucket: arn:aws:s3:::app-dr-eu-west-1}
+
+      IAM role attached policies (s3-repl-role):
+        - s3:GetReplicationConfiguration on arn:aws:s3:::prod-logs-source-us-east-1
+        - s3:GetObjectVersion on arn:aws:s3:::prod-logs-source-us-east-1/*
+        - s3:ReplicateObject, s3:ReplicateDelete on arn:aws:s3:::prod-logs-dr-eu-west-1/*
+        - kms:Decrypt on arn:aws:kms:us-east-1:111111111111:key/source-cmk
+        - kms:Encrypt on arn:aws:kms:eu-west-1:111111111111:key/dest-cmk
+
+      Destination KMS key policy:
+        Grants role arn:aws:iam::111111111111:role/s3-repl-role kms:Encrypt
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-logs-source-us-east-1"
+        - "prod-logs-dr-eu-west-1"
+        - "put-bucket-replication"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "ReplicationTime"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: diagnose-not-replicating-destination-versioning-off-blocked
+    description: >-
+      Replication rule shows Status: Enabled but no objects arrive at
+      the destination. Investigation reveals destination bucket
+      versioning is OFF (get-bucket-versioning returns empty/none).
+      Source versioning is Enabled. This is the false-green-rule trap.
+      Pre-checks must BLOCK and surface the put-bucket-versioning fix.
+    input: |
+      Operation: diagnose-not-replicating
+      Source: prod-logs-source-us-east-1 (us-east-1)
+      Destination: prod-logs-dr-eu-west-1 (eu-west-1)
+
+      Source bucket versioning:
+        Status: Enabled
+
+      Destination bucket versioning (aws s3api get-bucket-versioning):
+        (empty body — versioning OFF)
+
+      Replication config (aws s3api get-bucket-replication):
+        Role: arn:aws:iam::111111111111:role/s3-repl-role
+        Rules:
+          - ID: dr-crr-rtc
+            Status: Enabled
+            Priority: 1
+            Filter: {Prefix: "logs/"}
+            Destination: {Bucket: arn:aws:s3:::prod-logs-dr-eu-west-1}
+            ReplicationTime: {Status: Enabled, Time: {Minutes: 15}}
+            Metrics: {Status: Enabled, EventThreshold: {Minutes: 15}}
+
+      IAM role permissions: verified complete
+        (s3:ReplicateObject, s3:ReplicateDelete, kms:Decrypt, kms:Encrypt)
+
+      CloudWatch PendingReplication metric (last 24h):
+        rising trend, never drains below 5,000
+
+      S3 Server Access Logs on destination (last 24h):
+        zero Replication operations recorded
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "versioning"
+        - "put-bucket-versioning"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "Enabled"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: cross-account-dest-bucket-policy-missing-blocked
+    description: >-
+      Source bucket in account 111111111111 replicates to destination
+      in account 222222222222. All replicates fail with AccessDenied
+      visible only in destination CloudTrail. The destination bucket
+      policy is missing the s3:x-amz-source-account condition. Diagnose
+      and emit BLOCKED with the put-bucket-policy fix.
+    input: |
+      Operation: configure-cross-account (diagnose mode)
+      Source: prod-logs-source-us-east-1 (us-east-1, account 111111111111)
+      Destination: audit-logs-dest (us-west-2, account 222222222222)
+
+      Replication config:
+        Role: arn:aws:iam::111111111111:role/s3-repl-role
+        Rules:
+          - ID: xaccount-audit
+            Status: Enabled
+            Filter: {Prefix: "audit/"}
+            Destination: {Bucket: arn:aws:s3:::audit-logs-dest,
+                         Account: 222222222222,
+                         AccessControlTranslation: {Owner: Destination}}
+
+      Destination ObjectOwnership:
+        ObjectOwnership: BucketOwnerPreferred
+
+      IAM role permissions (account 111111111111):
+        - s3:ReplicateObject, s3:ReplicateDelete,
+          s3:ObjectOwnerOverrideToBucketOwner on
+          arn:aws:s3:::audit-logs-dest/*
+        - kms:Encrypt on destination CMK arn:aws:kms:us-west-2:222222222222:key/dest-cmk
+
+      Destination KMS key policy (account 222222222222):
+        Grants arn:aws:iam::111111111111:role/s3-repl-role kms:Encrypt (verified)
+
+      Destination bucket policy (aws s3api get-bucket-policy):
+        Statement: [{
+          Effect: Allow,
+          Principal: {AWS: arn:aws:iam::111111111111:role/s3-repl-role},
+          Action: [s3:ReplicateObject, s3:ReplicateDelete],
+          Resource: arn:aws:s3:::audit-logs-dest/*
+        }]
+        MISSING: s3:ObjectOwnerOverrideToBucketOwner action
+        MISSING: s3:x-amz-source-account condition
+
+      Destination CloudTrail (last 7d, filtered for s3 Replication):
+        AccessDenied on PutObject from s3-replication
+        2,341 events
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "AccessDenied"
+        - "put-bucket-policy"
+        - "VERDICT"
+        - "cross-account"
+        - "s3:x-amz-source-account"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: batch-replicate-existing-objects-ready
+    description: >-
+      Operator added a new CRR rule 7 days ago and now needs to backfill
+      4.2 TB of existing objects. S3 Inventory is configured with a
+      daily manifest. Plan the Batch Operations S3ReplicateObject job.
+      All pre-checks pass.
+    input: |
+      Operation: batch-replicate
+      Source: prod-logs-source-us-east-1 (us-east-1, account 111111111111)
+      Destination: prod-logs-dr-eu-west-1 (eu-west-1, account 111111111111)
+      Filter: prefix "logs/"
+      Estimated object count: ~12 million objects, 4.2 TB total
+      S3 Inventory config:
+        Id: prod-logs-inventory-daily
+        Destination: s3://prod-logs-inventory-prod/inv/
+        Schedule: Daily
+        Last manifest: 2026-08-09T03:00:00Z (within 24h)
+        Included fields: Bucket, Key, Size, LastModifiedDate, ReplicationStatus
+
+      Existing replication rule:
+        ID: dr-crr-rtc, Status: Enabled, Filter: {Prefix: "logs/"}
+
+      Batch Operations role (arn:aws:iam::111111111111:role/s3-batch-repl-role):
+        - s3:GetObject on arn:aws:s3:::prod-logs-source-us-east-1/*
+        - s3:ReplicateObject on arn:aws:s3:::prod-logs-dr-eu-west-1/*
+        - kms:Decrypt on source CMK
+        - kms:Encrypt on destination CMK
+        - s3:GetObject on the manifest bucket
+
+      Existing Batch Operations jobs for this prefix: none
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-job"
+        - "S3ReplicateObject"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "Inventory"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: delete-marker-replication-completed
+    description: >-
+      An existing CRR rule has DeleteMarkerReplication.Status: Disabled.
+      The operator has already updated the rule to Enabled and verified
+      a delete marker round-trip. Produce the COMPLETED post-verification
+      form.
+    input: |
+      Operation: enable-delete-marker-replication
+      Source: prod-logs-source-us-east-1 (us-east-1)
+      Destination: prod-logs-dr-eu-west-1 (eu-west-1)
+
+      Pre-change rule config (captured):
+        ID: dr-crr-rtc
+        Status: Enabled
+        DeleteMarkerReplication: {Status: Disabled}
+
+      Execution result (already applied):
+        aws s3api put-bucket-replication --bucket prod-logs-source-us-east-1 \
+          --replication-configuration file:///tmp/repl-merged-dmr-enabled.json
+        Result: success
+
+      Post-change rule config:
+        ID: dr-crr-rtc
+        Status: Enabled
+        DeleteMarkerReplication: {Status: Enabled}
+
+      Round-trip verification (operator-confirmed):
+        Sentinel object: __dmr-test-2026-08-10-001 (prefix "logs/")
+        1. aws s3api put-object --bucket prod-logs-source-us-east-1 \
+             --key logs/__dmr-test-2026-08-10-001 --body /tmp/test.txt
+           Result: VersionId v-src-001
+        2. aws s3api head-object --bucket prod-logs-dr-eu-west-1 \
+             --key logs/__dmr-test-2026-08-10-001
+           Result: 200, VersionId v-src-001 (matches source)
+        3. aws s3api delete-object --bucket prod-logs-source-us-east-1 \
+             --key logs/__dmr-test-2026-08-10-001
+           Result: DeleteMarker: true, VersionId dm-src-001
+        4. aws s3api head-object --bucket prod-logs-dr-eu-west-1 \
+             --key logs/__dmr-test-2026-08-10-001 --version-id dm-src-001
+           Result: 200, DeleteMarker: true, VersionId dm-src-001
+
+      CloudWatch PendingReplication (last 15m): 0 (stable)
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "DeleteMarkerReplication"
+        - "delete marker"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "Enabled"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

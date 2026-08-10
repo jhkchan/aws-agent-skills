@@ -1,0 +1,48 @@
+# Eval configuration for kms-key-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: kms-key-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: symmetric-data-encryption
+    difficulty: medium
+    prompt_file: prompts/symmetric-data-encryption.md
+    baseline_file: baselines/symmetric-data-encryption.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-root-break-glass
+    difficulty: hard
+    prompt_file: prompts/missing-root-break-glass.md
+    baseline_file: baselines/missing-root-break-glass.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: rsa-code-signing
+    difficulty: hard
+    prompt_file: prompts/rsa-code-signing.md
+    baseline_file: baselines/rsa-code-signing.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: multi-region-with-replicas
+    difficulty: hard
+    prompt_file: prompts/multi-region-with-replicas.md
+    baseline_file: baselines/multi-region-with-replicas.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: hmac-jwt-signing
+    difficulty: medium
+    prompt_file: prompts/hmac-jwt-signing.md
+    baseline_file: baselines/hmac-jwt-signing.md
+    expected_verdict: READY_TO_DEPLOY

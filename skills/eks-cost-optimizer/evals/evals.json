@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "eks-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EKS Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "node-group-overprovisioned-downsize",
+      "name": "m5.2xlarge node group underutilized, healthy bin-packing, Graviton-compatible — downsize + Karpenter + Savings Plan",
+      "difficulty": "medium",
+      "prompt_file": "prompts/node-group-overprovisioned-downsize.md",
+      "baseline_file": "baselines/node-group-overprovisioned-downsize.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "node-group-overprovisioned-downsize", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "Karpenter"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "fargate-vs-ec2-scheduling-mismatch",
+      "name": "Dev workload on On-Demand EC2 nodes with 2 pods/node — Fargate migration opportunity",
+      "difficulty": "medium",
+      "prompt_file": "prompts/fargate-vs-ec2-scheduling-mismatch.md",
+      "baseline_file": "baselines/fargate-vs-ec2-scheduling-mismatch.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "fargate-vs-ec2-scheduling-mismatch", "Fargate", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "bin-packing-requests-limits-waste",
+      "name": "Pods requesting 4 vCPU using 0.5 vCPU (8x ratio) — bin-packing fix needed before node right-sizing",
+      "difficulty": "hard",
+      "prompt_file": "prompts/bin-packing-requests-limits-waste.md",
+      "baseline_file": "baselines/bin-packing-requests-limits-waste.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "bin-packing-requests-limits-waste", "requests", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "spot-node-group-missing-pdb",
+      "name": "Spot node group requested but no PodDisruptionBudget or NTH — blocked on safety prerequisites",
+      "difficulty": "hard",
+      "prompt_file": "prompts/spot-node-group-missing-pdb.md",
+      "baseline_file": "baselines/spot-node-group-missing-pdb.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "spot-node-group-missing-pdb", "PodDisruptionBudget"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: ALREADY_OPTIMAL"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-karpenter-savings-plan",
+      "name": "Karpenter with consolidation + Spot + Savings Plan + VPA-tuned requests — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-karpenter-savings-plan.md",
+      "baseline_file": "baselines/already-optimal-karpenter-savings-plan.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-karpenter-savings-plan", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "stepfunctions-execution-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Step Functions Execution Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "sfn-runtime-invalid-jsonpath",
+      "name": "States.Runtime — Parameters references $.order.orderId but input has $.orderId",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sfn-runtime-invalid-jsonpath.md",
+      "baseline_file": "baselines/sfn-runtime-invalid-jsonpath.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "RUNTIME_ERROR",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "RUNTIME_ERROR", "$.order.orderId", "$.orderId", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "redrive"]
+        }
+      ]
+    },
+    {
+      "id": "sfn-task-timeout-lambda-sync",
+      "name": "States.Timeout — Lambda function 85-95s p99 exceeds Task TimeoutSeconds 60",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sfn-task-timeout-lambda-sync.md",
+      "baseline_file": "baselines/sfn-task-timeout-lambda-sync.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "TASK_TIMEOUT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "TASK_TIMEOUT", "TimeoutSeconds", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "redrive"]
+        }
+      ]
+    },
+    {
+      "id": "sfn-permission-cross-account-sts",
+      "name": "States.Permission — state machine role lacks sts:AssumeRole on cross-account role",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sfn-permission-cross-account-sts.md",
+      "baseline_file": "baselines/sfn-permission-cross-account-sts.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "PERMISSION_DENIED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "PERMISSION_DENIED", "sts:AssumeRole", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "sfn-retry-exhausted-dynamodb",
+      "name": "Execution fails after Retry MaxAttempts 3 exhausted on DynamoDB ProvisionedThroughputExceededException",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sfn-retry-exhausted-dynamodb.md",
+      "baseline_file": "baselines/sfn-retry-exhausted-dynamodb.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "RETRY_EXHAUSTED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "RETRY_EXHAUSTED", "MaxAttempts", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "sfn-vague-report-need-execution-arn",
+      "name": "Vague report of Step Functions failure — request execution ARN + describe-execution output",
+      "difficulty": "easy",
+      "prompt_file": "prompts/sfn-vague-report-need-execution-arn.md",
+      "baseline_file": "baselines/sfn-vague-report-need-execution-arn.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "describe-execution"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}
