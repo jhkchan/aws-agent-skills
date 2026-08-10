@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 17,
       "max": 20,
-      "justification": "The skill repeats many well\u2011known AWS Config facts (limits, evaluation modes, CLI syntax). It adds some useful specifics (exact soft limits, ordered pre\u2011check list, proactive rule hook details) but these are incremental rather than novel expert insight. No unique decision tree or undocumented exception is presented."
+      "justification": "Adds expert\u2011level delta such as a decision\u2011tree for stale compliance, exact service limits (150 rules, 25 packs, 256\u202fKB template), proactive rule mechanics, and a prioritized pre\u2011check list \u2013 information a generic model would not synthesize. Deductions for restating well\u2011known API docs and managed\u2011rule identifiers."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (pre\u2011check order, CONFIRM gate, snapshot before change) and well\u2011structured, but a few steps remain generic: no handling of paginated API responses, no explicit rollback plan if a CLI call fails, and the \u201crun pre\u2011checks\u201d wording lacks concrete error\u2011code handling."
+      "justification": "Encodes AWS\u2011specific procedures: ordered pre\u2011flight checks, mandatory CONFIRM gate, snapshot before mutation, forced evaluation step, and post\u2011verification sequence. Only a minor generic element (\"check IAM permissions\") prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "A thorough NEVER list is provided with reasons, yet some warnings are vague (e.g., \u201cavoid default service\u2011linked role\u201d without explaining least\u2011privilege impact) and it omits common pitfalls such as IAM role naming collisions or over\u2011permissive Lambda policies."
+      "justification": "Provides a thorough NEVER list with concrete reasons (recorder stopped, missing Lambda permission, timeout limits, limit\u2011exceeding, etc.). Missing a few anti\u2011patterns such as cost\u2011impact of high\u2011frequency evaluations and handling of API throttling."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, description, when_to_use, activation_triggers, and invocation_schema are present. However, the activation trigger list is overly broad (many synonyms) which could cause spurious activation, and the spec lacks an explicit \u201cdo NOT invoke when Config is disabled\u201d clause."
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. Activation triggers are overly exhaustive, which could cause spurious activation, so a small deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers information (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process) but critical safety rules (the CONFIRM gate) are buried in later sections, creating potential cognitive overload for a first\u2011time user. Some sections (expert heuristic, recent features) feel like appendices rather than progressive layers."
+      "justification": "Uses layered sections (quick reference, mindset, process, anti\u2011patterns, output contract) to avoid overload. However, the anti\u2011patterns and full CLI examples are placed early, adding some cognitive load before the core decision flow."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive operations are guarded by a CONFIRM gate and pre\u2011checks, showing good calibration. Missing are explicit constraints for remediation configuration (e.g., limiting auto\u2011remediation to approved SSM documents) and no guidance for safe deletion of rules, which leaves a gap for high\u2011risk actions."
+      "justification": "Destructive actions are tightly constrained with CONFIRM gate, pre\u2011checks, and snapshot. Minor gap: read\u2011only queries (e.g., listing rules) are not explicitly scoped, but this does not materially affect safety."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Process \u2192 Anti\u2011Patterns \u2192 Output contract). The \u201cExpert heuristic\u201d and \u201cRecent AWS features\u201d sections are slightly ad\u2011hoc, preventing a perfectly clean pattern."
+      "justification": "Follows a recognizable pattern (What, Quick navigation, Mindset, Pre\u2011flight, Process, Common patterns, Output contract, Anti\u2011patterns). No structural anomalies."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, output template, and examples that an agent could execute. Lacks handling for API throttling, missing region/partition errors, and does not show a failure branch when a CLI call returns an error. Edge cases such as partial rule creation or CloudFormation stack rollback are not covered."
+      "justification": "Provides exact CLI commands, decision trees, and a strict output contract that an agent can execute. Missing: explicit error\u2011handling branches (e.g., how to recover from AWS CLI failures) and a formal JSON schema for the input payload."
     }
   ],
-  "total_score": 99,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45897,
-  "latency_ms": 9666,
+  "token_count": 46534,
+  "latency_ms": 12838,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

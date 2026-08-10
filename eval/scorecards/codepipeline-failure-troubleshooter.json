@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "The skill consolidates many senior\u2011engineer insights (cross\u2011account trust policy nuance, KMS key policy impact, polling vs event\u2011driven source distinction, empty change\u2011set reasoning) that are not obvious to a generic model, but a large portion of the content restates standard AWS documentation rather than novel decision trees, so it falls short of a perfect score."
+      "justification": "Adds concrete decision\u2011tree, root\u2011cause catalog, recent AWS feature notes (Pipeline V2, retry modes, CodeStar v2) and precise CLI probes that a generic model would not enumerate, but much of the content restates official docs rather than novel expert heuristics."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific, ordered diagnostic procedure (capture signal \u2192 map stage \u2192 drill into underlying service) and concrete CLI commands for each failure category. One point is deducted because the procedure does not explicitly cover some edge\u2011case procedures (e.g., handling throttling or EventBridge replay) and therefore is not completely exhaustive."
+      "justification": "Provides an AWS\u2011specific diagnostic flow (capture signal \u2192 map stage \u2192 drill into underlying service \u2192 verify trust/KMS policies) with exact command order. Slight omission: no explicit handling of the newer CodePipeline V2 type in the procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never treat stage status as root cause, never retry without fixing). However a few warnings are generic (\u201cnever recommend raising the timeout without reading logs\u201d) and lack deeper explanation of why the timeout is often a symptom rather than a cause. Two points are deducted for the missing depth."
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never treat stage status as root cause, never retry without fixing, never add pipeline ARN to trust policy). A couple of pitfalls (like ignoring permission boundaries) are omitted, preventing a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. The only shortfall is the lack of an explicit \"entry_point\" flag set to true, which could hinder automatic activation in some runtimes."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. Lacks a formal JSON schema for the input, which would make activation more reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "The skill layers information (activation \u2192 mindset \u2192 quick reference \u2192 detailed steps) but the initial sections contain large tables and extensive prose that may overload an agent before it knows which path to follow. Critical rules (e.g., NEVER list) are buried later. Three points are deducted for insufficient early pruning of detail."
+      "justification": "Top\u2011level sections (quick reference, quick navigation) give a high\u2011level view, but the document front\u2011loads a large amount of detail (full tables, anti\u2011patterns) before the core decision tree, creating some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Calibration matches task fragility: destructive actions are guarded by strict evidence requirements, while diagnostic queries are free. Slight deduction because live\u2011account commands are allowed without explicit safety checks (e.g., IAM simulate\u2011principal\u2011policy may require elevated permissions)."
+      "justification": "Diagnostic steps are appropriately constrained; destructive actions (update\u2011pipeline, IAM policy changes) are only suggested after a ROOT_CAUSE_FOUND verdict. However, the skill does not explicitly guard against insufficient IAM permissions before issuing those commands."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (activation, mindset, quick reference, step\u2011by\u2011step walk, output contract, anti\u2011patterns). The mixture of narrative, tables, and code blocks makes the structure slightly ad\u2011hoc rather than a clean, reusable template. One point is deducted."
+      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick ref \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns). Structure is clear and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 11,
       "max": 15,
-      "justification": "Provides a decision tree, concrete CLI commands, and a worked example that an agent could follow. However the examples omit real command output snippets, do not show handling of pagination or permission errors, and lack fallback branches when logs are unavailable. Two points are deducted for these missing execution details."
+      "justification": "The decision tree, example outputs, and remediation commands enable an agent to act. However, the evidence requirements are sometimes ambiguous (e.g., the first example adds a \"GitHub audit log\" line not mandated by the contract) and edge cases like missing logs or cross\u2011region artifacts are not fully covered, leading to deductions."
     }
   ],
-  "total_score": 106,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46878,
-  "latency_ms": 8591,
+  "token_count": 47475,
+  "latency_ms": 11137,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 18,
       "max": 20,
-      "justification": "The skill assembles a detailed decision tree, specific sub\u2011symptom tables, and recent AWS features (e.g., enhanced import\u2011resources, ContinueUpdateRollback for nested stacks) that a generic model would not spontaneously provide. However much of the content (e.g., basic CloudFormation lifecycle phases, common IAM/limit errors) is already present in standard AWS documentation, so the delta is strong but not maximal."
+      "justification": "Adds substantial expert knowledge (earliest CREATE_FAILED as root cause, detailed ChangeSet replacement detection, ContinueUpdateRollback usage, recent 2024\u20112026 features). Missing coverage of stacksets, cross\u2011region stack operations, and explicit decision thresholds for when to invoke drift detection versus ChangeSet, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific diagnostic mindset and a concrete ordered procedure (capture signals, map StackStatus, run ChangeSet, use iam simulate\u2011principal\u2011policy, etc.). A few steps are generic (e.g., \"run cfn\u2011lint\" without CloudFormation\u2011specific nuance) which prevents a full score."
+      "justification": "Provides AWS\u2011specific procedures: mandatory ChangeSet review, IAM simulate\u2011principal\u2011policy, ordered diagnostic steps, and explicit anti\u2011patterns. Lacks a concrete step\u2011by\u2011step checklist for SCP or permissions\u2011boundary troubleshooting, which would make the procedure fully complete."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never update a ROLLBACK_COMPLETE stack, never rely on StackStatus alone). Some anti\u2011patterns are missing or only superficially covered (e.g., deeper guidance on when to import resources vs. rename) and a few warnings lack the explicit \"why\" rationale."
+      "justification": "Contains a thorough NEVER list with specific reasoning (e.g., never update a ROLLBACK_COMPLETE stack). Omits some common pitfalls such as using the default VPC, over\u2011reliance on CAPABILITY_AUTO_EXPAND, and does not always explain why each anti\u2011pattern is dangerous, reducing the score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The activation_triggers list is overly broad, which could cause spurious activation, so it loses one point."
+      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and includes rich keywords and activation triggers. The only shortfall is the missing explicit \u2018when_to_use\u2019 field in the frontmatter (it is present but could be more concise); otherwise activation is reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The skill layers information (quick reference, then detailed steps) but the initial sections are dense and include many deep details (full tables, edge\u2011case catalog) that could overload the agent before it knows whether they are needed."
+      "justification": "Information is layered (activation \u2192 mindset \u2192 quick reference \u2192 detailed steps \u2192 catalog). However, the skill front\u2011loads a very long \u201cMindset\u201d and \u201cQuick reference\u201d section, which can overload the agent before it knows the trigger. Critical rules are sometimes buried deep (e.g., the exact order of ContinueUpdateRollback) rather than highlighted early."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (delete\u2011stack, ContinueUpdateRollback) are guarded with checks, showing good calibration. However, the recommendation to \"skip the failing resource\" in UPDATE_ROLLBACK_FAILED is presented without a mandatory safety check, leaving a slight over\u2011freedom."
+      "justification": "Destructive operations (delete, ContinueUpdateRollback) are tightly constrained with explicit NEVER rules, while exploratory steps (drift detection, ChangeSet review) are left flexible. Calibration matches task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (Activation \u2192 Mindset \u2192 Quick reference \u2192 Steps \u2192 Output contract \u2192 Anti\u2011patterns). The inclusion of an ad\u2011hoc \"Expert edge cases\" section slightly breaks the uniform pattern."
+      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns). Structure is coherent and aids comprehension; no major deviation."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 13,
       "max": 15,
-      "justification": "Model outputs show several practical gaps: missing exact quoted ResourceStatusReason strings, extra non\u2011required evidence lines, omission of required fields in some cases, and ambiguous root\u2011cause statements (e.g., generic \"Resource update cancelled\" without property detail). These defects directly affect an agent's ability to execute the skill reliably."
+      "justification": "Provides a decision tree, concrete CLI commands, worked examples, and a strict output contract that an agent can execute. Missing explicit handling for nested\u2011stack import failures, soft vs hard service\u2011quota distinctions, and no guidance for CLI error handling, which limits full practical usability."
     }
   ],
-  "total_score": 102,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 48126,
-  "latency_ms": 9544,
+  "token_count": 47700,
+  "latency_ms": 16465,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

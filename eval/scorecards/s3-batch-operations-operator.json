@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides many concrete thresholds, recent feature notes, and a detailed failure\u2011mode table, but a sizable portion restates official documentation (e.g., IAM permission list, rate\u2011control limits) without adding a novel decision matrix or unique heuristic that a senior CloudOps engineer would not already know."
+      "justification": "Adds concrete expert details not usually memorized: exact numeric limits for RequestsPerSecond, CompletionWindow, KMS policy nuance (must grant Encrypt explicitly), Lambda reserved concurrency matching rate limit, two\u2011stage nature of Glacier restores, failure\u2011code table, and the subtle difference between job Status=Active vs. Complete. Some sections merely restate AWS docs, but the depth of decision\u2011tree information provides genuine delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Offers an AWS\u2011specific step\u2011by\u2011step flow (pre\u2011checks, CONFIRM gate, CLI sequence) and operation\u2011specific grant checks, yet some procedures are generic phrasing like \u201crun pre\u2011checks\u201d and omit a dedicated verification of the role\u2019s trust policy before job creation."
+      "justification": "Encodes AWS\u2011specific workflow: ordered pre\u2011flight checklist, role\u2011two\u2011sided permission model, confirm\u2011gate before any state\u2011changing CLI, operation\u2011specific grant matrix, and explicit handling of job priority and rate\u2011control. Lacks a concise decision tree for choosing the correct operation type based on manifest content, which would make the procedure fully complete."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., header rows in CSV, missing Lambda principal), but misses a few high\u2011impact anti\u2011patterns such as never using the maximum priority value and does not always explain the underlying AWS service behavior for each pitfall."
+      "justification": "A thorough NEVER list with concrete reasons (e.g., missing IAM grants cause 100% failure, header rows in CSV cause NoSuchKey, Status:Complete is not success). Some warnings are generic or lack specific error codes (e.g., missing iam:PassRole is noted only indirectly). Overall strong but not exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description outlines WHAT, WHEN, and KEYWORDS, and activation triggers are listed. However, the activation_triggers field is a free\u2011form list rather than a strict schema, and the when_to_use paragraph could be tighter for reliable automated activation."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The invocation_schema describes input shapes but does not provide a formal JSON schema, leaving some ambiguity for automated parsing."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns) but the initial sections are dense, causing cognitive overload before the core safety rules are reached. Some deep technical references could be deferred to an appendix."
+      "justification": "Content is layered: quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns. Nevertheless, the early sections are dense, potentially overloading the agent before it knows whether it needs the deep details."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained with pre\u2011checks and a mandatory CONFIRM gate, yet the cancel\u2011job operation lacks an extra safeguard (e.g., double\u2011confirm or explicit impact warning) that would match its high fragility."
+      "justification": "Destructive actions are tightly constrained by mandatory pre\u2011checks and a CONFIRM gate. Rate\u2011control limits are explicitly bounded. Minor gap: no lower\u2011bound guidance for tiny jobs and no explicit safe defaults for missing optional fields."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (What it does, navigation table, mindset, process, anti\u2011patterns, output contract), but the ordering of sections (quick reference before mindset) feels slightly ad\u2011hoc, preventing a perfectly clean pattern."
+      "justification": "Follows a recognizable pattern (description \u2192 navigation \u2192 mindset \u2192 process \u2192 contract \u2192 anti\u2011patterns). A few sections (e.g., \"Expert heuristic\") feel inserted rather than part of the core pattern, but overall the structure is coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides executable CLI snippets, decision trees, and sample outputs, enabling an agent to act. Missing coverage of some edge cases (cross\u2011region manifests, pagination of inventory listings, handling of create\u2011job API errors) reduces robustness."
+      "justification": "Provides concrete CLI commands, output contract, and worked examples that an agent could follow. Placeholders like <etag> and <returned-id> require manual substitution, and error handling for malformed input is limited to a generic VERDICT:ERROR case. Edge cases such as pagination failures or partial manifest corruption are not fully covered."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 50061,
-  "latency_ms": 13648,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "token_count": 49634,
+  "latency_ms": 14553,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }

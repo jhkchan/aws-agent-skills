@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 15,
       "max": 20,
-      "justification": "Provides concrete expert heuristics (shard\u2011per\u2011GB rule, storage multiplier, mandatory multiple\u2011of\u20113 node count, dedicated\u2011master sizing, immutable setting list). Missing newer Graviton3 instance families (r7g) and detailed cost\u2011per\u2011TB guidance, so not fully exhaustive."
+      "justification": "Provides concrete, expert\u2011level heuristics (e.g., shard count = ceil(data\u202fGB/30\u201150), storage multiplier 1.1, dedicated master sizing per node count, immutable setting list) that go beyond generic model knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Includes an AWS\u2011specific 10\u2011step provisioning order and dependency graph, but some steps (e.g., prerequisite verification) are generic and the decision tree for managed vs Serverless is only high\u2011level, lacking granular criteria."
+      "justification": "Encodes a detailed 10\u2011step AWS\u2011specific provisioning order with exact CLI flags and dependency reasoning, but some steps are generic checks (e.g., \"verify VPC\") and could be more tightly tied to OpenSearch nuances."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Strong NEVER list with concrete reasons (public access, t3.small, 2\u2011AZ odd count, missing masters). Omits a warning about using default master\u2011user password and about allowing public IP\u2011allowlist even in dev, leaving a minor gap."
+      "justification": "Contains a detailed NEVER list with specific reasons (e.g., never use public access for production, never skip dedicated masters). Misses a few common pitfalls such as cross\u2011cluster\u2011search limits and long\u2011term snapshot retention strategies."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, triggers, and output contract are present. Activation condition is expressed as a long keyword list rather than a concise trigger, and the description of when to invoke could be tighter."
+      "justification": "Full frontmatter, activation keywords, strict output contract, when_to_use section, and explicit required labels meet the specification perfectly."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "Information is layered but the skill front\u2011loads extensive tables and narrative before the concise checklist, causing cognitive overload; critical immutable\u2011setting rules are buried deep in the document."
+      "justification": "Provides quick\u2011navigation and layered sections, but the main body is dense and forces the reader to absorb many details before reaching the actionable checklist, causing some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive provisioning is constrained by required decisions and NEVER list, yet the skill permits free\u2011form instance\u2011type selection without explicit upper limits, risking over\u2011provisioning in fragile contexts."
+      "justification": "Calibrates freedom by enforcing immutable decisions and a strict checklist, yet the Serverless scenario leaves several fields as \"N/A\", which could permit ambiguous or incomplete actions."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset, quick navigation, procedure, anti\u2011patterns, error handling, output format) but mixes tables and prose inconsistently, slightly reducing structural clarity."
+      "justification": "Follows a recognizable pattern (mindset, navigation, procedure, anti\u2011patterns, output format) but mixes narrative and tables, making the structure slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 10,
       "max": 15,
-      "justification": "Model output matches the checklist for managed clusters, but the Serverless example violates the required instance\u2011type syntax (no .search suffix) and uses N/A fields not allowed by the contract, showing a usability gap."
+      "justification": "Agent can execute managed\u2011cluster provisioning using the checklist and commands, but the Serverless example violates the contract (instance type omitted) and the skill does not resolve this, reducing overall usability."
     }
   ],
-  "total_score": 102,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41441,
-  "latency_ms": 8555,
+  "token_count": 41489,
+  "latency_ms": 16034,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

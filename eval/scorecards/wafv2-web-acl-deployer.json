@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill provides many concrete AWS\u2011specific details (priority numbers, aggregate\u2011key matrix, recent 2024\u20112026 feature list, exact resource\u2011policy snippets). However, a large portion restates information that a competent CloudOps model already knows (e.g., basic scope vs regional distinction, generic rule\u2011type definitions). The net delta is valuable but not maximal."
+      "justification": "Adds concrete, expert\u2011level details (priority layout, aggregate\u2011key matrix, immutable scope rule, logging resource\u2011policy requirements). However, many statements restate standard AWS docs (e.g., default action choices) and stop short of a full decision tree for rule\u2011priority trade\u2011offs, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (scope selection, managed\u2011rule ordering, logging destination setup, association commands). A few steps are generic (\"verify IAM permissions\", \"confirm target resource exists\") and could be tighter to the WAFv2 workflow."
+      "justification": "Encodes an AWS\u2011specific 9\u2011step provisioning workflow, decision rules for scope, default action, rule ordering, and rate\u2011limit key selection. Includes pre\u2011flight safety checks and IAM permission list. Lacks a dedicated procedure for validating resource\u2011policy permissions on logging destinations, which would make it fully exhaustive."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The NEVER list enumerates concrete pitfalls with clear reasoning (e.g., wrong scope, allow\u2011list priority, aggregate\u2011key misuse). One minor omission: it does not explain why enabling ATP without a login path silently does nothing, leaving a small gap."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never use IP aggregate key behind CDN, never create wrong scope, never block before count). Missing anti\u2011patterns around WCU budgeting and Terraform state drift, which would complete the set."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, and a strict output contract are present. The \"when_to_use\" section is adequate, but trigger conditions rely heavily on keyword matching; a more formal activation predicate would improve reliability."
+      "justification": "Frontmatter is complete and well\u2011formed; description, when_to_use, activation keywords, and strict output contract are all present. An agent can reliably decide when to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers information (quick navigation, then deep sections) but the core checklist format and many detailed tables are presented early, creating cognitive load. Critical rules (e.g., NEVER list) could be hidden behind a reference link to better respect progressive disclosure."
+      "justification": "Uses layered sections (quick navigation, output contract, reasoning, prerequisites, procedure, anti\u2011patterns, heuristics, workload matrix, recent features) and external reference files for deep details. However, the initial document is dense, which can cause cognitive overload before the agent reaches the concise checklist."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (Web ACL creation) are guarded by extensive prerequisite checks and a mandatory checklist. However, the skill does not explicitly forbid accidental deletion or recreation of an existing ACL, leaving a small freedom\u2011calibration gap."
+      "justification": "Tightens constraints for fragile operations (strict output labels, forbidden patterns) and relaxes freedom for exploratory tasks (heuristic tables, optional sections). Rate\u2011based rule guidance could be stricter about key selection in mixed\u2011traffic environments."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (frontmatter \u2192 navigation \u2192 activation \u2192 output contract \u2192 reasoning \u2192 procedure). The ordering of sections is slightly ad\u2011hoc (e.g., \"Recent AWS features\" appears after the procedure) but overall the pattern is clear."
+      "justification": "Follows a recognizable skill pattern: frontmatter, activation keywords, strict output contract, reasoning framework, step\u2011by\u2011step procedure, anti\u2011pattern list, heuristics, and references. Minor ad\u2011hoc ordering of some tables prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, priority tables, and a ready\u2011to\u2011deploy checklist. Model output examples are syntactically correct. Missing edge\u2011case handling for unavailable managed rule groups (subscription not active) and for missing IP\u2011set ARNs reduces completeness."
+      "justification": "Provides working examples, decision trees, CLI commands, pre\u2011flight checks, and a ready\u2011to\u2011deploy checklist that an agent can execute. External reference files are mentioned but not included, and some edge\u2011case handling (e.g., IAM policy errors, WCU limit exceedance) is only briefly noted."
     }
   ],
-  "total_score": 103,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 43752,
-  "latency_ms": 12976,
+  "grade": "A",
+  "token_count": 43711,
+  "latency_ms": 12050,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

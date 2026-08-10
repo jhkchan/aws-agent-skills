@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill provides many expert\u2011level details (detection\u2011lag baselines, 512\u2011char rule limit, anomaly\u2011detector warm\u2011up, cross\u2011account metric syntax, action ordering, etc.) that a generic model would not know. However, several sections merely restate well\u2011known CloudWatch concepts (e.g., basic pre\u2011check list, standard CLI flags) and it lacks a concise decision tree for when to prefer static\u2011threshold vs anomaly\u2011detection vs metric\u2011math, leaving a modest knowledge gap."
+      "justification": "The skill contains many deep CloudWatch specifics (detection\u2011lag baselines, composite rule length limits, anomaly\u2011detector warm\u2011up, action ordering effects, cross\u2011account metric nuances). However, several points (TreatMissingData default, DatapointsToAlarm \u2264 EvaluationPeriods, basic alarm creation flags) are already well\u2011known to a capable model, so the added delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "The procedure is AWS\u2011specific and thorough: ordered pre\u2011checks, snapshot before change, mandatory CONFIRM gate, post\u2011verification steps. The only shortfall is that the composite\u2011alarm workflow does not explicitly verify child\u2011alarm states after creation (e.g., re\u2011reading the rule to ensure it was accepted), which is a minor procedural omission."
+      "justification": "Encodes AWS\u2011specific workflow: deterministic pre\u2011checks (namespace, dimensions, period alignment, IAM), snapshot before any state\u2011changing CLI, mandatory CONFIRM gate, exact flag ordering for put\u2011metric\u2011alarm/put\u2011composite\u2011alarm, and post\u2011verification steps. Only a few generic phrasings remain."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete pitfalls (TreatMissingData default, DatapointsToAlarm > EvaluationPeriods, silent overwrite, action caps) and reasons. Missing are a few common anti\u2011patterns such as forgetting OKActions, over\u2011using multiple SNS topics causing duplicate notifications, and no explicit warning about cross\u2011region alarm limitations, so the anti\u2011pattern coverage is strong but not exhaustive."
+      "justification": "Comprehensive NEVER list with concrete reasons (TreatMissingData default, DatapointsToAlarm > EvaluationPeriods, action duplication, etc.). Missing an explicit warning about using static thresholds on high\u2011variance metrics without sampling, so a minor deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and invocation schema are present, giving an agent clear activation cues. The only deficiency is that the \"when_to_use\" field is a free\u2011form paragraph rather than a concise, machine\u2011readable predicate, which could reduce reliable triggering in automated pipelines."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. Activation triggers include a few vague entries (e.g., \"composite alarm\") that could cause ambiguous activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill layers information well (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 patterns \u2192 output format). Nonetheless, the quick\u2011reference table and the extensive pre\u2011check priority list are dense, causing some cognitive overload before the agent has filtered what it needs for a specific operation."
+      "justification": "Content is layered: quick reference first, then mindset, pre\u2011flight, process, common patterns, diagnostics, output format, anti\u2011patterns, safety checks, and recent features. Critical rules are not buried; the top\u2011level gives just enough to act, deeper details on demand."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained by pre\u2011checks, snapshots, and a CONFIRM gate, while creative tasks (e.g., composing metric\u2011math expressions) are left flexible. The skill does not address the delete\u2011alarm operation at all, leaving a gap in calibration for the most irreversible action."
+      "justification": "Destructive operations are tightly constrained (pre\u2011checks, confirm gate, snapshot) while planning/diagnostic steps are freer. Calibration matches the fragility of each task."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (What it does, Quick navigation, Mindset, Process, Anti\u2011Patterns, Output contract). A minor inconsistency is the ordering of sections: the \"Common alarm patterns\" block appears after the process but before the output format, breaking the otherwise strict top\u2011down flow."
+      "justification": "Follows the established CloudOps skill pattern: quick navigation table, mindset, pre\u2011flight, process, common patterns, diagnostics, output format, anti\u2011patterns, safety checklist. Structure is coherent and recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill supplies decision trees, concrete CLI commands, and full output templates, enabling an agent to act. Gaps remain: error handling for malformed input is only mentioned briefly, pagination for describe\u2011alarms/get\u2011metric\u2011statistics is noted but not detailed, and there is no guidance for IAM permission failures, which are common in real deployments."
+      "justification": "Provides concrete CLI commands, decision trees, verification steps, and worked examples enabling an agent to execute the skill. Lacks explicit handling of CLI failures and automated rollback on post\u2011verify failure, which slightly reduces robustness."
     }
   ],
-  "total_score": 105,
+  "total_score": 111,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 40466,
-  "latency_ms": 12993,
+  "grade": "A",
+  "token_count": 40696,
+  "latency_ms": 13176,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

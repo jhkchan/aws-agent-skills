@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 18,
+      "score": 17,
       "max": 20,
-      "justification": "Provides concrete, up\u2011to\u2011date expert details not usually known by a generic model: exact family\u2011to\u2011engine mapping, static vs dynamic ApplyMethod nuance, formula syntax ({DBInstanceClassMemory/N}), Aurora Serverless v2 capacity interaction, recent 2024\u20112026 feature changes, and precise max_connections formula for Aurora. This is genuine expert knowledge."
+      "justification": "Provides many concrete, up\u2011to\u2011date AWS specifics (family formulas, Aurora Serverless v2 capacity handling, recent engine releases, memory\u2011formula syntax, static vs dynamic ApplyMethod nuances) that go beyond a generic model's baseline knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (family selection, static vs dynamic handling, ApplyMethod ordering) yet some steps remain generic (e.g., \u201cverify IAM permissions\u201d) and the skill lacks a concrete, ordered rollback or safety\u2011check procedure for production deployments."
+      "justification": "Outlines an AWS\u2011specific, ordered provisioning workflow with exact CLI commands, pre\u2011flight checks, and association steps; however it omits a brief Terraform/CloudFormation procedural shortcut, leaving a small gap."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The NEVER list is detailed and reasoned (e.g., static parameters require reboot, never use absolute memory values on Serverless v2), but it omits a common pitfall: parameter\u2011group version drift after engine upgrades, which can silently break configurations."
+      "justification": "Contains a detailed NEVER list with concrete pitfalls and reasons (wrong family, ApplyMethod misuse, absolute memory on Serverless, reboot planning, etc.). Missing a few advanced anti\u2011patterns such as least\u2011privilege IAM or parameter\u2011group version drift."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter and output contract are present, but activation triggers are expressed in a long free\u2011text list that could lead to ambiguous invocation; there is no explicit schema defining required input fields (group name, engine, parameters)."
+      "justification": "Frontmatter is complete, activation keywords, when\u2011to\u2011use description, and strict output contract are clearly defined. The only minor issue is the lack of an explicit schema for the checklist items."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill front\u2011loads extensive tables, matrices, and recent\u2011feature notes before the core checklist, causing cognitive overload; critical rules are buried rather than revealed incrementally."
+      "justification": "Uses layered sections (quick navigation, reasoning, prerequisites, procedure, matrix, references) so agents can skim or dive deeper. The initial navigation table is dense, causing slight cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (create/modify parameter groups) are constrained by a strict output contract, yet the skill does not enforce an explicit confirmation step or safety gate for production environments, leaving room for accidental execution."
+      "justification": "Destructive actions (create/modify parameter groups) are gated by a strict checklist and verification commands, matching the fragility of the task. Some creative flexibility (e.g., custom parameters) is left open, but overall calibration is appropriate."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The overall structure follows a recognizable pattern (navigation, activation, contract, reasoning, procedure, matrix, anti\u2011patterns, heuristics), with minor inconsistencies in section naming that slightly reduce coherence."
+      "justification": "Follows a recognizable skill pattern (metadata, navigation, strict contract, reasoning, procedure, anti\u2011patterns, heuristics, edge cases). Structure is consistent with other CloudOps skills."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 9,
       "max": 15,
-      "justification": "Model output generally matches the contract, but includes multiple checklist blocks separated by '---', which violates the rule against extra sections after VERIFICATION_COMMANDS. Also lacks explicit error handling for invalid families or missing IAM permissions."
+      "justification": "The model output generally matches the contract, but it misclassifies `max_connections` as dynamic in the PREREQUISITES_MISSING example and omits the static flag for that parameter, showing a concrete execution error. This undermines reliability."
     }
   ],
-  "total_score": 103,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41409,
-  "latency_ms": 11434,
+  "token_count": 41030,
+  "latency_ms": 9841,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

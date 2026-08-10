@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert details not usually known to a generic model: exact sequential\u2011minor\u2011version rule, add\u2011on bridge\u2011version requirement, IP\u2011capacity check for surge upgrades, extended\u2011support pricing ($0.10/cluster\u2011hour), recent AWS features (Auto Mode, Hybrid Nodes, Access Entries, Pod Identity, Karpenter v1) and a detailed deprecated\u2011API matrix. No major missing knowledge."
+      "justification": "The skill provides many concrete details (e.g., exact N+1 version rule, IP\u2011capacity check for maxSurge, specific deprecated\u2011API tables, exact addon\u2011compatibility queries). However, a large portion restates publicly documented EKS upgrade flow that a capable model could already generate, so the genuine expert delta is limited."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific upgrade mindset (add\u2011ons first, control\u2011plane second, node\u2011groups third) and precise procedural steps: pre\u2011flight metadata gate, mandatory CONFIRM gate, backup of cluster state, exact CLI flags, polling logic, and post\u2011verification checklist. All procedures are AWS\u2011specific rather than generic."
+      "justification": "Procedures are AWS\u2011specific (order: addon \u2192 control\u2011plane \u2192 node groups, confirm gate, backup commands, surge\u2011capacity verification). One deduction because some steps are phrased generically (e.g., \u201crun pre\u2011checks\u201d) without tying them to the exact AWS CLI sequence."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete NEVER list with specific reasons (e.g., skipping add\u2011on upgrade breaks networking, PDBs block drain, using --resolve-conflicts OVERWRITE without backup). Includes additional pitfalls (IAM role permissions, concurrent updates) but could list a few more edge\u2011cases such as forgetting to disable pod\u2011identity add\u2011on before upgrade."
+      "justification": "A solid NEVER list with concrete reasons is present, but it only covers five top pitfalls and omits other common failure modes (e.g., missing IAM permissions, Karpenter\u2011driven node replacement, Add\u2011on configuration\u2011value conflicts). The list could be more exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete with description, version, author, license, compatibility, keywords, tags, metadata, activation triggers, and invocation schema. The description clearly states WHAT the skill does, WHEN to invoke, and KEYWORDS. Minor omission: the \"when_to_use\" field repeats the description but could be a concise bullet list."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present, enabling reliable activation. The trigger list is overly broad (e.g., generic \"upgrade EKS addons\") which could cause ambiguous activation, hence a single point loss."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Content is layered: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns, and worked examples. Critical rules appear early, deeper references later. Slight overload in the long \"Step 0\" knowledge block, but overall the layering is effective."
+      "justification": "Information is layered into sections (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns). Nevertheless, the main body front\u2011loads extensive tables and detailed commands before the concise quick\u2011reference, creating some cognitive overload and earning a deduction."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained with mandatory CONFIRM gate, rollback advisory, IP\u2011capacity and PDB checks, and explicit safety warnings. Creative or read\u2011only tasks (pre\u2011check, post\u2011verify) are left flexible. No over\u2011constraining of harmless operations."
+      "justification": "Destructive operations are guarded by a mandatory CONFIRM gate and many pre\u2011checks. A minor deduction because capacity constraints for surge upgrades are mentioned only in prose, not enforced as a hard parameter in the skill definition."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (frontmatter \u2192 What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output format \u2192 Anti\u2011Patterns \u2192 Safety checks). The structure aids comprehension; only minor ad\u2011hoc phrasing in some tables."
+      "justification": "The skill follows a recognizable structure (What it does, Mindset, Process, Output format, Anti\u2011Patterns). However, the pattern is custom rather than a formally named framework, so it is slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI commands, and examples, but the example outputs violate the \"no placeholders\" rule (e.g., <update-id-from-step-2>) and contain ambiguous pre\u2011check statements (target version same as cluster). Error handling for IAM permission failures is only briefly mentioned. These gaps reduce immediate executability."
+      "justification": "Provides concrete CLI commands, decision flow, and worked examples, enabling an agent to execute upgrades. Lacks explicit error\u2011handling branches for failed CLI calls and does not detail rollback steps for node\u2011group failures beyond a generic statement, resulting in a deduction."
     }
   ],
-  "total_score": 105,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44640,
-  "latency_ms": 20907,
+  "token_count": 43850,
+  "latency_ms": 14277,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }
