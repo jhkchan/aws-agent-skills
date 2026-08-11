@@ -1,0 +1,201 @@
+# Eval test cases for dms-task-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: dms-task-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: postgres-cdc-wal-level-failed
+    description: >-
+      Operator's DMS replication task (postgres -> postgres, CDC mode)
+      failed immediately on start. Task logs show "logical decoding
+      requires wal_level >= logical." The source has wal_level=replica.
+      All other pre-checks pass (SG, pglogical extension, DMS user).
+      Diagnosis should produce ROOT_CAUSE_FOUND with
+      SOURCE_BINARY_LOGGING layer and the wal_level=logical fix.
+    input: |
+      Task: arn:aws:dms:us-east-1:111111111111:task:TASK001
+      Source engine: postgres (RDS PostgreSQL 15)
+      Target engine: postgres (Aurora PostgreSQL 15)
+      Migration type: full-load-and-cdc
+      Instance: dms.r5.large
+
+      Task status: failed (within 10s of start)
+      LastFailureMessage: "Task 'TASK001' was suspended."
+
+      Task logs (aws logs filter-log-events dms-task-TASK001):
+        ERROR: "logical decoding requires wal_level >= logical"
+
+      Source query: select setting from pg_settings where name='wal_level';
+        Result: replica
+
+      Source: pglogical extension installed (confirmed)
+      Source SG: allows DMS instance SG on tcp/5432 (confirmed)
+      DMS user: has REPLICATION attribute (confirmed)
+
+      Emit the standard VERDICT block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION, CONFIRM).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "wal_level"
+        - "logical"
+        - "SOURCE_BINARY_LOGGING"
+        - "modify-db-parameter-group"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: mysql-cdc-binlog-retention-latency
+    description: >-
+      Operator's DMS task (mysql -> postgres, CDC mode) has
+      CDCLatencySource climbing to 86400s (24h). The MySQL RDS source
+      has binlog_retention_hours=0 (default). Binlogs were purged.
+      Diagnosis should produce ROOT_CAUSE_FOUND with
+      SOURCE_BINARY_LOGGING layer and the binlog_retention fix.
+    input: |
+      Task: arn:aws:dms:us-east-1:111111111111:task:TASK002
+      Source engine: mysql (RDS MySQL 8.0)
+      Target engine: postgres (Aurora PostgreSQL 15)
+      Migration type: full-load-and-cdc
+      Instance: dms.r5.xlarge
+
+      Task status: running (but CDCLatencySource climbing)
+      CDCLatencySource: 86400s (24h, climbing)
+      CDCLatencyTarget: 5s (normal)
+
+      Source query: show variables like 'binlog_format';
+        Result: ROW
+      Source query: show variables like 'binlog_row_image';
+        Result: FULL
+      Source query: show variables like 'binlog_retention_hours';
+        Result: 0
+      Source query: show binary logs;
+        Result: only the current binlog (older binlogs purged)
+
+      DMS user: has REPLICATION SLAVE, REPLICATION CLIENT (confirmed)
+
+      Emit the standard VERDICT block.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "binlog_retention_hours"
+        - "SOURCE_BINARY_LOGGING"
+        - "purged"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: target-fk-constraint-violation-failed
+    description: >-
+      Operator's DMS task (oracle -> postgres, full-load-and-cdc)
+      failed at the ORDERS table with a foreign key constraint
+      violation. The customers table was not loaded before orders.
+      Diagnosis should produce ROOT_CAUSE_FOUND with TARGET_CONSTRAINTS
+      layer and the FK-disable remediation.
+    input: |
+      Task: arn:aws:dms:us-east-1:111111111111:task:TASK003
+      Source engine: oracle (RDS Oracle 19c)
+      Target engine: postgres (Aurora PostgreSQL 15)
+      Migration type: full-load-and-cdc
+      Instance: dms.r5.2xlarge
+
+      Task status: failed (at table ORDERS during full load)
+      Table ORDERS FullLoadRowCount: 0 (while other tables loaded OK)
+
+      Task logs (aws logs filter-log-events dms-task-TASK003):
+        ERROR: "insert or update on table 'orders' violates foreign key
+        constraint 'orders_customer_id_fkey'"
+
+      describe-table-statistics: CUSTOMERS in "loading" state while
+        ORDERS already attempted inserts.
+
+      Source/target connections: OK
+      Data types: compatible (verified)
+
+      Emit the standard VERDICT block.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "TARGET_CONSTRAINTS"
+        - "foreign key"
+        - "session_replication_role"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: memory-pressure-cdc-stall
+    description: >-
+      Operator's DMS replication instance (dms.r5.large) is running 3
+      CDC tasks. All 3 tasks show CDCLatencyTarget climbing.
+      FreeableMemory dropped to 200MB, SwapUsage climbed to 2GB,
+      CDCChangesDiskSource is non-zero. Diagnosis should produce
+      ROOT_CAUSE_FOUND with MEMORY_PRESSURE layer and instance upgrade.
+    input: |
+      Instance: dms.r5.large (rep-inst-001)
+      Tasks: TASK004 (mysql->postgres), TASK005 (mysql->postgres),
+        TASK006 (oracle->postgres) — all CDC, all showing
+        CDCLatencyTarget climbing
+
+      CloudWatch (last hour):
+        FreeableMemory: avg 200MB, min 50MB
+        SwapUsage: avg 2GB, climbing
+        CPUUtilization: avg 85%
+        CDCChangesDiskSource: non-zero on all 3 tasks
+
+      Source CDC configs: all verified OK (binlog_format=ROW,
+        wal_level=logical, LogMiner configured)
+      Source/target SGs: all OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "MEMORY_PRESSURE"
+        - "FreeableMemory"
+        - "SwapUsage"
+        - "modify-replication-instance"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: need-more-info-empty-logs
+    description: >-
+      Operator reports a DMS task failure but provides only the task ID
+      with no logs, no source/target engine, and no error message. Task
+      logs are empty (Logging=ESSENTIAL). Diagnosis should produce
+      NEED_MORE_INFO with the list of missing information.
+    input: |
+      Task: arn:aws:dms:us-east-1:111111111111:task:TASK007
+      The task is failing but I don't know why. Can you help?
+
+      (No task logs, no source/target engine type provided, no error
+      message, no CloudWatch metrics.)
+
+      Emit the standard VERDICT block.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "UNKNOWN"
+        - "Missing"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: ROOT_CAUSE_FOUND"
+        - "VERDICT: ESCALATE"

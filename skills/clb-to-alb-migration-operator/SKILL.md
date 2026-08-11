@@ -1,25 +1,20 @@
 ---
 name: clb-to-alb-migration-operator
 description: >-
-  Operates Classic Load Balancer (CLB / ELB) to Application Load Balancer
-  (ALB / ELBv2) migrations end-to-end — pre-migration feature assessment
+  Operates Classic Load Balancer (CLB) to Application Load Balancer
+  (ALB) migrations end-to-end — pre-migration feature assessment
   (proxy protocol vs X-Forwarded-For, sticky sessions, SSL termination,
-  backend HTTPS, cross-zone load balancing, connection draining vs
-  deregistration delay), ALB target group creation mapping each CLB
-  backend port/protocol, listener migration (HTTP/HTTPS with SNI, custom
-  SSL policies), listener rules for path/host-based routing that CLB
-  could not do natively, deregistration delay tuning matching the CLB's
-  connection draining timeout, SSL/TLS certificate migration (ACM or
-  IAM-uploaded), DNS cutover (Route 53 weighted routing for canary vs
-  direct swap), rollback strategy (CLB stays alive behind a weighted
-  record), and latest-feature coverage (ALB with Lambda targets, ALB
-  with OIDC authentication via Cognito, ALB built-in WAF, ZWZonal). Runs
-  deterministic pre-checks (CLB scheme matches ALB, subnet count >= 2,
-  no TCP listener without SSL on a layer-7 path, SSL cert ARN resolvable,
-  target group health check path reachable) behind a CONFIRM gate and
-  emits READY, BLOCKED, or COMPLETED per migration. Use when planning a
-  CLB-to-ALB migration, validating feature parity, cutting over traffic,
-  or rolling back a failed migration.
+  connection draining vs deregistration delay), ALB target group
+  creation mapping each CLB backend port/protocol, listener migration
+  with path/host-based routing, deregistration delay tuning, SSL/TLS
+  certificate migration (ACM or IAM), DNS cutover (Route 53 weighted
+  canary vs direct swap), rollback strategy, and latest-feature
+  coverage (ALB with Lambda targets, ALB with OIDC via Cognito, ALB
+  WAF). Runs deterministic pre-checks (CLB scheme matches ALB, subnet
+  count >= 2, no TCP passthrough listener, SSL cert resolvable, health
+  check path reachable) behind a CONFIRM gate and emits READY, BLOCKED,
+  or COMPLETED per migration. Use when planning a CLB-to-ALB migration,
+  validating feature parity, cutting over traffic, or rolling back.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

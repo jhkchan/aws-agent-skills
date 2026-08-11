@@ -4,20 +4,18 @@ description: >-
   Diagnoses AWS Database Migration Service (DMS) replication task
   failures through a systematic diagnostic tree covering task status
   (stopped, failed, running with errors), source connection failures
-  (security group ingress, IAM role trust policy, missing
-  pglogical/MySQL binlog/MS-Replication/Oracle LogMiner), target
-  connection failures (IAM, primary key missing, foreign key
-  constraint violations), CDC latency (memory pressure, disk swap,
-  task Logging disabled), full load errors (table mapping wildcards,
-  data type mismatches, LOB size limits), and task settings
-  optimization (Logging, validation, ParallelLoadThreads). Walks
-  symptoms to root cause with describe-replication-tasks, task logs
-  (CloudWatch Logs), table-statistics, and CDC metrics
-  (CDCLatencySource, CDCLatencyTarget, CDCChangesDiskSource). Emits
+  (security group ingress, IAM trust policy, missing pglogical/MySQL
+  binlog/MS-Replication/Oracle LogMiner), target connection failures
+  (IAM, PK/FK constraint violations), CDC latency (memory pressure,
+  disk swap, Logging disabled), full load errors (table mapping,
+  data type mismatches, LOB limits), and task settings (Logging,
+  validation, ParallelLoadThreads). Walks symptoms to root cause with
+  describe-replication-tasks, task logs, table-statistics, and CDC
+  metrics (CDCLatencySource, CDCLatencyTarget). Emits
   ROOT_CAUSE_FOUND with the specific failure layer or ESCALATE.
-  Latest coverage includes DMS Serverless, DMS with Babelfish, and
-  Amazon DMS Fleet Advisor. Use when a DMS task is stopped, failed,
-  or showing high CDC latency.
+  Latest coverage: DMS Serverless, DMS with Babelfish, DMS Fleet
+  Advisor. Use when a DMS task is stopped, failed, or showing high
+  CDC latency.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

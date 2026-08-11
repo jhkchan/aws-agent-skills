@@ -1,0 +1,47 @@
+# Eval configuration for dms-task-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: dms-task-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: postgres-cdc-wal-level-failed
+    difficulty: hard
+    prompt_file: prompts/postgres-cdc-wal-level-failed.md
+    baseline_file: baselines/postgres-cdc-wal-level-failed.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_risk: MODERATE
+  - id: mysql-cdc-binlog-retention-latency
+    difficulty: hard
+    prompt_file: prompts/mysql-cdc-binlog-retention-latency.md
+    baseline_file: baselines/mysql-cdc-binlog-retention-latency.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_risk: HIGH
+  - id: target-fk-constraint-violation-failed
+    difficulty: medium
+    prompt_file: prompts/target-fk-constraint-violation-failed.md
+    baseline_file: baselines/target-fk-constraint-violation-failed.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_risk: MODERATE
+  - id: memory-pressure-cdc-stall
+    difficulty: hard
+    prompt_file: prompts/memory-pressure-cdc-stall.md
+    baseline_file: baselines/memory-pressure-cdc-stall.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_risk: MODERATE
+  - id: need-more-info-empty-logs
+    difficulty: easy
+    prompt_file: prompts/need-more-info-empty-logs.md
+    baseline_file: baselines/need-more-info-empty-logs.md
+    expected_verdict: NEED_MORE_INFO
+    expected_risk: LOW

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "dms-task-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DMS Task Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "postgres-cdc-wal-level-failed",
+      "name": "PostgreSQL CDC task fails — wal_level=replica (ROOT_CAUSE_FOUND)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/postgres-cdc-wal-level-failed.md",
+      "baseline_file": "baselines/postgres-cdc-wal-level-failed.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "wal_level", "logical", "SOURCE_BINARY_LOGGING", "modify-db-parameter-group"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "mysql-cdc-binlog-retention-latency",
+      "name": "MySQL CDC latency climbing — binlog_retention_hours=0 (ROOT_CAUSE_FOUND)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/mysql-cdc-binlog-retention-latency.md",
+      "baseline_file": "baselines/mysql-cdc-binlog-retention-latency.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "binlog_retention_hours", "SOURCE_BINARY_LOGGING", "purged"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "target-fk-constraint-violation-failed",
+      "name": "Full load fails at ORDERS — FK constraint violation (ROOT_CAUSE_FOUND)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/target-fk-constraint-violation-failed.md",
+      "baseline_file": "baselines/target-fk-constraint-violation-failed.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "TARGET_CONSTRAINTS", "foreign key", "session_replication_role"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "memory-pressure-cdc-stall",
+      "name": "All CDC tasks slow — instance memory exhausted (ROOT_CAUSE_FOUND)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/memory-pressure-cdc-stall.md",
+      "baseline_file": "baselines/memory-pressure-cdc-stall.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "MEMORY_PRESSURE", "FreeableMemory", "SwapUsage", "modify-replication-instance"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "need-more-info-empty-logs",
+      "name": "Task failing but no context provided (NEED_MORE_INFO)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/need-more-info-empty-logs.md",
+      "baseline_file": "baselines/need-more-info-empty-logs.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "UNKNOWN", "Missing"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: ROOT_CAUSE_FOUND", "VERDICT: ESCALATE"]
+        }
+      ]
+    }
+  ]
+}
