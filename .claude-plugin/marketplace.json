@@ -257,5 +257,1086 @@
       ],
       "skill_count": 90
     }
+  ],
+  "skills": [
+    {
+      "name": "accessanalyzer-finding-triage",
+      "description": "Triages IAM Access Analyzer findings (external access + unused access) into risk verdicts with remed"
+    },
+    {
+      "name": "acm-certificate-deployer",
+      "description": "Provisions AWS ACM certificates with production defaults: certificate request (domain names, wildcar"
+    },
+    {
+      "name": "acm-certificate-expiry-auditor",
+      "description": "Audits AWS Certificate Manager (ACM) certificates for expiry risk, renewal health, validation method"
+    },
+    {
+      "name": "alb-5xx-troubleshooter",
+      "description": "Diagnoses ALB and NLB 5xx errors (500 InternalServerError, 502 BadGateway, 503 ServiceUnavailable, 5"
+    },
+    {
+      "name": "amazon-mq-broker-deployer",
+      "description": "Provisions Amazon MQ brokers (ActiveMQ or RabbitMQ) with production defaults: engine selection (Acti"
+    },
+    {
+      "name": "amplify-app-deployer",
+      "description": "Provisions AWS Amplify applications with production defaults: Git-based deployments (CodeCommit, Git"
+    },
+    {
+      "name": "apigateway-5xx-troubleshooter",
+      "description": "Diagnoses Amazon API Gateway 5xx errors (500 InternalServerError, 502 BadGateway, 503 ServiceUnavail"
+    },
+    {
+      "name": "apigateway-http-api-deployer",
+      "description": "Provisions production-grade API Gateway HTTP APIs (v2) with routes (ANY, GET, POST, {proxy+} greedy)"
+    },
+    {
+      "name": "apigateway-http-troubleshooter",
+      "description": "Diagnoses Amazon API Gateway HTTP API failures through a ten-category diagnostic tree: 4xx routing e"
+    },
+    {
+      "name": "apigateway-resource-policy-auditor",
+      "description": "Audits AWS API Gateway REST/HTTP APIs for unauthenticated public methods (authorizationType NONE), A"
+    },
+    {
+      "name": "apigateway-rest-deployer",
+      "description": "Provisions production-grade API Gateway REST APIs with correct resource/method models, AWS_PROXY Lam"
+    },
+    {
+      "name": "appconfig-deployer",
+      "description": "Provisions AWS AppConfig resources with production defaults: application creation, environments, con"
+    },
+    {
+      "name": "appconfig-deployment-operator",
+      "description": "Operates AWS AppConfig deployment lifecycles safely \u2014 creates applications, environments, and config"
+    },
+    {
+      "name": "appmesh-deployer",
+      "description": "Provisions production-grade AWS App Mesh service meshes \u2014 mesh with egress filter (DROP_ALL vs ALLOW"
+    },
+    {
+      "name": "apprunner-service-deployer",
+      "description": ""
+    },
+    {
+      "name": "athena-query-optimizer",
+      "description": "Optimizes Amazon Athena query performance and cost via a layered analysis framework covering partiti"
+    },
+    {
+      "name": "athena-workgroup-auditor",
+      "description": "Audits Amazon Athena workgroups for query-result encryption gaps (S3 + KMS), missing data-scan limit"
+    },
+    {
+      "name": "auditmanager-assessment-auditor",
+      "description": "Audits AWS Audit Manager assessments for evidence-collection integrity, control compliance rate, del"
+    },
+    {
+      "name": "aurora-cost-optimizer",
+      "description": ""
+    },
+    {
+      "name": "aurora-failover-operator",
+      "description": "Operates Aurora cluster failover and recovery workflows safely \u2014 automatic Multi-AZ failover (30s de"
+    },
+    {
+      "name": "auto-remediation-automator",
+      "description": "Designs and implements automated remediation workflows linking AWS Config rules to SSM Automation ru"
+    },
+    {
+      "name": "autoscaling-group-auditor",
+      "description": "Audits AWS Auto Scaling Groups for launch-template health (legacy launch configuration, IMDSv2), ELB"
+    },
+    {
+      "name": "autoscaling-policy-deployer",
+      "description": "Provisions Amazon EC2 Auto Scaling policies and surrounding primitives with production defaults: tar"
+    },
+    {
+      "name": "backup-compliance-automator",
+      "description": "Designs AWS Backup compliance automation across the four pillars: AWS Backup Audit Manager (audit fr"
+    },
+    {
+      "name": "backup-cross-region-operator",
+      "description": "Operates AWS Backup cross-region and cross-account operations \u2014 adds cross-region copy rules to back"
+    },
+    {
+      "name": "backup-plan-auditor",
+      "description": "Audits AWS Backup plans for coverage gaps (empty or missing resource selections), vault risks (missi"
+    },
+    {
+      "name": "backup-vault-deployer",
+      "description": "Provisions AWS Backup vaults with production defaults: vault creation (KMS encryption, tags), backup"
+    },
+    {
+      "name": "backup-vault-operator",
+      "description": "Operates AWS Backup vault lifecycles \u2014 creates vaults with KMS encryption and tags, applies vault lo"
+    },
+    {
+      "name": "batch-compute-environment-deployer",
+      "description": "Provisions AWS Batch compute environments, job queues, and job definitions with production defaults:"
+    },
+    {
+      "name": "bedrock-guardrail-coverage-auditor",
+      "description": "Audits Amazon Bedrock Guardrails configurations for model coverage gaps, weak or disabled content fi"
+    },
+    {
+      "name": "bedrock-guardrail-deployer",
+      "description": "Provisions Amazon Bedrock Guardrails with production defaults: guardrail creation (name, description"
+    },
+    {
+      "name": "bedrock-model-access-inventory",
+      "description": "Audits Amazon Bedrock model access posture \u2014 invocation logging coverage (S3/CloudWatch/DataFirehose"
+    },
+    {
+      "name": "billing-account-auditor",
+      "description": "Audits AWS account billing posture across five dimensions \u2014 root account security (MFA + access keys"
+    },
+    {
+      "name": "budget-deployer",
+      "description": "Provisions AWS Budgets and Cost Anomaly Detection with production defaults: cost budgets (fixed/thre"
+    },
+    {
+      "name": "budgets-auditor",
+      "description": "Audits AWS Budgets for cost-overrun blind spots: accounts with zero budgets, budgets configured with"
+    },
+    {
+      "name": "ce-cost-anomaly-auditor",
+      "description": "Audits AWS Cost Explorer (CE) anomaly-detection subscriptions, Savings Plan/RI coverage gaps, idle-r"
+    },
+    {
+      "name": "cicd-pipeline-automator",
+      "description": ""
+    },
+    {
+      "name": "clb-to-alb-migration-operator",
+      "description": "Operates Classic Load Balancer (CLB) to Application Load Balancer (ALB) migrations end-to-end \u2014 pre-"
+    },
+    {
+      "name": "cleanrooms-collaboration-auditor",
+      "description": "Audits AWS Clean Rooms collaborations for membership-status gaps (INVITED or REMOVED members), priva"
+    },
+    {
+      "name": "cloudformation-drift-troubleshooter",
+      "description": "Diagnoses AWS CloudFormation stack drift \u2014 resources whose actual configuration diverged from the te"
+    },
+    {
+      "name": "cloudformation-stack-troubleshooter",
+      "description": "Diagnoses AWS CloudFormation stack failures across the lifecycle. Covers CREATE_FAILED (IAM permissi"
+    },
+    {
+      "name": "cloudformation-stackset-deployer",
+      "description": "Provisions AWS CloudFormation StackSets with production defaults: StackSet creation (template, param"
+    },
+    {
+      "name": "cloudfront-cache-troubleshooter",
+      "description": "Diagnoses CloudFront caching issues via a symptom-to-cause decision tree covering cache misses on ev"
+    },
+    {
+      "name": "cloudfront-cost-optimizer",
+      "description": ""
+    },
+    {
+      "name": "cloudfront-distribution-auditor",
+      "description": "Audits AWS CloudFront distributions for insecure TLS viewer minimum protocol versions and viewer pro"
+    },
+    {
+      "name": "cloudfront-distribution-deployer",
+      "description": "Provisions production-grade CloudFront distributions with secure defaults: Origin Access Control (OA"
+    },
+    {
+      "name": "cloudfront-invalidation-operator",
+      "description": "Operates CloudFront cache invalidation workflows \u2014 invalidation creation with path patterns (/* all,"
+    },
+    {
+      "name": "cloudfront-keyvaluestore-deployer",
+      "description": "Provisions CloudFront KeyValueStore (KVS) with production defaults: KVS creation and key-value pair "
+    },
+    {
+      "name": "cloudfront-response-headers-deployer",
+      "description": "Provisions CloudFront response headers policies with secure defaults: security headers (Content-Secu"
+    },
+    {
+      "name": "cloudhsm-cluster-posture-auditor",
+      "description": "Audits AWS CloudHSM clusters for high-availability posture (HSM count and cross-AZ distribution), ba"
+    },
+    {
+      "name": "cloudtrail-gap-troubleshooter",
+      "description": "Diagnoses AWS CloudTrail logging gaps and missing events. Covers events missing because data events "
+    },
+    {
+      "name": "cloudtrail-lake-operator",
+      "description": "Operates AWS CloudTrail Lake end-to-end \u2014 Event Data Store (EDS) creation with the full ingestion su"
+    },
+    {
+      "name": "cloudtrail-org-trail-auditor",
+      "description": "Audits AWS CloudTrail organization trails for full-org coverage, multi-region logging, KMS encryptio"
+    },
+    {
+      "name": "cloudwatch-alarm-auditor",
+      "description": "Audits CloudWatch alarm configurations for blind spots across six dimensions: detection strategy (an"
+    },
+    {
+      "name": "cloudwatch-alarm-notification-automator",
+      "description": "Designs CloudWatch alarm notification and escalation automation across six surfaces: SNS-to-Lambda f"
+    },
+    {
+      "name": "cloudwatch-alarm-operator",
+      "description": "Operates CloudWatch alarm lifecycles safely \u2014 creates static-threshold, metric-math, anomaly-detecti"
+    },
+    {
+      "name": "cloudwatch-application-signals-deployer",
+      "description": ""
+    },
+    {
+      "name": "cloudwatch-cross-account-observability-deployer",
+      "description": "Provisions CloudWatch cross-account observability via Observability Access Manager (OAM) \u2014 creates t"
+    },
+    {
+      "name": "cloudwatch-dashboard-deployer",
+      "description": "Provisions CloudWatch dashboards with widget layouts, metric selections, and sharing models. Covers "
+    },
+    {
+      "name": "cloudwatch-logs-insights-troubshooter",
+      "description": "Diagnoses CloudWatch Logs Insights problems across six categories: query returns no results (wrong l"
+    },
+    {
+      "name": "cloudwatch-logs-retention-auditor",
+      "description": "Audits CloudWatch Logs log groups for Never-expire retention (silent infinite-cost accumulation), mi"
+    },
+    {
+      "name": "cloudwatch-metrics-troubleshooter",
+      "description": "Diagnoses missing or unexpected AWS CloudWatch metrics. Covers metric not appearing (wrong namespace"
+    },
+    {
+      "name": "cloudwatch-rum-deployer",
+      "description": "Provisions CloudWatch RUM (Real User Monitoring) app monitors with production-grade defaults \u2014 domai"
+    },
+    {
+      "name": "cloudwatch-synthetics-troubleshooter",
+      "description": "Diagnoses CloudWatch Synthetics canary failures via a symptom-to-cause decision tree covering all fi"
+    },
+    {
+      "name": "codeartifact-repository-deployer",
+      "description": ""
+    },
+    {
+      "name": "codebuild-project-auditor",
+      "description": "Audits AWS CodeBuild projects for privileged mode (Docker-in-Docker host kernel access), plaintext s"
+    },
+    {
+      "name": "codecommit-repository-auditor",
+      "description": "Audits AWS CodeCommit repositories for approval-rule-template coverage, customer-managed KMS encrypt"
+    },
+    {
+      "name": "codecommit-repository-deployer",
+      "description": "Provisions AWS CodeCommit repositories with production defaults: repository creation (create-reposit"
+    },
+    {
+      "name": "codedeploy-deployment-group-auditor",
+      "description": "Audits AWS CodeDeploy deployment groups for auto-rollback enablement, CloudWatch alarm monitoring, d"
+    },
+    {
+      "name": "codepipeline-failure-troubleshooter",
+      "description": "Diagnoses AWS CodePipeline execution failures across source, build, deploy, and approval stages. Cov"
+    },
+    {
+      "name": "codepipeline-pipeline-auditor",
+      "description": "Audits AWS CodePipeline pipelines for artifact-store encryption (KMS CMK presence), cross-account or"
+    },
+    {
+      "name": "codepipeline-v2-deployer",
+      "description": "Provisions production-grade CodePipeline V2-type pipelines with event-driven triggers (no polling), "
+    },
+    {
+      "name": "cognito-idp-user-pool-auditor",
+      "description": "Audits Amazon Cognito user pools for security posture \u2014 MFA enforcement, password policy strength, a"
+    },
+    {
+      "name": "cognito-user-pool-deployer",
+      "description": "Provisions Amazon Cognito user pools with secure defaults \u2014 user pool attributes (standard and custo"
+    },
+    {
+      "name": "compute-optimizer-findings-auditor",
+      "description": "Audits AWS Compute Optimizer findings for EC2, EBS, Lambda, Auto Scaling Group, and ECS resources \u2014 "
+    },
+    {
+      "name": "config-aggregator-deployer",
+      "description": ""
+    },
+    {
+      "name": "config-recorder-coverage-auditor",
+      "description": "Audits AWS Config posture across all four coverage layers \u2014 configuration recorder (existence, statu"
+    },
+    {
+      "name": "config-rule-deployer",
+      "description": "Provisions AWS Config rules with compliance coverage: managed rules (100+ AWS-managed like s3-bucket"
+    },
+    {
+      "name": "controltower-control-auditor",
+      "description": "Audits AWS Control Tower landing-zone state, enabled controls (preventive, detective, proactive), gu"
+    },
+    {
+      "name": "cost-anomaly-response-automator",
+      "description": "Designs automated AWS cost-anomaly detection and response workflows across AWS Cost Anomaly Detectio"
+    },
+    {
+      "name": "cost-optimization-hub-recommendations-auditor",
+      "description": "Audits AWS Cost Optimization Hub configuration for recommendation enablement, member-account coverag"
+    },
+    {
+      "name": "cur-automation-automator",
+      "description": "Designs end-to-end AWS Cost and Usage Report (CUR) automation: CUR creation (hourly granularity, res"
+    },
+    {
+      "name": "cur-cost-usage-report-auditor",
+      "description": "Audits AWS Cost and Usage Report (CUR) configurations for coverage gaps, data staleness, report-vers"
+    },
+    {
+      "name": "data-transfer-optimizer",
+      "description": ""
+    },
+    {
+      "name": "datasync-task-operator",
+      "description": ""
+    },
+    {
+      "name": "detective-investigation-coverage-auditor",
+      "description": "Audits Amazon Detective behavior graph coverage, member-account ingestion health, data-source packag"
+    },
+    {
+      "name": "devops-guru-troubleshooter",
+      "description": "Diagnoses Amazon DevOps Guru insights across Proactive and Reactive categories. Covers insight types"
+    },
+    {
+      "name": "directconnect-auditor",
+      "description": "Audits AWS Direct Connect (DX) topology for resilience and security posture \u2014 physical-layer redunda"
+    },
+    {
+      "name": "dlm-lifecycle-policy-auditor",
+      "description": "Audits AWS Data Lifecycle Manager (DLM) EBS snapshot lifecycle policies for coverage gaps and silent"
+    },
+    {
+      "name": "dms-replication-task-auditor",
+      "description": "Audits AWS DMS replication tasks for SSL/TLS gaps on source and target endpoints, missing CDC and ta"
+    },
+    {
+      "name": "dms-task-troubleshooter",
+      "description": "Diagnoses AWS Database Migration Service (DMS) replication task failures through a systematic diagno"
+    },
+    {
+      "name": "dr-failover-automator",
+      "description": "Designs AWS disaster recovery failover automation across the four DR strategies (backup & restore, p"
+    },
+    {
+      "name": "dynamodb-autoscaling-deployer",
+      "description": "Provisions DynamoDB auto-scaling with production defaults: target tracking for table (read/write cap"
+    },
+    {
+      "name": "dynamodb-backup-operator",
+      "description": "Operates DynamoDB backup and restore workflows safely \u2014 on-demand backups via create-backup, point-i"
+    },
+    {
+      "name": "dynamodb-global-tables-operator",
+      "description": "Operates DynamoDB Global Tables safely across the full lifecycle: creating replicated tables in mult"
+    },
+    {
+      "name": "dynamodb-table-auditor",
+      "description": "Audits DynamoDB table configurations for encryption-at-rest (KMS), point-in- time recovery (PITR), c"
+    },
+    {
+      "name": "dynamodb-table-deployer",
+      "description": "Provisions DynamoDB tables with production-grade defaults: partition key design (random suffix, comp"
+    },
+    {
+      "name": "dynamodb-throttling-troubleshooter",
+      "description": "Diagnoses DynamoDB ProvisionedThroughputExceededException and throttle events via a symptom-to-cause"
+    },
+    {
+      "name": "ebs-volume-auditor",
+      "description": "Audits AWS EBS volumes and EBS snapshots for unencrypted volumes, unattached cost-drift volumes, leg"
+    },
+    {
+      "name": "ebs-volume-optimizer",
+      "description": "Optimises EBS volume cost across six dimensions: volume type migration (gp2 to gp3 is 20% cheaper wi"
+    },
+    {
+      "name": "ec2-backup-operator",
+      "description": "Operates EC2 backup and snapshot workflows safely \u2014 EBS snapshot create and cross-region/cross-accou"
+    },
+    {
+      "name": "ec2-instance-recovery-operator",
+      "description": "Operates EC2 instance recovery \u2014 system status check failure (hardware degradation, stop/start, EC2 "
+    },
+    {
+      "name": "ec2-launch-template-deployer",
+      "description": "Provisions EC2 Launch Templates with production defaults: AMI and architecture validation (x86_64 / "
+    },
+    {
+      "name": "ec2-rightsizing-optimizer",
+      "description": "Right-sizes EC2 instances for cost optimization using a structured utilization-driven decision frame"
+    },
+    {
+      "name": "ec2-security-group-auditor",
+      "description": "Classifies each EC2 security group's inbound exposure as OPEN, PUBLIC_NONCRITICAL, or RESTRICTED (wo"
+    },
+    {
+      "name": "ec2-spot-fleet-deployer",
+      "description": "Provisions EC2 Spot Fleets with production defaults: launch template configuration, Spot Fleet reque"
+    },
+    {
+      "name": "ecr-repository-auditor",
+      "description": "Audits AWS ECR private repositories for public-access exposure via repositoryPolicy, image-scan conf"
+    },
+    {
+      "name": "ecs-fargate-deployer",
+      "description": ""
+    },
+    {
+      "name": "ecs-task-definition-auditor",
+      "description": "Audits ECS task definitions for privileged containers, plaintext secrets in environment variables (i"
+    },
+    {
+      "name": "ecs-task-troubleshooter",
+      "description": "Diagnoses why AWS ECS tasks fail to start, transition to STOPPED immediately, fail health checks, cr"
+    },
+    {
+      "name": "efs-access-point-deployer",
+      "description": "Provisions EFS Access Points and dependent primitives with production defaults: root-directory auto-"
+    },
+    {
+      "name": "efs-filesystem-auditor",
+      "description": "Audits AWS EFS filesystems for encryption-at-rest, filesystem policy public principal exposure, encr"
+    },
+    {
+      "name": "eks-add-on-deployer",
+      "description": "Provisions Amazon EKS add-ons with production defaults: add-on types (vpc-cni, coredns, kube-proxy, "
+    },
+    {
+      "name": "eks-cluster-auditor",
+      "description": "Audits AWS EKS cluster configurations for public API endpoint exposure, disabled control-plane loggi"
+    },
+    {
+      "name": "eks-cost-optimizer",
+      "description": "Optimizes EKS cluster costs via a layered analysis framework \u2014 right-sizes EC2 managed node groups f"
+    },
+    {
+      "name": "eks-pod-troubleshooter",
+      "description": "Diagnoses why Kubernetes pods fail on Amazon EKS \u2014 CrashLoopBackOff, ImagePullBackOff / ErrImagePull"
+    },
+    {
+      "name": "eks-upgrade-operator",
+      "description": "Operates EKS cluster and node group upgrade workflows safely \u2014 pre- upgrade checks (current Kubernet"
+    },
+    {
+      "name": "elasticache-cache-deployer",
+      "description": "Provisions ElastiCache (Redis OSS / Memcached) clusters with production defaults: engine selection ("
+    },
+    {
+      "name": "elasticache-cluster-deployer",
+      "description": "Provisions Amazon ElastiCache clusters with production defaults: Redis OSS self-designed clusters vs"
+    },
+    {
+      "name": "elasticache-cost-optimizer",
+      "description": ""
+    },
+    {
+      "name": "elbv2-load-balancer-auditor",
+      "description": "Audits AWS ELBv2 load balancers (ALB/NLB) for insecure TLS listener policies (TLS 1.0/1.1, weak ciph"
+    },
+    {
+      "name": "emr-cluster-auditor",
+      "description": "Audits AWS EMR clusters for security configuration across three encryption layers (S3 at-rest, local"
+    },
+    {
+      "name": "emr-serverless-deployer",
+      "description": ""
+    },
+    {
+      "name": "event-driven-automator",
+      "description": "Designs and implements event-driven architectures on Amazon EventBridge. Covers event bus selection "
+    },
+    {
+      "name": "eventbridge-bus-policy-auditor",
+      "description": "Audits AWS EventBridge event buses for public event-injection exposure (Principal:* or cross-account"
+    },
+    {
+      "name": "eventbridge-pipe-deployer",
+      "description": "Provisions production-grade Amazon EventBridge Pipes connecting sources (DynamoDB Streams, Kinesis, "
+    },
+    {
+      "name": "eventbridge-rule-deployer",
+      "description": "Provisions Amazon EventBridge rules and targets correctly the first time. Covers event-pattern rules"
+    },
+    {
+      "name": "fargate-cost-optimizer",
+      "description": "Optimises AWS Fargate cost across seven dimensions: task right-sizing (CPU/memory from 28 allowed co"
+    },
+    {
+      "name": "firehose-delivery-stream-auditor",
+      "description": "Audits Amazon Kinesis Data Firehose (firehose) delivery streams for encryption-at-rest gaps (explici"
+    },
+    {
+      "name": "firewall-manager-compliance-auditor",
+      "description": "Audits AWS Firewall Manager (FMS) policies across WAF, Shield Advanced, VPC Security Groups, Network"
+    },
+    {
+      "name": "firewall-manager-deployer",
+      "description": "Provisions AWS Firewall Manager (FMS) policies with production defaults: policy creation (WAF, Secur"
+    },
+    {
+      "name": "fis-experiment-deployer",
+      "description": "Provisions AWS Fault Injection Service (FIS) experiment templates with production-safe defaults: act"
+    },
+    {
+      "name": "globalaccelerator-deployer",
+      "description": "Provisions production-grade AWS Global Accelerator deployments with secure defaults: anycast static "
+    },
+    {
+      "name": "glue-crawler-job-auditor",
+      "description": "Audits AWS Glue crawlers and jobs (plus their data-catalog encryption, JDBC connections, IAM executi"
+    },
+    {
+      "name": "glue-job-troubleshooter",
+      "description": "Diagnoses AWS Glue ETL job failures through a seven-category diagnostic tree \u2014 Python script excepti"
+    },
+    {
+      "name": "grafana-dashboard-deployer",
+      "description": "Provisions Amazon Managed Grafana workspaces and dashboards with production defaults: workspace crea"
+    },
+    {
+      "name": "guardduty-finding-investigator",
+      "description": "Investigates Amazon GuardDuty findings through a finding-type-driven diagnostic tree covering Recon:"
+    },
+    {
+      "name": "guardduty-finding-severity-triage",
+      "description": "Classifies Amazon GuardDuty findings into a context-aware triage severity (CRITICAL | HIGH | MEDIUM "
+    },
+    {
+      "name": "health-event-auditor",
+      "description": "Audits AWS Health for active (open) issue events, upcoming scheduled changes, affected-resource enti"
+    },
+    {
+      "name": "health-event-automator",
+      "description": "Designs AWS Health event response automation across the three event type categories (issue, accountN"
+    },
+    {
+      "name": "iac-template-automator",
+      "description": "Generates and validates Infrastructure-as-Code templates for common AWS patterns across CloudFormati"
+    },
+    {
+      "name": "iam-least-privilege-advisor",
+      "description": "Analyzes AWS IAM policies to identify over-permissive grants \u2014 wildcard actions, wildcard resources,"
+    },
+    {
+      "name": "iam-permission-troubleshooter",
+      "description": "Diagnoses AWS IAM AccessDenied, ExplicitDeny, Client.UnauthorizedOperation, and NotAuthorized sts:As"
+    },
+    {
+      "name": "iam-role-deployer",
+      "description": "Creates production-grade IAM roles with correct trust policies and least- privilege permissions acro"
+    },
+    {
+      "name": "incident-response-automator",
+      "description": ""
+    },
+    {
+      "name": "inspector2-coverage-finding-auditor",
+      "description": "Audits Amazon Inspector2 coverage gaps and finding severity to determine whether EC2 instances, ECR "
+    },
+    {
+      "name": "inspector2-coverage-operator",
+      "description": "Operates Amazon Inspector v2 coverage across an AWS Organization or single account \u2014 enables / disab"
+    },
+    {
+      "name": "inspector2-finding-troubleshooter",
+      "description": "Diagnoses Amazon Inspector v2 vulnerability findings through a finding-type-driven diagnostic tree c"
+    },
+    {
+      "name": "kafka-connect-troubleshooter",
+      "description": "Diagnoses Kafka Connect and Amazon MSK Connect issues through a nine-category diagnostic tree \u2014 task"
+    },
+    {
+      "name": "kafka-msk-troubleshooter",
+      "description": "Diagnoses Amazon MSK (Managed Streaming for Apache Kafka) cluster issues via a symptom-to-cause deci"
+    },
+    {
+      "name": "kinesis-analytics-deployer",
+      "description": ""
+    },
+    {
+      "name": "kinesis-firehose-troubshooter",
+      "description": "Diagnoses Amazon Kinesis Data Firehose delivery stream failures via a systematic 8-symptom decision "
+    },
+    {
+      "name": "kinesis-stream-auditor",
+      "description": "Audits Amazon Kinesis Data Streams for encryption-at-rest gaps (EncryptionType NONE), extended-reten"
+    },
+    {
+      "name": "kinesis-stream-deployer",
+      "description": "Provisions Amazon Kinesis Data Streams with production defaults: stream creation (shard count, strea"
+    },
+    {
+      "name": "kms-key-deployer",
+      "description": ""
+    },
+    {
+      "name": "kms-key-policy-auditor",
+      "description": "Audits AWS KMS key policies and key metadata for cross-account or external principals, wildcard kms:"
+    },
+    {
+      "name": "kms-key-rotation-operator",
+      "description": "Operates AWS KMS key rotation workflows end-to-end \u2014 key type classification (AWS-managed, customer-"
+    },
+    {
+      "name": "lakeformation-data-lake-auditor",
+      "description": "Audits AWS Lake Formation data-lake posture for catalog-level super-grants, cross-account principals"
+    },
+    {
+      "name": "lakeformation-permissions-deployer",
+      "description": ""
+    },
+    {
+      "name": "lambda-alias-deployer",
+      "description": "Provisions Lambda aliases with production defaults: alias creation pointing to a specific published "
+    },
+    {
+      "name": "lambda-cost-optimizer",
+      "description": ""
+    },
+    {
+      "name": "lambda-function-deployer",
+      "description": ""
+    },
+    {
+      "name": "lambda-invocation-troubleshooter",
+      "description": "Diagnoses AWS Lambda invocation failures through an eight-category diagnostic tree: TaskTimeoutExcep"
+    },
+    {
+      "name": "lambda-layer-deployer",
+      "description": "Provisions AWS Lambda Layers with production defaults: layer creation (zip with dependencies), compa"
+    },
+    {
+      "name": "lambda-runtime-deprecation-auditor",
+      "description": "Audits AWS Lambda functions for deprecated/EOL runtimes (python3.9, nodejs16.x, etc.), over-permissi"
+    },
+    {
+      "name": "lightsail-instance-deployer",
+      "description": "Provisions production-grade Amazon Lightsail instances with secure defaults: blueprint selection (OS"
+    },
+    {
+      "name": "macie-data-classification-auditor",
+      "description": "Audits Amazon Macie data-classification posture \u2014 classification job coverage and status, automated "
+    },
+    {
+      "name": "macie-data-discovery-operator",
+      "description": "Operates Amazon Macie data discovery lifecycle \u2014 enables Macie (org-level delegated admin), creates "
+    },
+    {
+      "name": "managed-blockchain-deployer",
+      "description": "Provisions AWS Managed Blockchain with production defaults: Hyperledger Fabric network creation (edi"
+    },
+    {
+      "name": "memorydb-cluster-deployer",
+      "description": "Provisions Amazon MemoryDB for Redis clusters with production defaults: cluster creation (node type,"
+    },
+    {
+      "name": "msk-cluster-auditor",
+      "description": "Audits Amazon MSK (Managed Streaming for Kafka) clusters for encryption in-transit (TLS between clie"
+    },
+    {
+      "name": "msk-cost-optimizer",
+      "description": ""
+    },
+    {
+      "name": "multi-account-governance-automator",
+      "description": "Designs AWS multi-account governance automation spanning Organizations (OU hierarchy, account creati"
+    },
+    {
+      "name": "nat-gateway-cost-optimizer",
+      "description": "Optimises NAT Gateway cost through traffic analysis, VPC endpoint design, and architecture selection"
+    },
+    {
+      "name": "neptune-db-cluster-deployer",
+      "description": "Provisions Amazon Neptune DB clusters (graph database) with production defaults: cluster creation (i"
+    },
+    {
+      "name": "neptune-graph-deployer",
+      "description": "Provisions Amazon Neptune graph database clusters with production defaults: cluster creation (primar"
+    },
+    {
+      "name": "network-firewall-rule-auditor",
+      "description": "Audits AWS Network Firewall configurations for permissive stateful and stateless rules, missing TLS "
+    },
+    {
+      "name": "networkmanager-core-network-auditor",
+      "description": "Audits AWS Network Manager (Cloud WAN) core networks for detached attachments, permissive resource a"
+    },
+    {
+      "name": "opensearch-domain-auditor",
+      "description": "Audits Amazon OpenSearch Service (provisioned, not Serverless) domains for encryption-at-rest (KMS),"
+    },
+    {
+      "name": "opensearch-domain-deployer",
+      "description": "Provisions Amazon OpenSearch Service domains with production defaults: deployment type (managed clus"
+    },
+    {
+      "name": "opensearch-migration-operator",
+      "description": "Operates Elasticsearch to OpenSearch migration workflows safely \u2014 version compatibility assessment ("
+    },
+    {
+      "name": "opensearch-serverless-deployer",
+      "description": "Provisions Amazon OpenSearch Serverless collections with secure defaults \u2014 collection type selection"
+    },
+    {
+      "name": "organizations-account-deployer",
+      "description": "Provisions AWS Organizations member accounts with production defaults: account creation (create-acco"
+    },
+    {
+      "name": "organizations-scp-auditor",
+      "description": "Audits AWS Organizations Service Control Policies (SCPs) for effective permission boundaries across "
+    },
+    {
+      "name": "organizations-scp-deployer",
+      "description": "Provisions AWS Organizations Service Control Policies (SCPs) with safe defaults: SCP statement struc"
+    },
+    {
+      "name": "pinpoint-campaign-deployer",
+      "description": "Provisions Amazon Pinpoint campaigns and engagement workflows \u2014 project creation, channels (email, S"
+    },
+    {
+      "name": "ram-resource-share-deployer",
+      "description": ""
+    },
+    {
+      "name": "rds-backup-restore-operator",
+      "description": "Operates RDS and Aurora backup and restore workflows safely \u2014 automated backup window configuration,"
+    },
+    {
+      "name": "rds-connectivity-troubleshooter",
+      "description": "Diagnoses RDS and Aurora connection failures through a systematic seven-layer diagnostic tree \u2014 conn"
+    },
+    {
+      "name": "rds-cost-optimizer",
+      "description": "Optimises RDS and Aurora database cost through instance-class right-sizing (CloudWatch CPUUtilizatio"
+    },
+    {
+      "name": "rds-instance-auditor",
+      "description": "Audits AWS RDS DB instances for the seven high-impact configuration risks that drive data-loss and o"
+    },
+    {
+      "name": "rds-instance-deployer",
+      "description": "Provisions RDS and Aurora databases with production-grade defaults: instance class selection (bursta"
+    },
+    {
+      "name": "rds-parameter-group-deployer",
+      "description": ""
+    },
+    {
+      "name": "rds-proxy-deployer",
+      "description": "Provisions Amazon RDS Proxy connections with production defaults: connection pooling (create-db-prox"
+    },
+    {
+      "name": "redshift-cluster-auditor",
+      "description": "Audits Amazon Redshift provisioned clusters for security posture and configuration gaps \u2014 public acc"
+    },
+    {
+      "name": "redshift-cluster-optimizer",
+      "description": "Optimises Amazon Redshift cluster cost and performance through node-type selection (RA3 managed-stor"
+    },
+    {
+      "name": "redshift-serverless-deployer",
+      "description": ""
+    },
+    {
+      "name": "resiliencehub-app-assessment-auditor",
+      "description": "Audits AWS Resilience Hub application assessments for assessment staleness (older than 90 days), res"
+    },
+    {
+      "name": "route53-failover-operator",
+      "description": "Operates Route 53 health checks and DNS failover workflows end-to-end \u2014 health-check configuration ("
+    },
+    {
+      "name": "route53-health-check-troubleshooter",
+      "description": "Diagnoses Amazon Route 53 health check and DNS failover failures through a ten-category diagnostic t"
+    },
+    {
+      "name": "route53-record-auditor",
+      "description": "Audits AWS Route 53 record sets for missing health checks on weighted, failover, latency, geolocatio"
+    },
+    {
+      "name": "route53-resolver-deployer",
+      "description": "Provisions Route 53 Resolver endpoints, forwarding rules, DNS Firewall, and query logging with secur"
+    },
+    {
+      "name": "route53-routing-policy-deployer",
+      "description": ""
+    },
+    {
+      "name": "s3-access-points-deployer",
+      "description": "Provisions S3 Access Points and dependent primitives with production defaults: network-origin select"
+    },
+    {
+      "name": "s3-access-troubleshooter",
+      "description": ""
+    },
+    {
+      "name": "s3-batch-operations-operator",
+      "description": "Operates S3 Batch Operations at scale \u2014 job creation across operation types (copy, replace tag, rest"
+    },
+    {
+      "name": "s3-bucket-policy-deployer",
+      "description": "Provisions S3 bucket policies with production defaults: policy structure (Principal, Action, Resourc"
+    },
+    {
+      "name": "s3-directory-bucket-deployer",
+      "description": "Provisions S3 Express One Zone directory buckets and S3 Tables table buckets with production default"
+    },
+    {
+      "name": "s3-glacier-restore-operator",
+      "description": "Operates S3 Glacier restore workflows \u2014 initiates object restores from Flexible Retrieval tiers (Exp"
+    },
+    {
+      "name": "s3-intelligent-tiering-optimizer",
+      "description": "Optimises S3 storage cost with Intelligent-Tiering: enables bucket-level IntelligentTieringConfigura"
+    },
+    {
+      "name": "s3-lifecycle-optimizer",
+      "description": "Optimises S3 storage cost through lifecycle-policy design, storage-class selection, and access-patte"
+    },
+    {
+      "name": "s3-object-lambda-deployer",
+      "description": "Provisions S3 Object Lambda Access Points and the supporting transform Lambda function with producti"
+    },
+    {
+      "name": "s3-public-access-auditor",
+      "description": ""
+    },
+    {
+      "name": "s3-replication-operator",
+      "description": "Operates S3 cross-region replication (CRR) and same-region replication (SRR) end-to-end \u2014 rule confi"
+    },
+    {
+      "name": "s3-secure-bucket-deployer",
+      "description": ""
+    },
+    {
+      "name": "s3-transfer-acceleration-operator",
+      "description": "Operates S3 Transfer Acceleration workflows \u2014 enable/disable acceleration per bucket (put-bucket-acc"
+    },
+    {
+      "name": "s3-version-cleanup-operator",
+      "description": "Operates S3 version cleanup for cost optimization and compliance \u2014 NoncurrentVersionExpiration, Nonc"
+    },
+    {
+      "name": "sagemaker-endpoint-auditor",
+      "description": "Audits SageMaker real-time and async endpoints for security posture and production readiness \u2014 KMS e"
+    },
+    {
+      "name": "sagemaker-endpoint-deployer",
+      "description": "Provisions SageMaker real-time, serverless, and asynchronous inference endpoints with production def"
+    },
+    {
+      "name": "sagemaker-model-registry-operator",
+      "description": "Operates SageMaker Model Registry lifecycles safely \u2014 creates model package groups; registers versio"
+    },
+    {
+      "name": "sagemaker-training-job-operator",
+      "description": "Operates Amazon SageMaker training jobs end-to-end \u2014 job creation (algorithm spec, input data S3 cha"
+    },
+    {
+      "name": "secrets-rotation-operator",
+      "description": "Operates AWS Secrets Manager rotation workflows end-to-end \u2014 rotation Lambda setup (Python template "
+    },
+    {
+      "name": "secretsmanager-rotation-auditor",
+      "description": "Audits AWS Secrets Manager secrets for rotation posture \u2014 rotation enablement, rotation-Lambda healt"
+    },
+    {
+      "name": "securityhub-control-compliance-auditor",
+      "description": "Audits AWS Security Hub control compliance findings and maps each to a deterministic compliance verd"
+    },
+    {
+      "name": "securityhub-finding-troubleshooter",
+      "description": "Diagnoses and resolves AWS Security Hub findings through a standard-driven decision tree covering CI"
+    },
+    {
+      "name": "service-catalog-portfolio-deployer",
+      "description": "Provisions AWS Service Catalog portfolios and products with production-safe defaults: portfolio crea"
+    },
+    {
+      "name": "service-quotas-usage-auditor",
+      "description": "Audits AWS Service Quotas \u2014 quota utilization per service, approaching limits (>=80%), CloudWatch al"
+    },
+    {
+      "name": "ses-email-deployer",
+      "description": "Provisions Amazon SES email infrastructure \u2014 domain identity with DNS verification (DKIM CNAME, MX f"
+    },
+    {
+      "name": "shield-advanced-coverage-auditor",
+      "description": "Audits AWS Shield Advanced coverage posture \u2014 protected-resource coverage (CloudFront/Route 53 auto-"
+    },
+    {
+      "name": "sns-subscription-operator",
+      "description": "Operates AWS SNS subscription workflows end-to-end \u2014 subscription creation (HTTP/HTTPS/SQS/Lambda/em"
+    },
+    {
+      "name": "sns-topic-deployer",
+      "description": "Provisions AWS SNS topics with production-grade configuration: correct topic type (Standard vs FIFO)"
+    },
+    {
+      "name": "sns-topic-public-subscription-auditor",
+      "description": "Audits AWS SNS topics for public subscription exposure (Principal:\"*\" with sns:Subscribe or sns:Publ"
+    },
+    {
+      "name": "sqs-dlq-operator",
+      "description": "Operates SQS dead-letter queue lifecycles safely: creates DLQs with correct type (Standard vs FIFO m"
+    },
+    {
+      "name": "sqs-dlq-policy-auditor",
+      "description": "Audits AWS SQS queues for dead-letter-queue (DLQ) configuration gaps, public access via Principal:* "
+    },
+    {
+      "name": "sqs-fifo-deployer",
+      "description": "Provisions Amazon SQS FIFO queues with production defaults: FIFO queue attributes (FifoQueue=true, C"
+    },
+    {
+      "name": "sqs-queue-deployer",
+      "description": "Provisions AWS SQS queues with production-grade configuration: correct queue type (Standard vs FIFO)"
+    },
+    {
+      "name": "ssm-association-troubleshooter",
+      "description": "Diagnoses AWS Systems Manager (SSM) association failures via a systematic 5-symptom decision tree: a"
+    },
+    {
+      "name": "ssm-automation-deployer",
+      "description": "Provisions AWS Systems Manager (SSM) Automation documents with production defaults: document type (A"
+    },
+    {
+      "name": "ssm-managed-instance-auditor",
+      "description": "Audits AWS Systems Manager (SSM) managed instances across six dimensions \u2014 instance coverage (SSM Ag"
+    },
+    {
+      "name": "ssm-patch-baseline-deployer",
+      "description": "Provisions SSM Patch Baselines with secure patch-management defaults \u2014 baseline creation (OS, produc"
+    },
+    {
+      "name": "ssm-patch-operator",
+      "description": "Operates SSM Patch Manager workflows safely \u2014 patch baseline authoring (AWS-managed and custom), pat"
+    },
+    {
+      "name": "ssm-session-manager-troubshooter",
+      "description": "Diagnoses AWS Systems Manager (SSM) Session Manager failures via a systematic 7-symptom decision tre"
+    },
+    {
+      "name": "stepfunctions-execution-troubleshooter",
+      "description": "Diagnoses AWS Step Functions execution failures across Standard and Express workflows. Covers States"
+    },
+    {
+      "name": "stepfunctions-express-deployer",
+      "description": "Provisions Step Functions Express Workflows with production defaults: Express-vs-Standard decision ("
+    },
+    {
+      "name": "stepfunctions-statemachine-auditor",
+      "description": "Audits AWS Step Functions state machines for execution logging coverage (level ALL + includeExecutio"
+    },
+    {
+      "name": "stepfunctions-statemachine-deployer",
+      "description": ""
+    },
+    {
+      "name": "sts-cross-account-role-auditor",
+      "description": "Audits IAM role trust policies (AssumeRolePolicyDocument) for cross-account exposure, wildcard Princ"
+    },
+    {
+      "name": "tag-governance-automator",
+      "description": "Designs and implements AWS tag governance automation across Organizations TagPolicy JSON (allowed_va"
+    },
+    {
+      "name": "timestream-database-deployer",
+      "description": "Provisions Amazon Timestream databases and tables with production defaults: database creation (creat"
+    },
+    {
+      "name": "transfer-family-deployer",
+      "description": "Provisions AWS Transfer Family servers with secure defaults \u2014 SFTP, FTPS, and FTP protocols, server "
+    },
+    {
+      "name": "transit-gateway-deployer",
+      "description": "Provisions production-grade AWS Transit Gateway topologies with secure defaults: TGW creation (Amazo"
+    },
+    {
+      "name": "trustedadvisor-check-auditor",
+      "description": "Audits AWS Trusted Advisor check results across cost optimization, performance, security, fault tole"
+    },
+    {
+      "name": "verified-permissions-policy-auditor",
+      "description": "Audits Amazon Verified Permissions policy stores for Cedar policy validation, schema-to-policy consi"
+    },
+    {
+      "name": "vpc-connectivity-troubleshooter",
+      "description": "Diagnoses AWS VPC network connectivity issues through a systematic OSI-layered diagnostic tree: Laye"
+    },
+    {
+      "name": "vpc-lattice-auth-auditor",
+      "description": "Audits VPC Lattice service networks for auth-policy absence (default-open posture), public Principal"
+    },
+    {
+      "name": "vpc-network-deployer",
+      "description": "Provisions production-grade VPCs with secure, well-architected network infrastructure: RFC 1918 CIDR"
+    },
+    {
+      "name": "vpc-peering-deployer",
+      "description": "Provisions Amazon VPC peering connections with production defaults: requester/accepter model (create"
+    },
+    {
+      "name": "vpn-connection-deployer",
+      "description": "Provisions AWS Site-to-Site VPN connections with production defaults: customer gateway (CGW), virtua"
+    },
+    {
+      "name": "wafv2-web-acl-auditor",
+      "description": "Audits AWS WAFv2 Web ACL configurations to determine whether the ACL provides effective protection: "
+    },
+    {
+      "name": "wafv2-web-acl-deployer",
+      "description": ""
+    },
+    {
+      "name": "wellarchitected-review-operator",
+      "description": "Operates AWS Well-Architected Tool reviews end-to-end \u2014 creates workloads, runs pillar reviews (oper"
+    },
+    {
+      "name": "wellarchitected-workload-auditor",
+      "description": "Audits AWS Well-Architected Tool workloads for review staleness, per-pillar high-risk issue counts, "
+    },
+    {
+      "name": "xray-tracing-deployer",
+      "description": ""
+    }
+  ],
+  "skill_count": 263,
+  "family_coverage": [
+    "Migration",
+    "Management",
+    "Governance",
+    "AppIntegration",
+    "DevTools",
+    "Security",
+    "Compute",
+    "Databases",
+    "Storage",
+    "FinOps",
+    "Dev",
+    "AI/ML",
+    "Developer",
+    "Analytics",
+    "Networking",
+    "App"
+  ],
+  "task_type_coverage": [
+    "deploy",
+    "automate",
+    "operate",
+    "audit",
+    "troubleshoot",
+    "optimize"
   ]
 }
