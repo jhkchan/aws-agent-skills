@@ -1,0 +1,178 @@
+{
+  "skill": "cloudwatch-application-signals-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the CloudWatch Application Signals Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across platforms (ECS Fargate Java, EKS Python, Lambda Java) and prerequisite failure branches (missing IAM role policies, X-Ray sampling disabled). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "ecs-java-service-ready",
+      "name": "ECS Fargate Java 17 service with full prerequisites and availability SLO",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — ECS Fargate Java, IAM policies attached, X-Ray sampling set",
+      "prompt": "Enable CloudWatch Application Signals on the payments-api service running on ECS Fargate in us-east-1. Runtime: Java 17 (Corretto). The task role payments-api-task already has CloudWatchApplicationSignalsReportServiceAccess and AWSXrayWriteOnlyAccess attached. X-Ray Default sampling rule FixedRate=0.05. The service uses an ADOT collector sidecar with the Java auto-instrumentation agent injected. Service discovery via CloudMap namespace payments.local. Create a 99.9% availability SLO over 28 days rolling with burn-rate alarms. Account: 123456789012.",
+      "prompt_file": "prompts/ecs-java-service-ready.md",
+      "baseline_file": "baselines/ecs-java-service-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: payments-api\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Platform — ECS Fargate\n  [✓]      Runtime — Java 17 (Corretto)\n  [✓]      Auto-instrumentation — ADOT Java agent + collector sidecar\n  [✓]      Application Signals role — arn:aws:iam::123456789012:role/payments-api-task (CloudWatchApplicationSignalsReportServiceAccess, AWSXrayWriteOnlyAccess)\n  [✓]      Service name override — AWS_SERVICE_NAME=payments-api, AWS_APPLICATION_ENVIRONMENT=prod\n  [✓]      X-Ray tracing — enabled, Default sampling FixedRate=0.05\n  [✓]      Service discovery — CloudMap namespace payments.local\n  [✓]      RED metrics — CloudWatch AWS/ApplicationSignals namespace receives Rate / Errors / Duration\n  [✓]      Service map — node visible within 5-10 min of first trace\n  [✓]      SLO — 99.9% availability over 28 days rolling\n  [✓]      Burn-rate alarm — fast (5m, 14.4x), medium (1h, 6x), slow (6h, 3x)\nVERIFICATION_COMMANDS:\n  aws application-signals list-services --region us-east-1\n  aws application-signals list-service-level-objectives --region us-east-1\n  aws xray get-sampling-rules --region us-east-1\n  aws iam list-attached-role-policies --role-name payments-api-task\n  aws cloudwatch describe-alarms --alarm-name-prefix payments-api-slo\n  aws cloudwatch list-metrics --namespace AWS/ApplicationSignals --dimensions Name=ServiceName,Value=payments-api",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "payments-api",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "CloudWatchApplicationSignalsReportServiceAccess",
+            "ECS Fargate"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-iam-policies",
+      "name": "Task role missing CloudWatchApplicationSignalsReportServiceAccess — deployment blocker",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — required IAM policy missing",
+      "prompt": "Enable CloudWatch Application Signals on the orders-api service running on ECS Fargate in us-east-1. Runtime: Java 17. The task role orders-api-task currently has only AWSXrayWriteOnlyAccess attached; it does NOT have CloudWatchApplicationSignalsReportServiceAccess. X-Ray sampling is set up (FixedRate=0.05). Account: 123456789012.",
+      "prompt_file": "prompts/missing-iam-policies.md",
+      "baseline_file": "baselines/missing-iam-policies.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SERVICE: orders-api\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Platform — ECS Fargate\n  [✓]      Runtime — Java 17\n  [✗]      Application Signals role — MISSING. The task role orders-api-task does not have CloudWatchApplicationSignalsReportServiceAccess attached. Without this policy the ADOT agent runs but cannot publish RED metrics or service topology to AWS/ApplicationSignals — silent failure, service map stays empty.\n  [✓]      X-Ray tracing — enabled, Default sampling FixedRate=0.05\n  [INPUT NEEDED] Auto-instrumentation — pending IAM fix\nVERIFICATION_COMMANDS:\n  aws iam list-attached-role-policies --role-name orders-api-task\n  aws application-signals list-services --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "orders-api",
+            "VERDICT",
+            "CHECKLIST",
+            "CloudWatchApplicationSignalsReportServiceAccess"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eks-python-service-ready",
+      "name": "EKS Python 3.11 service via OTel Operator with dual SLO",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — EKS Python via Operator inject webhook, dual SLO",
+      "prompt": "Enable CloudWatch Application Signals on the search-api service running on EKS in us-east-1. Runtime: Python 3.11. The OpenTelemetry Operator is installed; the deployment is annotated instrumentation.opentelemetry.io/inject-python=\"true\". The service account has IAM roles via IRSA with CloudWatchApplicationSignalsReportServiceAccess and AWSXrayWriteOnlyAccess attached. X-Ray sampling FixedRate=0.10. Service discovery via Kubernetes services. Create a 99.9% availability SLO plus a p95 latency SLO (250ms target). Account: 123456789012.",
+      "prompt_file": "prompts/eks-python-service-ready.md",
+      "baseline_file": "baselines/eks-python-service-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: search-api\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Platform — EKS\n  [✓]      Runtime — Python 3.11\n  [✓]      Auto-instrumentation — OTel Operator python inject webhook (instrumentation.opentelemetry.io/inject-python=true)\n  [✓]      Application Signals role — IRSA role via service account (CloudWatchApplicationSignalsReportServiceAccess, AWSXrayWriteOnlyAccess)\n  [✓]      Service name override — AWS_SERVICE_NAME=search-api\n  [✓]      X-Ray tracing — enabled, FixedRate=0.10\n  [✓]      Service discovery — Kubernetes attributes processor (k8s.namespace.name, k8s.service.name)\n  [✓]      RED metrics — AWS/ApplicationSignals namespace receives Rate / Errors / Duration\n  [✓]      SLO 1 — 99.9% availability over 28 days rolling\n  [✓]      SLO 2 — p95 latency <= 250ms (period-based)\n  [✓]      Burn-rate alarm — fast (5m, 14.4x), medium (1h, 6x), slow (6h, 3x)\nVERIFICATION_COMMANDS:\n  aws application-signals list-services --region us-east-1\n  aws application-signals list-service-level-objectives --region us-east-1\n  aws xray get-sampling-rules --region us-east-1\n  aws cloudwatch describe-alarms --alarm-name-prefix search-api-slo\n  kubectl get deploy search-api -o jsonpath='{.metadata.annotations}'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "search-api",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "EKS",
+            "Python"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "xray-sampling-zero",
+      "name": "X-Ray Default sampling rule FixedRate=0 — RED metrics blank",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — X-Ray sampling disabled",
+      "prompt": "Enable CloudWatch Application Signals on the notifications-api service running on ECS Fargate in us-east-1. Runtime: Java 17. The task role has both required managed policies. The X-Ray Default sampling rule is currently set to FixedRate=0 (was disabled during a cost-reduction sweep). Create a 99.9% availability SLO. Account: 123456789012.",
+      "prompt_file": "prompts/xray-sampling-zero.md",
+      "baseline_file": "baselines/xray-sampling-zero.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SERVICE: notifications-api\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Platform — ECS Fargate\n  [✓]      Runtime — Java 17\n  [✓]      Application Signals role — both managed policies attached\n  [✗]      X-Ray tracing — Default sampling FixedRate=0. RED metrics derive from X-Ray traces; zero sampling blanks Rate / Errors / Duration. Raise FixedRate to at least 0.05 (5%) before enabling Application Signals.\n  [INPUT NEEDED] SLO — pending X-Ray sampling fix\nVERIFICATION_COMMANDS:\n  aws xray get-sampling-rules --region us-east-1\n  aws application-signals list-services --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "notifications-api",
+            "VERDICT",
+            "CHECKLIST",
+            "sampling"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lambda-java-slo",
+      "name": "Lambda Java 21 function via ADOT layer with availability SLO",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Lambda Java via ADOT layer",
+      "prompt": "Enable CloudWatch Application Signals on the auth-api Lambda function in us-east-1. Runtime: Java 21 (arm64). The aws-otel-java-wrapper-arm64 layer is attached. The function execution role has both required managed policies. X-Ray sampling FixedRate=0.05 (Lambda respects the Default rule). AWS_SERVICE_NAME=auth-api, AWS_APPLICATION_ENVIRONMENT=prod. Create a 99.9% availability SLO over 28 days rolling with burn-rate alarms (fast 5m/14.4x, medium 1h/6x, slow 6h/3x). Account: 123456789012.",
+      "prompt_file": "prompts/lambda-java-slo.md",
+      "baseline_file": "baselines/lambda-java-slo.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: auth-api\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Platform — Lambda (arm64)\n  [✓]      Runtime — Java 21\n  [✓]      Auto-instrumentation — aws-otel-java-wrapper-arm64 Lambda layer\n  [✓]      Application Signals role — execution role (CloudWatchApplicationSignalsReportServiceAccess, AWSXrayWriteOnlyAccess)\n  [✓]      Service name override — AWS_SERVICE_NAME=auth-api, AWS_APPLICATION_ENVIRONMENT=prod\n  [✓]      X-Ray tracing — enabled, Default sampling FixedRate=0.05\n  [✓]      RED metrics — AWS/ApplicationSignals namespace receives Rate / Errors / Duration\n  [✓]      SLO — 99.9% availability over 28 days rolling\n  [✓]      Burn-rate alarm — fast (5m, 14.4x), medium (1h, 6x), slow (6h, 3x)\nVERIFICATION_COMMANDS:\n  aws application-signals list-services --region us-east-1\n  aws application-signals list-service-level-objectives --region us-east-1\n  aws lambda get-function-configuration --function-name auth-api\n  aws xray get-sampling-rules --region us-east-1\n  aws cloudwatch describe-alarms --alarm-name-prefix auth-api-slo",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "auth-api",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Lambda"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

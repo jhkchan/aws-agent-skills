@@ -1,0 +1,164 @@
+# Eval test cases for service-catalog-portfolio-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across local-account S3 product with full constraints,
+# missing-LAUNCH-role rejection, OU share with delegated admin, multi-region
+# visibility, and Terraform Open Source product.
+skill: service-catalog-portfolio-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: s3-product-local-account-with-constraints
+    description: >-
+      Provision a Service Catalog portfolio with a curated S3-bucket
+      product, a STACK-based LAUNCH constraint (sc-launch-s3-role),
+      TAG_UPDATE NOT_ALLOWED, NOTIFICATION SNS, portfolio-level
+      TagOptions, no cross-account sharing (local account only).
+      Expects READY_TO_DEPLOY.
+    input: |
+      Create a Service Catalog portfolio "Curated S3 Products" by
+      ProviderName "Platform Governance" in us-east-1,
+      account 111111111111. Product: "Curated S3 Bucket" (CLOUD_FORMATION_TEMPLATE)
+      loaded from
+      https://s3.amazonaws.com/platform-templates-us-east-1/s3-bucket.yaml
+      (validated, accessible). Version v1.0.0. Constraints: LAUNCH
+      STACK-based with role sc-launch-s3-role (exists, scoped to s3:*
+      with iam:PassRole tag condition), TAG_UPDATE NOT_ALLOWED,
+      NOTIFICATION to SNS topic arn:aws:sns:us-east-1:111111111111:sc-launch-events
+      (exists). TagOptions: CostCenter=platform-1234 + Owner=platform-governance
+      bound at portfolio level. Local account only (no share).
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "PORTFOLIO"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "LAUNCH"
+        - "sc-launch-s3-role"
+        - "TagOptions"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-launch-role-rejected
+    description: >-
+      Product requested without a LAUNCH constraint or launch role.
+      Must reject as PREREQUISITES_MISSING citing the privilege
+      escalation risk.
+    input: |
+      Build a Service Catalog portfolio "Power Tools" with a powerful
+      VPC-creator product. No launch role — users will use their own
+      roles. No constraints, no TagOptions, no notification. Share
+      with the whole organization o-abc123def456 (Organizations
+      enabled). budgetDuration not applicable.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "LAUNCH"
+        - "privilege escalation"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: ou-share-with-delegated-admin
+    description: >-
+      Share a portfolio with an Organizational Unit where delegated
+      admin is enabled. Expects READY_TO_DEPLOY with delegated admin
+      and region explicitly cited.
+    input: |
+      Provision portfolio "Data Products" by "Data Platform" in
+      us-east-1, account 111111111111. Product: "Aurora Reader
+      Endpoint" (CLOUD_FORMATION_TEMPLATE) from
+      https://s3.amazonaws.com/data-templates/aurora-reader.yaml
+      (validated). Version v2.1.0. Constraints: LAUNCH STACK-based
+      with sc-launch-aurora-role (exists, scoped to rds:*), TAG_UPDATE
+      NOT_ALLOWED. TagOptions: CostCenter=data-9999 at portfolio
+      level. Share with OU ou-abc1-abcdef (Organizations enabled,
+      delegated admin account 222222222222 enabled for
+      servicecatalog.amazonaws.com).
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "PORTFOLIO"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "ORGANIZATIONAL_UNIT"
+        - "delegated admin"
+        - "us-east-1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-region-share-visibility-check
+    description: >-
+      Consumer in eu-west-1 cannot see portfolio shared from
+      us-east-1. Must call out the region quirk and either document
+      or replicate. Expects READY_TO_DEPLOY with region mismatch
+      warning.
+    input: |
+      Provision portfolio "Multi-Region S3" by "Platform Governance"
+      in us-east-1 with the S3-bucket product and full constraints
+      (LAUNCH sc-launch-s3-role, TAG_UPDATE NOT_ALLOWED). The consumer
+      accounts are in eu-west-1 and ap-southeast-1. TagOptions
+      CostCenter=platform-1234. Share with ORGANIZATION o-abc123def456
+      (Organizations enabled). Multi-region rollout is required.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "PORTFOLIO"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "region"
+        - "us-east-1"
+        - "eu-west-1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: terraform-open-source-product
+    description: >-
+      Provision a Terraform Open Source Service Catalog product from
+      a Git repo. Expects READY_TO_DEPLOY with TERRAFORM_OPEN_SOURCE
+      engine verification cited.
+    input: |
+      Build portfolio "Terraform Products" by "Platform Governance"
+      in us-east-1. Product: "Terraform S3 Bucket"
+      (TERRAFORM_OPEN_SOURCE) sourced from
+      git::https://github.com/example/terraform-s3-bucket.git?ref=v1.0.0
+      (engine confirmed available in us-east-1). Version v1.0.0.
+      Constraints: LAUNCH sc-launch-tf-s3-role (exists). TagOptions:
+      Owner=platform-governance at portfolio level. Local account
+      only.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "PORTFOLIO"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "TERRAFORM_OPEN_SOURCE"
+        - "Terraform"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

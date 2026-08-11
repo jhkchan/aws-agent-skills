@@ -1,0 +1,201 @@
+# Eval test cases for s3-glacier-restore-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-glacier-restore-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: expedited-single-object-ready
+    description: >-
+      Restore a single object from Glacier Flexible Retrieval via
+      Expedited tier with a 5-min RTO. Provisioned capacity exists;
+      IAM role holds s3:RestoreObject and s3:GetObject; ArchiveStatus
+      is ARCHIVE_ACCESS (restore required). All pre-checks pass;
+      plan should produce READY with the restore-object CLI, the
+      CONFIRM gate, the wait object-restored step, and the lease
+      caveat in NOTES.
+    input: |
+      Operation: restore-object
+      Bucket: prod-archive-bucket
+      Key: quarterly-report-2025-Q1.parquet
+      Source storage class: Glacier Flexible Retrieval
+      Tier: Expedited
+      Days: 7
+      RTO: 5 minutes
+
+      Pre-checks (already performed by caller):
+        aws s3api head-object:
+          StorageClass: GLACIER
+          ArchiveStatus: ARCHIVE_ACCESS
+          Restore: (absent)
+        Provisioned capacity: 1 unit in us-east-1
+        Caller IAM role: S3RestoreOperatorRole with
+          s3:RestoreObject, s3:GetObject, s3:HeadObject
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, STATE, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "restore-object"
+        - "Expedited"
+        - "VERDICT"
+        - "CONFIRM"
+        - "Days"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: deep-archive-expedited-blocked
+    description: >-
+      User requests Expedited tier on a Deep Archive object. This is
+      not supported — Deep Archive only allows Standard (12hr) and
+      Bulk (48hr). Plan should produce BLOCKED with the compatibility
+      matrix explanation and the recommendation to re-tier.
+    input: |
+      Operation: restore-object
+      Bucket: compliance-archive
+      Key: audit-2024.parquet
+      Source storage class: Glacier Deep Archive
+      Requested tier: Expedited
+      Days: 30
+      RTO: 5 minutes
+
+      Pre-checks:
+        aws s3api head-object:
+          StorageClass: DEEP_ARCHIVE
+          ArchiveStatus: DEEP_ARCHIVE_ACCESS
+        Caller IAM role: S3RestoreOperatorRole
+
+      Emit the standard VERDICT block. Explain the compatibility
+      matrix and recommend the correct tier.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "Deep Archive"
+        - "Expedited"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "restore-object --restore-request"
+
+  - id: glacier-instant-retrieval-no-restore-blocked
+    description: >-
+      User requests a restore for an object in Glacier Instant
+      Retrieval (GIR). GIR is directly readable — no restore is
+      required. Plan should produce BLOCKED (or NO_OP) explaining
+      GIR is not archived and recommending a direct GetObject.
+    input: |
+      Operation: restore-object
+      Bucket: warm-archive-bucket
+      Key: user-events-2025-07.parquet
+      Source storage class: Glacier Instant Retrieval (GLACIER_IR)
+      Tier: Expedited
+      Days: 7
+
+      Pre-checks:
+        aws s3api head-object:
+          StorageClass: GLACIER_IR
+          ArchiveStatus: (absent)
+        Caller IAM role: S3RestoreOperatorRole
+
+      Emit the standard VERDICT block. Explain that GIR is directly
+      readable and recommend GetObject instead.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "Instant Retrieval"
+        - "GetObject"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "restore-object --restore-request"
+
+  - id: batch-ops-bulk-restore-ready
+    description: >-
+      Bulk-restore 10000 objects from Glacier Flexible Retrieval via
+      S3 Batch Operations using the Bulk tier. Manifest, IAM role,
+      and report bucket are configured. RTO is 24 hr (accommodates
+      Bulk SLA of 5-12 hr). All pre-checks pass; plan should produce
+      READY with the create-job CLI, manifest validation, and the
+      completion-report review step.
+    input: |
+      Operation: bulk-restore
+      Bucket: prod-archive-bucket
+      Manifest: s3://batch-ops-manifests/restore-2025-Q1.csv (10000 keys)
+      Source storage class: Glacier Flexible Retrieval
+      Tier: Bulk
+      Days: 30
+      RTO: 24 hours
+      Report bucket: s3://batch-ops-reports/
+
+      Pre-checks:
+        Manifest sample verified (5 of 5 keys exist, ArchiveStatus
+          ARCHIVE_ACCESS)
+        IAM role S3BatchRestoreRole has s3:RestoreObject on
+          prod-archive-bucket and s3:PutObject on batch-ops-reports
+        Caller holds iam:PassRole on S3BatchRestoreRole
+        Report bucket exists in us-east-1
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-job"
+        - "Bulk"
+        - "manifest"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+
+  - id: completed-single-restore-verified
+    description: >-
+      A previously-issued restore-object for a Flexible Retrieval
+      object has completed. head-object shows Restore.ongoing-request
+      false with an expiry-date. get-object confirms readability.
+      Plan should produce COMPLETED with all POST_VERIFY checks
+      passing and the lease expiration captured in STATE/NOTES.
+    input: |
+      Operation: check-status
+      Bucket: prod-archive-bucket
+      Key: quarterly-report-2025-Q1.parquet
+      Previous restore: Tier=Expedited, Days=7, issued 2026-08-10
+
+      Post-checks (already performed by caller):
+        aws s3api head-object:
+          StorageClass: GLACIER
+          Restore: ongoing-request=false,
+                   expiry-date=Tue, 18 Aug 2026 00:00:00 GMT
+        aws s3api get-object:
+          HTTPStatusCode: 200, ContentLength: 42 MB — readable
+
+      Emit the standard VERDICT block with POST_VERIFY populated.
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "expiry-date"
+        - "ongoing-request"
+        - "VERDICT"
+        - "POST_VERIFY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

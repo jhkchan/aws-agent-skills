@@ -1,0 +1,181 @@
+{
+  "skill": "budget-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the AWS Budget Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across budget types (cost with action tier, RI utilization, SP coverage + anomaly, zero-spend sandbox with EC2 stop) and missing-prerequisite branches. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "cost-budget-with-action-tier",
+      "name": "Production cost budget with IAM policy action tier + anomaly subscription",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, IAM policy action wired, FORECAST + ACTUAL thresholds, anomaly subscription on default monitor",
+      "prompt": "Provision a production AWS Budget named \"prod-monthly-cost\" in account 111111111111 for the whole account (no filters). Budget amount $10,000 USD MONTHLY. Alerts at 80/90/100% ACTUAL and 100% FORECAST to SNS topic arn:aws:sns:us-east-1:111111111111:budget-alerts (policy already allows budgets.amazonaws.com and ce.amazonaws.com). Budget action: APPLY_IAM_POLICY (arn:aws:iam::111111111111:policy/BudgetDenyAll) on SandboxAppRole at 100% ACTUAL, ApprovalModel AUTOMATIC. ExecutionRoleArn arn:aws:iam::111111111111:role/BudgetActionsRole (trust verified on budgets.amazonaws.com). Also wire Cost Anomaly Detection: default monitor, subscription prod-anomaly-subscription Threshold $100 DAILY to the same SNS topic.",
+      "prompt_file": "prompts/cost-budget-with-action-tier.md",
+      "baseline_file": "baselines/cost-budget-with-action-tier.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUDGET: prod-monthly-cost in 111111111111 (account-wide)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Budget type: COST\n  [✓] Scope: account-wide | Amount: $10,000 USD | MONTHLY\n  [✓] Alerts: 80/90/100% ACTUAL + 100% FORECAST → SNS budget-alerts\n  [✓] Budget actions: APPLY_IAM_POLICY (BudgetDenyAll on SandboxAppRole) at 100% ACTUAL, AUTOMATIC\n  [✓] Action role: arn:aws:iam::111111111111:role/BudgetActionsRole (trust verified: budgets.amazonaws.com)\n  [✓] SNS topic: arn:aws:sns:us-east-1:111111111111:budget-alerts (policy allows budgets + ce)\n  [✓] Cost anomaly: default monitor + prod-anomaly-subscription (Threshold $100, DAILY, SNS)\nVERIFICATION_COMMANDS:\n  aws budgets describe-budget --account-id 111111111111 --budget-name prod-monthly-cost\n  aws budgets describe-notifications-for-budget --account-id 111111111111 --budget-name prod-monthly-cost\n  aws budgets describe-budget-actions --account-id 111111111111 --budget-name prod-monthly-cost\n  aws ce get-anomaly-subscriptions",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-monthly-cost",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "COST",
+            "APPLY_IAM_POLICY",
+            "budgets.amazonaws.com",
+            "FORECAST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ri-utilization-budget",
+      "name": "RI utilization budget at 80% target with LESS_THAN threshold",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — RI_UTILIZATION budget, notifications only (no budget actions — API rejects on usage budgets)",
+      "prompt": "Provision an AWS Budget for RI Utilization in account 111111111111. Budget name \"ri-util-target\". Target 80% MONTHLY. Alert me when utilization drops below 80% ACTUAL via SNS topic arn:aws:sns:us-east-1:111111111111:budget-alerts (policy allows budgets.amazonaws.com). We have RIs on EC2 m5.large in us-east-1. Account: 111111111111.",
+      "prompt_file": "prompts/ri-utilization-budget.md",
+      "baseline_file": "baselines/ri-utilization-budget.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUDGET: ri-util-target in 111111111111\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Budget type: RI_UTILIZATION\n  [✓] Amount / target: 80% utilization (LESS_THAN_THRESHOLD)\n  [✓] Time period: MONTHLY\n  [✓] Alerts: 80% ACTUAL LESS_THAN → SNS budget-alerts\n  [✓] Budget actions: none (RI_USAGE budgets do NOT support budget actions — API rejects)\n  [✓] SNS topic: arn:aws:sns:us-east-1:111111111111:budget-alerts (policy verified)\nVERIFICATION_COMMANDS:\n  aws budgets describe-budget --account-id 111111111111 --budget-name ri-util-target\n  aws budgets describe-notifications-for-budget --account-id 111111111111 --budget-name ri-util-target",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ri-util-target",
+            "VERDICT",
+            "CHECKLIST",
+            "RI_UTILIZATION",
+            "LESS_THAN"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "savings-plan-coverage-with-anomaly",
+      "name": "SP coverage budget + dimensional anomaly monitor with ce.amazonaws.com SNS principal",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SP_COVERAGE budget (latest GA) + dimensional SERVICE anomaly monitor, ce.amazonaws.com SNS principal verified",
+      "prompt": "Set up spend guardrails for account 111111111111. Two things: (1) A Savings Plan Coverage budget at 80% MONTHLY, alert when coverage drops below 80% ACTUAL via SNS arn:aws:sns:us-east-1:111111111111:budget-alerts (policy allows budgets.amazonaws.com AND ce.amazonaws.com). (2) Cost Anomaly Detection with a dimensional SERVICE monitor and subscription Threshold $250 DAILY to the same SNS topic. Account: 111111111111.",
+      "prompt_file": "prompts/savings-plan-coverage-with-anomaly.md",
+      "baseline_file": "baselines/savings-plan-coverage-with-anomaly.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUDGET: sp-coverage-target in 111111111111\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Budget type: SP_COVERAGE\n  [✓] Amount / target: 80% coverage (LESS_THAN_THRESHOLD)\n  [✓] Time period: MONTHLY\n  [✓] Alerts: 80% ACTUAL LESS_THAN → SNS budget-alerts\n  [✓] Budget actions: none (SP_USAGE budgets do NOT support budget actions)\n  [✓] SNS topic: arn:aws:sns:us-east-1:111111111111:budget-alerts (policy verified for budgets AND ce)\n  [✓] Cost anomaly monitor: dimensional SERVICE\n  [✓] Cost anomaly subscription: Threshold $250, DAILY, SNS\nVERIFICATION_COMMANDS:\n  aws budgets describe-budget --account-id 111111111111 --budget-name sp-coverage-target\n  aws ce get-anomaly-monitors\n  aws ce get-anomaly-subscriptions",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "VERDICT",
+            "CHECKLIST",
+            "SP_COVERAGE",
+            "ce.amazonaws.com",
+            "DAILY"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "zero-spend-sandbox-with-ec2-stop",
+      "name": "Zero-spend sandbox guardrail with IAM + EC2 stop actions",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — $0.01 zero-spend budget with 50% ACTUAL (fires on first dollar), APPLY_IAM_POLICY + RUN_SSM_DOCUMENTS actions at 100%",
+      "prompt": "Set up a zero-spend guardrail on sandbox account 111111111111. Budget name \"sandbox-zero-spend\", MONTHLY, amount $0.01. Alert at 50% ACTUAL (so we catch the first dollar) and 100% ACTUAL to SNS arn:aws:sns:us-east-1:111111111111:security-alerts (policy allows budgets.amazonaws.com). At 100% ACTUAL, run APPLY_IAM_POLICY on SandboxFullAccessRole with policy arn:aws:iam::111111111111:policy/BudgetDenyAll. Also at 100% ACTUAL, run RUN_SSM_DOCUMENTS STOP_EC2_INSTANCES on i-0aaa111222bbb33344 in us-east-1. ExecutionRoleArn arn:aws:iam::111111111111:role/BudgetActionsRole (trust verified on budgets.amazonaws.com). ApprovalModel AUTOMATIC.",
+      "prompt_file": "prompts/zero-spend-sandbox-with-ec2-stop.md",
+      "baseline_file": "baselines/zero-spend-sandbox-with-ec2-stop.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUDGET: sandbox-zero-spend in 111111111111\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Budget type: COST\n  [✓] Amount: $0.01 USD (zero-spend guardrail — 50% threshold fires on first dollar)\n  [✓] Time period: MONTHLY\n  [✓] Alerts: 50% ACTUAL + 100% ACTUAL → SNS security-alerts\n  [✓] Budget actions:\n        - APPLY_IAM_POLICY (BudgetDenyAll on SandboxFullAccessRole) at 100% ACTUAL, AUTOMATIC\n        - RUN_SSM_DOCUMENTS STOP_EC2_INSTANCES on i-0aaa111222bbb33344 at 100% ACTUAL, AUTOMATIC\n  [✓] Action role: arn:aws:iam::111111111111:role/BudgetActionsRole (trust verified)\nVERIFICATION_COMMANDS:\n  aws budgets describe-budget --account-id 111111111111 --budget-name sandbox-zero-spend\n  aws budgets describe-budget-actions --account-id 111111111111 --budget-name sandbox-zero-spend",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "sandbox-zero-spend",
+            "VERDICT",
+            "CHECKLIST",
+            "0.01",
+            "RUN_SSM_DOCUMENTS",
+            "STOP_EC2_INSTANCES"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-sns-and-action-role",
+      "name": "Operator missing ExecutionRoleArn and SNS topic lacks budgets.amazonaws.com principal",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — ExecutionRoleArn not provided + SNS topic policy lacks budgets.amazonaws.com",
+      "prompt": "Help me create an AWS Budget for account 111111111111 named \"dev-spend\". Budget $5,000 MONTHLY. I want a budget action that applies an IAM deny policy at 100% ACTUAL. Use SNS topic arn:aws:sns:us-east-1:111111111111:dev-alerts (policy currently only allows lambda.amazonaws.com to publish). Region: us-east-1.",
+      "prompt_file": "prompts/missing-sns-and-action-role.md",
+      "baseline_file": "baselines/missing-sns-and-action-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BUDGET: dev-spend in 111111111111\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] ExecutionRoleArn: NOT specified — budget action requires a role trusting budgets.amazonaws.com\n  [✗] SNS topic policy: arn:aws:sns:us-east-1:111111111111:dev-alerts allows only lambda.amazonaws.com — must add budgets.amazonaws.com (and ce.amazonaws.com if anomaly alerts will use the same topic)\n  [✗] IAM policy ARN for APPLY_IAM_POLICY: not specified\nVERIFICATION_COMMANDS:\n  aws iam list-roles --query 'Roles[?contains(AssumeRolePolicyDocument, `budgets.amazonaws.com`)]'\n  aws sns get-topic-attributes --topic-arn arn:aws:sns:us-east-1:111111111111:dev-alerts --query 'Attributes.Policy'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "dev-spend",
+            "VERDICT",
+            "CHECKLIST",
+            "ExecutionRoleArn"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

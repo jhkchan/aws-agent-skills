@@ -1,0 +1,48 @@
+# Eval configuration for codeartifact-repository-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: codeartifact-repository-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: npm-repository-with-public-upstream
+    difficulty: medium
+    prompt_file: prompts/npm-repository-with-public-upstream.md
+    baseline_file: baselines/npm-repository-with-public-upstream.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-parent-domain
+    difficulty: hard
+    prompt_file: prompts/missing-parent-domain.md
+    baseline_file: baselines/missing-parent-domain.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: maven-multiple-upstreams
+    difficulty: hard
+    prompt_file: prompts/maven-multiple-upstreams.md
+    baseline_file: baselines/maven-multiple-upstreams.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: cross-account-domain-share
+    difficulty: hard
+    prompt_file: prompts/cross-account-domain-share.md
+    baseline_file: baselines/cross-account-domain-share.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: swift-repo-with-region-check
+    difficulty: hard
+    prompt_file: prompts/swift-repo-with-region-check.md
+    baseline_file: baselines/swift-repo-with-region-check.md
+    expected_verdict: READY_TO_DEPLOY

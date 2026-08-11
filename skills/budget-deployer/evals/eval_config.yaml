@@ -1,0 +1,49 @@
+# Eval configuration for budget-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: budget-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: cost-budget-with-action-tier
+    difficulty: hard
+    prompt_file: prompts/cost-budget-with-action-tier.md
+    baseline_file: baselines/cost-budget-with-action-tier.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: ri-utilization-budget
+    difficulty: medium
+    prompt_file: prompts/ri-utilization-budget.md
+    baseline_file: baselines/ri-utilization-budget.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: savings-plan-coverage-with-anomaly
+    difficulty: hard
+    prompt_file: prompts/savings-plan-coverage-with-anomaly.md
+    baseline_file: baselines/savings-plan-coverage-with-anomaly.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: zero-spend-sandbox-with-ec2-stop
+    difficulty: hard
+    prompt_file: prompts/zero-spend-sandbox-with-ec2-stop.md
+    baseline_file: baselines/zero-spend-sandbox-with-ec2-stop.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-sns-and-action-role
+    difficulty: easy
+    prompt_file: prompts/missing-sns-and-action-role.md
+    baseline_file: baselines/missing-sns-and-action-role.md
+    expected_verdict: PREREQUISITES_MISSING

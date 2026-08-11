@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-glacier-restore-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Glacier Restore Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "expedited-single-object-ready",
+      "name": "Single Expedited restore from Glacier Flexible Retrieval (READY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/expedited-single-object-ready.md",
+      "baseline_file": "baselines/expedited-single-object-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "restore-object", "Expedited", "VERDICT", "CONFIRM", "Days"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "deep-archive-expedited-blocked",
+      "name": "Expedited tier requested on Deep Archive object (BLOCKED — compatibility matrix)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deep-archive-expedited-blocked.md",
+      "baseline_file": "baselines/deep-archive-expedited-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "Deep Archive", "Expedited", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "restore-object --restore-request"]
+        }
+      ]
+    },
+    {
+      "id": "glacier-instant-retrieval-no-restore-blocked",
+      "name": "Restore requested on Glacier Instant Retrieval object (BLOCKED — GIR is directly readable)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/glacier-instant-retrieval-no-restore-blocked.md",
+      "baseline_file": "baselines/glacier-instant-retrieval-no-restore-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "Instant Retrieval", "GetObject", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "restore-object --restore-request"]
+        }
+      ]
+    },
+    {
+      "id": "batch-ops-bulk-restore-ready",
+      "name": "Bulk restore 10000 objects via S3 Batch Operations (READY)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/batch-ops-bulk-restore-ready.md",
+      "baseline_file": "baselines/batch-ops-bulk-restore-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-job", "Bulk", "manifest", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "completed-single-restore-verified",
+      "name": "Single-object restore verified complete (COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/completed-single-restore-verified.md",
+      "baseline_file": "baselines/completed-single-restore-verified.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "expiry-date", "ongoing-request", "VERDICT", "POST_VERIFY"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

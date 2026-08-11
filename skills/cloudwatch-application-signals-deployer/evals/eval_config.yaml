@@ -1,0 +1,48 @@
+# Eval configuration for cloudwatch-application-signals-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: cloudwatch-application-signals-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: ecs-java-service-ready
+    difficulty: medium
+    prompt_file: prompts/ecs-java-service-ready.md
+    baseline_file: baselines/ecs-java-service-ready.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-iam-policies
+    difficulty: hard
+    prompt_file: prompts/missing-iam-policies.md
+    baseline_file: baselines/missing-iam-policies.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: eks-python-service-ready
+    difficulty: hard
+    prompt_file: prompts/eks-python-service-ready.md
+    baseline_file: baselines/eks-python-service-ready.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: xray-sampling-zero
+    difficulty: hard
+    prompt_file: prompts/xray-sampling-zero.md
+    baseline_file: baselines/xray-sampling-zero.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: lambda-java-slo
+    difficulty: medium
+    prompt_file: prompts/lambda-java-slo.md
+    baseline_file: baselines/lambda-java-slo.md
+    expected_verdict: READY_TO_DEPLOY

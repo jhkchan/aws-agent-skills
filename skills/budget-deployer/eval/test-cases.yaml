@@ -1,0 +1,168 @@
+# Eval test cases for budget-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across budget types (cost, RI utilization, SP coverage,
+# anomaly) and missing-prerequisite branches.
+skill: budget-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cost-budget-with-action-tier
+    description: >-
+      Provision a production cost budget with 80/90/100% ACTUAL alerts,
+      100% FORECAST, APPLY_IAM_POLICY budget action at 100% ACTUAL,
+      ExecutionRoleArn trusting budgets.amazonaws.com, SNS topic with
+      policy allowing budgets + ce principals, Cost Anomaly subscription.
+      Expects READY_TO_DEPLOY with full checklist.
+    input: |
+      Provision a production AWS Budget named "prod-monthly-cost" in
+      account 111111111111 for the whole account (no filters). Budget
+      amount $10,000 USD MONTHLY. Alerts at 80/90/100% ACTUAL and 100%
+      FORECAST to SNS topic arn:aws:sns:us-east-1:111111111111:budget-alerts
+      (policy already allows budgets.amazonaws.com and ce.amazonaws.com).
+      Budget action: APPLY_IAM_POLICY
+      (arn:aws:iam::111111111111:policy/BudgetDenyAll) on SandboxAppRole
+      at 100% ACTUAL, ApprovalModel AUTOMATIC. ExecutionRoleArn
+      arn:aws:iam::111111111111:role/BudgetActionsRole (trust verified on
+      budgets.amazonaws.com). Also wire Cost Anomaly Detection: default
+      monitor, subscription prod-anomaly-subscription Threshold $100
+      DAILY to the same SNS topic.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-monthly-cost"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "COST"
+        - "APPLY_IAM_POLICY"
+        - "budgets.amazonaws.com"
+        - "FORECAST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ri-utilization-budget
+    description: >-
+      Provision a RI_UTILIZATION budget at 80% target with LESS_THAN
+      threshold alerts to SNS. Verifies usage-budget constraints
+      (no budget actions, ACTUAL-only, FORECAST rejected).
+    input: |
+      Provision an AWS Budget for RI Utilization in account
+      111111111111. Budget name "ri-util-target". Target 80% MONTHLY.
+      Alert me when utilization drops below 80% ACTUAL via SNS topic
+      arn:aws:sns:us-east-1:111111111111:budget-alerts (policy allows
+      budgets.amazonaws.com). We have RIs on EC2 m5.large in us-east-1.
+      Account: 111111111111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ri-util-target"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "RI_UTILIZATION"
+        - "LESS_THAN"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: savings-plan-coverage-with-anomaly
+    description: >-
+      Provision a Savings Plan Coverage budget at 80% target plus a
+      Cost Anomaly Detection subscription on a dimensional SERVICE
+      monitor. Expects READY_TO_DEPLOY using the latest SP_COVERAGE
+      budget type (2024-2025 GA) and ce.amazonaws.com SNS principal.
+    input: |
+      Set up spend guardrails for account 111111111111. Two things:
+      (1) A Savings Plan Coverage budget at 80% MONTHLY, alert when
+      coverage drops below 80% ACTUAL via SNS
+      arn:aws:sns:us-east-1:111111111111:budget-alerts (policy allows
+      budgets.amazonaws.com AND ce.amazonaws.com).
+      (2) Cost Anomaly Detection with a dimensional SERVICE monitor
+      and subscription Threshold $250 DAILY to the same SNS topic.
+      Account: 111111111111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "SP_COVERAGE"
+        - "ce.amazonaws.com"
+        - "DAILY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: zero-spend-sandbox-with-ec2-stop
+    description: >-
+      Provision a zero-spend guardrail ($0.01) on a sandbox account
+      with APPLY_IAM_POLICY and RUN_SSM_DOCUMENTS (stop EC2) actions.
+      Expects READY_TO_DEPLOY with the zero-spend threshold pattern
+      (50% ACTUAL on a $0.01 budget fires on the first dollar).
+    input: |
+      Set up a zero-spend guardrail on sandbox account 111111111111.
+      Budget name "sandbox-zero-spend", MONTHLY, amount $0.01. Alert
+      at 50% ACTUAL (so we catch the first dollar) and 100% ACTUAL to
+      SNS arn:aws:sns:us-east-1:111111111111:security-alerts (policy
+      allows budgets.amazonaws.com). At 100% ACTUAL, run
+      APPLY_IAM_POLICY on SandboxFullAccessRole with policy
+      arn:aws:iam::111111111111:policy/BudgetDenyAll. Also at 100%
+      ACTUAL, run RUN_SSM_DOCUMENTS STOP_EC2_INSTANCES on
+      i-0aaa111222bbb33344 in us-east-1. ExecutionRoleArn
+      arn:aws:iam::111111111111:role/BudgetActionsRole (trust verified
+      on budgets.amazonaws.com). ApprovalModel AUTOMATIC.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "sandbox-zero-spend"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "0.01"
+        - "RUN_SSM_DOCUMENTS"
+        - "STOP_EC2_INSTANCES"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-sns-and-action-role
+    description: >-
+      Operator requests a budget with budget actions but has not
+      provided an ExecutionRoleArn that trusts budgets.amazonaws.com,
+      and the SNS topic policy only allows Lambda (not Budgets).
+      Expects PREREQUISITES_MISSING with specific gap citations.
+    input: |
+      Help me create an AWS Budget for account 111111111111 named
+      "dev-spend". Budget $5,000 MONTHLY. I want a budget action that
+      applies an IAM deny policy at 100% ACTUAL. Use SNS topic
+      arn:aws:sns:us-east-1:111111111111:dev-alerts (policy currently
+      only allows lambda.amazonaws.com to publish). Region: us-east-1.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "dev-spend"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "ExecutionRoleArn"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

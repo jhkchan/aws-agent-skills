@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-synthetics-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Synthetics Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "visual-monitoring-mismatch-post-deploy",
+      "name": "Visual Monitoring baseline mismatch — UI deployment changed payment page layout, 12.4% delta vs 1% tolerance",
+      "difficulty": "hard",
+      "prompt_file": "prompts/visual-monitoring-mismatch-post-deploy.md",
+      "baseline_file": "baselines/visual-monitoring-mismatch-post-deploy.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "VISUAL_MONITORING_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "VISUAL_MONITORING_MISMATCH", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "auth-failure-secret-rotation",
+      "name": "API canary auth failure — Secrets Manager auto-rotation + token caching across Lambda warm invocations",
+      "difficulty": "hard",
+      "prompt_file": "prompts/auth-failure-secret-rotation.md",
+      "baseline_file": "baselines/auth-failure-secret-rotation.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "AUTH_FAILURE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "AUTH_FAILURE", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "timeout-stale-selector-dom-change",
+      "name": "GUI Selenium canary timeout — stale DOM selector after target page removed #welcome-banner element",
+      "difficulty": "medium",
+      "prompt_file": "prompts/timeout-stale-selector-dom-change.md",
+      "baseline_file": "baselines/timeout-stale-selector-dom-change.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "TIMEOUT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "TIMEOUT", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-permissions-iam-role",
+      "name": "Canary AccessDenied — execution role missing s3:GetObject after bucket policy change",
+      "difficulty": "medium",
+      "prompt_file": "prompts/insufficient-permissions-iam-role.md",
+      "baseline_file": "baselines/insufficient-permissions-iam-role.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "INSUFFICIENT_PERMISSIONS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "INSUFFICIENT_PERMISSIONS", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-context-need-canary-name",
+      "name": "Vague report of canary failure — request canary name, region, and run report",
+      "difficulty": "easy",
+      "prompt_file": "prompts/insufficient-context-need-canary-name.md",
+      "baseline_file": "baselines/insufficient-context-need-canary-name.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

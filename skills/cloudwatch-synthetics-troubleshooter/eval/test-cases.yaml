@@ -1,0 +1,146 @@
+# Eval test cases for cloudwatch-synthetics-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-synthetics-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: visual-monitoring-mismatch-post-deploy
+    description: >-
+      Visual Monitoring baseline mismatch after a UI deployment changed
+      the payment page layout. Canary functionally succeeded but the
+      screenshot comparison flagged a 12.4% pixel delta.
+    input: |
+      Scenario: A CloudWatch Synthetics canary "checkout-ui-canary" in
+      us-east-1 transitioned to FAILED state at 2026-08-09T14:02Z. The
+      canary is a GUI Selenium WebDriver type checking the checkout
+      flow. The run report shows VisualMonitoringBaselineMismatch on
+      step 3 (payment-page) with a 12.4% pixel delta vs 1% tolerance.
+      CloudWatch SuccessPercent dropped from 100% to 0% at 14:02Z.
+      Duration is 18s (normal). The checkout-ui service deployed a
+      redesign at 2026-08-09T14:00Z (confirmed via CodePipeline). The
+      "Pay Now" button moved from right-aligned to center, and a trust
+      badge was added. describe-canary shows VisualTesting Tolerance
+      is 1%.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "VISUAL_MONITORING_MISMATCH"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: auth-failure-secret-rotation
+    description: >-
+      API canary auth failure caused by Secrets Manager auto-rotation
+      and token caching across Lambda warm invocations.
+    input: |
+      Scenario: A CloudWatch Synthetics canary "api-health-canary" in
+      us-east-1 is returning FAILED. The canary is an API HTTP type
+      that authenticates via OAuth client credentials. Step 1 retrieves
+      a secret from Secrets Manager and requests an OAuth token. Step 2
+      calls the health API. The run report shows 401 Unauthorized on
+      step 1 with response body {"error": "invalid_client"}. CloudWatch
+      SuccessPercent dropped from 100% to 0% at 2026-08-09T03:01Z.
+      Secrets Manager shows LastRotatedDate 2026-08-09T03:00:12Z. The
+      canary log shows "Retrieving secret from Secrets Manager..." on
+      the first run after rotation, then "Using cached token" on
+      subsequent runs. IAM simulation confirms the canary role has
+      secretsmanager:GetSecretValue. The OAuth server is healthy.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "AUTH_FAILURE"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: timeout-stale-selector-dom-change
+    description: >-
+      GUI Selenium canary timeout caused by a stale DOM selector after
+      the target page removed the element the canary waits for.
+    input: |
+      Scenario: A CloudWatch Synthetics canary "login-flow-canary" in
+      us-west-2 is hitting FAILED state consistently. The canary is a
+      GUI Selenium type with TimeoutInSeconds=60. Run reports show
+      Duration consistently at 59-60 seconds (the timeout limit). The
+      canary log shows the last step logged is "Waiting for dashboard
+      element #welcome-banner" — no subsequent steps are logged. No
+      runtime exception is thrown. The login step succeeds. The target
+      application deployed at 2026-08-08T22:00Z — the dashboard was
+      redesigned and the #welcome-banner element was removed and
+      replaced with .dashboard-greeting. The canary script still waits
+      for #welcome-banner. CloudWatch SuccessPercent dropped to 0%
+      at 2026-08-08T22:05Z.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "TIMEOUT"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: insufficient-permissions-iam-role
+    description: >-
+      Canary fails with AccessDenied because the execution role is
+      missing s3:GetObject on the artifact bucket after a bucket policy
+      change.
+    input: |
+      Scenario: A CloudWatch Synthetics canary "homepage-check" in
+      us-east-1 started failing at 2026-08-09T10:00Z. The canary is an
+      HTTP ping type. The run report shows AccessDenied when trying to
+      read its artifact from S3. describe-canary shows ExecutionRoleArn
+      arn:aws:iam::111111111111:role/synthetics-canary-role and
+      ArtifactS3Location cw-synthetics-artifacts-prod. IAM simulation
+      shows the role does NOT have s3:GetObject on the artifact bucket
+      (DENY). The bucket policy was updated at 2026-08-09T09:55Z to
+      restrict access to a different principal. The target endpoint
+      (https://example.com) responds normally with 200 OK from curl.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "INSUFFICIENT_PERMISSIONS"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: insufficient-context-need-canary-name
+    description: >-
+      Vague report of a Synthetics canary failure without the canary
+      name, region, or run report details.
+    input: |
+      Scenario: A user reports "our CloudWatch canary is failing and
+      the alarm is going off." They mention the application name
+      "checkout-service" but do not provide the canary name, the
+      region, the canary type, the run report error, or the CloudWatch
+      metric pattern.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

@@ -1,0 +1,179 @@
+{
+  "skill": "codeartifact-repository-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the CodeArtifact Repository Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across package formats (npm, pip, maven, swift) and scenarios (single-account, multi-hop upstreams, cross-account RAM sharing) plus a prerequisite failure branch (missing parent domain). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "npm-repository-with-public-upstream",
+      "name": "npm repository with public:npmjs external connection and internal upstream",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — npm repo, external connection + internal upstream, IAM policies",
+      "prompt": "Provision a CodeArtifact npm repository named shared-npm in us-east-1. Domain: shared (existing, owner 123456789012). Associate the public:npmjs external connection. Chain upstream to shared-internal (an internal npm mirror repository that already exists in the same domain). Repository consume access for the ci-build IAM role. Repository publish access for the release-pipeline IAM role. CI builds use the codeartifact login CLI for npm. Tags: Environment=production, Format=npm. Account: 123456789012.",
+      "prompt_file": "prompts/npm-repository-with-public-upstream.md",
+      "baseline_file": "baselines/npm-repository-with-public-upstream.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "REPOSITORY: shared-npm\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Domain — shared (existing, owner 123456789012)\n  [✓]      Repository — shared-npm\n  [✓]      Format — npm\n  [✓]      Upstream chain — shared-internal -> external:npmjs\n  [✓]      External connection — public:npmjs (CodeArtifact managed)\n  [✓]      Connection — arn:aws:codeartifact:us-east-1:123456789012:repository/shared/shared-npm\n  [✓]      Domain owner IAM — arn:aws:iam::123456789012:role/devops-admin (codeartifact:* on domain)\n  [✓]      Repository consume policy — arn:aws:iam::123456789012:role/ci-build (ReadFromRepository, GetAuthorizationToken, GetPackageVersionAsset)\n  [✓]      Repository publish policy — arn:aws:iam::123456789012:role/release-pipeline (PublishPackageVersion, PutPackageMetadata)\nVERIFICATION_COMMANDS:\n  aws codeartifact describe-domain --domain shared --domain-owner 123456789012\n  aws codeartifact describe-repository --domain shared --repository shared-npm\n  aws codeartifact list-repositories-in-domain --domain shared\n  aws codeartifact list-external-connections --domain shared\n  aws codeartifact get-repository-endpoint --domain shared --repository shared-npm --format npm\n  aws codeartifact login --tool npm --repository shared-npm --domain shared --domain-owner 123456789012",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-npm",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "public:npmjs",
+            "npm"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-parent-domain",
+      "name": "Parent domain does not exist — deployment blocker",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — parent domain required",
+      "prompt": "Provision a CodeArtifact pip repository named payments-pip in us-east-1. Domain: payments-team (does NOT exist in the account; describe-domain returns ResourceNotFoundException). Associate public:pypi external connection. CI role: payments-ci. Release role: payments-release. Account: 123456789012.",
+      "prompt_file": "prompts/missing-parent-domain.md",
+      "baseline_file": "baselines/missing-parent-domain.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "REPOSITORY: payments-pip\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗]      Domain — MISSING. The parent domain payments-team does not exist in account 123456789012. A CodeArtifact repository cannot exist without a parent domain. Create the domain first via `aws codeartifact create-domain --domain payments-team` or reference an existing domain.\n  [✓]      Repository — payments-pip (pending parent domain)\n  [✓]      Format — pip\n  [INPUT NEEDED] External connection — public:pypi (depends on domain)\n  [INPUT NEEDED] Upstream chain — depends on domain\nVERIFICATION_COMMANDS:\n  aws codeartifact describe-domain --domain payments-team\n  aws codeartifact create-domain --domain payments-team",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "payments-pip",
+            "VERDICT",
+            "CHECKLIST",
+            "domain"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "maven-multiple-upstreams",
+      "name": "maven repository with multi-hop upstream chain",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — maven multi-hop upstreams + external connection",
+      "prompt": "Provision a CodeArtifact maven repository named team-payments-maven in us-east-1. Domain: shared (existing, owner 123456789012). Multi-hop upstream chain: team-payments-internal, then shared-maven (both already exist in the domain), then the public:maven-central external connection on shared-maven. CI role: payments-ci with ReadFromRepository and GetAuthorizationToken. Release role: payments-release with PublishPackageVersion. CI uses the codeartifact login CLI for mvn. Tags: Environment=production, Team=payments, Format=maven. Account: 123456789012.",
+      "prompt_file": "prompts/maven-multiple-upstreams.md",
+      "baseline_file": "baselines/maven-multiple-upstreams.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "REPOSITORY: team-payments-maven\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Domain — shared (existing, owner 123456789012)\n  [✓]      Repository — team-payments-maven\n  [✓]      Format — maven\n  [✓]      Upstream chain — team-payments-internal -> shared-maven -> external:maven-central\n  [✓]      External connection — public:maven-central (on shared-maven)\n  [✓]      Connection — arn:aws:codeartifact:us-east-1:123456789012:repository/shared/team-payments-maven\n  [✓]      Domain owner IAM — arn:aws:iam::123456789012:role/devops-admin\n  [✓]      Repository consume policy — arn:aws:iam::123456789012:role/payments-ci (ReadFromRepository, GetAuthorizationToken)\n  [✓]      Repository publish policy — arn:aws:iam::123456789012:role/payments-release (PublishPackageVersion)\nVERIFICATION_COMMANDS:\n  aws codeartifact describe-domain --domain shared --domain-owner 123456789012\n  aws codeartifact describe-repository --domain shared --repository team-payments-maven\n  aws codeartifact list-repositories-in-domain --domain shared\n  aws codeartifact get-repository-endpoint --domain shared --repository team-payments-maven --format maven\n  aws codeartifact login --tool mvn --repository team-payments-maven --domain shared --domain-owner 123456789012",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "team-payments-maven",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "maven",
+            "public:maven-central"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-domain-share",
+      "name": "Cross-account domain sharing via RAM resource share",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — RAM resource share + consumer IAM",
+      "prompt": "Share the existing CodeArtifact domain named shared (owner 123456789012) with consumer account 123456789012 in us-east-1. Use a RAM resource share named codeartifact-shared-domain. The consumer account's IAM role consumer-ci-build needs codeartifact:GetAuthorizationToken and codeartifact:ReadFromRepository on the shared domain's ARN (with owner account ID 123456789012 embedded). The consumer uses `aws codeartifact login --tool npm --domain shared --domain-owner 123456789012 --repository shared-npm`. Account: 123456789012 (owner).",
+      "prompt_file": "prompts/cross-account-domain-share.md",
+      "baseline_file": "baselines/cross-account-domain-share.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "REPOSITORY: shared (domain-level share)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Domain — shared (existing, owner 123456789012)\n  [✓]      RAM resource share — codeartifact-shared-domain\n  [✓]      Principal — arn:aws:iam::123456789012:root\n  [✓]      Resource — arn:aws:codeartifact:us-east-1:123456789012:domain/shared\n  [✓]      Consumer IAM role — arn:aws:iam::123456789012:role/consumer-ci-build (GetAuthorizationToken, ReadFromRepository on owner domain ARN)\n  [✓]      Consumer login — aws codeartifact login --tool npm --domain shared --domain-owner 123456789012 --repository shared-npm\nVERIFICATION_COMMANDS:\n  aws ram get-resource-shares --resource-share-arns <ram-arn>\n  aws codeartifact get-domain-permissions-policy --domain shared\n  aws codeartifact describe-domain --domain shared --domain-owner 123456789012\n  aws codeartifact login --tool npm --domain shared --domain-owner 123456789012 --repository shared-npm",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "123456789012"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swift-repo-with-region-check",
+      "name": "swift repository in a Region without the public swift external connection",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Region-limited Swift external connection, generic-format approach",
+      "prompt": "Provision a CodeArtifact repository for Swift packages in ap-southeast-1. Domain: mobile-shared (existing, owner 123456789012). The public swift external connection is NOT available in ap-southeast-1 (list-external-connections does not list it). Provide the recommendation (use a generic-format repository and copy-package-versions from us-east-1 where Swift is supported). CI role: mobile-ci. Account: 123456789012.",
+      "prompt_file": "prompts/swift-repo-with-region-check.md",
+      "baseline_file": "baselines/swift-repo-with-region-check.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "REPOSITORY: mobile-shared-swift\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Domain — mobile-shared (existing, owner 123456789012)\n  [✓]      Repository — mobile-shared-swift\n  [✓]      Format — generic (Swift external connection not available in ap-southeast-1)\n  [✓]      Region constraint — ap-southeast-1 does not list public swift external connection; verified via list-external-connections\n  [✓]      Package ingestion — copy-package-versions from us-east-1 (where Swift is supported) into this repository\n  [✓]      Domain owner IAM — arn:aws:iam::123456789012:role/devops-admin (codeartifact:* on domain)\n  [✓]      Repository consume policy — arn:aws:iam::123456789012:role/mobile-ci (ReadFromRepository, GetAuthorizationToken)\nVERIFICATION_COMMANDS:\n  aws codeartifact describe-domain --domain mobile-shared --domain-owner 123456789012 --region ap-southeast-1\n  aws codeartifact describe-repository --domain mobile-shared --repository mobile-shared-swift --region ap-southeast-1\n  aws codeartifact list-external-connections --domain mobile-shared --region ap-southeast-1\n  aws codeartifact list-external-connections --domain mobile-shared --region us-east-1\n  aws codeartifact copy-package-versions --domain mobile-shared --repository mobile-shared-swift --source-repository mobile-shared-swift-us-east-1 --format swift --package <pkg> --versions <ver> --region ap-southeast-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "mobile-shared",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "swift"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

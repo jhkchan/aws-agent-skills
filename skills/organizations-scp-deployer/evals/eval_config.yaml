@@ -1,0 +1,48 @@
+# Eval configuration for organizations-scp-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: organizations-scp-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: guardrail-deny-regions-ready
+    difficulty: medium
+    prompt_file: prompts/guardrail-deny-regions-ready.md
+    baseline_file: baselines/guardrail-deny-regions-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: MODERATE
+  - id: policy-type-not-enabled-blocked
+    difficulty: easy
+    prompt_file: prompts/policy-type-not-enabled-blocked.md
+    baseline_file: baselines/policy-type-not-enabled-blocked.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: LOW
+  - id: delegate-allowlist-ready-with-warning
+    difficulty: hard
+    prompt_file: prompts/delegate-allowlist-ready-with-warning.md
+    baseline_file: baselines/delegate-allowlist-ready-with-warning.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: HIGH
+  - id: root-deny-cannot-be-overridden-blocked
+    difficulty: hard
+    prompt_file: prompts/root-deny-cannot-be-overridden-blocked.md
+    baseline_file: baselines/root-deny-cannot-be-overridden-blocked.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: MODERATE
+  - id: called-via-chained-service-ready
+    difficulty: medium
+    prompt_file: prompts/called-via-chained-service-ready.md
+    baseline_file: baselines/called-via-chained-service-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: MODERATE

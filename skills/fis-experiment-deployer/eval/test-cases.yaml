@@ -1,0 +1,154 @@
+# Eval test cases for fis-experiment-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across EC2 stop, Aurora failover, network blackhole,
+# permissive-target rejection, and EKS pod disruption.
+skill: fis-experiment-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ec2-stop-canary-with-alarm
+    description: >-
+      Provision an FIS experiment template that stops a single canary
+      EC2 instance (tagged fis-target=true) for 60s with a CloudWatch
+      alarm stop condition. Expects READY_TO_DEPLOY with alarm state +
+      IAM tag conditions cited.
+    input: |
+      Create an FIS experiment template named "ec2-stop-canary" in
+      us-east-1, account 111111111111. Stop one EC2 instance tagged
+      fis-target=true (currently 1 instance i-0abc123) for 60 seconds.
+      Stop condition: alarm "fis-stop-error-rate" (currently OK, FIS
+      role already has cloudwatch:DescribeAlarms on it). Log to S3
+      bucket "fis-logs-111111111111" prefix "experiments/" and CloudWatch
+      Logs group "/aws/fis/ec2-stop-canary". budgetDuration 2 minutes.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "EXPERIMENT_TEMPLATE"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "aws:ec2:stop-instances"
+        - "fis-target=true"
+        - "budgetDuration"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: permissive-target-tag-rejected
+    description: >-
+      FIS target scoped with env=prod (247 instances). Must reject the
+      target as too permissive and return PREREQUISITES_MISSING.
+    input: |
+      Build an FIS experiment template that stops EC2 instances tagged
+      "env=prod" for a chaos drill. We have 247 production instances
+      with that tag. Stop condition: none, we'll watch manually.
+      budgetDuration 5 minutes.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "247"
+        - "env=prod"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: aurora-failover-dr-drill
+    description: >-
+      Provision an Aurora failover FIS experiment for a DR drill with
+      a DB connection drop alarm as stop condition. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Provision an FIS experiment "aurora-failover-drill" in us-east-1.
+      Use aws:rds:failover-db-cluster against target cluster
+      arn:aws:rds:us-east-1:111111111111:cluster:api-prod-cluster
+      (cluster is AVAILABLE). Stop condition: alarm
+      "fis-stop-db-connections-dropped" (currently OK, role has
+      cloudwatch:DescribeAlarms). Log to CloudWatch Logs group
+      "/aws/fis/aurora-failover-drill". budgetDuration 5 minutes.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "EXPERIMENT_TEMPLATE"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "aws:rds:failover-db-cluster"
+        - "aurora"
+        - "budgetDuration"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: network-blackhole-with-ssm
+    description: >-
+      Provision an FIS experiment that blackholes traffic from app
+      instance to its DB via SSM Run Command on the app instance.
+      Expects READY_TO_DEPLOY with SSM agent verification cited.
+    input: |
+      Create an FIS experiment "network-blackhole-app-to-db" in
+      us-east-1. Use SSM Run Command on app instance i-0abc456 (tagged
+      fis-target=true, SSM agent Online) to drop traffic from
+      10.0.0.20 (DB IP). Run for 5 minutes via SSM document
+      AWS-RunShellScript. Stop condition: alarm "fis-stop-api-latency"
+      (OK state, role has DescribeAlarms). Log to S3
+      "fis-logs-111111111111" + CloudWatch Logs
+      "/aws/fis/network-blackhole-app-to-db". budgetDuration 10 minutes.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "EXPERIMENT_TEMPLATE"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "network"
+        - "SSM"
+        - "budgetDuration"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: eks-pod-disruption
+    description: >-
+      Provision an FIS experiment that disrupts EKS pods via kubectl
+      on a worker node. Expects READY_TO_DEPLOY with SSM + kubectl
+      verification cited.
+    input: |
+      Build an FIS experiment "eks-pod-kill-api" in us-east-1. Use
+      SSM Run Command on EKS worker node i-0abc789 (tagged
+      fis-target=true, SSM agent Online, has EKS API permissions via
+      kubeconfig). Delete pods matching label "app=critical" in
+      namespace "api". Run kubectl via AWS-RunShellScript. Stop
+      condition: alarm "fis-stop-api-5xx" (OK state, role has
+      DescribeAlarms). budgetDuration 3 minutes.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "EXPERIMENT_TEMPLATE"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "EKS"
+        - "kubectl"
+        - "budgetDuration"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

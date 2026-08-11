@@ -1,0 +1,180 @@
+{
+  "skill_name": "service-catalog-portfolio-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Service Catalog Portfolio Deployer. Five-case proven set exercising READY_TO_DEPLOY / PREREQUISITES_MISSING across local-account S3 product with full constraints, missing-LAUNCH-role rejection, OU share with delegated admin, multi-region visibility, and Terraform Open Source product. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "s3-product-local-account-with-constraints",
+      "name": "Local-account S3 product with LAUNCH + TAG_UPDATE + NOTIFICATION + TagOptions",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — STACK-based LAUNCH constraint with sc-launch-s3-role, all constraints and TagOptions configured, local account only",
+      "prompt": "Create a Service Catalog portfolio \"Curated S3 Products\" by ProviderName \"Platform Governance\" in us-east-1, account 111111111111. Product: \"Curated S3 Bucket\" (CLOUD_FORMATION_TEMPLATE) loaded from https://s3.amazonaws.com/platform-templates-us-east-1/s3-bucket.yaml (validated, accessible). Version v1.0.0. Constraints: LAUNCH STACK-based with role sc-launch-s3-role (exists, scoped to s3:* with iam:PassRole tag condition), TAG_UPDATE NOT_ALLOWED, NOTIFICATION to SNS topic arn:aws:sns:us-east-1:111111111111:sc-launch-events (exists). TagOptions: CostCenter=platform-1234 + Owner=platform-governance bound at portfolio level. Local account only (no share).",
+      "prompt_file": "prompts/s3-product-local-account-with-constraints.md",
+      "baseline_file": "baselines/s3-product-local-account-with-constraints.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PORTFOLIO: Curated S3 Products (products: 1, shares: local account only in us-east-1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Intent + consumer scope: Distribute curated S3-bucket product to local-account platform users, scope local\n  [✓] Portfolio created: Curated S3 Products by Platform Governance (us-east-1)\n  [✓] Product(s): 1 product (Curated S3 Bucket), 1 provisioning artifact (v1.0.0 active)\n  [✓] Product-portfolio association: 1 association (Curated S3 Bucket -> Curated S3 Products)\n  [✓] Constraint(s): LAUNCH sc-launch-s3-role (STACK-based, scoped to s3:* + iam:PassRole with tag condition), TAG_UPDATE NOT_ALLOWED, NOTIFICATION sc-launch-events SNS topic\n  [✓] TagOptions: 2 key-value pairs bound at portfolio level (CostCenter=platform-1234, Owner=platform-governance)\n  [✓] Share(s): local account only (region: us-east-1, no cross-account share configured)\nVERIFICATION_COMMANDS:\n  aws servicecatalog describe-portfolio --id port-aaaa1111\n  aws servicecatalog search-products-as-admin --portfolio-id port-aaaa1111\n  aws servicecatalog describe-constraint --id cons-bbbb2222\n  aws servicecatalog list-tag-options\n  aws iam get-role --role-name sc-launch-s3-role",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PORTFOLIO",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "LAUNCH",
+            "sc-launch-s3-role",
+            "TagOptions"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-launch-role-rejected",
+      "name": "Product without LAUNCH constraint or launch role must be rejected",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — no LAUNCH role, privilege escalation risk cited",
+      "prompt": "Build a Service Catalog portfolio \"Power Tools\" with a powerful VPC-creator product. No launch role — users will use their own roles. No constraints, no TagOptions, no notification. Share with the whole organization o-abc123def456 (Organizations enabled). budgetDuration not applicable.",
+      "prompt_file": "prompts/missing-launch-role-rejected.md",
+      "baseline_file": "baselines/missing-launch-role-rejected.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "PORTFOLIO: Power Tools (products: 1, shares: o-abc123def456)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓] Intent + consumer scope: Distribute powerful VPC-creator product to whole organization, scope ORGANIZATION\n  [—] Portfolio created: deferred until LAUNCH constraint is resolved\n  [—] Product(s): deferred\n  [—] Product-portfolio association: deferred\n  [✗] Constraint(s): no LAUNCH role exists. Without a LAUNCH constraint, CloudFormation assumes the launching user's role = privilege escalation risk. Create sc-launch-vpc-role with ec2:* + iam:PassRole (with tag condition) before applying the constraint.\n  [✗] TagOptions: no TagOptions configured — consumers will launch without governed tagging.\n  [✗] Share(s): ORGANIZATION-level share to o-abc123def456 would expose the unconstrained product to every account. Resolve LAUNCH constraint before sharing.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "VERDICT",
+            "CHECKLIST",
+            "LAUNCH",
+            "privilege escalation"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ou-share-with-delegated-admin",
+      "name": "OU share with delegated administrator enabled",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — OU share with delegated admin and caller region cited",
+      "prompt": "Provision portfolio \"Data Products\" by \"Data Platform\" in us-east-1, account 111111111111. Product: \"Aurora Reader Endpoint\" (CLOUD_FORMATION_TEMPLATE) from https://s3.amazonaws.com/data-templates/aurora-reader.yaml (validated). Version v2.1.0. Constraints: LAUNCH STACK-based with sc-launch-aurora-role (exists, scoped to rds:*), TAG_UPDATE NOT_ALLOWED. TagOptions: CostCenter=data-9999 at portfolio level. Share with OU ou-abc1-abcdef (Organizations enabled, delegated admin account 222222222222 enabled for servicecatalog.amazonaws.com).",
+      "prompt_file": "prompts/ou-share-with-delegated-admin.md",
+      "baseline_file": "baselines/ou-share-with-delegated-admin.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PORTFOLIO: Data Products (products: 1, shares: ou-abc1-abcdef in us-east-1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Intent + consumer scope: Distribute Aurora Reader Endpoint product to Data Platform OU, scope ORGANIZATIONAL_UNIT\n  [✓] Portfolio created: Data Products by Data Platform (us-east-1)\n  [✓] Product(s): 1 product (Aurora Reader Endpoint), 1 provisioning artifact (v2.1.0 active)\n  [✓] Product-portfolio association: 1 association\n  [✓] Constraint(s): LAUNCH sc-launch-aurora-role (STACK-based, scoped to rds:*), TAG_UPDATE NOT_ALLOWED\n  [✓] TagOptions: 1 key-value pair bound at portfolio level (CostCenter=data-9999)\n  [✓] Share(s): ORGANIZATIONAL_UNIT ou-abc1-abcdef (region: us-east-1, delegated admin: account 222222222222 enabled)\nVERIFICATION_COMMANDS:\n  aws servicecatalog describe-portfolio --id port-cccc3333\n  aws servicecatalog describe-portfolio-shares --portfolio-id port-cccc3333 --type ORGANIZATION\n  aws organizations list-delegated-administrators --service-principal servicecatalog.amazonaws.com",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PORTFOLIO",
+            "VERDICT",
+            "CHECKLIST",
+            "ORGANIZATIONAL_UNIT",
+            "delegated admin",
+            "us-east-1"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-region-share-visibility-check",
+      "name": "Multi-region consumer requires region replication or documented expectation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — region mismatch documented, replication via StackSets recommended",
+      "prompt": "Provision portfolio \"Multi-Region S3\" by \"Platform Governance\" in us-east-1 with the S3-bucket product and full constraints (LAUNCH sc-launch-s3-role, TAG_UPDATE NOT_ALLOWED). The consumer accounts are in eu-west-1 and ap-southeast-1. TagOptions CostCenter=platform-1234. Share with ORGANIZATION o-abc123def456 (Organizations enabled). Multi-region rollout is required.",
+      "prompt_file": "prompts/cross-region-share-visibility-check.md",
+      "baseline_file": "baselines/cross-region-share-visibility-check.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PORTFOLIO: Multi-Region S3 (products: 1, shares: o-abc123def456 in us-east-1; replication required for eu-west-1 + ap-southeast-1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Intent + consumer scope: Distribute S3-bucket product to multi-region consumers (us-east-1, eu-west-1, ap-southeast-1), scope ORGANIZATION\n  [✓] Portfolio created: Multi-Region S3 by Platform Governance (us-east-1)\n  [✓] Product(s): 1 product (Curated S3 Bucket), 1 provisioning artifact (v1.0.0)\n  [✓] Product-portfolio association: 1 association\n  [✓] Constraint(s): LAUNCH sc-launch-s3-role (STACK-based), TAG_UPDATE NOT_ALLOWED\n  [✓] TagOptions: 1 key-value pair bound at portfolio level (CostCenter=platform-1234)\n  [✓] Share(s): ORGANIZATION o-abc123def456 (region: us-east-1, delegated admin: enabled) [WARN: consumers in eu-west-1 and ap-southeast-1 will not see the portfolio unless replication in those regions is configured. Use CloudFormation StackSets to replicate the portfolio + product + share in each consumer region.]\nVERIFICATION_COMMANDS:\n  aws servicecatalog describe-portfolio --id port-dddd4444\n  aws servicecatalog describe-portfolio-shares --portfolio-id port-dddd4444 --type ORGANIZATION\n  aws cloudformation describe-stack-set --stack-set-name sc-portfolio-replication",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PORTFOLIO",
+            "VERDICT",
+            "CHECKLIST",
+            "region",
+            "us-east-1",
+            "eu-west-1"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "terraform-open-source-product",
+      "name": "Terraform Open Source Service Catalog product from Git",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — TERRAFORM_OPEN_SOURCE engine available, Git source URL",
+      "prompt": "Build portfolio \"Terraform Products\" by \"Platform Governance\" in us-east-1. Product: \"Terraform S3 Bucket\" (TERRAFORM_OPEN_SOURCE) sourced from git::https://github.com/example/terraform-s3-bucket.git?ref=v1.0.0 (engine confirmed available in us-east-1). Version v1.0.0. Constraints: LAUNCH sc-launch-tf-s3-role (exists). TagOptions: Owner=platform-governance at portfolio level. Local account only.",
+      "prompt_file": "prompts/terraform-open-source-product.md",
+      "baseline_file": "baselines/terraform-open-source-product.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PORTFOLIO: Terraform Products (products: 1, shares: local account only in us-east-1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Intent + consumer scope: Distribute Terraform S3-bucket product to local-account users, scope local\n  [✓] Portfolio created: Terraform Products by Platform Governance (us-east-1)\n  [✓] Product(s): 1 product (Terraform S3 Bucket), 1 provisioning artifact (v1.0.0 active) [TERRAFORM_OPEN_SOURCE engine verified available in us-east-1]\n  [✓] Product-portfolio association: 1 association\n  [✓] Constraint(s): LAUNCH sc-launch-tf-s3-role (STACK-based)\n  [✓] TagOptions: 1 key-value pair bound at portfolio level (Owner=platform-governance)\n  [✓] Share(s): local account only (region: us-east-1)\nVERIFICATION_COMMANDS:\n  aws servicecatalog describe-portfolio --id port-eeee5555\n  aws servicecatalog list-provisioning-engine-types --query 'ProvisioningEngineTypes'\n  aws servicecatalog describe-product --id prod-ffff6666",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PORTFOLIO",
+            "VERDICT",
+            "CHECKLIST",
+            "TERRAFORM_OPEN_SOURCE",
+            "Terraform"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+# Eval test cases for cloudwatch-application-signals-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across platforms (ECS, EKS,
+# EC2, Lambda) and prerequisite failure branches (missing IAM role
+# policies, X-Ray sampling disabled).
+skill: cloudwatch-application-signals-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ecs-java-service-ready
+    description: >-
+      Enable Application Signals on an ECS Fargate Java 17 service
+      (payments-api). Workload role has the required managed policies
+      attached, X-Ray sampling default is set to 5%, and the ADOT
+      collector sidecar is configured. Expects READY_TO_DEPLOY.
+    input: |
+      Enable CloudWatch Application Signals on the payments-api
+      service running on ECS Fargate in us-east-1. Runtime: Java 17
+      (Corretto). The task role payments-api-task already has
+      CloudWatchApplicationSignalsReportServiceAccess and
+      AWSXrayWriteOnlyAccess attached. X-Ray Default sampling rule
+      FixedRate=0.05. The service uses an ADOT collector sidecar
+      with the Java auto-instrumentation agent injected. Service
+      discovery via CloudMap namespace payments.local. Create a
+      99.9% availability SLO over 28 days rolling with burn-rate
+      alarms. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "payments-api"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "CloudWatchApplicationSignalsReportServiceAccess"
+        - "ECS Fargate"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-iam-policies
+    description: >-
+      Enable Application Signals on an ECS service whose task role is
+      MISSING the CloudWatchApplicationSignalsReportServiceAccess
+      policy. Expects PREREQUISITES_MISSING — without the policy the
+      agent runs but produces no RED metrics and no service-map nodes
+      (silent failure).
+    input: |
+      Enable CloudWatch Application Signals on the orders-api service
+      running on ECS Fargate in us-east-1. Runtime: Java 17. The task
+      role orders-api-task currently has only AWSXrayWriteOnlyAccess
+      attached; it does NOT have
+      CloudWatchApplicationSignalsReportServiceAccess. X-Ray sampling
+      is set up (FixedRate=0.05). Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "orders-api"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "CloudWatchApplicationSignalsReportServiceAccess"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: eks-python-service-ready
+    description: >-
+      Enable Application Signals on an EKS Python 3.11 service with
+      the OpenTelemetry Operator and the python auto-instrumentation
+      inject-webhook. Expects READY_TO_DEPLOY with the Python inject
+      path and Kubernetes attributes processor.
+    input: |
+      Enable CloudWatch Application Signals on the search-api service
+      running on EKS in us-east-1. Runtime: Python 3.11. The
+      OpenTelemetry Operator is installed; the deployment is
+      annotated instrumentation.opentelemetry.io/inject-python="true".
+      The service account has IAM roles via IRSA with
+      CloudWatchApplicationSignalsReportServiceAccess and
+      AWSXrayWriteOnlyAccess attached. X-Ray sampling FixedRate=0.10.
+      Service discovery via Kubernetes services. Create a 99.9%
+      availability SLO plus a p95 latency SLO (250ms target).
+      Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "search-api"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "EKS"
+        - "Python"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: xray-sampling-zero
+    description: >-
+      Enable Application Signals on a service where the X-Ray Default
+      sampling rule has FixedRate=0. Expects PREREQUISITES_MISSING —
+      zero sampling blanks the RED metrics derived from X-Ray traces.
+    input: |
+      Enable CloudWatch Application Signals on the notifications-api
+      service running on ECS Fargate in us-east-1. Runtime: Java 17.
+      The task role has both required managed policies. The X-Ray
+      Default sampling rule is currently set to FixedRate=0 (was
+      disabled during a cost-reduction sweep). Create a 99.9%
+      availability SLO. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "notifications-api"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "sampling"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: lambda-java-slo
+    description: >-
+      Enable Application Signals on a Lambda Java 21 function via the
+      ADOT Lambda layer, with a 99.9% availability SLO and a custom
+      p95 latency SLO. Expects READY_TO_DEPLOY with the Lambda layer
+      instrumentation path.
+    input: |
+      Enable CloudWatch Application Signals on the auth-api Lambda
+      function in us-east-1. Runtime: Java 21 (arm64). The
+      aws-otel-java-wrapper-arm64 layer is attached. The function
+      execution role has both required managed policies. X-Ray
+      sampling FixedRate=0.05 (Lambda respects the Default rule).
+      AWS_SERVICE_NAME=auth-api, AWS_APPLICATION_ENVIRONMENT=prod.
+      Create a 99.9% availability SLO over 28 days rolling with
+      burn-rate alarms (fast 5m/14.4x, medium 1h/6x, slow 6h/3x).
+      Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "auth-api"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Lambda"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

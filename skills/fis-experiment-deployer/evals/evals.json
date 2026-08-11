@@ -1,0 +1,181 @@
+{
+  "skill_name": "fis-experiment-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the FIS Experiment Deployer. Five-case proven set exercising READY_TO_DEPLOY / PREREQUISITES_MISSING across EC2 stop-instances (with alarm), permissive-target rejection, Aurora failover, network blackhole via SSM, and EKS pod disruption via kubectl. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "ec2-stop-canary-with-alarm",
+      "name": "EC2 stop-instances on canary with CloudWatch alarm stop condition",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — fis-target=true tag, alarm in OK state, role has DescribeAlarms, tag-scoped role",
+      "prompt": "Create an FIS experiment template named \"ec2-stop-canary\" in us-east-1, account 111111111111. Stop one EC2 instance tagged fis-target=true (currently 1 instance i-0abc123) for 60 seconds. Stop condition: alarm \"fis-stop-error-rate\" (currently OK, FIS role already has cloudwatch:DescribeAlarms on it). Log to S3 bucket \"fis-logs-111111111111\" prefix \"experiments/\" and CloudWatch Logs group \"/aws/fis/ec2-stop-canary\". budgetDuration 2 minutes.",
+      "prompt_file": "prompts/ec2-stop-canary-with-alarm.md",
+      "baseline_file": "baselines/ec2-stop-canary-with-alarm.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EXPERIMENT_TEMPLATE: ec2-stop-canary (action: aws:ec2:stop-instances, target: fis-target=true)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Intent + blast radius: Stop one canary instance for 60s to validate auto-recovery, blast radius 1 instance\n  [✓] Target scoped: resourceTags fis-target=true (1 instance i-0abc123)\n  [✓] Action(s): aws:ec2:stop-instances (duration PT60S)\n  [✓] Stop condition(s): fis-stop-error-rate (state: OK)\n  [✓] IAM role: fis-execution-role (fis trust, ec2:StopInstances + StartInstances scoped to aws:ResourceTag/fis-target=true, cloudwatch:DescribeAlarms on fis-stop-error-rate)\n  [✓] Logging: S3 fis-logs-111111111111 + CloudWatch Logs /aws/fis/ec2-stop-canary\n  [✓] budgetDuration: PT2M (rationale: 2x the 60s stop action for rollback margin)\nVERIFICATION_COMMANDS:\n  aws fis get-experiment-template --id <TEMPLATE_ID>\n  aws ec2 describe-instances --filters Name=tag:fis-target,Values=true --query 'Reservations[0].Instances[0].InstanceId'\n  aws cloudwatch describe-alarms --alarm-names fis-stop-error-rate --query 'MetricAlarms[0].StateValue'\n  aws iam get-role-policy --role-name fis-execution-role --policy-name fis-execution-policy",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EXPERIMENT_TEMPLATE",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "aws:ec2:stop-instances",
+            "fis-target=true",
+            "budgetDuration"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "permissive-target-tag-rejected",
+      "name": "Permissive target tag (env=prod, 247 instances) must be rejected",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — permissive target tag, no stop condition",
+      "prompt": "Build an FIS experiment template that stops EC2 instances tagged \"env=prod\" for a chaos drill. We have 247 production instances with that tag. Stop condition: none, we'll watch manually. budgetDuration 5 minutes.",
+      "prompt_file": "prompts/permissive-target-tag-rejected.md",
+      "baseline_file": "baselines/permissive-target-tag-rejected.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "EXPERIMENT_TEMPLATE: env-prod-stop (action: aws:ec2:stop-instances, target: env=prod)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓] Intent + blast radius: Stop production instances for a drill, blast radius unknown\n  [✗] Target scoped: resourceTags env=prod matches 247 instances — refusing to deploy with this filter. Switch to fis-target=true and tag only eligible resources.\n  [✓] Action(s): aws:ec2:stop-instances (duration PT60S)\n  [✗] Stop condition(s): no alarm name provided — without a stop condition, the experiment runs to budget with no auto-halt. Configure an error-rate or availability alarm.\n  [—] IAM role: deferred until target scope is corrected\n  [—] Logging: deferred\n  [✗] budgetDuration: cannot set without target + stop-condition confirmation (PT2M recommended)\nVERIFICATION_COMMANDS:\n  aws ec2 describe-instances --filters Name=tag:env,Values=prod --query 'Reservations[*].Instances[0].InstanceId'\n  aws cloudwatch describe-alarms --query 'MetricAlarms[?Namespace==`CWAgent`].AlarmName'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "VERDICT",
+            "CHECKLIST",
+            "247",
+            "env=prod"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aurora-failover-dr-drill",
+      "name": "Aurora failover DR drill with DB connection drop alarm",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Aurora cluster AVAILABLE, alarm OK, role scoped",
+      "prompt": "Provision an FIS experiment \"aurora-failover-drill\" in us-east-1. Use aws:rds:failover-db-cluster against target cluster arn:aws:rds:us-east-1:111111111111:cluster:api-prod-cluster (cluster is AVAILABLE). Stop condition: alarm \"fis-stop-db-connections-dropped\" (currently OK, role has cloudwatch:DescribeAlarms). Log to CloudWatch Logs group \"/aws/fis/aurora-failover-drill\". budgetDuration 5 minutes.",
+      "prompt_file": "prompts/aurora-failover-dr-drill.md",
+      "baseline_file": "baselines/aurora-failover-dr-drill.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EXPERIMENT_TEMPLATE: aurora-failover-drill (action: aws:rds:failover-db-cluster, target: api-prod-cluster)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Intent + blast radius: Trigger Aurora writer failover to validate RTO, blast radius 1 cluster\n  [✓] Target scoped: resourceArns arn:aws:rds:us-east-1:111111111111:cluster:api-prod-cluster (1 cluster, AVAILABLE)\n  [✓] Action(s): aws:rds:failover-db-cluster (no params; irreversible, no rollback)\n  [✓] Stop condition(s): fis-stop-db-connections-dropped (state: OK)\n  [✓] IAM role: fis-execution-role (fis trust, rds:FailoverDBCluster on api-prod-cluster, cloudwatch:DescribeAlarms on alarm)\n  [✓] Logging: CloudWatch Logs /aws/fis/aurora-failover-drill\n  [✓] budgetDuration: PT5M (rationale: 2-3x the expected 30-120s failover for margin)\nVERIFICATION_COMMANDS:\n  aws fis get-experiment-template --id <TEMPLATE_ID>\n  aws rds describe-db-clusters --db-cluster-identifier api-prod-cluster --query 'DBClusters[0].Status'\n  aws cloudwatch describe-alarms --alarm-names fis-stop-db-connections-dropped --query 'MetricAlarms[0].StateValue'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EXPERIMENT_TEMPLATE",
+            "VERDICT",
+            "CHECKLIST",
+            "aws:rds:failover-db-cluster",
+            "aurora",
+            "budgetDuration"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network-blackhole-with-ssm",
+      "name": "Network blackhole via SSM with SSM agent verification",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SSM agent online, alarm OK, manual rollback documented",
+      "prompt": "Create an FIS experiment \"network-blackhole-app-to-db\" in us-east-1. Use SSM Run Command on app instance i-0abc456 (tagged fis-target=true, SSM agent Online) to drop traffic from 10.0.0.20 (DB IP). Run for 5 minutes via SSM document AWS-RunShellScript. Stop condition: alarm \"fis-stop-api-latency\" (OK state, role has DescribeAlarms). Log to S3 \"fis-logs-111111111111\" + CloudWatch Logs \"/aws/fis/network-blackhole-app-to-db\". budgetDuration 10 minutes.",
+      "prompt_file": "prompts/network-blackhole-with-ssm.md",
+      "baseline_file": "baselines/network-blackhole-with-ssm.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EXPERIMENT_TEMPLATE: network-blackhole-app-to-db (action: aws:ssm:start-automation-execution, target: fis-target=true)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Intent + blast radius: Blackhole app-to-DB traffic for 5m to test fallback circuit, blast radius 1 instance\n  [✓] Target scoped: resourceTags fis-target=true (1 instance i-0abc456, SSM Online)\n  [✓] Action(s): aws:ssm:start-automation-execution (AWS-RunShellScript, duration PT5M, command: iptables -I INPUT -s 10.0.0.20 -j DROP)\n  [✓] Stop condition(s): fis-stop-api-latency (state: OK)\n  [✓] IAM role: fis-execution-role (fis trust, ssm:SendCommand + GetCommandInvocation on AWS-RunShellScript + i-0abc456, cloudwatch:DescribeAlarms)\n  [✓] Logging: S3 fis-logs-111111111111 + CloudWatch Logs /aws/fis/network-blackhole-app-to-db\n  [✓] budgetDuration: PT10M (rationale: 2x the 5m disruption for SSM rollback margin; manual rollback runbook: iptables -D + tc qdisc del)\nVERIFICATION_COMMANDS:\n  aws fis get-experiment-template --id <TEMPLATE_ID>\n  aws ssm describe-instance-information --filters Name=InstanceIds,Values=i-0abc456 --query 'InstanceInformationList[0].PingStatus'\n  aws cloudwatch describe-alarms --alarm-names fis-stop-api-latency --query 'MetricAlarms[0].StateValue'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EXPERIMENT_TEMPLATE",
+            "VERDICT",
+            "CHECKLIST",
+            "network",
+            "SSM",
+            "budgetDuration"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eks-pod-disruption",
+      "name": "EKS pod disruption via kubectl on worker node (SSM)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — worker has SSM + kubeconfig, alarm OK",
+      "prompt": "Build an FIS experiment \"eks-pod-kill-api\" in us-east-1. Use SSM Run Command on EKS worker node i-0abc789 (tagged fis-target=true, SSM agent Online, has EKS API permissions via kubeconfig). Delete pods matching label \"app=critical\" in namespace \"api\". Run kubectl via AWS-RunShellScript. Stop condition: alarm \"fis-stop-api-5xx\" (OK state, role has DescribeAlarms). budgetDuration 3 minutes.",
+      "prompt_file": "prompts/eks-pod-disruption.md",
+      "baseline_file": "baselines/eks-pod-disruption.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EXPERIMENT_TEMPLATE: eks-pod-kill-api (action: aws:ssm:start-automation-execution, target: fis-target=true)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Intent + blast radius: Delete api/critical pods to validate controller reschedule, blast radius 1 worker node / N pods\n  [✓] Target scoped: resourceTags fis-target=true (1 worker i-0abc789, SSM Online, kubeconfig verified)\n  [✓] Action(s): aws:ssm:start-automation-execution (AWS-RunShellScript: kubectl delete pod -n api -l app=critical --grace-period=0 --force)\n  [✓] Stop condition(s): fis-stop-api-5xx (state: OK)\n  [✓] IAM role: fis-execution-role (fis trust, ssm:SendCommand on AWS-RunShellScript + worker, cloudwatch:DescribeAlarms)\n  [✓] Logging: CloudWatch Logs /aws/fis/eks-pod-kill-api\n  [✓] budgetDuration: PT3M (rationale: 3x the expected pod-reschedule window for margin)\nVERIFICATION_COMMANDS:\n  aws fis get-experiment-template --id <TEMPLATE_ID>\n  aws ssm describe-instance-information --filters Name=InstanceIds,Values=i-0abc789 --query 'InstanceInformationList[0].PingStatus'\n  aws cloudwatch describe-alarms --alarm-names fis-stop-api-5xx --query 'MetricAlarms[0].StateValue'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EXPERIMENT_TEMPLATE",
+            "VERDICT",
+            "CHECKLIST",
+            "EKS",
+            "kubectl",
+            "budgetDuration"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+# Eval test cases for dynamodb-global-tables-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: dynamodb-global-tables-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: add-replica-region-ready
+    description: >-
+      Add a new replica region (eu-west-1) to an existing 2-region
+      global table. All pre-checks pass; the plan should be READY.
+    input: |
+      Scenario: We want to add a third replica region (eu-west-1) to
+      our DynamoDB Global Table "orders-prod". The global table
+      currently has replicas in us-east-1 and us-west-2, both ACTIVE.
+      No replica is in CREATING or DELETING state. The table is in
+      PAY_PER_REQUEST billing mode. eu-west-1 does not currently have
+      a replica. PITR is ENABLED in us-east-1 and us-west-2. The
+      caller's IAM role has dynamodb:UpdateGlobalTable and
+      dynamodb:CreateTable. The table is approximately 50 GB.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "VERDICT"
+        - "update-global-table"
+        - "eu-west-1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+
+  - id: remove-replica-blocked-active-traffic
+    description: >-
+      Remove a replica region (us-west-2) that is still receiving
+      active application traffic. Pre-check fails; verdict is BLOCKED.
+    input: |
+      Scenario: We want to remove the us-west-2 replica from our
+      DynamoDB Global Table "orders-prod". Current replicas: us-east-1
+      (ACTIVE), us-west-2 (ACTIVE), eu-west-1 (ACTIVE). However,
+      CloudWatch shows ConsumedReadCapacityUnits averaging 5,000/min
+      and ConsumedWriteCapacityUnits averaging 2,000/min in us-west-2.
+      The application has not been redirected away from us-west-2.
+      The table is 80 GB.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "VERDICT"
+        - "us-west-2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+
+  - id: regional-failover-completed
+    description: >-
+      Application-level failover from us-east-1 to us-west-2 during a
+      regional degradation. Pre-checks pass, SDK switches, writes
+      verified. Verdict COMPLETED.
+    input: |
+      Scenario: AWS Health Dashboard confirms a regional service
+      degradation in us-east-1 affecting DynamoDB. Our global table
+      "orders-prod" has replicas in us-east-1 (ACTIVE but degraded),
+      us-west-2 (ACTIVE), and eu-west-1 (ACTIVE). ReplicationLatency
+      us-east-1 to us-west-2 was 0.3s average before the degradation.
+      The application SDK has RegionSwitchingRetryPolicy configured.
+      The Route 53 health check detected the degradation and switched
+      the application to us-west-2. Test writes to us-west-2 succeed.
+      PITR is ENABLED in us-west-2. ReplicationLatency from us-west-2
+      to eu-west-1 is 0.8s.
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "VERDICT"
+        - "us-west-2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+
+  - id: create-global-table-ready
+    description: >-
+      Create a new global table across us-east-1 and eu-west-1.
+      Identical empty tables exist in both regions. All pre-checks pass.
+    input: |
+      Scenario: We want to create a new DynamoDB Global Table named
+      "sessions-prod" with replicas in us-east-1 and eu-west-1.
+      Identical empty tables have been created in both regions with
+      the same key schema (partition key: sessionId, type S) and
+      PAY_PER_REQUEST billing mode. Both tables are ACTIVE.
+      describe-global-table returns GlobalTableNotFoundException.
+      The caller's IAM role has dynamodb:CreateGlobalTable. Neither
+      table has any items.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "VERDICT"
+        - "create-global-table"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+
+  - id: insufficient-context-blocked
+    description: >-
+      Vague request to "set up multi-region DynamoDB" without a table
+      name, regions, or configuration details.
+    input: |
+      Scenario: A user asks "I need to set up multi-region DynamoDB
+      for disaster recovery." They do not provide the table name, the
+      target regions, the billing mode, the key schema, or whether the
+      table already exists.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"

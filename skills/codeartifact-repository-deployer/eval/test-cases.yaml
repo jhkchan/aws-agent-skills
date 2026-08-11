@@ -1,0 +1,169 @@
+# Eval test cases for codeartifact-repository-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across package formats
+# (npm, pip, maven, swift) and prerequisite failure branches
+# (missing parent domain, external connection unavailable in Region).
+skill: codeartifact-repository-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: npm-repository-with-public-upstream
+    description: >-
+      Provision a CodeArtifact npm repository named shared-npm in
+      the existing shared domain. Associate public:npmjs external
+      connection. Chain an internal mirror upstream. CI role has
+      ReadFromRepository and GetAuthorizationToken; release role has
+      PublishPackageVersion. Expects READY_TO_DEPLOY.
+    input: |
+      Provision a CodeArtifact npm repository named shared-npm in
+      us-east-1. Domain: shared (existing, owner 123456789012).
+      Associate the public:npmjs external connection. Chain upstream
+      to shared-internal (an internal npm mirror repository that
+      already exists in the same domain). Repository consume access
+      for the ci-build IAM role. Repository publish access for the
+      release-pipeline IAM role. CI builds use the codeartifact
+      login CLI for npm. Tags: Environment=production, Format=npm.
+      Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-npm"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "public:npmjs"
+        - "npm"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-parent-domain
+    description: >-
+      Provision a CodeArtifact repository whose parent domain does
+      NOT exist and is not being created in the same request. Expects
+      PREREQUISITES_MISSING — a repository cannot exist without a
+      parent domain.
+    input: |
+      Provision a CodeArtifact pip repository named payments-pip in
+      us-east-1. Domain: payments-team (does NOT exist in the
+      account; describe-domain returns ResourceNotFoundException).
+      Associate public:pypi external connection. CI role: payments-ci.
+      Release role: payments-release. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "payments-pip"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "domain"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: maven-multiple-upstreams
+    description: >-
+      Provision a CodeArtifact maven repository with a multi-hop
+      upstream chain (team-payments-maven -> team-payments-internal
+      -> shared-maven -> public:maven-central). Expects
+      READY_TO_DEPLOY with the multi-hop upstream chain documented.
+    input: |
+      Provision a CodeArtifact maven repository named
+      team-payments-maven in us-east-1. Domain: shared (existing,
+      owner 123456789012). Multi-hop upstream chain:
+      team-payments-internal, then shared-maven (both already exist
+      in the domain), then the public:maven-central external
+      connection on shared-maven. CI role: payments-ci with
+      ReadFromRepository and GetAuthorizationToken. Release role:
+      payments-release with PublishPackageVersion. CI uses the
+      codeartifact login CLI for mvn. Tags: Environment=production,
+      Team=payments, Format=maven. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "team-payments-maven"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "maven"
+        - "public:maven-central"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-domain-share
+    description: >-
+      Share the shared CodeArtifact domain with consumer account
+      123456789012 via RAM resource share. Configure the consumer
+      IAM role consumer-ci-build with ReadFromRepository on the
+      owner's domain ARN. Expects READY_TO_DEPLOY.
+    input: |
+      Share the existing CodeArtifact domain named shared (owner
+      123456789012) with consumer account 123456789012 in us-east-1.
+      Use a RAM resource share named codeartifact-shared-domain.
+      The consumer account's IAM role consumer-ci-build needs
+      codeartifact:GetAuthorizationToken and
+      codeartifact:ReadFromRepository on the shared domain's ARN
+      (with owner account ID 123456789012 embedded). The consumer
+      uses `aws codeartifact login --tool npm --domain shared
+      --domain-owner 123456789012 --repository shared-npm`. Account:
+      123456789012 (owner).
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "123456789012"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: swift-repo-with-region-check
+    description: >-
+      Provision a CodeArtifact swift repository in a Region where
+      the public swift external connection is NOT available. Expects
+      READY_TO_DEPLOY with a fallback to a generic-format repository
+      and copy-package-versions from a Region that does support
+      Swift.
+    input: |
+      Provision a CodeArtifact repository for Swift packages in
+      ap-southeast-1. Domain: mobile-shared (existing, owner
+      123456789012). The public swift external connection is NOT
+      available in ap-southeast-1 (list-external-connections does
+      not list it). Provide the fallback recommendation (use a
+      generic-format repository and copy-package-versions from
+      us-east-1 where Swift is supported). CI role: mobile-ci.
+      Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "mobile-shared"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "swift"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

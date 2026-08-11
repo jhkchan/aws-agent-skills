@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "dynamodb-global-tables-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DynamoDB Global Tables Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "add-replica-region-ready",
+      "name": "Add a third replica region (eu-west-1) to a 2-region global table — all pre-checks pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/add-replica-region-ready.md",
+      "baseline_file": "baselines/add-replica-region-ready.md",
+      "expected_verdict": "READY",
+      "expected_root_cause_category": "ADD_REPLICA",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "VERDICT", "update-global-table", "eu-west-1"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "remove-replica-blocked-active-traffic",
+      "name": "Remove a replica region still receiving active traffic — pre-check fails, BLOCKED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/remove-replica-blocked-active-traffic.md",
+      "baseline_file": "baselines/remove-replica-blocked-active-traffic.md",
+      "expected_verdict": "BLOCKED",
+      "expected_root_cause_category": "REMOVE_REPLICA_BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "VERDICT", "us-west-2"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY"]
+        }
+      ]
+    },
+    {
+      "id": "regional-failover-completed",
+      "name": "Application-level regional failover from us-east-1 to us-west-2 during degradation — COMPLETED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/regional-failover-completed.md",
+      "baseline_file": "baselines/regional-failover-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_root_cause_category": "FAILOVER",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "VERDICT", "us-west-2"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "create-global-table-ready",
+      "name": "Create a new 2-region global table with identical empty tables pre-created — READY",
+      "difficulty": "medium",
+      "prompt_file": "prompts/create-global-table-ready.md",
+      "baseline_file": "baselines/create-global-table-ready.md",
+      "expected_verdict": "READY",
+      "expected_root_cause_category": "CREATE_GLOBAL_TABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "VERDICT", "create-global-table"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-context-blocked",
+      "name": "Vague multi-region request without table name or regions — BLOCKED",
+      "difficulty": "easy",
+      "prompt_file": "prompts/insufficient-context-blocked.md",
+      "baseline_file": "baselines/insufficient-context-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY"]
+        }
+      ]
+    }
+  ]
+}
