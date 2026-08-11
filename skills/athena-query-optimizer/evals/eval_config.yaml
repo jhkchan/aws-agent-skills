@@ -1,0 +1,43 @@
+# Eval configuration for athena-query-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: athena-query-optimizer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: csv-to-parquet-migration
+    difficulty: medium
+    prompt_file: prompts/csv-to-parquet-migration.md
+    baseline_file: baselines/csv-to-parquet-migration.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: partition-projection-large-partition-count
+    difficulty: hard
+    prompt_file: prompts/partition-projection-large-partition-count.md
+    baseline_file: baselines/partition-projection-large-partition-count.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: query-rewrite-select-star
+    difficulty: hard
+    prompt_file: prompts/query-rewrite-select-star.md
+    baseline_file: baselines/query-rewrite-select-star.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: ctas-materialization-repeated-scan
+    difficulty: medium
+    prompt_file: prompts/ctas-materialization-repeated-scan.md
+    baseline_file: baselines/ctas-materialization-repeated-scan.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: already-optimal-parquet-partitioned-projection
+    difficulty: easy
+    prompt_file: prompts/already-optimal-parquet-partitioned-projection.md
+    baseline_file: baselines/already-optimal-parquet-partitioned-projection.md
+    expected_verdict: ALREADY_OPTIMAL

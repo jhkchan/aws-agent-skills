@@ -1,0 +1,236 @@
+# Eval test cases for backup-vault-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: backup-vault-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-vault-ready
+    description: >-
+      Create a backup vault with KMS encryption and tags. Vault name is
+      free; KMS key is enabled with proper service-principal grants;
+      IAM role holds backup:CreateBackupVault. All pre-checks pass;
+      plan should produce READY with the create-backup-vault CLI,
+      CONFIRM gate, and the no-lock caveat.
+    input: |
+      Operation: create-vault
+      Vault name: prod-daily-vault
+      Region: us-east-1
+      EncryptionKeyArn: arn:aws:kms:us-east-1:111111111111:key/abcd1234-5678-90ef-1234-567890abcdef
+      Tags: Environment=prod, Owner=platform-team
+
+      Pre-checks (already performed by caller):
+        aws backup describe-backup-vault --backup-vault-name prod-daily-vault:
+          ResourceNotFoundException (vault does not exist)
+        aws kms describe-key --key-id arn:aws:kms:us-east-1:111111111111:key/abcd1234-5678-90ef-1234-567890abcdef:
+          KeyState: Enabled, KeyManager: CUSTOMER
+          Policy grants kms:GenerateDataKey, kms:Decrypt to
+            backup.us-east-1.amazonaws.com
+        Caller IAM role: AWSBackupOperatorRole with
+          backup:CreateBackupVault
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, STATE, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-daily-vault"
+        - "create-backup-vault"
+        - "VERDICT"
+        - "CONFIRM"
+        - "KMS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: compliance-lock-ready
+    description: >-
+      Apply a COMPLIANCE-mode vault lock for CIS Benchmark 3.6.
+      Vault is currently UNLOCKED; MinRetentionDays=30,
+      MaxRetentionDays=3650, ChangeableForDays=3. Plan should produce
+      READY with the put-backup-vault-lock-configuration CLI and the
+      irreversibility caveat in NOTES.
+    input: |
+      Operation: lock-vault
+      Vault name: prod-compliance-vault
+      Region: us-east-1
+      Mode: COMPLIANCE
+      MinRetentionDays: 30
+      MaxRetentionDays: 3650
+      ChangeableForDays: 3
+      Justification: CIS Benchmark 3.6 (regulatory archive)
+
+      Pre-checks:
+        aws backup describe-backup-vault --backup-vault-name prod-compliance-vault:
+          VaultLock.LockState: (absent — UNLOCKED)
+          NumberOfRecoveryPoints: 14 (oldest 12 days)
+        Caller IAM role: AWSBackupOperatorRole with
+          backup:PutBackupVaultLockConfiguration
+        MinRetentionDays 30 <= MaxRetentionDays 3650: PASS
+        ChangeableForDays 3 <= 3 max grace: PASS
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "COMPLIANCE"
+        - "ChangeableForDays"
+        - "put-backup-vault-lock-configuration"
+        - "CONFIRM"
+        - "irreversible"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+        - "GOVERNANCE"
+
+  - id: cross-region-plan-ready
+    description: >-
+      Create a backup plan with nightly schedule, cold storage
+      transition at 30 days, delete at 365 days, and cross-region copy
+      to dr-vault in us-west-2 with 90-day retention. Pre-checks
+      verify destination vault + KMS exist and lifecycle fits within
+      the vault lock ceiling. Plan should produce READY.
+    input: |
+      Operation: create-plan
+      Plan name: prod-daily-with-dr
+      Region: us-east-1
+      TargetBackupVault: prod-compliance-vault
+      Schedule: cron(0 5 ? * * *)
+      StartWindowMinutes: 480
+      CompletionWindowMinutes: 1440
+      Lifecycle: MoveToColdStorageAfterDays=30, DeleteAfterDays=365
+      CopyActions:
+        - DestinationBackupVaultArn: arn:aws:backup:us-west-2:111111111111:backup-vault:dr-vault
+          Lifecycle: DeleteAfterDays=90
+
+      Pre-checks:
+        aws backup describe-backup-vault --backup-vault-name prod-compliance-vault:
+          VaultLock.LockState: LOCKED, Mode: COMPLIANCE,
+          MaxRetentionDays: 3650
+        aws backup describe-backup-vault --backup-vault-name dr-vault
+          --region us-west-2:
+          Vault exists with KMS key arn:aws:kms:us-west-2:111111111111:key/xyz
+        MoveToColdStorageAfterDays 30 < DeleteAfterDays 365: PASS
+        DeleteAfterDays 365 <= MaxRetentionDays 3650: PASS
+        Destination region KMS key grants backup.us-west-2.amazonaws.com
+          kms:Decrypt: PASS
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-daily-with-dr"
+        - "create-backup-plan"
+        - "us-west-2"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: governance-mode-misuse-blocked
+    description: >-
+      User requests governance mode for a regulatory archive (HIPAA).
+      Plan should BLOCK because governance mode does not meet
+      regulatory immutability requirements — surface COMPLIANCE mode
+      as the remediation.
+    input: |
+      Operation: lock-vault
+      Vault name: hipaa-archive-vault
+      Region: us-east-1
+      Requested mode: GOVERNANCE
+      MinRetentionDays: 2189  (6 years — HIPAA retention)
+      MaxRetentionDays: 2555  (7 years)
+      Compliance driver: HIPAA Security Rule
+
+      Pre-checks:
+        aws backup describe-backup-vault --backup-vault-name hipaa-archive-vault:
+          Vault exists, currently UNLOCKED
+        Caller IAM role holds backup:PutBackupVaultLockConfiguration
+        Compliance scan: vault contains recovery points tagged
+          "PHI" (Protected Health Information)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "GOVERNANCE"
+        - "HIPAA"
+        - "COMPLIANCE"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+        - "put-backup-vault-lock-configuration --mode GOVERNANCE"
+
+  - id: pitr-restore-completed
+    description: >-
+      Start a point-in-time restore for an EC2 instance from a
+      continuous-backup recovery point. Pre-checks pass; restore
+      executed; post-verification shows Status COMPLETED and
+      CreatedResourceArn populated. Plan should produce COMPLETED.
+    input: |
+      Operation: start-restore (post-verification after execution)
+      Vault: prod-compliance-vault
+      RecoveryPointArn: arn:aws:backup:us-east-1:111111111111:recovery-point:1-2-3-4
+      Resource type: EC2
+      Metadata:
+        InstanceId: i-restored-pitr
+        SubnetId: subnet-abc123
+        SecurityGroupIds: sg-abc123
+        InstanceType: t3.medium
+        RestoreTime: 2026-08-09T14:30:00Z
+
+      Pre-checks (passed):
+        aws backup describe-recovery-point --backup-vault-name prod-compliance-vault \
+          --recovery-point-arn arn:aws:backup:us-east-1:111111111111:recovery-point:1-2-3-4:
+          Status: COMPLETED
+          ContinuousBackup: true
+          ResourceType: EC2
+        RestoreTime 2026-08-09T14:30:00Z within 35-day continuous window: PASS
+
+      Executed CLI:
+        aws backup start-restore-job \
+          --recovery-point-arn arn:aws:backup:us-east-1:111111111111:recovery-point:1-2-3-4 \
+          --metadata '{"InstanceId":"i-restored-pitr","SubnetId":"subnet-abc123","SecurityGroupIds":"sg-abc123","InstanceType":"t3.medium","RestoreTime":"2026-08-09T14:30:00Z"}' \
+          --iam-role-arn arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole \
+          --resource-type EC2
+
+      Post-execution checks (all passed):
+        aws backup describe-restore-job --restore-job-id RESTORE-JOB-XYZ:
+          Status: COMPLETED
+          CreatedResourceArn: arn:aws:ec2:us-east-1:111111111111:instance/i-restored-pitr
+          CompletionDate: 2026-08-09T14:42:17Z
+        aws ec2 describe-instances --instance-ids i-restored-pitr:
+          State: running
+          LaunchTime: 2026-08-09T14:35:02Z
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "i-restored-pitr"
+        - "ContinuousBackup"
+        - "VERDICT"
+        - "POST_VERIFY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

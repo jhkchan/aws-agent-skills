@@ -1,0 +1,209 @@
+# Eval test cases for cost-anomaly-response-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per cost-anomaly scenario. Each case's
+# scenario name embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch).
+skill: cost-anomaly-response-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cad-notify-slack-full-playbook
+    description: >-
+      Design an automated CAD-to-Slack full-playbook workflow with
+      notify, tag, approval gate, and budget action. The operator
+      provides a CAD service monitor for EC2, threshold USD 100, dry-
+      run completed, kill-switch present, scoped IAM. Expected
+      verdict: AUTOMATED.
+    input: |
+      Scenario: cad-notify-slack-full-playbook
+
+      Detection source: CAD (Cost Anomaly Detection)
+      Response scope: full-playbook (notify Slack, tag suspect
+        resources, wait for approval, run budget action)
+      Monitor: ec2-spend-monitor (SERVICE type, daily cadence)
+      Anomaly subscription: prod-cost-anomaly-sub (USD 100 threshold)
+      SNS topic: arn:aws:sns:us-east-1:111122223333:cost-anomaly-alerts
+      Slack webhook: stored in Parameter Store /cost/slack-webhook
+      Kill-switch: Parameter Store /cost/kill-switch (enabled)
+      Dry-run: completed 2026-07-15 to 2026-07-29 (notify-only)
+      Approval gate: SQS task-token callback before EC2 stop
+      IAM: Lambda role scoped to ce:GetAnomalies, sns:Publish,
+        resourcegroupstaggingapi:TagResources, budgets:ExecuteBudgetAction
+      Idempotency: DynamoDB cost-anomaly-dedupe keyed by AnomalyId
+
+      Emit the standard design block (DETECTION_SOURCE,
+      RESPONSE_SCOPE, VERDICT, WORKFLOW, GUARDRAILS, AUDIT, FINDINGS,
+      REMEDIATION).
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "cad-notify-slack-full-playbook"
+        - "GUARDRAILS"
+        - "AUDIT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: budgets-ec2-stop-missing-approval-gate
+    description: >-
+      Validate an existing Budgets native EC2-stop action configured
+      with ApprovalModel=AUTOMATIC at 120% threshold. No human
+      approval gate exists. CUR delivery lag is 8-24h. Expected
+      verdict: MANUAL_STEP_REQUIRED.
+    input: |
+      Scenario: budgets-ec2-stop-missing-approval-gate
+
+      Detection source: AWS Budgets
+      Response scope: budget-action (RUN_SSM_DOCUMENTS STOP_EC2_INSTANCES)
+      Budget: monthly-ec2-budget (USD 10,000 monthly, EC2 cost filter)
+      Action: threshold 120% ACTUAL, ApprovalModel=AUTOMATIC,
+        InstanceIds=["i-0abc12345"], Region us-east-1
+      Kill-switch: Parameter Store /cost/kill-switch (enabled)
+      IAM: role scoped to budgets:ExecuteBudgetAction
+      No Step Functions approval gate wired.
+      CUR delivery latency: 8-24h.
+
+      Emit the standard validation block (DETECTION_SOURCE,
+      RESPONSE_SCOPE, VERDICT, WORKFLOW, GUARDRAILS, AUDIT, FINDINGS,
+      REMEDIATION).
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "budgets-ec2-stop-missing-approval-gate"
+        - "GUARDRAILS"
+        - "approval gate"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: cad-missing-sns-subscription-confirmation
+    description: >-
+      Design a CAD notify workflow where the SNS topic was just
+      created and the email subscription is unconfirmed. Expected
+      verdict: MANUAL_STEP_REQUIRED (subscription must be confirmed
+      before deployment).
+    input: |
+      Scenario: cad-missing-sns-subscription-confirmation
+
+      Detection source: CAD
+      Response scope: notify (email + Slack)
+      Monitor: total-spend-monitor (DIMENSION, daily)
+      Subscription threshold: USD 500
+      SNS topic: arn:aws:sns:us-east-1:111122223333:cost-alerts (newly created)
+      SNS subscriptions:
+        - email: finops@corp.example (Status: PendingConfirmation)
+        - Lambda: cost-slack-forwarder (Status: confirmed)
+      Kill-switch: Parameter Store /cost/kill-switch (enabled)
+      Dry-run: not yet started.
+
+      Emit the standard design block (DETECTION_SOURCE,
+      RESPONSE_SCOPE, VERDICT, WORKFLOW, GUARDRAILS, AUDIT, FINDINGS,
+      REMEDIATION).
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "cad-missing-sns-subscription-confirmation"
+        - "subscription"
+        - "GUARDRAILS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: cur-athena-top-spenders-scheduled
+    description: >-
+      Design a CUR Athena top-spenders query scheduled daily via
+      EventBridge, posting results to Slack. CUR is Parquet (CUR 2.0),
+      Glue partitions loaded, dry-run completed. Expected verdict:
+      AUTOMATED.
+    input: |
+      Scenario: cur-athena-top-spenders-scheduled
+
+      Detection source: CUR (Cost and Usage Report)
+      Response scope: cur-analysis (top-spenders drill-down)
+      CUR: parquet format, daily delivery, partitions loaded
+        (MSCK REPAIR run weekly)
+      Athena database: cur, table: cur_table
+      Athena results bucket: s3://cur-athena-results-us-east-1/
+      EventBridge schedule: cron(0 12 * * ? *) (daily 12:00 UTC)
+      Lambda: cur-top-spenders (start-query-execution, fetch results,
+        format Slack message, post to webhook)
+      Kill-switch: Parameter Store /cost/kill-switch (enabled)
+      IAM: Lambda scoped to athena:StartQueryExecution,
+        athena:GetQueryResults, s3:GetObject on results bucket,
+        ssm:GetParameter on /cost/slack-webhook
+      Dry-run: completed 14 days
+      Idempotency: query deduped by execution ID
+
+      Emit the standard design block (DETECTION_SOURCE,
+      RESPONSE_SCOPE, VERDICT, WORKFLOW, GUARDRAILS, AUDIT, FINDINGS,
+      REMEDIATION).
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "cur-athena-top-spenders-scheduled"
+        - "GUARDRAILS"
+        - "AUDIT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: q-recommendations-lambda-missing-dedupe
+    description: >-
+      Validate a Lambda that polls Cost Optimization Hub
+      recommendations daily and posts to Slack. The Lambda does not
+      dedupe by recommendationId, so it reposts the same
+      recommendation every day. Expected verdict:
+      MANUAL_STEP_REQUIRED.
+    input: |
+      Scenario: q-recommendations-lambda-missing-dedupe
+
+      Detection source: q-recommendations (Cost Optimization Hub)
+      Response scope: notify (Slack)
+      Schedule: EventBridge cron(0 9 * * ? *) (daily 09:00 UTC)
+      Lambda: cost-hub-poller (calls get-recommendations, formats,
+        posts to Slack)
+      The Lambda does NOT track last-seen recommendationId.
+      Last 7 days of Slack: same EC2 rightsize recommendation posted
+        every day.
+      Kill-switch: Parameter Store /cost/kill-switch (enabled)
+      IAM: Lambda scoped to cost-optimization-hub:GetRecommendations,
+        ssm:GetParameter on /cost/slack-webhook
+      Dry-run: never run (deployed straight to live).
+
+      Emit the standard validation block (DETECTION_SOURCE,
+      RESPONSE_SCOPE, VERDICT, WORKFLOW, GUARDRAILS, AUDIT, FINDINGS,
+      REMEDIATION).
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "q-recommendations-lambda-missing-dedupe"
+        - "dedupe"
+        - "GUARDRAILS"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"

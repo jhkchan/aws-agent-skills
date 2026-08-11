@@ -1,0 +1,257 @@
+# Eval test cases for athena-query-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern.
+skill: athena-query-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: csv-to-parquet-migration
+    description: >-
+      Athena table in CSV format, 1.2 TB, unpartitioned. Top queries select
+      5-8 of 42 columns and filter by date. No compression. No workgroup
+      data-scanned limit. Expected verdict: OPPORTUNITY_FOUND with Parquet
+      migration + partitioning + workgroup limit.
+    input: |
+      Database: analytics_db
+      Table: events_csv-to-parquet-migration
+      Region: us-east-1
+
+      Table DDL (aws glue get-table):
+        InputFormat: org.apache.hadoop.mapred.TextInputFormat (CSV)
+        Compressed: false
+        Location: s3://data-lake/events/
+        Columns: 42 columns (event_id, user_id, event_type, amount, ...)
+        PartitionKeys: [] (unpartitioned)
+
+      Query history (aws athena batch-get-query-execution, top 10 queries):
+        - Query: SELECT * FROM events_csv-to-parquet-migration WHERE amount > 100
+          DataScanned: 1.2 TB, Runtime: 320s, State: SUCCEEDED
+        - Query: SELECT user_id, event_type FROM events_csv-to-parquet-migration
+                 WHERE event_time >= '2026-07-01'
+          DataScanned: 1.2 TB, Runtime: 305s
+        - Average queries/day: 220 (all scanning full 1.2 TB)
+        - All top queries filter by event_time date range
+
+      Workgroup (aws athena get-work-group):
+        BytesScannedCutoffPerQuery: 0 (no limit set)
+        EnforceWorkGroupConfiguration: false
+        EngineVersion: Athena engine version 3
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "Parquet"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "partition"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: partition-projection-large-partition-count
+    description: >-
+      Parquet table with 500K partitions. MSCK REPAIR takes 30 minutes.
+      Query planning adds 5-10s latency. Expected verdict: OPPORTUNITY_FOUND
+      with partition projection recommendation.
+    input: |
+      Database: logs_db
+      Table: app_logs_partition-projection-large-partition-count
+      Region: us-east-1
+
+      Table DDL (aws glue get-table):
+        InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+        Compressed: true (Snappy)
+        Location: s3://logs/app/
+        PartitionKeys: [dt] (date, hourly partitions)
+        projection.enabled: not set (not enabled)
+
+      Partition count: 500,000+ (3 years of hourly data)
+
+      Query history:
+        - Top queries filter by dt range (e.g., WHERE dt >= '2026-08-01 00:00:00')
+        - Query planning latency: 5-10 seconds (Glue get-partitions overhead)
+        - MSCK REPAIR TABLE runtime: 30 minutes
+        - Data scanned per query: reasonable (partition pruning works once
+          metadata loads)
+
+      Workgroup: Athena engine version 3, 10 GB data-scanned limit set.
+
+      Expected optimization: enable partition projection to eliminate Glue
+      metadata latency and MSCK REPAIR need.
+
+      Emit the standard optimization block.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "partition projection"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: query-rewrite-select-star
+    description: >-
+      Parquet partitioned table but queries use SELECT * and missing
+      partition filters. Expected verdict: OPPORTUNITY_FOUND with query
+      rewrite recommendation.
+    input: |
+      Database: sales_db
+      Table: orders_query-rewrite-select-star
+      Region: us-east-1
+
+      Table DDL:
+        InputFormat: Parquet
+        Compressed: true (Snappy)
+        Location: s3://data-lake/orders/
+        Columns: 47 columns
+        PartitionKeys: [dt] (date, daily partitions)
+        projection.enabled: true (partition projection already set)
+
+      Query history (top 5 queries):
+        - Query: SELECT * FROM orders_query-rewrite-select-star
+                 WHERE amount > 100 ORDER BY created_at DESC
+          DataScanned: 850 GB, Runtime: 95s
+        - Query: SELECT * FROM orders_query-rewrite-select-star
+                 WHERE status = 'shipped'
+          DataScanned: 850 GB, Runtime: 88s
+        - Query: SELECT customer_id, COUNT(DISTINCT product_id)
+                 FROM orders_query-rewrite-select-star GROUP BY customer_id
+          DataScanned: 850 GB, Runtime: 120s
+
+      Problems identified:
+        - All queries use SELECT * (read all 47 columns)
+        - No WHERE filter on dt (partition column) — full table scan
+        - COUNT(DISTINCT) instead of APPROX_COUNT_DISTINCT
+        - ORDER BY without LIMIT
+
+      Workgroup: 50 GB data-scanned limit (queries exceed it, get blocked).
+
+      Emit the standard optimization block.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "SELECT"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "partition"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+
+  - id: ctas-materialization-repeated-scan
+    description: >-
+      Dashboard runs the same aggregation 50 times/day scanning 200 GB each
+      time. Expected verdict: OPPORTUNITY_FOUND with CTAS materialization.
+    input: |
+      Database: analytics_db
+      Table: events_parquet_ctas-materialization-repeated-scan
+      Region: us-east-1
+
+      Table DDL:
+        InputFormat: Parquet, Compressed: Snappy
+        Partitioned by: dt (daily)
+        Size: ~6 TB (1 year of daily data, ~16 GB/day)
+        projection.enabled: true
+
+      Query pattern: a dashboard runs this query 50 times/day:
+        SELECT date_trunc('day', event_time) AS day,
+               product_id, event_type,
+               COUNT(*) AS event_count,
+               SUM(amount) AS total_amount,
+               COUNT(DISTINCT user_id) AS unique_users
+        FROM events_parquet_ctas-materialization-repeated-scan
+        WHERE dt >= date_format(current_date - interval '1' day, '%Y-%m-%d')
+        GROUP BY 1, 2, 3
+
+      Per query: scans 200 GB, costs $1.00, runtime 45s.
+      Daily total: 50 queries * $1.00 = $50/day = $1,500/month.
+
+      Table is already Parquet + partitioned + partition projection.
+      The query is correctly filtering by dt. The issue is repeated
+      computation of the same aggregation.
+
+      Emit the standard optimization block.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "CTAS"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+
+  - id: already-optimal-parquet-partitioned-projection
+    description: >-
+      Table already in optimal state: Parquet + Snappy, partitioned, partition
+      projection, workgroup limit set, queries use column pruning + partition
+      filters + APPROXIMATE functions. Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      Database: analytics_db
+      Table: daily_summary_already-optimal-parquet-partitioned-projection
+      Region: us-east-1
+
+      Table DDL:
+        InputFormat: Parquet, Compressed: Snappy
+        Partitioned by: dt (daily)
+        projection.enabled: true (daily range 2024-01-01 to 2026-12-31)
+        Size: ~50 GB total, ~170 MB/day
+
+      Query history (top queries):
+        - SELECT product_id, APPROX_COUNT_DISTINCT(user_id) AS unique_users,
+                 SUM(amount) AS total
+          FROM daily_summary_already-optimal-parquet-partitioned-projection
+          WHERE dt >= '2026-07-01' AND dt <= '2026-08-01'
+          GROUP BY product_id
+          DataScanned: 800 MB, Runtime: 2s
+
+        - SELECT event_type, COUNT(*) FROM ... WHERE dt = '2026-08-05'
+          DataScanned: 170 MB, Runtime: 1s
+
+      Workgroup:
+        BytesScannedCutoffPerQuery: 10737418240 (10 GB)
+        EnforceWorkGroupConfiguration: true
+        EngineVersion: Athena engine version 3
+        Result reuse enabled (1 hour TTL)
+
+      No SELECT * usage. All queries use dt partition filter. APPROX_COUNT
+      used for distinct counts. Result reuse caches repeated dashboard queries.
+
+      Emit the standard optimization block.
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-parquet-partitioned-projection"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"

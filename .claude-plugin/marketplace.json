@@ -5,7 +5,7 @@
     "url": "https://github.com/jhkchan/aws-agent-skills"
   },
   "metadata": {
-    "description": "Eval-backed AWS CloudOps agent skills \u2014 150 skills across 6 task types",
+    "description": "Eval-backed AWS CloudOps agent skills \u2014 159 skills across 6 task types",
     "version": "2.1.0"
   },
   "plugins": [
@@ -163,7 +163,16 @@
         "./skills/multi-account-governance-automator",
         "./skills/rds-parameter-group-deployer",
         "./skills/s3-batch-operations-operator",
-        "./skills/wafv2-web-acl-deployer"
+        "./skills/wafv2-web-acl-deployer",
+        "./skills/appmesh-deployer",
+        "./skills/athena-query-optimizer",
+        "./skills/backup-vault-operator",
+        "./skills/cognito-user-pool-deployer",
+        "./skills/cost-anomaly-response-automator",
+        "./skills/guardduty-finding-investigator",
+        "./skills/kafka-connect-troubleshooter",
+        "./skills/kafka-msk-troubleshooter",
+        "./skills/transfer-family-deployer"
       ],
       "skill_count": 90
     }

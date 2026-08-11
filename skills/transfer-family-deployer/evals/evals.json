@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "transfer-family-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the AWS Transfer Family Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "deploy-sftp-service-managed-ready",
+      "name": "Deploy a Service Managed SFTP server with S3 backend and per-user session policies — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/deploy-sftp-service-managed-ready.md",
+      "baseline_file": "baselines/deploy-sftp-service-managed-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-sftp-inbox", "create-server", "create-user", "VERDICT", "CONFIRM", "SFTP", "session policy"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-sftp-vpc-custom-idp-ready",
+      "name": "Deploy SFTP+FTPS server on VPC_ENDPOINT with custom API Gateway Lambda IdP — ACM cert ISSUED, API deployed to stage, IdP Lambda returns expected JSON shape (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-sftp-vpc-custom-idp-ready.md",
+      "baseline_file": "baselines/deploy-sftp-vpc-custom-idp-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-sftp-vpc-custom-idp", "API_GATEWAY", "VPC_ENDPOINT", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-sftp-directory-service-ready",
+      "name": "Deploy SFTP server federated with AWS Directory Service (Managed Microsoft AD) on VPC_ENDPOINT — directory ACTIVE in matching VPC (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-sftp-directory-service-ready.md",
+      "baseline_file": "baselines/deploy-sftp-directory-service-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "AWS_DIRECTORY_SERVICE", "VPC_ENDPOINT", "create-server", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-sftp-missing-iam-role",
+      "name": "SFTP server configured with IAM execution role that does not exist — every user creation would fail at runtime; pre-check gate blocks (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-sftp-missing-iam-role.md",
+      "baseline_file": "baselines/deploy-sftp-missing-iam-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "TransferUserS3Role", "transfer.amazonaws.com", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-ftp-public-endpoint-blocked",
+      "name": "Plain FTP requested on PUBLIC endpoint — cleartext credentials on the internet; pre-check gate blocks (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-ftp-public-endpoint-blocked.md",
+      "baseline_file": "baselines/deploy-ftp-public-endpoint-blocked.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "FTP", "PUBLIC", "cleartext", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

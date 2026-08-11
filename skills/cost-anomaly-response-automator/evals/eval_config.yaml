@@ -1,0 +1,43 @@
+# Eval configuration for cost-anomaly-response-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the
+# same case can run with-skill (SKILL.md loaded) vs without-skill
+# (baseline only) for delta comparison. This is the canonical
+# structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer
+# shim discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: cost-anomaly-response-automator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: cad-notify-slack-full-playbook
+    difficulty: medium
+    prompt_file: prompts/cad-notify-slack-full-playbook.md
+    baseline_file: baselines/cad-notify-slack-full-playbook.md
+    expected_verdict: AUTOMATED
+  - id: budgets-ec2-stop-missing-approval-gate
+    difficulty: hard
+    prompt_file: prompts/budgets-ec2-stop-missing-approval-gate.md
+    baseline_file: baselines/budgets-ec2-stop-missing-approval-gate.md
+    expected_verdict: MANUAL_STEP_REQUIRED
+  - id: cad-missing-sns-subscription-confirmation
+    difficulty: medium
+    prompt_file: prompts/cad-missing-sns-subscription-confirmation.md
+    baseline_file: baselines/cad-missing-sns-subscription-confirmation.md
+    expected_verdict: MANUAL_STEP_REQUIRED
+  - id: cur-athena-top-spenders-scheduled
+    difficulty: hard
+    prompt_file: prompts/cur-athena-top-spenders-scheduled.md
+    baseline_file: baselines/cur-athena-top-spenders-scheduled.md
+    expected_verdict: AUTOMATED
+  - id: q-recommendations-lambda-missing-dedupe
+    difficulty: medium
+    prompt_file: prompts/q-recommendations-lambda-missing-dedupe.md
+    baseline_file: baselines/q-recommendations-lambda-missing-dedupe.md
+    expected_verdict: MANUAL_STEP_REQUIRED

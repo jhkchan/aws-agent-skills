@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "appmesh-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the App Mesh Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "weighted-canary-ready",
+      "name": "Provision mesh with weighted canary route 90/10 (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/weighted-canary-ready.md",
+      "baseline_file": "baselines/weighted-canary-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-checkout-mesh", "create-mesh", "create-virtual-node", "create-route", "DROP_ALL"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "virtual-gateway-ingress-ready",
+      "name": "Add virtual gateway with HTTPS ingress from ALB (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/virtual-gateway-ingress-ready.md",
+      "baseline_file": "baselines/virtual-gateway-ingress-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "ingress-gateway", "create-virtual-gateway", "create-gateway-route", "PERMISSIVE", "8443"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "mtls-strict-missing-ca-blocked",
+      "name": "STRICT mTLS requested with no ACM Private CA (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/mtls-strict-missing-ca-blocked.md",
+      "baseline_file": "baselines/mtls-strict-missing-ca-blocked.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "STRICT", "ACM Private CA", "BLOCKER", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY", "create-virtual-node"]
+        }
+      ]
+    },
+    {
+      "id": "circuit-breaking-paired-with-retry-ready",
+      "name": "Configure circuit breaking paired with existing retry policy (READY_TO_DEPLOY)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/circuit-breaking-paired-with-retry-ready.md",
+      "baseline_file": "baselines/circuit-breaking-paired-with-retry-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "checkout-service-v1", "connectionPool", "outlierDetection", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "allow-all-egress-warning-ready",
+      "name": "ALLOW_ALL egress for dev mesh with WARN finding (READY_TO_DEPLOY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/allow-all-egress-warning-ready.md",
+      "baseline_file": "baselines/allow-all-egress-warning-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "ALLOW_ALL", "WARN", "DROP_ALL", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    }
+  ]
+}

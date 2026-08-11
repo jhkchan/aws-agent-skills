@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "athena-query-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Athena Query Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "csv-to-parquet-migration",
+      "name": "CSV table (1.2 TB, unpartitioned) — migrate to Parquet + partitioning + workgroup limit",
+      "difficulty": "medium",
+      "prompt_file": "prompts/csv-to-parquet-migration.md",
+      "baseline_file": "baselines/csv-to-parquet-migration.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "Parquet", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "partition"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "partition-projection-large-partition-count",
+      "name": "Parquet table with 500K partitions — enable partition projection to eliminate Glue metadata latency",
+      "difficulty": "hard",
+      "prompt_file": "prompts/partition-projection-large-partition-count.md",
+      "baseline_file": "baselines/partition-projection-large-partition-count.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "partition projection", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "query-rewrite-select-star",
+      "name": "Parquet partitioned table — queries use SELECT *, missing partition filters, COUNT(DISTINCT)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/query-rewrite-select-star.md",
+      "baseline_file": "baselines/query-rewrite-select-star.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "SELECT", "RECOMMENDATION", "ESTIMATED_SAVINGS", "partition"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL"]
+        }
+      ]
+    },
+    {
+      "id": "ctas-materialization-repeated-scan",
+      "name": "Dashboard aggregation scanned 50x/day — CTAS materialization recommendation",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ctas-materialization-repeated-scan.md",
+      "baseline_file": "baselines/ctas-materialization-repeated-scan.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "CTAS", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-parquet-partitioned-projection",
+      "name": "Table already optimal — Parquet, partitioned, projection, workgroup limit, tight queries",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-parquet-partitioned-projection.md",
+      "baseline_file": "baselines/already-optimal-parquet-partitioned-projection.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-parquet-partitioned-projection", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

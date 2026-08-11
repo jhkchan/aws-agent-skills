@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "kafka-msk-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Kafka MSK Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "urp-isr-flapping-replica-lag",
+      "name": "MSK under-replicated partitions — ISR flapping from replica.lag.time.max.ms too aggressive for bursty workload",
+      "difficulty": "medium",
+      "prompt_file": "prompts/urp-isr-flapping-replica-lag.md",
+      "baseline_file": "baselines/urp-isr-flapping-replica-lag.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "TOPIC_ISSUE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "TOPIC_ISSUE", "replica.lag.time.max.ms", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "delete the topic"]
+        }
+      ]
+    },
+    {
+      "id": "connectivity-sg-blocking-port-9094",
+      "name": "MSK producer/consumer TimeoutException — security group missing inbound rule for port 9094 (TLS)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/connectivity-sg-blocking-port-9094.md",
+      "baseline_file": "baselines/connectivity-sg-blocking-port-9094.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "CONNECTIVITY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "CONNECTIVITY", "9094", "security group", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "BROKER_FAILURE"]
+        }
+      ]
+    },
+    {
+      "id": "storage-disk-full-infinite-retention",
+      "name": "MSK disk full — log.retention.hours=-1 (infinite retention) filling EBS volumes to 95%",
+      "difficulty": "hard",
+      "prompt_file": "prompts/storage-disk-full-infinite-retention.md",
+      "baseline_file": "baselines/storage-disk-full-infinite-retention.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "STORAGE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "STORAGE", "log.retention", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "connectivity-scram-secret-not-associated",
+      "name": "MSK SASL_AUTHENTICATION_FAILED — SCRAM secret exists in Secrets Manager but not associated with the cluster",
+      "difficulty": "hard",
+      "prompt_file": "prompts/connectivity-scram-secret-not-associated.md",
+      "baseline_file": "baselines/connectivity-scram-secret-not-associated.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "CONNECTIVITY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "CONNECTIVITY", "SCRAM", "secret", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-context-need-cluster-arn",
+      "name": "Vague report of MSK issues — request cluster ARN + name + symptom",
+      "difficulty": "easy",
+      "prompt_file": "prompts/insufficient-context-need-cluster-arn.md",
+      "baseline_file": "baselines/insufficient-context-need-cluster-arn.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "list-clusters"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

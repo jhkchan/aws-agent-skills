@@ -1,0 +1,48 @@
+# Eval configuration for transfer-family-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: transfer-family-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: deploy-sftp-service-managed-ready
+    difficulty: easy
+    prompt_file: prompts/deploy-sftp-service-managed-ready.md
+    baseline_file: baselines/deploy-sftp-service-managed-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: LOW
+  - id: deploy-sftp-vpc-custom-idp-ready
+    difficulty: medium
+    prompt_file: prompts/deploy-sftp-vpc-custom-idp-ready.md
+    baseline_file: baselines/deploy-sftp-vpc-custom-idp-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: LOW
+  - id: deploy-sftp-directory-service-ready
+    difficulty: medium
+    prompt_file: prompts/deploy-sftp-directory-service-ready.md
+    baseline_file: baselines/deploy-sftp-directory-service-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: MODERATE
+  - id: deploy-sftp-missing-iam-role
+    difficulty: hard
+    prompt_file: prompts/deploy-sftp-missing-iam-role.md
+    baseline_file: baselines/deploy-sftp-missing-iam-role.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: HIGH
+  - id: deploy-ftp-public-endpoint-blocked
+    difficulty: hard
+    prompt_file: prompts/deploy-ftp-public-endpoint-blocked.md
+    baseline_file: baselines/deploy-ftp-public-endpoint-blocked.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: HIGH

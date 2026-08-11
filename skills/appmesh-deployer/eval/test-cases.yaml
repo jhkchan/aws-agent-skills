@@ -1,0 +1,213 @@
+# Eval test cases for appmesh-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: appmesh-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: weighted-canary-ready
+    description: >-
+      Provision an App Mesh service mesh with two virtual nodes and a
+      weighted canary route (90/10). Cloud Map namespace exists,
+      virtual nodes reference valid Cloud Map services, route weights
+      sum to 100. Plan should produce READY_TO_DEPLOY with the
+      ordered create-mesh / create-virtual-node / create-virtual-router
+      / create-route CLI sequence.
+    input: |
+      Operation: deploy-mesh
+      Mesh name: prod-checkout-mesh
+      Region: us-east-1
+      Egress filter: DROP_ALL
+      Cloud Map namespace: prod-internal (ID ns-abc123, DNS-based)
+      Virtual nodes:
+        - checkout-service-v1 (Cloud Map service checkout-v1, HTTP listener port 8080, health check /health)
+        - checkout-service-v2 (Cloud Map service checkout-v2, HTTP listener port 8080, health check /health)
+      Virtual router: checkout-router on port 8080
+      Route: checkout-canary (HTTP prefix /), 90/10 weighted targets (v1/v2)
+      Retry: gateway-error + 5xx, maxRetries 3, perRetryTimeoutMillis 2000
+      Timeout: requestTimeoutMillis 5000, idleTimeoutMillis 300000
+      Compute: EKS namespace prod labeled appmesh.k8s.aws/sidecarInjectorWebhook=enabled
+
+      Pre-checks (already performed by caller):
+        aws servicediscovery list-namespaces:
+          prod-internal (ID ns-abc123, DNS-based, ACTIVE)
+        aws appmesh describe-mesh --mesh-name prod-checkout-mesh:
+          NotFoundException (mesh does not exist yet)
+        Caller IAM role: AWSAppMeshDeployerRole with
+          appmesh:CreateMesh, CreateVirtualNode, CreateVirtualRouter, CreateRoute
+        EKS namespace label check: PASS
+
+      Emit the standard VERDICT block (MESH_SPEC, VERDICT, ARCHITECTURE,
+      CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-checkout-mesh"
+        - "create-mesh"
+        - "create-virtual-node"
+        - "create-route"
+        - "DROP_ALL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: virtual-gateway-ingress-ready
+    description: >-
+      Add a virtual gateway and gateway route for HTTPS ingress from
+      an ALB. ACM cert is issued, ALB listener forwards to the gateway
+      target group. Plan should produce READY_TO_DEPLOY.
+    input: |
+      Operation: deploy-gateway
+      Mesh: prod-checkout-mesh (already exists)
+      Region: us-east-1
+      Virtual gateway: ingress-gateway
+      Listener: HTTPS port 8443, ACM cert arn:aws:acm:us-east-1:111111111111:certificate/abc123
+      Mode: PERMISSIVE (migration phase)
+      Gateway route: checkout-ingress (HTTP prefix /checkout -> checkout virtual service)
+      ALB target group: tg-ingress-gateway (forwards to gateway Envoy pods on port 8443)
+
+      Pre-checks:
+        aws appmesh describe-mesh --mesh-name prod-checkout-mesh:
+          OK (egress_filter DROP_ALL)
+        aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:111111111111:certificate/abc123:
+          Status: ISSUED
+        aws elbv2 describe-target-groups --names tg-ingress-gateway:
+          OK (target group references gateway pods)
+        aws appmesh describe-virtual-service --mesh-name prod-checkout-mesh --virtual-service-name checkout.prod-checkout-mesh.svc.cluster.local:
+          OK
+        Caller IAM role: AWSAppMeshDeployerRole with
+          appmesh:CreateVirtualGateway, CreateGatewayRoute
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ingress-gateway"
+        - "create-virtual-gateway"
+        - "create-gateway-route"
+        - "PERMISSIVE"
+        - "8443"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: mtls-strict-missing-ca-blocked
+    description: >-
+      User requests STRICT mTLS for east-west traffic, but no ACM
+      Private CA exists in the account. Plan should produce
+      PREREQUISITES_MISSING with a BLOCKER finding that the CA must
+      be created first.
+    input: |
+      Operation: deploy-mtls
+      Mesh: prod-secure-mesh (already exists)
+      Region: us-east-1
+      mTLS mode: STRICT
+      Cert distribution: SDS (Secret Discovery Service)
+      CA: (user did not specify; expects skill to identify missing)
+
+      Pre-checks:
+        aws appmesh describe-mesh --mesh-name prod-secure-mesh:
+          OK
+        aws acm-pca list-certificate-authorities:
+          [] (no CAs in account)
+        Cloud Map namespace secure-internal:
+          NotFoundException (namespace does not exist)
+        EKS namespace secure: label check PASS
+
+      Emit the standard VERDICT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "STRICT"
+        - "ACM Private CA"
+        - "BLOCKER"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY_TO_DEPLOY"
+        - "create-virtual-node"
+
+  - id: circuit-breaking-paired-with-retry-ready
+    description: >-
+      Configure circuit breaking (connection pool + outlier detection)
+      on a virtual node that already has a retry policy. Pre-checks
+      verify the connection pool thresholds are sane and outlier
+      detection maxEjectionPercent is set to 50 (aggressive). Plan
+      should produce READY_TO_DEPLOY.
+    input: |
+      Operation: configure-circuit-breaking
+      Mesh: prod-checkout-mesh
+      Virtual node: checkout-service-v1
+      Listener: HTTP port 8080
+      Connection pool: maxConnections 100, maxPendingRequests 50, maxRequests 200, maxRetries 3
+      Outlier detection: maxServerErrors 5, intervalMillis 10000, baseEjectionDurationMillis 30000, maxEjectionPercent 50
+      Existing retry policy on route: gateway-error + 5xx, 3 retries, 2s perRetry
+
+      Pre-checks:
+        aws appmesh describe-virtual-node --mesh-name prod-checkout-mesh --virtual-node-name checkout-service-v1:
+          OK (Cloud Map prod-internal/checkout-v1, HTTP listener port 8080)
+        aws appmesh describe-route --mesh-name prod-checkout-mesh --virtual-router-name checkout-router --route-name checkout-canary:
+          OK (retry policy gateway-error + 5xx, 3 retries, 2s perRetry)
+        Retry budget 3 * 2s = 6s; per_request_timeout 5s on route is LESS than retry budget
+          (FINDING: surface in plan)
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "checkout-service-v1"
+        - "connectionPool"
+        - "outlierDetection"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: allow-all-egress-warning-ready
+    description: >-
+      User requests an ALLOW_ALL egress filter for the mesh to "make
+      it work" during initial rollout. Pre-checks pass, but the plan
+      must surface ALLOW_ALL as a WARN finding with DROP_ALL as the
+      recommended production posture. Plan should produce
+      READY_TO_DEPLOY with the warning.
+    input: |
+      Operation: deploy-mesh
+      Mesh name: dev-test-mesh
+      Region: us-east-1
+      Egress filter: ALLOW_ALL
+      Virtual nodes: api-service-v1 (Cloud Map service api-v1, HTTP listener port 8080)
+      Virtual router: api-router on port 8080
+      Route: api-default (HTTP prefix /), 100/0 weighted targets (v1 only)
+      Compute: EKS namespace dev labeled for sidecar injection
+
+      Pre-checks:
+        aws servicediscovery list-namespaces:
+          dev-internal (ID ns-dev123, DNS-based, ACTIVE)
+        aws appmesh describe-mesh --mesh-name dev-test-mesh:
+          NotFoundException (mesh does not exist yet)
+        EKS namespace dev: label check PASS
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ALLOW_ALL"
+        - "WARN"
+        - "DROP_ALL"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"

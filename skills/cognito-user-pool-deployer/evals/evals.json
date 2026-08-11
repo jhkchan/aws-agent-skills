@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cognito-user-pool-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Cognito User Pool Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "deploy-standard-user-pool-ready",
+      "name": "Deploy a standard production user pool with TOTP MFA, ENFORCED ASF, and OAuth code flow app client — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/deploy-standard-user-pool-ready.md",
+      "baseline_file": "baselines/deploy-standard-user-pool-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-users", "create-user-pool", "create-user-pool-client", "VERDICT", "CONFIRM", "TOTP", "ENFORCED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING", "implicit"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-user-pool-with-saml-idp-ready",
+      "name": "Deploy user pool federated with corporate SAML IdP (Okta) for workforce B2B login — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-user-pool-with-saml-idp-ready.md",
+      "baseline_file": "baselines/deploy-user-pool-with-saml-idp-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "corp-workforce-pool", "create-identity-provider", "SAML", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-app-client-client-credentials-ready",
+      "name": "Deploy M2M app client with client-credentials grant, resource server, and custom scopes — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-app-client-client-credentials-ready.md",
+      "baseline_file": "baselines/deploy-app-client-client-credentials-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "create-resource-server", "client-credentials", "products.read", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING", "implicit"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-user-pool-implicit-flow-blocked",
+      "name": "App client requests OAuth implicit flow — token leakage via URL fragment; pre-check gate blocks deployment (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-user-pool-implicit-flow-blocked.md",
+      "baseline_file": "baselines/deploy-user-pool-implicit-flow-blocked.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "implicit", "code", "VERDICT", "URL fragment"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-user-pool-sms-mfa-missing-sns-role",
+      "name": "SMS MFA requested but SNS caller IAM role does not exist — every SMS-OTP signup would fail at runtime; pre-check gate blocks (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-user-pool-sms-mfa-missing-sns-role.md",
+      "baseline_file": "baselines/deploy-user-pool-sms-mfa-missing-sns-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "CognitoSmsCaller", "SNS", "VERDICT", "SmsConfiguration"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

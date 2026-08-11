@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "backup-vault-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Backup Vault Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-vault-ready",
+      "name": "Create backup vault with KMS encryption — all pre-checks pass (READY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/create-vault-ready.md",
+      "baseline_file": "baselines/create-vault-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod-daily-vault", "create-backup-vault", "VERDICT", "CONFIRM", "KMS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "compliance-lock-ready",
+      "name": "Apply COMPLIANCE-mode vault lock for CIS 3.6 (READY with irreversibility caveat)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/compliance-lock-ready.md",
+      "baseline_file": "baselines/compliance-lock-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "COMPLIANCE", "ChangeableForDays", "put-backup-vault-lock-configuration", "VERDICT", "CONFIRM", "irreversible"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED", "GOVERNANCE"]
+        }
+      ]
+    },
+    {
+      "id": "cross-region-plan-ready",
+      "name": "Create backup plan with cross-region copy to us-west-2 (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cross-region-plan-ready.md",
+      "baseline_file": "baselines/cross-region-plan-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod-daily-with-dr", "create-backup-plan", "us-west-2", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "governance-mode-misuse-blocked",
+      "name": "Governance mode requested for HIPAA archive — blocked, COMPLIANCE required (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/governance-mode-misuse-blocked.md",
+      "baseline_file": "baselines/governance-mode-misuse-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "GOVERNANCE", "HIPAA", "COMPLIANCE", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "pitr-restore-completed",
+      "name": "Point-in-time restore for EC2 — post-verification passed (COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/pitr-restore-completed.md",
+      "baseline_file": "baselines/pitr-restore-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "i-restored-pitr", "ContinuousBackup", "VERDICT", "POST_VERIFY"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

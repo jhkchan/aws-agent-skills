@@ -1,0 +1,48 @@
+# Eval configuration for appmesh-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: appmesh-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: weighted-canary-ready
+    difficulty: medium
+    prompt_file: prompts/weighted-canary-ready.md
+    baseline_file: baselines/weighted-canary-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: MODERATE
+  - id: virtual-gateway-ingress-ready
+    difficulty: medium
+    prompt_file: prompts/virtual-gateway-ingress-ready.md
+    baseline_file: baselines/virtual-gateway-ingress-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: MODERATE
+  - id: mtls-strict-missing-ca-blocked
+    difficulty: hard
+    prompt_file: prompts/mtls-strict-missing-ca-blocked.md
+    baseline_file: baselines/mtls-strict-missing-ca-blocked.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: HIGH
+  - id: circuit-breaking-paired-with-retry-ready
+    difficulty: hard
+    prompt_file: prompts/circuit-breaking-paired-with-retry-ready.md
+    baseline_file: baselines/circuit-breaking-paired-with-retry-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: LOW
+  - id: allow-all-egress-warning-ready
+    difficulty: easy
+    prompt_file: prompts/allow-all-egress-warning-ready.md
+    baseline_file: baselines/allow-all-egress-warning-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: LOW

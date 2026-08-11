@@ -1,0 +1,246 @@
+# Eval test cases for transfer-family-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: transfer-family-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: deploy-sftp-service-managed-ready
+    description: >-
+      Deploy a Service Managed SFTP server with S3 backend on a PUBLIC
+      endpoint. S3 bucket exists in-region, IAM execution role trusts
+      transfer.amazonaws.com with SourceAccount condition, logging role
+      resolves. Two users (alice, bob) with per-user session policies
+      scoping them to their home prefixes. All pre-checks pass; plan
+      should produce READY_TO_DEPLOY with create-server and create-user
+      CLIs, CONFIRM gate, and the PUBLIC-endpoint caveat note.
+    input: |
+      Operation: create
+      Server description: prod-sftp-inbox
+      Region: us-east-1
+      Account: 111111111111
+      Protocols: ["SFTP"]
+      EndpointType: PUBLIC
+      IdentityProviderType: SERVICE_MANAGED
+      Storage backend: S3 bucket "prod-sftp-inbox"
+      LoggingRole: arn:aws:iam::111111111111:role/TransferLoggingRole
+      Tags: Environment=prod, Name=prod-sftp-inbox
+      Users:
+        - UserName: alice
+          SSHPublicKey: ssh-rsa AAAAB3...
+          Role: arn:aws:iam::111111111111:role/TransferUserS3Role
+          HomeDirectory: /prod-sftp-inbox/alice
+          SessionPolicy: scope to s3://prod-sftp-inbox/alice/*
+        - UserName: bob
+          SSHPublicKey: ssh-rsa AAAAB3...
+          Role: arn:aws:iam::111111111111:role/TransferUserS3Role
+          HomeDirectory: /prod-sftp-inbox/bob
+          SessionPolicy: scope to s3://prod-sftp-inbox/bob/*
+
+      Pre-flight (already performed by caller):
+        aws s3api head-bucket --bucket prod-sftp-inbox:
+          OK (bucket exists in us-east-1)
+        aws iam get-role --role-name TransferUserS3Role:
+          OK (trusts transfer.amazonaws.com with SourceAccount=111111111111)
+        aws iam get-role --role-name TransferLoggingRole:
+          OK (has logs:CreateLogStream, logs:PutLogEvents)
+        aws transfer list-servers:
+          no server with description "prod-sftp-inbox"
+
+      Emit the standard VERDICT block (SERVER, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, PROTOCOLS, ENDPOINT, IDP,
+      STORAGE, SESSION_POLICY_SCOPE, WORKFLOWS, NOTES).
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-sftp-inbox"
+        - "create-server"
+        - "create-user"
+        - "VERDICT"
+        - "CONFIRM"
+        - "SFTP"
+        - "session policy"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-sftp-vpc-custom-idp-ready
+    description: >-
+      Deploy an SFTP+FTPS server on a VPC_ENDPOINT with a custom API
+      Gateway Lambda identity provider. ACM cert is ISSUED in-region,
+      API Gateway is deployed to stage prod with the invocation role,
+      pre-flight Lambda test returns the expected JSON shape. All
+      pre-checks pass; plan should produce READY_TO_DEPLOY with the
+      create-server CLI carrying identity-provider-details.
+    input: |
+      Operation: create
+      Server description: prod-sftp-vpc-custom-idp
+      Region: us-east-1
+      Account: 111111111111
+      Protocols: ["SFTP", "FTPS"]
+      EndpointType: VPC_ENDPOINT
+      IdentityProviderType: API_GATEWAY
+      IdentityProviderDetails:
+        Url: https://abc123.execute-api.us-east-1.amazonaws.com/prod/
+        InvocationRole: arn:aws:iam::111111111111:role/TransferIdPInvocationRole
+      Certificate (FTPS): arn:aws:acm:us-east-1:111111111111:certificate/abc-123
+      VpcId: vpc-abc123
+      SubnetIds: [subnet-aaa, subnet-bbb]
+      SecurityGroupIds: [sg-ssh, sg-ftps]
+      LoggingRole: arn:aws:iam::111111111111:role/TransferLoggingRole
+
+      Pre-flight:
+        aws acm describe-certificate --certificate-arn <arn> --region us-east-1:
+          OK (status ISSUED, subject prod-sftp.example.com)
+        aws apigateway get-rest-api --rest-api-id abc123:
+          OK (REST API exists, stage prod deployed)
+        aws iam get-role --role-name TransferIdPInvocationRole:
+          OK (trusts transfer.amazonaws.com with apigateway:Invoke)
+        curl -X POST -d '{"username":"test","password":"test"}' https://abc123.execute-api.us-east-1.amazonaws.com/prod/:
+          200 OK — {"Role":"arn:aws:iam::111111111111:role/TransferUserS3Role","HomeDirectory":"/prod-sftp-inbox/test","Policy":"{...session policy...}"}
+        aws ec2 describe-security-groups --group-ids sg-ssh sg-ftps:
+          OK (sg-ssh inbound port 22, sg-ftps inbound port 990)
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-sftp-vpc-custom-idp"
+        - "API_GATEWAY"
+        - "VPC_ENDPOINT"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-sftp-directory-service-ready
+    description: >-
+      Deploy an SFTP server federated with AWS Directory Service
+      (Managed Microsoft AD) on a VPC_ENDPOINT. Directory is ACTIVE and
+      in the same VPC, security group allows inbound on port 22, logging
+      role resolves. All pre-checks pass; plan should produce
+      READY_TO_DEPLOY with the create-server CLI carrying
+      identity-provider-type AWS_DIRECTORY_SERVICE.
+    input: |
+      Operation: create
+      Server description: prod-sftp-ad
+      Region: us-east-1
+      Account: 111111111111
+      Protocols: ["SFTP"]
+      EndpointType: VPC_ENDPOINT
+      IdentityProviderType: AWS_DIRECTORY_SERVICE
+      IdentityProviderDetails:
+        DirectoryId: d-abc123
+      Domain: example.com
+      VpcId: vpc-abc123
+      SubnetIds: [subnet-aaa, subnet-bbb]
+      SecurityGroupIds: [sg-ssh]
+      LoggingRole: arn:aws:iam::111111111111:role/TransferLoggingRole
+
+      Pre-flight:
+        aws ds describe-directories --directory-ids d-abc123:
+          OK (status ACTIVE, VPC matches vpc-abc123)
+        aws ec2 describe-security-groups --group-ids sg-ssh:
+          OK (inbound port 22)
+        aws iam get-role --role-name TransferLoggingRole: OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AWS_DIRECTORY_SERVICE"
+        - "VPC_ENDPOINT"
+        - "create-server"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-sftp-missing-iam-role
+    description: >-
+      Attempt to deploy a Service Managed SFTP server but the configured
+      IAM execution role (TransferUserS3Role) does not exist in the
+      account. The server would create but every user creation would
+      fail at runtime. Pre-checks must produce PREREQUISITES_MISSING
+      naming the missing IAM role.
+    input: |
+      Operation: create
+      Server description: prod-sftp-inbox
+      Region: us-east-1
+      Account: 111111111111
+      Protocols: ["SFTP"]
+      EndpointType: PUBLIC
+      IdentityProviderType: SERVICE_MANAGED
+      Storage backend: S3 bucket "prod-sftp-inbox"
+      LoggingRole: arn:aws:iam::111111111111:role/TransferLoggingRole
+      Users:
+        - UserName: alice
+          Role: arn:aws:iam::111111111111:role/TransferUserS3Role
+          HomeDirectory: /prod-sftp-inbox/alice
+
+      Pre-flight:
+        aws s3api head-bucket --bucket prod-sftp-inbox: OK
+        aws iam get-role --role-name TransferUserS3Role:
+          NoSuchEntity (role does not exist)
+        aws iam get-role --role-name TransferLoggingRole: OK
+        aws transfer list-servers: no server with description "prod-sftp-inbox"
+
+      Emit the standard VERDICT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "TransferUserS3Role"
+        - "transfer.amazonaws.com"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: deploy-ftp-public-endpoint-blocked
+    description: >-
+      Attempt to deploy an FTP server on a PUBLIC endpoint. Plain FTP
+      sends username, password, and file contents in cleartext on the
+      wire. The skill must block this configuration at the pre-check
+      gate with PREREQUISITES_MISSING — never silently rewrite to FTPS.
+    input: |
+      Operation: create
+      Server description: legacy-ftp-public
+      Region: us-east-1
+      Account: 111111111111
+      Protocols: ["FTP"]
+      EndpointType: PUBLIC
+      IdentityProviderType: SERVICE_MANAGED
+      Storage backend: S3 bucket "legacy-ftp-inbox"
+      LoggingRole: arn:aws:iam::111111111111:role/TransferLoggingRole
+
+      Pre-flight:
+        aws s3api head-bucket --bucket legacy-ftp-inbox: OK
+        aws iam get-role --role-name TransferUserS3Role: OK
+        aws iam get-role --role-name TransferLoggingRole: OK
+        aws transfer list-servers: no server with description "legacy-ftp-public"
+
+      Emit the standard VERDICT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "FTP"
+        - "PUBLIC"
+        - "cleartext"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY_TO_DEPLOY"
