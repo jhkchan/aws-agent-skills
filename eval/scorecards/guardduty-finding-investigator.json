@@ -1,0 +1,70 @@
+{
+  "skill": "guardduty-finding-investigator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete expert knowledge: a detailed finding\u2011type\u2011driven decision tree, specific thresholds (e.g., CPU >80% for crypto mining), exact CLI commands, suppression JSON patterns, and recent GuardDuty features (Runtime Monitoring, EKS Protection, Malware Protection) that go beyond a generic model's baseline."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "It encodes senior\u2011engineer thinking: treat GuardDuty findings as hypotheses, require independent evidence, map each finding family to a precise probe order, and embed AWS\u2011specific procedures (e.g., trusted\u2011IP\u2011list preference, create\u2011filter syntax). Lacks a few advanced procedures such as cross\u2011account suppression handling, which keeps it from full marks."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a concrete NEVER list with clear rationales (no auto\u2011terminate, no blanket suppression, never trust low severity, etc.). Missing some common pitfalls like operating without CloudTrail data events or VPC Flow Logs enabled, and limited guidance on handling permission errors during CLI calls."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, when_not_to_use, activation_triggers and invocation_schema are all present and detailed enough for reliable activation. The when_to_use narrative is a bit verbose, but still meets the spec."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill is layered (high\u2011level description, quick navigation table, detailed step\u2011by\u2011step process), but the sheer volume of information and some critical rules are buried deep, creating potential cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by a CONFIRM prompt, isolation is preferred over termination, and suppression rules are scoped narrowly. Calibration is well\u2011matched to the fragility of the operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset, Strict output contract, Quick navigation table, step\u2011wise process, NEVER list, heuristics, and worked examples. Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides a usable decision tree, concrete CLI examples, and output format that an agent can follow. However, the input schema is vague, error handling (CLI failures, pagination, region selection) is missing, and some example reasoning (e.g., FP ruled out) lacks independent evidence, limiting practical reliability."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 45789,
+  "latency_ms": 14636,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

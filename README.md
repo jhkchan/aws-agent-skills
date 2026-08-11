@@ -172,6 +172,8 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | apigateway-5xx-troubleshooter | amazon.nova-pro-v1:0 | 109/120 | A | 0/5 | 21.4s | 54610 |
 | apigateway-resource-policy-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 9.6s | 35471 |
 | apigateway-rest-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 15.8s | 48821 |
+| appmesh-deployer | amazon.nova-pro-v1:0 | 106/120 | B | 3/5 | 9.7s | 45013 |
+| athena-query-optimizer | amazon.nova-pro-v1:0 | 104/120 | B | 5/5 | 9.5s | 40792 |
 | athena-workgroup-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 8.6s | 49642 |
 | auditmanager-assessment-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.6s | 50433 |
 | aurora-cost-optimizer | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 15.7s | 46740 |
@@ -179,6 +181,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | auto-remediation-automator | amazon.nova-pro-v1:0 | 111/120 | A | 1/5 | 14.3s | 51136 |
 | autoscaling-group-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 18.9s | 39803 |
 | backup-plan-auditor | amazon.nova-pro-v1:0 | 115/120 | A | 6/6 | 8.5s | 30595 |
+| backup-vault-operator | amazon.nova-pro-v1:0 | 101/120 | B | 2/5 | 16.6s | 47864 |
 | bedrock-guardrail-coverage-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 5.1s | 31762 |
 | bedrock-model-access-inventory | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 14.4s | 35705 |
 | billing-account-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 13.4s | 37235 |
@@ -205,10 +208,12 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | codepipeline-failure-troubleshooter | amazon.nova-pro-v1:0 | 103/120 | B | 5/5 | 11.1s | 47475 |
 | codepipeline-pipeline-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 13.7s | 39910 |
 | cognito-idp-user-pool-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 6.8s | 41140 |
+| cognito-user-pool-deployer | amazon.nova-pro-v1:0 | 102/120 | B | 4/5 | 8.6s | 48707 |
 | compute-optimizer-findings-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.8s | 35720 |
 | config-recorder-coverage-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 35.6s | 43031 |
-| config-rule-deployer | amazon.nova-pro-v1:0 | 107/120 | B | 5/5 | 12.8s | 46534 |
+| config-rule-deployer | amazon.nova-pro-v1:0 | 106/120 | B | 5/5 | 12.1s | 36083 |
 | controltower-control-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 23.1s | 33282 |
+| cost-anomaly-response-automator | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 13.3s | 43178 |
 | cost-optimization-hub-recommendations-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.3s | 37941 |
 | cur-cost-usage-report-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 7.0s | 38402 |
 | data-transfer-optimizer | amazon.nova-pro-v1:0 | 114/120 | A | 2/5 | 15.7s | 75706 |
@@ -228,7 +233,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | ec2-rightsizing-optimizer | amazon.nova-pro-v1:0 | 108/120 | A | 3/5 | 14.9s | 65548 |
 | ec2-security-group-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 5/5 | 11.5s | 38372 |
 | ecr-repository-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 12.4s | 46409 |
-| ecs-fargate-deployer | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 12.1s | 50838 |
+| ecs-fargate-deployer | amazon.nova-pro-v1:0 | 100/120 | B | 0/5 | 11.9s | 39469 |
 | ecs-task-definition-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 13.9s | 45015 |
 | ecs-task-troubleshooter | amazon.nova-pro-v1:0 | 109/120 | A | 2/5 | 12.3s | 55277 |
 | efs-filesystem-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 38429 |
@@ -246,6 +251,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | firewall-manager-compliance-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 16.8s | 53101 |
 | glue-crawler-job-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 35.0s | 48227 |
 | glue-job-troubleshooter | amazon.nova-pro-v1:0 | 104/120 | B | 0/5 | 11.9s | 45528 |
+| guardduty-finding-investigator | amazon.nova-pro-v1:0 | 105/120 | B | 0/5 | 14.6s | 45789 |
 | guardduty-finding-severity-triage | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.3s | 55940 |
 | health-event-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 12.4s | 42780 |
 | iac-template-automator | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 20.6s | 58312 |
@@ -254,6 +260,8 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | iam-role-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 20.9s | 54672 |
 | incident-response-automator | amazon.nova-pro-v1:0 | 109/120 | A | 0/5 | 4.9s | 55975 |
 | inspector2-coverage-finding-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.3s | 52550 |
+| kafka-connect-troubleshooter | amazon.nova-pro-v1:0 | 106/120 | B | 0/5 | 5.9s | 39730 |
+| kafka-msk-troubleshooter | amazon.nova-pro-v1:0 | 102/120 | B | 4/5 | 11.5s | 39273 |
 | kinesis-stream-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 27.1s | 42232 |
 | kms-key-deployer | amazon.nova-pro-v1:0 | 96/120 | B | 3/5 | 8.3s | 37848 |
 | kms-key-policy-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.2s | 49516 |
@@ -293,6 +301,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | secrets-rotation-operator | amazon.nova-pro-v1:0 | 112/120 | A | 3/5 | 13.4s | 47093 |
 | secretsmanager-rotation-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 11.2s | 48554 |
 | securityhub-control-compliance-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 47500 |
+| securityhub-finding-troubleshooter | amazon.nova-pro-v1:0 | 101/120 | B | 0/5 | 17.4s | 43678 |
 | service-quotas-usage-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 5.6s | 36547 |
 | shield-advanced-coverage-auditor | amazon.nova-pro-v1:0 | 116/120 | A | 6/6 | 4.5s | 46206 |
 | sns-topic-deployer | amazon.nova-pro-v1:0 | 102/120 | B | 3/5 | 11.7s | 40513 |
@@ -307,6 +316,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | stepfunctions-statemachine-deployer | amazon.nova-pro-v1:0 | 115/120 | A | 3/5 | 19.4s | 63461 |
 | sts-cross-account-role-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 9.3s | 47639 |
 | tag-governance-automator | amazon.nova-pro-v1:0 | 109/120 | A | 2/5 | 16.5s | 54948 |
+| transfer-family-deployer | amazon.nova-pro-v1:0 | 104/120 | B | 4/5 | 13.5s | 46447 |
 | trustedadvisor-check-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 16.1s | 40241 |
 | verified-permissions-policy-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 10.6s | 40262 |
 | vpc-connectivity-troubleshooter | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 39.9s | 71520 |
