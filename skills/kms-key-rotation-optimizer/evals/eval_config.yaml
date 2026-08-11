@@ -1,0 +1,43 @@
+# Eval configuration for kms-key-rotation-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: kms-key-rotation-optimizer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: orphaned-key-cleanup
+    difficulty: medium
+    prompt_file: prompts/orphaned-key-cleanup.md
+    baseline_file: baselines/orphaned-key-cleanup.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: stale-grant-retirement
+    difficulty: hard
+    prompt_file: prompts/stale-grant-retirement.md
+    baseline_file: baselines/stale-grant-retirement.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: multi-region-replica-deletion
+    difficulty: hard
+    prompt_file: prompts/multi-region-replica-deletion.md
+    baseline_file: baselines/multi-region-replica-deletion.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: already-optimal-key
+    difficulty: easy
+    prompt_file: prompts/already-optimal-key.md
+    baseline_file: baselines/already-optimal-key.md
+    expected_verdict: ALREADY_OPTIMAL
+  - id: rotation-enablement
+    difficulty: medium
+    prompt_file: prompts/rotation-enablement.md
+    baseline_file: baselines/rotation-enablement.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE

@@ -1,0 +1,173 @@
+# Eval test cases for backup-schedule-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: backup-schedule-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: tag-based-daily-backup
+    description: >-
+      Standard production backup plan using tag-based resource assignment.
+      The skill should produce an AUTOMATION_DEPLOYED workflow with a
+      named backup vault, daily schedule, lifecycle tiering (hot to cold),
+      tag-based selection, and vault notifications.
+    input: |
+      Design reference: tag-based-daily-backup
+      Account: 111111111111
+      Region: us-east-1
+
+      Resources: DynamoDB tables and EBS volumes tagged
+        backup-plan=daily-prod, environment=prod
+      Backup frequency: Daily at 05:00 UTC
+      Retention: 30 days hot, 90 days cold
+      Vault: prod-backup-vault (named, with access policy)
+      Cross-region copy: us-west-2 dr-vault
+
+      Emit the standard BACKUP block (PLAN, VAULT, LIFECYCLE, TRIGGER,
+      RESTORE_TEST, TAG_SCOPE, CROSS_ACCOUNT, CROSS_REGION, VERDICT,
+      TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "tag-based-daily-backup"
+        - "DeleteAfterDays"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: vault-lock-worm-compliance
+    description: >-
+      Compliance workload requiring WORM backup vault lock. The skill
+      should produce AUTOMATION_DEPLOYED with a GOVERNANCE-mode vault lock
+      recommendation before COMPLIANCE mode, retention bounds, and
+      lifecycle tiering.
+    input: |
+      Design reference: vault-lock-worm-compliance
+      Account: 111111111111
+      Region: us-east-1
+
+      Compliance requirement: SOX (7-year retention, WORM)
+      Resources: RDS instances tagged backup-plan=compliance, environment=prod
+      Backup frequency: Daily
+      Retention: 365 days hot, 2555 days (7 years) cold
+      Vault lock: required (COMPLIANCE mode)
+
+      Emit the standard BACKUP block. Include vault lock configuration
+      (GOVERNANCE first, then COMPLIANCE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "vault-lock-worm-compliance"
+        - "COMPLIANCE"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: empty-tag-scope-gap
+    description: >-
+      Backup plan exists but zero resources match the tag scope. The
+      skill should classify REVIEW_REQUIRED and cite the empty selection,
+      missing lifecycle, and absence of restore testing.
+    input: |
+      Design reference: empty-tag-scope-gap
+      Account: 111111111111
+      Region: us-east-1
+
+      Existing plan: daily-7d (Default vault, no lock)
+      Tag scope: backup-plan=daily (0 resources match)
+      Lifecycle: NONE (all backups in hot storage indefinitely)
+      Restore testing: NOT configured
+      Vault: Default (no access policy, no lock)
+
+      Emit the standard BACKUP block identifying all gaps.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "empty-tag-scope-gap"
+        - "VERDICT"
+        - "GAP"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: on-demand-backup-eventbridge
+    description: >-
+      On-demand backup triggered by CodePipeline deployment success via
+      EventBridge + Lambda. The skill should produce AUTOMATION_DEPLOYED
+      with the EventBridge rule, Lambda function, and DLQ.
+    input: |
+      Design reference: on-demand-backup-eventbridge
+      Account: 111111111111
+      Region: us-east-1
+
+      Trigger: CodePipeline SUCCEEDED event
+      Target resource: DynamoDB table prod-orders-table
+      Backup vault: on-demand-vault
+      Retention: 7 days
+      DLQ: backup-trigger-dlq
+
+      Emit the standard BACKUP block including the EventBridge rule
+      and Lambda function template.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "on-demand-backup-eventbridge"
+        - "start-backup-job"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: cross-account-org-policy
+    description: >-
+      Cross-account backup via Organizations backup policy. The skill
+      should produce AUTOMATION_DEPLOYED with the Organizations policy
+      JSON, member account inheritance, and cross-region copy to a DR
+      account vault.
+    input: |
+      Design reference: cross-account-org-policy
+      Organizations OU: ou-prod-xxxxx (10 member accounts)
+      Region: us-east-1
+      DR region: us-west-2
+
+      Requirements:
+      - Deploy Organizations backup policy at OU level
+      - Daily backup of all EBS volumes tagged backup-plan=daily
+      - Cross-region copy to us-west-2 (90-day retention)
+      - Policy inheritance: all member accounts automatically
+
+      Emit the standard BACKUP block including the Organizations
+      backup policy JSON.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "cross-account-org-policy"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

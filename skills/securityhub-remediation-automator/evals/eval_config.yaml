@@ -1,0 +1,39 @@
+# Eval configuration for securityhub-remediation-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison.
+skill_name: securityhub-remediation-automator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: critical-s3-auto-remediation
+    difficulty: easy
+    prompt_file: prompts/critical-s3-auto-remediation.md
+    baseline_file: baselines/critical-s3-auto-remediation.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: high-iam-key-revoke
+    difficulty: medium
+    prompt_file: prompts/high-iam-key-revoke.md
+    baseline_file: baselines/high-iam-key-revoke.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: custom-finding-no-runbook
+    difficulty: medium
+    prompt_file: prompts/custom-finding-no-runbook.md
+    baseline_file: baselines/custom-finding-no-runbook.md
+    expected_verdict: REVIEW_REQUIRED
+  - id: suppression-with-expiration
+    difficulty: hard
+    prompt_file: prompts/suppression-with-expiration.md
+    baseline_file: baselines/suppression-with-expiration.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: multi-account-delegation
+    difficulty: hard
+    prompt_file: prompts/multi-account-delegation.md
+    baseline_file: baselines/multi-account-delegation.md
+    expected_verdict: AUTOMATION_DEPLOYED

@@ -1,0 +1,47 @@
+# Eval configuration for elb-cost-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: elb-cost-optimizer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: idle-alb-detection
+    difficulty: easy
+    prompt_file: prompts/idle-alb-detection.md
+    baseline_file: baselines/idle-alb-detection.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    expected_root_cause_category: IDLE_LB
+  - id: lcu-peak-dimension-new-connections
+    difficulty: hard
+    prompt_file: prompts/lcu-peak-dimension-new-connections.md
+    baseline_file: baselines/lcu-peak-dimension-new-connections.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    expected_root_cause_category: LCU_DIM
+  - id: alb-consolidation-multi-path-routing
+    difficulty: medium
+    prompt_file: prompts/alb-consolidation-multi-path-routing.md
+    baseline_file: baselines/alb-consolidation-multi-path-routing.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    expected_root_cause_category: CONSOLIDATION
+  - id: already-optimal-elb-fleet
+    difficulty: easy
+    prompt_file: prompts/already-optimal-elb-fleet.md
+    baseline_file: baselines/already-optimal-elb-fleet.md
+    expected_verdict: OPTIMIZED
+  - id: clb-to-alb-migration-savings
+    difficulty: medium
+    prompt_file: prompts/clb-to-alb-migration-savings.md
+    baseline_file: baselines/clb-to-alb-migration-savings.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    expected_root_cause_category: CLB_MIGRATION

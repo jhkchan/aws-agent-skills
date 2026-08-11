@@ -1,0 +1,218 @@
+# Eval test cases for route53-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# zone name or health check id embeds the test-case id so the model
+# naturally echoes it (avoids assertion-token mismatch). The decision
+# framework in SKILL.md produces exactly the expected verdicts below.
+skill: route53-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: unused-zone-deletion
+    description: >-
+      Public hosted zone for a decommissioned staging environment. Zero
+      DNS queries in 30 days. No ACM certificate validation CNAMEs, no
+      SES records, no MX. 2 endpoint health checks monitoring a deleted
+      ALB. DNSSEC enabled with a dedicated KMS key. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with zone deletion.
+    input: |
+      HostedZoneId: Z-unused-zone-deletion
+      DomainName: legacy-staging.example.com
+      ZoneType: Public
+      RecordCount: 4 (SOA, NS, 1 A record pointing at deleted ALB, 1 TXT)
+      HealthChecks: 2 (endpoint-based, 30s interval, monitoring deleted ALB)
+      QueryVolume: 0 queries (last 30 days, CloudWatch DNSQueries Sum = 0)
+      DNSSEC: Enabled (1 KMS key, $1/month)
+      QueryLogging: Enabled (CloudWatch Logs, ~0 GB due to no queries)
+      RoutingPolicy: Simple
+      TrafficPolicies: None
+      Region: us-east-1
+
+      ACM certificates referencing this zone: None
+      SES domain verification records: None
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "unused-zone-deletion"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "REMEDIATION_STEPS"
+        - "$0.50"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: health-check-calculated-conversion
+    description: >-
+      Production hosted zone with 12 endpoint health checks feeding into
+      DNS failover for a multi-region service. 3 of the 12 checks are
+      redundant (monitor the same ALB that already has target group
+      health checks). Converting to a calculated health check saves the
+      3 redundant check fees. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with calculated health check.
+    input: |
+      HostedZoneId: Z-health-check-calculated-conversion
+      DomainName: api.example.com
+      ZoneType: Public
+      RecordCount: 20 (SOA, NS, 8 A records with failover, 10 health check references)
+      HealthChecks: 12 endpoint-based ($0.50/month each = $6.00/month)
+        - 3 checks monitor the same ALB that has target group health checks (redundant)
+        - 9 checks monitor unique endpoints (justified)
+      QueryVolume: 450M queries/month (last 30 days)
+      DNSSEC: Disabled
+      QueryLogging: Disabled
+      RoutingPolicy: Failover (no surcharge)
+      TrafficPolicies: None
+      Region: us-east-1
+
+      Workload context: multi-region API with DNS failover. 3 health
+      checks duplicate ALB target group health monitoring.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "health-check-calculated-conversion"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "calculated"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: routing-policy-surcharge-removal
+    description: >-
+      Hosted zone using latency-based routing for a single-region
+      service. 200M queries/month. The latency-based routing surcharge
+      (+$0.20/B) is unjustified because all traffic originates from one
+      region. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with
+      routing policy change to weighted or simple.
+    input: |
+      HostedZoneId: Z-routing-policy-surcharge-removal
+      DomainName: single-region-app.example.com
+      ZoneType: Public
+      RecordCount: 8 (SOA, NS, 2 A records with latency-based routing, 4 supporting records)
+      HealthChecks: 2 (endpoint-based, justified for failover)
+      QueryVolume: 200M queries/month (last 30 days)
+        - All queries from us-east-1 (single region traffic)
+      DNSSEC: Disabled
+      QueryLogging: Disabled
+      RoutingPolicy: Latency-based (2 records)
+      TrafficPolicies: None
+      Region: us-east-1
+
+      Workload context: single-region application. All users are in
+      us-east-1. Latency-based routing was enabled during a multi-region
+      migration that was later cancelled. No multi-region SLO.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "routing-policy-surcharge-removal"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "latency"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: already-optimal-zone
+    description: >-
+      Production hosted zone with healthy query volume, justified health
+      checks, simple routing, no traffic policy, DNSSEC justified by
+      compliance. No optimization dimension has positive savings.
+      Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      HostedZoneId: Z-already-optimal-zone
+      DomainName: production.example.com
+      ZoneType: Public
+      RecordCount: 15 (SOA, NS, 10 A/AAAA records, 3 MX, 1 TXT)
+      HealthChecks: 3 (endpoint-based, each monitoring a unique endpoint)
+      QueryVolume: 500M queries/month (last 30 days, healthy traffic)
+      DNSSEC: Enabled (compliance requirement — PCI-DSS)
+      QueryLogging: Disabled
+      RoutingPolicy: Simple + Weighted (no surcharge)
+      TrafficPolicies: None
+      Region: us-east-1
+
+      Workload context: production e-commerce domain. DNSSEC required
+      by PCI-DSS compliance. Health checks monitor 3 unique API
+      endpoints for DNS failover. Simple and weighted routing only (no
+      latency or geo surcharges). No query logging needed.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-zone"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: OPTIMIZED"
+
+  - id: traffic-policy-replacement
+    description: >-
+      Hosted zone using a Route 53 traffic policy ($50/month) that
+      replicates a simple weighted routing rule achievable with
+      record-level configuration. The traffic policy handles 50K
+      queries/month. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE
+      with traffic policy replacement.
+    input: |
+      HostedZoneId: Z-traffic-policy-replacement
+      DomainName: marketing-site.example.com
+      ZoneType: Public
+      RecordCount: 6 (SOA, NS, 2 A records via traffic policy, 2 CNAME)
+      HealthChecks: 0
+      QueryVolume: 50K queries/month (last 30 days)
+      DNSSEC: Disabled
+      QueryLogging: Disabled
+      RoutingPolicy: Traffic Policy (weighted 80/20 split)
+      TrafficPolicies: 1 active ($50/month)
+        - Rule: 80% to primary endpoint, 20% to secondary
+        - This is achievable with weighted record-level routing
+      Region: us-east-1
+
+      Workload context: marketing landing page. 80/20 blue-green
+      deployment split. No complex geoproximity or multi-region logic.
+      Weighted record-level routing achieves the same result at $0.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "traffic-policy-replacement"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "$50"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"

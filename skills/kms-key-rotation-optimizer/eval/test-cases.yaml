@@ -1,0 +1,243 @@
+# Eval test cases for kms-key-rotation-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# alias or key id embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The decision framework in
+# SKILL.md produces exactly the expected verdicts below.
+skill: kms-key-rotation-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: orphaned-key-cleanup
+    description: >-
+      Customer-managed KMS key with 0 Decrypt, Encrypt, or
+      GenerateDataKey calls in 30 days. No S3 bucket, EBS volume, RDS
+      instance, or Secrets Manager secret references this key. 3 expired
+      grants on deleted IAM roles. Rotation disabled. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with key deletion.
+    input: |
+      KeyId: arn:aws:kms:us-east-1:123456789012:key/orphaned-key-cleanup
+      Alias: alias/legacy-app-encryption
+      KeyState: Enabled
+      KeyManager: CUSTOMER
+      KeySpec: SYMMETRIC_DEFAULT
+      RotationStatus: Disabled
+      Grants: 3 active (all expired, grantee principals deleted)
+      MultiRegion: False
+      Region: us-east-1
+
+      CloudTrail (last 30 days):
+        - Decrypt: 0 calls
+        - Encrypt: 0 calls
+        - GenerateDataKey: 0 calls
+
+      Resource associations:
+        - S3 bucket default encryption: None referencing this key
+        - EBS volumes: None referencing this key
+        - RDS instances: None referencing this key
+        - Secrets Manager: None referencing this key
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "orphaned-key-cleanup"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "REMEDIATION_STEPS"
+        - "$1.00"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: stale-grant-retirement
+    description: >-
+      Active customer-managed KMS key used for S3 encryption. Key has
+      18 grants, of which 7 are expired (grantee IAM roles were deleted
+      60+ days ago). The key itself is actively used. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with grant retirement.
+    input: |
+      KeyId: arn:aws:kms:us-east-1:123456789012:key/stale-grant-retirement
+      Alias: alias/s3-bucket-encryption
+      KeyState: Enabled
+      KeyManager: CUSTOMER
+      KeySpec: SYMMETRIC_DEFAULT
+      RotationStatus: Enabled (annual)
+      Grants: 18 total
+        - 11 active grants (current IAM roles, recently used in CloudTrail)
+        - 7 expired grants (grantee principals deleted 60+ days ago, no CloudTrail usage)
+      MultiRegion: False
+      Region: us-east-1
+
+      CloudTrail (last 30 days):
+        - Decrypt: 850,000 calls
+        - Encrypt: 120,000 calls
+        - GenerateDataKey: 45,000 calls
+
+      Resource associations:
+        - S3 bucket default encryption: 3 buckets reference this key
+        - EBS volumes: None
+        - RDS instances: None
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "stale-grant-retirement"
+        - "RECOMMENDATION"
+        - "grant"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: multi-region-replica-deletion
+    description: >-
+      Multi-region KMS key with primary in us-east-1 and replicas in
+      eu-west-1, ap-southeast-1, and sa-east-1. Only us-east-1 and
+      eu-west-1 have API calls in 30 days. ap-southeast-1 and sa-east-1
+      replicas have 0 calls. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with replica deletion.
+    input: |
+      KeyId: arn:aws:kms:us-east-1:123456789012:key/multi-region-replica-deletion
+      Alias: alias/global-data-encryption
+      KeyState: Enabled
+      KeyManager: CUSTOMER
+      KeySpec: SYMMETRIC_DEFAULT
+      RotationStatus: Enabled (annual)
+      MultiRegion: True
+        - Primary: us-east-1
+        - Replicas:
+          - eu-west-1: 12,000 Decrypt calls/30 days (active)
+          - ap-southeast-1: 0 calls/30 days (unused)
+          - sa-east-1: 0 calls/30 days (unused)
+      Grants: 4 active (all current)
+      Region: us-east-1
+
+      CloudTrail (last 30 days):
+        - us-east-1: Decrypt 50,000, Encrypt 8,000, GenerateDataKey 2,000
+        - eu-west-1: Decrypt 12,000, Encrypt 1,500, GenerateDataKey 300
+        - ap-southeast-1: 0 calls
+        - sa-east-1: 0 calls
+
+      Resource associations:
+        - S3 (us-east-1): 5 buckets
+        - S3 (eu-west-1): 2 buckets
+        - S3 (ap-southeast-1): 0 buckets
+        - S3 (sa-east-1): 0 buckets
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "multi-region-replica-deletion"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "replica"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: already-optimal-key
+    description: >-
+      Active customer-managed KMS key with rotation enabled, grants
+      clean, no multi-region replicas, actively used for S3 encryption.
+      No optimization dimension has positive savings. Expected verdict:
+      ALREADY_OPTIMAL.
+    input: |
+      KeyId: arn:aws:kms:us-east-1:123456789012:key/already-optimal-key
+      Alias: alias/production-data-encryption
+      KeyState: Enabled
+      KeyManager: CUSTOMER
+      KeySpec: SYMMETRIC_DEFAULT
+      RotationStatus: Enabled (annual, last rotated 3 months ago)
+      Grants: 3 active (all current, all recently used in CloudTrail)
+      MultiRegion: False
+      Region: us-east-1
+
+      CloudTrail (last 30 days):
+        - Decrypt: 2,500,000 calls
+        - Encrypt: 350,000 calls
+        - GenerateDataKey: 80,000 calls
+
+      Resource associations:
+        - S3 bucket default encryption: 8 buckets reference this key
+        - EBS volumes: None
+        - RDS instances: None
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-key"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: OPTIMIZED"
+
+  - id: rotation-enablement
+    description: >-
+      Active customer-managed KMS key with rotation DISABLED. Key is
+      actively used for Secrets Manager encryption. No cost saving from
+      enabling rotation (rotation is free), but compliance requires it.
+      2 expired grants need retirement. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with grant retirement and rotation
+      enablement surfaced in REASON.
+    input: |
+      KeyId: arn:aws:kms:us-east-1:123456789012:key/rotation-enablement
+      Alias: alias/secrets-encryption
+      KeyState: Enabled
+      KeyManager: CUSTOMER
+      KeySpec: SYMMETRIC_DEFAULT
+      RotationStatus: Disabled (no regulatory prohibition)
+      Grants: 5 total
+        - 3 active grants (current IAM roles)
+        - 2 expired grants (grantee principals deleted 30+ days ago)
+      MultiRegion: False
+      Region: us-east-1
+
+      CloudTrail (last 30 days):
+        - Decrypt: 45,000 calls
+        - Encrypt: 3,000 calls
+        - GenerateDataKey: 1,200 calls
+
+      Resource associations:
+        - Secrets Manager: 15 secrets reference this key
+        - S3: None
+        - EBS: None
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "rotation-enablement"
+        - "RECOMMENDATION"
+        - "grant"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"

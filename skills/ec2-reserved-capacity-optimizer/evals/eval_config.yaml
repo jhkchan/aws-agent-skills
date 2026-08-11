@@ -1,0 +1,47 @@
+# Eval configuration for ec2-reserved-capacity-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ec2-reserved-capacity-optimizer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: low-ri-coverage-steady-state
+    difficulty: medium
+    prompt_file: prompts/low-ri-coverage-steady-state.md
+    baseline_file: baselines/low-ri-coverage-steady-state.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    expected_root_cause_category: COVERAGE_GAP
+  - id: underutilized-ri-after-migration
+    difficulty: hard
+    prompt_file: prompts/underutilized-ri-after-migration.md
+    baseline_file: baselines/underutilized-ri-after-migration.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    expected_root_cause_category: UTILIZATION_GAP
+  - id: convertible-ri-exchange-opportunity
+    difficulty: hard
+    prompt_file: prompts/convertible-ri-exchange-opportunity.md
+    baseline_file: baselines/convertible-ri-exchange-opportunity.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    expected_root_cause_category: UTILIZATION_GAP
+  - id: already-optimal-portfolio
+    difficulty: easy
+    prompt_file: prompts/already-optimal-portfolio.md
+    baseline_file: baselines/already-optimal-portfolio.md
+    expected_verdict: OPTIMIZED
+  - id: savings-plans-vs-ri-for-graviton-migration
+    difficulty: medium
+    prompt_file: prompts/savings-plans-vs-ri-for-graviton-migration.md
+    baseline_file: baselines/savings-plans-vs-ri-for-graviton-migration.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    expected_root_cause_category: VEHICLE_EVAL

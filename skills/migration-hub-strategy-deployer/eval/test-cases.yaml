@@ -1,0 +1,178 @@
+# Eval test cases for migration-hub-strategy-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: migration-hub-strategy-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: full-portfolio-assessment
+    description: >-
+      Standard migration portfolio assessment with both agent-based and
+      agentless discovery deployed, 14-day collection window, all
+      prerequisites met. The skill should produce a READY_TO_DEPLOY plan
+      with Collector deployment, assessment schedule, 6R strategy groups,
+      anti-pattern detection, TCO, wave plan, and MGN/DMS handoff.
+    input: |
+      Design reference: full-portfolio-assessment
+      Account: 111111111111
+      Home region: us-east-1
+      vCenter: vcenter.example.com (reachable on 443)
+
+      Portfolio: 120 servers across 8 applications.
+      Discovery: agent-based on 120 critical hosts + agentless Collector on vCenter.
+      Collection window: 14 days.
+      Anti-patterns expected: Windows Server 2012 R2 EOL (srv-042), Oracle 11g (srv-078).
+      MGN service role: configured. DMS replication instance: provisioned.
+      S3 report bucket: s3://migration-reports-111111111111/portfolio-q3/
+
+      Emit the standard ASSESSMENT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "full-portfolio-assessment"
+        - "6R"
+        - "VERDICT"
+        - "TEMPLATE"
+        - "wave"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: agentless-only-short-window
+    description: >-
+      Assessment attempted with agentless-only discovery (no agents
+      deployed) and a 2-day collection window. The skill should flag
+      PREREQUISITES_MISSING and cite the missing agent data (no dependency
+      graph, no right-sizing) and the insufficient collection window.
+    input: |
+      Design reference: agentless-only-short-window
+      Account: 111111111111
+      Home region: us-east-1
+      vCenter: vcenter.example.com
+
+      Portfolio: 200 VMs in vCenter.
+      Discovery: agentless only (Collector VM deployed, no agents installed).
+      Collection window: 2 days.
+      Dependencies: unknown (no agent data).
+      MGN service role: not yet configured.
+      DMS: not yet configured.
+
+      Emit the standard ASSESSMENT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "agentless-only-short-window"
+        - "VERDICT"
+        - "GAP"
+        - "agent"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: eol-os-anti-pattern
+    description: >-
+      Assessment discovers Windows Server 2012 R2 (EOL) on 3 servers.
+      The skill should detect the anti-pattern, flag the replatform
+      requirement, and produce a READY_TO_DEPLOY plan with wave sequencing
+      that accounts for the OS upgrade.
+    input: |
+      Design reference: eol-os-anti-pattern
+      Account: 111111111111
+      Home region: us-east-1
+
+      Portfolio: 50 servers.
+      Discovery: agent-based on all 50 hosts, 14-day collection window.
+      Anti-pattern: Windows Server 2012 R2 on srv-001, srv-002, srv-003.
+      Dependencies: srv-001 and srv-002 form a connected cluster with shared-dns.
+      MGN: configured. DMS: not needed (no databases).
+
+      Emit the standard ASSESSMENT block. Include anti-pattern detection
+      and wave sequencing for the EOL servers.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "eol-os-anti-pattern"
+        - "end-of-life"
+        - "VERDICT"
+        - "wave"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: database-replatform-dms
+    description: >-
+      Assessment recommends replatform from self-managed Oracle 11g to
+      Aurora PostgreSQL. The skill should produce a READY_TO_DEPLOY plan
+      including the AWS SCT schema conversion prerequisite and DMS task
+      configuration for the database replatform.
+    input: |
+      Design reference: database-replatform-dms
+      Account: 111111111111
+      Home region: us-east-1
+
+      Portfolio: 20 servers, one Oracle 11g database (srv-db01).
+      Discovery: agent-based, 14-day collection.
+      Strategy: replatform (Oracle 11g -> Aurora PostgreSQL).
+      DMS replication instance: dms.r5.xlarge provisioned.
+      AWS SCT: not yet run.
+      Source endpoint: oracle-prod.example.com:1521.
+      Target endpoint: aurora-pg.cluster-xxxxx.us-east-1.rds.amazonaws.com:5432.
+
+      Emit the standard ASSESSMENT block. Include the DMS handoff plan.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "database-replatform-dms"
+        - "DMS"
+        - "VERDICT"
+        - "SCT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: collector-network-blocker
+    description: >-
+      Collector VM is deployed but cannot reach AWS (port 443 blocked by
+      firewall). The skill should flag PREREQUISITES_MISSING and cite the
+      network path blocker with the specific firewall rule to fix.
+    input: |
+      Design reference: collector-network-blocker
+      Account: 111111111111
+      Home region: us-east-1
+      vCenter: vcenter.example.com
+
+      Portfolio: 80 VMs.
+      Discovery: agentless Collector VM deployed on vCenter.
+      Collector status: registered but not reporting data.
+      Network test: vCenter 443 reachable, AWS 443 BLOCKED by on-prem firewall.
+      Agent-based: not deployed.
+
+      Emit the standard ASSESSMENT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "collector-network-blocker"
+        - "VERDICT"
+        - "GAP"
+        - "network"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

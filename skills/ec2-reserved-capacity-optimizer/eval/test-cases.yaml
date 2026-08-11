@@ -1,0 +1,130 @@
+# Eval test cases for ec2-reserved-capacity-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ec2-reserved-capacity-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: low-ri-coverage-steady-state
+    description: >-
+      EC2 fleet of 50 m5.large instances running 24/7 with only 40% RI
+      coverage. Should recommend committing the steady-state baseline
+      with 3-year Standard RIs or EC2 Instance SPs.
+    input: |
+      Scenario: An EC2 fleet of 50 m5.large (Linux) instances runs
+      24/7 in us-east-1. The 90-day minimum instance count is 48.
+      Current RI coverage is 40% (20 instances covered by 1-year
+      Standard RIs, No Upfront). RI utilization is 97%. Cost Explorer
+      shows $3,504/month on on-demand for the uncovered 30 instances.
+      The fleet has been stable for 6 months with no planned migration.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "COVERAGE_GAP"
+        - "VERDICT"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPTIMIZED"
+
+  - id: underutilized-ri-after-migration
+    description: >-
+      Standard RIs for c5.xlarge are at 55% utilization after the
+      fleet migrated to c6i.xlarge. Should recommend selling on the RI
+      Marketplace since Standard RIs cannot be exchanged.
+    input: |
+      Scenario: A fleet previously ran 20 c5.xlarge instances. 15
+      3-year Standard RIs (All Upfront) were purchased 18 months ago.
+      The fleet has since migrated to c6i.xlarge for better
+      price-performance. Current RI utilization is 55% (only 8 of 15
+      RIs are used by the remaining c5 instances). The c5.xlarge RIs
+      have 18 months remaining on a 3-year term. No Convertible RIs
+      or Savings Plans exist.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "UTILIZATION_GAP"
+        - "VERDICT"
+        - "Marketplace"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPTIMIZED"
+
+  - id: convertible-ri-exchange-opportunity
+    description: >-
+      Convertible RIs for m5.large at 60% utilization after fleet
+      right-sized to m5.xlarge. Should recommend exchanging Convertible
+      RIs to the new instance type.
+    input: |
+      Scenario: A fleet runs 30 m5.xlarge instances (Linux, us-east-1).
+      The fleet was recently right-sized from m5.large to m5.xlarge.
+      20 Convertible RIs (1-year, Partial Upfront) for m5.large were
+      purchased 4 months ago. RI utilization has dropped to 60% because
+      the RIs cover m5.large but the fleet now runs m5.xlarge. The
+      Convertible RIs have 8 months remaining.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "UTILIZATION_GAP"
+        - "exchange"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPTIMIZED"
+
+  - id: already-optimal-portfolio
+    description: >-
+      Well-optimized RI/SP portfolio: 95% RI coverage on core fleet,
+      97% RI utilization, Compute SP covering flexible workloads,
+      correct terms and payment options. Should return OPTIMIZED.
+    input: |
+      Scenario: An EC2 fleet of 40 m5.2xlarge (Linux) instances runs
+      24/7 in us-east-1. 38 instances are covered by 3-year Standard
+      RIs (All Upfront), purchased 12 months ago. RI utilization is
+      97%. RI coverage is 95%. A Compute SP (1-year, No Upfront)
+      covers $5/hour of flexible EC2 + Fargate spend. SP utilization
+      is 94%. The fleet has been stable for 12 months. CloudWatch
+      alerts are set at 80% RI utilization. No migrations are planned.
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "VERDICT"
+      must_not_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "Error:"
+        - "I cannot"
+
+  - id: savings-plans-vs-ri-for-graviton-migration
+    description: >-
+      EC2 fleet planning Graviton (c7g) migration from x86 (c5).
+      Should recommend Compute SP over Standard RI because Standard
+      RIs cannot cross instance families.
+    input: |
+      Scenario: A fleet of 25 c5.xlarge (x86_64) instances runs 24/7
+      in us-east-1. The team is planning a migration to c7g.xlarge
+      (Graviton) in 3 months for 20% better price-performance.
+      Currently, all instances are on-demand (no RIs or SPs). Cost
+      Explorer shows $1,752/month on on-demand EC2. The team wants
+      to commit for savings but needs flexibility for the upcoming
+      family migration.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "Compute SP"
+        - "VERDICT"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPTIMIZED"

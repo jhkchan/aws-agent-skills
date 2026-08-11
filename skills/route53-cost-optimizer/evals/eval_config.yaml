@@ -1,0 +1,43 @@
+# Eval configuration for route53-cost-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: route53-cost-optimizer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: unused-zone-deletion
+    difficulty: medium
+    prompt_file: prompts/unused-zone-deletion.md
+    baseline_file: baselines/unused-zone-deletion.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: health-check-calculated-conversion
+    difficulty: hard
+    prompt_file: prompts/health-check-calculated-conversion.md
+    baseline_file: baselines/health-check-calculated-conversion.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: routing-policy-surcharge-removal
+    difficulty: hard
+    prompt_file: prompts/routing-policy-surcharge-removal.md
+    baseline_file: baselines/routing-policy-surcharge-removal.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: already-optimal-zone
+    difficulty: easy
+    prompt_file: prompts/already-optimal-zone.md
+    baseline_file: baselines/already-optimal-zone.md
+    expected_verdict: ALREADY_OPTIMAL
+  - id: traffic-policy-replacement
+    difficulty: medium
+    prompt_file: prompts/traffic-policy-replacement.md
+    baseline_file: baselines/traffic-policy-replacement.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE

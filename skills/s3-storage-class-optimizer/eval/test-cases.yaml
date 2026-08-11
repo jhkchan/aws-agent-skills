@@ -1,0 +1,222 @@
+# Eval test cases for s3-storage-class-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# BucketName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: s3-storage-class-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: lifecycle-policy-gap
+    description: >-
+      45 TB data-lake bucket with no lifecycle policy. 71% of data in
+      Standard despite 13 TB being >365 days old with <1% retrieval.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with lifecycle
+      deployment recommendation.
+    input: |
+      BucketName: bucket-lifecycle-policy-gap
+      Region: us-east-1
+      Storage (total): 45 TB
+      Storage class distribution:
+        - Standard: 32 TB (71%)
+        - Standard-IA: 8 TB (18%)
+        - Glacier Instant Retrieval: 0 TB
+        - Glacier Flexible Retrieval: 3 TB (7%)
+        - Glacier Deep Archive: 2 TB (4%)
+      Versioning: Enabled
+      Lifecycle policy: none
+      Intelligent-Tiering: not configured
+      Storage Lens (last 30 days):
+        - Objects aged 0-30 days: 12 TB
+        - Objects aged 31-90 days: 9 TB
+        - Objects aged 91-180 days: 6 TB
+        - Objects aged 181-365 days: 5 TB
+        - Objects aged >365 days: 13 TB
+      Retrieval frequency: <1% of objects accessed after 90 days
+      Cost Explorer (last 30 days): $1,035/month on S3 (71% Standard rate)
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "lifecycle-policy-gap"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "lifecycle"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: intelligent-tiering-candidate
+    description: >-
+      20 TB bucket of user-uploaded documents with mixed access patterns.
+      No lifecycle or Intelligent-Tiering configured. 40% of data is
+      >90 days old with sporadic unpredictable retrieval. Expected
+      verdict: FURTHER_OPTIMIZATION_AVAILABLE with Intelligent-Tiering.
+    input: |
+      BucketName: bucket-intelligent-tiering-candidate
+      Region: us-east-1
+      Storage (total): 20 TB
+      Storage class distribution:
+        - Standard: 20 TB (100%)
+      Versioning: Suspended
+      Lifecycle policy: none
+      Intelligent-Tiering: not configured
+      Storage Lens (last 30 days):
+        - Objects aged 0-30 days: 8 TB
+        - Objects aged 31-90 days: 4 TB
+        - Objects aged 91-180 days: 3 TB
+        - Objects aged 181-365 days: 3 TB
+        - Objects aged >365 days: 2 TB
+      Retrieval pattern: unpredictable — some old objects get sudden
+      reads; access pattern varies by prefix with no clear rule.
+      Cost Explorer: $460/month (all Standard)
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "intelligent-tiering-candidate"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "Intelligent-Tiering"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: versioning-bloat
+    description: >-
+      50 TB versioned bucket where noncurrent versions consume 12 TB
+      (24% of total). No noncurrent-version lifecycle rules. Expected
+      verdict: FURTHER_OPTIMIZATION_AVAILABLE with noncurrent-version
+      lifecycle recommendation.
+    input: |
+      BucketName: bucket-versioning-bloat
+      Region: us-east-1
+      Storage (total): 50 TB
+      Current version storage: 38 TB
+      Noncurrent version storage: 12 TB (24% of total)
+      Delete markers: 450,000
+      Storage class distribution:
+        - Standard: 35 TB (current) + 10 TB (noncurrent)
+        - Standard-IA: 3 TB (current) + 2 TB (noncurrent)
+      Versioning: Enabled
+      Lifecycle policy: none (no current or noncurrent rules)
+      Intelligent-Tiering: not configured
+      IncompleteMultipartUploads: 2 TB
+      Storage Lens: noncurrent versions growing 8% per month
+      Retrieval pattern: only current versions accessed
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "versioning-bloat"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "noncurrent"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-bucket
+    description: >-
+      10 TB bucket with lifecycle policy already deployed, Intelligent-
+      Tiering on mixed prefixes, no versioning bloat, and <1% retrieval.
+      No optimization dimension has positive savings. Expected verdict:
+      ALREADY_OPTIMAL.
+    input: |
+      BucketName: bucket-already-optimal-bucket
+      Region: us-east-1
+      Storage (total): 10 TB
+      Storage class distribution:
+        - Standard: 3 TB (30%)
+        - Standard-IA: 2 TB (20%)
+        - Glacier Instant Retrieval: 2 TB (20%)
+        - Glacier Deep Archive: 3 TB (30%)
+      Versioning: Suspended
+      Lifecycle policy: Enabled (Standard→IA 30d, →GIR 90d, →DA 180d)
+      Intelligent-Tiering: Enabled on /user-uploads/ prefix
+      Storage Lens: all objects align with lifecycle transitions
+      Retrieval pattern: <1% retrieval of archived objects
+      Cost Explorer: $115/month — matches expected class distribution
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-bucket"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: glacier-retrieval-mismatch
+    description: >-
+      30 TB bucket where 18 TB is in Deep Archive but retrieval rate
+      is 15% of archive per month (high). The retrieval cost exceeds
+      the storage savings from Deep Archive. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with retrieval-mismatch finding
+      recommending move to Glacier Instant Retrieval.
+    input: |
+      BucketName: bucket-glacier-retrieval-mismatch
+      Region: us-east-1
+      Storage (total): 30 TB
+      Storage class distribution:
+        - Standard: 5 TB (17%)
+        - Standard-IA: 7 TB (23%)
+        - Glacier Deep Archive: 18 TB (60%)
+      Versioning: Suspended
+      Lifecycle policy: Enabled (Standard→IA 30d, →DA 90d)
+      Intelligent-Tiering: not configured
+      Storage Lens:
+        - Objects aged 0-30 days: 5 TB
+        - Objects aged 31-90 days: 7 TB
+        - Objects aged >90 days: 18 TB
+      Retrieval pattern: 15% of archived data retrieved per month
+      (approximately 2.7 TB/month retrieved from Deep Archive)
+      Cost Explorer: $54/mo storage + $55.30/mo retrieval = $109.30 total
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "glacier-retrieval-mismatch"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "retrieval"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "route53-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Route 53 Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "unused-zone-deletion",
+      "name": "Public hosted zone with zero queries, no dependents, redundant health checks — delete zone",
+      "difficulty": "medium",
+      "prompt_file": "prompts/unused-zone-deletion.md",
+      "baseline_file": "baselines/unused-zone-deletion.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "unused-zone-deletion", "RECOMMENDATION", "ESTIMATED_SAVINGS", "REMEDIATION_STEPS", "$0.50"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "health-check-calculated-conversion",
+      "name": "12 endpoint health checks with 3 redundant — convert to calculated health check",
+      "difficulty": "hard",
+      "prompt_file": "prompts/health-check-calculated-conversion.md",
+      "baseline_file": "baselines/health-check-calculated-conversion.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "health-check-calculated-conversion", "RECOMMENDATION", "ESTIMATED_SAVINGS", "calculated"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "routing-policy-surcharge-removal",
+      "name": "Latency-based routing on single-region zone — switch to weighted routing to remove surcharge",
+      "difficulty": "hard",
+      "prompt_file": "prompts/routing-policy-surcharge-removal.md",
+      "baseline_file": "baselines/routing-policy-surcharge-removal.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "routing-policy-surcharge-removal", "RECOMMENDATION", "ESTIMATED_SAVINGS", "latency"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-zone",
+      "name": "Production zone with healthy traffic, justified health checks, DNSSEC for compliance — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-zone.md",
+      "baseline_file": "baselines/already-optimal-zone.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-zone", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "traffic-policy-replacement",
+      "name": "Traffic policy replicating weighted routing on low-volume zone — replace with record-level routing",
+      "difficulty": "medium",
+      "prompt_file": "prompts/traffic-policy-replacement.md",
+      "baseline_file": "baselines/traffic-policy-replacement.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "traffic-policy-replacement", "RECOMMENDATION", "ESTIMATED_SAVINGS", "$50"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}

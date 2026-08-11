@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "securityhub-remediation-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Security Hub Remediation Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "critical-s3-auto-remediation",
+      "name": "Critical S3 public access finding — FSBP, AWS-DisableS3BucketPublicAccess, AUTOMATION_DEPLOYED",
+      "difficulty": "easy",
+      "prompt_file": "prompts/critical-s3-auto-remediation.md",
+      "baseline_file": "baselines/critical-s3-auto-remediation.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "critical-s3-auto-remediation", "AWS-DisableS3BucketPublicAccess", "VERDICT", "CRITICAL_AUTO", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "high-iam-key-revoke",
+      "name": "High severity IAM unused key — AWS-IAMRevokeUnusedAccessKey, AUTOMATION_DEPLOYED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/high-iam-key-revoke.md",
+      "baseline_file": "baselines/high-iam-key-revoke.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "high-iam-key-revoke", "AWS-IAMRevokeUnusedAccessKey", "VERDICT", "HIGH_AUTO", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "custom-finding-no-runbook",
+      "name": "Custom Lambda credential exposure finding — no managed runbook, REVIEW_REQUIRED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/custom-finding-no-runbook.md",
+      "baseline_file": "baselines/custom-finding-no-runbook.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "custom-finding-no-runbook", "VERDICT", "GAP", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "suppression-with-expiration",
+      "name": "CIS SQS finding accepted risk — suppression with expiration date, AUTOMATION_DEPLOYED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/suppression-with-expiration.md",
+      "baseline_file": "baselines/suppression-with-expiration.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "suppression-with-expiration", "SUPPRESSED", "VERDICT", "2026-12-01"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "multi-account-delegation",
+      "name": "Multi-account Security Hub via Organizations delegated administrator",
+      "difficulty": "hard",
+      "prompt_file": "prompts/multi-account-delegation.md",
+      "baseline_file": "baselines/multi-account-delegation.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "multi-account-delegation", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,177 @@
+# Eval test cases for securityhub-remediation-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: securityhub-remediation-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: critical-s3-auto-remediation
+    description: >-
+      Critical S3 public access finding with FSBP standard active and a
+      managed SSM runbook available. The skill should produce an
+      AUTOMATION_DEPLOYED workflow with EventBridge routing, Lambda
+      dispatcher, AWS-DisableS3BucketPublicAccess runbook, and
+      batch-update-findings closure.
+    input: |
+      Design reference: critical-s3-auto-remediation
+      Account: 111111111111
+      Region: us-east-1
+
+      Standard: AWS Foundational Security Best Practices (ACTIVE)
+      Finding type: S3.1 (S3 bucket publicly accessible)
+      Severity: CRITICAL
+      Sample finding resource: arn:aws:s3:::app-data-bucket-prod
+      EventBridge detail-type: Security Hub Findings - Imported
+
+      Emit the standard REMEDIATION block (FINDING_TYPE, STANDARD,
+      SEVERITY_ROUTE, RUNBOOK, TRIGGER, SAFETY, SUPPRESSION, VERDICT,
+      TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "critical-s3-auto-remediation"
+        - "AWS-DisableS3BucketPublicAccess"
+        - "VERDICT"
+        - "CRITICAL_AUTO"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: high-iam-key-revoke
+    description: >-
+      High severity IAM unused access key finding with managed runbook.
+      The skill should produce AUTOMATION_DEPLOYED with the
+      AWS-IAMRevokeUnusedAccessKey runbook and safety gates including
+      post-execution verification.
+    input: |
+      Design reference: high-iam-key-revoke
+      Account: 111111111111
+      Region: us-east-1
+
+      Standard: FSBP (ACTIVE)
+      Finding type: IAM.3 (IAM access key unused for 90+ days)
+      Severity: HIGH
+      Sample finding resource: arn:aws:iam::111111111111:user/ci-deploy-bot
+      SSM service role ARN:
+        arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole
+
+      Emit the standard REMEDIATION block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "high-iam-key-revoke"
+        - "AWS-IAMRevokeUnusedAccessKey"
+        - "VERDICT"
+        - "HIGH_AUTO"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: custom-finding-no-runbook
+    description: >-
+      Custom Security Hub finding for Lambda environment variable
+      credential exposure. No managed SSM runbook exists. The skill
+      should classify REVIEW_REQUIRED and cite the missing custom Lambda
+      remediation function.
+    input: |
+      Design reference: custom-finding-no-runbook
+      Account: 111111111111
+      Region: us-east-1
+
+      Standard: Custom
+      Finding type: Custom/ExposedCredentialsInLambdaEnv
+      Severity: HIGH
+      Sample finding resource: arn:aws:lambda:us-east-1:111111111111:function:api-handler
+      No managed SSM runbook maps to this finding type.
+
+      Emit the standard REMEDIATION block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "custom-finding-no-runbook"
+        - "VERDICT"
+        - "GAP"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: suppression-with-expiration
+    description: >-
+      CIS 2.1 finding for SQS without SSE where the team has accepted
+      the risk temporarily. The skill should configure a suppression
+      rule with an expiration date and document the re-evaluation
+      trigger. AUTOMATION_DEPLOYED for the suppression workflow.
+    input: |
+      Design reference: suppression-with-expiration
+      Account: 111111111111
+      Region: us-east-1
+
+      Standard: CIS AWS Foundations Benchmark
+      Finding type: 2.1 (SQS queue without SSE)
+      Severity: MEDIUM
+      Sample finding resource: arn:aws:sqs:us-east-1:111111111111:legacy-events-queue
+      Business justification: Legacy queue being decommissioned in Q4.
+      Suppression expiration: 2026-12-01.
+
+      Emit the standard REMEDIATION block including the suppression rule
+      with expiration.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "suppression-with-expiration"
+        - "SUPPRESSED"
+        - "VERDICT"
+        - "2026-12-01"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: multi-account-delegation
+    description: >-
+      Multi-account Security Hub setup requiring Organizations delegated
+      administrator configuration, member account management, and FSBP
+      enablement across accounts. AUTOMATION_DEPLOYED with the delegation
+      and standard enablement template.
+    input: |
+      Design reference: multi-account-delegation
+      Organizations: 5 member accounts
+      Delegated admin: 222222222222
+      Region: us-east-1
+
+      Requirements:
+      - Designate 222222222222 as delegated administrator
+      - Invite 5 member accounts
+      - Enable FSBP standard for all members
+      - Configure EventBridge rule on delegated admin for aggregated findings
+
+      Emit the standard REMEDIATION block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "multi-account-delegation"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

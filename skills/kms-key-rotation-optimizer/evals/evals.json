@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "kms-key-rotation-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the KMS Key Rotation Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "orphaned-key-cleanup",
+      "name": "Customer-managed key with 0 API calls, no resource associations, 3 expired grants — delete key",
+      "difficulty": "medium",
+      "prompt_file": "prompts/orphaned-key-cleanup.md",
+      "baseline_file": "baselines/orphaned-key-cleanup.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "orphaned-key-cleanup", "RECOMMENDATION", "ESTIMATED_SAVINGS", "REMEDIATION_STEPS", "$1.00"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "stale-grant-retirement",
+      "name": "Active KMS key with 7 expired grants on deleted IAM roles — retire grants",
+      "difficulty": "hard",
+      "prompt_file": "prompts/stale-grant-retirement.md",
+      "baseline_file": "baselines/stale-grant-retirement.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "stale-grant-retirement", "RECOMMENDATION", "grant"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "multi-region-replica-deletion",
+      "name": "Multi-region key with unused replicas in 2 regions — delete unused replicas",
+      "difficulty": "hard",
+      "prompt_file": "prompts/multi-region-replica-deletion.md",
+      "baseline_file": "baselines/multi-region-replica-deletion.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "multi-region-replica-deletion", "RECOMMENDATION", "ESTIMATED_SAVINGS", "replica"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-key",
+      "name": "Active key with rotation enabled, clean grants, no replicas — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-key.md",
+      "baseline_file": "baselines/already-optimal-key.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-key", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "rotation-enablement",
+      "name": "Active key with rotation disabled, 2 expired grants — enable rotation and retire grants",
+      "difficulty": "medium",
+      "prompt_file": "prompts/rotation-enablement.md",
+      "baseline_file": "baselines/rotation-enablement.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "rotation-enablement", "RECOMMENDATION", "grant"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}

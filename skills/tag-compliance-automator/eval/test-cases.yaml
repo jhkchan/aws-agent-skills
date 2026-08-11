@@ -1,0 +1,187 @@
+# Eval test cases for tag-compliance-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: tag-compliance-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: full-stack-org-policy
+    description: >-
+      Standard organization-wide tag compliance rollout with all four
+      layers (TagPolicy, Config rules, auto-tagger with propagation,
+      cost allocation activation via API). The skill should produce an
+      AUTOMATION_DEPLOYED workflow with the full deployment template
+      and tag propagation from EC2 to EBS and ENI.
+    input: |
+      Design reference: full-stack-org-policy
+      Organization ID: o-xxxxxxx
+      Root ID: r-xxxx
+      Account: 111111111111 (payer), 222222222222 (member)
+      Region: us-east-1
+
+      Required tags: Environment, Owner, CostCenter, Project, Application.
+      Environment allowed_values: dev, staging, prod.
+      CostCenter allowed_values: cc-100, cc-200, cc-300.
+      Target resource types: EC2 instances, S3 buckets, RDS instances, Lambda functions.
+      SSM service role ARN: arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole
+      Auto-tagger Lambda role ARN: arn:aws:iam::111111111111:role/AutoTaggerRole
+      Pre-prod validation: completed for auto-tagger (EC2->EBS/ENI propagation tested).
+      Cost allocation tags: API activation confirmed available (Billing IAM access enabled).
+
+      Emit the standard COMPLIANCE block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "full-stack-org-policy"
+        - "enforced_for"
+        - "VERDICT"
+        - "TEMPLATE"
+        - "Environment"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: ec2-propagation-gap
+    description: >-
+      Auto-tagger covers EC2 instances but does NOT propagate tags to
+      child EBS volumes and ENIs. The skill should flag REVIEW_REQUIRED
+      and cite the propagation gap with the specific fix (extend the
+      Lambda handler to call create-tags on volumes and ENIs).
+    input: |
+      Design reference: ec2-propagation-gap
+      Organization ID: o-xxxxxxx
+      Root ID: r-xxxx
+      Account: 111111111111
+      Region: us-east-1
+
+      Required tags: Environment, Owner, Project.
+      Target resource types: EC2 instances.
+      Auto-tagger: deployed on RunInstances, stamps Environment and Owner on the instance only.
+      Propagation: NOT configured (EBS volumes and ENIs remain untagged).
+      Cost allocation tags: active.
+
+      Emit the standard COMPLIANCE block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "ec2-propagation-gap"
+        - "VERDICT"
+        - "GAP"
+        - "ENI"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: billing-console-blocker
+    description: >-
+      Cost allocation tag activation is blocked because the payer
+      account has not enabled IAM access to Billing. The API returns
+      AccessDeniedException. The skill should flag REVIEW_REQUIRED and
+      cite the manual Billing-console step.
+    input: |
+      Design reference: billing-console-blocker
+      Organization ID: o-xxxxxxx
+      Root ID: r-xxxx
+      Account: 111111111111 (payer)
+      Region: us-east-1
+
+      Required tags: Environment, Owner, CostCenter.
+      TagPolicy: deployed and enforced.
+      Config rules: required-tags-core deployed.
+      Auto-tagger: deployed with EC2->EBS/ENI propagation.
+      Cost allocation tags: BLOCKED — ce update-cost-allocation-tags-status returns AccessDeniedException.
+      Billing console IAM access: NOT enabled.
+
+      Emit the standard COMPLIANCE block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "billing-console-blocker"
+        - "VERDICT"
+        - "GAP"
+        - "Billing"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: case-sensitivity-mismatch
+    description: >-
+      TagPolicy declares Environment (capital E) but the auto-tagger
+      Lambda stamps environment (lowercase). Config required-tags
+      checks Environment. The skill should flag REVIEW_REQUIRED and
+      cite the case-sensitivity mismatch with the normalization fix.
+    input: |
+      Design reference: case-sensitivity-mismatch
+      Organization ID: o-xxxxxxx
+      Root ID: r-xxxx
+      Account: 111111111111
+      Region: us-east-1
+
+      Required tags: Environment, Owner.
+      TagPolicy: TagKey Environment, case_sensitive: true, enforced_for EC2::Instance.
+      Config rule: required-tags-core, InputParameters tag1Key=Environment.
+      Auto-tagger Lambda: stamps key "environment" (lowercase) from event detail.
+      Observed: instances are TagPolicy-NON_COMPLIANT AND Config-NON_COMPLIANT despite the Lambda firing.
+
+      Emit the standard COMPLIANCE block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "case-sensitivity-mismatch"
+        - "VERDICT"
+        - "GAP"
+        - "case"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: six-key-custom-rule
+    description: >-
+      Organization requires 6 tag keys enforced (Environment, Owner,
+      CostCenter, Project, Application, ComplianceTier). The managed
+      required-tags rule checks only 5. The skill should produce an
+      AUTOMATION_DEPLOYED workflow with a second Config rule
+      (required-tags-ext) or a custom Lambda rule for the 6th key.
+    input: |
+      Design reference: six-key-custom-rule
+      Organization ID: o-xxxxxxx
+      Root ID: r-xxxx
+      Account: 111111111111
+      Region: us-east-1
+
+      Required tags: Environment, Owner, CostCenter, Project, Application, ComplianceTier.
+      Target resource types: EC2 instances, S3 buckets, Lambda functions.
+      Auto-tagger: deployed with EC2->EBS/ENI propagation.
+      Cost allocation tags: active for all 6 keys.
+      Pre-prod validation: completed.
+
+      Emit the standard COMPLIANCE block. Include the Config rule
+      configuration for all 6 keys.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "six-key-custom-rule"
+        - "required-tags"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

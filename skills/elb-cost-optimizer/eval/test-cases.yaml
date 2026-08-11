@@ -1,0 +1,142 @@
+# Eval test cases for elb-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: elb-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: idle-alb-detection
+    description: >-
+      ALB with zero healthy targets and < 100 requests/day for 14 days.
+      Should recommend deletion after a 7-day observation period.
+    input: |
+      Scenario: An ALB named api-staging-old has been in the account
+      for 6 months. CloudWatch shows RequestCount averaging 23/day
+      (mostly health checks). HealthyHostCount is 0 for the past 14
+      days (all targets deregistered). The ALB has 1 listener (HTTPS
+      443) and 2 target groups, both with 0 registered targets. Cost
+      Explorer shows $22.15/month for this ALB ($16.43 base + LCU
+      charges from health-check traffic). No Route 53 records point
+      to this ALB.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "IDLE_LB"
+        - "VERDICT"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPTIMIZED"
+
+  - id: lcu-peak-dimension-new-connections
+    description: >-
+      ALB with high new connection rate (500/sec) as the peak LCU
+      dimension due to disabled HTTP keep-alive. Should recommend
+      enabling keep-alive to reduce LCU consumption by 30-60%.
+    input: |
+      Scenario: An ALB named web-frontend-prod serves a high-traffic
+      web application. 14-day CloudWatch metrics show:
+      ConsumedLCUs average 18.0, max 25.0. Per-dimension breakdown:
+      NewConnectionCount averages 500/sec (20 LCU), ActiveConnectionCount
+      averages 12,000 (4 LCU), ProcessedBytes averages 1.5 GB/hour
+      (1.5 LCU), RuleEvaluations averages 2000/sec (2 LCU). The peak
+      dimension is new connections at 20 LCU. HTTP keep-alive is
+      disabled on the target EC2 instances (connection: close in
+      responses). Cost Explorer shows $121.54/month in LCU charges
+      ($0.008 x 18 x 730).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "LCU_DIM"
+        - "keep-alive"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPTIMIZED"
+
+  - id: alb-consolidation-multi-path-routing
+    description: >-
+      Three ALBs in the same VPC serving related microservices on the
+      same domain. Should recommend consolidating to 1 ALB using
+      host-based and path-based routing.
+    input: |
+      Scenario: A VPC has three ALBs: api-alb (serves api.example.com),
+      admin-alb (serves admin.example.com), and static-alb (serves
+      static.example.com). All three are in the same VPC, same region
+      (us-east-1), same scheme (internet-facing), and use certificates
+      from the same ACM account. Each ALB processes moderate traffic
+      (ConsumedLCUs: 3-5 each). Cost Explorer shows $147.87/month
+      total ($49.29/month base for 3 ALBs + LCU charges). The team
+      already has a wildcard certificate for *.example.com in ACM.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "CONSOLIDATION"
+        - "VERDICT"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPTIMIZED"
+
+  - id: already-optimal-elb-fleet
+    description: >-
+      Well-optimized ELB fleet: no idle ALBs, LCU peak managed,
+      consolidated to one ALB per environment, no CLBs, NLB
+      cross-zone disabled with balanced AZ targets, access logs
+      with lifecycle. Should return OPTIMIZED.
+    input: |
+      Scenario: An account has 2 ALBs: prod-alb (main production,
+      1 VPC) and staging-alb (staging, 1 VPC). Both are in us-east-1.
+      Prod-alb has 5 path-based listener rules serving 5 microservices.
+      ConsumedLCUs average 8.0 (peak dimension: new connections at
+      8 LCU, managed with HTTP keep-alive enabled). Staging-alb has
+      3 rules, ConsumedLCUs average 1.2. No CLBs exist. No idle ALBs
+      (all have > 10,000 requests/day and healthy targets). ALB
+      access logs are written to S3 with lifecycle rules (Standard-IA
+      at 30d, Glacier at 90d, expire at 365d). No NLBs in use.
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "VERDICT"
+      must_not_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "Error:"
+        - "I cannot"
+
+  - id: clb-to-alb-migration-savings
+    description: >-
+      Active CLB serving HTTP/HTTPS traffic. Should recommend
+      migrating to ALB for cost savings and feature gains (path
+      routing, LCU pricing, SNI).
+    input: |
+      Scenario: A Classic Load Balancer named legacy-web-clb has been
+      serving HTTP/HTTPS traffic for 3 years. It processes ~2 TB/month
+      and serves 5M requests/day. The CLB has two listeners (HTTP:80
+      and HTTPS:443) and routes to 4 EC2 instances. Cost Explorer shows
+      $34.25/month for this CLB ($18.25 base + $16.00 for 2 TB at
+      $0.008/GB). The application needs path-based routing (currently
+      handled by nginx on the instances) and SSL termination with SNI
+      (currently using a single certificate). No ALBs or NLBs exist
+      in the account yet.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "CLB"
+        - "ALB"
+        - "VERDICT"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPTIMIZED"

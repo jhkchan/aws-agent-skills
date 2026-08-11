@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-storage-class-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Storage Class Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "lifecycle-policy-gap",
+      "name": "45 TB bucket with no lifecycle policy, 71% in Standard despite 13 TB >365 days old — deploy lifecycle",
+      "difficulty": "medium",
+      "prompt_file": "prompts/lifecycle-policy-gap.md",
+      "baseline_file": "baselines/lifecycle-policy-gap.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "lifecycle-policy-gap", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "lifecycle"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "intelligent-tiering-candidate",
+      "name": "20 TB bucket of user uploads with unpredictable access patterns — enable Intelligent-Tiering",
+      "difficulty": "medium",
+      "prompt_file": "prompts/intelligent-tiering-candidate.md",
+      "baseline_file": "baselines/intelligent-tiering-candidate.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "intelligent-tiering-candidate", "RECOMMENDATION", "ESTIMATED_SAVINGS", "Intelligent-Tiering"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "versioning-bloat",
+      "name": "50 TB versioned bucket with 12 TB noncurrent versions and no noncurrent lifecycle rules — add noncurrent-version lifecycle",
+      "difficulty": "hard",
+      "prompt_file": "prompts/versioning-bloat.md",
+      "baseline_file": "baselines/versioning-bloat.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "versioning-bloat", "RECOMMENDATION", "ESTIMATED_SAVINGS", "noncurrent"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-bucket",
+      "name": "10 TB bucket with lifecycle deployed, Intelligent-Tiering on mixed prefixes, no retrieval mismatch — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-bucket.md",
+      "baseline_file": "baselines/already-optimal-bucket.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-bucket", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "glacier-retrieval-mismatch",
+      "name": "30 TB bucket with 18 TB in Deep Archive but 15% monthly retrieval rate — retrieval mismatch, move to Glacier IR",
+      "difficulty": "hard",
+      "prompt_file": "prompts/glacier-retrieval-mismatch.md",
+      "baseline_file": "baselines/glacier-retrieval-mismatch.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "glacier-retrieval-mismatch", "RECOMMENDATION", "ESTIMATED_SAVINGS", "retrieval"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

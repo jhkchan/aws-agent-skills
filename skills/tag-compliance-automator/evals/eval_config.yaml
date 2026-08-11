@@ -1,0 +1,43 @@
+# Eval configuration for tag-compliance-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: tag-compliance-automator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: full-stack-org-policy
+    difficulty: hard
+    prompt_file: prompts/full-stack-org-policy.md
+    baseline_file: baselines/full-stack-org-policy.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: ec2-propagation-gap
+    difficulty: medium
+    prompt_file: prompts/ec2-propagation-gap.md
+    baseline_file: baselines/ec2-propagation-gap.md
+    expected_verdict: REVIEW_REQUIRED
+  - id: billing-console-blocker
+    difficulty: hard
+    prompt_file: prompts/billing-console-blocker.md
+    baseline_file: baselines/billing-console-blocker.md
+    expected_verdict: REVIEW_REQUIRED
+  - id: case-sensitivity-mismatch
+    difficulty: medium
+    prompt_file: prompts/case-sensitivity-mismatch.md
+    baseline_file: baselines/case-sensitivity-mismatch.md
+    expected_verdict: REVIEW_REQUIRED
+  - id: six-key-custom-rule
+    difficulty: hard
+    prompt_file: prompts/six-key-custom-rule.md
+    baseline_file: baselines/six-key-custom-rule.md
+    expected_verdict: AUTOMATION_DEPLOYED

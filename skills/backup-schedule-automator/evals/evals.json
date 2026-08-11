@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "backup-schedule-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Backup Schedule Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "tag-based-daily-backup",
+      "name": "Tag-based daily backup with lifecycle tiering and cross-region copy",
+      "difficulty": "easy",
+      "prompt_file": "prompts/tag-based-daily-backup.md",
+      "baseline_file": "baselines/tag-based-daily-backup.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "tag-based-daily-backup", "DeleteAfterDays", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "vault-lock-worm-compliance",
+      "name": "WORM vault lock for SOX compliance — GOVERNANCE then COMPLIANCE mode",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vault-lock-worm-compliance.md",
+      "baseline_file": "baselines/vault-lock-worm-compliance.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "vault-lock-worm-compliance", "COMPLIANCE", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "empty-tag-scope-gap",
+      "name": "Empty tag scope — zero resources match, missing lifecycle and restore testing",
+      "difficulty": "medium",
+      "prompt_file": "prompts/empty-tag-scope-gap.md",
+      "baseline_file": "baselines/empty-tag-scope-gap.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "empty-tag-scope-gap", "VERDICT", "GAP", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "on-demand-backup-eventbridge",
+      "name": "On-demand backup triggered by CodePipeline via EventBridge + Lambda",
+      "difficulty": "medium",
+      "prompt_file": "prompts/on-demand-backup-eventbridge.md",
+      "baseline_file": "baselines/on-demand-backup-eventbridge.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "on-demand-backup-eventbridge", "start-backup-job", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-org-policy",
+      "name": "Cross-account backup via Organizations backup policy with member inheritance",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-org-policy.md",
+      "baseline_file": "baselines/cross-account-org-policy.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "cross-account-org-policy", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

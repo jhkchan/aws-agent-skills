@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "tag-compliance-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Tag Compliance Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "full-stack-org-policy",
+      "name": "Full four-layer tag compliance rollout — TagPolicy + Config + auto-tagger with propagation + cost allocation",
+      "difficulty": "hard",
+      "prompt_file": "prompts/full-stack-org-policy.md",
+      "baseline_file": "baselines/full-stack-org-policy.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "full-stack-org-policy", "enforced_for", "VERDICT", "TEMPLATE", "Environment"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "ec2-propagation-gap",
+      "name": "Auto-tagger missing EC2-to-EBS/ENI tag propagation — REVIEW_REQUIRED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ec2-propagation-gap.md",
+      "baseline_file": "baselines/ec2-propagation-gap.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "ec2-propagation-gap", "VERDICT", "GAP", "ENI"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "billing-console-blocker",
+      "name": "Cost allocation tag activation blocked by Billing console IAM setting — REVIEW_REQUIRED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/billing-console-blocker.md",
+      "baseline_file": "baselines/billing-console-blocker.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "billing-console-blocker", "VERDICT", "GAP", "Billing"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "case-sensitivity-mismatch",
+      "name": "TagPolicy case vs auto-tagger case mismatch — REVIEW_REQUIRED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/case-sensitivity-mismatch.md",
+      "baseline_file": "baselines/case-sensitivity-mismatch.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "case-sensitivity-mismatch", "VERDICT", "GAP", "case"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "six-key-custom-rule",
+      "name": "6 required tag keys — second Config rule or custom Lambda for the 6th key — AUTOMATION_DEPLOYED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/six-key-custom-rule.md",
+      "baseline_file": "baselines/six-key-custom-rule.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "six-key-custom-rule", "required-tags", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

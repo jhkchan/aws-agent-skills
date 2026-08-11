@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "elb-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ELB Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "idle-alb-detection",
+      "name": "Idle ALB with zero healthy targets and < 100 requests/day — should recommend deletion",
+      "difficulty": "easy",
+      "prompt_file": "prompts/idle-alb-detection.md",
+      "baseline_file": "baselines/idle-alb-detection.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_root_cause_category": "IDLE_LB",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "IDLE_LB", "VERDICT", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "lcu-peak-dimension-new-connections",
+      "name": "ALB with new connections as peak LCU dimension — should recommend enabling keep-alive",
+      "difficulty": "hard",
+      "prompt_file": "prompts/lcu-peak-dimension-new-connections.md",
+      "baseline_file": "baselines/lcu-peak-dimension-new-connections.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_root_cause_category": "LCU_DIM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "LCU_DIM", "keep-alive", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "alb-consolidation-multi-path-routing",
+      "name": "Three ALBs serving related subdomains — should consolidate to one ALB via host-based routing",
+      "difficulty": "medium",
+      "prompt_file": "prompts/alb-consolidation-multi-path-routing.md",
+      "baseline_file": "baselines/alb-consolidation-multi-path-routing.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_root_cause_category": "CONSOLIDATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "CONSOLIDATION", "VERDICT", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-elb-fleet",
+      "name": "Already-optimized ELB fleet — consolidated, LCU-efficient, no CLBs, access log lifecycle",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-elb-fleet.md",
+      "baseline_file": "baselines/already-optimal-elb-fleet.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "Error:", "I cannot"]
+        }
+      ]
+    },
+    {
+      "id": "clb-to-alb-migration-savings",
+      "name": "Active CLB serving HTTP traffic — should migrate to ALB for cost savings and path routing",
+      "difficulty": "medium",
+      "prompt_file": "prompts/clb-to-alb-migration-savings.md",
+      "baseline_file": "baselines/clb-to-alb-migration-savings.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_root_cause_category": "CLB_MIGRATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "CLB", "ALB", "VERDICT", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}

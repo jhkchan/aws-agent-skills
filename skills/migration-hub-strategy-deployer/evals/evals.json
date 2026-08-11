@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "migration-hub-strategy-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Migration Hub Strategy Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "full-portfolio-assessment",
+      "name": "Full portfolio assessment with agent-based + agentless discovery, 14-day window — READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/full-portfolio-assessment.md",
+      "baseline_file": "baselines/full-portfolio-assessment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "full-portfolio-assessment", "6R", "VERDICT", "TEMPLATE", "wave"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "agentless-only-short-window",
+      "name": "Agentless-only discovery with 2-day window — no dependency graph, no right-sizing — PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/agentless-only-short-window.md",
+      "baseline_file": "baselines/agentless-only-short-window.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "agentless-only-short-window", "VERDICT", "GAP", "agent"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "eol-os-anti-pattern",
+      "name": "EOL OS anti-pattern detection (Windows Server 2012 R2) — wave sequencing with replatform — READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/eol-os-anti-pattern.md",
+      "baseline_file": "baselines/eol-os-anti-pattern.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "eol-os-anti-pattern", "end-of-life", "VERDICT", "wave"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "database-replatform-dms",
+      "name": "Oracle 11g to Aurora PostgreSQL replatform with DMS + SCT — READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/database-replatform-dms.md",
+      "baseline_file": "baselines/database-replatform-dms.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "database-replatform-dms", "DMS", "VERDICT", "SCT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "collector-network-blocker",
+      "name": "Collector VM deployed but AWS 443 blocked by firewall — PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/collector-network-blocker.md",
+      "baseline_file": "baselines/collector-network-blocker.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "collector-network-blocker", "VERDICT", "GAP", "network"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}
