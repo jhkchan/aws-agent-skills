@@ -187,6 +187,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | autoscaling-group-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 18.9s | 39803 |
 | autoscaling-policy-deployer | amazon.nova-pro-v1:0 | 106/120 | B | 0/5 | 13.6s | 43695 |
 | backup-compliance-automator | amazon.nova-pro-v1:0 | 106/120 | B | 0/5 | 11.4s | 46455 |
+| backup-cross-region-operator | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 18.0s | 43394 |
 | backup-plan-auditor | amazon.nova-pro-v1:0 | 115/120 | A | 6/6 | 8.5s | 30595 |
 | backup-vault-operator | amazon.nova-pro-v1:0 | 95/120 | B | 2/5 | 9.8s | 48488 |
 | bedrock-guardrail-coverage-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 5.1s | 31762 |
