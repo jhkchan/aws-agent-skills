@@ -528,19 +528,16 @@ DMS_HANDOFF: ready (SCT + DMS endpoints prepared for user-auth PostgreSQL replat
 VERDICT: READY_TO_DEPLOY
 GAP: None
 TEMPLATE:
-  # 1. Deploy Collector VM (agentless inventory)
-  # Download OVA from Migration Hub console, deploy on vcenter.example.com
+  # 1. Deploy Collector VM (download OVA from console, deploy on vcenter.example.com)
   aws discovery start-import-task --name vcenter-import --vcenter --region us-east-1
 
-  # 2. Install agents on 120 critical hosts (agent-based)
-  # Per OS: yum install aws-discovery-agent / MSI / apt
+  # 2. Install agents on 120 critical hosts (yum/apt/MSI per OS)
 
   # 3. Wait 14 days, then start assessment
   aws migrationhub-strategy start-assessment --assessment-name portfolio-q3-assessment --s3bucket-for-report-data migration-reports-111111111111 --region us-east-1
 
   # 4. MGN rehost for billing-service
   aws mgn create-launch-template-template --launch-template-template-name billing-rehost --region us-east-1
-
   # 5. DMS replatform for user-auth PostgreSQL
   aws dms create-replication-instance --replication-instance-identifier user-auth-rep --replication-instance-class dms.r5.xlarge --region us-east-1
 ```
@@ -676,8 +673,8 @@ components fail silently or produce unreliable output.
 6. MGN test cutover MUST succeed before production cutover.
 
 **Parallelizable:** Collector deployment and agent installation are
-independent; MGN and DMS setup for different applications can proceed in
-parallel once the 6R strategies are confirmed.
+independent. MGN and DMS setup for different applications can proceed
+in parallel once the 6R strategies are confirmed.
 
 ## Pre-flight safety checks
 
