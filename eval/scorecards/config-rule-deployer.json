@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds expert\u2011level delta such as a decision\u2011tree for stale compliance, exact service limits (150 rules, 25 packs, 256\u202fKB template), proactive rule mechanics, and a prioritized pre\u2011check list \u2013 information a generic model would not synthesize. Deductions for restating well\u2011known API docs and managed\u2011rule identifiers."
+      "justification": "Adds concrete expert details not usually known to a baseline model: exact service limits (150 rules, 25 packs), recent 2024\u20112026 features (proactive rules, organization conformance packs), a prioritized pre\u2011check list, and nuanced behaviours (evaluation lag, remediation defaults). No major missing knowledge, but some content merely restates common docs."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: ordered pre\u2011flight checks, mandatory CONFIRM gate, snapshot before mutation, forced evaluation step, and post\u2011verification sequence. Only a minor generic element (\"check IAM permissions\") prevents a perfect score."
+      "justification": "Provides AWS\u2011specific procedures (pre\u2011flight checks, CONFIRM gate, snapshot before modification, forced evaluation). However it only details creation flow; update or delete pathways are omitted, leaving a gap in the full lifecycle procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a thorough NEVER list with concrete reasons (recorder stopped, missing Lambda permission, timeout limits, limit\u2011exceeding, etc.). Missing a few anti\u2011patterns such as cost\u2011impact of high\u2011frequency evaluations and handling of API throttling."
+      "justification": "Includes a concrete NEVER list with reasons (recorder must run, immediate evaluation, remediation auto\u2011enable, Lambda permission, avoid periodic for security\u2011critical rules). The skill mentions a full 15\u2011item list in references but only enumerates the top 5, so the anti\u2011pattern coverage is incomplete."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. Activation triggers are overly exhaustive, which could cause spurious activation, so a small deduction."
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The only minor issue is that activation triggers are very broad, which could cause accidental invocation in edge cases."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Uses layered sections (quick reference, mindset, process, anti\u2011patterns, output contract) to avoid overload. However, the anti\u2011patterns and full CLI examples are placed early, adding some cognitive load before the core decision flow."
+      "justification": "Content is layered logically: quick reference, mindset, pre\u2011flight, process, patterns, output contract, NEVER, and deep references. No overload at top level, but the references section is only hinted at, requiring external lookup for full details."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained with CONFIRM gate, pre\u2011checks, and snapshot. Minor gap: read\u2011only queries (e.g., listing rules) are not explicitly scoped, but this does not materially affect safety."
+      "justification": "Destructive actions are tightly constrained by mandatory CONFIRM gate, exhaustive pre\u2011checks, and snapshotting. Creative tasks (e.g., template authoring) are given freedom with guidance, matching fragility levels perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What, Quick navigation, Mindset, Pre\u2011flight, Process, Common patterns, Output contract, Anti\u2011patterns). No structural anomalies."
+      "justification": "The skill follows a recognizable structure (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 patterns \u2192 output contract \u2192 NEVER \u2192 references). However, the pattern is not explicitly labeled as a known framework, making it slightly ad\u2011hoc rather than a formalized template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides exact CLI commands, decision trees, and a strict output contract that an agent can execute. Missing: explicit error\u2011handling branches (e.g., how to recover from AWS CLI failures) and a formal JSON schema for the input payload."
+      "justification": "Model outputs conform to the strict contract and demonstrate end\u2011to\u2011end flow. However, the proactive\u2011rule example uses the wrong CLI (`put-organization-config-rule` instead of the appropriate `put-config-rule` for a CloudFormation hook), and the skill lacks explicit error\u2011handling or fallback steps for API failures, reducing real\u2011world reliability."
     }
   ],
-  "total_score": 107,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46534,
-  "latency_ms": 12838,
+  "token_count": 36083,
+  "latency_ms": 12090,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0
