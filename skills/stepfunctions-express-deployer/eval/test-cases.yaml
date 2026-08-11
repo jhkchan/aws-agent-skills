@@ -1,0 +1,169 @@
+# Eval test cases for stepfunctions-express-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across Express-vs-Standard decision, logging configuration,
+# waitForTaskToken incompatibility, sync API Gateway timeout alignment,
+# and Standard-to-Express migration.
+skill: stepfunctions-express-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: express-distributed-map-logging
+    description: >-
+      Provision an Express workflow with Distributed Map (S3
+      ItemReader, 1000 concurrency), CloudWatch Logs at ALL level
+      with includeExecutionData, async invocation via EventBridge
+      schedule, IAM least-privilege role. Expects READY_TO_DEPLOY.
+    input: |
+      Provision an Express Workflow named "order-processor" in
+      account 123456789012, region us-east-1. The workflow uses a
+      Distributed Map with an S3 ItemReader (bucket "my-bucket",
+      key "input.json") and Lambda Task "process-item" per item,
+      MaxConcurrency 1000. Attach a CloudWatch Logs log group
+      /aws/states/order-processor at level ALL with
+      includeExecutionData=true and 30-day retention. The Lambda
+      handler is idempotent via IdempotencyKey from $$.Execution.Id.
+      Execution role scoped to lambda:InvokeFunction on the
+      process-item ARN and s3:GetObject on the input object.
+      Configure EventBridge to invoke the workflow every 5 minutes
+      with the EventBridge target role. Add an alarm on
+      ExecutionsFailed.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "order-processor"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Distributed Map"
+        - "includeExecutionData"
+        - "IdempotencyKey"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: standard-migration-waitfortasktoken
+    description: >-
+      A Standard workflow using .waitForTaskToken is being migrated
+      to Express. Must flag the incompatibility and return
+      PREREQUISITES_MISSING.
+    input: |
+      Migrate this Standard state machine to EXPRESS for cost
+      savings. The state machine "approval-flow" (account
+      123456789012, region us-east-1) uses an SQS
+      sendMessage.waitForTaskToken integration at line 18 to wait
+      for an external approval callback. The workflow also has a
+      4-minute Glue .sync job plus a 2-minute downstream ECS task.
+      Total workflow runtime is up to 6 minutes when the callback
+      is slow. Set up CloudWatch Logs at ERROR level.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "approval-flow"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "waitForTaskToken"
+        - "5-min"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: sync-apigateway-timeout-alignment
+    description: >-
+      Provision a sync Express workflow fronted by API Gateway.
+      Must align the API Gateway integration timeout to 29000ms
+      and add an ExecutionsTimedOut alarm. Expects READY_TO_DEPLOY.
+    input: |
+      Provision an Express workflow "checkout-api" (account
+      123456789012, region us-east-1) invoked synchronously from
+      API Gateway. Workflow p99 is 8 seconds. Attach CloudWatch
+      Logs at ALL level with includeExecutionData=true. The
+      execution role is scoped to lambda:InvokeFunction on
+      function:checkout-handler. Make sure the API Gateway
+      integration timeout is set correctly so the client does not
+      receive a 504 while the workflow is still running. Add an
+      alarm on ExecutionsTimedOut.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "checkout-api"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "29000"
+        - "ExecutionsTimedOut"
+        - "sync"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-logging-on-async
+    description: >-
+      Provision an async Express workflow where the operator forgot
+      to attach a log group. Must flag the missing logging and
+      return PREREQUISITES_MISSING (since async without logging is
+      a NEVER pattern).
+    input: |
+      Provision an async Express Workflow "batch-loader" (account
+      123456789012, region us-east-1) triggered by EventBridge
+      rate(1 minute). I will attach CloudWatch Logs later — skip
+      the loggingConfiguration for now. The execution role is
+      scoped to lambda:InvokeFunction on function:loader. Add the
+      EventBridge target role. Make sure I can debug failures.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "batch-loader"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "log group"
+        - "CloudWatch Logs"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: express-idempotency-for-at-least-once
+    description: >-
+      Provision an Express workflow with side-effecting Lambda
+      (credit-card charge). Must include an idempotency key via
+      $$.Execution.Id persisted in DynamoDB before the side effect.
+      Expects READY_TO_DEPLOY.
+    input: |
+      Provision an Express workflow "charge-card-flow" (account
+      123456789012, region us-east-1). The workflow calls Lambda
+      function "charge-card" which charges a credit card — this
+      MUST be idempotent because Express is at-least-once. Use
+      $$.Execution.Id as the idempotency key, persisted in
+      DynamoDB table "IdempotencyTable" BEFORE the charge. Attach
+      CloudWatch Logs at ALL level. Execution role scoped to
+      lambda:InvokeFunction and dynamodb:PutItem/GetItem on the
+      table. Workflow runs async via start-execution.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "charge-card-flow"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "IdempotencyKey"
+        - "$$.Execution.Id"
+        - "at-least-once"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

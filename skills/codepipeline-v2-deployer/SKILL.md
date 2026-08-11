@@ -156,9 +156,9 @@ Three facts make V2 provisioning different from V1:
 
 ## Pre-flight: deployment specification gate
 
-Before producing the deployment plan, validate the input specification.
-Several requirements **block deployment** — proceeding with an invalid
-spec produces a non-functional or insecure pipeline.
+Validate the input specification. Several requirements **block
+deployment** — proceeding with an invalid spec produces a
+non-functional or insecure pipeline.
 
 **Live-account pre-flight checks (skip if doing offline plan):**
 1. Verify IAM permissions for `codepipeline:CreatePipeline`,
@@ -202,16 +202,15 @@ REQUIRED:
 
 ## STRICT output contract
 
-When this skill is invoked with a V2 pipeline provisioning request
-(source, trigger, build, deploy, cross-account, manual approval, or a
-partial configuration), the agent MUST respond with the deployment
-plan defined in the "Output format" section using the literal
-all-caps labels `PIPELINE_SPEC:`, `VERDICT:`, `ARCHITECTURE:`,
-`CHECKLIST:`, `FINDINGS:`, and `DEPLOY_COMMANDS:`. Do NOT preface the
-block with prose, headings, or disclaimers — emit it as the first
-lines of the response. This contract is what assertion-based evals and
-downstream provisioning pipelines rely on; deviating from the literal
-labels breaks automation silently.
+When this skill is invoked with a V2 pipeline provisioning request,
+the agent MUST respond with the deployment plan defined in the "Output
+format" section using the literal all-caps labels `PIPELINE_SPEC:`,
+`VERDICT:`, `ARCHITECTURE:`, `CHECKLIST:`, `FINDINGS:`, and
+`DEPLOY_COMMANDS:`. Do NOT preface the block with prose, headings, or
+disclaimers — emit it as the first lines of the response. This
+contract is what assertion-based evals and downstream provisioning
+pipelines rely on; deviating from the literal labels breaks automation
+silently.
 
 If any prerequisite is missing, the verdict is
 `PREREQUISITES_MISSING` with a specific gap citation in the checklist
@@ -234,13 +233,13 @@ verdicts are mutually exclusive.
 | references/triggers-and-namespace-variables-reference.md | Trigger filter + variable deep dive |
 | references/cross-account-and-deploy-actions-reference.md | Cross-account + per-deploy-type contracts |
 
-## Process — Architecture planning (apply in order, produce deployment plan)
+## Process — Architecture planning (apply in order)
 
 ### Step 0: Expert heuristic — V1 to V2 migration gotchas
 
 Migrating a V1 pipeline to V2 looks like changing one field
-(`pipelineType: V1` → `V2`). It is not. The migration touches three
-load-bearing areas: triggers, IAM, and variables.
+(`pipelineType: V1` → `V2`). It is not. The migration touches
+triggers, IAM, and variables.
 
 ```text
 V1 → PollForSourceChanges: true (or false + CloudWatch Events rule)
@@ -252,14 +251,14 @@ V2 → PollForSourceChanges MUST be false (V2 rejects polling).
 ```
 
 **Migration failure modes:**
-- **Stale `PollForSourceChanges: true` in the migrated JSON.** V2
-  rejects this with a confusing "Invalid action configuration" error.
-  Always set `DetectOptions: false` and use a trigger instead.
+- **Stale `PollForSourceChanges: true`.** V2 rejects this with a
+  confusing "Invalid action configuration" error. Set
+  `DetectOptions: false` and use a trigger instead.
 - **CloudWatch Events rule orphan.** V1 pipelines often have a
-  side-car CloudWatch Events rule that calls `StartPipelineExecution`.
-  After migration, delete the rule — V2 triggers handle this natively,
-  and a leftover rule can fire BOTH the V2 trigger and the legacy rule
-  (duplicate executions).
+  side-car rule calling `StartPipelineExecution`. After migration,
+  delete the rule — V2 triggers handle this natively, and a leftover
+  rule can fire BOTH the V2 trigger and the legacy rule (duplicate
+  executions).
 - **IAM role trust policy scope.** V1 roles trust
   `codepipeline.amazonaws.com` broadly. V2 supports condition keys
   like `codepipeline:FullPipelineArn` — tighten the trust policy.
@@ -279,14 +278,13 @@ touches triggers, IAM, variables, and stage conditions.
 | Trigger filter | Branch only (via EventBridge rule) | Branch, paths, tags, glob patterns |
 | Namespace variables | No | Yes (stage-to-stage) |
 | Stage conditions | No | Yes (skip stages based on variables) |
-| Pricing | $1/active pipeline/month | $0.002/pipeline-execution (event-driven) |
+| Pricing | $1/active pipeline/month | $0.002/pipeline-execution |
 
-**Pick V2 when ALL of these hold:** the source supports event-driven
-triggers (CodeCommit, S3 with EventBridge, GitHub via CodeConnections);
-you want sub-second trigger latency (vs V1's ~17s polling); you want
+**Pick V2 when ALL hold:** source supports event-driven triggers
+(CodeCommit, S3 via EventBridge, GitHub via CodeConnections); you want
+sub-second trigger latency (vs V1's ~17s polling); you want
 pipeline-level variables or stage conditions; you want per-execution
-pricing instead of flat monthly fees. Pick V1 only if you need polling
-(rare) or have an existing pipeline that cannot be migrated safely.
+pricing. Pick V1 only for legacy pipelines that cannot be migrated.
 New pipelines should default to V2.
 
 ### Step 2: Source action
@@ -328,8 +326,8 @@ to authorize AWS to access the GitHub repo.
 
 ### Step 3: Trigger configuration (event-driven filter)
 
-V2 triggers replace V1's polling / CloudWatch Events rule. The trigger
-filter scopes which pushes start a pipeline run.
+V2 triggers replace V1's polling / CloudWatch Events rule. The filter
+scopes which pushes start a run:
 
 ```yaml
 Triggers:
@@ -343,17 +341,16 @@ Triggers:
 ```
 
 **Critical trigger rules:**
-- A trigger with NO filter fires on EVERY push to EVERY branch. This
-  floods pipeline history and burns per-execution costs. ALWAYS scope
-  to production branches.
+- A trigger with NO filter fires on EVERY push to EVERY branch —
+  always scope `Branches.Includes` to production branches.
 - `Branches.Includes` supports glob (`release/*` matches
-  `release/v1`, `release/v2`). `main` is exact-match only.
+  `release/v1`). `main` is exact-match only.
 - `FilePaths.Includes` limits runs to changes under those paths. Use
-  `Excludes` for docs/CI-only changes that don't need a deploy.
+  `Excludes` for docs/CI-only changes.
 - `Tags` filters on Git tags (annotated or lightweight). Useful for
   "deploy only on tagged releases."
-- Multiple triggers are OR'd (any match fires). Within a trigger,
-  branches/paths/tags are AND'd (all must match for that block).
+- Multiple triggers are OR'd; within a trigger, branches/paths/tags
+  are AND'd.
 
 ### Step 4: Build (CodeBuild)
 
@@ -371,13 +368,11 @@ Triggers:
 The `Namespace: BuildVars` block exposes the build's exported
 variables to downstream stages as `#{BuildVars.IMAGE_TAG}`. The
 CodeBuild project must declare the variables it exports in
-`buildspec.yml` under the `exported-variables` block:
+`buildspec.yml` under `exported-variables`:
 
 ```yaml
 env:
-  exported-variables:
-    - IMAGE_TAG
-    - BUILD_VERSION
+  exported-variables: [IMAGE_TAG, BUILD_VERSION]
 phases:
   build:
     commands:
@@ -388,8 +383,8 @@ phases:
 
 | Deploy type | Provider | Key configuration |
 |---|---|---|
-| CloudFormation | `CloudFormation` | `ActionMode: CREATE_REPLACE`, `StackName`, `RoleArn` (target account), `TemplatePath` |
-| ECS | `ECS` | `ClusterName`, `ServiceName`, `TaskDefinitionTemplatePath` or `Image1` (direct image) |
+| CloudFormation | `CloudFormation` | `ActionMode: CREATE_REPLACE`, `StackName`, `RoleArn` (target), `TemplatePath` |
+| ECS | `ECS` | `ClusterName`, `ServiceName`, `Image1` (direct image) or `TaskDefinitionTemplatePath` |
 | S3 deploy | `S3` | `BucketName`, `Extract: true` (unzip artifact) |
 | Service Catalog | `ServiceCatalog` | `ProductId`, `ProvisionedProductName` |
 | CodeDeploy | `CodeDeploy` | `ApplicationName`, `DeploymentGroupName`, `DeploymentStyle: BLUE_GREEN` / `IN_PLACE` |
@@ -411,19 +406,18 @@ phases:
       Namespace: DeployVars
 ```
 
-For cross-account, `RoleArn` points to a role in the TARGET account
-that CloudFormation assumes; the pipeline role in the source account
-needs `sts:AssumeRole` on that role.
+For cross-account, `RoleArn` points to a role in the TARGET account;
+the pipeline role in the source account needs `sts:AssumeRole` on it.
 
-**ECS deploy action (direct image):** uses `Image1:
-#{BuildVars.IMAGE_URI}` (a namespace variable from the Build stage);
-the deploy action cannot start until the build's exported variable is
-resolved. Configure `ClusterName`, `ServiceName`, `Image1`.
+**ECS deploy (direct image):** uses `Image1: #{BuildVars.IMAGE_URI}`
+(a namespace variable from Build); the deploy cannot start until the
+build's exported variable is resolved. Configure `ClusterName`,
+`ServiceName`, `Image1`.
 
 **CodeDeploy for EC2 (in-place or blue/green):** configure
 `ApplicationName`, `DeploymentGroupName`, `DeploymentStyle`
 (`IN_PLACE` or `BLUE_GREEN`). EC2 instances must have the CodeDeploy
-agent installed and the CodeDeploy service role configured.
+agent and the CodeDeploy service role configured.
 
 ### Step 6: Manual approval gate
 
@@ -437,39 +431,34 @@ agent installed and the CodeDeploy service role configured.
         CustomData: "Approve to deploy to prod. SNS topic arn:aws:sns:us-east-1:111111111111:prod-approval"
 ```
 
-The pipeline blocks at this stage until
-`put-job-approval-result --result APPROVED` is called (or REJECTED).
-Configure an SNS topic to notify reviewers via email/Slack. The action
-accepts `ExternalEntityLink` (a Change Management ticket URL) and
-`CustomData` (free-form context for the reviewer). Approval timeouts
-are NOT enforced by CodePipeline — the pipeline waits indefinitely.
-Use an external scheduled Lambda to auto-reject stale approvals.
+The pipeline blocks until `put-job-approval-result --result APPROVED`
+(or REJECTED). Configure an SNS topic to notify reviewers via
+email/Slack. `ExternalEntityLink` points to a Change Management
+ticket; `CustomData` is free-form reviewer context. Approval timeouts
+are NOT enforced — the pipeline waits indefinitely. Use an external
+scheduled Lambda to auto-reject stale approvals.
 
 ### Step 7: Namespace variables
 
-Namespace variables are defined by setting `Namespace: <name>` on an
-action and exporting variables from the action (CodeBuild's
-`exported-variables`, CloudFormation's `OutputFileName`, or literal
-`Variables` block on the action).
+Defined by setting `Namespace: <name>` on an action and exporting
+variables from the action (CodeBuild's `exported-variables`,
+CloudFormation's `OutputFileName`, or literal `Variables` block).
 
 **Consumption patterns:**
 - Downstream action configuration: `Image1: #{BuildVars.IMAGE_URI}`
 - Stage condition: `Conditions: [{ConditionKey: "#{BuildVars.ENV}", ConditionValue: prod, Operator: StringEquals}]`
-- Nested namespace: `#{BuildVars.Deeply.Nested.Key}` (dotted paths for
-  JSON-exported values)
+- Nested namespace: `#{BuildVars.Deeply.Nested.Key}` (dotted paths for JSON-exported values)
 
 **Critical variable rules:**
 - Variables flow forward only — a stage cannot consume a variable from
   a later stage.
-- A missing variable renders as empty string (no error). Validate with
-  a stage condition that the variable is non-empty before using it in
-  a deploy.
-- Variables are scoped per-execution (per pipeline run). Concurrent
-  pipeline runs do not share variable state.
-- Secrets must NOT be passed as namespace variables — they appear in
-  the pipeline execution history in plaintext. Use Secrets Manager or
-  Parameter Store SecureString, referenced by ARN in the action's IAM
-  role.
+- A missing variable renders as empty string (no error). Validate
+  with a stage condition before using in a deploy.
+- Variables are scoped per-execution. Concurrent pipeline runs do not
+  share variable state.
+- Secrets must NOT be namespace variables — they appear in plaintext
+  in the pipeline execution history. Use Secrets Manager or Parameter
+  Store SecureString, referenced by ARN in the action's IAM role.
 
 ### Step 8: Cross-account deployment
 
@@ -728,12 +717,11 @@ aws codepipeline start-pipeline-execution --name <name>
    CloudWatch Events rule from V1 — a leftover rule fires alongside
    the V2 trigger and produces duplicate executions.
 
-Additional hard constraints: never assume approval timeouts are
-enforced (CodePipeline waits indefinitely); never assume a missing
-namespace variable errors (it silently renders as empty string);
-never use S3-managed encryption (SSE-S3) on the artifact bucket
-(cross-account requires customer-managed KMS CMK); never grant the
-pipeline role `iam:PassRole` on `*` (privilege escalation).
+Additional hard constraints: approval timeouts are NOT enforced
+(CodePipeline waits indefinitely); a missing namespace variable
+silently renders as empty string; S3-managed encryption (SSE-S3) is
+incompatible with cross-account (requires customer-managed KMS CMK);
+`iam:PassRole` on `*` is a privilege escalation path.
 
 ## Pre-flight safety checks (run before any deployment CLI)
 
@@ -781,27 +769,22 @@ AWS CloudOps / CodePipeline V2 Provisioning.
 
 ## Recent AWS features (2024-2026)
 
-- **Pipeline V2 type (GA):** V2 pipelines use event-driven triggers
-  (no polling), support namespace variables passed between stages,
-  stage conditions for selective execution, and per-execution pricing.
-  V1 pipelines continue to work; new pipelines should default to V2.
-
-- **Pipeline V2 with EC2 / CodeDeploy:** V2 pipelines support
-  CodeDeploy deploy actions for EC2 in-place and blue/green
-  deployments, including the new blue/green deployment style with
-  target group swapping. Manual approvals now support
-  `ExternalEntityLink` and richer `CustomData` for reviewer context.
-
+- **Pipeline V2 type (GA):** event-driven triggers (no polling),
+  namespace variables between stages, stage conditions, per-execution
+  pricing. V1 pipelines continue to work; new pipelines should
+  default to V2.
+- **Pipeline V2 with EC2 / CodeDeploy:** V2 supports CodeDeploy
+  deploy actions for EC2 in-place and blue/green (including target
+  group swapping). Manual approvals now support `ExternalEntityLink`
+  and richer `CustomData`.
 - **Stage-level conditions and pipeline rollback (2024-2025):** V2
   supports `Conditions` blocks that skip stages based on namespace
   variables, plus `RollbackStage` for automatic rollback on stage
-  failure (reverts to the last successful execution's source revision).
-
-- **CodeConnections (formerly CodeStar Connections):** renamed to
-  CodeConnections; supports GitHub, GitLab, Bitbucket, GitHub
-  Enterprise Server. Connections are region-locked to us-east-1.
-
-- **Trigger filter enhancements:** trigger filters now support
+  failure.
+- **CodeConnections (formerly CodeStar Connections):** renamed;
+  supports GitHub, GitLab, Bitbucket, GitHub Enterprise Server.
+  Connections are region-locked to us-east-1.
+- **Trigger filter enhancements:** filters now support
   `FilePaths.Excludes` (negate paths) and glob patterns in branch
   filters (`release/*` matches `release/v1.2`).
 

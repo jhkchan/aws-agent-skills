@@ -1,0 +1,180 @@
+{
+  "skill": "stepfunctions-express-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Step Functions Express Workflows Deployer. Five-case proven set exercising READY_TO_DEPLOY / PREREQUISITES_MISSING across Distributed Map with logging, Standard-to-Express migration with .waitForTaskToken, sync API Gateway timeout alignment, missing-logging on async, and at-least-once idempotency. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "express-distributed-map-logging",
+      "name": "Express with Distributed Map, CloudWatch Logs ALL, EventBridge schedule, idempotency",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Distributed Map + ALL-level logging + includeExecutionData + EventBridge + alarm",
+      "prompt": "Provision an Express Workflow named \"order-processor\" in account 123456789012, region us-east-1. The workflow uses a Distributed Map with an S3 ItemReader (bucket \"my-bucket\", key \"input.json\") and Lambda Task \"process-item\" per item, MaxConcurrency 1000. Attach a CloudWatch Logs log group /aws/states/order-processor at level ALL with includeExecutionData=true and 30-day retention. The Lambda handler is idempotent via IdempotencyKey from $$.Execution.Id. Execution role scoped to lambda:InvokeFunction on the process-item ARN and s3:GetObject on the input object. Configure EventBridge to invoke the workflow every 5 minutes with the EventBridge target role. Add an alarm on ExecutionsFailed.",
+      "prompt_file": "prompts/express-distributed-map-logging.md",
+      "baseline_file": "baselines/express-distributed-map-logging.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EXPRESS_WORKFLOW: order-processor\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Express-vs-Standard decision: EXPRESS (Distributed Map, high-volume, idempotent)\n  [✓] Duration budget: per-item < 1s, MaxConcurrency 1000 fits in 5-min cap\n  [✓] No .waitForTaskToken in ASL: verified (grep returned 0 matches)\n  [✓] ASL definition validated: Distributed Map + Lambda Task + S3 ItemReader\n  [✓] IAM execution role: scoped to lambda:InvokeFunction on process-item + s3:GetObject on input\n  [✓] Logging: /aws/states/order-processor, level ALL, includeExecutionData=true, retention 30d\n  [✓] Invocation mode: async (EventBridge rate(5 minutes))\n  [✓] EventBridge schedule + CloudWatch alarm: rate(5 minutes) + alarm on ExecutionsFailed\n  [✓] Idempotency: Lambda uses IdempotencyKey.$: $$.Execution.Id\nVERIFICATION_COMMANDS:\n  aws stepfunctions describe-state-machine --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:order-processor\n  aws logs describe-log-groups --log-group-name-prefix /aws/states/order-processor\n  aws events describe-rule --name order-processor-schedule\n  aws cloudwatch describe-alarms --alarm-names order-processor-failed",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "order-processor",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Distributed Map",
+            "includeExecutionData",
+            "IdempotencyKey"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "standard-migration-waitfortasktoken",
+      "name": "Standard-to-Express migration blocked by .waitForTaskToken and 5-min cap",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — .waitForTaskToken + 6-min runtime both incompatible with Express",
+      "prompt": "Migrate this Standard state machine to EXPRESS for cost savings. The state machine \"approval-flow\" (account 123456789012, region us-east-1) uses an SQS sendMessage.waitForTaskToken integration at line 18 to wait for an external approval callback. The workflow also has a 4-minute Glue .sync job plus a 2-minute downstream ECS task. Total workflow runtime is up to 6 minutes when the callback is slow. Set up CloudWatch Logs at ERROR level.",
+      "prompt_file": "prompts/standard-migration-waitfortasktoken.md",
+      "baseline_file": "baselines/standard-migration-waitfortasktoken.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "EXPRESS_WORKFLOW: approval-flow\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓] Express-vs-Standard decision: EXPRESS requested\n  [✗] Duration budget: 4-min Glue + 2-min ECS = 6 min; cannot fit in 5-min Express cap — migrate to STANDARD or split into Standard (callback) + Express (hot path)\n  [✗] No .waitForTaskToken in ASL: FAILED — arn:aws:states:::sqs:sendMessage.waitForTaskToken at line 18; replace with .sync or STANDARD\n  [✗] ASL definition validated: blocked pending integration fixes\n  [✓] IAM execution role: scoped\n  [✗] Logging: blocked pending ASL fix\n  [OPTIONAL] Invocation mode: not applicable pending ASL fix\n  [OPTIONAL] EventBridge schedule: not requested\n  [✗] Idempotency: cannot verify pending ASL fix\nVERIFICATION_COMMANDS:\n  grep -E ':waitForTaskToken' approval-flow.json\n  aws logs create-log-group --log-group-name /aws/states/approval-flow",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "approval-flow",
+            "VERDICT",
+            "CHECKLIST",
+            "waitForTaskToken",
+            "5-min"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sync-apigateway-timeout-alignment",
+      "name": "Sync Express fronted by API Gateway with timeout aligned to 29000ms and ExecutionsTimedOut alarm",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — sync mode + API Gateway integration timeout 29000ms + alarm on ExecutionsTimedOut",
+      "prompt": "Provision an Express workflow \"checkout-api\" (account 123456789012, region us-east-1) invoked synchronously from API Gateway. Workflow p99 is 8 seconds. Attach CloudWatch Logs at ALL level with includeExecutionData=true. The execution role is scoped to lambda:InvokeFunction on function:checkout-handler. Make sure the API Gateway integration timeout is set correctly so the client does not receive a 504 while the workflow is still running. Add an alarm on ExecutionsTimedOut.",
+      "prompt_file": "prompts/sync-apigateway-timeout-alignment.md",
+      "baseline_file": "baselines/sync-apigateway-timeout-alignment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EXPRESS_WORKFLOW: checkout-api\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Express-vs-Standard decision: EXPRESS (sync, p99 8s < 29s)\n  [✓] Duration budget: p99 8s; API Gateway integration timeout 29000ms\n  [✓] No .waitForTaskToken in ASL: verified\n  [✓] ASL definition validated\n  [✓] IAM execution role: scoped to lambda:InvokeFunction on checkout-handler\n  [✓] Logging: /aws/states/checkout-api, level ALL, includeExecutionData=true\n  [✓] Invocation mode: sync (start-sync-execution); API Gateway integration timeout 29000ms\n  [OPTIONAL] EventBridge schedule: not requested\n  [✓] Alarm on ExecutionsTimedOut configured\nVERIFICATION_COMMANDS:\n  aws stepfunctions describe-state-machine --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:checkout-api\n  aws apigateway get-method --rest-api-id <API_ID> --resource-id <RES_ID> --http-method POST\n  aws cloudwatch describe-alarms --alarm-names checkout-api-timed-out",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "checkout-api",
+            "VERDICT",
+            "CHECKLIST",
+            "29000",
+            "ExecutionsTimedOut",
+            "sync"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-logging-on-async",
+      "name": "Async Express with no log group attached — must flag as PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — async Express without CloudWatch Logs is a NEVER pattern",
+      "prompt": "Provision an async Express Workflow \"batch-loader\" (account 123456789012, region us-east-1) triggered by EventBridge rate(1 minute). I will attach CloudWatch Logs later — skip the loggingConfiguration for now. The execution role is scoped to lambda:InvokeFunction on function:loader. Add the EventBridge target role. Make sure I can debug failures.",
+      "prompt_file": "prompts/missing-logging-on-async.md",
+      "baseline_file": "baselines/missing-logging-on-async.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "EXPRESS_WORKFLOW: batch-loader\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓] Express-vs-Standard decision: EXPRESS (async, high-frequency)\n  [✓] Duration budget: fits\n  [✓] No .waitForTaskToken in ASL: verified\n  [✓] ASL definition validated\n  [✓] IAM execution role: scoped to lambda:InvokeFunction on loader\n  [✗] Logging: no log group attached — async Express without logging is a NEVER pattern; create /aws/states/batch-loader first\n  [✓] Invocation mode: async (EventBridge rate(1 minute))\n  [✓] EventBridge schedule + target role: configured\n  [✗] Alarm on ExecutionsFailed: cannot verify without logging\nVERIFICATION_COMMANDS:\n  aws logs create-log-group --log-group-name /aws/states/batch-loader\n  aws logs put-retention-policy --log-group-name /aws/states/batch-loader --retention-in-days 30",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "batch-loader",
+            "VERDICT",
+            "CHECKLIST",
+            "log group",
+            "CloudWatch Logs"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "express-idempotency-for-at-least-once",
+      "name": "Express workflow with side-effecting Lambda and idempotency via $$.Execution.Id",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — DynamoDB idempotency record + Lambda charge-card with IdempotencyKey",
+      "prompt": "Provision an Express workflow \"charge-card-flow\" (account 123456789012, region us-east-1). The workflow calls Lambda function \"charge-card\" which charges a credit card — this MUST be idempotent because Express is at-least-once. Use $$.Execution.Id as the idempotency key, persisted in DynamoDB table \"IdempotencyTable\" BEFORE the charge. Attach CloudWatch Logs at ALL level. Execution role scoped to lambda:InvokeFunction and dynamodb:PutItem/GetItem on the table. Workflow runs async via start-execution.",
+      "prompt_file": "prompts/express-idempotency-for-at-least-once.md",
+      "baseline_file": "baselines/express-idempotency-for-at-least-once.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EXPRESS_WORKFLOW: charge-card-flow\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Express-vs-Standard decision: EXPRESS (idempotent side effect via key)\n  [✓] Duration budget: charge-card p99 1s < 5 min\n  [✓] No .waitForTaskToken in ASL: verified\n  [✓] ASL definition validated: DynamoDB PutItem (idempotency record) → Lambda charge-card with IdempotencyKey\n  [✓] IAM execution role: scoped to lambda:InvokeFunction on charge-card + dynamodb on IdempotencyTable\n  [✓] Logging: /aws/states/charge-card-flow, level ALL, includeExecutionData=true\n  [✓] Invocation mode: async (start-execution)\n  [OPTIONAL] EventBridge schedule: not requested\n  [✓] Idempotency: IdempotencyKey.$: $$.Execution.Id persisted in IdempotencyTable BEFORE ChargeCard\nVERIFICATION_COMMANDS:\n  aws stepfunctions describe-state-machine --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:charge-card-flow\n  aws logs describe-log-groups --log-group-name-prefix /aws/states/charge-card-flow",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "charge-card-flow",
+            "VERDICT",
+            "CHECKLIST",
+            "IdempotencyKey",
+            "$$.Execution.Id",
+            "at-least-once"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}
