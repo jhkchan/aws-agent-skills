@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 13,
       "max": 20,
-      "justification": "Adds concrete, expert\u2011level details not usually known by a baseline model: exact IAM trust policy JSON for budget actions, KMS key policy requirements for encrypted SNS topics, the 80/90/100% tiering rule, recent 2024\u20112026 feature notes (Savings Plan budget types, anomaly monitor specification), and a precise dependency graph. However much of the content restates official documentation without novel decision heuristics, so it falls short of a perfect 20."
+      "justification": "The skill mostly restates standard AWS Budgets and Cost Anomaly Detection concepts that a competent CloudOps model already knows. The only genuine delta is the 80/90/100% tiering rule and the explicit KMS key\u2011policy grant for both budgets.amazonaws.com and ce.amazonaws.com, which are useful but limited; most of the content (CLI syntax, filter names, role trust policy) is already widely documented."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific 10\u2011step provisioning workflow, decision\u2011tree mapping of user signals to budget types, and explicit precedence rules (budget before anomaly). Procedures are detailed and ordered for the AWS Budgets service."
+      "justification": "Provides a clear AWS\u2011specific step\u2011by\u2011step procedure and decision tree, but some steps are generic (e.g., \"verify prerequisites\" without a concrete checklist order) and the ordering of SNS topic creation vs. role creation is not strictly enforced, leaving room for ambiguous execution."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (missing SNS policy, missing role trust, using usage budgets for actions, reusing Budgets SNS topic for anomalies, zero\u2011budget API rejection). Some minor anti\u2011patterns (e.g., missing explicit note for \"no notification\") could be added."
+      "justification": "Contains a solid NEVER list with reasons, yet it omits a few common pitfalls such as forgetting to enable Cost Explorer for linked\u2011account filters and the danger of using a default SNS topic policy that only allows budgets.amazonaws.com (missing ce.amazonaws.com). The list is good but not exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description explains WHAT and WHEN, and keywords are thorough. The activation trigger section is present but mixes free\u2011form phrases with a separate \"Trigger phrases\" list, making exact activation slightly ambiguous for an automated matcher."
+      "justification": "Frontmatter and description are present, and activation phrases are listed. However, the \"when_to_use\" paragraph is long and mixes multiple scenarios, making automated trigger detection less reliable. A concise, single\u2011sentence trigger would be more robust."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "Top\u2011level summary, then a 10\u2011step procedure, then deep CLI examples and policy JSON. However, the skill intermixes high\u2011level concepts with detailed JSON in the same sections, causing some cognitive overload."
+      "justification": "The skill presents a massive amount of detail up front (mindset, decision tree, full 10\u2011step procedure) before the agent knows which path is needed, causing cognitive overload. Critical rules (e.g., role trust requirement) are buried deep rather than highlighted early."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive operations (budget actions) are guarded by role\u2011trust and SNS\u2011policy checks, showing good calibration. However, the skill still permits \"AUTOMATIC\" approval models without clear guidance on when manual approval is required, leaving some fragility."
+      "justification": "Destructive actions (budget actions, EC2 stop) are well\u2011constrained with prerequisite checks and role verification. The only shortfall is the zero\u2011spend budget example, which allows a 50% threshold without explicitly warning that $0.01 budgets can cause noisy alerts if the threshold is mis\u2011set."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick navigation \u2192 Stepwise procedure \u2192 Decision tree \u2192 Anti\u2011patterns \u2192 Output contract. Structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern (mindset, quick navigation, step list, anti\u2011patterns, output contract) but the layout mixes Markdown sections with raw text blocks, making the overall structure slightly ad\u2011hoc rather than a clean, reusable template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill yields a concrete output block that an agent can copy\u2011paste. However, the model output examples show multiple blocks in one response, which could break automation that expects a single block. Minor missing edge\u2011case handling (e.g., explicit \"no notification\" note) also reduces usability."
+      "justification": "The model output examples conform to the required block format and include working CLI commands. However, edge cases such as encrypted SNS topics with customer\u2011managed KMS keys are only mentioned in prose, not demonstrated in the checklist or verification commands, leaving a gap for agents handling those scenarios."
     }
   ],
-  "total_score": 104,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47560,
-  "latency_ms": 18174,
+  "token_count": 49515,
+  "latency_ms": 23882,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill supplies concrete, non\u2011trivial thresholds (e.g., password length \u226512, token validity ranges, deletion\u2011protection defaults) and a detailed decision\u2011tree of 14 ordered pre\u2011checks plus exact CLI flag combinations that a senior CloudOps engineer would not memorize, representing genuine expert knowledge beyond a generic model's baseline."
+      "justification": "The skill supplies many concrete thresholds (e.g., password length \u226512, token validity ranges, service limits) and recent AWS feature nuances (Managed Login Branding, ASF ENFORCED improvements). However, a capable CloudOps model already knows most of these details; the added value is moderate rather than revolutionary."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "It codifies AWS\u2011specific procedures: pagination of list\u2011user\u2011pools, IAM role trust checks for SMS MFA, ACM\u2011cert region validation, explicit CONFIRM gate, and post\u2011verification steps. The mindset section explains Cognito\u2019s silent\u2011failure traps, showing domain\u2011specific reasoning rather than generic \"check security\" advice."
+      "justification": "Provides AWS\u2011specific procedures: pre\u2011flight metadata validation, exact CLI sequence, mandatory CONFIRM gate, snapshot of existing pool before updates, and post\u2011verification steps. The steps are tightly tied to Cognito\u2019s API semantics rather than generic \"check security\" advice."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "A solid \"NEVER (top\u202f5)\" list with concrete security reasoning is present, but the list is limited to five items and omits other common pitfalls (e.g., never disable token revocation, never reuse client secrets across environments). The reasoning is clear for the listed items, but the coverage is not exhaustive."
+      "justification": "Contains a concrete \"NEVER\" list (5 top anti\u2011patterns) with explicit security rationale, plus additional warnings throughout (e.g., implicit OAuth flow, ALLOW_ADMIN_USER_PASSWORD_AUTH, missing DeletionProtection). Lacks a few less common pitfalls (e.g., token revocation defaults) but overall strong."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "The skill includes full front\u2011matter, a concise description, explicit \"when_to_use\", a rich set of activation triggers, and a well\u2011defined invocation schema. Minor weakness: activation triggers are very broad strings, which could lead to over\u2011matching, but overall compliance is strong."
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, keywords, tags, dependencies, metadata, activation triggers, invocation schema). The description clearly states WHAT the skill does, WHEN to use it, and provides KEYWORDS for activation. No missing mandatory element."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information effectively: quick reference, mindset, pre\u2011flight, process, patterns, output contract, NEVER list, heuristics, and recent features. Minor overload occurs in the quick\u2011reference table, which mixes thresholds and matrix details, but overall the hierarchy is clear."
+      "justification": "The document layers information: a quick reference table, then deeper sections (Mindset, Pre\u2011flight, Process, etc.). Nonetheless, some critical rules (e.g., deletion\u2011protection requirement) appear only in the long pre\u2011check list, causing occasional cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained by a mandatory CONFIRM gate and exhaustive pre\u2011checks, while the skill leaves room for creative extensions (e.g., custom branding, additional IdPs). Calibration matches task fragility."
+      "justification": "Destructive actions are tightly constrained by pre\u2011checks and a mandatory CONFIRM gate. Creative tasks (e.g., heuristic MFA selection) are left open, matching the fragility of the operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (overview, quick navigation, mindset, pre\u2011flight, process, common patterns, strict output contract, NEVER list, heuristic, recent features, references). Structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern: overview, quick navigation, mindset, detailed process, strict output contract, anti\u2011pattern list, expert heuristic, and references. Structure is coherent though not labeled with a formal taxonomy."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 11,
       "max": 15,
-      "justification": "Provides exact CLI commands and a decision tree, but examples contain placeholders like <returned-id> that violate the \"no placeholders\" rule. Error handling for CLI failures, pagination beyond 60 pools, and automatic region/account discovery are not addressed, limiting real\u2011world execution."
+      "justification": "Provides a concrete output contract, decision tree, and working CLI examples, enabling an agent to act. However, the example READY_TO_DEPLOY output contains a placeholder `<returned-id>`, violating the \u2018no placeholders\u2019 rule, and the update\u2011flow handling is less detailed than the create\u2011flow, leaving edge cases unaddressed."
     }
   ],
-  "total_score": 106,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 48495,
-  "latency_ms": 15114,
+  "token_count": 48690,
+  "latency_ms": 18735,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

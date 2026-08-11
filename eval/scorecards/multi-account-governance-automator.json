@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 16,
       "max": 20,
-      "justification": "The skill compiles many known AWS governance concepts but adds little truly novel expert insight; the decision tree and patterns are largely restatements of standard best\u2011practice guidance rather than new thresholds, ordering rules, or exceptions a senior engineer would learn."
+      "justification": "The skill supplies concrete decision trees, OU hierarchy patterns, specific SCP JSON snippets, CLI command sequences, and recent AWS feature notes that a senior engineer would find useful. However, most of this information restates publicly documented best\u2011practices; it does not introduce novel thresholds (e.g., policy size limits, cost\u2011impact guidelines) or unique decision criteria that a capable model could not already generate."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Delivers AWS\u2011specific procedures (dry\u2011run SCP attachment, mandatory confirmation gate, pre\u2011flight checks) and expert mindset, but a few steps (e.g., \"verify Organizations is enabled\") are generic cloud\u2011ops checks, costing 1 point."
+      "justification": "Provides many AWS\u2011specific procedures (OU creation commands, SCP JSON, delegated\u2011admin CLI calls). However, several steps are generic security hygiene (e.g., \u201cverify MFA\u201d) and lack deeper AWS\u2011specific reasoning such as policy\u2011type ordering or Control Tower lifecycle nuances."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is concrete and explains why each anti\u2011pattern is dangerous. However it omits several common pitfalls such as SCP size limits, over\u2011reliance on SCPs for fine\u2011grained permissions, and the risk of policy version drift, reducing its completeness."
+      "justification": "A solid NEVER list enumerates concrete pitfalls (e.g., never run GuardDuty in the management account) with clear reasoning, and expert heuristics add depth. Missing are anti\u2011patterns around SCP size limits, policy versioning, and circular OU dependencies, which would be valuable from experience."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers and invocation schema are present, enabling reliable skill activation."
+      "justification": "Frontmatter is complete and the description, activation triggers, and invocation schema are well\u2011defined. Minor issue: the `entry_point: false` flag is ambiguous and could hinder reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level summary and quick\u2011navigation table give a concise entry point, with deeper details later. However, the navigation table and extensive early sections introduce some cognitive load before the core rules, leading to a 2\u2011point deduction."
+      "justification": "The skill uses a navigation table and layered sections, delivering high\u2011level intent first and detailed commands later. Nonetheless, the document is dense; critical rules (e.g., the confirmation gate) are embedded among many examples, which may cause cognitive overload for an agent."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by explicit CONFIRM prompts, dry\u2011run guidance, and snapshot recommendations. Creative tasks (e.g., OU design) are left relatively open, which is appropriate. Slight over\u2011constraint on some commands (hard\u2011coded region names) reduces flexibility."
+      "justification": "Destructive operations are guarded by pre\u2011flight checks and explicit confirmation prompts, showing good calibration. However, some CLI commands lack explicit safety flags (e.g., no `--dry-run` for policy attachment), leaving a small gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset \u2192 Pre\u2011flight \u2192 Decision Tree \u2192 Detailed Layers \u2192 Output Contract \u2192 NEVER \u2192 Heuristics. The structure is consistent, though the mix of markdown tables and raw code blocks makes the pattern a bit ad\u2011hoc."
+      "justification": "The document follows a recognizable structure (Mindset, Process sections, NEVER, Output contract) but the ordering is somewhat ad\u2011hoc rather than a strict, reusable template, preventing full pattern credit."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, output format, and examples that an agent could execute. However, edge cases such as cross\u2011region Config aggregator failures, IAM Identity Center ARN region mismatches, and handling of existing resources are only briefly mentioned, leaving potential execution gaps."
+      "justification": "Provides actionable commands, JSON snippets, and a strict output contract, enabling an agent to execute the skill. Some CLI examples (e.g., `aws controltower create-landing-zone`) are not exact AWS commands, and error\u2011handling branches are minimal, which could cause execution failures."
     }
   ],
-  "total_score": 103,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42154,
-  "latency_ms": 13506,
+  "token_count": 44683,
+  "latency_ms": 15873,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

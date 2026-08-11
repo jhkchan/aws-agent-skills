@@ -1,0 +1,70 @@
+{
+  "skill": "cloudwatch-application-signals-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides concrete, expert\u2011level details (exact IAM policies, sampling\u2011rule JSON, burn\u2011rate thresholds, ordering constraints, recent 2024\u20112026 feature changes). Adds specific decision points a senior CloudOps engineer would reference, but largely restates publicly documented steps rather than novel insight."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Describes an AWS\u2011specific, step\u2011by\u2011step provisioning order (IAM role first, instrumentation second, service discovery after traces, etc.). However a few steps (e.g., \u201cverify IAM policies\u201d) are generic checks that could apply to any service, costing two points."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Includes a concrete NEVER list with five specific pitfalls and clear reasoning (missing IAM, missing AWS_SERVICE_NAME, zero\u2011sampling, SLO before service discovery, mismatched alarm periods). The list could be broader (e.g., role\u2011name collisions, region mismatches), so two points are deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, keywords, when_to_use, and a strict output contract are present, but activation triggers are described only in prose; no explicit machine\u2011readable trigger schema, which could cause unreliable invocation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses sections, quick\u2011navigation table, and external reference files to layer information. Nonetheless the main body front\u2011loads a large amount of detail before the checklist, creating some cognitive overload; two points are deducted."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibration matches task fragility: destructive actions (IAM attachment, role creation) are clearly ordered and accompanied by verification commands. Slightly loose wording around role attachment (no explicit safety guard) costs one point."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 8,
+      "max": 10,
+      "justification": "The skill follows a coherent structure (output contract, reasoning, procedure, edge cases, references) but does not adhere to a named, reusable pattern; the ad\u2011hoc layout loses two points."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 9,
+      "max": 15,
+      "justification": "Model output shows concrete failures: missing required items marked OPTIONAL, incomplete verification commands, and inconsistent handling of PREREQUISITES_MISSING. Indicates the skill does not guarantee correct agent execution without ambiguity."
+    }
+  ],
+  "total_score": 99,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 40203,
+  "latency_ms": 11433,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

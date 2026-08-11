@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides several expert\u2011level insights not in a baseline model (silent\u2011failure table, exact ordering constraints, tag\u2011condition IAM policy snippet, budgetDuration heuristic). Missing deeper delta such as cross\u2011account trust\u2011policy nuances and a concrete decision\u2011tree for choosing between stop\u2011instances vs terminate\u2011instances."
+      "justification": "The skill provides many concrete details (silent\u2011failure table, IAM tag\u2011condition policy, budgetDuration heuristics) that a generic model would not enumerate, but a large portion restates publicly documented AWS FIS guidance. The novel decision\u2011tree ordering and specific anti\u2011pattern examples add value, yet the core knowledge is largely already known to a capable CloudOps model."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedural flow (target \u2192 action \u2192 stop\u2011condition \u2192 IAM \u2192 logging \u2192 budget) and includes concrete CLI steps. Lacks a dedicated rollback\u2011verification procedure, which would make the mindset fully complete."
+      "justification": "Procedures are AWS\u2011specific (target\u2011before\u2011action, stop\u2011condition permission check, least\u2011privilege role with tag condition). The only shortfall is a vague \u201cConfirm experiment intent\u201d step that lacks a concrete template for capturing intent, making the mindset slightly less concrete."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons and a silent\u2011failure matrix. Does not explicitly flag the irreversible `terminate-instances` action as a separate WARN entry in the checklist, leaving a small gap in anti\u2011pattern coverage."
+      "justification": "Provides a concrete NEVER list with reasoning for five high\u2011impact pitfalls. Missing are other common anti\u2011patterns (e.g., cross\u2011account role trust mis\u2011configuration, region\u2011specific action limits) and deeper \u201cwhy\u201d for some items, so the anti\u2011pattern coverage is strong but not exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. The only minor issue is that the activation_triggers duplicate many keywords, which could cause ambiguous routing in some agents."
+      "justification": "Front\u2011matter, description, activation triggers, and a detailed invocation schema are present. The activation triggers are a plain list without explicit matching rules (regex, priority), and the output contract versioning is not explicitly versioned, leaving a minor ambiguity."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered from quick reference to deep heuristics, but the Quick Reference table packs many details (step, reversibility, risk) which may overload the initial read. Critical rules are still buried in later sections."
+      "justification": "The document layers information (quick reference, then deep sections) but the initial sections are dense; a reader must parse a large amount before reaching the concise checklist, which can cause cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly gated by prerequisites and NEVER rules, while creative specification is left flexible. BudgetDuration rationale is qualitative (\u201c2x\u201d) rather than a precise formula, leaving a small calibration gap."
+      "justification": "Destructive actions (IAM role, experiment template) are gated by prerequisite checks and explicit verification steps. BudgetDuration guidance is a generic 2\u00d7 rule rather than action\u2011specific limits, so calibration is good but could be tighter."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 8,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a logical sectioned pattern (What, Quick nav, Procedure, Anti\u2011pattern, Output contract) but does not map to a recognized canonical framework (e.g., Mindset\u2011Navigation\u2011Philosophy\u2011Process\u2011Tool). Structure is coherent but somewhat ad\u2011hoc."
+      "justification": "The skill follows a recognizable structure (overview \u2192 quick reference \u2192 detailed procedure \u2192 anti\u2011patterns \u2192 output contract). The pattern is slightly custom rather than a widely\u2011adopted template, but it remains coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides end\u2011to\u2011end CLI commands, verification steps, and example outputs that are syntactically correct. Lacks explicit error\u2011handling guidance for failed verification commands and does not show fallback actions when a prerequisite check fails."
+      "justification": "Includes decision trees, checklist, verification commands, and ready\u2011to\u2011use CLI examples. However, examples assume specific IDs and do not demonstrate handling of missing resources, multi\u2011action experiments, or fallback error paths, leaving some edge cases uncovered."
     }
   ],
-  "total_score": 105,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41774,
-  "latency_ms": 30174,
+  "token_count": 41512,
+  "latency_ms": 16343,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

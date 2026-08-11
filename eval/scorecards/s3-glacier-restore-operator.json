@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete SLA windows (Expedited 1\u20115\u202fmin, Standard 3\u20115\u202fhr, Bulk 5\u201112\u202fhr, Deep Archive Standard 12\u202fhr, Bulk 48\u202fhr), cost markers, provisioned capacity units (3\u202freq/min per unit), and recent 2024\u20112026 feature changes (Instant Retrieval, Bulk cost\u2011tier, manifest tag support). This information is not typically known by a baseline model. Minor overlap with public docs prevents a perfect score."
+      "justification": "Provides concrete SLA numbers, cost markers, provisioned capacity units, recent feature timeline (2024\u20112026), exact IAM policy JSON, and a tier\u2011selection decision tree that a generic model would not enumerate. However, most of the underlying concepts (restore\u2011object, tiers, batch ops) are already known, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: pre\u2011flight head\u2011object checks, IAM permission verification, explicit capacity verification, step\u2011by\u2011step CLI commands for single\u2011object and Batch Operations restores, lifecycle\u2011policy integration, and a mandatory CONFIRM gate. Only a small portion is generic (\"verify permissions\"), but overall the process is tightly AWS\u2011focused."
+      "justification": "Lists AWS\u2011specific pre\u2011flight checks, exact CLI commands, waiters, batch\u2011operations job JSON, and lifecycle\u2011rule adjustments. Missing a dedicated step for version\u2011ed objects and delete\u2011marker handling, which prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete top\u20115 NEVER list with specific reasons (e.g., GIR restore is a no\u2011op, Expedited on Deep Archive errors, duplicate restore resets timer). Adds several additional anti\u2011patterns. Missing a few niche pitfalls (e.g., cross\u2011region restore latency, version\u2011id handling in depth), so not perfect."
+      "justification": "Contains a detailed top\u20115 NEVER list with concrete reasons and an extended NEVER section covering capacity, bulk tier misuse, lifecycle side\u2011effects, etc. Lacks a few niche pitfalls (e.g., cost\u2011overrun on massive bulk restores, manifest retention policies)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and a detailed invocation schema are present. The schema mentions partial specifications but does not precisely define how the agent should prompt for missing fields, making the trigger slightly less deterministic."
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS, activation triggers are exhaustive, and invocation_schema is described. All required metadata fields are present, enabling reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered into Mindset, Quick reference, Decision tree, Process, Bulk restore, etc., which helps navigation. Nonetheless, critical anti\u2011pattern rules and cost estimates are buried deep, requiring the agent to read far into the document before safe execution, causing some cognitive overload."
+      "justification": "Information is layered: high\u2011level mindset, quick reference tables, decision tree, step\u2011by\u2011step process, bulk\u2011restore section, anti\u2011patterns, edge\u2011cases, and remediation. Some sections (e.g., cost estimates) are embedded deep, which may cause slight overload for quick look\u2011ups."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by CONFIRM, pre\u2011checks, tier\u2011compatibility, and capacity verification. The only shortfall is the ambiguous method for checking provisioned capacity (no CLI command), leaving a small freedom gap for a fragile operation."
+      "justification": "Destructive actions are gated by a CONFIRM step and extensive pre\u2011checks; creative planning steps are allowed offline. The only shortfall is the ambiguous \u201cProvisioned capacity\u201d check (no CLI exists), but overall calibration is strong."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset, Navigation, Process, Anti\u2011Pattern, Edge Cases, Remediation, Recent Features). Minor inconsistency in ordering of sections (e.g., recent features appear after anti\u2011patterns) prevents a perfect score."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Navigation \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Decision tree \u2192 Detailed process \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Edge\u2011case handling \u2192 Remediation \u2192 Recent features. Structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, decision trees, and full output examples that an agent could execute. Some edge cases (versioned objects, cross\u2011region restores) are mentioned but not fully integrated into the step\u2011by\u2011step flow, and capacity\u2011check ambiguity remains, limiting flawless execution."
+      "justification": "Provides runnable CLI commands, a strict output schema, and example model outputs that mostly conform. Some gaps: versioned object restore steps are only mentioned briefly, placeholders like <JobId> may confuse an autonomous agent, and cross\u2011region restore guidance is limited."
     }
   ],
-  "total_score": 107,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 40425,
-  "latency_ms": 9719,
+  "grade": "A",
+  "token_count": 39528,
+  "latency_ms": 15196,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Provides many non\u2011trivial decision thresholds (e.g., ChangeableForDays \u2264\u202f3, MinRetentionDays \u2265 longest existing recovery\u2011point age, MaxRetentionDays \u2265 plan retention) and nuanced AWS Backup behaviours (compliance vs governance lock irreversibility, continuous\u2011backup requirements, cross\u2011region copy vault binding). However, a large portion restates documented AWS facts that a capable model could already generate, so it falls short of a perfect 20."
+      "justification": "Adds concrete, non\u2011trivial AWS Backup specifics (e.g., ChangeableForDays max\u202f3, exact retention\u2011window checks, compliance vs governance lock irreversibility, continuous\u2011backup flag requirements, cross\u2011region copy vault\u2011KMS dependencies). These details are beyond a generic model\u2019s baseline knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedural flow: pre\u2011flight metadata gate, ordered pre\u2011checks, mandatory CONFIRM gate, snapshot before lock changes, and per\u2011operation CLI sequencing. The only shortfall is a few generic steps (e.g., \u201cverify IAM permissions\u201d) that could be more AWS\u2011specific (listing exact required actions per operation)."
+      "justification": "Encodes AWS\u2011specific pre\u2011flight ordering, confirm\u2011gate before any state\u2011changing CLI, and post\u2011verification steps. Some procedures (e.g., generic IAM permission check) are generic, but overall the flow is AWS\u2011tailored."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 11,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with reasons (e.g., never apply COMPLIANCE lock without surfacing grace period, never delete before MinRetentionDays). Missing some common pitfalls such as cross\u2011account backup delegation errors and IAM role trust\u2011policy nuances, which prevents a full score."
+      "justification": "Provides a solid NEVER list with concrete reasons (e.g., never use governance lock for regulatory compliance, never shorten retention after compliance lock). However the example output violates this rule by applying a GOVERNANCE lock for HIPAA and omits warnings about duplicate tag\u2011based selections, indicating incomplete anti\u2011pattern coverage."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present, enabling reliable activation. The invocation_schema is somewhat vague about exact JSON structure, which could hinder precise triggering."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present and detailed. The activation trigger list is overly broad and the invocation_schema is informal rather than a strict JSON schema, which could hinder reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, patterns, output format, anti\u2011patterns, and worked examples. Slight overload in the long \u201cStep\u202f0: Expert knowledge\u201d block, but overall the hierarchy is clear and avoids cognitive overload."
+      "justification": "Information is layered (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 patterns \u2192 output format). However, the quick reference table and some sections are dense, causing a modest cognitive load."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained by pre\u2011checks, retention thresholds, and confirm gates. Creative tasks (e.g., plan design) are not over\u2011constrained. Minor issue: the restore\u2011metadata example forces a fixed set of fields, which could limit less common resource types."
+      "justification": "Destructive actions are tightly constrained with mandatory CONFIRM gates and exhaustive pre\u2011checks. Creative tasks (e.g., plan design) allow flexibility. The start\u2011restore example omitted the CONFIRM step, a small calibration slip."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Common patterns \u2192 Output \u2192 Anti\u2011patterns). The structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern (What it does \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Anti\u2011Patterns \u2192 Output contract). The structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 6,
       "max": 15,
-      "justification": "Provides exact CLI commands, pre\u2011check listings, and output template, enabling an agent to act. However, examples contain a malformed cron expression (\"cron(0 5? * * *)\"), use placeholder\u2011like pending POST_VERIFY entries, and sometimes omit PASS/FAIL markers, which could cause execution ambiguity."
+      "justification": "Model output shows critical flaws: malformed cron expression in create\u2011plan, missing CONFIRM gate in start\u2011restore, and contradictory governance\u2011mode lock for HIPAA despite anti\u2011pattern warning. These errors mean an agent could not reliably execute the skill without additional correction."
     }
   ],
-  "total_score": 107,
+  "total_score": 95,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47798,
-  "latency_ms": 14891,
+  "token_count": 48488,
+  "latency_ms": 9765,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

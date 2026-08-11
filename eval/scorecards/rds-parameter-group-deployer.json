@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds many expert details (family tables, static vs dynamic nuances, ApplyMethod quirks, formula syntax, Aurora Serverless v2 capacity handling, 2024\u20112026 feature updates). However, a large portion restates information a competent model already knows (basic family naming, generic static/dynamic distinction) and therefore does not achieve full novelty."
+      "justification": "Provides several concrete, up\u2011to\u2011date expert details (e.g., PostgreSQL\u202f17 family, MySQL\u202f8.4 family, dynamic innodb_buffer_pool_size, exact memory\u2011formula syntax, Aurora Serverless\u202fv2 capacity interaction). However, most of the family\u2011selection and static/dynamic classification is already present in standard AWS docs, so the net delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (family selection order, static vs dynamic handling, ApplyMethod rules) and well\u2011structured, yet the prerequisite verification step is described in generic terms (\u201cverify prerequisites\u201d) rather than an AWS\u2011tailored checklist, costing one point."
+      "justification": "Encodes the correct AWS\u2011specific ordering (family \u2192 type \u2192 static/dynamic \u2192 ApplyMethod \u2192 association) and includes a 9\u2011step procedural checklist. Lacks a concise decision\u2011tree diagram for family selection, which would make the mindset transfer more explicit."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The NEVER section lists many concrete pitfalls with clear reasoning, but it omits a few common anti\u2011patterns (e.g., parameter\u2011group version drift after engine upgrades, accidental use of default groups in production) and therefore loses one point."
+      "justification": "Contains a thorough NEVER list with concrete pitfalls and reasons (wrong family, ApplyMethod misuse, absolute memory on Serverless, reboot windows, disabling autovacuum, exceeding max_connections, etc.). Slightly missing a few rare edge\u2011cases (e.g., parameter name collisions) but overall strong."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter, activation keywords, and the strict output contract are thorough, but the \u2018when_to_use\u2019 description is verbose and includes overlapping triggers, making reliable activation slightly less crisp."
+      "justification": "Frontmatter, description, activation keywords, and strict output contract are all present and well\u2011defined. Minor vagueness in trigger phrasing could affect reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (navigation table, long matrices, recent\u2011features list) before the core provisioning steps, which can overload the agent with details that could be deferred to references."
+      "justification": "The skill layers information (quick navigation \u2192 high\u2011level contract \u2192 detailed reasoning \u2192 procedure \u2192 matrices). However, the initial sections are dense and include many large tables before the core checklist, which can overload the agent on first read."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (creation of a parameter group) are allowed with only prerequisite checks; there is no explicit confirmation step or safety\u2011net for accidental overwrites, so the calibration is a bit too permissive for a fragile operation."
+      "justification": "Destructive actions (creation/modification of parameter groups) are tightly constrained by the required checklist and verification commands. The skill does not address deletion, which could leave a gap for overly permissive use."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The overall layout follows a recognizable skill pattern (metadata, navigation, contract, reasoning, procedure), but the mixture of tables, markdown, and free\u2011form sections feels slightly ad\u2011hoc rather than a single, clean template."
+      "justification": "Follows a recognizable CloudOps skill pattern (metadata \u2192 navigation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 safety). The mix of markdown tables, narrative prose, and code blocks is slightly ad\u2011hoc rather than a single canonical template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides concrete checklist format, CLI commands, and examples that an agent can execute. Missing explicit error\u2011handling guidance (e.g., how to react to a rejected parameter value or a failed reboot) and no fallback path, which limits usability in edge cases."
+      "justification": "Model output examples obey the strict contract, include correct CLI commands, handle missing prerequisites, and cover edge cases. Minor omission: no explicit error\u2011handling example for a rejected parameter value."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42104,
-  "latency_ms": 13538,
+  "token_count": 42080,
+  "latency_ms": 11852,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

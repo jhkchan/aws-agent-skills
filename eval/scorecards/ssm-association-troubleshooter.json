@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 15,
       "max": 20,
-      "justification": "The skill contains many non\u2011obvious AWS SSM details (3\u2011layer health check, VPC endpoint trio, cron syntax quirks, document version drift, concurrency limits, etc.) that a generic model would not enumerate, but a large portion restates well\u2011known CLI commands and basic SSM concepts that any capable model already knows, reducing the net delta."
+      "justification": "The skill aggregates many specific, non\u2011obvious AWS details (three required VPC endpoints, cron syntax requiring '?', distinction between association status and document result, hybrid activation nuances, concurrency limits, etc.) that a generic model would not automatically provide, but the majority of the content restates well\u2011known best\u2011practice information rather than delivering brand\u2011new expert insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific diagnostic order and concrete CLI steps, but some procedures are generic (e.g., \"run the CLI command\" without pagination or error\u2011handling guidance) and lack explicit handling of API throttling or multi\u2011region contexts."
+      "justification": "Procedures are AWS\u2011specific (3\u2011layer health check, exact CLI commands, order of IAM \u2192 connectivity \u2192 agent). However, it omits handling of pagination, API throttling, and multi\u2011region contexts, which are common in real\u2011world ops."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Includes a solid NEVER list with reasoning (e.g., never skip the 3\u2011layer check, never treat PingStatus Active as full health). Missing some common pitfalls such as rate\u2011limiting back\u2011off, IAM trust\u2011relationship nuances, and SSM Agent version compatibility with specific OSes."
+      "justification": "Provides a solid NEVER list with reasons (e.g., never diagnose without 3\u2011layer check). Missing some common pitfalls such as forgetting to verify the IAM role trust relationship or neglecting SSM Agent version drift beyond the simple 'IsLatestVersion' flag."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. However, the spec lacks an explicit \"when NOT to use\" or limitation section, making activation criteria slightly less precise."
+      "justification": "Frontmatter is complete and includes description, keywords, activation triggers, and invocation schema. The 'when_to_use' paragraph is verbose and overlaps with activation triggers, making precise activation criteria slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The skill layers information (mindset, quick navigation, step\u2011by\u2011step tree, output format, examples). Yet the initial sections are dense, presenting many details up front, which can cause cognitive overload before the agent knows which path to follow."
+      "justification": "The skill presents a large amount of information up front (mindset, quick navigation, extensive step\u2011by\u2011step tables). Critical rules are buried in tables rather than highlighted, causing potential cognitive overload for an agent."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (update\u2011association, start\u2011associations\u2011once) are gated by safety warnings and blast\u2011radius notes, but the calibration is advisory rather than enforced, leaving room for overly permissive execution."
+      "justification": "Destructive actions (e.g., update\u2011association, start\u2011associations\u2011once) are gated by safety notes, but the skill does not enforce an explicit confirmation prompt or a 'dry\u2011run' mode, leaving a small risk of accidental state change."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "The document follows a clear, repeatable pattern (Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Process steps \u2192 Output format \u2192 Anti\u2011patterns \u2192 Appendices), making it easy to recognize and navigate."
+      "justification": "The document follows a recognizable pattern (Mindset \u2192 Quick navigation \u2192 Stepwise decision tree \u2192 Output template). Minor inconsistency in ordering of anti\u2011patterns vs. steps prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides actionable CLI snippets, decision tree, and output format; agents can execute end\u2011to\u2011end. Lacks guidance on handling paginated CLI results and ambiguous multi\u2011instance outputs, which could cause execution gaps."
+      "justification": "Provides concrete CLI snippets, output format, and worked examples, enabling an agent to act. Lacks handling for API errors (throttling, missing region), pagination of large target sets, and does not show fallback when S3 output is unavailable."
     }
   ],
-  "total_score": 106,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 39920,
-  "latency_ms": 12285,
+  "token_count": 39584,
+  "latency_ms": 10922,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

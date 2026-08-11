@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 17,
       "max": 20,
-      "justification": "The skill supplies a detailed decision tree, specific AWS CLI queries, and a concrete NEVER list that a senior engineer would find useful, but the majority of the content restates standard GuardDuty best\u2011practice patterns rather than introducing novel thresholds, decision criteria, or undocumented exception handling."
+      "justification": "Adds genuine expert knowledge: a detailed finding\u2011type\u2011driven decision tree, concrete CLI query patterns, specific thresholds (e.g., CPU >80%, mining ports 3333/4444), and recent AWS GuardDuty features (Runtime Monitoring, EKS Protection, Malware Protection). Some sections merely restate AWS documentation, preventing a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Mindset section and step\u2011by\u2011step procedures are AWS\u2011specific (e.g., GuardDuty IP\u2011set handling, CloudTrail lookup\u2011events, VPC Flow Log queries). A few steps remain generic (\u201ccollect corroborating evidence\u201d) and lack the exact ordering that a senior engineer would codify, resulting in a small deduction."
+      "justification": "Encodes AWS\u2011specific procedures: exact CLI commands, pre\u2011flight data collection, per\u2011finding\u2011type probes, and a mindset that treats GuardDuty signals as hypotheses. Some instructions remain generic (e.g., \"check CloudTrail\" without always specifying the exact lookup\u2011attributes for every finding), preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a solid NEVER list with concrete reasons (no auto\u2011terminate, no blanket suppression, etc.). Missing are some additional pitfalls such as over\u2011reliance on trusted IP lists in multi\u2011account orgs and handling of stale data\u2011event configurations, so a modest deduction is applied."
+      "justification": "Includes a solid NEVER list with concrete reasoning (never auto\u2011terminate, never blanket\u2011suppress, etc.). Missing a few nuanced pitfalls such as the need to periodically review trusted\u2011IP lists or the danger of over\u2011scoping suppression filters to mutable resource attributes."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are all present and clear enough for an agent to decide when to invoke. The only minor issue is that some activation trigger strings are long and could be normalized, but overall compliance is high."
+      "justification": "Frontmatter is complete, description clearly states WHAT the skill does, WHEN to invoke, and provides exhaustive keywords and activation triggers. The skill meets all specification requirements."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information (high\u2011level overview, mindset, strict output contract, quick navigation, detailed steps). Nevertheless, a large amount of detail (full command examples, NEVER list) appears early, creating some cognitive overload before the core trigger rules are understood."
+      "justification": "Top\u2011level overview, quick\u2011navigation table, then step\u2011by\u2011step detail \u2013 good layering. However, the document front\u2011loads a large amount of detail (full command blocks, tables) which can cause cognitive overload before the agent knows it needs that depth."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are gated by an explicit CONFIRM prompt and the NEVER list enforces tight constraints. Creative tasks (e.g., suppression rule creation) are not over\u2011constrained. No over\u2011permissive defaults are observed."
+      "justification": "Destructive actions (isolate instance, delete user, create suppression filter) are gated by explicit CONFIRM prompts. Creative tasks (investigation) are left open. Calibration matches task fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (mindset \u2192 strict output contract \u2192 quick navigation \u2192 stepwise decision tree \u2192 NEVER list \u2192 heuristics \u2192 output format). The structure is coherent and aids comprehension."
+      "justification": "Follows a coherent, recognizable pattern (mindset \u2192 contract \u2192 navigation \u2192 pre\u2011flight \u2192 decision tree \u2192 suppression \u2192 never list \u2192 heuristics \u2192 output format), aiding comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Model output examples are largely executable and respect the contract. Minor issues: the Runtime:EKS remediation uses a vague instance\u2011specification via node name for snapshot creation, and the CryptoCurrency example\u2019s \u201cFP ruled out\u201d line is slightly contradictory but does not break execution. These ambiguities prevent a perfect score."
+      "justification": "Provides working examples, decision branches, concrete CLI commands, and a strict output contract, enabling an agent to act. Missing explicit error handling, pagination for CLI calls, and guidance for missing permissions or disabled services, leading to reduced usability."
     }
   ],
-  "total_score": 102,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 45455,
-  "latency_ms": 13863,
+  "grade": "A",
+  "token_count": 45534,
+  "latency_ms": 7639,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

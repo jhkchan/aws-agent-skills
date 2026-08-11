@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides concrete thresholds (e.g., UnderReplicatedPartitions > 0, replica.lag.time.max.ms default 30000, DiskUsage > 90%), a specific decision\u2011tree ordering, and recent AWS features (Cluster Tier, KRaft, Serverless throttling) that a generic model would not enumerate, but much of the content restates well\u2011known MSK basics, so it falls short of a perfect score."
+      "justification": "Adds concrete expert details not usually memorized: specific thresholds (replica.lag.time.max.ms default 30000\u202fms, DiskUsage >90\u202f%), exact AWS CLI query shapes, recent 2024\u20112026 feature nuances (Cluster Tier, KRaft, Serverless throttling). However a portion restates standard docs, so not a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Offers an AWS\u2011specific stepwise diagnostic procedure with exact CLI commands for each failure category, but omits a detailed procedure for KRaft\u2011only Zookeeper diagnostics (marked N/A) and lacks explicit IAM\u2011policy verification steps beyond listing, leaving a small procedural gap."
+      "justification": "Provides a clear AWS\u2011centric diagnostic flow, exact command sequences and ordering (state \u2192 partition health \u2192 metrics). Missing a concrete step\u2011by\u2011step procedure for KRaft\u2011mode Zookeeper diagnostics (simply marked N/A) and no explicit ordering for Serverless capacity\u2011mode checks, thus a small deduction."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with clear reasoning (e.g., never infer root cause from State alone, never assume connectivity issue is broker\u2011side, never delete topics to fix URP). Could be more exhaustive (e.g., missing warnings about disabled enhanced monitoring), hence a minor deduction."
+      "justification": "Contains a solid NEVER list with reasoning (e.g., never infer root cause from State alone, never assume connectivity issue is broker\u2011side). Lacks warnings about common IAM\u2011policy mis\u2011configurations and about forgetting to enable Enhanced Monitoring before relying on CloudWatch metrics, so two points are deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, activation triggers, when_to_use/when_not_to_use, and invocation schema are all present and well\u2011written. The invocation schema is described in prose rather than a formal JSON schema, which could hinder reliable parsing."
+      "justification": "Full frontmatter, clear description, activation triggers, and an invocation schema narrative. The schema is not a strict JSON schema, which could hinder automated parsing, thus a small deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (activation, mindset, quick reference, detailed steps, output contract). However the quick\u2011reference table and large block of commands are dense, causing some cognitive overload before deeper sections, so it is not perfectly progressive."
+      "justification": "Information is layered: quick reference table, then step\u2011by\u2011step deep dive, then full reference. Nonetheless the document front\u2011loads a large amount of detail, which may cause cognitive overload for an agent."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "The skill is purely diagnostic; it enforces tight constraints (requires cluster ARN, explicit symptom) and provides a NEED_MORE_INFO fallback, matching the fragility of MSK troubleshooting operations."
+      "justification": "Diagnostic actions are safe; destructive remediation commands are clearly marked and require explicit execution. Slight risk remains that remediation steps could be run unintentionally, but overall calibration is strong."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Stepwise diagnostics \u2192 Output contract \u2192 Catalog \u2192 Heuristics \u2192 NEVER). Minor inconsistency in ordering of some sections prevents a perfect score."
+      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick Ref \u2192 Detailed Steps \u2192 Output Contract). Minor ad\u2011hoc elements (e.g., mixed tables and prose) prevent a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Model output examples demonstrate correct usage and formatting, and the skill supplies decision trees and remediation steps. Missing are explicit ESCALATE examples and guidance for absent CloudWatch metrics or partial data, which could leave an agent without a clear path in those edge cases."
+      "justification": "Provides a deterministic decision tree, concrete CLI commands, and worked examples that an agent could execute. Lacks handling for some edge cases (e.g., missing CloudWatch metrics, Serverless\u2011only nuances) and the output contract does not define how to handle multi\u2011symptom inputs."
     }
   ],
-  "total_score": 107,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 39540,
-  "latency_ms": 12966,
-  "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "token_count": 40993,
+  "latency_ms": 14988,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
 }

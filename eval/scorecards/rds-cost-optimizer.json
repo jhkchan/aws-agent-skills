@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill supplies concrete, expert\u2011level data not usually known by a generic model: exact CPU/Memory thresholds, real 2026 pricing numbers (e.g., $0.12/ACU\u2011hour, $0.38/hr for db.m6i.large), a full right\u2011sizing decision tree, and nuanced AWS\u2011specific behaviours (Aurora Multi\u2011AZ has no extra compute charge, Graviton support limits). However much of the content restates standard best\u2011practice concepts, so the delta is strong but not maximal."
+      "justification": "Provides concrete, non\u2011trivial thresholds (CPU <30% + FreeableMemory >50% for downsize, 7\u2011day idle rule, exact RI discount percentages, ACU cost model, Graviton\u2011only support matrix). These specifics are not generally known by a baseline model, but many sections merely restate common best\u2011practice concepts, limiting the delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Includes an AWS\u2011specific stepwise process, pre\u2011flight CLI script, and a right\u2011sizing decision tree, yet some procedures are generic (e.g., \"monitor for 7 days\" without naming the exact CloudWatch metric) and the RI purchase flow lacks the precise ordering of offering\u2011search \u2192 purchase \u2192 verification."
+      "justification": "Encodes AWS\u2011specific procedures: pre\u2011flight CLI script, snapshot before modify, exact `aws rds modify-db-instance` commands, RI purchase flow, and a step\u2011wise optimisation order. Some steps (e.g., \u201ctake snapshot\u201d) are generic, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with clear rationales (e.g., never downsize without FreeableMemory, never recommend Compute Savings Plans for RDS). The list is experience\u2011driven. Missing some common pitfalls such as overlooking read\u2011replica cost implications or snapshot\u2011retention policies, so not full credit."
+      "justification": "Provides a concrete NEVER list with clear rationales (e.g., never downsize without FreeableMemory, never use Compute Savings Plans for RDS). Missing a few nuanced pitfalls such as handling read\u2011replica size mismatches or cross\u2011region replica cost impacts."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, activation triggers, invocation schema, and when\u2011to\u2011use/when\u2011not\u2011to\u2011use sections are well defined. The description clearly states the skill\u2019s purpose and keywords. The only shortfall is a slightly verbose \"when_to_use\" narrative that could be tighter for reliable activation."
+      "justification": "Full front\u2011matter, clear description, activation triggers, invocation schema, and example. The only shortfall is a slightly verbose \"when to use\" section that could be tighter for reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The document layers information (high\u2011level overview, quick reference, then deep sections, decision tree, and output contract). However, the early sections are dense and include many tables and details, which can overload the agent before it knows which part to apply."
+      "justification": "Information is layered (quick reference, detailed steps, decision tree, anti\u2011patterns), but the initial sections are dense and may overload the agent before it reaches the concise output contract."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions are tightly guarded by a CONFIRM gate, mandatory snapshots, and maintenance\u2011window advice. Creative tasks (e.g., ACU tuning) are left flexible. Calibration is appropriate; only minor over\u2011specification in some CLI flags prevents a perfect score."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and snapshot requirements, matching fragility. However the skill also advertises batch optimisation without reiterating the per\u2011DB CONFIRM rule, leaving a slight over\u2011freedom for pipelines."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: frontmatter \u2192 purpose \u2192 mindset \u2192 philosophy \u2192 process steps \u2192 output contract \u2192 anti\u2011patterns \u2192 decision tree. The structure is coherent, though a few sections (e.g., \"Recent AWS features\") feel appended rather than integrated."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Philosophy \u2192 Process \u2192 Decision Tree \u2192 Anti\u2011Patterns \u2192 Output contract). Structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 10,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision trees, error\u2011handling table, and worked examples, enabling an agent to act. Deductions stem from inconsistencies (Savings Plans mention), missing explicit handling for read\u2011replica right\u2011sizing, and a slight formula error in the Multi\u2011AZ removal example (division by 2 is unclear)."
+      "justification": "Provides a strict output contract, concrete CLI commands, and worked examples. However, the idle\u2011deletion example contains a contradictory savings calculation (shows $19.94 but computes $567.60), and some formulas in other examples are imprecise, which would mislead an executing agent."
     }
   ],
-  "total_score": 104,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41359,
-  "latency_ms": 14963,
+  "token_count": 40407,
+  "latency_ms": 12365,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

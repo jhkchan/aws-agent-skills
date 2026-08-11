@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill adds useful expert details (e.g., aws:CalledVia chain conditions, recent 2024\u20112026 feature list, concrete anti\u2011pattern warnings) but much of the content restates standard SCP concepts that a capable model already knows. It lacks a clear decision\u2011tree or quantitative thresholds for choosing guardrail vs delegate strategies, so the knowledge gain is moderate rather than maximal."
+      "justification": "The skill contains many expert details (intersection model, aws:CalledVia usage, strategy patterns, anti\u2011patterns, recent feature notes) that go beyond a baseline model, but a large portion restates publicly documented AWS guidance without novel thresholds or decision trees, so genuine delta is limited."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a thorough AWS\u2011specific procedure (enable policy type, author JSON, attach, verify, rollback) and mindset framing. The only shortfall is a few generic steps (e.g., \u201cverify caller IAM role holds permissions\u201d) that are not expressed as concrete CLI commands or IAM policy checks."
+      "justification": "Procedures are AWS\u2011specific (enable\u2011policy\u2011type, create\u2011policy, attach\u2011policy, verification steps) and reflect real\u2011world workflow, but some steps are generic (e.g., \u201crun a dry\u2011run validation\u201d) and omit handling of pagination, AWS CLI error codes, or IAM Access Analyzer result parsing. The mindset is well\u2011captured but not exhaustive."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid \"NEVER\" list with concrete reasoning (e.g., never remove FullAWSAccess without an allowlist). Missing are some common pitfalls such as SCP size limits, interactions with cross\u2011account trusted access, and subtle tag\u2011policy vs SCP overlaps, which would have completed the anti\u2011pattern coverage."
+      "justification": "The NEVER list enumerates five high\u2011impact pitfalls with concrete reasons, which is strong. However, a few items lack explicit \u201cwhy\u201d (e.g., why a wildcard Allow defeats guardrails) and the list could include more nuanced pitfalls such as cross\u2011account trusted\u2011access interactions. Missing depth costs points."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter, description, activation triggers, and invocation schema are present, enabling reliable activation. However, the input schema is described only in prose, not as a formal JSON schema, and the activation triggers could be ambiguous for an automated parser."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present and well\u2011structured. Activation triggers are overly broad (e.g., \"create an SCP\" could fire on any mention) and the invocation schema, while detailed, mixes free\u2011form text with JSON\u2011like expectations, leaving some ambiguity about required fields."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick navigation, checklist, then deep sections) but front\u2011loads a large amount of detail; critical \"NEVER\" warnings appear later, which can cause cognitive overload for a first\u2011time user."
+      "justification": "The document layers high\u2011level mindset, quick reference, detailed steps, and deep anti\u2011patterns, but the checklist and rollback guidance are buried later, causing some cognitive overload for a first\u2011time user."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are guarded by a confirmation gate, dry\u2011run validation, and rollback documentation, showing good calibration. The confirmation step is described but not enforced programmatically (no timeout or forced yes/no handling), leaving a slight gap."
+      "justification": "Destructive actions (create\u2011policy, attach\u2011policy) are gated by explicit pre\u2011flight checks and a mandatory confirmation prompt, matching the fragility of the task. The only shortfall is that the confirmation is described textually rather than enforced by a tool, but the calibration is otherwise spot\u2011on."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Checklist \u2192 Process \u2192 Library \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Edge cases \u2192 Remediation). The pattern is not explicitly labeled, and a few sections (e.g., recent features) break the strict order, costing a point."
+      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Quick navigation \u2192 Checklist \u2192 Process \u2192 Anti\u2011patterns \u2192 Edge\u2011cases), which aids comprehension. It is not labeled as a formal framework, but the structure is coherent and consistent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, example outputs, and a deployment checklist, enabling an agent to act. Lacks handling of AWS CLI error codes, does not auto\u2011populate placeholders like <POLICY_ID>, and omits guidance for multi\u2011region StackSets deployment, which limits full practical execution."
+      "justification": "Provides concrete CLI commands, a deployment checklist, and rollback guidance, enabling an agent to act. Minor issues: checklist items sometimes lack explicit markers (e.g., missing \"[x]\" in some examples), no explicit error\u2011handling flow, and the delegate example assumes the allowlist is already safe without a validation step. These gaps prevent flawless execution."
     }
   ],
-  "total_score": 105,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 39560,
-  "latency_ms": 14028,
+  "token_count": 38060,
+  "latency_ms": 8358,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

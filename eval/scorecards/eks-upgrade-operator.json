@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides many expert details (sequential N+1 rule, addon\u2011first requirement, surge capacity check, deprecated\u2011API table, rollback advisory) that a generic model would not enumerate. Missing a concrete decision\u2011tree for handling addon incompatibility (e.g., fallback to a bridge version) and no explicit treatment of extended\u2011support surcharge impact, so not full delta."
+      "justification": "Provides detailed EKS upgrade decision tree, specific version\u2011compatibility matrices, PDB disruption calculations, surge\u2011capacity verification, and a deprecated\u2011API table\u2014information that a generic model would not supply without expert knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific upgrade order, confirm\u2011gate, pre\u2011state capture, polling logic, and PDB calculations. The IAM\u2011role permission check is only mentioned generically without naming required policies (e.g., eks:UpdateClusterVersion), which is a minor procedural gap."
+      "justification": "Encodes the AWS\u2011specific upgrade sequence (add\u2011ons \u2192 control plane \u2192 node groups), exact CLI flags, mandatory CONFIRM gate, and rollback advisory, reflecting expert CloudOps thinking rather than generic best\u2011practice advice."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (skip addon first, one\u2011way control\u2011plane, drain flags, resolve\u2011conflicts, deprecated\u2011API scan). Lacks anti\u2011patterns for Auto\u202fMode clusters (e.g., never run node\u2011group updates) and for ignoring quota errors, reducing completeness."
+      "justification": "Contains a concrete NEVER list with specific reasons (e.g., never skip add\u2011on upgrade, never run control\u2011plane upgrade without acknowledging one\u2011way migration, never drain without proper flags, never use OVERWRITE without backup, never ignore deprecated\u2011API scans)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers and invocation schema are well defined, meeting specification requirements."
+      "justification": "Frontmatter is complete, description clearly states WHAT it does and WHEN to invoke, keywords, activation triggers, and a precise invocation schema are all present and well\u2011formed."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, output format). However, the initial bulk of detailed tables and external reference links can overload the reader before the quick reference, and the worked\u2011examples are only referenced, not inlined."
+      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns, and safety checks, delivering only what is needed at each stage and avoiding cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained with a mandatory CONFIRM gate, rollback advisory, and pre\u2011state capture. Slightly over\u2011permissive because no timeout or retry limit is prescribed for the confirm step."
+      "justification": "Destructive operations are tightly constrained by a mandatory CONFIRM gate, pre\u2011state capture, and explicit safety checks; non\u2011destructive planning steps are left free, matching task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns). Minor inconsistency: the Mindset section is not explicitly labeled as part of the standard pattern, causing a small deviation."
+      "justification": "Follows a recognizable structure (Mindset \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Safety) that aligns with established CloudOps skill patterns."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision tree, and output template, enabling an agent to act. Missing explicit error\u2011handling branches for failed CLI calls, quota exceed errors, and reliance on external reference files for detailed compatibility tables reduces robustness."
+      "justification": "Provides actionable CLI commands, confirm prompts, and verification steps, enabling an agent to execute the plan. However, placeholders like <update-id-from-step-2> require runtime substitution, the input schema is only described in prose (no JSON schema), and external reference files are mentioned but not included, which could hinder a fully autonomous execution."
     }
   ],
-  "total_score": 107,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 44317,
-  "latency_ms": 13631,
+  "grade": "A",
+  "token_count": 44688,
+  "latency_ms": 11807,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

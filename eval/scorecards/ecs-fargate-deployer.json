@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert details such as the exact CPU/memory combination matrix, capacity\u2011provider weighting (base + weight), Spot interruption handling, EFA support, and startPeriod health\u2011check tuning\u2014information a generic model would not enumerate. However a large portion restates official AWS documentation, so the delta is not maximal."
+      "justification": "Provides concrete, expert\u2011level details not usually known by a generic model: exact Fargate CPU/memory combo table, capacity\u2011provider weight/base strategy, recent 2024\u20112026 feature list, and precise IAM policy snippets. However, some of the information (e.g., basic ECS concepts) is restated rather than novel, so it falls short of a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific deployment mindset: ordered steps (task definition \u2192 roles \u2192 service \u2192 networking \u2192 ALB \u2192 autoscaling), separate execution/task roles, capacity\u2011provider strategy, and precise CLI sequences. Lacks a decision tree for when to prefer Spot vs. On\u2011Demand, leaving a small procedural gap."
+      "justification": "Encodes an AWS\u2011specific deployment mindset: task definition first, separate execution/task roles, capacity\u2011provider ordering, awsvpc networking, ALB target\u2011type ip, circuit\u2011breaker, and auto\u2011scaling sequencing. The procedures are detailed and AWS\u2011centric, but a few steps (e.g., NAT gateway verification) are mentioned only in prose rather than as a concrete checklist item."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete NEVER list with five high\u2011impact pitfalls and clear rationales (e.g., never use :latest tag, never combine roles, never use target_type=instance). The full 14\u2011item list is relegated to an external reference, so the skill is not self\u2011contained in anti\u2011pattern coverage."
+      "justification": "Contains concrete NEVER rules with clear why (e.g., never use :latest tag, never mix execution and task roles, never use target_type=instance). Only the top\u20115 are listed; the full list is only referenced, and a few common pitfalls (e.g., unpinned platform version) are omitted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, triggers, keywords, and a strict output contract are present, enabling reliable activation. The 'when_to_use' paragraph is verbose and could miss some edge triggers, hence a minor deduction."
+      "justification": "Frontmatter is complete, description, triggers, and when_to_use are well defined. Minor omission: no explicit version field for the output contract in metadata, which could affect reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections, a quick\u2011navigation table, and external reference files, which supports progressive disclosure. However the main document contains large tables (CPU/memory combos, workload matrix) that may overload the initial read, reducing optimal layering."
+      "justification": "The skill layers information well: quick navigation, high\u2011level contract, reasoning, step\u2011by\u2011step procedure, matrices, and deep reference files. However, the initial sections are dense, and some critical rules (e.g., optional ALB handling) are buried, causing a small overload risk."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "The output contract tightly constrains destructive output, preventing prose or extra sections. Slight shortfall: the skill does not explicitly require a dry\u2011run or safety\u2011check flag before issuing `aws ecs create-service` commands."
+      "justification": "Calibrates freedom appropriately for a checklist\u2011only skill, tightly constraining output format. However, it does not explicitly forbid generation of IaC templates, which could be used for destructive actions if mis\u2011applied."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (contract \u2192 reasoning \u2192 prerequisites \u2192 procedure \u2192 NEVER \u2192 heuristics \u2192 edge cases), but section headings are inconsistent and the order of some subsections feels ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (output contract \u2192 reasoning \u2192 procedure \u2192 NEVER \u2192 references). Some headings (e.g., \"Workload matrix\") feel ad\u2011hoc, costing one point."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 11,
       "max": 15,
-      "justification": "The provided examples obey the contract and are executable, but the skill does not cover all edge cases (e.g., missing NAT gateway verification, cross\u2011account ECR pulls) and lacks guidance for handling CLI failures or rollbacks, which limits real\u2011world reliability."
+      "justification": "Model output examples mostly obey the contract, but the third example inserts a \"Load balancer \u2014 None\" line, which deviates from the required checklist format that expects an ALB entry. The skill also lacks explicit guidance for services that truly have no load balancer, leading to potential format violations."
     }
   ],
-  "total_score": 107,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40623,
-  "latency_ms": 18129,
+  "token_count": 39121,
+  "latency_ms": 12811,
   "assertions_passed": false,
   "assertions_passed_count": 1,
   "assertions_failed_count": 4
