@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill supplies many non\u2011obvious AWS specifics (e.g., TagPolicy case\u2011sensitivity defaults, the 5\u2011key limit of required\u2011tags, eventual consistency of Resource Groups Tagging API, need to sleep before re\u2011query, how OU policies override root policies, the JSON\u2011string quirk of Config InputParameters, and the 24\u2011hour propagation delay of Cost Explorer activation). These details go beyond a generic model\u2019s baseline knowledge, but a few deeper nuggets (exact error codes for AccessDenied, full list of all supported resource\u2011type strings, or precise IAM policy syntax) are omitted, preventing a perfect 20."
+      "justification": "Provides many expert details (e.g., Config required\u2011tags limit of 5 keys, TagPolicy case\u2011sensitivity defaults, child\u2011resource propagation gaps) that a baseline model may not know, but a portion of the content merely restates well\u2011known AWS behaviours rather than delivering a novel decision tree or exclusive exception."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Lists AWS\u2011specific ordering (enable policy type \u2192 create policy \u2192 attach, recorder scope before Config rules, role creation before EventBridge target). However, several steps are phrased generically (e.g., \"add inline policy for ec2:CreateTags\") without tying them to the exact IAM policy document or required resource ARNs."
+      "justification": "Lists AWS\u2011specific ordering (enable TAG_POLICY \u2192 create policy \u2192 attach, Config recorder before rules, Lambda role before EventBridge target) and concrete CLI snippets, yet some steps are generic safety advice (backup before change) and the remediation trigger ordering (when to run SSM vs Config) is not fully explicit."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Robust NEVER list with concrete reasons (e.g., missing enforced_for makes policy advisory, idempotency of Lambda, cost\u2011allocation delay). Missing a few common pitfalls such as tag\u2011key length limits (128 chars) and value size limits (256 chars)."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never omit enforced_for, never assume required\u2011tags >5 keys, never forget child\u2011resource permissions). Missing only a brief note on TagPolicy versioning pitfalls, so a small deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, metadata, when_to_use, activation_triggers, and invocation_schema are all present and detailed enough for reliable activation. The activation_triggers list is verbose but still functional; no critical fields are missing."
+      "justification": "Frontmatter is complete (name, description, version, keywords, metadata, activation_triggers, invocation_schema, verdict_shape, when_to_use). The activation_triggers list is extensive but includes some overly generic phrases that could cause false positives; otherwise the spec is solid."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses top\u2011level summary, quick\u2011navigation table, then deep steps and appendices, but critical rules are sometimes buried in large tables, and the decision\u2011tree is placed at the end, causing occasional cognitive overload."
+      "justification": "Information is layered (Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Step\u2011by\u2011step \u2192 Output format). However, some critical rules (e.g., case\u2011sensitivity impact) are buried in \u201cStep\u202f0\u201d and the large \u201cCritical rules at a glance\u201d table, requiring extra scrolling for a first\u2011time user, leading to slight cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Includes confirmation gate, backup of existing policies, and clear constraints for destructive actions. A few destructive steps (e.g., bulk tag\u2011resources) lack explicit safety limits or rate\u2011limit guidance."
+      "justification": "Destructive actions are tightly gated with a CONFIRM prompt, backup commands, and pre\u2011flight safety checks. The only gap is the absence of explicit rate\u2011limiting or throttling guidance for bulk tag\u2011operations, which could be risky in large orgs."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset \u2192 Navigation \u2192 Critical rules \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns), but the pattern is not explicitly labeled, making it slightly less obvious to a reader."
+      "justification": "Follows a recognizable pattern (Mindset, Navigation, Process steps, Output format, Anti\u2011Patterns, Dependency graph). The structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides runnable CLI snippets, Lambda handler example, SSM document YAML, and error\u2011handling notes (e.g., check FailedResourcesMap, DLQ recommendation). Missing are explicit pagination handling for bulk tagging beyond 100 resources, and a concrete example of setting up the EventBridge DLQ, which could cause execution gaps."
+      "justification": "Provides working CLI snippets, error\u2011handling notes (FailedResourcesMap, AccessDenied cases), and decision trees. Missing explicit pagination handling for bulk tagging beyond 100 resources and a full IAM permission matrix for all commands, which could cause execution failures for agents."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43290,
-  "latency_ms": 11765,
+  "token_count": 43131,
+  "latency_ms": 8572,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Introduces expert\u2011level heuristics not commonly known: remediation\u2011grace\u2011period decision framework, first\u2011match\u2011wins policy priority logic, a detailed configuration dependency graph, explicit NEVER list with concrete reasons, and ready\u2011to\u2011use JSON snippets for each policy type. However it omits newer FMS features such as DNS Firewall policies and cross\u2011region scoping nuances, so not a full 20."
+      "justification": "Adds genuine expert heuristics not in a baseline model (remediation grace\u2011period decision framework, OU dynamic expansion, admin\u2011account exclusion, exclude\u2011tag precedence). However it omits concrete instructions for setting the policy priority via the API and does not show the exact JSON field for priority, leaving a small knowledge gap."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow (admin delegation \u2192 policy type selection \u2192 OU vs account targeting \u2192 remediation mode \u2192 rule group association \u2192 priority ordering) with concrete CLI commands and decision trees. The only shortfall is a few generic steps like \u201cverify prerequisites\u201d that could be more AWS\u2011specific."
+      "justification": "Provides AWS\u2011specific step\u2011by\u2011step procedures with exact CLI commands (associate\u2011admin\u2011account, put\u2011policy, verification calls) and decision frameworks for remediation mode and priority ordering. Minor gap: the reordering of policy priority is mentioned only in the error\u2011handling example, not as a dedicated procedural step."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a detailed \"NEVER\" list (10 items) with concrete reasons (e.g., admin account cannot be targeted, monitor\u2011only \u2260 auto\u2011apply, exclude tags always win). The warnings are specific to FMS and explain the underlying failure mode."
+      "justification": "Contains a thorough NEVER list with concrete reasons (admin account cannot be target, monitor vs auto\u2011apply differences, priority conflicts, tag precedence, etc.). Could be stronger by adding a few more pitfalls such as forgetting region consistency or forgetting to enable FMS in the target region."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, keywords, and activation triggers are well defined. The output contract is explicit. Minor issue: the trigger list is long and some phrases overlap, making reliable activation slightly ambiguous."
+      "justification": "Complete frontmatter, clear description, activation keywords, explicit output contract, and when\u2011to\u2011use section. All required metadata and triggers are present and unambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Information is layered: quick navigation, high\u2011level mindset, detailed step\u2011by\u2011step procedures, heuristics, NEVER list, output format, and error handling. Some deep JSON examples appear early, which adds slight cognitive load, but overall the layering is effective."
+      "justification": "Information is layered: high\u2011level overview, quick navigation, detailed step\u2011by\u2011step sections, heuristics, and NEVER list later. Minor redundancy between heuristics and steps adds slight cognitive load."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions (put\u2011policy) are gated by a prerequisite checklist and explicit verification commands. Remediation mode choices are calibrated with a grace\u2011period framework. No over\u2011constraining of creative tasks."
+      "justification": "Destructive actions (policy creation) are tightly gated by prerequisite checks and a PREREQUISITES_MISSING verdict. The skill matches freedom to task fragility without over\u2011constraining creative aspects."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Stepwise Process \u2192 NEVER list \u2192 Output format \u2192 Error handling \u2192 References). The structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern (mindset \u2192 heuristics \u2192 stepwise process \u2192 NEVER list \u2192 output format) that aids comprehension and reuse."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a ready\u2011to\u2011use checklist, verification commands, and concrete CLI/JSON examples, enabling an agent to execute the skill. Some JSON fields (e.g., ResourceType, ExcludeResourceTags, PolicyPriority) are not valid parameters for the FMS put\u2011policy API, and edge cases like IAM permission errors or unsupported regions are not fully covered, reducing practical reliability."
+      "justification": "Provides actionable CLI commands, JSON templates, and verification steps, enabling an agent to execute the skill. JSON examples omit some required fields (e.g., priority attribute, exact subnet\u2011mapping syntax) and error\u2011handling guidance is limited, which could cause execution failures."
     }
   ],
-  "total_score": 106,
+  "total_score": 112,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 45037,
-  "latency_ms": 24301,
+  "grade": "A",
+  "token_count": 45698,
+  "latency_ms": 13364,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

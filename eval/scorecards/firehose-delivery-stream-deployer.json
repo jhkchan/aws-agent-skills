@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 18,
       "max": 20,
-      "justification": "Provides concrete expert heuristics not found in baseline models (buffering\u2011hints trade\u2011off tables, interaction between buffering and Parquet conversion, dependency graph, specific size recommendations). However, many sections restate standard AWS docs without novel insight, preventing a perfect score."
+      "justification": "Provides concrete expert heuristics not found in generic docs, e.g., precise buffering\u2011hint size ranges for Parquet vs OpenSearch, interaction between buffering and format conversion, and a novel dependency graph that a senior CloudOps engineer would find new."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Lists an AWS\u2011specific step\u2011by\u2011step provisioning flow, exact CloudFormation/CLI snippets, and ordering (source \u2192 Lambda \u2192 format conversion \u2192 destination). Minor deduction because some procedures (e.g., \"verify prerequisites\") are generic and not tied to a unique decision tree."
+      "justification": "Encodes AWS\u2011specific provisioning order (source \u2192 Lambda \u2192 format conversion \u2192 destination) and detailed IAM role trust requirements, rather than generic \"check security\" steps."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., default buffering for Parquet, flat S3 prefixes, missing backup). Lacks a few additional pitfalls such as IAM role over\u2011privilege and KMS key rotation, so not full credit."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., default buffering for Parquet creates tiny files, flat S3 prefixes break Athena) and explains the failure mode for each."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, triggers, keywords, and strict output contract are well defined. Slight ambiguity in the \"when_to_use\" paragraph (mixes prose with triggers) prevents a perfect rating."
+      "justification": "Frontmatter is complete, description and when\u2011to\u2011use are clear, and activation keywords are listed, but the trigger list is a free\u2011form paragraph rather than a strict enumerated schema, leaving a small ambiguity for automated activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Uses a quick\u2011navigation table, top\u2011level overview, then deep sections, and isolates critical rules (NEVER list, output format) near the end. The document is long; some essential constraints appear after many pages, causing slight cognitive overload."
+      "justification": "Provides a quick\u2011navigation table and layered sections, yet the initial body contains a dense amount of detail that could overload a first\u2011time reader before they know which part to consult."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive provisioning is constrained by required prerequisites and explicit checklist. Yet the skill leaves many optional parameters (e.g., backup mode) open without guidance, which could lead to under\u2011constrained deployments."
+      "justification": "Calibrates freedom appropriately: destructive actions (creation of streams) are tightly constrained by prerequisite checks, while optional tuning parameters are given sensible default ranges."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Heuristics \u2192 NEVER \u2192 Output), yet the pattern is informal and not explicitly labeled, making it slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format), aiding comprehension, though the pattern is slightly customized rather than a textbook template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Includes ready\u2011to\u2011copy CLI snippets, checklist templates, and verification commands, enabling immediate execution. Missing automated validation of prerequisites and error\u2011handling branches (e.g., what to do if S3 bucket does not exist) reduces usability."
+      "justification": "Model output demonstrates correct checklist generation, handling of missing prerequisites, and includes ready\u2011to\u2011run AWS CLI commands; only minor edge\u2011case handling (e.g., optional backup modes) is omitted."
     }
   ],
-  "total_score": 105,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 39529,
-  "latency_ms": 14411,
+  "token_count": 40147,
+  "latency_ms": 23332,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1
