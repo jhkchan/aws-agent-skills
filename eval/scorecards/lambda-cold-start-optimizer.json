@@ -1,0 +1,70 @@
+{
+  "skill": "lambda-cold-start-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides several concrete data points (e.g., SnapStart restores to ~200\u202fms, hyperplane ENI <100\u202fms, 1769\u202fMB = 1\u202fvCPU, idle cost for 10 PC \u2248 $394/mo) that a generic model would not know, but many statements (e.g., \"more memory gives more CPU\") restate common knowledge, so the delta is not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers AWS\u2011specific step\u2011by\u2011step CLI procedures (SnapStart enable, provisioned concurrency sizing, Power Tuning workflow) and a clear decision order, but a few steps (e.g., \"monitor metrics\") are generic monitoring advice rather than a concrete AWS\u2011only procedure."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never recommend SnapStart for non\u2011Java, never add PC to async workloads). However, it omits a specific anti\u2011pattern warning about SnapStart\u2019s extra ~150\u2011200\u202fms restore cost and its impact on ultra\u2011low\u2011latency SLOs, leaving a gap in experience\u2011driven pitfalls."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are present and mostly well\u2011formed. The activation trigger list is overly long and contains some redundant phrases, which could cause unreliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information well (quick start, mindset, step\u2011by\u2011step). Yet the \"Step\u202f0 non\u2011obvious behaviours\" section packs many edge\u2011cases into a dense table, which can overload the agent before deeper sections are reached."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by a CONFIRM step and safety checks. The calibration could be tighter: the bulk\u2011operation limit (5 functions) is mentioned only in a comment, not enforced programmatically, leaving a small risk of over\u2011permissive execution."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The document follows a recognizable pattern (overview \u2192 mindset \u2192 stepwise process \u2192 anti\u2011patterns \u2192 output contract). The mixture of tables, narrative, and code blocks feels slightly ad\u2011hoc, preventing a perfectly clean pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides decision matrices, CLI commands, output format, and worked examples that let an agent act end\u2011to\u2011end. Missing are explicit handling of container\u2011image Lambdas (SnapStart unsupported) and a cost\u2011impact estimate for provisioned concurrency, which are common edge cases agents may encounter."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 47013,
+  "latency_ms": 15518,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

@@ -242,6 +242,24 @@ REMEDIATION: Re-prompt the operator for: (1) DistributionId and failing
   access-log row showing the 502/504; (4) recent deployment timestamps.
 ```
 
+## Quick reference — symptom triage table
+
+| Symptom / log signal | Most likely layer | First probe |
+|---|---|---|
+| `x-cache: Error from origin` + origin unreachable | ORIGIN_CONNECTION_TIMEOUT | `elbv2 describe-target-health` (ALB) or `s3api head-object` (S3) |
+| `x-cache: Error from origin` + handshake errors | ORIGIN_TLS_PROTOCOL_MISMATCH / ORIGIN_TLS_CIPHER_MISMATCH | `openssl s_client -connect origin:443` from edge-like client |
+| 502 only on responses > 10 MB | ORIGIN_RESPONSE_TOO_LARGE | Origin `Content-Length` vs CF payload cap |
+| 502 begins after adding `OriginCustomHeader` | CUSTOM_HEADER_VALIDATION | Compare header value at origin vs config |
+| `x-edge-result-type: FunctionExecutionError` | LAMBDA_AT_EDGE_ERROR | `logs filter-log-events` on `/aws/lambda/us-east-1.<fn>` in us-east-1 |
+| 502 only on S3 origin, ALB origin fine | OAC_MISCONFIGURATION | `s3api get-bucket-policy` + verify `cloudfront:GetResource` principal |
+| 502 when primary fails; secondary never reached | FAILOVER_MISCONFIGURATION | `get-distribution-config` OriginGroups + behaviour `TargetOriginId` |
+| 502 only from one country; `x-edge-result-type: LimitExceeded` | GEO_RESTRICTION_BLOCKING | `get-distribution-config` Restrictions.GeoRestriction |
+| 502 with field-level encryption recently enabled | FIELD_LEVEL_ENCRYPTION_ERROR | Verify public key, query profile, content-type |
+| `504` consistently after N seconds of TTFB | ORIGIN_RESPONSE_TIMEOUT | Origin app logs; curl TTFB measurement |
+| 502 only when OriginShield enabled | ORIGIN_SHIELD_MISCONFIGURATION | `get-distribution-config` OriginShield config |
+| `Status: InProgress`; mixed results across POPs | DISTRIBUTION_NOT_DEPLOYED | `get-distribution` Status, LastModifiedTime |
+| Origin recovered but 502 persists for minutes | CACHED_ERROR_RESPONSE | `Cache-Control` / `age` header; Custom Error Response TTL |
+
 ## Process — Diagnostic decision tree
 
 Symptom-driven. Each layer ends with a positive root-cause confirmation

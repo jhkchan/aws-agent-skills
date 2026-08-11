@@ -1,0 +1,70 @@
+{
+  "skill": "dynamodb-throttling-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides concrete, expert\u2011level details not usually memorised: 300\u2011second burst bucket math, exact adaptive\u2011capacity timing, write\u2011sharding suffix algorithm, cost\u2011premium numbers for on\u2011demand, precise CLI sequences, and a full decision\u2011tree with thresholds. Adds substantive new knowledge beyond a generic model."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific workflow (pre\u2011flight data gate \u2192 step\u2011wise priority order \u2192 confirmation gate) and lists exact CLI commands for each dimension. Procedure is specific to DynamoDB, not a generic \"check security\" approach."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill provides a solid NEVER list (e.g., never increase WCU first, never rely on adaptive capacity), but it omits a specific anti\u2011pattern warning that BatchWriteItem does not change consumed WCU. This omission is exposed by the sample output that recommends BatchWriteItem without noting the unchanged WCU, reducing the overall anti\u2011pattern coverage."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Invocation schema and example are well\u2011formed, enabling reliable activation. Only minor vagueness in \"when_to_use\" phrasing could be tighter."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick start \u2192 mindset \u2192 detailed steps), but the initial sections are dense and include many deep\u2011dive tables before a concise high\u2011level summary, causing some cognitive overload for a first\u2011time user."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (write\u2011sharding, capacity\u2011mode switch) are gated behind a CONFIRM step, matching fragility. However, the burst\u2011capacity calculations are presented without an explicit safety\u2011limit guard (e.g., \u201cdo not exceed 80\u202f% of burst bucket\u201d), leaving a slight over\u2011freedom for a fragile operation."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (mindset \u2192 stepwise process \u2192 output contract), but the inclusion of ad\u2011hoc tables (quick navigation, decision matrix) and occasional deviation from the canonical skill template makes the structure marginally less cohesive."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides decision trees, CLI snippets, code examples, and a strict output contract, enabling an agent to act. Yet the fifth example output recommends BatchWriteItem as a throttling fix without noting that WCU consumption is unchanged, violating a hard rule and showing a usability gap."
+    }
+  ],
+  "total_score": 102,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 44676,
+  "latency_ms": 10704,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
