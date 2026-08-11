@@ -133,30 +133,25 @@ profile versioning, trusted profile management.
 
 ## STRICT output contract
 
-When this skill is invoked with a Signer-provisioning request
-(create a signing profile, configure Lambda code signing, start a
-signing job, validate a signer certificate, or manage profile
-versions), the agent MUST respond with the READY_TO_DEPLOY checklist
-defined in "Output format" using the literal all-caps labels
-`SIGNER:`, `VERDICT:`, `CHECKLIST:`, and `VERIFICATION_COMMANDS:`.
-Do NOT preface the checklist with prose, headings, or disclaimers —
-emit the block as the first lines of the response. This contract is
-what assertion-based evals and downstream provisioning pipelines rely
-on; deviating from the literal labels breaks automation silently.
+When this skill is invoked with a Signer-provisioning request (create
+a signing profile, configure Lambda code signing, start a signing
+job, validate a signer certificate, or manage profile versions), the
+agent MUST respond with the READY_TO_DEPLOY checklist defined in
+"Output format" using the literal all-caps labels `SIGNER:`,
+`VERDICT:`, `CHECKLIST:`, and `VERIFICATION_COMMANDS:`. Do NOT
+preface the checklist with prose, headings, or disclaimers — emit the
+block as the first lines of the response. This contract is what
+assertion-based evals and downstream provisioning pipelines rely on;
+deviating from the literal labels breaks automation silently.
 
 If any prerequisite is missing, the verdict is
 `PREREQUISITES_MISSING` with a specific gap citation in the checklist
-(marked `[✗]`), and `READY_TO_DEPLOY` MUST NOT also appear.
-
-### Required output structure
-
-1. `SIGNER: <profile-name> (<platform-id>)` — the profile being
-   provisioned.
-2. `VERDICT: READY_TO_DEPLOY` OR `VERDICT: PREREQUISITES_MISSING`.
-3. `CHECKLIST:` followed by indented lines with status markers
-   (`[✓]`, `[✗]`, `[OPTIONAL]`, `[INPUT NEEDED]`).
-4. `VERIFICATION_COMMANDS:` followed by indented `aws signer ...`
-   and `aws lambda ...` commands.
+(marked `[✗]`), and `READY_TO_DEPLOY` MUST NOT also appear. The
+response uses these literal labels: `SIGNER: <profile-name>
+(<platform-id>)`, then `VERDICT:`, then `CHECKLIST:` with status
+markers (`[✓]`, `[✗]`, `[OPTIONAL]`, `[INPUT NEEDED]`), then
+`VERIFICATION_COMMANDS:` with indented `aws signer ...` and
+`aws lambda ...` commands.
 
 ## Quick navigation
 
@@ -333,9 +328,6 @@ specific gap must be cited.
 | `UntrustedArtifactOnViolation` decision | `Enforce` blocks on mismatch; `Warn` only logs | Confirm policy intent |
 | CloudTrail trail present in the region | Signer events appear in CloudTrail | `aws cloudtrail describe-trails` |
 
-If any prerequisite is missing, output
-`VERDICT: PREREQUISITES_MISSING` and cite the specific gap.
-
 ## Step 1 — Platform selection (determines the crypto algorithm)
 
 The platform id is the single source of truth for the cryptographic
@@ -412,10 +404,10 @@ aws lambda update-function-code \
 **Critical decisions:**
 - `UntrustedArtifactOnViolation`:
   - `Enforce` — Lambda rejects the deploy with
-    `ResourceConflictException` if the signature is missing,
-    untrusted, or signed by a revoked profile. Production default.
-  - `Warn` — Lambda logs the violation to CloudWatch but allows the
-    deploy. Useful for brownfield migrations; not a control.
+    `ResourceConflictException` if signature is missing, untrusted,
+    or signed by a revoked profile. Production default.
+  - `Warn` — Lambda logs the violation but allows the deploy. Useful
+    for brownfield migrations; not a control.
 - `AllowedPublishingProfiles` MUST include the profile ARN WITH
   version suffix. A versionless ARN matches only the default version.
 
@@ -543,8 +535,8 @@ code. Minimum action set:
   `lambda:ListCodeSigningConfigs`,
   `lambda:UpdateFunctionConfiguration`,
   `lambda:UpdateFunctionCode`, `lambda:GetFunctionConfiguration`.
-- **S3:** `s3:GetObject` on the unsigned source bucket;
-  `s3:PutObject` on the signed destination bucket.
+- **S3:** `s3:GetObject` on the unsigned source; `s3:PutObject` on
+  the signed destination.
 
 **Common pitfall:** granting `signer:*` instead of the call sites
 above. Use resource ARNs to narrow further in multi-tenant CI.
@@ -649,9 +641,8 @@ aws signer list-signing-profiles \
 - **Tag-based access control (2024-2025):** `aws:ResourceTag`
   conditions honored on `signer:StartSigningJob` and
   `signer:PutSigningProfile`, enabling ABAC for multi-tenant CI.
-- **Cross-region signing (2024-2025):** Signer available in more
-  regions; profiles can be shared cross-region.
-- **IoT job document integration (2024-2025):** AWS IoT consumes
+- **Cross-region signing (2024-2025):** Signer in more regions;
+  profiles shareable cross-region. IoT (2024-2025) consumes
   Signer-produced signatures directly in OTA job documents.
 
 ## NEVER do these things
@@ -696,9 +687,8 @@ aws signer list-signing-profiles \
    artifact in the destination S3 prefix.
 
 10. **NEVER skip the CloudTrail audit setup.** Signer events
-    (`PutSigningProfile`, `StartSigningJob`,
-    `CancelSigningProfile`) are the provenance record for every
-    signed artifact.
+    (`PutSigningProfile`, `StartSigningJob`, `CancelSigningProfile`)
+    are the provenance record for every signed artifact.
 
 ## Output format
 
@@ -770,35 +760,33 @@ VERIFICATION_COMMANDS:
 
 ### CreateCodeSigningConfig fails with ValidationException
 - The `AllowedPublishingProfiles` ARN is malformed or the profile is
-  on the wrong platform. Confirm the ARN includes the version suffix
-  and the platform is `AWSLambda-SHA384-ECDSA`.
+  on the wrong platform. Confirm ARN includes the version suffix and
+  platform is `AWSLambda-SHA384-ECDSA`.
 
 ### UpdateFunctionCode fails with ResourceConflictException
-- Signature verification failed. The package was not signed by a
-  profile in `AllowedPublishingProfiles`, the version is revoked, or
+- Signature verification failed. Package was not signed by a profile
+  in `AllowedPublishingProfiles`, the version is revoked, or
   `Enforce` is correctly blocking an unsigned package. Re-sign and
   redeploy.
 
 ### StartSigningJob fails with AccessDeniedException
-- Caller is missing `signer:StartSigningJob` on the profile ARN or
+- Caller missing `signer:StartSigningJob` on the profile ARN or
   `s3:GetObject` on the source bucket.
 
 ### Signing job stuck InProgress
 - Poll with `describe-signing-job`. If stuck >15 min, source may be
-  inaccessible or destination bucket missing the Signer write grant.
+  inaccessible or destination bucket missing Signer write grant.
 
 ### Profile version not appearing in ARN
 - Version suffix is assigned after the first successful signing job.
-  Start a signing job to materialize the version.
 
 ### Already-published function keeps running after profile revoke
-- Expected. Lambda code signing is a deploy-time gate. Revoke
-  triggers a CI/CD redeploy workflow, not a runtime rollback.
+- Expected. Code signing is a deploy-time gate. Revoke triggers a
+  CI/CD redeploy workflow, not a runtime rollback.
 
 ## Domain
 
-AWS CloudOps / AWS Signer Signing Profile Provisioning & Lambda Code
-Signing Configuration.
+AWS CloudOps / AWS Signer Signing Profile Provisioning & Lambda Code Signing Config.
 
 ## AWS documentation
 

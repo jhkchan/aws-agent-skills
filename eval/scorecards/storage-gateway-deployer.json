@@ -1,0 +1,70 @@
+{
+  "skill": "storage-gateway-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete expert heuristics not in baseline models (cache vs upload buffer sizing thresholds, region\u2011bucket alignment cost impact, bandwidth\u2011rate\u2011limit scheduling, immutable gateway\u2011type rule). However much of the content restates generic AWS Storage Gateway concepts, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific and ordered correctly (activate gateway \u2192 add cache/upload buffer \u2192 create shares/volumes \u2192 join AD \u2192 set bandwidth limits). The only shortfall is the lack of a concise decision\u2011tree for choosing gateway type based on workload, which would make the mindset fully complete."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never conflate cache and upload buffer, never change gateway type). Lacks warnings about encryption\u2011at\u2011rest, missing backup\u2011retention policies, and potential IAM over\u2011privilege, so the anti\u2011pattern coverage is solid but not exhaustive."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, triggers, keywords, and a strict output contract are provided. The only shortfall is that the \"when_to_use\" paragraph is verbose, which could affect reliable activation parsing."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses quick\u2011navigation table, high\u2011level mindset, then deep sections (heuristics, dependency graph, step\u2011by\u2011step). However, the heuristic sections are long and embed critical rules deep in text, risking cognitive overload for the agent."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 12,
+      "max": 15,
+      "justification": "Destructive actions (gateway activation, disk allocation) are constrained by required parameters, but the skill does not enforce safety checks such as verifying activation\u2011key expiration, confirming disk IDs exist, or prompting for confirmation before irreversible actions (gateway type cannot be changed)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The document follows a recognizable pattern (mindset \u2192 dependency graph \u2192 heuristics \u2192 step list \u2192 NEVER \u2192 output format). The pattern is consistent, but the inclusion of multiple unrelated sections (e.g., recent features, error handling) makes the overall structure slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides a ready\u2011to\u2011deploy checklist, concrete CLI examples, and error\u2011handling guidance. Model output shows missing checklist items (bandwidth, CloudWatch) and reliance on placeholders, indicating the skill does not guarantee complete execution paths or handle all edge cases."
+    }
+  ],
+  "total_score": 102,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 47402,
+  "latency_ms": 12334,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

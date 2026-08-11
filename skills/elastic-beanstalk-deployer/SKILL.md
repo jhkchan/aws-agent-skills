@@ -1,23 +1,22 @@
 ---
 name: elastic-beanstalk-deployer
 description: >-
-  Provisions AWS Elastic Beanstalk environments with production defaults:
-  application creation, environment tier (web server vs worker), platform
-  (Amazon Linux 2023, Node.js/Python/Java/Go/.NET), deployment policies
-  (all at once, rolling, rolling with additional batch, immutable,
-  traffic splitting), managed platform updates, enhanced health
-  reporting, load balancer (ALB vs NLB), EC2 instance profile, service
-  role, VPC configuration, security groups, auto scaling group, RDS
-  integration, environment links, application version lifecycle,
-  CNAME swap for blue-green, .ebextensions and .platform for
-  infrastructure as code. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating an Elastic Beanstalk
-  environment, deploying to Beanstalk, configuring blue-green with
-  CNAME swap, setting up worker tier with SQS, or managing platform
-  updates. Triggers: create elastic beanstalk environment, deploy
-  beanstalk application, beanstalk blue-green cname swap, beanstalk
-  worker tier sqs, beanstalk immutable deployment, ebextensions,
-  beanstalk managed updates, beanstalk platform amazon linux 2023.
+  Provisions AWS Elastic Beanstalk environments with production
+  defaults: application creation, environment tier (web server vs
+  worker), platform (Amazon Linux 2023, Node.js/Python/Java/Go/.NET),
+  deployment policies (all at once, rolling, rolling with additional
+  batch, immutable, traffic splitting), managed platform updates,
+  enhanced health reporting, load balancer (ALB vs NLB), EC2 instance
+  profile, service role, VPC configuration, security groups, auto
+  scaling group, RDS integration, CNAME swap for blue-green,
+  .ebextensions and .platform for infrastructure as code. Emits a
+  READY_TO_DEPLOY checklist with verification commands. Use when
+  creating an Elastic Beanstalk environment, configuring blue-green
+  with CNAME swap, setting up worker tier with SQS, or managing
+  platform updates. Triggers: create elastic beanstalk environment,
+  deploy beanstalk application, beanstalk blue-green cname swap,
+  beanstalk worker tier sqs, beanstalk immutable deployment,
+  ebextensions, beanstalk managed updates.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

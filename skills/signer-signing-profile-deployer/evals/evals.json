@@ -1,0 +1,180 @@
+{
+  "skill": "signer-signing-profile-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Signer Signing Profile Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across AWS Signer scenarios (Lambda SHA384-ECDSA profile with CSC and Enforce on violation, IoT firmware signing profile, signing job from S3 source to destination prefix, revoked profile impact workflow, and a wrong-platform profile that Lambda will reject). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "lambda-sha384-ecdsa-profile-with-csc",
+      "name": "AWSLambda-SHA384-ECDSA signing profile with Lambda CSC (Enforce)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Lambda SHA384-ECDSA profile, CSC with AllowedPublishingProfiles (version suffix), UntrustedArtifactOnViolation=Enforce, function association, signing job",
+      "prompt": "Create a Signer signing profile \"lambda-signing-prod\" on the AWSLambda-SHA384-ECDSA platform in us-east-1, account 111122223333. Create a Lambda code signing config \"lambda-csc-prod\" that allows publishing from that profile, sets UntrustedArtifactOnViolation to Enforce, and is associated with function my-prod-function. Source bucket my-unsigned-artifacts, destination bucket my-signed-artifacts with prefix lambda/signed/. Tags: Environment=production, Workload=lambda, Owner=platform-team.",
+      "prompt_file": "prompts/lambda-sha384-ecdsa-profile-with-csc.md",
+      "baseline_file": "baselines/lambda-sha384-ecdsa-profile-with-csc.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SIGNER: lambda-signing-prod (AWSLambda-SHA384-ECDSA)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Profile name: lambda-signing-prod\n  [✓] Platform: AWSLambda-SHA384-ECDSA (SHA-384, ECDSA on P-384)\n  [✓] Profile status: Active\n  [✓] Lambda CSC: lambda-csc-prod (arn:aws:lambda:us-east-1:111122223333:code-signing-config:csc-aaa111222)\n  [✓] AllowedPublishingProfiles: arn:aws:signer:us-east-1:111122223333:/signing-profiles/lambda-signing-prod\n  [✓] UntrustedArtifactOnViolation: Enforce\n  [✓] CSC → function association: my-prod-function\n  [✓] Signing job source: s3://my-unsigned-artifacts/lambda/\n  [✓] Signing job destination: s3://my-signed-artifacts/lambda/signed/\nVERIFICATION_COMMANDS:\n  aws signer get-signing-profile --profile-name lambda-signing-prod --region us-east-1\n  aws lambda get-code-signing-config --code-signing-config-arn arn:aws:lambda:us-east-1:111122223333:code-signing-config:csc-aaa111222 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AWSLambda-SHA384-ECDSA",
+            "lambda-signing-prod",
+            "lambda-csc-prod",
+            "Enforce",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "AllowedPublishingProfiles"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "iot-firmware-signing-profile",
+      "name": "AWSIoT-platform signing profile for IoT OTA firmware",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — AWSIoT platform (NOT valid for Lambda CSC), OTA consumption flow, firmware source/destination",
+      "prompt": "Create a Signer signing profile \"iot-firmware-prod\" on the AWSIoT platform in us-east-1, account 111122223333. Source bucket my-unsigned-firmware, destination bucket my-signed-firmware with prefix firmware/signed/. This profile will be used by AWS IoT OTA update jobs. Tags: Environment=production, Workload=iot-firmware.",
+      "prompt_file": "prompts/iot-firmware-signing-profile.md",
+      "baseline_file": "baselines/iot-firmware-signing-profile.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SIGNER: iot-firmware-prod (AWSIoT)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Profile name: iot-firmware-prod\n  [✓] Platform: AWSIoT (SHA-256, RSA-3072/ECDSA)\n  [✓] Profile status: Active\n  [✓] Signing job source: s3://my-unsigned-firmware/\n  [✓] Signing job destination: s3://my-signed-firmware/firmware/signed/\n  [✓] IoT OTA integration: device verifies against pinned Signer root cert",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AWSIoT",
+            "iot-firmware-prod",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "signing-job-from-s3-source",
+      "name": "Signer signing job from S3 source to destination prefix",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — signing job with immutability noted, source/destination S3 buckets cited, UpdateFunctionCode flow",
+      "prompt": "Start a signing job using the existing profile \"lambda-signing-prod\" (AWSLambda-SHA384-ECDSA) in us-east-1. Source: s3://my-unsigned-artifacts/lambda/my-prod-function.zip (version v1abc). Destination: s3://my-signed-artifacts/lambda/signed/. The signed artifact must be consumed by a subsequent UpdateFunctionCode call.",
+      "prompt_file": "prompts/signing-job-from-s3-source.md",
+      "baseline_file": "baselines/signing-job-from-s3-source.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SIGNER: lambda-signing-prod (AWSLambda-SHA384-ECDSA)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Profile name: lambda-signing-prod\n  [✓] Signing job source: s3://my-unsigned-artifacts/lambda/my-prod-function.zip\n  [✓] Signing job destination: s3://my-signed-artifacts/lambda/signed/\n  [✓] Immutability: signed artifact is immutable once job Succeeded",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "my-unsigned-artifacts",
+            "my-signed-artifacts",
+            "lambda-signing-prod",
+            "StartSigningJob",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "revoked-profile-impact",
+      "name": "Revoked profile version impact and redeploy workflow",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — revocation playbook: remove ARN from CSC, identify affected functions via CloudTrail, redeploy under new profile version",
+      "prompt": "The profile version IVYAAABRQEXAMPLE of signing profile \"lambda-signing-prod\" has been revoked. Function my-prod-function still has CSC \"lambda-csc-prod\" listing that version in AllowedPublishingProfiles. Tell me what to do, including removing the ARN from the CSC and redeploying from a known-good signed artifact under a new profile version.",
+      "prompt_file": "prompts/revoked-profile-impact.md",
+      "baseline_file": "baselines/revoked-profile-impact.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SIGNER: lambda-signing-prod (AWSLambda-SHA384-ECDSA)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Revocation handling: remove IVYAAABRQEXAMPLE ARN from AllowedPublishingProfiles\n  [✓] Identify functions via CloudTrail\n  [✓] Redeploy from known-good signed artifact under new profile version",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "IVYAAABRQEXAMPLE",
+            "AllowedPublishingProfiles",
+            "redeploy",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wrong-platform-for-lambda",
+      "name": "AWSIoT-platform profile in a Lambda CSC (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — AWSIoT profile cannot satisfy Lambda's verifier which expects AWSLambda-SHA384-ECDSA",
+      "prompt": "Create a Signer signing profile \"lambda-iot-wrong\" on the AWSIoT platform in us-east-1 and add it to the AllowedPublishingProfiles of CSC \"lambda-csc-prod\" for function my-prod-function.",
+      "prompt_file": "prompts/wrong-platform-for-lambda.md",
+      "baseline_file": "baselines/wrong-platform-for-lambda.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SIGNER: lambda-iot-wrong (AWSIoT)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Platform mismatch: AWSIoT is not AWSLambda-SHA384-ECDSA; Lambda's verifier rejects it at UpdateFunctionCode",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "AWSIoT",
+            "AWSLambda-SHA384-ECDSA",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

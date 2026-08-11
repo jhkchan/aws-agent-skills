@@ -4,22 +4,19 @@ description: >-
   Provisions AWS Transfer Family servers and managed workflows with
   production defaults: SFTP/FTPS/FTP protocol, identity provider
   (service-managed, AWS Directory Service, custom Lambda), endpoint
-  type (PUBLIC, VPC, VPC_ENDPOINT), security groups and subnets for
-  VPC endpoints, Route 53 hosted zone DNS, user home directory mapping
-  (logical vs physical), S3 bucket access via IAM role and session
-  policy for per-user scoping, AS2 connectors for trading partner
-  exchange, Managed Workflow with Step Functions for pre/post file
-  processing, structured JSON logging to CloudWatch, CloudWatch
-  metrics and throttling, server host key generation, trusted host
-  keys for partner verification. Emits a READY_TO_DEPLOY checklist
-  with verification commands. Use when creating a Transfer Family
-  SFTP server, configuring custom Lambda authentication, setting up
-  VPC endpoint for private SFTP, deploying managed file transfer
-  workflows, or configuring AS2 connectors. Triggers: create transfer
-  family sftp server, transfer family custom lambda identity, transfer
-  family vpc endpoint, transfer family managed workflow, transfer
-  family as2 connector, sftp user session policy, transfer family
-  hosted zone route53.
+  type (PUBLIC, VPC, VPC_ENDPOINT), security groups and subnets,
+  Route 53 hosted zone DNS, user home directory mapping (logical vs
+  physical), S3 access via IAM role and session policy for per-user
+  scoping, AS2 connectors for trading partner exchange, Managed
+  Workflow with Step Functions for file processing, structured JSON
+  logging, server host key, trusted host keys. Emits a
+  READY_TO_DEPLOY checklist with verification commands. Use when
+  creating a Transfer Family SFTP server, configuring custom Lambda
+  authentication, setting up VPC endpoint for private SFTP, or
+  deploying managed workflows. Triggers: create transfer family sftp
+  server, transfer family custom lambda identity, transfer family vpc
+  endpoint, transfer family managed workflow, transfer family as2
+  connector, sftp user session policy.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
