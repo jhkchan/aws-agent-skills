@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds genuine expert knowledge: decision table for Express vs Standard, cost break\u2011even calculations, silent\u2011failure table with four failure modes most models miss, idempotency\u2011key pattern, sync API Gateway timeout alignment, detailed ordering constraints, and recent feature notes. Deducted 3 points because it omits some hard limits (e.g., exact Distributed Map concurrency caps on Express, per\u2011region availability matrix) that a senior engineer would expect."
+      "justification": "Provides many concrete, senior\u2011engineer level details (cost break\u2011even table, exact 5\u2011minute cap, at\u2011least\u2011once semantics, .waitForTaskToken incompatibility, logging level trade\u2011offs, EventBridge target\u2011role requirement, idempotency\u2011key pattern). However it omits a few niche but useful facts such as the regional availability matrix for Express and the exact maximum concurrency limits for Distributed Map on Express (10k), so it is not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific ordering of steps (decision \u2192 duration check \u2192 integration compatibility \u2192 IAM \u2192 logging \u2192 invocation mode \u2192 EventBridge \u2192 verification) and concrete CLI commands. However, the initial \u201cverify prerequisites\u201d step is generic and not tied to any AWS\u2011specific artifact, costing one point."
+      "justification": "Encodes an AWS\u2011specific 9\u2011step provisioning workflow, ordering constraints, decision table for Express vs Standard, and verification commands. A small deduction for occasional generic phrasing (e.g., \"Verify prerequisites\") that could be more AWS\u2011specific."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Includes a solid NEVER list with concrete reasons (e.g., never use .waitForTaskToken, never deploy async without logs). The list is limited to five items and omits other common pitfalls such as forgetting X\u2011Ray permissions, missing log\u2011group retention, or over\u2011broad IAM conditions, resulting in a deduction."
+      "justification": "Contains a solid \"NEVER\" list of five concrete pitfalls with clear \"why\" explanations (waitForTaskToken, missing logs, assuming exactly\u2011once, API Gateway timeout mismatch, OFF/FATAL log levels). Missing a broader set of anti\u2011patterns (e.g., default IAM role, disabling X\u2011Ray for debugging) prevents a full score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The only shortfall is the absence of an explicit output schema field (e.g., JSON schema for the checklist block), which prevents perfect validation."
+      "justification": "Frontmatter is complete and the description clearly states WHAT the skill does, WHEN to invoke, and includes a rich keyword list. The activation triggers and invocation schema are present, but the frontmatter lacks an explicit \"activation_triggers\" field and a concise example usage block, so one point is deducted."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference, navigation table, deep sections) but the initial sections are dense with large tables and long paragraphs before the concise checklist, creating some cognitive overload for an agent that needs only the top\u2011level decision."
+      "justification": "Uses a quick\u2011reference table, navigation pane, and layered sections (high\u2011level, then deep heuristics, then full procedure). Critical rules (e.g., logging level must not be OFF) are buried in the \"NEVER\" list rather than highlighted early, causing some cognitive overload. Hence a modest deduction."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations (state\u2011machine creation, IAM role creation) are gated by a prerequisite checklist, which is good. However, the skill does not explicitly require a confirmation prompt or a dry\u2011run flag before issuing the CLI commands, leaving a small amount of freedom for irreversible actions."
+      "justification": "Destructive actions (state\u2011machine creation, IAM role creation) are tightly constrained with verification steps and anti\u2011patterns. Creative tasks (e.g., choosing sync vs async) have appropriate flexibility. Lacks an explicit \"dry\u2011run\" or \"preview\" mode for the most fragile steps, costing one point."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable structure (what it does, navigation, quick reference, heuristics, procedure, NEVER, output contract). It is slightly ad\u2011hoc because sections like \"Reasoning framework\" and \"Dependency graph\" are not part of a formalized template, costing one point."
+      "justification": "Follows a recognizable pattern (What it does \u2192 Navigation \u2192 Quick reference \u2192 Activation \u2192 Invocation contract \u2192 Reasoning \u2192 Procedure \u2192 NEVER \u2192 Output format). The structure is coherent, but section headings are not explicitly labeled as \"Mindset\" or \"Process\", making it slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a complete 9\u2011step CLI workflow, verification commands, and a strict output contract, enabling an agent to act. Missing edge\u2011case handling (cross\u2011region support, existing IAM role detection, automatic log\u2011group retention defaults) and no guidance for non\u2011Lambda side\u2011effects reduce usability slightly."
+      "justification": "Provides concrete CLI commands, decision trees, verification commands, and a strict output contract that an agent can follow. Some command syntax (e.g., logging\u2011configuration using \"level=ALL\") does not match the exact AWS CLI JSON format, and error\u2011handling for failed commands is not described, leading to a small deduction."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 48706,
-  "latency_ms": 16347,
+  "token_count": 49323,
+  "latency_ms": 10270,
   "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }

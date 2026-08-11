@@ -1,0 +1,161 @@
+# Eval test cases for codecommit-repository-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across CodeCommit repository
+# topologies (standard repo with KMS encryption + approval rules,
+# cross-account access via resource policy + KMS key policy, branch
+# protection + notification rules + PR template, git-remote-codecommit
+# IAM auth, missing KMS key policy cross-account grant, missing
+# notification SNS topic policy).
+skill: codecommit-repository-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: standard-repo-with-kms
+    description: >-
+      Provision a standard CodeCommit repository with customer-managed
+      KMS encryption, default branch main, description, approval rule
+      template (two reviewers), and tags. Expects READY_TO_DEPLOY with
+      KMS key policy granting CodeCommit, approval rule template
+      associated, and branch protection noted.
+    input: |
+      Create a CodeCommit repository named my-app-repo in us-east-1,
+      account 123456789012. Default branch main. Description
+      "Microservice repository for my-app". KMS encryption with
+      customer-managed key arn:aws:kms:us-east-1:123456789012:key/abcd-1234.
+      Approval rule template require-two-reviewers (2 approvals from
+      pool alice, bob). Branch protection on main (deny direct push).
+      Tags: Environment=production, Team=platform.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "my-app-repo"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "codecommit.amazonaws.com"
+        - "require-two-reviewers"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-resource-policy
+    description: >-
+      Provision cross-account CodeCommit access via repository resource
+      policy plus KMS key policy cross-account grant. Expects
+      READY_TO_DEPLOY with both the resource policy and KMS key policy
+      granting the cross-account principal.
+    input: |
+      Configure cross-account access for CodeCommit repository
+      my-app-repo in us-east-1, account 123456789012, to grant access
+      to account 999999999999. The repository is encrypted with
+      customer-managed KMS key
+      arn:aws:kms:us-east-1:123456789012:key/abcd-1234. Grant
+      codecommit:GitPull and codecommit:GitPush to the cross-account
+      principal.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-account"
+        - "999999999999"
+        - "123456789012"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "KMS key policy"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: branch-protection-and-notification
+    description: >-
+      Provision branch protection, notification rules, pull request
+      template, and repository trigger. Expects READY_TO_DEPLOY with
+      IAM deny-push policy on main, notification rule to SNS with topic
+      policy granting CodeStar, and Lambda trigger target policy.
+    input: |
+      Configure my-app-repo in us-east-1, account 123456789012, with
+      branch protection on main (deny direct GitPush, force PR
+      workflow), notification rule for pull-request-created and
+      pull-request-merged events to SNS topic
+      arn:aws:sns:us-east-1:123456789012:codecommit-notifications,
+      pull request template at .github/PULL_REQUEST_TEMPLATE.md, and a
+      repository trigger invoking Lambda function
+      arn:aws:lambda:us-east-1:123456789012:function:trigger-handler on
+      all events.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "notification"
+        - "codestar-notifications.amazonaws.com"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: git-remote-codecommit-iam-auth
+    description: >-
+      Provision a CodeCommit repository using git-remote-codecommit
+      (GRC) for IAM session token authentication instead of static git
+      credentials or SSH keys. Expects READY_TO_DEPLOY with GRC noted
+      as the auth method for developers and IAM git credentials for CI.
+    input: |
+      Create a CodeCommit repository named platform-tools in us-east-1,
+      account 123456789012. Developers authenticate via SSO and should
+      use git-remote-codecommit (GRC). The CI pipeline uses a dedicated
+      IAM user ci-codecommit-user with static git credentials. Default
+      branch main. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "git-remote-codecommit"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-kms-key-policy-cross-account
+    description: >-
+      Operator requests cross-account CodeCommit access, but the KMS
+      key policy does not grant the cross-account principal. This is a
+      prerequisite failure. Expects PREREQUISITES_MISSING with the KMS
+      key policy gap cited.
+    input: |
+      Configure cross-account access for CodeCommit repository
+      shared-repo in us-east-1, account 123456789012, to grant access
+      to account 888888888888. The repository is encrypted with
+      customer-managed KMS key
+      arn:aws:kms:us-east-1:123456789012:key/efgh-5678. The KMS key
+      policy currently only grants the owning account root and does
+      NOT include the cross-account principal.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "KMS key policy"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "888888888888"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

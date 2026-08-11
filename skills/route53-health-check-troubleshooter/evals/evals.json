@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "route53-health-check-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Route 53 Health Check Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cert-mismatch-https-health-check",
+      "name": "HTTPS health check unhealthy — certificate SAN does not include health check FQDN",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cert-mismatch-https-health-check.md",
+      "baseline_file": "baselines/cert-mismatch-https-health-check.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CERTIFICATE_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "cert-mismatch-https-health-check", "CERTIFICATE_MISMATCH", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: ENDPOINT_HEALTH"]
+        }
+      ]
+    },
+    {
+      "id": "calculated-hc-inverted-logic",
+      "name": "Calculated health check reports unhealthy despite all child checks healthy — Inverted flag accidentally set",
+      "difficulty": "hard",
+      "prompt_file": "prompts/calculated-hc-inverted-logic.md",
+      "baseline_file": "baselines/calculated-hc-inverted-logic.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CALCULATED_HC_LOGIC",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "calculated-hc-inverted-logic", "CALCULATED_HC_LOGIC", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: ENDPOINT_HEALTH"]
+        }
+      ]
+    },
+    {
+      "id": "dns-failover-ttl-stale-record",
+      "name": "DNS failover too slow — TTL of 300s caches old record after health check flips; total failover 390s",
+      "difficulty": "hard",
+      "prompt_file": "prompts/dns-failover-ttl-stale-record.md",
+      "baseline_file": "baselines/dns-failover-ttl-stale-record.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "DNS_RESOLUTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "dns-failover-ttl-stale-record", "DNS_RESOLUTION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: ENDPOINT_HEALTH"]
+        }
+      ]
+    },
+    {
+      "id": "missing-ns-delegation-info",
+      "name": "DNS failover not working — health check ID, routing policy, TTL, and NS delegation status not provided",
+      "difficulty": "hard",
+      "prompt_file": "prompts/missing-ns-delegation-info.md",
+      "baseline_file": "baselines/missing-ns-delegation-info.md",
+      "expected_verdict": "INSUFFICIENT_DATA",
+      "expected_layer": "UNKNOWN",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INSUFFICIENT_DATA", "missing-ns-delegation-info", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "I cannot", "I'm unable"]
+        }
+      ]
+    },
+    {
+      "id": "alarm-based-hc-threshold-ambiguous",
+      "name": "CloudWatch alarm-based health check not triggering — alarm period, threshold, and current state not provided",
+      "difficulty": "hard",
+      "prompt_file": "prompts/alarm-based-hc-threshold-ambiguous.md",
+      "baseline_file": "baselines/alarm-based-hc-threshold-ambiguous.md",
+      "expected_verdict": "INSUFFICIENT_DATA",
+      "expected_layer": "UNKNOWN",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INSUFFICIENT_DATA", "alarm-based-hc-threshold-ambiguous", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "I cannot", "I'm unable"]
+        }
+      ]
+    }
+  ]
+}

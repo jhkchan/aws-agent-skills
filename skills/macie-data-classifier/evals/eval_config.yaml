@@ -1,0 +1,49 @@
+# Eval configuration for macie-data-classifier.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: macie-data-classifier
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: healthy-classified-posture
+    difficulty: hard
+    prompt_file: prompts/healthy-classified-posture.md
+    baseline_file: baselines/healthy-classified-posture.md
+    expected_verdict: CLASSIFIED
+
+  - id: partial-asdd-only-coverage-gap
+    difficulty: hard
+    prompt_file: prompts/partial-asdd-only-coverage-gap.md
+    baseline_file: baselines/partial-asdd-only-coverage-gap.md
+    expected_verdict: PARTIALLY_CLASSIFIED
+
+  - id: unclassified-macie-disabled
+    difficulty: easy
+    prompt_file: prompts/unclassified-macie-disabled.md
+    baseline_file: baselines/unclassified-macie-disabled.md
+    expected_verdict: UNCLASSIFIED
+
+  - id: dangerous-broad-suppression-rule
+    difficulty: medium
+    prompt_file: prompts/dangerous-broad-suppression-rule.md
+    baseline_file: baselines/dangerous-broad-suppression-rule.md
+    expected_verdict: PARTIALLY_CLASSIFIED
+
+  - id: missing-multi-account-coverage
+    difficulty: medium
+    prompt_file: prompts/missing-multi-account-coverage.md
+    baseline_file: baselines/missing-multi-account-coverage.md
+    expected_verdict: PARTIALLY_CLASSIFIED

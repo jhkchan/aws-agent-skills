@@ -1,0 +1,261 @@
+# Eval test cases for route53-health-check-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — three ROOT_CAUSE_IDENTIFIED and two
+# INSUFFICIENT_DATA. Each case's TARGET embeds the test-case id so the
+# model naturally echoes it (avoids assertion-token mismatch).
+skill: route53-health-check-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cert-mismatch-https-health-check
+    description: >-
+      HTTPS Route 53 health check. FQDN is health.example.com but the
+      endpoint serves a certificate with SAN [api.example.com,
+      www.example.com]. Certificate name mismatch causes the HTTPS
+      health check to fail. Endpoint is reachable via curl -k.
+      Expected layer: CERTIFICATE_MISMATCH.
+    input: |
+      Symptom: Route 53 health check hc-cert-mismatch reports
+      unhealthy. The endpoint at 10.0.1.10:443 is reachable from
+      within the VPC via curl -k. DNS failover should redirect to
+      the secondary, but the primary record is still being served
+      because the health check has not flipped (failure threshold
+      not yet met on all regions).
+
+      HealthCheckId: hc-cert-mismatch
+      Type: HTTPS
+      FullyQualifiedDomainName: health.example.com
+      IPAddress: 10.0.1.10 (public via ALB)
+      Port: 443
+      EnableSNI: true
+      RequestInterval: 30
+      FailureThreshold: 3
+      ResourcePath: /
+
+      RoutingPolicy: FAILOVER
+      PrimaryRecord: api.example.com (Failover: PRIMARY, HealthCheckId: hc-cert-mismatch)
+      SecondaryRecord: api.example.com (Failover: SECONDARY)
+      TTL: 60
+
+      Certificate on the endpoint (openssl s_client):
+        subject: CN=api.example.com
+        SAN: [api.example.com, www.example.com]
+        "health.example.com" is NOT in the SAN list
+
+      Health check status (get-health-check-status):
+        All 15+ regions reporting unhealthy
+        StatusReason: "The SSL certificate failed validation"
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "cert-mismatch-https-health-check"
+        - "CERTIFICATE_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ENDPOINT_HEALTH"
+
+  - id: calculated-hc-inverted-logic
+    description: >-
+      Calculated health check with Inverted flag accidentally set to
+      true. The underlying expression evaluates healthy but the
+      Inverted flag flips the result to unhealthy. DNS failover
+      triggers unexpectedly.
+    input: |
+      Symptom: Route 53 calculated health check hc-calc-inverted
+      reports unhealthy even though both child health checks are
+      healthy. DNS failover is triggering to the secondary endpoint
+      despite the primary being fully operational.
+
+      HealthCheckId: hc-calc-inverted
+      Type: CALCULATED
+      ChildHealthChecks: [hc-child-north, hc-child-south]
+      Inverted: true
+      HealthCheckStatus: Unhealthy
+
+      Child health checks:
+        hc-child-north: Healthy (HTTPS, endpoint in us-east-1)
+        hc-child-south: Healthy (HTTPS, endpoint in us-east-2)
+
+      RoutingPolicy: FAILOVER
+      PrimaryRecord: app.example.com (HealthCheckId: hc-calc-inverted)
+      SecondaryRecord: app.example.com (Failover: SECONDARY)
+
+      The calculated health check uses default AND logic (healthy when
+      ALL children are healthy). Both children are healthy, so the
+      expression evaluates to healthy. But Inverted: true flips the
+      result to unhealthy.
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "calculated-hc-inverted-logic"
+        - "CALCULATED_HC_LOGIC"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ENDPOINT_HEALTH"
+
+  - id: dns-failover-ttl-stale-record
+    description: >-
+      DNS failover is too slow — TTL of 300 seconds means clients
+      cache the old record for up to 5 minutes after the health check
+      flips. Combined with standard health check (90s detection),
+      total failover is up to 390s (6.5 min). Expected layer:
+      DNS_RESOLUTION (TTL caching).
+    input: |
+      Symptom: After the primary endpoint went down at T+0, DNS did
+      not switch to the secondary until T+7 minutes. The health check
+      flipped to unhealthy at T+90s (as expected with
+      RequestInterval: 30, FailureThreshold: 3), but clients continued
+      hitting the old primary IP for several more minutes.
+
+      HealthCheckId: hc-ttl-stale
+      Type: HTTP
+      RequestInterval: 30
+      FailureThreshold: 3
+      IPAddress: 54.210.1.10
+      Port: 80
+      HealthCheckStatus: Unhealthy (flipped at T+90s)
+
+      RoutingPolicy: FAILOVER
+      PrimaryRecord: app.example.com (HealthCheckId: hc-ttl-stale)
+      SecondaryRecord: app.example.com (Failover: SECONDARY)
+      TTL: 300
+
+      DNS resolution verification:
+        dig @8.8.8.8 app.example.com +short:
+          T+0s:   54.210.1.10 (primary — expected)
+          T+90s:  54.210.1.10 (primary — HC flipped but DNS cached)
+          T+300s: 54.210.1.10 (primary — TTL not yet expired on 8.8.8.8)
+          T+360s: 54.210.2.20 (secondary — TTL expired, new record served)
+
+        dig @<authoritative-ns> app.example.com +short:
+          T+90s: 54.210.2.20 (secondary — Route 53 updated the record)
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "dns-failover-ttl-stale-record"
+        - "DNS_RESOLUTION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ENDPOINT_HEALTH"
+
+  - id: missing-ns-delegation-info
+    description: >-
+      Domain not resolving. Health check ID, routing policy, record
+      TTL, and NS delegation status are not provided. Cannot
+      distinguish health check config, routing policy, DNS TTL
+      caching, or NS delegation problem. Expected verdict:
+      INSUFFICIENT_DATA.
+    input: |
+      Symptom: DNS failover is not working for example.com. The
+      primary endpoint is down but clients are still being directed
+      to it. The secondary should be taking over.
+
+      Domain: example.com
+      Hosted zone: not provided
+      Health check ID: not provided
+      Routing policy: not provided
+      Record TTL: not provided
+      NS delegation status: not provided
+      get-health-check-status output: not provided
+
+      Missing context:
+        - Hosted zone ID: not provided
+        - Health check config (type, interval, threshold): not provided
+        - Health check status (healthy/unhealthy): not provided
+        - Routing policy (FAILOVER / WEIGHTED / LATENCY): not provided
+        - Record TTL on the primary and secondary: not provided
+        - dig NS example.com output: not provided
+
+      Emit the standard diagnostic block.
+    expected_verdict: INSUFFICIENT_DATA
+    assertions:
+      must_contain:
+        - "INSUFFICIENT_DATA"
+        - "missing-ns-delegation-info"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: alarm-based-hc-threshold-ambiguous
+    description: >-
+      CloudWatch alarm-based health check not triggering failover.
+      Alarm period, evaluation periods, datapoints to alarm, and
+      current alarm state are not fully provided. Cannot determine
+      if the alarm threshold is wrong or the alarm is in
+      INSUFFICIENT_DATA state. Expected verdict: INSUFFICIENT_DATA.
+    input: |
+      Symptom: Route 53 CloudWatch alarm-based health check is not
+      triggering DNS failover even though the primary endpoint
+      appears unhealthy. The health check stays healthy.
+
+      HealthCheckId: hc-alarm-ambiguous
+      Type: CLOUDWATCH_METRIC
+      AlarmIdentifier:
+        Name: not provided
+        Region: us-east-1
+
+      Missing context:
+        - Alarm name: not provided
+        - Alarm metric name and namespace: not provided
+        - Alarm period: not provided
+        - Alarm evaluation periods: not provided
+        - Alarm datapoints to alarm: not provided
+        - Alarm threshold and comparison operator: not provided
+        - Current alarm state (OK / ALARM / INSUFFICIENT_DATA): not provided
+        - Alarm history (describe-alarm-history): not provided
+
+      The operator says the endpoint is "unhealthy" but has not
+      verified what metric the alarm monitors or whether the alarm
+      is actually in ALARM state.
+
+      Emit the standard diagnostic block.
+    expected_verdict: INSUFFICIENT_DATA
+    assertions:
+      must_contain:
+        - "INSUFFICIENT_DATA"
+        - "alarm-based-hc-threshold-ambiguous"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "I cannot"
+        - "I'm unable"

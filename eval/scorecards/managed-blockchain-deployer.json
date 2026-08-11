@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge not found in a baseline model: immutable fields (edition, instance type), retirement of Starter edition, exact voting\u2011policy thresholds, exhaustive instance\u2011type matrix, recent feature timeline (Query API, Sepolia/Holesky), and a decision\u2011tree for product\u2011line selection."
+      "justification": "Adds concrete expert knowledge: immutable edition and instance\u2011type decisions, retirement of Starter edition, exact Fabric 1.4 vs 2.x lifecycle differences, detailed dependency graph, and specific instance\u2011type matrix. Most of this granularity is not present in a baseline model."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are largely AWS\u2011specific (order of network \u2192 member \u2192 node, polling CA availability, voting policy creation). Yet some steps are generic \u201cverify prerequisites\u201d without a detailed AWS\u2011centric checklist (e.g., no explicit IAM\u2011policy verification order), reducing the depth of expert mindset transfer."
+      "justification": "Provides AWS\u2011specific procedural flow: product\u2011line decision tree, exact CLI commands in correct order, voting\u2011policy JSON, CA enrollment steps, and node\u2011creation AZ checks. Some steps (e.g., VPC verification) are described generically without concrete CLI snippets."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list (12 items) with concrete reasons (Starter edition retirement, non\u2011existent create\u2011channel API, immutable instance type, missing VPC subnet, etc.) and explains why each pitfall breaks provisioning."
+      "justification": "Contains a thorough NEVER list (12 items) with explicit reasons (e.g., Starter edition retirement, non\u2011existent create\u2011channel API). Lacks a few additional pitfalls such as IAM policy edge cases for Query API."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete and includes description, when_to_use, keywords, tags, and activation keywords. The output contract is well defined. Missing a formal trigger regex or explicit \"required fields\" list prevents a perfect score."
+      "justification": "Frontmatter is complete, description clearly states WHAT and WHEN, activation keywords listed, and strict output contract defined. Missing a formal trigger pattern (e.g., regex) that an agent runtime could reliably parse."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered (high\u2011level description \u2192 quick navigation \u2192 mindset \u2192 detailed steps \u2192 NEVER \u2192 output format). However, the initial sections are dense, which could overload an agent before it knows which part to read."
+      "justification": "Information is layered: quick navigation, high\u2011level mindset, step\u2011by\u2011step details, heuristics, NEVER list, and output format. Some sections (Recent features) add bulk but do not obscure critical rules."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained (edition must be STANDARD, instance type immutable, verify AZ subnet, poll for CA availability). Creative/read\u2011only tasks (Query API) are left flexible. Only a minor omission of explicit region\u2011support check for Ethereum/Query reduces a point."
+      "justification": "Calibrates freedom for fragile operations: prerequisites checklist, immutable\u2011resource warnings, and NEVER rules. However, destructive actions like create\u2011network are only gated by prerequisites, not by additional safety confirmations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset, Quick navigation, Step\u2011by\u2011step process, NEVER list, Output format, References. The structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Heuristics \u2192 NEVER \u2192 Output). Section naming is slightly ad\u2011hoc but overall structure is coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides working examples, decision trees, error\u2011handling guidance, and verification commands that let an agent execute the skill cold. Slight gaps: IAM permissions for node creation are mentioned but not enumerated, and region\u2011support verification is only a note."
+      "justification": "Provides decision tree, concrete CLI commands, checklist, and verification commands enabling an agent to act. Missing explicit error\u2011handling branches, polling loops for async resources, and some formatting inconsistencies (e.g., missing space in 'admin-msp at./admin-msp')."
     }
   ],
   "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47732,
-  "latency_ms": 15916,
-  "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "token_count": 44395,
+  "latency_ms": 13992,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
 }

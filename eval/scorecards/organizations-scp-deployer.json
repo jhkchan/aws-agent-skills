@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill contains many expert details (intersection model, aws:CalledVia usage, strategy patterns, anti\u2011patterns, recent feature notes) that go beyond a baseline model, but a large portion restates publicly documented AWS guidance without novel thresholds or decision trees, so genuine delta is limited."
+      "justification": "The skill adds concrete expert knowledge such as the recent 2024\u20112026 AWS features (aws:CalledVia chain conditions, Backup policy type, Control Tower preventive controls) and a decision tree for choosing guardrail/throttle/delegate strategies. However, the majority of the content restates standard AWS documentation (SCP structure, intersection model) that a capable model already knows, limiting the net delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (enable\u2011policy\u2011type, create\u2011policy, attach\u2011policy, verification steps) and reflect real\u2011world workflow, but some steps are generic (e.g., \u201crun a dry\u2011run validation\u201d) and omit handling of pagination, AWS CLI error codes, or IAM Access Analyzer result parsing. The mindset is well\u2011captured but not exhaustive."
+      "justification": "Provides AWS\u2011specific procedures: enable\u2011policy\u2011type, create\u2011policy, attach\u2011policy, verification steps, rollback documentation, and a confirmation gate. Some steps (e.g., dry\u2011run validation) are generic and not uniquely AWS\u2011specific, costing a point."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list enumerates five high\u2011impact pitfalls with concrete reasons, which is strong. However, a few items lack explicit \u201cwhy\u201d (e.g., why a wildcard Allow defeats guardrails) and the list could include more nuanced pitfalls such as cross\u2011account trusted\u2011access interactions. Missing depth costs points."
+      "justification": "Contains a strong NEVER list (top 5) with explicit why\u2011its\u2011bad explanations and additional pitfalls. Missing a few nuanced anti\u2011patterns such as cross\u2011account role permissions not filtered by SCPs, which prevents a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present and well\u2011structured. Activation triggers are overly broad (e.g., \"create an SCP\" could fire on any mention) and the invocation schema, while detailed, mixes free\u2011form text with JSON\u2011like expectations, leaving some ambiguity about required fields."
+      "justification": "Front\u2011matter is complete (name, description, version, author, keywords, activation_triggers, invocation_schema, verdict_shape). The description clearly states WHAT the skill does and WHEN to invoke. Missing: a concrete example of the input JSON shape and a tighter definition of required fields, making activation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The document layers high\u2011level mindset, quick reference, detailed steps, and deep anti\u2011patterns, but the checklist and rollback guidance are buried later, causing some cognitive overload for a first\u2011time user."
+      "justification": "The document layers information (quick reference, checklist, detailed process, anti\u2011patterns, edge\u2011case handling). However, the initial Mindset and Quick navigation sections dump a large amount of detail before the core actionable steps, which can overload the reader and violates optimal progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (create\u2011policy, attach\u2011policy) are gated by explicit pre\u2011flight checks and a mandatory confirmation prompt, matching the fragility of the task. The only shortfall is that the confirmation is described textually rather than enforced by a tool, but the calibration is otherwise spot\u2011on."
+      "justification": "Destructive actions are tightly constrained with pre\u2011flight checks and a mandatory CONFIRM prompt; creative design steps are left open. Slight over\u2011constraint in the checklist formatting (hard\u2011coded '[x]') reduces flexibility marginally."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Quick navigation \u2192 Checklist \u2192 Process \u2192 Anti\u2011patterns \u2192 Edge\u2011cases), which aids comprehension. It is not labeled as a formal framework, but the structure is coherent and consistent."
+      "justification": "Follows a coherent pattern (Mindset \u2192 Navigation \u2192 Checklist \u2192 Process \u2192 Library \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Edge cases \u2192 Remediation). Minor inconsistency in section naming (e.g., 'Quick navigation' vs 'Quick reference') prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, a deployment checklist, and rollback guidance, enabling an agent to act. Minor issues: checklist items sometimes lack explicit markers (e.g., missing \"[x]\" in some examples), no explicit error\u2011handling flow, and the delegate example assumes the allowlist is already safe without a validation step. These gaps prevent flawless execution."
+      "justification": "Provides actionable CLI commands, decision trees, and concrete examples, enabling an agent to execute the skill. Inconsistencies in checklist formatting and occasional missing error\u2011handling (e.g., malformed JSON) could cause execution failures."
     }
   ],
   "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 38060,
-  "latency_ms": 8358,
+  "token_count": 38513,
+  "latency_ms": 10811,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

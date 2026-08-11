@@ -1,0 +1,165 @@
+# Eval test cases for rds-proxy-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across RDS Proxy topologies
+# (Aurora PostgreSQL proxy with IAM auth + TLS + Secrets Manager
+# rotation, Aurora Serverless v2 proxy with ACU-based max connections,
+# multi-AZ proxy with failover + security groups + subnet group, proxy
+# with missing Secrets Manager secret association, proxy with missing
+# subnet group multi-AZ requirement).
+skill: rds-proxy-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: aurora-proxy-iam-auth-tls
+    description: >-
+      Provision an RDS Proxy for an Aurora PostgreSQL cluster with IAM
+      authentication, TLS enforced, Secrets Manager secret (verified
+      format), and Secrets Manager rotation. Expects READY_TO_DEPLOY
+      with proxy endpoint noted, IAM auth + TLS coupling, and rotation
+      pairing.
+    input: |
+      Create an RDS Proxy named my-app-proxy for Aurora PostgreSQL
+      cluster my-aurora-cluster in us-east-1, account 123456789012.
+      Enable IAM authentication and require TLS. Secrets Manager secret
+      arn:aws:secretsmanager:us-east-1:123456789012:secret:rds/db-credentials-abc
+      (format: username, password, engine, host, port, dbClusterIdentifier).
+      IAM role arn:aws:iam::123456789012:role/rds-proxy-role. Enable
+      Secrets Manager rotation every 30 days via Lambda
+      arn:aws:lambda:us-east-1:123456789012:function:secretsmanager-rds-rotation.
+      Subnet group my-proxy-subnet-group (subnets in us-east-1a, 1b, 1c).
+      Proxy security group sg-proxy111. Database security group
+      sg-database222. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "my-app-proxy"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "proxy endpoint"
+        - "IAM authentication"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: serverless-v2-acu-sizing
+    description: >-
+      Provision an RDS Proxy for an Aurora Serverless v2 cluster with
+      max connections percent sized based on ACU (8 ACU). Expects
+      READY_TO_DEPLOY with MaxConnectionsPercent set on the target
+      group, ACU-based sizing noted, and target being the cluster.
+    input: |
+      Create an RDS Proxy named serverless-proxy for Aurora Serverless
+      v2 cluster my-serverless-v2-cluster (8 ACU minimum) in us-east-1,
+      account 123456789012. Engine POSTGRESQL. Max connections percent
+      75 based on ACU sizing. Max idle connections percent 50. Secrets
+      Manager secret
+      arn:aws:secretsmanager:us-east-1:123456789012:secret:rds/serverless-creds.
+      IAM role arn:aws:iam::123456789012:role/rds-proxy-role. Subnet
+      group spanning us-east-1a, us-east-1b. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "serverless"
+        - "MaxConnectionsPercent"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: multi-az-failover-security-groups
+    description: >-
+      Provision a multi-AZ RDS Proxy with failover handling, security
+      group associations, and DB subnet group spanning 3 AZs. Expects
+      READY_TO_DEPLOY with multi-AZ noted, database SG ingress from
+      proxy SG, and failover handling described.
+    input: |
+      Create a multi-AZ RDS Proxy named ha-proxy for Aurora MySQL
+      cluster my-aurora-mysql in us-east-1, account 123456789012.
+      The proxy must be highly available across us-east-1a, us-east-1b,
+      and us-east-1c. Proxy security group sg-proxy-ha. Database
+      security group sg-db-ha on port 3306. Failover handling is
+      critical. Secrets Manager secret
+      arn:aws:secretsmanager:us-east-1:123456789012:secret:rds/mysql-creds.
+      IAM role arn:aws:iam::123456789012:role/rds-proxy-role. Tags:
+      Environment=production, HA=true.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "multi-AZ"
+        - "failover"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-secrets-manager-secret
+    description: >-
+      Operator requests an RDS Proxy but the Secrets Manager secret
+      does not exist or is not in the correct format. This is a
+      prerequisite failure. Expects PREREQUISITES_MISSING with the
+      secret gap cited.
+    input: |
+      Create an RDS Proxy named my-broken-proxy for Aurora PostgreSQL
+      cluster my-aurora-cluster in us-east-1, account 123456789012.
+      Reference Secrets Manager secret
+      arn:aws:secretsmanager:us-east-1:123456789012:secret:rds/nonexistent-secret
+      which does NOT exist in Secrets Manager. IAM role
+      arn:aws:iam::123456789012:role/rds-proxy-role.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Secrets Manager"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "secret"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-subnet-group-multi-az
+    description: >-
+      Operator requests a multi-AZ RDS Proxy but the provided subnets
+      are all in the same AZ. This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING with the single-AZ subnet gap cited.
+    input: |
+      Create a highly available RDS Proxy named ha-proxy-broken for
+      Aurora PostgreSQL cluster my-aurora-cluster in us-east-1, account
+      123456789012. The proxy must be multi-AZ. However, all provided
+      subnets (subnet-aaa, subnet-bbb) are in the same AZ
+      us-east-1a. Secrets Manager secret
+      arn:aws:secretsmanager:us-east-1:123456789012:secret:rds/db-credentials-abc.
+      IAM role arn:aws:iam::123456789012:role/rds-proxy-role.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "AZ"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "subnet"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

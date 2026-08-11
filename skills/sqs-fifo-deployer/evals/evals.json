@@ -1,0 +1,178 @@
+{
+  "skill": "sqs-fifo-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the SQS FIFO Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across SQS FIFO topologies (standard FIFO with content-based dedup and DLQ and SSE-KMS, high-throughput FIFO with per-group dedup and throughput, cross-account FIFO delivery with access policy, missing .fifo suffix prerequisite failure, missing deduplication config prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "standard-fifo-with-dedup-and-dlq",
+      "name": "Standard FIFO queue with content-based deduplication, DLQ, and SSE-KMS",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — standard FIFO, content-based dedup, FIFO DLQ with maxReceiveCount, SSE-KMS, per-entity message group IDs",
+      "prompt": "Create an SQS FIFO queue named order-processing.fifo in us-east-1. Content-based deduplication enabled. Per-entity message group IDs (customer ID). Visibility timeout 120 seconds. FIFO DLQ: order-processing-dlq.fifo with maxReceiveCount 5. SSE-KMS encryption with customer-managed key arn:aws:kms:us-east-1:123456789012:key/abc123. Tags: Environment=production, Application=order-service.",
+      "prompt_file": "prompts/standard-fifo-with-dedup-and-dlq.md",
+      "baseline_file": "baselines/standard-fifo-with-dedup-and-dlq.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SQS_FIFO: order-processing.fifo\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Queue name: order-processing.fifo\n  [✓] FifoQueue: true (immutable)\n  [✓] ContentBasedDeduplication: true\n  [✓] DeduplicationScope: queue\n  [✓] ThroughputLimit: perQueue\n  [✓] Visibility timeout: 120\n  [✓] DLQ: order-processing-dlq.fifo — maxReceiveCount: 5\n  [✓] SSE-KMS encryption: enabled\nVERIFICATION_COMMANDS:\n  aws sqs get-queue-attributes --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/order-processing.fifo --attribute-names All",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "FifoQueue",
+            "ContentBasedDeduplication",
+            "DLQ",
+            "SSE-KMS",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "high-throughput-fifo-partitioning",
+      "name": "High-throughput FIFO queue with per-group deduplication and throughput",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — high-throughput FIFO, DeduplicationScope=messageGroup, ThroughputLimit=messagesPerGroupId, explicit dedup IDs",
+      "prompt": "Create a high-throughput SQS FIFO queue named high-throughput-events.fifo in us-east-1. DeduplicationScope=messageGroup, ThroughputLimit=messagesPerGroupId. Per-entity message group IDs (event ID) for parallel processing. Explicit MessageDeduplicationId from event ID. Visibility timeout 60 seconds. No DLQ needed. Tags: Environment=production, Application=event-processor.",
+      "prompt_file": "prompts/high-throughput-fifo-partitioning.md",
+      "baseline_file": "baselines/high-throughput-fifo-partitioning.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SQS_FIFO: high-throughput-events.fifo\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] DeduplicationScope: messageGroup\n  [✓] ThroughputLimit: messagesPerGroupId\n  [✓] High-throughput mode: enabled (per-group dedup + throughput)\n  [✓] Message group ID strategy: per-entity (event ID)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "DeduplicationScope",
+            "messageGroup",
+            "ThroughputLimit",
+            "messagesPerGroupId",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-fifo-delivery",
+      "name": "Cross-account FIFO queue delivery with access policy and KMS",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — cross-account delivery, access policy grants sqs:SendMessage to producer account, SSE-KMS with cross-account key policy",
+      "prompt": "Create an SQS FIFO queue named cross-account-orders.fifo in us-east-1, account 123456789012. Cross-account delivery from producer account 999999999999. Access policy grants sqs:SendMessage to the producer role. Content-based deduplication enabled. SSE-KMS encryption with key policy allowing producer account. Visibility timeout 90 seconds. Tags: Environment=production, Topology=cross-account.",
+      "prompt_file": "prompts/cross-account-fifo-delivery.md",
+      "baseline_file": "baselines/cross-account-fifo-delivery.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SQS_FIFO: cross-account-orders.fifo\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cross-account delivery: enabled (producer accounts: 999999999999)\n  [✓] Access policy: cross-account — producer account 999999999999 granted sqs:SendMessage",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cross-account",
+            "999999999999",
+            "123456789012",
+            "VERDICT",
+            "CHECKLIST",
+            "Access policy"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-fifo-attribute",
+      "name": "FIFO queue with missing .fifo suffix in queue name (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — queue name 'my-queue' lacks .fifo suffix; FIFO queues require the suffix",
+      "prompt": "Create an SQS FIFO queue named my-queue in us-east-1. Enable FIFO ordering, content-based deduplication, visibility timeout 60 seconds. DLQ: my-queue-dlq.fifo. Tags: Environment=production.",
+      "prompt_file": "prompts/missing-fifo-attribute.md",
+      "baseline_file": "baselines/missing-fifo-attribute.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SQS_FIFO: my-queue\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Queue name: MISSING .fifo suffix — FIFO queue names must end with .fifo",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            ".fifo",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-deduplication-config",
+      "name": "FIFO queue with no deduplication method (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — ContentBasedDeduplication=false and no explicit dedup ID strategy; FIFO requires dedup",
+      "prompt": "Create an SQS FIFO queue named events.fifo in us-east-1. ContentBasedDeduplication is false. Producers will send messages without MessageDeduplicationId. Visibility timeout 30 seconds. Tags: Environment=development.",
+      "prompt_file": "prompts/missing-deduplication-config.md",
+      "baseline_file": "baselines/missing-deduplication-config.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SQS_FIFO: events.fifo\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Deduplication: MISSING — ContentBasedDeduplication=false and no explicit dedup ID strategy; FIFO queues require dedup",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "deduplication",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

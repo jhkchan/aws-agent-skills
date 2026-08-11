@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Provides deep, expert\u2011level details (silent\u2011failure table, exact ordering constraints, concurrency trap, WriteGetObjectResponse nuance, event\u2011schema keys, multi\u2011region caveats). Missing explicit mention that Object Lambda does not replicate data across regions and that cross\u2011region routing must be handled externally, which would be valuable expert knowledge."
+      "justification": "The skill provides several expert\u2011level insights (silent\u2011failure table, throttle\u2011as\u2011AccessDenied trap, WriteGetObjectResponse nuance, event\u2011schema changes, multi\u2011region routing) that a baseline model would not know. However, a large portion restates well\u2011known S3 Object Lambda concepts (basic provisioning steps, CLI syntax) that a competent model already knows, so full credit is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: exact CLI commands, trust\u2011policy for s3-object-lambda, required permission set, reserved concurrency workflow, and verification steps. One generic \u201cverify prerequisites\u201d bullet could be more AWS\u2011specific (e.g., explicit IAM policy version handling)."
+      "justification": "A concrete 9\u2011step AWS\u2011specific procedure is given, with exact CLI commands, trust\u2011policy JSON, and permission policy JSON. The only shortfall is a minor reliance on generic advice (e.g., \"verify prerequisites\") without an explicit AWS\u2011centric checklist for each prerequisite."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "A solid NEVER list of five concrete pitfalls is present, each with a why, but the list is not exhaustive. It omits common anti\u2011patterns such as missing CloudWatch alarm thresholds for Lambda throttles, cross\u2011region latency pitfalls, and over\u2011permissive AP policies. The coverage is therefore incomplete."
+      "justification": "The skill lists a solid \"NEVER\" section with five concrete anti\u2011patterns and clear \"why it\u2019s wrong\" explanations. It could be stronger by covering more edge cases (e.g., IAM policy versioning, cross\u2011account APs) and by providing a deeper root\u2011cause analysis for each."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS, and activation triggers are enumerated. Lacks a tiny example of how the skill is invoked via the orchestration layer, which would make activation deterministic."
+      "justification": "Frontmatter, description, keywords, activation triggers, and an explicit invocation schema are all present and well\u2011formed. The only gap is that the \"when_to_use\" paragraph could be more succinct for reliable trigger matching."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick reference, detailed steps, heuristics, optional features). However, the 9\u2011step table and the full reasoning framework are dense and could overload the agent before it knows which parts are required."
+      "justification": "The document layers high\u2011level navigation, quick reference, then deep technical details, which aids progressive consumption. However, the initial sections already contain extensive CLI snippets and JSON blocks, which adds cognitive load before the reader sees the overall 9\u2011step summary."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive provisioning steps are tightly specified, but the skill does not provide a safety\u2011net such as a dry\u2011run mode or explicit confirmation prompt before creating resources. For a fragile operation, tighter constraints would be expected."
+      "justification": "Destructive actions (creation of APs, IAM roles, Lambda functions) are tightly gated by a prerequisite checklist and a strict output contract, matching the fragility of the task. A slight weakness is the lack of explicit guardrails for accidental deletion or overwriting of existing resources."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (metadata, quick navigation, stepwise procedure, anti\u2011patterns, output contract). The layout is slightly ad\u2011hoc rather than a formally named template, costing one point."
+      "justification": "The skill follows a recognizable structure (frontmatter \u2192 overview \u2192 navigation table \u2192 detailed sections \u2192 checklist \u2192 output contract). It is not tied to a named framework (e.g., Mindset\u2011Process\u2011Output) which would make the pattern more explicit."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 13,
       "max": 15,
-      "justification": "The skill supplies a decision tree, CLI commands, and a strict output contract, enabling an agent to act. Missing are explicit error\u2011handling branches (e.g., rollback if step 4 fails), guidance for handling verification mismatches, and examples of region\u2011mismatch remediation. These gaps reduce real\u2011world usability."
+      "justification": "An agent can follow the checklist and CLI commands, and the output contract is clear. Yet the example outputs omit verification commands for optional features (e.g., multi\u2011region checks) and do not demonstrate error handling for failed CLI calls, leaving gaps for real\u2011world execution."
     }
   ],
-  "total_score": 103,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44477,
-  "latency_ms": 16354,
+  "token_count": 45437,
+  "latency_ms": 7234,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

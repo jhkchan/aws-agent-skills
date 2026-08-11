@@ -1,0 +1,158 @@
+# Eval test cases for sqs-fifo-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across SQS FIFO topologies
+# (standard FIFO with dedup + DLQ + SSE-KMS, high-throughput FIFO
+# with message group partitioning, cross-account FIFO delivery,
+# missing FIFO attribute, missing deduplication config).
+skill: sqs-fifo-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: standard-fifo-with-dedup-and-dlq
+    description: >-
+      Provision a standard FIFO queue with content-based deduplication,
+      a FIFO DLQ with redrive policy (maxReceiveCount=5), SSE-KMS
+      encryption, and per-entity message group IDs. Expects
+      READY_TO_DEPLOY with all components cited.
+    input: |
+      Create an SQS FIFO queue named order-processing.fifo in
+      us-east-1. Content-based deduplication enabled. Per-entity
+      message group IDs (customer ID). Visibility timeout 120
+      seconds. FIFO DLQ: order-processing-dlq.fifo with
+      maxReceiveCount 5. SSE-KMS encryption with customer-managed
+      key arn:aws:kms:us-east-1:123456789012:key/abc123. Tags:
+      Environment=production, Application=order-service.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "FifoQueue"
+        - "ContentBasedDeduplication"
+        - "DLQ"
+        - "SSE-KMS"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: high-throughput-fifo-partitioning
+    description: >-
+      Provision a high-throughput FIFO queue with
+      DeduplicationScope=messageGroup and
+      ThroughputLimit=messagesPerGroupId, per-entity message group
+      IDs for parallelism, and explicit deduplication IDs.
+      Expects READY_TO_DEPLOY with high-throughput mode cited.
+    input: |
+      Create a high-throughput SQS FIFO queue named
+      high-throughput-events.fifo in us-east-1.
+      DeduplicationScope=messageGroup,
+      ThroughputLimit=messagesPerGroupId. Per-entity message group
+      IDs (event ID) for parallel processing. Explicit
+      MessageDeduplicationId from event ID. Visibility timeout 60
+      seconds. No DLQ needed. Tags: Environment=production,
+      Application=event-processor.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "DeduplicationScope"
+        - "messageGroup"
+        - "ThroughputLimit"
+        - "messagesPerGroupId"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-fifo-delivery
+    description: >-
+      Provision an SQS FIFO queue with cross-account delivery.
+      Producer account 999999999999 needs to send messages to the
+      queue in account 123456789012. Access policy grants
+      sqs:SendMessage. SSE-KMS key policy allows producer account.
+      Expects READY_TO_DEPLOY with cross-account cited.
+    input: |
+      Create an SQS FIFO queue named cross-account-orders.fifo in
+      us-east-1, account 123456789012. Cross-account delivery from
+      producer account 999999999999. Access policy grants
+      sqs:SendMessage to the producer role. Content-based
+      deduplication enabled. SSE-KMS encryption with key policy
+      allowing producer account. Visibility timeout 90 seconds.
+      Tags: Environment=production, Topology=cross-account.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-account"
+        - "999999999999"
+        - "123456789012"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Access policy"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-fifo-attribute
+    description: >-
+      Operator creates a queue named my-queue (no .fifo suffix)
+      and wants FIFO ordering. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the missing .fifo suffix
+      cited.
+    input: |
+      Create an SQS FIFO queue named my-queue in us-east-1. Enable
+      FIFO ordering, content-based deduplication, visibility
+      timeout 60 seconds. DLQ: my-queue-dlq.fifo. Tags:
+      Environment=production.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - ".fifo"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-deduplication-config
+    description: >-
+      Operator creates a FIFO queue with
+      ContentBasedDeduplication=false but provides no explicit
+      deduplication ID strategy. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the missing deduplication
+      configuration cited.
+    input: |
+      Create an SQS FIFO queue named events.fifo in us-east-1.
+      ContentBasedDeduplication is false. Producers will send
+      messages without MessageDeduplicationId. Visibility timeout
+      30 seconds. Tags: Environment=development.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "deduplication"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

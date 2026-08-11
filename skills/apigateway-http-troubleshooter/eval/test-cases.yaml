@@ -1,0 +1,234 @@
+# Eval test cases for apigateway-http-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — three ROOT_CAUSE_IDENTIFIED and two
+# INSUFFICIENT_DATA. Each case's TARGET embeds the test-case id so the
+# model naturally echoes it (avoids assertion-token mismatch).
+skill: apigateway-http-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: payload-format-v2-base64-body
+    description: >-
+      HTTP API with Lambda proxy integration. PayloadFormatVersion 2.0
+      delivers binary/large POST bodies base64-encoded. Handler reads
+      event.body as raw JSON and throws SyntaxError. API Gateway
+      returns 502. Expected layer: PAYLOAD_FORMAT_VERSION.
+    input: |
+      Symptom: HTTP API api-payload-v2 returns 502 Bad Gateway on
+      POST /orders when the request body exceeds 1 KB or contains
+      non-ASCII characters. GET requests to the same route succeed.
+      Lambda logs show "SyntaxError: Unexpected token" at the line
+      JSON.parse(event.body).
+
+      ApiId: api-payload-v2
+      ProtocolType: HTTP
+      Stage: $default
+      AutoDeploy: true
+      RouteKey: POST /orders
+      IntegrationType: AWS_PROXY
+      IntegrationSubtype: Lambda
+      PayloadFormatVersion: "2.0"
+      LambdaFunctionArn: arn:aws:lambda:us-east-1:111111111111:function:fn-orders
+
+      Lambda log excerpt:
+        INFO  Received request on POST /orders
+        SyntaxError: Unexpected token in JSON at position 0
+        event.isBase64Encoded: true
+        event.body: "eyJvcmRlcklkIjoi...
+        END RequestId: ... Duration: 12 ms
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "payload-format-v2-base64-body"
+        - "PAYLOAD_FORMAT_VERSION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: JWT_AUTHORIZER"
+
+  - id: jwt-authorizer-audience-mismatch
+    description: >-
+      HTTP API with JWT authorizer. Authorizer Audience is
+      ["orders-api-client"] but the client token has aud
+      ["profile-api-client"]. All requests return 403. Expected
+      layer: JWT_AUTHORIZER.
+    input: |
+      Symptom: HTTP API api-jwt-audience returns 403 Forbidden with
+      {"message": "User is not authorized"}} on every request to
+      GET /profile. The client sends a valid JWT from Cognito.
+
+      ApiId: api-jwt-audience
+      ProtocolType: HTTP
+      Stage: prod
+      AutoDeploy: true
+      RouteKey: GET /profile
+      AuthorizerId: auth-abc
+      AuthorizerType: JWT
+      IdentitySource: $request.header.Authorization
+      JwtConfiguration:
+        Issuer: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_abc123
+        Audience: ["orders-api-client"]
+
+      Client token decoded (payload):
+        iss: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_abc123
+        aud: ["profile-api-client"]
+        exp: 1799900000
+        sub: user-xyz
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "jwt-authorizer-audience-mismatch"
+        - "JWT_AUTHORIZER"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: CORS_MISCONFIG"
+
+  - id: cors-preflight-headers-missing
+    description: >-
+      HTTP API returns CORS error in browser. CorsConfiguration
+      AllowMethods is missing OPTIONS. Preflight OPTIONS request
+      fails. Expected layer: CORS_MISCONFIG.
+    input: |
+      Symptom: Browser console shows "Access to fetch at
+      'https://api.example.com/data' from origin 'https://app.example.com'
+      has been blocked by CORS policy: No 'Access-Control-Allow-Origin'
+      header". The preflight OPTIONS request returns 404.
+
+      ApiId: api-cors-preflight
+      ProtocolType: HTTP
+      Stage: $default
+      AutoDeploy: true
+      CorsConfiguration:
+        AllowOrigins: ["https://app.example.com"]
+        AllowMethods: ["GET", "POST"]
+        AllowHeaders: ["Content-Type", "Authorization"]
+        MaxAge: 300
+
+      RouteKey: ANY /data
+      IntegrationType: AWS_PROXY
+      IntegrationSubtype: Lambda
+
+      Note: AllowMethods does not include OPTIONS. The browser sends
+      a preflight OPTIONS request before the actual GET/POST. API
+      Gateway has no route for OPTIONS and returns 404.
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "cors-preflight-headers-missing"
+        - "CORS_MISCONFIG"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: JWT_AUTHORIZER"
+
+  - id: integration-timeout-unknown-502
+    description: >-
+      HTTP API returns 502 on POST /webhook intermittently.
+      Integration ID, PayloadFormatVersion, and VPC link configuration
+      are not provided. Cannot distinguish payload format mismatch,
+      Lambda response shape error, or VPC link backend failure.
+      Expected verdict: INSUFFICIENT_DATA.
+    input: |
+      Symptom: HTTP API api-webhook-502 returns 502 Bad Gateway on
+      POST /webhook intermittently — about 10% of requests. GET
+      requests work fine.
+
+      ApiId: api-webhook-502
+      ProtocolType: HTTP
+      Stage: $default
+
+      Missing context:
+        - IntegrationId: not provided
+        - PayloadFormatVersion: not provided
+        - Integration type (Lambda vs HTTP vs VPC_LINK): not provided
+        - VPC link ID: not provided
+        - Execution logs: not enabled
+        - Lambda logs: not checked
+
+      Emit the standard diagnostic block.
+    expected_verdict: INSUFFICIENT_DATA
+    assertions:
+      must_contain:
+        - "INSUFFICIENT_DATA"
+        - "integration-timeout-unknown-502"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: vpclink-nlb-config-incomplete
+    description: >-
+      HTTP API private integration returns 502 via VPC link. VPC link
+      ID is provided but NLB target group ARN and target health are
+      not. Cannot determine if NLB targets are unhealthy, SG blocks
+      traffic, or wrong VPC link. Expected verdict: INSUFFICIENT_DATA.
+    input: |
+      Symptom: HTTP API api-vpclink-502 returns 502 Bad Gateway on
+      every request to GET /internal-api. The integration is a
+      private integration via VPC link to an NLB.
+
+      ApiId: api-vpclink-502
+      ProtocolType: HTTP
+      Stage: prod
+      AutoDeploy: true
+      RouteKey: GET /internal-api
+      IntegrationType: HTTP_PROXY
+      ConnectionType: VPC_LINK
+      ConnectionId: vpc-link-abc123
+      IntegrationURI: https://internal.example.com/internal-api
+
+      Missing context:
+        - NLB target group ARN: not provided
+        - NLB target health (describe-target-health): not provided
+        - VPC link subnet IDs and SG IDs: not provided
+        - NLB listener configuration: not provided
+        - Whether the VPC link and NLB are in the same VPC: unknown
+
+      Emit the standard diagnostic block.
+    expected_verdict: INSUFFICIENT_DATA
+    assertions:
+      must_contain:
+        - "INSUFFICIENT_DATA"
+        - "vpclink-nlb-config-incomplete"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "I cannot"
+        - "I'm unable"

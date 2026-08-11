@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill repeats many well\u2011documented CUR/Athena facts (e.g., hourly vs daily lag, partition projection need) that a competent model already knows. It adds some concrete thresholds (1\u202fTB BytesScannedCutoff, NOW range syntax, engine\u2011v3 requirement) but lacks deeper expert decision\u2011trees such as when to prefer CUR\u202f2.0 vs legacy CUR, cost\u2011impact calculations for Athena scans, or cross\u2011account sharing patterns. Those missing high\u2011value insights keep the delta below maximum."
+      "justification": "Provides many concrete details (1\u202fTB BytesScannedCutoff, exact TBLPROPERTIES syntax, specific CUR 2.0 enablement steps) that a generic model may not recall, but the majority of the content restates publicly documented AWS guidance rather than delivering novel decision trees or undocumented thresholds."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The procedure is AWS\u2011specific (pre\u2011flight checks, bucket\u2011policy design, workgroup creation, partition projection), but several steps are generic (\u201crun pre\u2011flight\u201d, \u201cverify bucket exists\u201d) and the ordering of IAM role trust policy creation before workgroup use is not explicitly enforced. The mindset section is solid, yet the procedural flow could be tighter."
+      "justification": "Encodes a clear AWS\u2011specific workflow (pre\u2011flight checks, bucket\u2011policy validation, workgroup creation, partition\u2011projection setup) and the underlying reasoning, yet the ordering of some steps (e.g., creating the Glue database before confirming bucket policy) is presented generically rather than as a rigorously ordered procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., avoid MSCK REPAIR, never use bucket policy \"*\", never enable OVERWRITE). Missing a few common pitfalls such as S3 encryption\u2011in\u2011transit requirements, IAM policy size limits, and cross\u2011region Glue catalog constraints, which reduces completeness."
+      "justification": "A solid NEVER list and five detailed failure\u2011mode heuristics are present, with clear why\u2011statements. Missing are some additional pitfalls such as the cost\u2011explosion risk when the Athena workgroup lacks a BytesScannedCutoff (only hinted) and a concrete example of a confused\u2011deputy attack beyond the bucket\u2011policy case."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present and well\u2011formed. The only shortfall is a slightly vague activation trigger list (some entries overlap) and the lack of an explicit versioned schema for the output contract beyond the textual description."
+      "justification": "Front\u2011matter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are all present and unambiguous, giving an agent reliable criteria for when to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract) but occasionally front\u2011loads detailed CloudFormation snippets in the main body, which could overload the agent. Deep references are relegated to external files, but the core document still contains large blocks before the agent knows it needs them."
+      "justification": "The skill layers information (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 contract), but the early sections contain dense tables and long markdown blocks that can overload the reader before they know which part is needed."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (CUR creation, IAM role changes) are gated by pre\u2011flight checks and a mandatory CONFIRM prompt, showing good calibration. However, the skill does not explicitly require a dry\u2011run flag or safeguard against overwriting an existing CUR definition, leaving a small gap for irreversible changes."
+      "justification": "Destructive actions are gated by a manual CONFIRM step and requirement checks, matching fragility. However, the confirmation is described textually rather than enforced by a concrete schema, leaving a small freedom\u2011calibration gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (quick reference, mindset, pre\u2011flight, process, output contract) but mixes several meta\u2011patterns (e.g., anti\u2011pattern list, expert heuristic) without a single unifying schema, making the structure slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns), but the pattern is custom to this document and not a widely\u2011adopted template, making it slightly less immediately recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, requirement checklists, output format, and concrete examples that an agent could follow. Missing are explicit handling of existing resources conflicts (e.g., duplicate Glue tables), error\u2011handling branches for IAM role creation failures, and Terraform equivalents. These omissions reduce the ability to execute flawlessly in all edge cases."
+      "justification": "Provides concrete output contracts, CloudFormation snippets, and remediation commands, enabling an agent to act. Missing are explicit handling of existing resources (e.g., name collisions), error\u2011handling branches for failed Athena queries, and guidance for cross\u2011account role creation, which could cause execution failures."
     }
   ],
-  "total_score": 105,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45632,
-  "latency_ms": 14542,
+  "token_count": 45230,
+  "latency_ms": 10690,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

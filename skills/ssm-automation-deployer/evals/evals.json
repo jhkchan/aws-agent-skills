@@ -1,0 +1,177 @@
+{
+  "skill": "ssm-automation-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the SSM Automation Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across SSM Automation runbook scenarios (remediation with aws:executeAwsApi + aws:invokeLambdaFunction, nested runbook with aws:branch + tag targets, EventBridge scheduled automation with SNS, missing execution role trust policy, missing parameter binding). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "remediation-execute-api-lambda",
+      "name": "SSM Automation runbook with aws:executeAwsApi and aws:invokeLambdaFunction",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — remediation runbook with aws:executeAwsApi, aws:changeInstanceState, aws:invokeLambdaFunction, resource group targets, rate control, SNS notifications",
+      "prompt": "Create an SSM Automation document \"RemediateEC2\" that: 1) Uses aws:executeAwsApi to call ec2:DescribeInstances for a given InstanceId parameter. 2) Uses aws:changeInstanceState to stop the instance if running. 3) Uses aws:invokeLambdaFunction to invoke \"remediation-handler\" with the instance ID. Targets via resource group \"rg-prod-ec2\". Rate control: MaxConcurrency 10, MaxErrors 3. Execution role: SSMAutomationRole (trust ssm.amazonaws.com). SNS notification on Success and Failed to arn:aws:sns:us-east-1:123456789012:ssm-alerts. Schema version 0.3. Region us-east-1.",
+      "prompt_file": "prompts/remediation-execute-api-lambda.md",
+      "baseline_file": "baselines/remediation-execute-api-lambda.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SSM_AUTOMATION: RemediateEC2 (Automation, schema 0.3)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Document name: RemediateEC2\n  [✓] mainSteps: aws:executeAwsApi, aws:changeInstanceState, aws:invokeLambdaFunction\n  [✓] Targets: resource group rg-prod-ec2\n  [✓] Rate control: MaxConcurrency=10, MaxErrors=3\n  [✓] Execution role: SSMAutomationRole (trust: ssm.amazonaws.com)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "RemediateEC2",
+            "aws:executeAwsApi",
+            "aws:invokeLambdaFunction",
+            "SSMAutomationRole",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nested-runbook-branch-targets",
+      "name": "SSM Automation runbook with aws:branch conditional and nested runbook",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — aws:branch conditional routing, nested runbook via aws:executeAutomation, tag-based targets, rate control",
+      "prompt": "Create an SSM Automation document \"AutoRemediateByState\" that: 1) Uses aws:executeAwsApi to check instance state. 2) Uses aws:branch to route: if running → StopStep, if stopped → StartStep, default → NoOpStep. 3) StopStep and StartStep use aws:changeInstanceState. 4) NoOpStep uses aws:executeAutomation to invoke child runbook \"ChildHealthCheck\" with the instance ID. Targets via tag Environment=production. Rate control: MaxConcurrency 5, MaxErrors 1. Execution role: SSMAutomationRole. Schema version 0.3. Region us-east-1.",
+      "prompt_file": "prompts/nested-runbook-branch-targets.md",
+      "baseline_file": "baselines/nested-runbook-branch-targets.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SSM_AUTOMATION: AutoRemediateByState (Automation, schema 0.3)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] aws:branch steps: 1 (BranchOnState: running→Stop, stopped→Start)\n  [✓] Nested runbook: yes (ChildHealthCheck)\n  [✓] Targets: tags Environment=production\n  [✓] Rate control: MaxConcurrency=5, MaxErrors=1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws:branch",
+            "aws:executeAutomation",
+            "MaxConcurrency",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eventbridge-scheduled-sns-rate-control",
+      "name": "SSM Automation with EventBridge schedule, SNS, and rate control",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — EventBridge scheduled automation, SNS notifications, tag-based targets, rate control",
+      "prompt": "Create an SSM Automation document \"NightlyPatchCheck\" that: 1) Uses aws:executeAwsApi to call ssm:DescribeInstancePatches. 2) Uses aws:sleep for 60 seconds between checks. 3) EventBridge rule \"NightlyPatchSchedule\" with cron(0 2 ? * SUN *). 4) SNS notification on Success and Failed to arn:aws:sns:us-east-1:123456789012:patch-alerts. 5) Targets via tag PatchGroup=weekly. Rate control: MaxConcurrency 10, MaxErrors 3. Execution role: SSMAutomationRole. Schema 0.3. Region us-east-1.",
+      "prompt_file": "prompts/eventbridge-scheduled-sns-rate-control.md",
+      "baseline_file": "baselines/eventbridge-scheduled-sns-rate-control.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SSM_AUTOMATION: NightlyPatchCheck (Automation, schema 0.3)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] EventBridge schedule: NightlyPatchSchedule (cron(0 2 ? * SUN *))\n  [✓] SNS notification: arn:aws:sns:us-east-1:123456789012:patch-alerts\n  [✓] Rate control: MaxConcurrency=10, MaxErrors=3",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EventBridge",
+            "SNS",
+            "MaxConcurrency",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-execution-role-trust",
+      "name": "SSM Automation with wrong execution role (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — execution role MyEC2Role does not have ssm.amazonaws.com in trust policy",
+      "prompt": "Create an SSM Automation document \"RemediateEC2\" with steps using aws:executeAwsApi and aws:changeInstanceState. Execution role: MyEC2Role (this is an EC2 instance profile role, NOT an automation assume role — it does not have ssm.amazonaws.com in its trust policy). Targets via resource group rg-prod-ec2. Schema 0.3. Region us-east-1.",
+      "prompt_file": "prompts/missing-execution-role-trust.md",
+      "baseline_file": "baselines/missing-execution-role-trust.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SSM_AUTOMATION: RemediateEC2\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Execution role trust policy: MyEC2Role does not allow ssm.amazonaws.com to assume",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "trust",
+            "ssm.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-parameter-binding",
+      "name": "SSM Automation with undefined parameter reference (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — step references {{ UndefinedParam }} which is not declared in parameters",
+      "prompt": "Create an SSM Automation document \"BadRunbook\" that: 1) Uses aws:executeAwsApi to call ec2:DescribeInstances with parameter {{ UndefinedParam }}. The parameter UndefinedParam is not declared in the parameters section. 2) Uses aws:changeInstanceState. Execution role: SSMAutomationRole. Schema 0.3. Region us-east-1.",
+      "prompt_file": "prompts/missing-parameter-binding.md",
+      "baseline_file": "baselines/missing-parameter-binding.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SSM_AUTOMATION: BadRunbook\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Parameter binding: step references {{ UndefinedParam }} which is not declared in parameters",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "parameter",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

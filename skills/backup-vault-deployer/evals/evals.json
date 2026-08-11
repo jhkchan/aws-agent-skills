@@ -1,0 +1,174 @@
+{
+  "skill": "backup-vault-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Backup Vault Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across backup vault scenarios (compliance-mode vault with cross-region DR, governance-mode vault with continuous backup, lifecycle outside lock window, cross-account copy missing vault access policy, KMS key not found). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "compliance-vault-with-cross-region-dr",
+      "name": "Compliance-mode vault with cross-region DR copy and continuous backup",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — compliance-mode vault lock, customer-managed KMS, daily backup plan with lifecycle within lock window, cross-region copy to us-west-2 with destination vault and key ready, continuous backup for RDS/DynamoDB, tag-based selection, report plan",
+      "prompt": "Create an AWS Backup vault named production-backup-vault in us-east-1 account 123456789012. Use KMS key alias/backup-encryption-key (customer-managed, enabled). Apply vault lock in COMPLIANCE mode with MinRetentionDays=90 and MaxRetentionDays=365, ChangeableForDays=3. Create a backup plan named production-daily-backup with schedule cron(0 5 ? * MON-SAT *) targeting this vault, lifecycle DeleteAfterDays=180, MoveToColdStorageAfterDays=60. Cross-region copy to vault dr-backup-vault in us-west-2 (destination vault exists, KMS key alias/dr-encryption-key accessible). Continuous backup for RDS and DynamoDB resources (RecoveryPointType=CONTINUOUS). Tag-based selection (Backup=daily) matching 45 resources. Report plan to S3 bucket backup-compliance-reports. Tags: Environment=production, Compliance=PCI-DSS.",
+      "prompt_file": "prompts/compliance-vault-with-cross-region-dr.md",
+      "baseline_file": "baselines/compliance-vault-with-cross-region-dr.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BACKUP_VAULT: production-backup-vault (us-east-1) — KMS: alias/backup-encryption-key\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Vault name: production-backup-vault\n  [✓] KMS key: customer-managed, enabled\n  [✓] Vault lock: Compliance\n  [✓] Lock retention: MinRetentionDays=90, MaxRetentionDays=365\n  [✓] Lifecycle within lock window: PASS (90 ≤ 180 ≤ 365)\n  [✓] Cross-region copy: destination vault dr-backup-vault in us-west-2 (ready)\n  [✓] Continuous backup (PITR): enabled\nVERIFICATION_COMMANDS:\n  aws backup describe-backup-vault --backup-vault-name production-backup-vault --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "production-backup-vault",
+            "COMPLIANCE",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "MinRetentionDays"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "governance-vault-with-continuous-backup",
+      "name": "Governance-mode vault with continuous backup for EC2 and EFS",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — governance-mode vault lock (soft protection), continuous backup for EC2/EFS (PITR), periodic for S3, resource-ARN selection, no cross-region copy",
+      "prompt": "Create an AWS Backup vault named dev-backup-vault in us-east-1 account 123456789012. Use KMS key alias/dev-backup-key (customer-managed, enabled). Apply vault lock in GOVERNANCE mode with MinRetentionDays=7, MaxRetentionDays=90. Create a backup plan named dev-continuous-backup with schedule cron(0 2 ? * * *) targeting this vault, lifecycle DeleteAfterDays=30. Continuous backup for EC2 and EFS (RecoveryPointType=CONTINUOUS). Periodic for S3. Resource-ARN selection for 10 EC2 instances and 3 EFS filesystems. No cross-region copy needed. Tags: Environment=development.",
+      "prompt_file": "prompts/governance-vault-with-continuous-backup.md",
+      "baseline_file": "baselines/governance-vault-with-continuous-backup.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BACKUP_VAULT: dev-backup-vault (us-east-1) — KMS: alias/dev-backup-key\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Vault name: dev-backup-vault\n  [✓] Vault lock: Governance (soft protection)\n  [✓] Lock retention: MinRetentionDays=7, MaxRetentionDays=90\n  [✓] Continuous backup (PITR): enabled (EC2, EFS)\n  [✓] Backup selection: resource-ARN (10 EC2, 3 EFS)\nVERIFICATION_COMMANDS:\n  aws backup describe-backup-vault --backup-vault-name dev-backup-vault --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "GOVERNANCE",
+            "dev-backup-vault",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lifecycle-outside-lock-window",
+      "name": "Backup plan lifecycle DeleteAfterDays below vault lock MinRetentionDays",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — DeleteAfterDays=7 with MinRetentionDays=90 violates the lock window; backup jobs would fail",
+      "prompt": "Create an AWS Backup vault named locked-vault in us-east-1 account 123456789012. The vault will be locked in COMPLIANCE mode with MinRetentionDays=90 and MaxRetentionDays=365. Create a backup plan targeting this vault with lifecycle DeleteAfterDays=7 and MoveToColdStorageAfterDays=3. The plan should run daily. Tag-based selection.",
+      "prompt_file": "prompts/lifecycle-outside-lock-window.md",
+      "baseline_file": "baselines/lifecycle-outside-lock-window.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BACKUP_VAULT: locked-vault (us-east-1)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Lifecycle within lock window: FAIL (DeleteAfterDays=7 is below MinRetentionDays=90)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "DeleteAfterDays",
+            "VERDICT",
+            "CHECKLIST",
+            "MinRetentionDays"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-missing-vault-policy",
+      "name": "Cross-account backup copy with missing destination vault access policy",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — destination KMS key policy correct but destination vault lacks backup:CopyIntoBackupVault grant for source account",
+      "prompt": "Create an AWS Backup vault named source-vault in us-east-1 account 111111111111. Create a backup plan with a cross-account copy action to vault dest-vault in us-west-2 account 222222222222. The destination KMS key policy is correctly configured to grant the source account. However, the destination vault dest-vault does NOT have a vault access policy granting backup:CopyIntoBackupVault to the source account 111111111111.",
+      "prompt_file": "prompts/cross-account-missing-vault-policy.md",
+      "baseline_file": "baselines/cross-account-missing-vault-policy.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BACKUP_VAULT: source-vault (us-east-1)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Cross-account: vault access policy missing backup:CopyIntoBackupVault grant on destination vault dest-vault",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "vault access policy",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kms-key-not-found",
+      "name": "Backup vault with nonexistent KMS key alias",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — KMS key alias/nonexistent-key does not exist; vault creation would fail",
+      "prompt": "Create an AWS Backup vault named production-vault in us-east-1 account 123456789012. Use KMS key alias/nonexistent-key. The key does not exist — aws kms describe-key returns NotFoundException. Create a backup plan with daily schedule. Compliance-mode vault lock with MinRetentionDays=30.",
+      "prompt_file": "prompts/kms-key-not-found.md",
+      "baseline_file": "baselines/kms-key-not-found.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BACKUP_VAULT: production-vault (us-east-1)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] KMS key: alias/nonexistent-key NOT FOUND (aws kms describe-key returns NotFoundException)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "KMS",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

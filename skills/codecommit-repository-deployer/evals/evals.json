@@ -1,0 +1,176 @@
+{
+  "skill": "codecommit-repository-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the CodeCommit Repository Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across CodeCommit repository topologies (standard repo with KMS + approval rules, cross-account resource policy + KMS key policy, branch protection + notification + PR template + trigger, git-remote-codecommit IAM auth, missing KMS key policy cross-account grant, missing notification SNS topic policy). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "standard-repo-with-kms",
+      "name": "Standard CodeCommit repository with KMS encryption and approval rule template",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — standard repo with customer-managed KMS key (policy grants CodeCommit), approval rule template (2 reviewers) associated, branch protection on main",
+      "prompt": "Create a CodeCommit repository named my-app-repo in us-east-1, account 123456789012. Default branch main. Description \"Microservice repository for my-app\". KMS encryption with customer-managed key arn:aws:kms:us-east-1:123456789012:key/abcd-1234. Approval rule template require-two-reviewers (2 approvals from pool alice, bob). Branch protection on main (deny direct push). Tags: Environment=production, Team=platform.",
+      "prompt_file": "prompts/standard-repo-with-kms.md",
+      "baseline_file": "baselines/standard-repo-with-kms.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CODECOMMIT_REPO: my-app-repo (arn:aws:codecommit:us-east-1:123456789012:my-app-repo)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Repository name: my-app-repo\n  [✓] Default branch: main (created at first push)\n  [✓] KMS encryption: customer-managed key abcd-1234 (policy grants codecommit.amazonaws.com)\n  [✓] Approval rule template: require-two-reviewers (2 approvals)\n  [✓] Branch protection: IAM denies direct push to main\nVERIFICATION_COMMANDS:\n  aws codecommit get-repository --repository-name my-app-repo --region us-east-1\n  aws kms describe-key --key-id abcd-1234 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "my-app-repo",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "codecommit.amazonaws.com",
+            "require-two-reviewers"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-resource-policy",
+      "name": "Cross-account CodeCommit access via resource policy and KMS key policy",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — cross-account access: repository resource policy grants GitPull/GitPush, KMS key policy also grants cross-account principal (both required)",
+      "prompt": "Configure cross-account access for CodeCommit repository my-app-repo in us-east-1, account 123456789012, to grant access to account 999999999999. The repository is encrypted with customer-managed KMS key arn:aws:kms:us-east-1:123456789012:key/abcd-1234. Grant codecommit:GitPull and codecommit:GitPush to the cross-account principal.",
+      "prompt_file": "prompts/cross-account-resource-policy.md",
+      "baseline_file": "baselines/cross-account-resource-policy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CODECOMMIT_REPO: my-app-repo (arn:aws:codecommit:us-east-1:123456789012:my-app-repo)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cross-account access: resource policy grants 999999999999\n  [✓] KMS key policy cross-account: granted to 999999999999",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cross-account",
+            "999999999999",
+            "123456789012",
+            "VERDICT",
+            "CHECKLIST",
+            "KMS key policy"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "branch-protection-and-notification",
+      "name": "Branch protection, notification rules, PR template, and trigger",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — branch protection (IAM deny push to main), notification rule to SNS (topic policy grants CodeStar), PR template, Lambda trigger (target policy grants CodeCommit)",
+      "prompt": "Configure my-app-repo in us-east-1, account 123456789012, with branch protection on main (deny direct GitPush, force PR workflow), notification rule for pull-request-created and pull-request-merged events to SNS topic arn:aws:sns:us-east-1:123456789012:codecommit-notifications, pull request template at .github/PULL_REQUEST_TEMPLATE.md, and a repository trigger invoking Lambda function arn:aws:lambda:us-east-1:123456789012:function:trigger-handler on all events.",
+      "prompt_file": "prompts/branch-protection-and-notification.md",
+      "baseline_file": "baselines/branch-protection-and-notification.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CODECOMMIT_REPO: my-app-repo\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Branch protection: IAM policy denies direct push to main\n  [✓] Notification rule: PR events → SNS (topic policy grants codestar-notifications.amazonaws.com)\n  [✓] Pull request template: .github/PULL_REQUEST_TEMPLATE.md\n  [✓] Repository trigger: trigger-handler (Lambda policy grants codecommit.amazonaws.com)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "notification",
+            "codestar-notifications.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "git-remote-codecommit-iam-auth",
+      "name": "CodeCommit repository with git-remote-codecommit (GRC) IAM auth",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — GRC for developer auth (SSO/federated), IAM git credentials for CI pipeline, session-token based auth selection",
+      "prompt": "Create a CodeCommit repository named platform-tools in us-east-1, account 123456789012. Developers authenticate via SSO and should use git-remote-codecommit (GRC). The CI pipeline uses a dedicated IAM user ci-codecommit-user with static git credentials. Default branch main. Tags: Environment=production.",
+      "prompt_file": "prompts/git-remote-codecommit-iam-auth.md",
+      "baseline_file": "baselines/git-remote-codecommit-iam-auth.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CODECOMMIT_REPO: platform-tools\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Auth method: git-remote-codecommit (GRC) for developers, IAM git credentials for CI",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "git-remote-codecommit",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-kms-key-policy-cross-account",
+      "name": "Cross-account CodeCommit access with missing KMS key policy (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — cross-account access requested but KMS key policy does not grant the cross-account principal",
+      "prompt": "Configure cross-account access for CodeCommit repository shared-repo in us-east-1, account 123456789012, to grant access to account 888888888888. The repository is encrypted with customer-managed KMS key arn:aws:kms:us-east-1:123456789012:key/efgh-5678. The KMS key policy currently only grants the owning account root and does NOT include the cross-account principal.",
+      "prompt_file": "prompts/missing-kms-key-policy-cross-account.md",
+      "baseline_file": "baselines/missing-kms-key-policy-cross-account.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "CODECOMMIT_REPO: shared-repo\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] KMS key policy cross-account: NOT granted to 888888888888 — key policy must grant the cross-account principal kms:Decrypt, kms:Encrypt, kms:GenerateDataKey*",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "KMS key policy",
+            "VERDICT",
+            "CHECKLIST",
+            "888888888888"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 14,
       "max": 20,
-      "justification": "Provides many concrete AWS\u2011specific details (status\u2011reason codes, latency numbers, exact CLI commands, automation\u2011rule pitfalls) that a generic model would not list, but a large portion restates publicly documented procedures; the core decision tree mirrors existing AWS docs, so the net delta is modest."
+      "justification": "The skill largely restates known AWS CLI commands, control IDs, and standard mappings that a senior CloudOps engineer already knows; it does not introduce novel decision thresholds, unique heuristics, or previously undocumented exception handling."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (pre\u2011flight hub queries, per\u2011service probes, exact order of steps, confirmation gate before state changes). The only shortfall is occasional reliance on generic advice like \"check security\" in the mindset paragraph, which prevents a perfect score."
+      "justification": "Procedures are AWS\u2011specific and well ordered for most controls, but some steps are generic (e.g., \"wait for next eval cycle\") and the ordering of prerequisite actions (e.g., enable account\u2011level BPA before bucket\u2011level remediation) is not always explicit."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete NEVER list of five pitfalls with clear reasoning (e.g., never emit ROOT_CAUSE_FOUND without evidence). However, it omits other common anti\u2011patterns such as over\u2011using blanket Automation Rules or ignoring IAM policy drift, and the list is relatively short."
+      "justification": "Provides a solid \"NEVER\" list with reasoning, yet the list is limited to five items and omits other common pitfalls such as missing IAM permissions for Config rule Lambdas, region\u2011specific aggregation latency, and pagination errors."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, when_not_to_use, activation_triggers, and invocation_schema are all present and well\u2011structured, enabling reliable activation. The invocation_schema is slightly vague about required fields and error handling, preventing a perfect score."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The invocation_schema is slightly vague about optional fields, error handling, and how to supply a Config rule evaluation when only a finding ID is given."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The document separates quick navigation, stepwise procedures, and reference sections, which aids layering. However, the initial sections already contain extensive tables and command blocks, creating cognitive overload before a user can drill down, so full progressive disclosure is not achieved."
+      "justification": "The document presents a very large amount of detail up front; critical rules and anti\u2011patterns are buried deep rather than offered in a concise top\u2011level summary, causing potential cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by an explicit CONFIRM prompt, and diagnostic steps are left flexible. The only minor issue is that the skill does not explicitly restrict the scope of bulk remediation (e.g., \u201cdo not run across all buckets without explicit list\u201d), leaving a small freedom gap."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and the skill calibrates freedom well for fragile operations; only a minor gap in handling optional dry\u2011run mode."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: mindset, strict output contract, decision\u2011tree steps, NEVER list, and heuristics. Minor ad\u2011hoc sections (e.g., recent AWS features) slightly break the uniformity but the overall structure is coherent."
+      "justification": "The skill follows a recognizable structure (mindset, strict contract, quick navigation, stepwise decision tree) that aids comprehension, though the layout mixes narrative and tables, making the pattern slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 12,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI commands, and worked examples that match the output contract. Nevertheless, some examples contain inconsistencies (e.g., FALSE_POSITIVE layer paired with 'Not applicable' suppression) and the skill lacks guidance for handling CLI errors, pagination, missing permissions, and rate\u2011limit retries, which hampers reliable execution."
+      "justification": "Provides working examples, decision branches, and concrete remediation commands. Lacks explicit error handling for CLI failures, pagination, multi\u2011region considerations, and assumes the operator has necessary IAM permissions. Edge cases such as missing resource ARN or throttling are not addressed."
     }
   ],
-  "total_score": 103,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43082,
-  "latency_ms": 13067,
+  "token_count": 43088,
+  "latency_ms": 9841,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

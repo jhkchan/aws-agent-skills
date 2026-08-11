@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill supplies concrete thresholds (e.g., CPUUtilization <30% AND QueryQueueLength = 0 for down\u2011size), exact 2026 pricing numbers, a detailed decision\u2011tree, and specific storage\u2011utilisation breakpoints for RA3 vs DC2. These are precise data points a generic model would not enumerate, but the bulk of the content restates well\u2011known Redshift best practices, limiting the delta."
+      "justification": "The skill supplies concrete thresholds (e.g., CPU <30% AND QueryQueueLength =0 for downsize), specific 2026 pricing numbers, a detailed decision tree, and a multi\u2011dimensional cost model that a generic model would not generate on its own. However, most of the content restates well\u2011known Redshift best\u2011practices rather than introducing novel expert heuristics, so it falls short of a perfect delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "The skill encodes an AWS\u2011specific workflow: pre\u2011flight metadata gate, ordered optimisation dimensions, explicit CLI commands, and a right\u2011sizing decision tree. Procedures are largely Redshift\u2011centric, though some steps (e.g., \"monitor CPUUtilization\") are generic and lack metric\u2011level detail."
+      "justification": "Encodes AWS\u2011specific pre\u2011flight checks, exact CLI commands, snapshot\u2011before\u2011resize, and a step\u2011wise mindset. One point deducted because some steps (e.g., \"monitor CPUUtilization\") are generic monitoring actions rather than uniquely Redshift\u2011specific procedures."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasoning (downsize without queue data, RIs for Serverless, unchecked Concurrency Scaling, skipping VACUUM, missing CONFIRM gate). Only five anti\u2011patterns are covered; additional common pitfalls (e.g., snapshot size limits, cross\u2011region data\u2011sharing impact) are absent."
+      "justification": "Provides a concrete NEVER list with specific reasons (e.g., never downsize without QueryQueueLength, never use RIs for Serverless, never enable Concurrency Scaling without cost check). Only five anti\u2011patterns are listed; additional common pitfalls (e.g., SQA mis\u2011configuration) are omitted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Full frontmatter, clear description, when\u2011to\u2011use/when\u2011not\u2011to\u2011use, activation triggers, invocation schema, and a valid example. The only minor issue is the ambiguous \"entry_point: false\" which could affect automated discovery, but overall compliance is strong."
+      "justification": "Front\u2011matter, description, when\u2011to\u2011use, activation triggers, invocation schema and example are all present. One point deducted because the skill does not define an explicit output schema field (e.g., JSON schema) which would aid automated validation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers information: quick reference, then mindset, process, heuristics, and deep references. Some sections (quick reference table) are dense, but critical rules are not buried, achieving effective progressive disclosure."
+      "justification": "Uses quick reference, then deeper sections, which is good. However the initial sections (quick navigation table, long tables of cost baselines, and extensive philosophy) are dense and front\u2011load a lot of information before the concise top\u2011level contract, causing some cognitive overload. Two points deducted."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a mandatory CONFIRM step and snapshot recommendation, matching fragility. Creative recommendations (e.g., materialized views) are less constrained, which is appropriate. However, downsize guidance could be tighter (e.g., explicit minimum\u2011node checks)."
+      "justification": "Destructive actions are gated by CONFIRM and snapshot steps, and creative tasks have fewer constraints. One point deducted because the guidance on minimum node count (2 nodes) is only mentioned later in the process, not reinforced in the pre\u2011flight safety checklist."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Heuristics \u2192 NEVER \u2192 Decision tree). Minor ad\u2011hoc naming of sections prevents a perfect 10."
+      "justification": "Follows a recognizable structure (What it does, Quick reference, Mindset, Process, Anti\u2011patterns, Decision tree). The pattern is slightly ad\u2011hoc (mix of tables and narrative) rather than a clean, canonical template, so one point is deducted."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides actionable CLI snippets, a deterministic output contract, and cost\u2011calculation formulas, enabling an agent to execute the skill. However, the example calculations contain minor arithmetic inconsistencies (e.g., monthly right\u2011size savings formula uses $3.39\u202f\u00d7\u202f2\u202f\u00d7\u202f730 but claims removal of 2 nodes), and some edge cases (single\u2011node clusters, minimum node count) are not explicitly handled."
+      "justification": "Provides exact CLI commands, deterministic output contract, decision\u2011tree, and worked examples that an agent can execute. Minor issues: arithmetic rounding inconsistencies in example savings, and no explicit handling of edge cases such as single\u2011node clusters or elastic\u2011resize failures beyond generic error table."
     }
   ],
   "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47911,
-  "latency_ms": 18493,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "token_count": 49180,
+  "latency_ms": 12645,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

@@ -1,0 +1,160 @@
+# Eval test cases for backup-vault-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across backup vault scenarios
+# (compliance-mode vault with cross-region DR, governance-mode vault
+# with continuous backup, lifecycle outside lock window prerequisite
+# failure, cross-account copy missing vault access policy, KMS key not
+# found prerequisite failure).
+skill: backup-vault-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: compliance-vault-with-cross-region-dr
+    description: >-
+      Provision a compliance-mode backup vault with customer-managed
+      KMS key, daily backup plan, cross-region copy to us-west-2,
+      tag-based selection, and report plan. Expects READY_TO_DEPLOY
+      with all prerequisites verified.
+    input: |
+      Create an AWS Backup vault named production-backup-vault in
+      us-east-1 account 123456789012. Use KMS key
+      alias/backup-encryption-key (customer-managed, enabled). Apply
+      vault lock in COMPLIANCE mode with MinRetentionDays=90 and
+      MaxRetentionDays=365, ChangeableForDays=3. Create a backup plan
+      named production-daily-backup with schedule cron(0 5 ? * MON-SAT
+      *) targeting this vault, lifecycle DeleteAfterDays=180,
+      MoveToColdStorageAfterDays=60. Cross-region copy to vault
+      dr-backup-vault in us-west-2 (destination vault exists, KMS key
+      alias/dr-encryption-key accessible). Continuous backup for RDS
+      and DynamoDB resources (RecoveryPointType=CONTINUOUS). Tag-based
+      selection (Backup=daily) matching 45 resources. Report plan to
+      S3 bucket backup-compliance-reports. Tags: Environment=production,
+      Compliance=PCI-DSS.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "production-backup-vault"
+        - "COMPLIANCE"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "MinRetentionDays"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: governance-vault-with-continuous-backup
+    description: >-
+      Provision a governance-mode backup vault with continuous backup
+      for EC2 and EFS, periodic for S3. Expects READY_TO_DEPLOY with
+      governance mode noted as soft protection (not for compliance).
+    input: |
+      Create an AWS Backup vault named dev-backup-vault in us-east-1
+      account 123456789012. Use KMS key alias/dev-backup-key
+      (customer-managed, enabled). Apply vault lock in GOVERNANCE mode
+      with MinRetentionDays=7, MaxRetentionDays=90. Create a backup
+      plan named dev-continuous-backup with schedule cron(0 2 ? * * *)
+      targeting this vault, lifecycle DeleteAfterDays=30. Continuous
+      backup for EC2 and EFS (RecoveryPointType=CONTINUOUS). Periodic
+      for S3. Resource-ARN selection for 10 EC2 instances and 3 EFS
+      filesystems. No cross-region copy needed. Tags:
+      Environment=development.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "GOVERNANCE"
+        - "dev-backup-vault"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: lifecycle-outside-lock-window
+    description: >-
+      Operator requests a backup plan with DeleteAfterDays=7 on a vault
+      locked with MinRetentionDays=90. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the lifecycle violation cited.
+    input: |
+      Create an AWS Backup vault named locked-vault in us-east-1
+      account 123456789012. The vault will be locked in COMPLIANCE mode
+      with MinRetentionDays=90 and MaxRetentionDays=365. Create a
+      backup plan targeting this vault with lifecycle
+      DeleteAfterDays=7 and MoveToColdStorageAfterDays=3. The plan
+      should run daily. Tag-based selection.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "DeleteAfterDays"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "MinRetentionDays"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: cross-account-missing-vault-policy
+    description: >-
+      Operator requests cross-account backup copy but the destination
+      vault does not have a vault access policy granting the source
+      account. Expects PREREQUISITES_MISSING with the missing vault
+      access policy cited.
+    input: |
+      Create an AWS Backup vault named source-vault in us-east-1
+      account 111111111111. Create a backup plan with a cross-account
+      copy action to vault dest-vault in us-west-2 account
+      222222222222. The destination KMS key policy is correctly
+      configured to grant the source account. However, the destination
+      vault dest-vault does NOT have a vault access policy granting
+      backup:CopyIntoBackupVault to the source account 111111111111.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "vault access policy"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: kms-key-not-found
+    description: >-
+      Operator requests a backup vault but the KMS key alias does not
+      exist. Expects PREREQUISITES_MISSING with the KMS key gap cited.
+    input: |
+      Create an AWS Backup vault named production-vault in us-east-1
+      account 123456789012. Use KMS key alias/nonexistent-key. The key
+      does not exist — aws kms describe-key returns NotFoundException.
+      Create a backup plan with daily schedule. Compliance-mode vault
+      lock with MinRetentionDays=30.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "KMS"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

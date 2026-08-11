@@ -1,0 +1,176 @@
+{
+  "skill": "appconfig-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the AppConfig Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across AppConfig topologies (linear deployment with alarms and validators, exponential with feature flags and schema validation, all-at-once for non-critical configs, missing deployment strategy prerequisite failure, missing configuration profile prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "linear-deployment-with-alarms",
+      "name": "Linear AppConfig deployment with Lambda validator and CloudWatch alarm rollback",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — linear deployment strategy, 20% growth, 10-minute bake, Lambda validator, CloudWatch alarm for rollback",
+      "prompt": "Create an AppConfig application named my-app-config in us-east-1. Environment: production. Configuration profile: app-settings (JSON). Deployment strategy: linear, 20% growth factor, 10-minute bake time. Attach a Lambda validator (config-validator function). Configure a CloudWatch alarm (appconfig-deploy-error-rate) for rollback during bake time. Application ID abc12345. Environment ID def67890. Profile ID ghi11111. Strategy ID jkl22222. Tags: Environment=production.",
+      "prompt_file": "prompts/linear-deployment-with-alarms.md",
+      "baseline_file": "baselines/linear-deployment-with-alarms.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APPCONFIG: my-app-config (abc12345) / production (def67890)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Application: my-app-config (abc12345)\n  [✓] Environment: production (def67890)\n  [✓] Configuration profile: app-settings (ghi11111) — type: AWS.AppConfig.JSON\n  [✓] Deployment strategy: linear-20pct-10min (jkl22222) — LINEAR growth=20% bake=10min\n  [✓] Lambda validator: config-validator\n  [✓] CloudWatch alarms: appconfig-deploy-error-rate [monitored during bake time]\n  [✓] Rollback on alarm: enabled (auto-rollback during bake time)\nVERIFICATION_COMMANDS:\n  aws appconfig get-application --application-id abc12345\n  aws appconfig get-deployment-strategy --deployment-strategy-id jkl22222",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "LINEAR",
+            "growth=20%",
+            "bake=10",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Lambda validator",
+            "CloudWatch alarms"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exponential-with-validators-and-feature-flags",
+      "name": "Exponential AppConfig deployment with feature flags, validators, and schema validation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — exponential deployment strategy, feature flag schema, Lambda validator, JSON schema validation",
+      "prompt": "Create an AppConfig application named feature-flag-platform in us-east-1. Environment: staging. Configuration profile: feature-flag-store with feature flag schema. Deployment strategy: exponential, 2% growth factor, 10-minute bake time. Attach a Lambda validator (flag-validator function). Enable JSON schema validation for flag structure. Tags: Environment=staging, Application=feature-platform.",
+      "prompt_file": "prompts/exponential-with-validators-and-feature-flags.md",
+      "baseline_file": "baselines/exponential-with-validators-and-feature-flags.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APPCONFIG: feature-flag-platform / staging\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Configuration profile: feature-flag-store — type: AWS.Freeform\n  [✓] Deployment strategy: EXPONENTIAL growth=2% bake=10min\n  [✓] Feature flags: enabled\n  [✓] JSON schema validation: enabled\n  [✓] Lambda validator: flag-validator",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EXPONENTIAL",
+            "Feature flags",
+            "VERDICT",
+            "CHECKLIST",
+            "JSON schema validation"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "all-at-once-json-config",
+      "name": "All-at-once AppConfig deployment for non-critical YAML configuration",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — all-at-once deployment (100% growth, 0-minute bake) for non-critical development YAML config",
+      "prompt": "Create an AppConfig application named simple-config-app in us-east-1. Environment: development. Configuration profile: banner-text (YAML, free form). Deployment strategy: all-at-once (100% growth, 0-minute bake). This is a non-critical development config for UI banner text. Tags: Environment=development.",
+      "prompt_file": "prompts/all-at-once-json-config.md",
+      "baseline_file": "baselines/all-at-once-json-config.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APPCONFIG: simple-config-app / development\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Configuration profile: banner-text — type: AWS.Freeform\n  [✓] Deployment strategy: all-at-once growth=100% bake=0min\n  [✓] Rollback on alarm: disabled (bake time = 0)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "all-at-once",
+            "bake=0",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-deployment-strategy",
+      "name": "AppConfig deployment with missing deployment strategy (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no deployment strategy specified; cannot start deployment without one",
+      "prompt": "Deploy a new configuration version to AppConfig application abc12345, environment def67890. Configuration profile ghi11111, version 5. No deployment strategy specified. Just deploy it to production.",
+      "prompt_file": "prompts/missing-deployment-strategy.md",
+      "baseline_file": "baselines/missing-deployment-strategy.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "APPCONFIG: (abc12345) / (def67890)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Deployment strategy: MISSING — cannot start deployment without a strategy (growth factor, bake time)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "deployment strategy",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-configuration-profile",
+      "name": "AppConfig deployment with missing configuration profile (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no configuration profile or version exists; deployment requires a profile and version",
+      "prompt": "Create an AppConfig deployment for application my-app-config (abc12345), environment production (def67890). Use deployment strategy linear-20pct-10min (jkl22222). No configuration profile has been created yet — just deploy what we have.",
+      "prompt_file": "prompts/missing-configuration-profile.md",
+      "baseline_file": "baselines/missing-configuration-profile.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "APPCONFIG: my-app-config (abc12345) / production (def67890)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Configuration profile: MISSING — no profile exists; must create a profile and version before deploying",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "configuration profile",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

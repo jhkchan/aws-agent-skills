@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "apigateway-http-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the API Gateway HTTP API Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "payload-format-v2-base64-body",
+      "name": "502 Bad Gateway on POST when body exceeds 1 KB — PayloadFormatVersion 2.0 delivers base64 body, handler JSON.parse throws",
+      "difficulty": "hard",
+      "prompt_file": "prompts/payload-format-v2-base64-body.md",
+      "baseline_file": "baselines/payload-format-v2-base64-body.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "PAYLOAD_FORMAT_VERSION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "payload-format-v2-base64-body", "PAYLOAD_FORMAT_VERSION", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: JWT_AUTHORIZER"]
+        }
+      ]
+    },
+    {
+      "id": "jwt-authorizer-audience-mismatch",
+      "name": "403 Forbidden on all requests — JWT authorizer Audience mismatch between config and token aud claim",
+      "difficulty": "hard",
+      "prompt_file": "prompts/jwt-authorizer-audience-mismatch.md",
+      "baseline_file": "baselines/jwt-authorizer-audience-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "JWT_AUTHORIZER",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "jwt-authorizer-audience-mismatch", "JWT_AUTHORIZER", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CORS_MISCONFIG"]
+        }
+      ]
+    },
+    {
+      "id": "cors-preflight-headers-missing",
+      "name": "Browser CORS error — AllowMethods missing OPTIONS, preflight returns 404",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cors-preflight-headers-missing.md",
+      "baseline_file": "baselines/cors-preflight-headers-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CORS_MISCONFIG",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "cors-preflight-headers-missing", "CORS_MISCONFIG", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: JWT_AUTHORIZER"]
+        }
+      ]
+    },
+    {
+      "id": "integration-timeout-unknown-502",
+      "name": "Intermittent 502 on POST /webhook — integration config, payload format version, and VPC link details not provided",
+      "difficulty": "hard",
+      "prompt_file": "prompts/integration-timeout-unknown-502.md",
+      "baseline_file": "baselines/integration-timeout-unknown-502.md",
+      "expected_verdict": "INSUFFICIENT_DATA",
+      "expected_layer": "UNKNOWN",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INSUFFICIENT_DATA", "integration-timeout-unknown-502", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "I cannot", "I'm unable"]
+        }
+      ]
+    },
+    {
+      "id": "vpclink-nlb-config-incomplete",
+      "name": "502 from VPC link private integration — NLB target group ARN and target health not provided",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpclink-nlb-config-incomplete.md",
+      "baseline_file": "baselines/vpclink-nlb-config-incomplete.md",
+      "expected_verdict": "INSUFFICIENT_DATA",
+      "expected_layer": "UNKNOWN",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["INSUFFICIENT_DATA", "vpclink-nlb-config-incomplete", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "I cannot", "I'm unable"]
+        }
+      ]
+    }
+  ]
+}

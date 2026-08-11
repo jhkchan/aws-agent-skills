@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds genuine expert knowledge: silent\u2011failure table, dual\u2011policy trap, predictive\u2011scaling 24h history requirement, capacity\u2011rebalance no\u2011op, warm\u2011pool race conditions, specific ordering constraints and concrete CLI flag nuances. Some sections merely restate AWS docs, preventing a perfect score."
+      "justification": "Adds concrete expert insights not usually memorized: silent\u2011failure table, dual\u2011policy trap, predictive\u2011scaling 24\u2011hour data requirement, capacity\u2011rebalance no\u2011op on On\u2011Demand\u2011only ASGs, warm\u2011pool drain race, and precise CLI flag nuances (e.g., --treat-missing-data, --time-zone). However, a portion restates standard AWS docs, so not a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides an explicit 9\u2011step AWS\u2011CLI procedure, rationale for each ordering decision, and verification commands; only a few steps remain generic (e.g., \u201cconfirm baseline\u201d) rather than fully AWS\u2011specific."
+      "justification": "Provides an AWS\u2011specific 9\u2011step provisioning workflow with reasoning for ordering and exact CLI commands. Some steps (e.g., \u201cConfirm ASG baseline\u201d) are generic checks that any CloudOps engineer would perform, reducing the score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list of five specific anti\u2011patterns with clear why\u2011it\u2011fails explanations, but omits other common traps such as missing IAM service\u2011linked role, mis\u2011configured cooldowns, or overly aggressive MinSize/MaxSize settings."
+      "justification": "Contains a concrete NEVER list with five well\u2011explained pitfalls and additional warnings throughout the document. Could be stronger by enumerating more silent\u2011failure scenarios (e.g., missing service\u2011linked role, conflicting launch\u2011template versions) and providing deeper reasoning for each."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, activation triggers, and invocation schema are all present and well\u2011formed; however the skill lacks an explicit input\u2011schema definition or a concrete example payload, which would improve reliable activation."
+      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are all present and precise. The input schema is described in prose rather than a formal JSON schema, which is a minor omission."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered from a quick reference to deep sections (reasoning, dependency graph, heuristics, full 9\u2011step procedure). The full procedure appears early, adding some cognitive load, but overall the layering is effective."
+      "justification": "Information is layered: quick reference first, then deep sections (reasoning, dependency graph, 9\u2011step procedure, anti\u2011patterns, contract). The quick\u2011reference table is dense and may overload the reader, preventing perfect progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive provisioning is gated by prerequisite checks and a verification step, matching the fragility of the task; however the skill does not constrain policy count, warm\u2011pool size limits, or other quantitative safety guards, leaving a bit too much freedom."
+      "justification": "Destructive actions are gated by prerequisite checks and a PREREQUISITES_MISSING verdict, showing good calibration, yet some parameters (e.g., target values, cooldowns) remain loosely specified, allowing overly permissive configurations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (overview \u2192 activation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 output format) that aids comprehension; no ad\u2011hoc structure detected."
+      "justification": "Follows a recognizable skill pattern (overview \u2192 navigation \u2192 procedure \u2192 anti\u2011patterns \u2192 contract). The pattern is coherent but not explicitly labeled, making it slightly less obvious."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides working CLI snippets, verification commands, and a strict output contract, enabling an agent to execute the skill. Missing explicit error\u2011handling branches for failed commands and a few optional\u2011section examples reduce completeness."
+      "justification": "Provides working CLI commands, verification steps, and a strict output contract that an agent can execute. Missing guidance for handling IAM/service\u2011linked\u2011role errors and some checklist items lack explicit verification commands (e.g., warm\u2011pool health checks)."
     }
   ],
-  "total_score": 106,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43695,
-  "latency_ms": 13585,
+  "token_count": 43725,
+  "latency_ms": 32601,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

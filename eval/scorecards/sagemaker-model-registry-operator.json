@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert details not in generic docs: exact approval\u2011state transition matrix, prioritized pre\u2011check list, regex for group\u2011name validation, KMS encryption nuance, ValidationSpecification behavior, EventBridge rule pattern, and immutable fields vs mutable fields. This information would teach a senior CloudOps engineer new decision\u2011trees and thresholds."
+      "justification": "Provides many AWS\u2011specific nuances (approval state machine, KMS encryption scope, ValidationSpecification, AdditionalInferenceSpecifications, Model Card auto\u2011population, EventBridge rule pattern) that a generic model would not enumerate, but most of this information is already documented in official AWS docs, so the delta is solid but not groundbreaking."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedural flow: pre\u2011flight CLI commands, exact order of IAM, KMS, artifact checks, confirm\u2011gate before any state\u2011changing CLI, snapshot of current group state, and post\u2011verification steps. Only minor generic phrasing (e.g., \"check security\") prevents a perfect score."
+      "justification": "Defines an AWS\u2011specific procedural flow: ordered pre\u2011checks, mandatory CONFIRM gate, snapshot before mutation, post\u2011verification steps, and per\u2011operation checklists. However, some steps (e.g., IAM permission check) are described generically without the exact AWS CLI or simulation command, leaving a slight gap in procedure specificity."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never register production packages without a group, never auto\u2011approve, never assume deployability without InferenceSpecification). Missing some common pitfalls such as pagination edge\u2011cases, eventual\u2011consistency delays, and race conditions when two operators act concurrently."
+      "justification": "Contains a concrete NEVER list with clear rationales (e.g., never register production packages without a group, never set Approved at registration, never approve without InferenceSpecification). Missing a few common pitfalls such as forgetting required tags or mishandling pagination errors, which prevents a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The \"when_to_use\" and \"when_not_to_use\" sections are clear, but the invocation schema could be more explicit about required field names and types, preventing a perfect score."
+      "justification": "Frontmatter is complete, description, when_to_use/when_not_to_use, activation_triggers, and invocation_schema are all present, giving an agent reliable activation cues. The activation_triggers list is overly broad (includes low\u2011level CLI names) which could cause spurious activation, thus a small deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, patterns, output format, anti\u2011patterns) so an agent can skim or dive deeper. However the skill front\u2011loads a large amount of dense information, which may cause cognitive overload before the agent reaches the concise QUICK REFERENCE."
+      "justification": "Uses a clear hierarchy (quick reference, mindset, pre\u2011flight, process, patterns, output format, anti\u2011patterns) that layers information. The initial sections are dense, potentially overloading the agent before it knows which part to read, so not fully optimal."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained with mandatory CONFIRM gate, pre\u2011check blocking, and state snapshots. Creative or informational tasks (listing, diagnostics) are left open. No over\u2011constraining observed."
+      "justification": "Destructive operations are tightly constrained with CONFIRM gates, state snapshots, and exhaustive pre\u2011checks. For read\u2011only actions (list/describe) the same heavy gating is still suggested, which is unnecessary but does not introduce risk."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Common patterns \u2192 Output format \u2192 Anti\u2011Patterns. The structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns) that aids comprehension. Minor inconsistency in naming sections (e.g., mixing \u2018\u00a7\u2019 symbols with plain headings) makes the pattern slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides decision trees, full CLI examples, worked scenarios, and error\u2011handling flow. Missing explicit handling for pagination beyond 100, eventual\u2011consistency retries, and CLI failure branches (e.g., retry logic, fallback). Deducted 2 points."
+      "justification": "Provides decision trees, concrete CLI examples, and a strict output contract, enabling an agent to act. The sample model outputs contain inconsistencies (e.g., STATE values not matching allowed list, VERDICT READY for approve without clear transition to COMPLETED, ambiguous placeholders like <returned-arn>), and some edge cases (pagination failures, network errors) are not covered, reducing practical reliability."
     }
   ],
-  "total_score": 107,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45952,
-  "latency_ms": 12066,
+  "token_count": 46106,
+  "latency_ms": 8505,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

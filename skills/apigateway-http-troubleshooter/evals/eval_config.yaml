@@ -1,0 +1,48 @@
+# Eval configuration for apigateway-http-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: apigateway-http-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: payload-format-v2-base64-body
+    difficulty: hard
+    prompt_file: prompts/payload-format-v2-base64-body.md
+    baseline_file: baselines/payload-format-v2-base64-body.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: PAYLOAD_FORMAT_VERSION
+  - id: jwt-authorizer-audience-mismatch
+    difficulty: hard
+    prompt_file: prompts/jwt-authorizer-audience-mismatch.md
+    baseline_file: baselines/jwt-authorizer-audience-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: JWT_AUTHORIZER
+  - id: cors-preflight-headers-missing
+    difficulty: medium
+    prompt_file: prompts/cors-preflight-headers-missing.md
+    baseline_file: baselines/cors-preflight-headers-missing.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: CORS_MISCONFIG
+  - id: integration-timeout-unknown-502
+    difficulty: hard
+    prompt_file: prompts/integration-timeout-unknown-502.md
+    baseline_file: baselines/integration-timeout-unknown-502.md
+    expected_verdict: INSUFFICIENT_DATA
+    expected_layer: UNKNOWN
+  - id: vpclink-nlb-config-incomplete
+    difficulty: hard
+    prompt_file: prompts/vpclink-nlb-config-incomplete.md
+    baseline_file: baselines/vpclink-nlb-config-incomplete.md
+    expected_verdict: INSUFFICIENT_DATA
+    expected_layer: UNKNOWN

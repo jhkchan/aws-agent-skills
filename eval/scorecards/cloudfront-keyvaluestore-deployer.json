@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides concrete thresholds (1\u202fMB total store, 512\u2011char keys, 3\u202fKB values), explicit etag concurrency pattern, mandatory runtime version (cloudfront-js-2.0), detailed propagation timing (seconds to minutes, worst\u2011case 5\u202fmin), deterministic hash\u2011based A/B routing algorithm, and size\u2011budget calculations\u2014information a baseline model would not enumerate."
+      "justification": "Provides several expert\u2011level specifics (1\u202fMB total store limit, 512\u2011char key limit, 3\u202fKB value limit, etag concurrency, propagation latency ranges, runtime requirement) that go beyond a generic model's knowledge, but some content merely restates official documentation without novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific ordering: create KVS \u2192 fetch etag \u2192 put keys \u2192 create function with `--key-value-store-associations` \u2192 publish function \u2192 associate with distribution, plus precise CLI flags and required re\u2011fetch of etag before each mutation."
+      "justification": "Offers a concrete AWS\u2011specific provisioning workflow (create store \u2192 fetch etag \u2192 put\u2011key \u2192 create function with cloudfront-js-2.0 \u2192 publish \u2192 associate with distribution) and decision\u2011tree style reasoning for A/B testing and feature flags. One minor gap: the etag re\u2011fetch loop is described later but not emphasized in the initial step list."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never use cloudfront-js-1.0, never exceed 1\u202fMB, never write from a function, never reuse stale etag). Lacks warnings about missing IAM policies, over\u2011reliance on eventual consistency for security, and no guidance on monitoring failures."
+      "justification": "Contains a detailed NEVER list with specific pitfalls (wrong runtime, stale etag, size limit overflow, using KVS for security\u2011critical instant rules, Math.random() in A/B, case\u2011sensitive keys) and explains why each is dangerous. Missing a few edge\u2011case warnings (e.g., forgetting to set function stage to LIVE after publishing) prevents a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, keywords, and strict output contract are all present. The \"when to invoke\" paragraph is slightly vague about edge\u2011case triggers, preventing a perfect rating."
+      "justification": "Frontmatter, description, keywords, activation triggers, and a clear output contract are present. However, the \"when_to_use\" section could be more succinct, and the activation keyword list mixes natural language with technical terms, which may reduce reliable trigger detection."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Top\u2011level summary, then detailed sections, then full command examples. However, the initial sections (mindset, configuration graph) are dense and front\u2011load many details before the core checklist, causing some cognitive overload."
+      "justification": "Information is layered well: high\u2011level overview \u2192 quick navigation \u2192 mindset \u2192 detailed steps \u2192 anti\u2011patterns \u2192 output format \u2192 worked example. No critical information is buried, but the worked example repeats many steps, adding some redundancy."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (store creation, key writes) are tightly constrained with size limits, etag handling, and runtime checks. Missing explicit enforcement of required IAM permissions reduces the score by one point."
+      "justification": "Destructive actions (store creation, key writes) are guarded by size checks, etag handling, and runtime validation, while creative tasks (example generation) are left open. The calibration could be tighter for batch key writes, where the skill should explicitly enforce per\u2011write etag refresh."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 heuristic \u2192 prerequisites \u2192 step\u2011by\u2011step \u2192 NEVER \u2192 output format). Some sections feel ad\u2011hoc (e.g., large tables) which prevents a perfect score."
+      "justification": "Follows a recognizable structure (metadata \u2192 mindset \u2192 stepwise procedure \u2192 anti\u2011patterns \u2192 output format). The pattern is consistent and aids comprehension; only a minor deviation is the mixed use of tables and free\u2011form text."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 11,
       "max": 15,
-      "justification": "Provides complete, copy\u2011pasteable CLI commands, etag refresh loop, verification commands, and a ready\u2011to\u2011deploy checklist. Missing explicit IAM permission guidance and pagination handling for large key sets, which could cause execution failures."
+      "justification": "Provides working CLI snippets, a ready\u2011to\u2011deploy checklist, and error\u2011handling notes. Lacks guidance on IAM permissions, pagination for list\u2011keys, handling of existing resources, and the IP\u2011blocklist function example is unrealistic for CloudFront Functions (loop over 8000 keys exceeds size limits). These gaps reduce immediate usability."
     }
   ],
-  "total_score": 107,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 51516,
-  "latency_ms": 13124,
+  "token_count": 51401,
+  "latency_ms": 14554,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

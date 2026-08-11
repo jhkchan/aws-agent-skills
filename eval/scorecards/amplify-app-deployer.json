@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill consolidates many known Amplify practices but adds only a few truly novel heuristics (e.g., the explicit dependency graph and cost table). A large portion restates standard AWS documentation, so it does not achieve full expert delta."
+      "justification": "Adds concrete expert knowledge such as the exact ordering of provisioning steps, region\u2011specific ACM requirement, a novel dependency\u2011graph heuristic, and cost/latency trade\u2011offs for rendering modes. However, a large portion restates official documentation without new insight, preventing a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a detailed 10\u2011step AWS\u2011specific provisioning flow and decision trees, but includes a generic \u201cverify prerequisites\u201d step that is not uniquely AWS\u2011focused, costing one point."
+      "justification": "Provides AWS\u2011specific ordering (git provider \u2192 app \u2192 framework \u2192 buildspec \u2192 backend \u2192 domain) and concrete CLI snippets, but some procedures are generic (e.g., \u201cverify prerequisites\u201d) and lack explicit AWS\u2011only nuances such as required IAM policies for CodeConnections."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons, yet omits a few common pitfalls such as over\u2011permissive IAM roles for SSR compute and missing CDK bootstrap validation."
+      "justification": "Contains a concrete \"NEVER\" list with specific reasons (e.g., console\u2011only headers, wrong ACM region, using ampx push in CI). Missing some common pitfalls such as IAM role permission gaps and idempotent re\u2011runs, so not a full 15."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and includes a rich keyword list; the output contract is unambiguous."
+      "justification": "Frontmatter, description, keywords, and a clear output contract are present. However the activation trigger is only described in prose (\u201cwhen to use\u201d) rather than a precise, machine\u2011readable trigger field, making reliable invocation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (summary, quick\u2011nav table, detailed sections) but the long narrative blocks and deep references are interspersed, causing some cognitive overload for an agent."
+      "justification": "The document layers information well: high\u2011level overview, quick\u2011navigation table, detailed step sections, and deep reference links. Critical rules (the NEVER list) are placed near the end, which is appropriate, but the initial \"What this skill does\" paragraph repeats many details that could be deferred."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (create\u2011app, domain association) are allowed with minimal input validation; tighter constraints (e.g., explicit schema validation of repo URL, region, app name) would better match the fragility of provisioning."
+      "justification": "Calibrates freedom by requiring prerequisite checks and a PREREQUISITES_MISSING verdict before proceeding. Destructive commands (e.g., create\u2011app, create\u2011domain\u2011association) are presented without an explicit confirmation step, leaving a small risk of over\u2011permissiveness."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset \u2192 Philosophy \u2192 Steps \u2192 NEVER \u2192 Output), but the ordering is slightly ad\u2011hoc and not a formally defined template, losing a point."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Philosophy \u2192 Quick navigation \u2192 Reasoning framework \u2192 Steps \u2192 NEVER \u2192 Output format). Minor inconsistency in naming sections makes it slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides actionable CLI commands, decision trees, and example outputs, yet lacks explicit error\u2011handling branches (e.g., what to do if ACM validation times out or a CodeConnections connection stays PENDING)."
+      "justification": "Provides decision trees, concrete CLI snippets, error\u2011handling table, and ready\u2011to\u2011use checklist examples. Lacks handling for existing resources (idempotency), placeholder values (<id>) are not auto\u2011filled, and some edge cases (cross\u2011region resources) are omitted."
     }
   ],
-  "total_score": 107,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46223,
-  "latency_ms": 31992,
-  "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "token_count": 43061,
+  "latency_ms": 10643,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
 }

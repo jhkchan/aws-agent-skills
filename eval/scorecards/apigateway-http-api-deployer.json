@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert rules (e.g., NEVER use ANY /{proxy+} with NONE, trailing\u2011slash requirement for Cognito issuers, auto\u2011deploy vs pinned stage race) and recent 2024\u20112026 feature notes (Step Functions direct integration, VPC Lattice, mTLS). Some of this is already known to a capable model and the mTLS details are only mentioned in passing, so not a perfect 20."
+      "justification": "Provides many expert heuristics (ANY/{proxy+} trap, auto\u2011deploy vs pinned stage race, JWT trailing\u2011slash rule) that a baseline model would not know, but a sizable portion restates standard AWS documentation without novel decision thresholds."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific step\u2011by\u2011step procedure (pre\u2011flight IAM checks, VPC\u2011link creation, JWT authorizer creation, auto\u2011deploy heuristics) and orders the aws apigatewayv2 commands. Missing a dedicated sub\u2011procedure for creating the least\u2011privilege IAM role required for direct SQS/Kinesis/Step Functions integrations."
+      "justification": "Encodes AWS\u2011specific ordering (create\u2011api \u2192 routes \u2192 integrations \u2192 authorizer \u2192 stage) and decision rules, yet the initial IAM\u2011permission checklist is generic and not uniquely HTTP\u2011API\u2011focused."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never use ANY/{proxy+} with NONE auth, never set auto\u2011deploy false without a deployment, never use wildcard origins with allowCredentials). The list is thorough but could include more pitfalls (e.g., forgetting lambda:AddPermission for private integrations) and sometimes repeats generic warnings."
+      "justification": "Contains concrete NEVER statements with clear why (e.g., ANY/{proxy+} with NONE, wildcard origins with credentials, mixing auto\u2011deploy with explicit deployments). One minor gap: no explicit reason given for why ALB is invalid for VPC\u2011link beyond \u201cnot a valid target\u201d."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, includes description, version, keywords, activation triggers, and invocation schema. Activation triggers contain some redundancy and the schema description is high\u2011level rather than a strict JSON schema, which may hinder reliable activation."
+      "justification": "Complete frontmatter, clear description of WHAT it does, WHEN to invoke, exhaustive keywords, activation triggers, invocation schema, and a strict literal output contract. All required specification elements are present."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered (Mindset, Quick reference, Detailed steps, Edge\u2011case handling, NEVER list). However, the initial sections are dense and many critical rules appear only in later sections, creating potential cognitive overload for a quick\u2011use agent."
+      "justification": "The skill layers information (Mindset \u2192 Quick reference \u2192 Detailed steps), but the initial sections are dense and contain many details before the concise checklist, creating some cognitive overload for an agent."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (create\u2011api, associate\u2011web\u2011acl) are tightly constrained with explicit safety gates and NEVER rules. Slight gap: no explicit guidance on throttling limits when auto\u2011deploy is enabled, which could lead to runaway traffic."
+      "justification": "Calibrates freedom well for a provisioning task (pre\u2011flight checks, strict NEVER rules). Slightly over\u2011constrains non\u2011destructive creative scenarios (e.g., no guidance for optional custom extensions)."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Process steps \u2192 Output format \u2192 Edge\u2011case handling). The structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset, Quick reference, Process steps, Anti\u2011patterns, Output format). The ordering of sections is a bit ad\u2011hoc (e.g., references appear after anti\u2011patterns), preventing a perfectly clean pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a usable checklist, decision tree, and ordered AWS CLI commands. Nevertheless, several commands are syntactically wrong (e.g., create-api with a '--target' flag, missing integration\u2011id placeholders in create\u2011route, incorrect create\u2011api syntax for internal\u2011api). These errors would cause execution failures, indicating incomplete practical usability."
+      "justification": "Provides a complete checklist, decision tree, and ordered AWS CLI commands that an agent can execute. However, error\u2011handling paths are sparse, placeholders (<api-id>) are left unresolved (expected but not guided), and no guidance for handling throttling or idempotency errors."
     }
   ],
-  "total_score": 102,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 47431,
-  "latency_ms": 11411,
+  "grade": "A",
+  "token_count": 50055,
+  "latency_ms": 13464,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

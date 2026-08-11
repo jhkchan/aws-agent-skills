@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill supplies concrete, non\u2011generic data such as the OCU floor of 4, exact cost per OCU ($0.204/hr), ordering rules (encryption policy before collection, network policy before collection), specific vector engine choices (faiss vs nmslib) and auto\u2011scaling thresholds. These details go beyond a baseline model's knowledge, but much of the content restates official AWS documentation without introducing a novel decision tree, so it falls short of a perfect score."
+      "justification": "Adds concrete, expert\u2011level details such as the exact OCU floor (4), per\u2011OCU cost ($0.204/hr), auto\u2011scaling thresholds, specific JSON structures for encryption and network policies, and a heuristic matrix for collection\u2011type selection. These are not generic knowledge and would teach a senior CloudOps engineer new actionable thresholds. Deducted 4 points because most of the information is restated from official docs rather than novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific pre\u2011flight checklist and exact CLI ordering (encryption \u2192 network \u2192 collection \u2192 VPC endpoint \u2192 access policy). Some steps (e.g., \"verify IAM permissions\") are generic and not tied to a concrete AWS procedure, preventing a perfect score."
+      "justification": "Provides an AWS\u2011specific procedural flow: encryption policy must exist before collection, network policy before collection, then collection creation, followed by VPC endpoint and access policy. Includes detailed pre\u2011flight CLI checks. Missing explicit rollback or error\u2011handling steps for failed CLI calls, so 2 points deducted."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete \"NEVER\" list with five specific anti\u2011patterns and clear rationales (e.g., immutable KMS key, standby replicas for HA). Lacks a few additional pitfalls (e.g., forgetting to update lifecycle policy after index rollover) that would make it exhaustive."
+      "justification": "Includes a solid top\u20115 NEVER list with reasoning, but it omits other common pitfalls (e.g., forgetting lifecycle policy for SEARCH collections, handling async policy propagation delays) and therefore is not exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present and well\u2011formed. However, activation triggers include some loosely phrased items (e.g., \"create OpenSearch Serverless collection\") that could fire in unrelated contexts, making the spec slightly less precise."
+      "justification": "Frontmatter, description, activation triggers, and invocation schema are present, but the \"when NOT to use\" clause is missing, making the trigger definition slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers information (quick reference \u2192 mindset \u2192 detailed process \u2192 output contract). The initial quick\u2011reference table is dense, potentially overloading the reader before they know the context, which slightly reduces progressive disclosure quality."
+      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, output contract, NEVER list, and heuristics. The 'Expert heuristic' section is dense and could overload the initial read, so 2 points deducted for sub\u2011optimal layering."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a CONFIRM step and extensive pre\u2011checks; the skill calibrates freedom appropriately for a fragile operation. Minor over\u2011specification (cost estimate always shown) could be unnecessary for simple create\u2011only scenarios."
+      "justification": "Destructive actions are tightly constrained by a CONFIRM gate and exhaustive pre\u2011checks, matching the fragility of the operations. Slight over\u2011freedom: the skill does not guard against re\u2011creating policies that already exist (idempotency), costing 1 point."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Process \u2192 Output contract \u2192 NEVER list). The structure is consistent and aids comprehension, missing only a brief summary table that would make the pattern fully canonical."
+      "justification": "Follows a recognizable structure (overview \u2192 mindset \u2192 process \u2192 contract \u2192 anti\u2011patterns \u2192 heuristics). Minor ad\u2011hoc ordering of sections prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a complete decision tree, example CLI commands, verification steps, and cost estimates, enabling an agent to execute the plan. However, placeholders like <endpoint-from-step-4> are not resolved, update\u2011vs\u2011create handling is only hinted, and there is no explicit error\u2011handling for CLI failures, limiting full practical reliability."
+      "justification": "Provides complete CLI command sequence, exact output format, cost estimation, and edge\u2011case handling. Lacks explicit failure handling/retry logic for each CLI step, which could cause execution gaps. Deducted 2 points."
     }
   ],
-  "total_score": 104,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 37965,
-  "latency_ms": 14257,
+  "token_count": 38680,
+  "latency_ms": 20148,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

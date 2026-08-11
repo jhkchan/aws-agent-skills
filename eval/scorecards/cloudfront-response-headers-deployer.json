@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert details not usually known to a baseline model: exact managed policy IDs, immutable ETag update workflow, the fact that Server/Via headers cannot be removed, the irreversible nature of long HSTS max\u2011age, the default CSP baseline, and the nuance that response\u2011headers policies do not apply to cached error responses. These specifics constitute genuine delta knowledge."
+      "justification": "Provides several pieces of expert knowledge not commonly known (exact managed policy IDs, immutable removal\u2011header behavior, ETag versioning requirement, automatic managed\u2011policy updates). However, much of the content restates official documentation rather than novel decision trees, so full credit is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow: pre\u2011flight checklist, ETag capture, confirmation gate, attach\u2011to\u2011cache\u2011behavior steps, and explicit CLI commands. Some steps (e.g., \"verify distribution exists\") are generic and could be more CloudFront\u2011centric, preventing a perfect score."
+      "justification": "Procedures are AWS\u2011specific (ETag handling, pre\u2011flight CLI checks, attach\u2011to\u2011behavior order). A small deduction for inclusion of generic advice like \"verify distribution exists\" without tying it to a concrete AWS API response pattern."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., wildcard origin with credentials, Override:false on security headers, HSTS max\u2011age on non\u2011prod). Missing a few additional pitfalls such as IAM permission failures or policy\u2011name collisions, so not flawless."
+      "justification": "Contains a thorough NEVER list with concrete reasons (CORS * + credentials, Override:false, HSTS max\u2011age, removal of Server/Via, etc.), but a few anti\u2011patterns are only mentioned in prose rather than as explicit list items, and the rationale for some (e.g., why \u2018X\u2011Frame\u2011Options: ALLOW\u2011FROM\u2019 is deprecated) could be deeper."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present, enabling reliable activation. The input shape description is vague (\u201cone of: a deployment spec \u2026\u201d) and lacks a concrete JSON schema, which weakens precise triggering."
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are present. The \"when_to_use\" paragraph is long and contains some overlap with other sections, making the trigger definition a bit vague for an automated agent."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns) so readers can skim or dive deep. The initial sections are dense, risking cognitive overload for a first\u2011time user, preventing a perfect score."
+      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns) that let an agent skim or dive deeper. However, some critical rules (the strict output contract) are buried deep, requiring a full read to avoid violations."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Calibrates freedom well: destructive actions require confirmation, ETag matching, and pre\u2011flight validation. However, the skill does not explicitly forbid automated execution without human confirmation, leaving a small gap in safety constraints."
+      "justification": "Destructive actions (create/update/delete policies) are guarded by pre\u2011flight checks and ETag verification, showing good calibration. However, the skill does not explicitly constrain the delete operation (no \"never delete without backup\" rule), leaving a small gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 anti\u2011patterns \u2192 output contract). The structure is coherent and aids comprehension, missing only a formal naming of the pattern."
+      "justification": "Follows a recognizable pattern (What it does \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract), aiding comprehension. Minor inconsistency in ordering of sections (e.g., anti\u2011patterns appear both early and later) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI snippets, CloudFormation/Terraform templates, and full example outputs that an agent could execute. Lacks handling for edge cases such as policy name collisions, IAM permission errors, and does not show a rollback strategy, so usability is strong but not exhaustive."
+      "justification": "Provides concrete CloudFormation snippets, CLI commands, decision trees, and example outputs that an agent could execute. Gaps remain: Terraform examples are only referenced, not shown; a small syntax error in the example (`ResponseHeadersPolicyId:!Ref`) could cause failure; and edge\u2011case handling for multi\u2011behavior distributions is not detailed."
     }
   ],
-  "total_score": 104,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42454,
-  "latency_ms": 11894,
+  "token_count": 43219,
+  "latency_ms": 9311,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

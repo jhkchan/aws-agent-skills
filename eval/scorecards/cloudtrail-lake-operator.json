@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill supplies many expert\u2011level details not usually restated by a generic model: exact retention limits (90\u20113653 days or INDEFINITE), KMS key\u2011policy requirements, the \"partition\u2011or\u2011perish\" heuristic, multi\u2011column partitioning (2025), EDS replication, cost and latency baselines, and precise failure\u2011mode tables. However it omits some operational limits (e.g., maximum number of Event Data Stores per account, maximum query length) and does not mention newer limits such as query result size caps, so the knowledge is not absolutely complete."
+      "justification": "Adds concrete expert details not usually known to a generic model: exact retention limits (90\u20113653 days or literal INDEFINITE), required KMS key\u2011policy grants for cloudtrail.amazonaws.com, multi\u2011column partitioning introduced in 2025, EDS replication feature, precise pre\u2011check ordering, and cost\u2011time baselines. These constitute genuine delta knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow: ordered pre\u2011checks (region alignment, KMS policy, organization scope, retention, etc.), explicit CONFIRM gate, capture of pre\u2011state, and detailed Athena\u2011federation steps. Some steps are described generically (e.g., \"check IAM permissions\" without listing exact actions) which prevents a perfect score."
+      "justification": "Provides AWS\u2011specific procedures: exact CLI flag composition, deterministic pre\u2011flight checklist, mandatory CONFIRM gate, pre\u2011state capture, and per\u2011operation planning. Missing a detailed delete\u2011event\u2011data\u2011store workflow, so one point is deducted."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasons (e.g., never run without a time filter, never assume global scope, never delete without disabling termination protection). Missing a few common pitfalls such as forgetting to set S3 bucket policies for Athena result locations or overlooking Lake Formation grant inheritance, so the anti\u2011pattern coverage is strong but not exhaustive."
+      "justification": "A thorough NEVER list is provided with concrete reasons (e.g., \"partition\u2011or\u2011perish\", organization\u2011scoped EDS creation, missing KMS grant). The list covers most common pitfalls. It lacks a few niche anti\u2011patterns (e.g., cost\u2011blowout from overly broad AdvancedEventSelectors) and does not always explain the underlying AWS service behavior in depth, so two points are deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The only inconsistency is the mention of a \"VERDICT: ERROR\" response for malformed input, which contradicts the strict output contract that allows only READY, BLOCKED, or COMPLETED. This violates full compliance."
+      "justification": "Frontmatter is complete, the description, when_to_use, activation_triggers, and invocation_schema are all present and detailed. The only shortfall is that the \"Malformed input\" section mentions emitting VERDICT: ERROR, which is not listed in the strict output contract's allowed verdicts, creating a slight inconsistency."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns, and examples. The initial sections are dense, which can cause some cognitive overload, but critical rules are still surfaced early enough."
+      "justification": "Information is layered into sections (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns, etc.) and a navigation table. However the initial description is very dense, presenting many details before the navigation cue, causing some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained by mandatory CONFIRM gates and exhaustive pre\u2011checks. Creative tasks (query authoring) are given freedom but are calibrated by requiring a partition filter and column selection guidance. No over\u2011constrained or under\u2011constrained areas were found."
+      "justification": "Destructive operations are tightly constrained by pre\u2011checks and a mandatory CONFIRM gate, while query\u2011writing is left flexible with guidance on partition pruning. The calibration matches task fragility well; a single point is deducted for the earlier VERDICT: ERROR inconsistency."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "The skill follows a clear, repeatable pattern (mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 anti\u2011patterns \u2192 heuristics). The structure is coherent and aids comprehension."
+      "justification": "Follows a clear, recognizable pattern (mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 anti\u2011patterns) that aligns with established CloudOps skill structures."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 11,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI commands, verification steps, and worked examples that an agent could follow. However the contract conflict (VERDICT: ERROR) and the lack of explicit handling for pagination errors, API rate\u2011limit retries, and eventual\u2011consistency windows after EDS creation reduce practical reliability."
+      "justification": "Provides concrete CLI steps, verification protocol, and worked examples, enabling an agent to execute. However the output contract is violated by mentioning a VERDICT: ERROR (not allowed) and by referencing a PARTITION_PRUNING field that is not part of the contract. Delete\u2011eds operation is not covered. These inconsistencies reduce usability."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 54052,
-  "latency_ms": 13279,
+  "token_count": 54210,
+  "latency_ms": 13929,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

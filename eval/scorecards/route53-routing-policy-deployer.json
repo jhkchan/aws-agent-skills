@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge not in a baseline model: silent\u2011failure matrix for each routing policy, exact ordering constraints (hosted\u2011zone before target resolution, policy before health checks), ARC safety\u2011rule invariant, TTL heuristics tied to policy, specific CLI snippets for calculated health checks and ARC primitives. The bulk is novel, though some sections merely restate AWS docs, preventing a perfect score."
+      "justification": "Adds concrete expert knowledge not usually known by a generic model: a detailed silent\u2011failure matrix, precise TTL heuristics per policy, mandatory health\u2011check requirement per weighted/latency/multivalue set, ARC safety\u2011rule invariant, and exact ordering constraints for atomic change\u2011batch creation."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Offers an AWS\u2011specific 8\u2011step provisioning workflow, ordered dependencies, and concrete CLI commands. Procedures are clearly tied to Route\u00a053 internals; only a minor lack of a formal decision\u2011tree diagram prevents a perfect score."
+      "justification": "Defines an 8\u2011step AWS\u2011specific provisioning workflow, includes exact CLI commands for each step, and ties policy choice to required fields. Deducted for occasional generic phrasing (e.g., \"verify IAM\" without showing how to programmatically check permissions) and for not explicitly sequencing health\u2011check creation before alias target resolution in all cases."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 12,
       "max": 15,
-      "justification": "Contains a solid NEVER list of five high\u2011impact anti\u2011patterns with clear \"why\" explanations. However, it omits other common pitfalls (e.g., overlapping CIDR order in IP\u2011based routing, misuse of EvaluateTargetHealth on VPC interface endpoints) and could list more than five items."
+      "justification": "Lists five concrete NEVER rules with clear why\u2011statements (weighted\u2011no\u2011HC, alias CNAME, ETH false, missing geolocation default, ARC without safety rule). However, the output contract lacks a checklist item to confirm ARC safety rule and readiness check, leading to an example that violates the ARC NEVER rule. This ambiguity reduces the anti\u2011pattern quality."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, activation triggers, and invocation schema are present and well\u2011structured. The invocation schema is textual rather than a strict JSON schema, which slightly reduces compliance."
+      "justification": "Frontmatter is complete, description, activation triggers, and invocation schema are well defined. The strict output contract is detailed, but the contract omits a required checklist entry for ARC safety rule/readiness check, making activation criteria slightly vague."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Content is layered from quick reference to deep technical details, preventing overload. However, the extensive tables and heuristics sometimes appear early, adding modest cognitive load."
+      "justification": "Information is layered: quick reference, activation keywords, reasoning framework, detailed 8\u2011step procedure, NEVER list, and recent features. Slight overload in the long \u201cReasoning framework\u201d section and some critical rules (ARC safety) are buried in the NEVER list rather than highlighted early."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained (prerequisite checks, atomic batch, health\u2011check verification) while allowing creative configurations. Minor over\u2011specification in some optional features prevents a perfect score."
+      "justification": "Destructive actions (record creation, ARC control) are gated by prerequisite checks and atomic change\u2011batch usage. TTL flexibility is calibrated per policy. Only minor looseness: the skill allows \u201coptional\u201d ARC without explicitly forcing safety\u2011rule verification in the output contract."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable skill\u2011doc pattern (metadata, quick navigation, reasoning, procedure, NEVER, output contract). The structure is coherent, with only a slight deviation in ordering of the ARC section."
+      "justification": "Follows a recognizable pattern (metadata \u2192 what it does \u2192 quick navigation \u2192 activation \u2192 contract \u2192 step\u2011by\u2011step \u2192 NEVER \u2192 output format). The structure is consistent with other CloudOps skills."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 11,
       "max": 15,
-      "justification": "The skill defines a strict output contract and most example outputs comply, but the ARC example violates the checklist schema (routing policy value \"ARC\" not in allowed list) and omits required rationale for TTL/N/A rows. No guidance for updating or deleting existing records and limited error\u2011handling examples, reducing real\u2011world usability."
+      "justification": "Provides working CLI snippets, decision tree, and verification commands, but the ARC example violates the strict checklist (missing safety\u2011rule citation) and the weighted example relies on the operator to remember to add health checks despite the NEVER list. These gaps reduce real\u2011world executability."
     }
   ],
-  "total_score": 104,
+  "total_score": 102,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41600,
-  "latency_ms": 14935,
+  "token_count": 44733,
+  "latency_ms": 20427,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

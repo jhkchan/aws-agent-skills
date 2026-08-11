@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert knowledge: ordered pre\u2011check priority list, specific IAM trust\u2011policy conditions (SourceAccount/SourceArn), FTPS certificate subject matching, VPC_ENDPOINT vs VPC nuances, AS2 profile requirements, recent 2024\u20112026 feature list. However, many items (e.g., basic protocol list, generic IAM role creation) restate what a capable model already knows, so not a perfect 20."
+      "justification": "The skill provides many detailed, expert\u2011level checks (port numbers, SourceAccount condition, exact pre\u2011check ordering) that go beyond a generic model, but a large portion restates official AWS documentation without adding novel decision trees or thresholds, limiting the true delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: exact pre\u2011flight CLI checks, CONFIRM gate before any state\u2011changing command, detailed post\u2011verification steps, and a decision\u2011tree for IdP/endpoint selection. Some steps are generic (e.g., \u201cverify operator has permissions\u201d) and not uniquely AWS\u2011specific, costing a point."
+      "justification": "It codifies AWS\u2011specific procedures (pre\u2011flight checklist, CONFIRM gate, exact CLI flags for create\u2011server, create\u2011user, workflow steps) and embeds expert mindset (session\u2011policy importance, IdP response shape). Some steps remain generic (e.g., \u201crun pre\u2011checks\u201d) and lack a fully documented decision matrix for edge cases."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with clear why\u2011clauses (FTP on PUBLIC, unscoped IAM role, missing SourceAccount condition, FTPS cert not ISSUED, custom IdP response shape). Missing broader anti\u2011patterns such as EFS access\u2011point misconfiguration or workflow step failure handling, so two points are deducted."
+      "justification": "Provides a concrete NEVER list with clear rationales (FTP on PUBLIC, unscoped IAM role, missing SourceAccount condition, etc.). Missing are a few additional pitfalls such as over\u2011permissive IAM role policies beyond S3 scope and the risk of stale ACM certificates, which would have earned full marks."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Full frontmatter, rich description, when\u2011to\u2011use, activation_triggers, and invocation_schema are present, enabling reliable activation. The trigger list is overly exhaustive, risking false positives, which prevents a perfect score."
+      "justification": "Front\u2011matter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are all present and well\u2011structured. Minor omission: no explicit required AWS CLI version or minimum Transfer Family service version, which could affect reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 14,
       "max": 15,
-      "justification": "Information is layered: high\u2011level overview, quick reference, mindset, pre\u2011flight, process, detailed CLI examples, and strict output contract. No critical rule is buried, but the extensive CLI boilerplate appears early in the document, adding some cognitive load."
+      "justification": "Content is layered effectively (quick reference, mindset, pre\u2011flight, process, output contract). The quick\u2011reference table at the very start is dense but still serves as a concise entry point; overall the skill avoids cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates tightly for fragile actions (pre\u2011checks, CONFIRM gate, no placeholders) while allowing flexibility for optional workflows and storage backends. However, the example outputs include placeholder tokens (e.g., <returned-id>) which contradict the strict no\u2011placeholder rule."
+      "justification": "Destructive operations are tightly constrained by a mandatory CONFIRM gate and exhaustive pre\u2011checks, matching the fragility of Transfer Family provisioning. Creative tasks (e.g., choosing IdP) are left flexible with heuristics, showing good calibration."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 NEVER \u2192 Heuristic). Section titles are slightly ad\u2011hoc (e.g., \u201cCommon server patterns\u201d) but overall the structure is coherent."
+      "justification": "The skill follows a recognizable pattern (metadata, quick navigation, mindset, pre\u2011flight, process, output contract, NEVER list, heuristic). The structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 10,
       "max": 15,
-      "justification": "Provides exact CLI commands, output contract, and decision trees, enabling an agent to act. However, the \"perfect example output\" violates the no\u2011placeholder rule by using <returned-id>, and some examples omit required fields (e.g., storage backend for Directory Service). Missing error\u2011handling branches for post\u2011verify failures also reduce usability."
+      "justification": "The skill supplies exact CLI commands and a strict output contract, enabling an agent to act. However, the provided example outputs contain placeholders like `<returned-id>` and `<id>` which violate the \"no placeholders\" rule. The skill also mentions auto\u2011inserting a default session policy but does not detail the exact policy JSON, leaving a gap for edge\u2011case handling. These issues reduce practical usability."
     }
   ],
-  "total_score": 106,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47131,
-  "latency_ms": 14357,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "token_count": 46485,
+  "latency_ms": 10714,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

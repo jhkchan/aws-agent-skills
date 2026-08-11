@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides many concrete mappings (e.g., ConnectionDraining \u2192 deregistration_delay, ProxyProtocol \u2192 X-Forwarded-For) and a full cutover plan, but most of the information is already documented in AWS guides; the skill does not introduce a novel decision tree or undocumented exception."
+      "justification": "Adds substantial expert knowledge: exact CLB\u2011>ALB attribute mappings, concrete CLI command templates, cost\u2011baseline numbers, recent 2024\u20112026 ALB features (Lambda targets, OIDC, WAF, TLS\u202f1.3, weight\u2011based TG forwarding). However it omits several edge\u2011case details such as IPv6/dualstack handling, IP\u2011type target groups, ALB IP address type selection, and full health\u2011check matcher nuances beyond HTTP\u202f200, which prevents a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: ordered pre\u2011flight checks, mandatory CONFIRM gate, capture of pre\u2011state for audit, precise pagination handling, and step\u2011by\u2011step CLI sequences for each migration phase. Only a minor generic element (\u201ccheck security\u201d) prevents a perfect score."
+      "justification": "Encodes AWS\u2011specific reasoning: ordered pre\u2011flight checks, mandatory CONFIRM gate, capture of pre\u2011state for audit, exact CLI sequences for each migration phase, and explicit rollback strategy. Minor gap: IAM\u2011uploaded certificate import is mentioned but not detailed step\u2011by\u2011step."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (proxy protocol, TCP listeners, deleting CLB, sticky\u2011cookie mismatch, direct DNS swap). Missing two common pitfalls: (a) cross\u2011zone off on CLB causing AZ\u2011specific overload after ALB migration, and (b) Route\u00a053 TTL caching beyond weighted cutover, which could delay rollback."
+      "justification": "Provides a concrete NEVER list with specific reasons (e.g., never migrate TCP/SSL passthrough, never cutover with Proxy Protocol, never delete CLB at cutover). Missing some common pitfalls such as security\u2011group ingress mismatches for the new ALB SG and health\u2011check matcher differences beyond 200, so not fully exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. Deducted 1 point because the \"when to invoke\" clause could be more explicit (e.g., a concise trigger rule rather than a paragraph) and the input schema lacks a formal JSON schema definition."
+      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are present. The invocation schema is slightly vague about required JSON field names and types, which could cause activation ambiguity."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns) so readers can skim or dive deep. However, the initial sections are dense, placing a moderate amount of detail early and slightly reducing progressive disclosure."
+      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns, heuristics) so a reader can skim or dive deeper. However, the initial sections are dense, which can cause cognitive overload before reaching the concise output contract."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom well: destructive actions are gated by CONFIRM and strict pre\u2011checks; planning steps are permissive. Minor gap: planning operation could benefit from an explicit \u201cdry\u2011run only\u201d mode flag."
+      "justification": "Destructive actions are tightly gated (CONFIRM, pre\u2011checks, rollback plan, weighted DNS cutover phases). Creative tasks (planning) are left freer. Only minor over\u2011constraint: the cutover example forces a specific 5/25/50/100 schedule, which may not suit all workloads."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What, Quick navigation, Mindset, Pre\u2011flight, Process, Output contract, Anti\u2011patterns, Heuristics). Structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Heuristics). Structure is coherent, though section titles are custom rather than a textbook template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a strict output contract, working CLI examples, error handling for malformed input, and verification steps. Missing detailed guidance for IAM\u2011uploaded certificate import and for IPv6/alb\u2011dualstack scenarios, which limits full practical coverage."
+      "justification": "Provides working CLI commands, JSON payloads, and exact output format, enabling an agent to execute end\u2011to\u2011end. Missing full pagination loops for describe\u2011load\u2011balancers, detailed IAM\u2011cert import steps, and exhaustive error\u2011handling for edge cases (e.g., partial target registration failures)."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46106,
-  "latency_ms": 13605,
+  "token_count": 45681,
+  "latency_ms": 16528,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1
