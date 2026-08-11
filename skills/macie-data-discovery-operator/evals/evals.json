@@ -1,0 +1,181 @@
+{
+  "skill": "macie-data-discovery-operator",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Macie Data Discovery Operator. Five-case proven set exercising the READY / BLOCKED / COMPLETED classification across operation types (enable Macie org-level delegated admin, create scheduled classification job, Macie not enabled blocked, custom regex data identifier, auto-remediation via Step Functions completed). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "enable-macie-org-delegated-admin",
+      "name": "Enable Macie at org level with delegated admin account",
+      "difficulty": "medium",
+      "branch": "READY — org-level Macie enablement with delegated admin 123456789012, auto-enable for new members, FIFTEEN_MINUTES frequency",
+      "prompt": "Enable Amazon Macie for our AWS Organization. We want account 123456789012 as the delegated Macie administrator. The management account is 123456789012. Configure auto-enable for all new member accounts. Set finding publish frequency to FIFTEEN_MINUTES. We have 5 member accounts currently. Region: us-east-1. Provide the full enablement procedure with pre-checks and post-verification.",
+      "prompt_file": "prompts/enable-macie-org-delegated-admin.md",
+      "baseline_file": "baselines/enable-macie-org-delegated-admin.md",
+      "expected_verdict": "READY",
+      "expected_output": "OPERATION: enable\nVERDICT: READY\nTARGET: macie-org-enablement\nPRE_CHECKS:\n  - [PASS] Management account 123456789012 has organizations:EnableAWSServiceAccess permission\n  - [PASS] Target admin account 123456789012 exists and is a member of the org\n  - [PASS] No existing delegated admin (get-administrator-account returns NotFoundException)\nSTEPS:\n  1. CONFIRM: About to enable Macie org-level with delegated admin 123456789012. Proceed? (yes/no)\n  2. aws macie2 enable-organization-admin-account --admin-account-id 123456789012\n  3. aws macie2 enable-macie-session --finding-publishing-frequency FIFTEEN_MINUTES --status ENABLED\n  4. aws macie2 update-organization-configuration --auto-enable true\nPOST_VERIFY: (pending execution)\nSTATE: pending — Macie will be ENABLED with org-level delegated admin\nNOTES: Auto-enable true means new member accounts get Macie automatically. Existing 5 member accounts need explicit invitation or auto-enable retroactively.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY",
+            "enable",
+            "VERDICT",
+            "PRE_CHECKS",
+            "delegated",
+            "123456789012",
+            "auto-enable"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: BLOCKED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create-classification-job-scheduled",
+      "name": "Create scheduled daily classification job with RECOMMENDED identifiers",
+      "difficulty": "medium",
+      "branch": "READY — daily scheduled classification job on prod-data-bucket and financial-records with RECOMMENDED managed identifiers",
+      "prompt": "Create a Macie classification job named \"daily-pii-scan\" for our production data buckets: prod-data-bucket and financial-records. Account: 123456789012. Use RECOMMENDED managed data identifier selector. Daily schedule. Macie is already enabled with FIFTEEN_MINUTES finding publish frequency. Region: us-east-1. Provide the full procedure with pre-checks and post-verification.",
+      "prompt_file": "prompts/create-classification-job-scheduled.md",
+      "baseline_file": "baselines/create-classification-job-scheduled.md",
+      "expected_verdict": "READY",
+      "expected_output": "OPERATION: classify\nVERDICT: READY\nTARGET: daily-pii-scan\nPRE_CHECKS:\n  - [PASS] Macie session ENABLED (get-macie-session status=ENABLED)\n  - [PASS] Target bucket prod-data-bucket exists in account 123456789012\n  - [PASS] Target bucket financial-records exists in account 123456789012\n  - [PASS] IAM role has macie2:CreateClassificationJob permission\nSTEPS:\n  1. CONFIRM: About to create scheduled classification job daily-pii-scan. Proceed? (yes/no)\n  2. aws macie2 create-classification-job --name daily-pii-scan --job-type SCHEDULED --schedule-frequency '{dailySchedule:{}}' --s3-job-definition bucketDefinitions='[{accountId=123456789012,buckets=[prod-data-bucket,financial-records]}]' --managed-data-identifier-selector RECOMMENDED --description \"Daily PII scan of production data buckets\"\nPOST_VERIFY: (pending execution)\nSTATE: pending — job will be RUNNING after creation, COMPLETE after first scan cycle\nNOTES: RECOMMENDED selector lets Macie sample bucket content and select relevant identifiers. Job runs daily. Findings published at FIFTEEN_MINUTES frequency.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY",
+            "classify",
+            "VERDICT",
+            "PRE_CHECKS",
+            "daily-pii-scan",
+            "prod-data-bucket",
+            "RECOMMENDED",
+            "SCHEDULED"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: BLOCKED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "macie-not-enabled-blocked",
+      "name": "Classification job blocked — Macie not enabled",
+      "difficulty": "easy",
+      "branch": "BLOCKED — Macie session not enabled in target account; pre-flight gate catches missing enablement",
+      "prompt": "Create a Macie classification job named \"pii-scan-2026-08\" on the bucket sensitive-data-prod. Account: 123456789012. One-time scan for USA_SOCIAL_SECURITY_NUMBER and CREDIT_CARD_NUMBER. We think Macie is enabled but aren't sure. Region: us-east-1.",
+      "prompt_file": "prompts/macie-not-enabled-blocked.md",
+      "baseline_file": "baselines/macie-not-enabled-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_output": "OPERATION: classify\nVERDICT: BLOCKED\nTARGET: pii-scan-2026-08\nPRE_CHECKS:\n  - [FAIL] Macie session NOT ENABLED — get-macie-session returns NotFoundException. Macie must be enabled before creating classification jobs.\nSTEPS: (none — pre-checks failed)\nPOST_VERIFY: (none)\nSTATE: Macie disabled\nNOTES: Enable Macie first: aws macie2 enable-macie-session --finding-publishing-frequency FIFTEEN_MINUTES --status ENABLED.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "BLOCKED",
+            "VERDICT",
+            "PRE_CHECKS",
+            "pii-scan-2026-08"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY",
+            "VERDICT: COMPLETED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-data-identifier-regex",
+      "name": "Custom data identifier with regex for employee ID format",
+      "difficulty": "hard",
+      "branch": "READY — custom regex data identifier for EMP###### employee ID with proximity keywords and ignore words",
+      "prompt": "Create a Macie custom data identifier named \"employee-id-pattern\" that detects our internal employee ID format EMP###### (EMP followed by 6 digits). Use proximity keywords: employee, emp_id, staff, id. Ignore test/sample data: example, test, sample, demo. Maximum match distance 50 characters. Severity HIGH. Account: 123456789012. Region: us-east-1. Provide the full procedure.",
+      "prompt_file": "prompts/custom-data-identifier-regex.md",
+      "baseline_file": "baselines/custom-data-identifier-regex.md",
+      "expected_verdict": "READY",
+      "expected_output": "OPERATION: custom-id\nVERDICT: READY\nTARGET: employee-id-pattern\nPRE_CHECKS:\n  - [PASS] Macie session ENABLED\n  - [PASS] Regex pattern EMP[0-9]{6} is valid PCRE\n  - [PASS] Keywords provided (employee, emp_id, staff, id) — proximity scoping active\n  - [PASS] Ignore words provided (example, test, sample, demo) — test data excluded\nSTEPS:\n  1. CONFIRM: About to create custom data identifier employee-id-pattern. Proceed? (yes/no)\n  2. aws macie2 create-custom-data-identifier --name employee-id-pattern --regex \"EMP[0-9]{6}\" --keywords employee emp_id staff id --ignore-words example test sample demo --maximum-match-distance 50 --severity-levels HIGH --description \"Detects EMP###### employee ID format\"\nPOST_VERIFY: (pending execution)\nSTATE: pending — custom identifier available for classification jobs immediately\nNOTES: Proximity keywords reduce false positives. Without keywords, every EMP###### match is reported. Reference this identifier in future classification jobs via --custom-data-identifier-ids.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY",
+            "custom-id",
+            "VERDICT",
+            "PRE_CHECKS",
+            "employee-id-pattern",
+            "EMP",
+            "keywords"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: BLOCKED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "automated-remediation-step-functions",
+      "name": "Verify Macie + Step Functions auto-remediation integration (COMPLETED)",
+      "difficulty": "hard",
+      "branch": "COMPLETED — EventBridge + Step Functions remediation verified: test finding triggered object quarantine and SNS notification",
+      "prompt": "We already have Macie enabled and Step Functions state machine macie-remediation-workflow deployed. The EventBridge rule macie-finding-trigger routes high-severity Macie findings to the Step Functions workflow. Verify the integration is working: we generated a test finding (sensitiveData:S3Object/Credit_Card on a public bucket), and the workflow quarantined the object and sent an SNS notification. Confirm post-verification passed. Account: 123456789012. Region: us-east-1.",
+      "prompt_file": "prompts/automated-remediation-step-functions.md",
+      "baseline_file:": "baselines/automated-remediation-step-functions.md",
+      "expected_verdict": "COMPLETED",
+      "expected_output": "OPERATION: remediate\nVERDICT: COMPLETED\nTARGET: macie-remediation-workflow\nPRE_CHECKS:\n  - [PASS] Macie session ENABLED\n  - [PASS] Step Functions state machine macie-remediation-workflow exists and is ACTIVE\n  - [PASS] EventBridge rule macie-finding-trigger routes to Step Functions\n  - [PASS] Test finding sensitiveData:S3Object/Credit_Card generated on public bucket\nSTEPS:\n  1. (verification only — no state-changing operation)\n  2. aws stepfunctions describe-execution --execution-arn <exec-arn> (confirmed SUCCEEDED)\nPOST_VERIFY:\n  - [PASS] Step Functions execution SUCCEEDED for test finding\n  - [PASS] Object quarantined (moved to isolated bucket macie-quarantine)\n  - [PASS] SNS notification sent to security team topic\n  - [PASS] Source bucket ACL restricted (public access blocked)\nSTATE: Remediation workflow verified and operational\nNOTES: EventBridge triggers on high-severity Macie findings only. Step Functions handles multi-step remediation: parse finding, quarantine object, restrict ACL, notify. The workflow is idempotent — duplicate findings do not re-quarantine.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "COMPLETED",
+            "remediate",
+            "VERDICT",
+            "POST_VERIFY",
+            "PASS",
+            "Step Functions"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: BLOCKED"
+          ]
+        }
+      ]
+    }
+  ]
+}

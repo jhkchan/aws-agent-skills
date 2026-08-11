@@ -1,0 +1,192 @@
+# Eval test cases for redshift-cluster-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimisation pattern. Each case's
+# cluster name embeds the test-case id so the model naturally echoes it.
+skill: redshift-cluster-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: oversized-ra3-rightsize-reserved-node
+    description: >-
+      Production RA3 cluster (ra3.4xlarge x 4) running at 15% CPU / 0
+      QueryQueueLength over 30 days on On-Demand pricing. Clear
+      overprovisioning with no query contention. Expected verdict:
+      OPPORTUNITY_FOUND with right-size to 2 nodes + 3-yr Reserved Node
+      recommendation and estimated savings.
+    input: |
+      Cluster: analytics-prod-cluster-oversized-ra3-rightsize-reserved-node
+      Region: us-east-1
+      NodeType: ra3.4xlarge
+      NumberOfNodes: 4
+      Pricing: On-Demand (no Reserved Nodes)
+      ClusterStatus: available
+
+      CloudWatch metrics (last 30 days):
+        - CPUUtilization: avg=15%, max=30%
+        - QueryQueueLength: avg=0, max=2
+        - DatabaseConnections: avg=20, max=50
+
+      WLM: Auto WLM with SQA enabled, 2 queues (BI + ETL)
+      Concurrency Scaling: off
+      Storage: 12 TB managed storage (RA3)
+      Data sharing: not configured
+
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "oversized-ra3-rightsize-reserved-node"
+        - "QueryQueueLength"
+        - "CONFIRM"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: OPTIMIZED"
+
+  - id: dc2-migrate-to-ra3
+    description: >-
+      DC2 cluster (dc2.8xlarge x 3) using 45% of local storage (2.56 TB
+      per node) at 25% CPU. RA3 migration is clearly cheaper — storage
+      usage is low enough that managed storage cost will be less than the
+      DC2 local-storage premium. Expected verdict: OPPORTUNITY_FOUND with
+      DC2-to-RA3 migration recommendation.
+    input: |
+      Cluster: reporting-dc2-cluster-dc2-migrate-to-ra3
+      Region: us-east-1
+      NodeType: dc2.8xlarge
+      NumberOfNodes: 3
+      Pricing: On-Demand
+      ClusterStatus: available
+
+      Storage: 3.4 TB used out of 7.68 TB local (44% utilisation)
+      CloudWatch metrics (last 30 days):
+        - CPUUtilization: avg=25%, max=40%
+        - QueryQueueLength: avg=0, max=5
+        - DatabaseConnections: avg=8, max=15
+
+      Emit the standard optimisation block.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "dc2-migrate-to-ra3"
+        - "RA3"
+        - "managed storage"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+
+  - id: already-optimal-steady-state-reserved
+    description: >-
+      Production RA3 cluster with 3-yr Reserved Nodes, CPU at 55%,
+      QueryQueueLength low, WLM properly configured with SQA, storage
+      compressed and VACUUMed. All dimensions pass. Expected verdict:
+      ALREADY_OPTIMAL.
+    input: |
+      Cluster: prod-warehouse-already-optimal-steady-state-reserved
+      Region: us-east-1
+      NodeType: ra3.16xlarge
+      NumberOfNodes: 2
+      Pricing: 3-yr Reserved Node (No Upfront)
+      ClusterStatus: available
+
+      CloudWatch metrics (last 30 days):
+        - CPUUtilization: avg=55%, max=68%
+        - QueryQueueLength: avg=3, max=12
+        - DatabaseConnections: avg=120, max=200
+
+      WLM: Auto WLM, SQA enabled, 3 queues (BI/ETL/ad-hoc)
+      Concurrency Scaling: on (AUTO), scales < 1h/day
+      Storage: 45 TB managed storage, all columns AZ64-encoded
+      VACUUM: last run 2 days ago, ANALYZE current
+      Materialized views: 8 active with auto-refresh
+
+      Emit the standard optimisation block.
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-steady-state-reserved"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: OPTIMIZED"
+
+  - id: serverless-base-rpu-too-high
+    description: >-
+      Redshift Serverless workgroup with base capacity RPU 32 and max RPU
+      128. Actual usage averages 8 RPU with peak at 20 RPU. Base RPU is
+      4x higher than actual average, creating excessive floor cost.
+      Expected verdict: OPPORTUNITY_FOUND with base RPU reduction.
+    input: |
+      Workgroup: analytics-serverless-serverless-base-rpu-too-high
+      Region: us-east-1
+      Type: Redshift Serverless
+      Base capacity RPU: 32
+      Max RPU: 128
+
+      CloudWatch metrics (last 30 days):
+        - RPU usage: avg=8 RPU, max=20 RPU
+        - Query count: avg=5000/day, mostly 9am-5pm
+
+      Emit the standard optimisation block.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "serverless-base-rpu-too-high"
+        - "RPU"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "Reserved Node"
+
+  - id: idle-cluster-detection
+    description: >-
+      Dev Redshift cluster (ra3.4xlarge x 2) with DatabaseConnections = 0
+      for 20+ days and CPUUtilization < 1%. Clear idle cluster candidate.
+      Expected verdict: OPPORTUNITY_FOUND with pause/delete recommendation.
+    input: |
+      Cluster: dev-sandbox-cluster-idle-cluster-detection
+      Region: us-east-1
+      NodeType: ra3.4xlarge
+      NumberOfNodes: 2
+      Pricing: On-Demand
+      ClusterStatus: available
+
+      CloudWatch metrics (last 30 days):
+        - CPUUtilization: avg=0.2%, max=1.1%
+        - QueryQueueLength: avg=0, max=0
+        - DatabaseConnections: avg=0, max=0 for 22 consecutive days
+
+      Last query: 22 days ago (ad-hoc SELECT by data scientist)
+      Data sharing: consumer of one datashare (read-only)
+
+      Emit the standard optimisation block.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "idle-cluster-detection"
+        - "snapshot"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"

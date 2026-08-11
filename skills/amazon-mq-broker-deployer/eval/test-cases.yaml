@@ -1,0 +1,188 @@
+# Eval test cases for amazon-mq-broker-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across workload types
+# (ActiveMQ active/standby, RabbitMQ cluster with IAM, missing
+# prerequisites, ActiveMQ multi-protocol, RabbitMQ transit gateway).
+skill: amazon-mq-broker-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: production-activemq-active-standby
+    description: >-
+      Provision a production ActiveMQ broker with active/standby HA,
+      LDAP authentication, customer CMK encryption at rest, TLS,
+      CloudWatch general + audit logs, OpenWire + STOMP + MQTT protocols.
+      Expects READY_TO_DEPLOY with all checklist items verified.
+    input: |
+      Provision a production Amazon MQ ActiveMQ broker named "prod-mq"
+      in us-east-1. We need active/standby HA (standby in a different
+      AZ). Workload is JMS-style messaging with OpenWire clients at
+      ~500 connections and ~1,000 msg/sec. Use mq.m5.large instance
+      type. LDAP authentication against AWS Managed Microsoft AD
+      (d-1234567890). Customer-managed CMK alias/prod-mq-kms for
+      encryption at rest. TLS enabled. Enable CloudWatch general and
+      audit logs. Protocols: OpenWire (61617), STOMP (61614), MQTT
+      (8883), and Web Console (8162). Subnet group prod-mq-subnet
+      spans 2 AZs (us-east-1a, us-east-1b). Security group sg-mq123
+      inbound 61617, 61614, 8883, 8162 from sg-app456. Automatic minor
+      version upgrades enabled, window SUN 03:00 UTC. Tags:
+      Environment=production, Workload=messaging. Account ID:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-mq"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "ActiveMQ"
+        - "Active/Standby"
+        - "mq.m5.large"
+        - "LDAP"
+        - "audit"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: rabbitmq-cluster-with-iam
+    description: >-
+      Provision a production RabbitMQ broker in cluster mode (3 nodes)
+      with AWS IAM authentication, quorum queues, customer CMK
+      encryption, TLS, audit logging. Expects READY_TO_DEPLOY with
+      RabbitMQ-specific patterns.
+    input: |
+      Provision a production Amazon MQ RabbitMQ broker named
+      "prod-rabbit" in us-east-1. We need cluster mode with 3 nodes
+      for horizontal scaling and quorum-based HA. Workload is
+      high-throughput AMQP 0-9-1 at ~5,000 connections and ~15,000
+      msg/sec. Use mq.m5.2xlarge instance type per node. AWS IAM
+      authentication (passwordless, AWS-native). Customer-managed CMK
+      alias/rabbit-kms for encryption at rest. TLS enabled. Enable
+      CloudWatch general and audit logs. Protocols: AMQP (5671),
+      RabbitMQ Management (15671). Subnet group prod-rabbit-subnet
+      spans 3 AZs. Security group sg-rabbit inbound 5671, 15671 from
+      sg-app. Automatic minor version upgrades enabled. Tags:
+      Environment=production, Workload=messaging. Account ID:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-rabbit"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "RabbitMQ"
+        - "Cluster"
+        - "mq.m5.2xlarge"
+        - "IAM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+        - "Single instance"
+
+  - id: missing-vpc-and-subnet
+    description: >-
+      Operator requests an ActiveMQ broker but has not specified the
+      VPC, subnet, security group, or configuration details.
+      Active/standby requires a multi-AZ subnet. Expects
+      PREREQUISITES_MISSING with specific gaps cited.
+    input: |
+      Help me create a new Amazon MQ ActiveMQ broker called
+      "orders-mq" in us-east-1. I want active/standby with failover
+      and LDAP auth. We will send order events — should be pretty
+      simple. Region: us-east-1, Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "orders-mq"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: activemq-stomp-mqtt-protocols
+    description: >-
+      Provision an ActiveMQ broker with the full multi-protocol surface:
+      OpenWire, STOMP, MQTT, AMQP, and WebSocket. Dev/test environment
+      with single instance mode. Expects READY_TO_DEPLOY with all
+      protocol ports listed.
+    input: |
+      Provision an Amazon MQ ActiveMQ broker named "dev-mq-multi" in
+      us-east-1 for a dev environment. This broker needs the full
+      multi-protocol surface: OpenWire (61617), STOMP (61614), MQTT
+      (8883), AMQP (5671), and WebSocket WSS (61619). Single instance
+      mode (dev only, no HA needed). Use mq.t3.micro. Username/password
+      authentication (basic). AWS-managed KMS key for encryption at
+      rest (dev, no CMK needed). Enable general logs. Subnet group
+      dev-mq-subnet in us-east-1a. Security group sg-dev-mq inbound
+      61617, 61614, 8883, 5671, 61619, 8162 from sg-dev-app. Tags:
+      Environment=dev, Workload=messaging. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "dev-mq-multi"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "ActiveMQ"
+        - "Single instance"
+        - "61617"
+        - "61614"
+        - "8883"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+        - "Active/Standby"
+
+  - id: rabbitmq-transit-gateway-cross-account
+    description: >-
+      Provision a RabbitMQ active/standby broker with transit gateway
+      for cross-account access. Secondary account 123456789012 needs
+      to consume messages via the TGW. Expects READY_TO_DEPLOY with
+      transit gateway configuration.
+    input: |
+      Provision an Amazon MQ RabbitMQ broker named "shared-rabbit" in
+      us-east-1 with active/standby HA. The broker needs cross-account
+      access via transit gateway tgw-0abc123 — account 123456789012
+      must consume messages from a separate VPC. Use mq.m5.large.
+      Username/password auth. Customer CMK alias/shared-rabbit-kms for
+      encryption at rest. TLS enabled. CloudWatch general and audit
+      logs. Protocols: AMQP (5671). Subnet group shared-rabbit-subnet
+      spans 2 AZs. Security group sg-shared-rabbit inbound 5671 from
+      sg-app and from the peer VPC CIDR (10.20.0.0/16). Transit gateway
+      tgw-0abc123 shared via RAM to account 123456789012. Tags:
+      Environment=production, Workload=shared-messaging. Account ID:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-rabbit"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "RabbitMQ"
+        - "transit gateway"
+        - "tgw-0abc123"
+        - "Active/Standby"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

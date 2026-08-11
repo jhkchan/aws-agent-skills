@@ -1,0 +1,43 @@
+# Eval configuration for ssm-session-manager-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it - it adds the structured with-skill-vs-baseline dimension.
+skill_name: ssm-session-manager-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: session-start-iam-gap
+    difficulty: easy
+    prompt_file: prompts/session-start-iam-gap.md
+    baseline_file: baselines/session-start-iam-gap.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: port-forward-local-port-in-use
+    difficulty: medium
+    prompt_file: prompts/port-forward-local-port-in-use.md
+    baseline_file: baselines/port-forward-local-port-in-use.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: shell-access-agent-too-old
+    difficulty: medium
+    prompt_file: prompts/shell-access-agent-too-old.md
+    baseline_file: baselines/shell-access-agent-too-old.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: session-disconnects-nat-idle
+    difficulty: hard
+    prompt_file: prompts/session-disconnects-nat-idle.md
+    baseline_file: baselines/session-disconnects-nat-idle.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: cross-account-kms-key-policy
+    difficulty: hard
+    prompt_file: prompts/cross-account-kms-key-policy.md
+    baseline_file: baselines/cross-account-kms-key-policy.md
+    expected_verdict: ESCALATE

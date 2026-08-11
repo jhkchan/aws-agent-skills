@@ -1,0 +1,178 @@
+{
+  "skill": "route53-routing-policy-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Route 53 Routing Policy Deployer. Five-case proven set exercising READY_TO_DEPLOY / PREREQUISITES_MISSING across weighted (with and without health checks), failover, geolocation, and Application Recovery Controller. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "weighted-canary-with-health-checks",
+      "name": "Weighted canary with per-record health checks + atomic change-batch",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — weighted with HCs on both records, atomic POST",
+      "prompt": "Provision a weighted routing policy in hosted zone Z2DABCDEFGHIJK (example.com) for record \"api.example.com\" type A. Primary target 10.0.0.10 weight 90 with health check on HTTPS /healthz interval 30s threshold 3. Canary target 10.0.0.20 weight 10 with its own health check on the same path. Atomic change-batch. TTL 60s for fast canary re-normalization.",
+      "prompt_file": "prompts/weighted-canary-with-health-checks.md",
+      "baseline_file": "baselines/weighted-canary-with-health-checks.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "RECORD_SET: api.example.com A (routing policy: weighted)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Hosted zone confirmed: Z2DABCDEFGHIJK (example.com)\n  [✓] Routing policy: weighted\n  [✓] Target(s): primary 10.0.0.10 (w=90, hc-primary), canary 10.0.0.20 (w=10, hc-canary)\n  [✓] Health check(s): hc-primary (HTTPS /healthz, 30s, threshold 3), hc-canary (same)\n  [✓] Change-batch atomic: CREATE 2 records (single POST)\n  [OPTIONAL] Optional feature: none\n  [✓] TTL applied: 60s (rationale: weighted canary needs fast re-normalization)\nVERIFICATION_COMMANDS:\n  aws route53 test-dns-answer --hosted-zone-id Z2DABCDEFGHIJK --record-name api.example.com. --record-type A\n  aws route53 get-health-check-status --health-check-id hc-primary\n  aws route53 get-health-check-status --health-check-id hc-canary",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "api.example.com",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "weighted",
+            "HealthCheck"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weighted-without-health-check",
+      "name": "Weighted routing without health checks — must flag missing HCs",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — no HCs provided, weighted will route to dead targets",
+      "prompt": "Create a weighted routing policy for \"api.example.com\" in zone Z3DABCDEFGHIJK with primary 10.0.0.10 weight 90 and canary 10.0.0.20 weight 10. We don't have health checks set up yet and don't want to add them. Just do the routing.",
+      "prompt_file": "prompts/weighted-without-health-check.md",
+      "baseline_file": "baselines/weighted-without-health-check.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "RECORD_SET: api.example.com A (routing policy: weighted)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓] Hosted zone confirmed: Z3DABCDEFGHIJK (example.com)\n  [✓] Routing policy: weighted\n  [✓] Target(s): primary 10.0.0.10 (w=90), canary 10.0.0.20 (w=10)\n  [✗] Health check(s): none provided — weighted without HC sends dead targets their allotted percentage of traffic for the whole TTL window. Create HCs before applying.\n  [—] Change-batch: deferred until HCs exist\n  [OPTIONAL] Optional feature: none\n  [✗] TTL applied: cannot set without HC confirmation (60s recommended for canary)\nVERIFICATION_COMMANDS:\n  aws route53 list-health-checks --query 'HealthChecks[?HealthCheckConfig.FullyQualifiedDomainName==`api.example.com`]'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "api.example.com",
+            "VERDICT",
+            "CHECKLIST",
+            "Health check"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "failover-primary-secondary-with-eth",
+      "name": "Failover routing with PRIMARY alias to ALB (ETH true) + SECONDARY static IP",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — failover with ETH explicitly true on ALB alias",
+      "prompt": "Provision DR failover routing in zone Z4DABCDEFGHIJK (example.com) for \"dr.example.com\" type A. PRIMARY: alias to ALB \"my-alb-12345.us-east-1.elb.amazonaws.com\" (canonical hosted zone Z35SXDOTRQ7X7K), EvaluateTargetHealth true. SECONDARY: static IP 10.99.0.20 in us-west-2. PRIMARY must reference its own health check on HTTPS /healthz. TTL 60s.",
+      "prompt_file": "prompts/failover-primary-secondary-with-eth.md",
+      "baseline_file": "baselines/failover-primary-secondary-with-eth.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "RECORD_SET: dr.example.com A (routing policy: failover)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Hosted zone confirmed: Z4DABCDEFGHIJK (example.com)\n  [✓] Routing policy: failover\n  [✓] Target(s): PRIMARY alias to my-alb-12345.us-east-1.elb.amazonaws.com (ETH: true), SECONDARY 10.99.0.20\n  [✓] Health check(s): hc-primary (HTTPS /healthz on ALB)\n  [✓] Change-batch atomic: CREATE 2 records (single POST)\n  [OPTIONAL] Optional feature: none\n  [✓] TTL applied: 60s (rationale: failover speed bounded by TTL)\nVERIFICATION_COMMANDS:\n  aws route53 test-dns-answer --hosted-zone-id Z4DABCDEFGHIJK --record-name dr.example.com. --record-type A\n  aws route53 get-health-check-status --health-check-id hc-primary",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "dr.example.com",
+            "VERDICT",
+            "CHECKLIST",
+            "failover",
+            "EvaluateTargetHealth"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "geolocation-with-default-record",
+      "name": "Geolocation routing with NA, EU, and default records + per-target HCs",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — geolocation with explicit default record",
+      "prompt": "Build geolocation routing for \"geo.example.com\" in zone Z5DABCDEFGHIJK. North America (NA) -> 10.10.0.10, Europe (EU) -> 10.20.0.20, default (everywhere else) -> 10.30.0.30. TTL 300s. Include health checks on each target.",
+      "prompt_file": "prompts/geolocation-with-default-record.md",
+      "baseline_file": "baselines/geolocation-with-default-record.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "RECORD_SET: geo.example.com A (routing policy: geolocation)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Hosted zone confirmed: Z5DABCDEFGHIJK (example.com)\n  [✓] Routing policy: geolocation\n  [✓] Target(s): NA 10.10.0.10 (hc-na), EU 10.20.0.20 (hc-eu), default 10.30.0.30 (hc-default)\n  [✓] Health check(s): one per target\n  [✓] Change-batch atomic: CREATE 3 records (single POST, default included)\n  [OPTIONAL] Optional feature: none\n  [✓] TTL applied: 300s (rationale: geolocation stability)\nVERIFICATION_COMMANDS:\n  aws route53 test-dns-answer --hosted-zone-id Z5DABCDEFGHIJK --record-name geo.example.com. --record-type A --edns0-client-subnet-ip 203.0.113.10/32",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "geo.example.com",
+            "VERDICT",
+            "CHECKLIST",
+            "geolocation",
+            "default"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "arc-routing-control-with-safety-rule",
+      "name": "Application Recovery Controller with mandatory safety rule + readiness check",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — ARC with safety rule + readiness check cited",
+      "prompt": "Set up Route 53 ARC for an active-passive DR topology. Cluster \"api-dr-cluster\", control panel \"api-dr-panel\", routing controls \"us-east-1-routing\" and \"us-west-2-routing\". Mandatory safety rule that blocks both-off. Readiness check on the us-west-2 API Gateway stage ARN \"arn:aws:apigateway:us-west-2::/apis/abc123/stages/prod\".",
+      "prompt_file": "prompts/arc-routing-control-with-safety-rule.md",
+      "baseline_file": "baselines/arc-routing-control-with-safety-rule.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "RECORD_SET: ARC cluster api-dr-cluster (2 routing controls)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster + control panel created\n  [✓] Routing controls: us-east-1-routing, us-west-2-routing\n  [✓] Safety rule: ASSERTION prevent-all-off (at least one control ON)\n  [✓] Readiness check: api-failover on apigateway stage arn:aws:apigateway:us-west-2::/apis/abc123/stages/prod\nVERIFICATION_COMMANDS:\n  aws route53-recovery-cluster get-routing-control-state --routing-control-arn <us-east-1-control>\n  aws route53-recovery-readiness get-readiness-check --readiness-check-name api-failover",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "VERDICT",
+            "CHECKLIST",
+            "routing control",
+            "safety rule",
+            "readiness check",
+            "Application Recovery Controller"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

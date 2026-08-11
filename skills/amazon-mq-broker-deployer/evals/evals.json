@@ -1,0 +1,189 @@
+{
+  "skill": "amazon-mq-broker-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Amazon MQ Broker Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across workload types (ActiveMQ active/standby with LDAP, RabbitMQ cluster with IAM auth, missing prerequisites, ActiveMQ multi-protocol surface, RabbitMQ transit gateway cross-account) and missing-prerequisite branches. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-activemq-active-standby",
+      "name": "Production ActiveMQ active/standby with LDAP + CMK + TLS + audit logs",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, active/standby HA + customer CMK + TLS + LDAP auth + OpenWire/STOMP/MQTT protocols + audit logging",
+      "prompt": "Provision a production Amazon MQ ActiveMQ broker named \"prod-mq\" in us-east-1. We need active/standby HA (standby in a different AZ). Workload is JMS-style messaging with OpenWire clients at ~500 connections and ~1,000 msg/sec. Use mq.m5.large instance type. LDAP authentication against AWS Managed Microsoft AD (d-1234567890). Customer-managed CMK alias/prod-mq-kms for encryption at rest. TLS enabled. Enable CloudWatch general and audit logs. Protocols: OpenWire (61617), STOMP (61614), MQTT (8883), and Web Console (8162). Subnet group prod-mq-subnet spans 2 AZs (us-east-1a, us-east-1b). Security group sg-mq123 inbound 61617, 61614, 8883, 8162 from sg-app456. Automatic minor version upgrades enabled, window SUN 03:00 UTC. Tags: Environment=production, Workload=messaging. Account ID: 123456789012.",
+      "prompt_file": "prompts/production-activemq-active-standby.md",
+      "baseline_file": "baselines/production-activemq-active-standby.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BROKER: prod-mq\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: ActiveMQ\n  [✓] Deployment mode: Active/Standby (standby in us-east-1b)\n  [✓] Instance type: mq.m5.large (8 GiB; ~1,000 connections)\n  [✓] EBS storage: 200 GiB (encrypted with customer CMK alias/prod-mq-kms)\n  [✓] Subnet: prod-mq-subnet (2 AZs: us-east-1a, us-east-1b)\n  [✓] Security group: sg-mq123 (inbound 61617, 61614, 8883, 8162 from sg-app456)\n  [✓] Encryption at rest: Enabled (customer CMK alias/prod-mq-kms)\n  [✓] Encryption in transit (TLS): Enabled\n  [✓] Authentication: LDAP (AWS Managed Microsoft AD d-1234567890)\n  [✓] Configuration: XML (OpenWire + STOMP + MQTT protocols enabled)\n  [✓] General logs: Enabled (CloudWatch log group: /aws/amazonmq/broker/prod-mq/general)\n  [✓] Audit logs: Enabled (CloudWatch log group: /aws/amazonmq/broker/prod-mq/audit)\n  [✓] Automatic minor version upgrades: Enabled (window: SUN 03:00 UTC)\n  [✓] Transit gateway: N/A\nVERIFICATION_COMMANDS:\n  aws mq describe-broker --broker-id prod-mq\n  aws mq describe-configuration --configuration-id <config-id>\n  aws ec2 describe-security-groups --group-ids sg-mq123\n  aws kms describe-key --key-id alias/prod-mq-kms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-mq",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "ActiveMQ",
+            "Active/Standby",
+            "mq.m5.large",
+            "LDAP",
+            "audit"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rabbitmq-cluster-with-iam",
+      "name": "Production RabbitMQ cluster (3 nodes) with AWS IAM auth + quorum queues",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — RabbitMQ cluster mode with 3 nodes, IAM authentication (creation-time-only), customer CMK + TLS + audit logging",
+      "prompt": "Provision a production Amazon MQ RabbitMQ broker named \"prod-rabbit\" in us-east-1. We need cluster mode with 3 nodes for horizontal scaling and quorum-based HA. Workload is high-throughput AMQP 0-9-1 at ~5,000 connections and ~15,000 msg/sec. Use mq.m5.2xlarge instance type per node. AWS IAM authentication (passwordless, AWS-native). Customer-managed CMK alias/rabbit-kms for encryption at rest. TLS enabled. Enable CloudWatch general and audit logs. Protocols: AMQP (5671), RabbitMQ Management (15671). Subnet group prod-rabbit-subnet spans 3 AZs. Security group sg-rabbit inbound 5671, 15671 from sg-app. Automatic minor version upgrades enabled. Tags: Environment=production, Workload=messaging. Account ID: 123456789012.",
+      "prompt_file": "prompts/rabbitmq-cluster-with-iam.md",
+      "baseline_file": "baselines/rabbitmq-cluster-with-iam.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BROKER: prod-rabbit\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: RabbitMQ\n  [✓] Deployment mode: Cluster (3 nodes, quorum-based HA)\n  [✓] Instance type: mq.m5.2xlarge (32 GiB per node; ~10,000 connections)\n  [✓] EBS storage: 200 GiB (encrypted with customer CMK alias/rabbit-kms)\n  [✓] Subnet: prod-rabbit-subnet (3 AZs)\n  [✓] Security group: sg-rabbit (inbound 5671, 15671 from sg-app)\n  [✓] Encryption at rest: Enabled (customer CMK alias/rabbit-kms)\n  [✓] Encryption in transit (TLS): Enabled\n  [✓] Authentication: AWS IAM (creation-time-only; SigV4-signed credentials)\n  [✓] Configuration: definitions JSON (quorum queues, exchange bindings)\n  [✓] General logs: Enabled (CloudWatch log group: /aws/amazonmq/broker/prod-rabbit/general)\n  [✓] Audit logs: Enabled (CloudWatch log group: /aws/amazonmq/broker/prod-rabbit/audit)\n  [✓] Automatic minor version upgrades: Enabled\n  [✓] Transit gateway: N/A\nVERIFICATION_COMMANDS:\n  aws mq describe-broker --broker-id prod-rabbit\n  aws ec2 describe-security-groups --group-ids sg-rabbit\n  aws kms describe-key --key-id alias/rabbit-kms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-rabbit",
+            "VERDICT",
+            "CHECKLIST",
+            "RabbitMQ",
+            "Cluster",
+            "mq.m5.2xlarge",
+            "IAM"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING",
+            "Single instance"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-vpc-and-subnet",
+      "name": "Operator has not specified VPC, subnet, security group, or configuration",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — VPC/subnet (active/standby requires multi-AZ), security group (broker ports inbound), LDAP directory, and configuration all unspecified",
+      "prompt": "Help me create a new Amazon MQ ActiveMQ broker called \"orders-mq\" in us-east-1. I want active/standby with failover and LDAP auth. We will send order events — should be pretty simple. Region: us-east-1, Account: 123456789012.",
+      "prompt_file": "prompts/missing-vpc-and-subnet.md",
+      "baseline_file": "baselines/missing-vpc-and-subnet.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BROKER: orders-mq\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Subnet: NOT specified — active/standby requires a multi-AZ subnet spanning >=2 AZs\n  [✗] Security group: NOT specified — broker needs inbound on protocol ports from application SG\n  [✗] LDAP directory: NOT specified — LDAP auth requires a reachable directory endpoint\n  [✗] Configuration: NOT specified — broker.xml or definitions JSON needed for custom topology\n  [✗] Instance type: NOT specified — workload connection count drives instance type selection\nVERIFICATION_COMMANDS:\n  aws ec2 describe-subnets --query 'Subnets[*].AvailabilityZone' --output text\n  aws ec2 describe-security-groups --query 'SecurityGroups[*].[GroupId,GroupName]' --output text\n  aws ds describe-directories --query 'DirectoryDescriptions[*].[DirectoryId,Name,Type]' --output text\n  aws mq list-configurations",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "orders-mq",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "activemq-stomp-mqtt-protocols",
+      "name": "ActiveMQ single instance with full multi-protocol surface (OpenWire/STOMP/MQTT/AMQP/WS)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — ActiveMQ dev broker with single instance mode, full protocol surface (OpenWire, STOMP, MQTT, AMQP, WS), basic auth, AWS-managed KMS",
+      "prompt": "Provision an Amazon MQ ActiveMQ broker named \"dev-mq-multi\" in us-east-1 for a dev environment. This broker needs the full multi-protocol surface: OpenWire (61617), STOMP (61614), MQTT (8883), AMQP (5671), and WebSocket WSS (61619). Single instance mode (dev only, no HA needed). Use mq.t3.micro. Username/password authentication (basic). AWS-managed KMS key for encryption at rest (dev, no CMK needed). Enable general logs. Subnet group dev-mq-subnet in us-east-1a. Security group sg-dev-mq inbound 61617, 61614, 8883, 5671, 61619, 8162 from sg-dev-app. Tags: Environment=dev, Workload=messaging. Account ID: 123456789012.",
+      "prompt_file": "prompts/activemq-stomp-mqtt-protocols.md",
+      "baseline_file": "baselines/activemq-stomp-mqtt-protocols.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BROKER: dev-mq-multi\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: ActiveMQ\n  [✓] Deployment mode: Single instance (dev environment, no HA needed)\n  [✓] Instance type: mq.t3.micro (1 GiB; ~1,000 connections)\n  [✓] EBS storage: 20 GiB (encrypted with AWS-managed KMS key)\n  [✓] Subnet: dev-mq-subnet (1 AZ: us-east-1a)\n  [✓] Security group: sg-dev-mq (inbound 61617, 61614, 8883, 5671, 61619, 8162 from sg-dev-app)\n  [✓] Encryption at rest: Enabled (AWS-managed KMS key)\n  [✓] Encryption in transit (TLS): Enabled\n  [✓] Authentication: Username/password (basic)\n  [✓] Configuration: XML (OpenWire + STOMP + MQTT + AMQP + WS protocols enabled)\n  [✓] General logs: Enabled (CloudWatch log group: /aws/amazonmq/broker/dev-mq-multi/general)\n  [✓] Audit logs: Disabled (dev environment)\n  [✓] Automatic minor version upgrades: Enabled\n  [✓] Transit gateway: N/A\nVERIFICATION_COMMANDS:\n  aws mq describe-broker --broker-id dev-mq-multi\n  aws ec2 describe-security-groups --group-ids sg-dev-mq",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "dev-mq-multi",
+            "VERDICT",
+            "CHECKLIST",
+            "ActiveMQ",
+            "Single instance",
+            "61617",
+            "61614",
+            "8883"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING",
+            "Active/Standby"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rabbitmq-transit-gateway-cross-account",
+      "name": "RabbitMQ active/standby with transit gateway cross-account access",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — RabbitMQ active/standby with transit gateway for cross-account (123456789012) message consumption via RAM-shared TGW",
+      "prompt": "Provision an Amazon MQ RabbitMQ broker named \"shared-rabbit\" in us-east-1 with active/standby HA. The broker needs cross-account access via transit gateway tgw-0abc123 — account 123456789012 must consume messages from a separate VPC. Use mq.m5.large. Username/password auth. Customer CMK alias/shared-rabbit-kms for encryption at rest. TLS enabled. CloudWatch general and audit logs. Protocols: AMQP (5671). Subnet group shared-rabbit-subnet spans 2 AZs. Security group sg-shared-rabbit inbound 5671 from sg-app and from the peer VPC CIDR (10.20.0.0/16). Transit gateway tgw-0abc123 shared via RAM to account 123456789012. Tags: Environment=production, Workload=shared-messaging. Account ID: 123456789012.",
+      "prompt_file": "prompts/rabbitmq-transit-gateway-cross-account.md",
+      "baseline_file": "baselines/rabbitmq-transit-gateway-cross-account.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BROKER: shared-rabbit\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: RabbitMQ\n  [✓] Deployment mode: Active/Standby (standby in us-east-1b)\n  [✓] Instance type: mq.m5.large (8 GiB; ~2,000 connections)\n  [✓] EBS storage: 200 GiB (encrypted with customer CMK alias/shared-rabbit-kms)\n  [✓] Subnet: shared-rabbit-subnet (2 AZs: us-east-1a, us-east-1b)\n  [✓] Security group: sg-shared-rabbit (inbound 5671 from sg-app and 10.20.0.0/16)\n  [✓] Encryption at rest: Enabled (customer CMK alias/shared-rabbit-kms)\n  [✓] Encryption in transit (TLS): Enabled\n  [✓] Authentication: Username/password (basic)\n  [✓] Configuration: definitions JSON (exchanges, queues, bindings for cross-account consumers)\n  [✓] General logs: Enabled (CloudWatch log group: /aws/amazonmq/broker/shared-rabbit/general)\n  [✓] Audit logs: Enabled (CloudWatch log group: /aws/amazonmq/broker/shared-rabbit/audit)\n  [✓] Automatic minor version upgrades: Enabled\n  [✓] Transit gateway: tgw-0abc123 (shared via RAM to account 123456789012)\nVERIFICATION_COMMANDS:\n  aws mq describe-broker --broker-id shared-rabbit\n  aws ec2 describe-security-groups --group-ids sg-shared-rabbit\n  aws ec2 describe-transit-gateways --transit-gateway-ids tgw-0abc123\n  aws ram get-resource-shares --resource-owner SELF",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-rabbit",
+            "VERDICT",
+            "CHECKLIST",
+            "RabbitMQ",
+            "transit gateway",
+            "tgw-0abc123",
+            "Active/Standby"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

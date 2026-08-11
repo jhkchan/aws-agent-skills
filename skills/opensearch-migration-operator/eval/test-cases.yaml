@@ -1,0 +1,215 @@
+# Eval test cases for opensearch-migration-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per migration pattern. Each case's
+# domain name embeds the test-case id so the model naturally echoes it.
+skill: opensearch-migration-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: es710-inplace-upgrade-ready
+    description: >-
+      Production Elasticsearch 7.10 domain with standard plugins
+      (analysis-icu, ingest-attachment) and cluster health green.
+      All pre-checks pass for in-place upgrade to OpenSearch 2.11.
+      Expected verdict: READY with the upgrade CLI sequence and
+      CONFIRM gate.
+    input: |
+      Domain: prod-search-cluster-es710-inplace-upgrade-ready
+      Region: us-east-1
+      Current version: Elasticsearch_7.10
+      Target version: OpenSearch_2.11
+      Operation: assess-migration-readiness
+
+      Cluster configuration:
+        - EngineVersion: Elasticsearch_7.10
+        - ClusterStatus: Active
+        - ClusterHealth: green (45 indices, 12 TB)
+        - Instance type: r6g.2xlarge.search
+        - Node count: 6 (3 dedicated masters, 3 data)
+        - Plugins: analysis-icu, analysis-phonetic, ingest-attachment
+        - Snapshot repository: s3-migration-repo (registered, verified)
+        - VPC: yes (VPC-only domain)
+        - EncryptionAtRest: enabled
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, PRE_CHECKS,
+      STEPS, POST_VERIFY, ENDPOINT, CLIENT_NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "es710-inplace-upgrade-ready"
+        - "update-domain-config"
+        - "CONFIRM"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: es68-blocked-version-plugin
+    description: >-
+      Legacy Elasticsearch 6.8 domain with x-pack-ml plugin installed.
+      Cannot directly upgrade to OpenSearch — version too old and ES-only
+      plugin present. Expected verdict: BLOCKED with remediation guidance.
+    input: |
+      Domain: legacy-search-cluster-es68-blocked-version-plugin
+      Region: us-east-1
+      Current version: Elasticsearch_6.8
+      Target version: OpenSearch_2.11
+      Operation: assess-migration-readiness
+
+      Cluster configuration:
+        - EngineVersion: Elasticsearch_6.8
+        - ClusterStatus: Active
+        - ClusterHealth: green (20 indices, 3 TB)
+        - Plugins: analysis-icu, x-pack-ml, x-pack-sql
+        - Snapshot repository: not configured
+        - VPC: no (public endpoint)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "es68-blocked-version-plugin"
+        - "PRE_CHECKS"
+        - "x-pack-ml"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: blue-green-migration-completed
+    description: >-
+      Blue/green migration from ES 7.10 to OpenSearch 2.11 has completed.
+      All post-verification checks passed: cluster green, document counts
+      match, mappings preserved, compatible=40 tested, plugins confirmed.
+      Expected verdict: COMPLETED with post-verify results.
+    input: |
+      Domain: prod-search-cluster-blue-green-migration-completed
+      Region: us-east-1
+      Operation: verify-post-migration
+
+      Migration details:
+        - Source: Elasticsearch_7.10
+        - Target: OpenSearch_2.11
+        - Method: blue/green (in-place upgrade via update-domain-config)
+        - Start: 2026-08-10T08:15:00Z
+        - Complete: 2026-08-10T09:45:00Z (90 minutes)
+
+      Post-migration verification results:
+        - Cluster health: green
+        - Document counts: 45 indices, 2.1B docs (source=target match)
+        - Index mappings: preserved correctly
+        - Application search queries: 100% match with pre-migration baseline
+        - compatible=40 mode: works with elasticsearch-py 7.17 clients
+        - Snapshot repository: s3-migration-repo registered and verified
+        - Plugins: analysis-icu, analysis-phonetic, ingest-attachment confirmed
+        - No red shards or unassigned replicas
+
+      Emit the standard VERDICT block with COMPLETED.
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "blue-green-migration-completed"
+        - "POST_VERIFY"
+        - "ENDPOINT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: snapshot-setup-blocked-no-s3-bucket
+    description: >-
+      Operator requests snapshot repository setup for migration, but the
+      S3 bucket does not exist and IAM role is missing permissions.
+      Expected verdict: BLOCKED with remediation guidance.
+    input: |
+      Domain: staging-search-cluster-snapshot-setup-blocked-no-s3-bucket
+      Region: us-east-1
+      Operation: snapshot-setup
+
+      Cluster configuration:
+        - EngineVersion: Elasticsearch_7.10
+        - ClusterStatus: Active
+        - ClusterHealth: green
+
+      S3 bucket check:
+        - Bucket name: migration-snapshots-nonexistent
+        - Status: does not exist (aws s3 ls returns empty)
+
+      IAM role check:
+        - Role name: OpenSearchSnapshotRole
+        - Status: exists but missing s3:PutObject permission
+
+      Current snapshot repositories: none registered
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "snapshot-setup-blocked-no-s3-bucket"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: reindex-from-remote-ready
+    description: >-
+      New OpenSearch 2.11 cluster is provisioned and accessible. Source
+      ES 7.10 cluster is network-reachable. Reindex-from-remote is
+      configured on the target. All pre-checks pass for reindex migration.
+      Expected verdict: READY with the reindex API sequence and CONFIRM gate.
+    input: |
+      Source domain: old-es-cluster-reindex-from-remote-ready
+      Target domain: new-os-cluster-reindex-from-remote-ready
+      Region: us-east-1
+      Operation: new-cluster-reindex
+
+      Source cluster:
+        - EngineVersion: Elasticsearch_7.10
+        - Status: Active, health green
+        - Endpoint: search-old-es-cluster.us-east-1.es.amazonaws.com
+        - Indices: products, orders, customers (5.2 TB total)
+        - VPC: no (public endpoint)
+
+      Target cluster:
+        - EngineVersion: OpenSearch_2.11
+        - Status: Active, health green
+        - Endpoint: search-new-os-cluster.us-east-1.es.amazonaws.com
+        - Target indices: created with correct mappings
+        - reindex.remote.whitelist: configured for source endpoint
+
+      Network connectivity: verified (target can reach source on port 443)
+      IAM: opensearch:ESHttp* and es:ESHttp* permissions confirmed
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "reindex-from-remote-ready"
+        - "_reindex"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"

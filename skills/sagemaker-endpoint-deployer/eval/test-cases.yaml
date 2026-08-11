@@ -1,0 +1,165 @@
+# Eval test cases for sagemaker-endpoint-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across hosting modes (real-time, serverless, async), A/B
+# testing, and missing-prerequisite branches.
+skill: sagemaker-endpoint-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: real-time-endpoint-production
+    description: >-
+      Deploy a SageMaker real-time endpoint with auto-scaling, data capture,
+      model monitoring, KMS encryption, and 2-instance HA. Expects
+      READY_TO_DEPLOY with all checklist items verified.
+    input: |
+      Deploy a SageMaker real-time inference endpoint in us-east-1 for a
+      recommendation model. Endpoint name "prod-recommendation". Model
+      artifact at s3://ml-artifacts/models/rec/model.tar.gz. Container image
+      763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1.0-cpu-py310.
+      Execution role arn:aws:iam::123456789012:role/SageMakerExecutionRole.
+      Instance type ml.c5.xlarge, initial count 2 for HA. Auto-scaling on
+      InvocationsPerInstance with target 14, min 2, max 8. Data capture
+      enabled at 20% sampling to s3://sagemaker-captures-prod/rec/.
+      Data quality model monitor on hourly schedule. KMS encryption with
+      key alias/prod-sagemaker-key. VPC subnets subnet-aaa, subnet-bbb,
+      security group sg-xxx. Tags: Environment=production, Workload=recommendation.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-recommendation"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "real-time"
+        - "auto-scaling"
+        - "data capture"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ab-testing-deployment
+    description: >-
+      Deploy a SageMaker endpoint with two variants for A/B testing at 90/10
+      traffic split. Expects READY_TO_DEPLOY with A/B testing pattern.
+    input: |
+      Set up A/B testing on a SageMaker endpoint "ab-churn-endpoint" in
+      us-east-1. Two models: "churn-model-v1" (artifact s3://ml/churn-v1/model.tar.gz)
+      and "churn-model-v2" (artifact s3://ml/churn-v2/model.tar.gz). Both
+      use the same container image 763104351884.dkr.ecr.us-east-1.amazonaws.com/xgboost-inference:1.7-1.
+      Execution role arn:aws:iam::123456789012:role/SageMakerExecutionRole.
+      Instance type ml.c5.xlarge, 2 instances each. Traffic split 90% to
+      variantA (v1), 10% to variantB (v2). Data capture enabled at 50%
+      sampling. KMS encryption with alias/sagemaker-key. Tags:
+      Environment=staging, Workload=churn-ab-test.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ab-churn-endpoint"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "variantA"
+        - "variantB"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: serverless-inference-intermittent
+    description: >-
+      Deploy a SageMaker Serverless Inference endpoint for an intermittent
+      text classification workload. Expects READY_TO_DEPLOY with the
+      serverless pattern.
+    input: |
+      Deploy a SageMaker Serverless Inference endpoint in us-east-1 for a
+      text classification model. Endpoint name "serverless-classifier".
+      Model artifact at s3://ml-artifacts/classifier/model.tar.gz.
+      Container image 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1.0-cpu-py310.
+      Execution role arn:aws:iam::123456789012:role/SageMakerExecutionRole.
+      Traffic is intermittent — a few requests per hour. Serverless config:
+      MemorySizeInMB 2048, MaxConcurrency 10, ProvisionedConcurrency 1
+      for minimal warm capacity. KMS encryption with alias/sagemaker-key.
+      Tags: Environment=production, Workload=text-classification.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "serverless-classifier"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "serverless"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: async-inference-large-model
+    description: >-
+      Deploy a SageMaker Asynchronous Inference endpoint for a large
+      computer vision model with S3 queueing. Expects READY_TO_DEPLOY with
+      the async inference pattern.
+    input: |
+      Deploy a SageMaker Asynchronous Inference endpoint in us-east-1 for
+      a computer vision model that processes large images. Endpoint name
+      "async-vision". Model artifact at s3://ml-artifacts/vision/model.tar.gz.
+      Container image 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1.0-gpu-py310.
+      Execution role arn:aws:iam::123456789012:role/SageMakerExecutionRole.
+      Instance type ml.g5.xlarge, initial count 1 (scale to 0 when idle).
+      Async output to s3://async-output/vision/ with SNS success topic
+      arn:aws:sns:us-east-1:123456789012:vision-success and error topic
+      arn:aws:sns:us-east-1:123456789012:vision-error. Auto-scaling on
+      ApproximateBacklogSizePerInstance with target 5, min 0, max 4.
+      KMS encryption with alias/sagemaker-key. Tags: Environment=production,
+      Workload=computer-vision-async.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "async-vision"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "asynchronous"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-artifact-and-role
+    description: >-
+      Operator requests a SageMaker endpoint but has not uploaded the model
+      artifact or created an execution role. Expects PREREQUISITES_MISSING
+      with specific gaps cited.
+    input: |
+      Help me create a SageMaker endpoint called "fraud-detection" in
+      us-east-1. I have a trained model locally but haven't uploaded it
+      to S3 yet. I also haven't set up a SageMaker execution role. I want
+      a real-time endpoint on ml.c5.xlarge with 2 instances. Account ID:
+      123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "fraud-detection"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

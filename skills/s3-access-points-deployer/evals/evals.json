@@ -1,0 +1,179 @@
+{
+  "skill": "s3-access-points-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the S3 Access Points Deployer. Five-case proven set exercising READY_TO_DEPLOY / PREREQUISITES_MISSING across Internet-origin, VPC-origin (with and without VPC endpoint), Object Lambda, MRAP, and cross-account delegation. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "vpc-only-team-ap",
+      "name": "VPC-only access point for Team A with through-AP-only bucket Deny",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — VPC origin + through-AP Deny + per-AP BPA",
+      "prompt": "Provision a VPC-only access point for bucket \"prod-shared-data\" (account 123456789012, region us-east-1) so that Team A's role arn:aws:iam::123456789012:role/TeamARole can read/write only the team-a/ prefix. AP name: team-a-vpc-ap. VPC ID: vpc-0abc123def456. Bucket baseline (BPA, SSE-KMS, versioning) already verified. Include per-AP Block Public Access and the bucket policy that blocks the global hostname bypass.",
+      "prompt_file": "prompts/vpc-only-team-ap.md",
+      "baseline_file": "baselines/vpc-only-team-ap.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCESS_POINT: team-a-vpc-ap\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Bucket baseline verified (BPA, SSE-KMS, versioning)\n  [✓] Network origin: VPC (vpc-0abc123def456)\n  [✓] VPC endpoint + private DNS configured\n  [✓] Access point created: team-a-vpc-ap\n  [✓] Access point policy: principal TeamARole, prefix team-a/\n  [✓] Through-AP-only bucket-policy Deny (s3:DataAccessPointArn)\n  [✓] Per-AP Block Public Access: all 4 settings True\n  [OPTIONAL] Object Lambda / MRAP / cross-account: none\nVERIFICATION_COMMANDS:\n  aws s3control get-access-point --account-id 123456789012 --name team-a-vpc-ap\n  aws s3control get-access-point-policy --account-id 123456789012 --name team-a-vpc-ap\n  aws s3api get-bucket-policy --bucket prod-shared-data",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "team-a-vpc-ap",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "s3:DataAccessPointArn",
+            "VPC",
+            "Block Public Access"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-vpc-endpoint",
+      "name": "VPC-origin AP requested without VPC endpoint — must flag gap",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — VPC endpoint for S3 not present in target VPC",
+      "prompt": "Create a VPC-only access point \"internal-logs-ap\" for bucket \"internal-logs\" in account 123456789012 region us-west-2, VPC vpc-998877. The bucket has BPA + SSE-S3. I checked and there is no VPC endpoint for S3 in vpc-998877. Make the bucket truly VPC-only.",
+      "prompt_file": "prompts/missing-vpc-endpoint.md",
+      "baseline_file": "baselines/missing-vpc-endpoint.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ACCESS_POINT: internal-logs-ap\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓] Bucket baseline verified\n  [✓] Network origin: VPC (vpc-998877)\n  [✗] VPC endpoint: no gateway endpoint for com.amazonaws.us-west-2.s3 in VPC vpc-998877 — create endpoint first\n  [✓] Access point created: internal-logs-ap\n  [✗] Through-AP-only bucket-policy Deny: cannot verify without endpoint (defer until endpoint exists)\n  [✓] Per-AP Block Public Access: all 4 settings True\nVERIFICATION_COMMANDS:\n  aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=vpc-998877\n  aws s3api get-bucket-policy --bucket internal-logs",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "internal-logs-ap",
+            "VERDICT",
+            "CHECKLIST",
+            "VPC endpoint"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "object-lambda-pii-redaction",
+      "name": "Object Lambda access point for PII redaction with reserved concurrency",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Object Lambda AP + transform function + reserved concurrency",
+      "prompt": "Build an Object Lambda access point \"pii-redacted-olap\" over bucket \"raw-customer-data\" (account 123456789012, region us-east-1). Supporting standard AP name: raw-customer-ap (Internet origin). Transform Lambda function ARN: arn:aws:lambda:us-east-1:123456789012:function:pii-redact-fn. Transform action: GetObject. Reserve 30 concurrent executions on the Lambda.",
+      "prompt_file": "prompts/object-lambda-pii-redaction.md",
+      "baseline_file": "baselines/object-lambda-pii-redaction.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCESS_POINT: pii-redacted-olap\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Bucket baseline verified\n  [✓] Supporting standard AP: raw-customer-ap (Internet)\n  [✓] Transform function: arn:aws:lambda:us-east-1:123456789012:function:pii-redact-fn\n  [✓] Reserved concurrency: 30\n  [✓] Object Lambda AP created: pii-redacted-olap\n  [✓] Lambda invocation policy grants s3-object-lambda.amazonaws.com\nVERIFICATION_COMMANDS:\n  aws s3control get-access-point-configuration-for-object-lambda --account-id 123456789012 --name pii-redacted-olap\n  aws lambda get-function-concurrency --function-name pii-redact-fn",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "pii-redacted-olap",
+            "Object Lambda",
+            "VERDICT",
+            "CHECKLIST",
+            "reserved-concurrent-executions"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mrap-two-region-active-active",
+      "name": "Multi-Region Access Point spanning two regional buckets with backfill warning",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — MRAP active-active with explicit non-backfill warning",
+      "prompt": "Build a Multi-Region Access Point \"global-assets-mrap\" over buckets assets-use1 (us-east-1) and assets-usw2 (us-west-2). Account: 123456789012. Both buckets have versioning enabled and SSE-KMS. Tell me how to verify and warn me about the backfill limitation.",
+      "prompt_file": "prompts/mrap-two-region-active-active.md",
+      "baseline_file": "baselines/mrap-two-region-active-active.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCESS_POINT: global-assets-mrap\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Bucket baseline verified (both buckets, BPA + SSE-KMS + versioning)\n  [✓] MRAP regions: us-east-1, us-west-2\n  [✓] MRAP created: global-assets-mrap\n  [NOTE] Pre-existing objects are NOT backfilled — copy via Batch Operations if they must be reachable through the MRAP\nVERIFICATION_COMMANDS:\n  aws s3control get-multi-region-access-point --account-id 123456789012 --name global-assets-mrap",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "global-assets-mrap",
+            "MRAP",
+            "VERDICT",
+            "CHECKLIST",
+            "backfill"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-ap-delegation",
+      "name": "Cross-account AP delegation with containment on foreign-owned AP",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — delegated AP creation + containment statement on foreign AP ARN",
+      "prompt": "Bucket \"shared-with-partner\" in account 123456789012 (region us-east-1) needs to let partner account 991122334455 create their own access point named \"partner-ap\" scoped to prefix \"partner-data/\". I want to delegate creation but contain the foreign-owned AP so it cannot expose the \"internal/\" prefix.",
+      "prompt_file": "prompts/cross-account-ap-delegation.md",
+      "baseline_file": "baselines/cross-account-ap-delegation.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCESS_POINT: partner-ap\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Bucket baseline verified\n  [✓] Delegation grant: s3:CreateAccessPoint to 991122334455\n  [✓] Containment Deny on s3:DataAccessPointAccount == 991122334455 for internal/* prefix\n  [✓] Foreign account will run create-access-point with prefix partner-data/\nVERIFICATION_COMMANDS:\n  aws s3api get-bucket-policy --bucket shared-with-partner",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-with-partner",
+            "partner-ap",
+            "VERDICT",
+            "CHECKLIST",
+            "s3:CreateAccessPoint",
+            "s3:DataAccessPointAccount"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+# Eval configuration for amazon-mq-broker-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: amazon-mq-broker-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: production-activemq-active-standby
+    difficulty: hard
+    prompt_file: prompts/production-activemq-active-standby.md
+    baseline_file: baselines/production-activemq-active-standby.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: rabbitmq-cluster-with-iam
+    difficulty: hard
+    prompt_file: prompts/rabbitmq-cluster-with-iam.md
+    baseline_file: baselines/rabbitmq-cluster-with-iam.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-vpc-and-subnet
+    difficulty: easy
+    prompt_file: prompts/missing-vpc-and-subnet.md
+    baseline_file: baselines/missing-vpc-and-subnet.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: activemq-stomp-mqtt-protocols
+    difficulty: medium
+    prompt_file: prompts/activemq-stomp-mqtt-protocols.md
+    baseline_file: baselines/activemq-stomp-mqtt-protocols.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: rabbitmq-transit-gateway-cross-account
+    difficulty: hard
+    prompt_file: prompts/rabbitmq-transit-gateway-cross-account.md
+    baseline_file: baselines/rabbitmq-transit-gateway-cross-account.md
+    expected_verdict: READY_TO_DEPLOY

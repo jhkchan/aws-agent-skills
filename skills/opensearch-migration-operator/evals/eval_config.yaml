@@ -1,0 +1,39 @@
+# Eval configuration for opensearch-migration-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+skill_name: opensearch-migration-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: es710-inplace-upgrade-ready
+    difficulty: medium
+    prompt_file: prompts/es710-inplace-upgrade-ready.md
+    baseline_file: baselines/es710-inplace-upgrade-ready.md
+    expected_verdict: READY
+  - id: es68-blocked-version-plugin
+    difficulty: hard
+    prompt_file: prompts/es68-blocked-version-plugin.md
+    baseline_file: baselines/es68-blocked-version-plugin.md
+    expected_verdict: BLOCKED
+  - id: blue-green-migration-completed
+    difficulty: easy
+    prompt_file: prompts/blue-green-migration-completed.md
+    baseline_file: baselines/blue-green-migration-completed.md
+    expected_verdict: COMPLETED
+  - id: snapshot-setup-blocked-no-s3-bucket
+    difficulty: medium
+    prompt_file: prompts/snapshot-setup-blocked-no-s3-bucket.md
+    baseline_file: baselines/snapshot-setup-blocked-no-s3-bucket.md
+    expected_verdict: BLOCKED
+  - id: reindex-from-remote-ready
+    difficulty: medium
+    prompt_file: prompts/reindex-from-remote-ready.md
+    baseline_file: baselines/reindex-from-remote-ready.md
+    expected_verdict: READY

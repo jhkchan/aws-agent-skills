@@ -1,0 +1,226 @@
+# Eval test cases for ssm-session-manager-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ssm-session-manager-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: session-start-iam-gap
+    description: >-
+      aws ssm start-session returns AccessDeniedException. The caller
+      identity policy scopes ssm:StartSession to instance resources
+      only, omitting the SSM-SessionManagerRunShell document. Skill
+      must identify the IAM gap via simulate-principal-policy, pass
+      the 4-layer check for client/connectivity/agent, and produce
+      ROOT_CAUSE_FOUND with the inline policy fix.
+    input: |
+      Diagnosis reference: session-start-iam-gap
+      Account: 111111111111
+      Region: us-east-1
+      Instance-id: i-0abc123def456789a
+      Symptom: SessionFailsToStart (AccessDeniedException)
+
+      Recent diagnostic output:
+      - aws ssm start-session --target i-0abc123def456789a returned:
+        "AccessDeniedException: User arn:aws:sts::111111111111:assumed-role/DevOpsRole/jacky
+        is not authorized to perform: ssm:StartSession"
+      - session-manager-plugin --version: 1.2.612.0
+      - describe-instance-information: PingStatus=Active,
+        LastPingDateTime=2026-08-10T10:00:00Z, AgentVersion=3.3.131.0,
+        IsLatestVersion=true
+      - simulate-principal-policy on arn:aws:sts::111111111111:assumed-role/DevOpsRole/jacky:
+        Denied for ssm:StartSession on
+        arn:aws:ssm:us-east-1:111111111111:document/SSM-SessionManagerRunShell
+      - ec2 describe-vpc-endpoints: ssm, ssmmesages, ec2messages all present
+        with PrivateDnsEnabled=true
+
+      Emit the standard DIAGNOSIS block (SYMPTOM, ROOT_CAUSE,
+      EVIDENCE, LAYER_CHECK, FIX, VERIFICATION, VERDICT).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "session-start-iam-gap"
+        - "VERDICT"
+        - "ssm:StartSession"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: port-forward-local-port-in-use
+    description: >-
+      Port forwarding session binds then closes immediately with
+      "bind: address already in use". Local port 2222 is held by
+      another process. Skill must identify the local-port conflict
+      via lsof and produce ROOT_CAUSE_FOUND with the free-or-rebind
+      fix.
+    input: |
+      Diagnosis reference: port-forward-local-port-in-use
+      Account: 111111111111
+      Region: us-east-1
+      Instance-id: i-0fedcba9876543210
+      Symptom: PortForwardingFails
+
+      Command run:
+        aws ssm start-session --target i-0fedcba9876543210 \
+          --document-name AWS-StartPortForwardingSession \
+          --parameters '{"portNumber":["22"],"localPortNumber":["2222"]}'
+
+      Recent diagnostic output:
+      - session-manager-plugin log: "bind: address already in use"
+        at session start; session terminated immediately.
+      - lsof -i :2222: returns PID 4517 (sshd listening on 2222).
+      - simulate-principal-policy: ssm:StartSession allowed on both
+        the instance and AWS-StartPortForwardingSession document.
+      - describe-instance-information: PingStatus=Active,
+        AgentVersion=3.3.131.0.
+
+      Emit the standard DIAGNOSIS block.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "port-forward-local-port-in-use"
+        - "VERDICT"
+        - "2222"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: shell-access-agent-too-old
+    description: >-
+      Session starts but shell is unresponsive and returns "shell
+      not configured". SSM agent is version 2.2.0.0, below the
+      2.3.12.0 Session Manager floor. Skill must identify the
+      agent-version gap and produce ROOT_CAUSE_FOUND with the
+      AWS-UpdateSSMAgent fix.
+    input: |
+      Diagnosis reference: shell-access-agent-too-old
+      Account: 111111111111
+      Region: us-east-1
+      Instance-id: i-0bbb222ddd333eee4
+      Symptom: ShellAccessFails
+
+      Recent diagnostic output:
+      - aws ssm start-session opens but returns "This shell is not
+        configured" and disconnects within 2 seconds.
+      - describe-instance-information: PingStatus=Active,
+        AgentVersion=2.2.0.0, IsLatestVersion=false,
+        PlatformType=Linux
+      - send-command AWS-RunShellScript "ls /bin/bash": present;
+        /etc/passwd for ssm-user shows /bin/bash.
+      - ssm-sessionmanager-console-perm attached to caller; IAM and
+        connectivity layers PASS.
+
+      Emit the standard DIAGNOSIS block. Identify the root cause via
+      the 4-layer health check (Step 1, Layer 4).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "shell-access-agent-too-old"
+        - "VERDICT"
+        - "2.3.12.0"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: session-disconnects-nat-idle
+    description: >-
+      Sessions drop at predictable ~5m50s intervals of idle. NAT
+      gateway idle timeout (350 sec) is the cause, not SSM
+      IdleDisconnectTimeout (20 min). Skill must identify the NAT
+      idle timeout as the root cause and produce ROOT_CAUSE_FOUND
+      with the keepalive / VPC-endpoint fix.
+    input: |
+      Diagnosis reference: session-disconnects-nat-idle
+      Account: 111111111111
+      Region: us-east-1
+      Instance-id: i-0ccc333eee444fff5
+      Session-id: jacky-0a1b2c3d4example
+      Symptom: SessionDisconnects
+
+      Recent diagnostic output:
+      - describe-sessions: SessionId=jacky-0a1b2c3d4example,
+        Duration=5m52s, TerminateReason=ConnectionLost
+      - Pattern: every idle session drops at ~5m50s; active sessions
+        (typing commands) stay connected past 20 min.
+      - describe-instance-information: PingStatus=Active,
+        LastPingDateTime within last 2 min.
+      - SSM-SessionManagerRunShell: idleDisconnectTimeout=1200 (20 min),
+        maxSessionDuration=60.
+      - ec2 describe-route-tables: instance subnet routes 0.0.0.0/0
+        via nat-0abc123 (NAT gateway). No ssmmesages VPC endpoint.
+
+      Emit the standard DIAGNOSIS block. Identify the root cause via
+      Step 7 (SessionDisconnects).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "session-disconnects-nat-idle"
+        - "VERDICT"
+        - "350"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: cross-account-kms-key-policy
+    description: >-
+      Cross-account Session Manager session from source account
+      111111111111 to target account 222222222222 fails with
+      AccessDeniedException on kms:GenerateDataKey. KMS key policy
+      in the target account allows only the target account root.
+      Skill must identify the KMS key policy gap and ESCALATE
+      (requires target-account key admin to modify the key policy).
+    input: |
+      Diagnosis reference: cross-account-kms-key-policy
+      Source account: 111111111111
+      Target account: 222222222222
+      Region: us-east-1
+      Instance-id: i-0ddd444eee555fff6 (in target account)
+      KMS key: arn:aws:kms:us-east-1:222222222222:key/abc123def456
+      Symptom: LatestFeature (cross-account session)
+
+      Recent diagnostic output:
+      - aws ssm start-session from source account returned:
+        "AccessDeniedException: User arn:aws:sts::222222222222:assumed-role/CrossAcctSessionRole/jacky
+        is not authorized to perform: kms:GenerateDataKey on
+        arn:aws:kms:us-east-1:222222222222:key/abc123def456"
+      - simulate-principal-policy in target account on
+        arn:aws:sts::222222222222:assumed-role/CrossAcctSessionRole/jacky:
+        ssm:StartSession allowed, ssmmessages:* allowed.
+      - aws kms describe-key: KeyState=Enabled, MultiRegion=false.
+      - aws kms get-key-policy: Statement Principal =
+        {"AWS":"arn:aws:iam::222222222222:root"} only (no source
+        account principal).
+
+      Emit the standard DIAGNOSIS block.
+    expected_verdict: ESCALATE
+    assertions:
+      must_contain:
+        - "ESCALATE"
+        - "cross-account-kms-key-policy"
+        - "VERDICT"
+        - "kms:GenerateDataKey"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ROOT_CAUSE_FOUND"
+        - "VERDICT: NEED_MORE_INFO"

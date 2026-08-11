@@ -1,0 +1,142 @@
+# Eval test cases for route53-routing-policy-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across weighted, failover, geolocation, alias, and ARC.
+skill: route53-routing-policy-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: weighted-canary-with-health-checks
+    description: >-
+      Provision a weighted routing policy with two targets and health
+      checks on each. Must use a single atomic change-batch and include
+      test-dns-answer verification. Expects READY_TO_DEPLOY.
+    input: |
+      Provision a weighted routing policy in hosted zone Z2DABCDEFGHIJK
+      (example.com) for record "api.example.com" type A. Primary
+      target 10.0.0.10 weight 90 with health check on HTTPS /healthz
+      interval 30s threshold 3. Canary target 10.0.0.20 weight 10 with
+      its own health check on the same path. Atomic change-batch. TTL
+      60s for fast canary re-normalization.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "api.example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "weighted"
+        - "HealthCheck"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: weighted-without-health-check
+    description: >-
+      Weighted routing requested without health checks. Must flag the
+      missing HC gap and return PREREQUISITES_MISSING.
+    input: |
+      Create a weighted routing policy for "api.example.com" in zone
+      Z3DABCDEFGHIJK with primary 10.0.0.10 weight 90 and canary
+      10.0.0.20 weight 10. We don't have health checks set up yet
+      and don't want to add them. Just do the routing.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "api.example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Health check"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: failover-primary-secondary-with-eth
+    description: >-
+      Failover routing with PRIMARY alias to ALB (EvaluateTargetHealth
+      true) and SECONDARY static IP. Expects READY_TO_DEPLOY with ETH
+      explicitly cited.
+    input: |
+      Provision DR failover routing in zone Z4DABCDEFGHIJK
+      (example.com) for "dr.example.com" type A. PRIMARY: alias to ALB
+      "my-alb-12345.us-east-1.elb.amazonaws.com" (canonical hosted zone
+      Z35SXDOTRQ7X7K), EvaluateTargetHealth true. SECONDARY: static IP
+      10.99.0.20 in us-west-2. PRIMARY must reference its own health
+      check on HTTPS /healthz. TTL 60s.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "dr.example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "failover"
+        - "EvaluateTargetHealth"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: geolocation-with-default-record
+    description: >-
+      Geolocation routing for NA, EU, and a default record. Must
+      include the default record (CountryCode *) to avoid NXDOMAIN.
+      Expects READY_TO_DEPLOY.
+    input: |
+      Build geolocation routing for "geo.example.com" in zone
+      Z5DABCDEFGHIJK. North America (NA) -> 10.10.0.10, Europe (EU) ->
+      10.20.0.20, default (everywhere else) -> 10.30.0.30. TTL 300s.
+      Include health checks on each target.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "geo.example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "geolocation"
+        - "default"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: arc-routing-control-with-safety-rule
+    description: >-
+      Provision a Route 53 Application Recovery Controller cluster
+      with two routing controls, a safety rule (ASSERTION), and a
+      readiness check. Must cite all three. Expects READY_TO_DEPLOY.
+    input: |
+      Set up Route 53 ARC for an active-passive DR topology. Cluster
+      "api-dr-cluster", control panel "api-dr-panel", routing controls
+      "us-east-1-routing" and "us-west-2-routing". Mandatory safety
+      rule that blocks both-off. Readiness check on the us-west-2
+      API Gateway stage ARN
+      "arn:aws:apigateway:us-west-2::/apis/abc123/stages/prod".
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "routing control"
+        - "safety rule"
+        - "readiness check"
+        - "Application Recovery Controller"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

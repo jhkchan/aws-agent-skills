@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ssm-session-manager-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SSM Session Manager Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "session-start-iam-gap",
+      "name": "SessionFailsToStart: caller identity policy omits SSM-SessionManagerRunShell document resource - ROOT_CAUSE_FOUND",
+      "difficulty": "easy",
+      "prompt_file": "prompts/session-start-iam-gap.md",
+      "baseline_file": "baselines/session-start-iam-gap.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "session-start-iam-gap", "VERDICT", "ssm:StartSession"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "port-forward-local-port-in-use",
+      "name": "PortForwardingFails: local port 2222 in use - ROOT_CAUSE_FOUND via lsof",
+      "difficulty": "medium",
+      "prompt_file": "prompts/port-forward-local-port-in-use.md",
+      "baseline_file": "baselines/port-forward-local-port-in-use.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "port-forward-local-port-in-use", "VERDICT", "2222"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "shell-access-agent-too-old",
+      "name": "ShellAccessFails: SSM agent 2.2.0.0 below 2.3.12.0 Session Manager floor - ROOT_CAUSE_FOUND",
+      "difficulty": "medium",
+      "prompt_file": "prompts/shell-access-agent-too-old.md",
+      "baseline_file": "baselines/shell-access-agent-too-old.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "shell-access-agent-too-old", "VERDICT", "2.3.12.0"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "session-disconnects-nat-idle",
+      "name": "SessionDisconnects: NAT gateway idle timeout 350s drops idle sessions - ROOT_CAUSE_FOUND",
+      "difficulty": "hard",
+      "prompt_file": "prompts/session-disconnects-nat-idle.md",
+      "baseline_file": "baselines/session-disconnects-nat-idle.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "session-disconnects-nat-idle", "VERDICT", "350"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-kms-key-policy",
+      "name": "LatestFeature cross-account: target-account KMS key policy lacks source-account principal - ESCALATE",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-kms-key-policy.md",
+      "baseline_file": "baselines/cross-account-kms-key-policy.md",
+      "expected_verdict": "ESCALATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ESCALATE", "cross-account-kms-key-policy", "VERDICT", "kms:GenerateDataKey"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ROOT_CAUSE_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

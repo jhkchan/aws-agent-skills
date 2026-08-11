@@ -1,0 +1,176 @@
+{
+  "skill": "sagemaker-endpoint-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the SageMaker Endpoint Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across hosting modes (real-time with auto-scaling, A/B testing, serverless inference, asynchronous inference) and missing-prerequisite branches. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "real-time-endpoint-production",
+      "name": "Real-time endpoint with auto-scaling, data capture, and model monitoring",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, real-time endpoint with 2-instance HA, auto-scaling, data capture, model monitor",
+      "prompt": "Deploy a SageMaker real-time inference endpoint in us-east-1 for a recommendation model. Endpoint name \"prod-recommendation\". Model artifact at s3://ml-artifacts/models/rec/model.tar.gz. Container image 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1.0-cpu-py310. Execution role arn:aws:iam::123456789012:role/SageMakerExecutionRole. Instance type ml.c5.xlarge, initial count 2 for HA. Auto-scaling on InvocationsPerInstance with target 14, min 2, max 8. Data capture enabled at 20% sampling to s3://sagemaker-captures-prod/rec/. Data quality model monitor on hourly schedule. KMS encryption with key alias/prod-sagemaker-key. VPC subnets subnet-aaa, subnet-bbb, security group sg-xxx. Tags: Environment=production, Workload=recommendation. Account ID: 123456789012.",
+      "prompt_file": "prompts/real-time-endpoint-production.md",
+      "baseline_file": "baselines/real-time-endpoint-production.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ENDPOINT: prod-recommendation\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Model: prod-recommendation-model (S3: s3://ml-artifacts/models/rec/model.tar.gz)\n  [✓] Container image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1.0-cpu-py310\n  [✓] Execution role: arn:aws:iam::123456789012:role/SageMakerExecutionRole\n  [✓] Hosting mode: real-time\n  [✓] Instance type: ml.c5.xlarge (CPU, tabular recommendation)\n  [✓] Initial instance count: 2 (HA across 2 AZs)\n  [✓] Variant: AllTraffic\n  [✓] Encryption: KMS alias/prod-sagemaker-key\n  [✓] Auto-scaling: target=InvocationsPerInstance, TargetValue=14, min=2, max=8\n  [✓] Data capture: Enabled, sampling=20%, destination=s3://sagemaker-captures-prod/rec/\n  [✓] Model monitor: data quality schedule=hourly\n  [✓] VPC config: subnet-aaa, subnet-bbb, sg-xxx\n  [✓] Tags: Environment=production, Workload=recommendation\nVERIFICATION_COMMANDS:\n  aws sagemaker describe-endpoint --endpoint-name prod-recommendation\n  aws sagemaker describe-endpoint-config --endpoint-config-name prod-recommendation-config\n  aws sagemaker describe-model --model-name prod-recommendation-model\n  aws application-autoscaling describe-scaling-policies --service-namespace sagemaker --resource-id endpoint/prod-recommendation/variant/AllTraffic\n  aws s3 ls s3://sagemaker-captures-prod/rec/prod-recommendation/AllTraffic/",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-recommendation",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "real-time",
+            "auto-scaling",
+            "data capture"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ab-testing-deployment",
+      "name": "A/B testing endpoint with two variants at 90/10 traffic split",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — A/B testing with two variants, same instance type, weighted traffic",
+      "prompt": "Set up A/B testing on a SageMaker endpoint \"ab-churn-endpoint\" in us-east-1. Two models: \"churn-model-v1\" (artifact s3://ml/churn-v1/model.tar.gz) and \"churn-model-v2\" (artifact s3://ml/churn-v2/model.tar.gz). Both use the same container image 763104351884.dkr.ecr.us-east-1.amazonaws.com/xgboost-inference:1.7-1. Execution role arn:aws:iam::123456789012:role/SageMakerExecutionRole. Instance type ml.c5.xlarge, 2 instances each. Traffic split 90% to variantA (v1), 10% to variantB (v2). Data capture enabled at 50% sampling. KMS encryption with alias/sagemaker-key. Tags: Environment=staging, Workload=churn-ab-test. Account ID: 123456789012.",
+      "prompt_file": "prompts/ab-testing-deployment.md",
+      "baseline_file": "baselines/ab-testing-deployment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ENDPOINT: ab-churn-endpoint\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Model: churn-model-v1 (S3: s3://ml/churn-v1/model.tar.gz)\n  [✓] Model: churn-model-v2 (S3: s3://ml/churn-v2/model.tar.gz)\n  [✓] Container image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/xgboost-inference:1.7-1\n  [✓] Hosting mode: real-time (A/B testing)\n  [✓] Instance type: ml.c5.xlarge (same for both variants — avoids confounding)\n  [✓] Variant A: churn-model-v1, InitialInstanceCount=2, InitialVariantWeight=9 (90%)\n  [✓] Variant B: churn-model-v2, InitialInstanceCount=2, InitialVariantWeight=1 (10%)\n  [✓] Data capture: Enabled, sampling=50%\n  [✓] Encryption: KMS alias/sagemaker-key\n  [✓] Tags: Environment=staging, Workload=churn-ab-test\nVERIFICATION_COMMANDS:\n  aws sagemaker describe-endpoint --endpoint-name ab-churn-endpoint\n  aws sagemaker describe-endpoint-config --endpoint-config-name ab-churn-config",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ab-churn-endpoint",
+            "VERDICT",
+            "CHECKLIST",
+            "variantA",
+            "variantB"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "serverless-inference-intermittent",
+      "name": "Serverless Inference endpoint for intermittent text classification",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — serverless with ProvisionedConcurrency=1, scale-to-zero when idle",
+      "prompt": "Deploy a SageMaker Serverless Inference endpoint in us-east-1 for a text classification model. Endpoint name \"serverless-classifier\". Model artifact at s3://ml-artifacts/classifier/model.tar.gz. Container image 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1.0-cpu-py310. Execution role arn:aws:iam::123456789012:role/SageMakerExecutionRole. Traffic is intermittent — a few requests per hour. Serverless config: MemorySizeInMB 2048, MaxConcurrency 10, ProvisionedConcurrency 1 for minimal warm capacity. KMS encryption with alias/sagemaker-key. Tags: Environment=production, Workload=text-classification. Account ID: 123456789012.",
+      "prompt_file": "prompts/serverless-inference-intermittent.md",
+      "baseline_file": "baselines/serverless-inference-intermittent.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ENDPOINT: serverless-classifier\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Model: serverless-classifier-model (S3: s3://ml-artifacts/classifier/model.tar.gz)\n  [✓] Container image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1.0-cpu-py310\n  [✓] Execution role: arn:aws:iam::123456789012:role/SageMakerExecutionRole\n  [✓] Hosting mode: serverless\n  [✓] Serverless config: MemorySizeInMB=2048, MaxConcurrency=10, ProvisionedConcurrency=1\n  [✓] Auto-scaling: built-in (scale-to-zero when idle)\n  [✓] Encryption: KMS alias/sagemaker-key\n  [✓] Tags: Environment=production, Workload=text-classification\nVERIFICATION_COMMANDS:\n  aws sagemaker describe-endpoint --endpoint-name serverless-classifier\n  aws sagemaker describe-endpoint-config --endpoint-config-name serverless-classifier-config",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "serverless-classifier",
+            "VERDICT",
+            "CHECKLIST",
+            "serverless"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "async-inference-large-model",
+      "name": "Asynchronous Inference endpoint for large computer vision payloads",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — async with S3 queueing, SNS notification, scale-to-zero",
+      "prompt": "Deploy a SageMaker Asynchronous Inference endpoint in us-east-1 for a computer vision model that processes large images. Endpoint name \"async-vision\". Model artifact at s3://ml-artifacts/vision/model.tar.gz. Container image 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1.0-gpu-py310. Execution role arn:aws:iam::123456789012:role/SageMakerExecutionRole. Instance type ml.g5.xlarge, initial count 1 (scale to 0 when idle). Async output to s3://async-output/vision/ with SNS success topic arn:aws:sns:us-east-1:123456789012:vision-success and error topic arn:aws:sns:us-east-1:123456789012:vision-error. Auto-scaling on ApproximateBacklogSizePerInstance with target 5, min 0, max 4. KMS encryption with alias/sagemaker-key. Tags: Environment=production, Workload=computer-vision-async. Account ID: 123456789012.",
+      "prompt_file": "prompts/async-inference-large-model.md",
+      "baseline_file": "baselines/async-inference-large-model.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ENDPOINT: async-vision\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Model: async-vision-model (S3: s3://ml-artifacts/vision/model.tar.gz)\n  [✓] Container image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:2.1.0-gpu-py310\n  [✓] Hosting mode: asynchronous\n  [✓] Instance type: ml.g5.xlarge (GPU for computer vision)\n  [✓] Initial instance count: 1 (scale to 0 when idle)\n  [✓] Async output: s3://async-output/vision/, SNS success=arn:aws:sns:us-east-1:123456789012:vision-success, error=arn:aws:sns:us-east-1:123456789012:vision-error\n  [✓] Auto-scaling: target=ApproximateBacklogSizePerInstance, TargetValue=5, min=0, max=4\n  [✓] Encryption: KMS alias/sagemaker-key\n  [✓] Tags: Environment=production, Workload=computer-vision-async\nVERIFICATION_COMMANDS:\n  aws sagemaker describe-endpoint --endpoint-name async-vision\n  aws sagemaker describe-endpoint-config --endpoint-config-name async-vision-config\n  aws application-autoscaling describe-scaling-policies --service-namespace sagemaker --resource-id endpoint/async-vision/variant/AllTraffic",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "async-vision",
+            "VERDICT",
+            "CHECKLIST",
+            "asynchronous"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-artifact-and-role",
+      "name": "Operator missing S3 model artifact and execution role — prerequisites missing",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — S3 model artifact and execution role both unprovided",
+      "prompt": "Help me create a SageMaker endpoint called \"fraud-detection\" in us-east-1. I have a trained model locally but haven't uploaded it to S3 yet. I also haven't set up a SageMaker execution role. I want a real-time endpoint on ml.c5.xlarge with 2 instances. Account ID: 123456789012.",
+      "prompt_file": "prompts/missing-artifact-and-role.md",
+      "baseline_file": "baselines/missing-artifact-and-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ENDPOINT: fraud-detection\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] S3 model artifact: NOT provided — model.tar.gz must be uploaded to S3 before create-model\n  [✗] Execution role: NOT provided — SageMaker execution role with sagemaker.amazonaws.com trust + S3 read + ECR pull required\nVERIFICATION_COMMANDS:\n  aws s3 ls s3://  (identify target bucket)\n  aws iam list-roles --query 'Roles[?contains(RoleName, `SageMaker`)]'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "fraud-detection",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

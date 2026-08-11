@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "redshift-cluster-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Redshift Cluster Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "oversized-ra3-rightsize-reserved-node",
+      "name": "Oversized RA3 cluster — right-size from 4 to 2 nodes + 3-yr Reserved Node",
+      "difficulty": "medium",
+      "prompt_file": "prompts/oversized-ra3-rightsize-reserved-node.md",
+      "baseline_file": "baselines/oversized-ra3-rightsize-reserved-node.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "oversized-ra3-rightsize-reserved-node", "QueryQueueLength", "CONFIRM", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "dc2-migrate-to-ra3",
+      "name": "DC2 cluster with low storage usage — migrate to RA3 managed storage",
+      "difficulty": "hard",
+      "prompt_file": "prompts/dc2-migrate-to-ra3.md",
+      "baseline_file": "baselines/dc2-migrate-to-ra3.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "dc2-migrate-to-ra3", "RA3", "managed storage"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-steady-state-reserved",
+      "name": "Already optimal production cluster with 3-yr RIs, proper WLM, compressed storage",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-steady-state-reserved.md",
+      "baseline_file": "baselines/already-optimal-steady-state-reserved.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-steady-state-reserved"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "serverless-base-rpu-too-high",
+      "name": "Redshift Serverless workgroup with base RPU 4x higher than actual usage",
+      "difficulty": "medium",
+      "prompt_file": "prompts/serverless-base-rpu-too-high.md",
+      "baseline_file": "baselines/serverless-base-rpu-too-high.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "serverless-base-rpu-too-high", "RPU"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "Reserved Node"]
+        }
+      ]
+    },
+    {
+      "id": "idle-cluster-detection",
+      "name": "Idle dev cluster — 0 connections for 22 days, snapshot + delete candidate",
+      "difficulty": "easy",
+      "prompt_file": "prompts/idle-cluster-detection.md",
+      "baseline_file": "baselines/idle-cluster-detection.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "idle-cluster-detection", "snapshot"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL"]
+        }
+      ]
+    }
+  ]
+}

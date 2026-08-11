@@ -1,0 +1,175 @@
+{
+  "skill": "grafana-dashboard-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Grafana Dashboard Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across data source combinations (CloudWatch, AMP/Prometheus, multi-source with alerting, Enterprise with Incident/OnCall) and missing-prerequisite branches. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "cloudwatch-dashboard-production",
+      "name": "Production Grafana workspace with CloudWatch data source + alerting",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, CloudWatch data source, customer-managed IAM role, IAM Identity Center auth, dashboard with templating, alerting",
+      "prompt": "Create an Amazon Managed Grafana workspace in us-east-1 for production observability. Workspace name \"prod-observability\". Use IAM Identity Center (AWS_SSO) authentication. Permission type CUSTOMER_MANAGED with a role \"GrafanaDataSourceRole\" that has CloudWatch read access (cloudwatch:GetMetricData, cloudwatch:ListMetrics, logs:DescribeLogGroups). Data source: CloudWatch for regions us-east-1 and us-west-2. Grafana version 10.4. Dashboard with 12 panels covering EC2, Lambda, and RDS metrics with templating variables for $region and $datasource. Alert rules for CPU > 85% and Lambda errors > 5 with SNS notification to arn:aws:sns:us-east-1:123456789012:grafana-alerts. Tags: Environment=production, Workload=observability. Account ID: 123456789012.",
+      "prompt_file": "prompts/cloudwatch-dashboard-production.md",
+      "baseline_file": "baselines/cloudwatch-dashboard-production.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WORKSPACE: prod-observability\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Workspace: prod-observability, version: 10.4 (Standard)\n  [✓] Authentication: AWS_SSO (IAM Identity Center)\n  [✓] Permission type: CUSTOMER_MANAGED\n  [✓] IAM role: GrafanaDataSourceRole (cloudwatch:GetMetricData, cloudwatch:ListMetrics, logs:DescribeLogGroups)\n  [✓] Data source: CloudWatch (regions: us-east-1, us-west-2)\n  [✓] Dashboard: Production Observability (12 panels, templating: $region, $datasource)\n  [✓] Alert rules: CPU > 85% (5m for), Lambda errors > 5 (5m for)\n  [✓] Notification policies: route by severity\n  [✓] Contact points: SNS arn:aws:sns:us-east-1:123456789012:grafana-alerts\n  [✓] Tags: Environment=production, Workload=observability\nVERIFICATION_COMMANDS:\n  aws grafana describe-workspace --workspace-id <workspace-id>\n  aws iam get-role --role-name GrafanaDataSourceRole",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-observability",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "CloudWatch",
+            "IAM Identity Center"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "amp-prometheus-dashboard",
+      "name": "Grafana workspace with AMP/Prometheus data source integration",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — AMP workspace verified ACTIVE, PromQL dashboard with alerting",
+      "prompt": "Create an Amazon Managed Grafana workspace in us-east-1 for application monitoring. Workspace name \"app-monitoring\". IAM Identity Center auth. Permission type CUSTOMER_MANAGED. Data source: AMP/Prometheus. The AMP workspace \"prod-metrics\" (workspace ID ws-abc123def) is already ACTIVE. Customer-managed IAM role \"GrafanaDataSourceRole\" with aps:QueryMetrics on the AMP workspace ARN. Grafana version 10.4. Dashboard with service-level metrics (request rate, error rate, latency p99) using PromQL queries against the AMP workspace. Alert on error rate > 1% with SNS notification. Tags: Environment=production, Workload=app-monitoring. Account ID: 123456789012.",
+      "prompt_file": "prompts/amp-prometheus-dashboard.md",
+      "baseline_file": "baselines/amp-prometheus-dashboard.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WORKSPACE: app-monitoring\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Workspace: app-monitoring, version: 10.4 (Standard)\n  [✓] Authentication: AWS_SSO (IAM Identity Center)\n  [✓] Permission type: CUSTOMER_MANAGED\n  [✓] IAM role: GrafanaDataSourceRole (aps:QueryMetrics on AMP workspace)\n  [✓] Data source: AMP/Prometheus (workspace: ws-abc123def, status: ACTIVE)\n  [✓] Dashboard: Application Monitoring (PromQL queries, request rate, error rate, latency p99)\n  [✓] Alert rules: error rate > 1% with SNS notification\n  [✓] Tags: Environment=production, Workload=app-monitoring\nVERIFICATION_COMMANDS:\n  aws grafana describe-workspace --workspace-id <workspace-id>\n  aws amps describe-workspace --workspace-id ws-abc123def\n  aws iam get-role --role-name GrafanaDataSourceRole",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "app-monitoring",
+            "VERDICT",
+            "CHECKLIST",
+            "AMP"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-datasource-alerting",
+      "name": "Multi data source (CloudWatch + AMP + X-Ray) with full alerting chain",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — multi data source, 3-tier dashboard, alert rules + notification policies + contact points",
+      "prompt": "Create an Amazon Managed Grafana workspace in us-east-1 for full-stack observability. Workspace name \"fullstack-obs\". IAM Identity Center auth. Permission type CUSTOMER_MANAGED. Data sources: CloudWatch (us-east-1), AMP/Prometheus (workspace ws-metrics-xyz, ACTIVE), and X-Ray. IAM role \"GrafanaFullStackRole\" with read permissions for all three data source types. Grafana version 10.4. Dashboard with 3-tier layout: status overview (stat panels), time-series trends (CPU, latency, throughput from CloudWatch and AMP), detail tables (X-Ray trace summaries). Alert rules: CPU > 85% (CloudWatch), error rate > 1% (AMP PromQL), trace error rate > 5% (X-Ray). Notification policies routing by severity: critical -> sns-critical, warning -> sns-warning. Contact points: SNS arn:aws:sns:us-east-1:123456789012:grafana-critical and arn:aws:sns:us-east-1:123456789012:grafana-warning. Tags: Environment=production, Workload=fullstack-observability. Account ID: 123456789012.",
+      "prompt_file": "prompts/multi-datasource-alerting.md",
+      "baseline_file": "baselines/multi-datasource-alerting.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WORKSPACE: fullstack-obs\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Workspace: fullstack-obs, version: 10.4 (Standard)\n  [✓] Authentication: AWS_SSO (IAM Identity Center)\n  [✓] Permission type: CUSTOMER_MANAGED\n  [✓] IAM role: GrafanaFullStackRole (CloudWatch + AMP + X-Ray read)\n  [✓] Data source: CloudWatch (us-east-1)\n  [✓] Data source: AMP/Prometheus (workspace: ws-metrics-xyz, ACTIVE)\n  [✓] Data source: X-Ray\n  [✓] Dashboard: Full-Stack Observability (3-tier layout, templating: $datasource)\n  [✓] Alert rules: CPU > 85% (CW), error rate > 1% (AMP), trace error > 5% (X-Ray)\n  [✓] Notification policies: severity=critical -> sns-critical, severity=warning -> sns-warning\n  [✓] Contact points: SNS grafana-critical + grafana-warning\n  [✓] Tags: Environment=production, Workload=fullstack-observability\nVERIFICATION_COMMANDS:\n  aws grafana describe-workspace --workspace-id <workspace-id>\n  aws amps describe-workspace --workspace-id ws-metrics-xyz\n  aws iam get-role --role-name GrafanaFullStackRole",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "fullstack-obs",
+            "VERDICT",
+            "CHECKLIST",
+            "notification policies",
+            "contact points"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "enterprise-incident-oncall",
+      "name": "Grafana Enterprise workspace with Incident + OnCall + 5 data sources",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Enterprise tier, SAML team sync, Incident, OnCall, 5 data sources",
+      "prompt": "Create an Amazon Managed Grafana Enterprise workspace in us-east-1 for enterprise observability. Workspace name \"enterprise-obs\". SAML authentication with team sync from the corporate IdP. Permission type CUSTOMER_MANAGED. Data sources: CloudWatch, AMP (workspace ws-prod-metrics, ACTIVE), Timestream, OpenSearch (domain prod-logs), X-Ray. Grafana version 11.0. Enable Grafana Incident for real-time incident declaration and tracking. Enable Grafana OnCall for escalation schedule management with integration to Slack channel #oncall-platform. IAM role \"GrafanaEnterpriseRole\" with read access to all data source types. Dashboard suite: executive overview, service health, incident response. Alerting with escalation policy: severity=critical pages on-call immediately, severity=warning notifies Slack channel. Tags: Environment=production, Workload=enterprise-observability, Tier=enterprise. Account ID: 123456789012.",
+      "prompt_file": "prompts/enterprise-incident-oncall.md",
+      "baseline_file": "baselines/enterprise-incident-oncall.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WORKSPACE: enterprise-obs\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Workspace: enterprise-obs, version: 11.0 (Enterprise)\n  [✓] Authentication: SAML with team sync from IdP\n  [✓] Permission type: CUSTOMER_MANAGED\n  [✓] IAM role: GrafanaEnterpriseRole (CloudWatch + AMP + Timestream + OpenSearch + X-Ray read)\n  [✓] Data source: CloudWatch, AMP (ws-prod-metrics ACTIVE), Timestream, OpenSearch (prod-logs), X-Ray\n  [✓] Grafana Incident: Enabled (real-time incident declaration)\n  [✓] Grafana OnCall: Enabled (escalation schedules, Slack #oncall-platform)\n  [✓] Dashboard suite: executive overview, service health, incident response\n  [✓] Alerting: critical pages on-call, warning notifies Slack\n  [✓] Tags: Environment=production, Workload=enterprise-observability, Tier=enterprise\nVERIFICATION_COMMANDS:\n  aws grafana describe-workspace --workspace-id <workspace-id>\n  aws amps describe-workspace --workspace-id ws-prod-metrics\n  aws iam get-role --role-name GrafanaEnterpriseRole",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "enterprise-obs",
+            "VERDICT",
+            "CHECKLIST",
+            "Enterprise"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-iam-role-and-sso",
+      "name": "Operator missing IAM Identity Center and IAM role — prerequisites missing",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — IAM Identity Center not enabled, no IAM role, no AMP workspace",
+      "prompt": "Help me create a Managed Grafana workspace called \"team-dashboards\" in us-east-1. I want CloudWatch and AMP data sources. I haven't enabled IAM Identity Center yet and I don't have an IAM role for data source access. I also don't have an AMP workspace set up. Account ID: 123456789012.",
+      "prompt_file": "prompts/missing-iam-role-and-sso.md",
+      "baseline_file": "baselines/missing-iam-role-and-sso.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "WORKSPACE: team-dashboards\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] IAM Identity Center: NOT enabled — required for AWS_SSO authentication (recommended auth mode)\n  [✗] IAM role: NOT provided — customer-managed role with data source read permissions required\n  [✗] AMP workspace: NOT created — required for Prometheus data source integration\nVERIFICATION_COMMANDS:\n  aws sso-admin list-instances\n  aws iam list-roles --query 'Roles[?contains(RoleName, `Grafana`)]'\n  aws amps list-workspaces",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "team-dashboards",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

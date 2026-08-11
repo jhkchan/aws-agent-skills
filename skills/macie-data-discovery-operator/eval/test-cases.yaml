@@ -1,0 +1,152 @@
+# Eval test cases for macie-data-discovery-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY / BLOCKED / COMPLETED
+# classification across operation types (enable, classify, custom-id,
+# not-enabled blocked, auto-remediation completed).
+skill: macie-data-discovery-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: enable-macie-org-delegated-admin
+    description: >-
+      Enable Macie at organization level with delegated admin account
+      123456789012, auto-enable for new member accounts, 15-minute
+      finding publish frequency. Expects READY with enablement steps.
+    input: |
+      Enable Amazon Macie for our AWS Organization. We want account
+      123456789012 as the delegated Macie administrator. The management
+      account is 123456789012. Configure auto-enable for all new member
+      accounts. Set finding publish frequency to FIFTEEN_MINUTES. We
+      have 5 member accounts currently. Region: us-east-1. Provide the
+      full enablement procedure with pre-checks and post-verification.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "enable"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "delegated"
+        - "123456789012"
+        - "auto-enable"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: BLOCKED"
+
+  - id: create-classification-job-scheduled
+    description: >-
+      Create a scheduled daily classification job on production S3 buckets
+      with RECOMMENDED managed identifiers. Macie is already enabled.
+      Expects READY with the exact CLI command.
+    input: |
+      Create a Macie classification job named "daily-pii-scan" for our
+      production data buckets: prod-data-bucket and financial-records.
+      Account: 123456789012. Use RECOMMENDED managed data identifier
+      selector. Daily schedule. Macie is already enabled with
+      FIFTEEN_MINUTES finding publish frequency. Region: us-east-1.
+      Provide the full procedure with pre-checks and post-verification.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "classify"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "daily-pii-scan"
+        - "prod-data-bucket"
+        - "RECOMMENDED"
+        - "SCHEDULED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: BLOCKED"
+
+  - id: macie-not-enabled-blocked
+    description: >-
+      Operator requests a classification job but Macie is not enabled in
+      the target account. The pre-flight gate should catch this and emit
+      BLOCKED with a specific gap citation.
+    input: |
+      Create a Macie classification job named "pii-scan-2026-08" on the
+      bucket sensitive-data-prod. Account: 123456789012. One-time scan
+      for USA_SOCIAL_SECURITY_NUMBER and CREDIT_CARD_NUMBER. We think
+      Macie is enabled but aren't sure. Region: us-east-1.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "pii-scan-2026-08"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: custom-data-identifier-regex
+    description: >-
+      Create a custom data identifier with regex pattern for employee ID
+      format (EMP######), with proximity keywords and ignore words for
+      test data. Expects READY with the exact CLI command.
+    input: |
+      Create a Macie custom data identifier named "employee-id-pattern"
+      that detects our internal employee ID format EMP###### (EMP followed
+      by 6 digits). Use proximity keywords: employee, emp_id, staff, id.
+      Ignore test/sample data: example, test, sample, demo. Maximum match
+      distance 50 characters. Severity HIGH. Account: 123456789012.
+      Region: us-east-1. Provide the full procedure.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "custom-id"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "employee-id-pattern"
+        - "EMP"
+        - "keywords"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: BLOCKED"
+
+  - id: automated-remediation-step-functions
+    description: >-
+      Set up Macie auto-remediation via EventBridge + Step Functions for
+      high-severity findings on public S3 buckets. The Step Functions
+      workflow quarantines objects and notifies the security team.
+      Expects COMPLETED with post-verification confirming the workflow.
+    input: |
+      We already have Macie enabled and Step Functions state machine
+      macie-remediation-workflow deployed. The EventBridge rule
+      macie-finding-trigger routes high-severity Macie findings to the
+      Step Functions workflow. Verify the integration is working: we
+      generated a test finding (sensitiveData:S3Object/Credit_Card on a
+      public bucket), and the workflow quarantined the object and sent
+      an SNS notification. Confirm post-verification passed. Account:
+      123456789012. Region: us-east-1.
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "remediate"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "PASS"
+        - "Step Functions"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: BLOCKED"

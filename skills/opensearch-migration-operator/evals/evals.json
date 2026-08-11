@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "opensearch-migration-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the OpenSearch Migration Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "es710-inplace-upgrade-ready",
+      "name": "ES 7.10 domain with standard plugins — in-place upgrade to OpenSearch 2.11 (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/es710-inplace-upgrade-ready.md",
+      "baseline_file": "baselines/es710-inplace-upgrade-ready.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "es710-inplace-upgrade-ready", "update-domain-config", "CONFIRM", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "es68-blocked-version-plugin",
+      "name": "Legacy ES 6.8 with x-pack-ml — version too old and ES-only plugin (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/es68-blocked-version-plugin.md",
+      "baseline_file": "baselines/es68-blocked-version-plugin.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "es68-blocked-version-plugin", "PRE_CHECKS", "x-pack-ml"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "blue-green-migration-completed",
+      "name": "Blue/green ES 7.10 to OpenSearch 2.11 migration completed and all post-verification passed (COMPLETED)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/blue-green-migration-completed.md",
+      "baseline_file": "baselines/blue-green-migration-completed.md",
+      "expected_verdict": "COMPLETED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "blue-green-migration-completed", "POST_VERIFY", "ENDPOINT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "snapshot-setup-blocked-no-s3-bucket",
+      "name": "Snapshot repository setup — S3 bucket does not exist and IAM role missing permissions (BLOCKED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/snapshot-setup-blocked-no-s3-bucket.md",
+      "baseline_file": "baselines/snapshot-setup-blocked-no-s3-bucket.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "snapshot-setup-blocked-no-s3-bucket", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "reindex-from-remote-ready",
+      "name": "New OpenSearch cluster with reindex-from-remote configured — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/reindex-from-remote-ready.md",
+      "baseline_file": "baselines/reindex-from-remote-ready.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "reindex-from-remote-ready", "_reindex", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

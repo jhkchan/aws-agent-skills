@@ -1,0 +1,148 @@
+# Eval test cases for s3-access-points-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across Internet-origin, VPC-origin, Object Lambda, MRAP,
+# and cross-account scenarios.
+skill: s3-access-points-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: vpc-only-team-ap
+    description: >-
+      Provision a VPC-origin access point for a shared bucket used by
+      Team A. Must include the through-AP-only bucket-policy Deny to
+      make the VPC-only claim true. Expects READY_TO_DEPLOY.
+    input: |
+      Provision a VPC-only access point for bucket "prod-shared-data"
+      (account 123456789012, region us-east-1) so that Team A's role
+      "arn:aws:iam::123456789012:role/TeamARole" can read/write only
+      the "team-a/" prefix. AP name: "team-a-vpc-ap". VPC ID:
+      vpc-0abc123def456. Bucket baseline (BPA, SSE-KMS, versioning)
+      already verified. Include per-AP Block Public Access and the
+      bucket policy that blocks the global hostname bypass.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "team-a-vpc-ap"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "s3:DataAccessPointArn"
+        - "VPC"
+        - "Block Public Access"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-vpc-endpoint
+    description: >-
+      VPC-origin AP requested but the VPC has no S3 gateway endpoint.
+      Must flag the endpoint gap and return PREREQUISITES_MISSING.
+    input: |
+      Create a VPC-only access point "internal-logs-ap" for bucket
+      "internal-logs" in account 123456789012 region us-west-2, VPC
+      vpc-998877. The bucket has BPA + SSE-S3. I checked and there is
+      no VPC endpoint for S3 in vpc-998877. Make the bucket truly
+      VPC-only.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "internal-logs-ap"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VPC endpoint"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: object-lambda-pii-redaction
+    description: >-
+      Provision an Object Lambda access point that redacts PII from
+      CSV objects on GET. Must include the supporting standard AP,
+      transform function ARN, and reserved concurrency. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Build an Object Lambda access point "pii-redacted-olap" over
+      bucket "raw-customer-data" (account 123456789012, region
+      us-east-1). Supporting standard AP name: "raw-customer-ap"
+      (Internet origin). Transform Lambda function ARN:
+      "arn:aws:lambda:us-east-1:123456789012:function:pii-redact-fn".
+      Transform action: GetObject. Reserve 30 concurrent executions
+      on the Lambda.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "pii-redacted-olap"
+        - "Object Lambda"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "reserved-concurrent-executions"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: mrap-two-region-active-active
+    description: >-
+      Provision a Multi-Region Access Point spanning two regional
+      buckets. Must note that pre-existing objects are NOT backfilled.
+      Expects READY_TO_DEPLOY.
+    input: |
+      Build a Multi-Region Access Point "global-assets-mrap" over
+      buckets "assets-use1" (us-east-1) and "assets-usw2"
+      (us-west-2). Account: 123456789012. Both buckets have versioning
+      enabled and SSE-KMS. Tell me how to verify and warn me about the
+      backfill limitation.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "global-assets-mrap"
+        - "MRAP"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "backfill"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-ap-delegation
+    description: >-
+      Bucket owner delegates AP creation to a partner account. Must
+      include the bucket-policy grant AND a containment statement on
+      the foreign-owned AP ARN. Expects READY_TO_DEPLOY.
+    input: |
+      Bucket "shared-with-partner" in account 123456789012 (region
+      us-east-1) needs to let partner account 991122334455 create
+      their own access point named "partner-ap" scoped to prefix
+      "partner-data/". I want to delegate creation but contain the
+      foreign-owned AP so it cannot expose the "internal/" prefix.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-with-partner"
+        - "partner-ap"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "s3:CreateAccessPoint"
+        - "s3:DataAccessPointAccount"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

@@ -1,0 +1,45 @@
+# Eval configuration for macie-data-discovery-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+skill_name: macie-data-discovery-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: enable-macie-org-delegated-admin
+    difficulty: medium
+    prompt_file: prompts/enable-macie-org-delegated-admin.md
+    baseline_file: baselines/enable-macie-org-delegated-admin.md
+    expected_verdict: READY
+
+  - id: create-classification-job-scheduled
+    difficulty: medium
+    prompt_file: prompts/create-classification-job-scheduled.md
+    baseline_file: baselines/create-classification-job-scheduled.md
+    expected_verdict: READY
+
+  - id: macie-not-enabled-blocked
+    difficulty: easy
+    prompt_file: prompts/macie-not-enabled-blocked.md
+    baseline_file: baselines/macie-not-enabled-blocked.md
+    expected_verdict: BLOCKED
+
+  - id: custom-data-identifier-regex
+    difficulty: hard
+    prompt_file: prompts/custom-data-identifier-regex.md
+    baseline_file: baselines/custom-data-identifier-regex.md
+    expected_verdict: READY
+
+  - id: automated-remediation-step-functions
+    difficulty: hard
+    prompt_file: prompts/automated-remediation-step-functions.md
+    baseline_file: baselines/automated-remediation-step-functions.md
+    expected_verdict: COMPLETED
