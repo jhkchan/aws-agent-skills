@@ -1,0 +1,177 @@
+{
+  "skill": "ram-resource-share-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the RAM Resource Share Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across sharing patterns (subnet sharing with account IDs, Transit Gateway with Organization ARN, Route53 Resolver rules with OU ARN, customer-managed permissions) and prerequisite failure branches (missing principal IDs). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "subnet-share-with-accounts",
+      "name": "RAM resource share for subnets with two account ID principals, same Organization",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — ec2:Subnet, two account IDs, internal sharing, default managed permission",
+      "prompt": "Provision a RAM resource share in us-east-1. Name: shared-subnets-prod. Resource type: ec2:Subnet. Resources: subnet-abc123 (arn:aws:ec2:us-east-1:123456789012:subnet/subnet-abc123), subnet-def456 (arn:aws:ec2:us-east-1:123456789012:subnet/subnet-def456). Principals: account IDs 111111111111, 222222222222. Same Organization, all features enabled. Allow external principals: false. Use default AWS managed permission for subnets. Tags: Environment=production, Application=networking.",
+      "prompt_file": "prompts/subnet-share-with-accounts.md",
+      "baseline_file": "baselines/subnet-share-with-accounts.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "RESOURCE_SHARE: shared-subnets-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Resource share name — shared-subnets-prod\n  [✓]      Resource type — ec2:Subnet (subnet-abc123, subnet-def456)\n  [✓]      Principals — 111111111111, 222222222222 (account IDs)\n  [✓]      Permission association — AWSRAMDefaultPermissionSubnet (managed)\n  [✓]      Allow external principals — false (internal accounts only)\n  [✓]      Sharing visibility — INTERNAL (principals in same Organization)\n  [✓]      Feature set — ALL (Organization all features enabled)\n  [✓]      Resource share status — ACTIVE\n  [✓]      Tags — Environment=production, Application=networking\n  [OPTIONAL] Customer-managed permissions — none (using AWS managed default)\nVERIFICATION_COMMANDS:\n  aws ram get-resource-shares --resource-share-arns arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod\n  aws ram list-principals --resource-owner SELF --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod\n  aws ram list-resources --resource-owner SELF --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod\n  aws ram list-permissions --resource-owner SELF",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-subnets-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "ec2:Subnet"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "transit-gateway-share-organization",
+      "name": "RAM resource share for Transit Gateway shared with entire Organization ARN",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — ec2:TransitGateway, Organization ARN principal, auto-accept for all accounts",
+      "prompt": "Provision a RAM resource share in us-east-1. Name: shared-tgw-org. Resource type: ec2:TransitGateway. Resource ARN: arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-0abc123def. Principals: entire Organization arn:aws:organizations::123456789012:organization/o-abc123def. All features enabled. Allow external principals: false. Use default managed permission. Tags: Environment=production, Application=networking.",
+      "prompt_file": "prompts/transit-gateway-share-organization.md",
+      "baseline_file": "baselines/transit-gateway-share-organization.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "RESOURCE_SHARE: shared-tgw-org\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Resource share name — shared-tgw-org\n  [✓]      Resource type — ec2:TransitGateway (tgw-0abc123def)\n  [✓]      Principals — arn:aws:organizations::123456789012:organization/o-abc123def (Organization ARN)\n  [✓]      Permission association — AWSRAMDefaultPermissionTransitGateway (managed)\n  [✓]      Allow external principals — false (Organization-internal)\n  [✓]      Sharing visibility — INTERNAL (Organization principal)\n  [✓]      Feature set — ALL (Organization all features enabled)\n  [✓]      Resource share status — ACTIVE (auto-accepted within Organization)\n  [✓]      Tags — Environment=production, Application=networking\nVERIFICATION_COMMANDS:\n  aws ram get-resource-shares --resource-share-arns arn:aws:ram:us-east-1:123456789012:resource-share/shared-tgw-org\n  aws ram list-principals --resource-owner SELF --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-tgw-org\n  aws ram list-resources --resource-owner SELF --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-tgw-org",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-tgw-org",
+            "VERDICT",
+            "CHECKLIST",
+            "ec2:TransitGateway",
+            "organization",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-principal-ids",
+      "name": "RAM resource share for subnet but no principal account IDs or ARNs specified",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — at least one principal (account ID, OU ARN, or Organization ARN) must be provided",
+      "prompt": "Provision a RAM resource share in us-east-1. Name: shared-subnets-prod. Resource type: ec2:Subnet. Resource ARN: arn:aws:ec2:us-east-1:123456789012:subnet/subnet-abc123. I have not decided which accounts to share with yet. Allow external principals: false. Use default managed permission. Tags: Environment=production.",
+      "prompt_file": "prompts/missing-principal-ids.md",
+      "baseline_file": "baselines/missing-principal-ids.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "RESOURCE_SHARE: shared-subnets-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Resource share name — shared-subnets-prod\n  [✓]      Resource type — ec2:Subnet (subnet-abc123)\n  [INPUT NEEDED] Principals — NOT SPECIFIED. At least one principal (12-digit account ID, OU ARN, or Organization ARN) must be provided to create a resource share.\n  [✓]      Allow external principals — false\nVERIFICATION_COMMANDS:\n  aws organizations list-accounts\n  aws ram list-resources --resource-owner SELF",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "shared-subnets-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "principal"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "route53-resolver-rules-share-ou",
+      "name": "RAM resource share for Route53 Resolver rules shared with an OU ARN",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — route53resolver:ResolverRule, OU ARN principal, auto-applies to accounts in OU",
+      "prompt": "Provision a RAM resource share in us-east-1. Name: shared-resolver-rules-ou. Resource type: route53resolver:ResolverRule. Resource ARN: arn:aws:route53resolver:us-east-1:123456789012:resolver-rule/rslvr-rr-abc123. Principals: OU arn:aws:organizations::123456789012:ou/o-abc123def/ou-xyz456. All features enabled. Allow external principals: false. Use default managed permission for Resolver Rules. Tags: Environment=production, Application=dns.",
+      "prompt_file": "prompts/route53-resolver-rules-share-ou.md",
+      "baseline_file": "baselines/route53-resolver-rules-share-ou.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "RESOURCE_SHARE: shared-resolver-rules-ou\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Resource share name — shared-resolver-rules-ou\n  [✓]      Resource type — route53resolver:ResolverRule (rslvr-rr-abc123)\n  [✓]      Principals — arn:aws:organizations::123456789012:ou/o-abc123def/ou-xyz456 (OU ARN)\n  [✓]      Permission association — AWSRAMDefaultPermissionRoute53ResolverRule (managed)\n  [✓]      Allow external principals — false (Organization-internal)\n  [✓]      Sharing visibility — INTERNAL (OU principal)\n  [✓]      Feature set — ALL (Organization all features enabled)\n  [✓]      Resource share status — ACTIVE (auto-accepted within Organization)\n  [✓]      Tags — Environment=production, Application=dns\nVERIFICATION_COMMANDS:\n  aws ram get-resource-shares --resource-share-arns arn:aws:ram:us-east-1:123456789012:resource-share/shared-resolver-rules-ou\n  aws ram list-principals --resource-owner SELF --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-resolver-rules-ou\n  aws ram list-resources --resource-owner SELF --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-resolver-rules-ou",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-resolver-rules-ou",
+            "VERDICT",
+            "CHECKLIST",
+            "route53resolver:ResolverRule",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "customer-managed-permissions-subnet",
+      "name": "RAM resource share for subnets with customer-managed permission (fine-grained access control)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — ec2:Subnet, customer-managed permission allowing CreateNetworkInterface + DescribeSubnets, denying Delete",
+      "prompt": "Provision a RAM resource share in us-east-1. Name: shared-subnets-custom-perm. Resource type: ec2:Subnet. Resources: arn:aws:ec2:us-east-1:123456789012:subnet/subnet-abc123. Principals: OU arn:aws:organizations::123456789012:ou/o-abc123def/ou-xyz456. Create and associate a customer-managed permission named custom-subnet-readonly that allows ec2:CreateNetworkInterface and ec2:DescribeSubnets but denies ec2:DeleteNetworkInterface. Allow external principals: false. Tags: Environment=production.",
+      "prompt_file": "prompts/customer-managed-permissions-subnet.md",
+      "baseline_file": "baselines/customer-managed-permissions-subnet.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "RESOURCE_SHARE: shared-subnets-custom-perm\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Resource share name — shared-subnets-custom-perm\n  [✓]      Resource type — ec2:Subnet (subnet-abc123)\n  [✓]      Principals — arn:aws:organizations::123456789012:ou/o-abc123def/ou-xyz456 (OU ARN)\n  [✓]      Permission association — custom-subnet-readonly (customer-managed: allows ec2:CreateNetworkInterface, ec2:DescribeSubnets; denies ec2:DeleteNetworkInterface)\n  [✓]      Allow external principals — false (Organization-internal)\n  [✓]      Sharing visibility — INTERNAL (OU principal)\n  [✓]      Feature set — ALL (Organization all features enabled)\n  [✓]      Resource share status — ACTIVE\n  [✓]      Tags — Environment=production\nVERIFICATION_COMMANDS:\n  aws ram get-resource-shares --resource-share-arns arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-custom-perm\n  aws ram list-permissions --resource-owner SELF --resource-type ec2:Subnet\n  aws ram list-resource-share-permissions --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-custom-perm",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-subnets-custom-perm",
+            "VERDICT",
+            "CHECKLIST",
+            "customer-managed",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

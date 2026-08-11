@@ -1,0 +1,222 @@
+# Eval test cases for s3-transfer-acceleration-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-transfer-acceleration-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: enable-acceleration-standard-bucket-ready
+    description: >-
+      Operator wants to enable Transfer Acceleration on a standard S3
+      bucket used as a data lake with uploaders in Asia Pacific and
+      South America. All pre-checks pass: bucket exists, not a
+      directory bucket, region supports acceleration, caller has
+      s3:PutAccelerateConfiguration, bucket name is DNS-compatible.
+      Plan should produce READY with put-bucket-accelerate-
+      configuration CLI and a CONFIRM gate.
+    input: |
+      Operation: enable-acceleration
+      BucketName: prod-data-lake
+      Region: us-east-1
+
+      Bucket metadata (aws s3api head-bucket):
+        Bucket: prod-data-lake
+        Response: 200 OK (bucket exists)
+
+      Current acceleration config (aws s3api get-bucket-accelerate-configuration):
+        Status: Suspended
+
+      Bucket location (aws s3api get-bucket-location):
+        LocationConstraint: us-east-1
+
+      In-flight multipart uploads (aws s3api list-multipart-uploads):
+        Uploads: [] (none)
+
+      Calling identity: arn:aws:iam::111111111111:role/S3Admin
+      IAM policy grants: s3:PutAccelerateConfiguration,
+        s3:GetAccelerateConfiguration on prod-data-lake
+
+      Uploaders: Tokyo, Singapore, Sydney, Sao Paulo (long-distance
+      transfers to us-east-1)
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, COST, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "put-bucket-accelerate-configuration"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "CONFIRM"
+        - "s3-accelerate"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: enable-acceleration-directory-bucket-blocked
+    description: >-
+      Operator tries to enable Transfer Acceleration on an S3 Express
+      One Zone directory bucket. Directory buckets do NOT support
+      acceleration. Pre-checks must BLOCK.
+    input: |
+      Operation: enable-acceleration
+      BucketName: my-express-bucket--xaz-use1-az1
+      Region: us-east-1
+
+      Bucket metadata (aws s3api head-bucket):
+        Bucket: my-express-bucket--xaz-use1-az1
+        Response: 200 OK (bucket exists)
+
+      Bucket location: us-east-1 (S3 Express One Zone)
+
+      Current acceleration config: (not available — directory bucket)
+
+      Calling identity has s3:PutAccelerateConfiguration.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "directory bucket"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "put-bucket-accelerate-configuration"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: speed-comparison-acceleration-completed
+    description: >-
+      Operator wants to verify that Transfer Acceleration is enabled
+      and working. Speed comparison was run, accelerate endpoint is
+      reachable, CloudWatch confirms traffic. All checks pass. Emit
+      COMPLETED with post-verification results.
+    input: |
+      Operation: speed-comparison
+      BucketName: prod-data-lake
+      Region: us-east-1
+
+      Acceleration config (aws s3api get-bucket-accelerate-configuration):
+        Status: Enabled
+
+      Speed comparison result:
+        Direct upload (Tokyo -> us-east-1): 12.3 MB/s
+        Accelerated upload (Tokyo -> edge -> us-east-1): 58.7 MB/s
+        Speedup: 4.8x
+
+      Endpoint reachability test:
+        aws s3 ls s3://prod-data-lake/ --endpoint-url
+          https://prod-data-lake.s3-accelerate.amazonaws.com
+        Result: OK (bucket listing returned)
+
+      CloudWatch metrics (last 1 hour):
+        BytesUploaded (accelerate endpoint): 42.3 GB
+        BytesUploaded (standard endpoint): 1.2 GB
+
+      Checksum verification:
+        Object: test-upload-2026-08.bin
+        x-amz-checksum-crc32c: matches local CRC32C
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "Enabled"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "BytesUploaded"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: disable-acceleration-inflight-blocked
+    description: >-
+      Operator tries to disable Transfer Acceleration while multipart
+      uploads are in-flight via the accelerate endpoint. Pre-checks
+      must BLOCK and surface the in-flight uploads.
+    input: |
+      Operation: disable-acceleration
+      BucketName: prod-data-lake
+      Region: us-east-1
+
+      Acceleration config:
+        Status: Enabled
+
+      In-flight multipart uploads (aws s3api list-multipart-uploads):
+        Uploads:
+          - UploadId: abc123-initiated-2026-08-10T15:00Z
+            Key: large-dataset-part1.bin
+            StorageClass: STANDARD
+          - UploadId: def456-initiated-2026-08-10T15:15Z
+            Key: large-dataset-part2.bin
+            StorageClass: STANDARD
+
+      Calling identity has s3:PutAccelerateConfiguration.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "multipart"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "put-bucket-accelerate-configuration Status=Suspended"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: cost-analysis-bulk-transfer-ready
+    description: >-
+      Operator wants to plan a 50 TB data migration from Asia Pacific
+      (Tokyo) to a US-East bucket with Transfer Acceleration. Cost
+      analysis shows $1,280 for acceleration. Direct Connect comparison
+      surfaces as an alternative. Plan should produce READY with cost
+      advisory and Direct Connect comparison.
+    input: |
+      Operation: compare-direct-connect
+      BucketName: migration-target
+      Region: us-east-1
+
+      Acceleration config:
+        Status: Enabled
+
+      Transfer details:
+        Source: Tokyo data center (ap-northeast-1)
+        Destination: migration-target bucket (us-east-1)
+        Volume: 50 TB (one-time migration)
+        Source region acceleration rate: $0.025/GB
+
+      Direct Connect (1 Gbps port available):
+        Port hourly rate: $0.30/hour
+        Data transfer out rate: $0.0204/GB
+        Estimated transfer time at 80% utilization: ~5.7 days
+
+      Emit the standard VERDICT block with cost analysis.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "VERDICT"
+        - "0.025"
+        - "Direct Connect"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"

@@ -1,0 +1,222 @@
+# Eval test cases for route53-resolver-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: route53-resolver-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: deploy-inbound-endpoint-ready
+    description: >-
+      Deploy a standard Resolver inbound endpoint so on-prem DNS servers
+      can forward queries to Route 53. Two subnets in distinct AZs,
+      security group with UDP/TCP 53 ingress from the on-prem CIDR, VPC
+      DNS settings enabled. All pre-checks pass; plan should produce
+      READY_TO_DEPLOY with create-resolver-endpoint CLI and CONFIRM gate.
+    input: |
+      Operation: create
+      Endpoint name: prod-inbound
+      Region: us-east-1
+      Account: 111111111111
+      Direction: INBOUND
+      VPC: vpc-0abc123 (enableDnsSupport=true, enableDnsHostnames=true)
+      SecurityGroupId: sg-0abc123 (ingress UDP/TCP 53 from 10.99.0.0/16)
+      IpAddresses:
+        - SubnetId: subnet-aaa (us-east-1a, 10.0.1.0/24), Ip: 10.0.1.10
+        - SubnetId: subnet-bbb (us-east-1b, 10.0.2.0/24), Ip: 10.0.2.10
+
+      Pre-flight (already performed by caller):
+        aws route53resolver list-resolver-endpoints --max-results 100:
+          no endpoint named prod-inbound
+        aws ec2 describe-security-groups --group-ids sg-0abc123:
+          ingress 10.99.0.0/16 UDP/TCP 53
+        aws iam get-role --role-name ResolverOperatorRole:
+          OK (holds route53resolver:CreateResolverEndpoint)
+
+      Emit the standard VERDICT block (RESOLVER, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, ENDPOINT_TYPE, SUBNETS,
+      SECURITY_GROUPS, FORWARDING_RULES, FIREWALL_GROUPS, QUERY_LOGS,
+      NOTES).
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-inbound"
+        - "create-resolver-endpoint"
+        - "INBOUND"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-outbound-forwarding-rule-ready
+    description: >-
+      Deploy an outbound Resolver endpoint with a forwarding rule for
+      corp.example.local. targeting on-prem DNS servers. Security group
+      egress verified on UDP/TCP 53 to target IPs. All pre-checks pass;
+      plan should produce READY_TO_DEPLOY with create-resolver-endpoint,
+      create-resolver-rule, and associate-resolver-rule CLIs.
+    input: |
+      Operation: create
+      Endpoint name: prod-outbound
+      Region: us-east-1
+      Account: 111111111111
+      Direction: OUTBOUND
+      VPC: vpc-0abc123 (enableDnsSupport=true, enableDnsHostnames=true)
+      SecurityGroupId: sg-0def456 (egress UDP/TCP 53 to 10.99.1.5, 10.99.2.5)
+      IpAddresses:
+        - SubnetId: subnet-aaa (us-east-1a)
+        - SubnetId: subnet-bbb (us-east-1b)
+      Forwarding rule:
+        Name: forward-corp-local
+        DomainName: corp.example.local.
+        TargetIps: [{"Ip":"10.99.1.5","Port":53},{"Ip":"10.99.2.5","Port":53}]
+
+      Pre-flight:
+        aws route53resolver list-resolver-endpoints: no endpoint named prod-outbound
+        aws ec2 describe-security-groups --group-ids sg-0def456:
+          egress 10.99.1.5/32 UDP/TCP 53, 10.99.2.5/32 UDP/TCP 53
+        aws route53resolver list-resolver-rules: no rule for corp.example.local.
+        aws iam get-role --role-name ResolverOperatorRole: OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-outbound"
+        - "create-resolver-rule"
+        - "OUTBOUND"
+        - "corp.example.local."
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-dns-firewall-ready
+    description: >-
+      Deploy a DNS Firewall rule group using the AWS-managed malware
+      domain list with BLOCK/NXDOMAIN action, associated to a VPC at
+      priority 1 with MutationProtection ENABLED. All pre-checks pass;
+      plan should produce READY_TO_DEPLOY with create-firewall-rule and
+      create-firewall-rule-group-association CLIs.
+    input: |
+      Operation: create
+      Region: us-east-1
+      Account: 111111111111
+      VPC: vpc-0abc123
+      Firewall rule group:
+        Name: prod-firewall-rules
+        Rules:
+          - ManagedDomainListId: rslvr-fdl-aws-managed-domains-malware
+            Priority: 1
+            Action: BLOCK
+            BlockResponse: NXDOMAIN
+      Association:
+        VPC: vpc-0abc123
+        Priority: 1
+        MutationProtection: ENABLED
+
+      Pre-flight:
+        aws route53resolver list-firewall-rule-group-associations:
+          no associations on vpc-0abc123 (priority 1 available)
+        aws route53resolver list-firewall-domain-lists:
+          rslvr-fdl-aws-managed-domains-malware exists
+        aws iam get-role --role-name ResolverOperatorRole: OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "create-firewall-rule"
+        - "create-firewall-rule-group-association"
+        - "BLOCK"
+        - "NXDOMAIN"
+        - "ENABLED"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-outbound-endpoint-single-az-blocked
+    description: >-
+      Attempt to deploy an outbound endpoint with both IP addresses in
+      the same Availability Zone. The API would accept it but HA is lost.
+      The skill must block with PREREQUISITES_MISSING flagging the AZ
+      diversity violation.
+    input: |
+      Operation: create
+      Endpoint name: prod-outbound
+      Region: us-east-1
+      Account: 111111111111
+      Direction: OUTBOUND
+      VPC: vpc-0abc123
+      SecurityGroupId: sg-0def456
+      IpAddresses:
+        - SubnetId: subnet-aaa (us-east-1a)
+        - SubnetId: subnet-ccc (us-east-1a — same AZ)
+
+      Pre-flight:
+        aws route53resolver list-resolver-endpoints: no endpoint named prod-outbound
+        aws ec2 describe-subnets --subnet-ids subnet-aaa subnet-ccc:
+          both subnets are in us-east-1a (AZ diversity violation)
+        aws iam get-role --role-name ResolverOperatorRole: OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "AZ"
+        - "distinct"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: deploy-query-log-missing-resource-policy
+    description: >-
+      Attempt to enable Resolver query logging to a CloudWatch Logs log
+      group that does not have a resource policy granting
+      route53resolver.amazonaws.com write permission. Logs would be
+      silently dropped; pre-checks must produce PREREQUISITES_MISSING
+      naming the missing resource policy.
+    input: |
+      Operation: create
+      Region: us-east-1
+      Account: 111111111111
+      VPC: vpc-0abc123
+      Query log config:
+        Name: prod-query-logs-cw
+        Destination: CloudWatch Logs
+        DestinationArn: arn:aws:logs:us-east-1:111111111111:log-group:/aws/route53resolver/prod
+
+      Pre-flight:
+        aws logs describe-log-groups --log-group-name-prefix /aws/route53resolver:
+          log group /aws/route53resolver/prod exists
+        aws logs describe-resource-policies:
+          no policy granting route53resolver.amazonaws.com logs:PutLogEvents
+        aws route53resolver list-resolver-query-log-configs:
+          no config named prod-query-logs-cw
+        aws iam get-role --role-name ResolverOperatorRole: OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "route53resolver.amazonaws.com"
+        - "resource policy"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY_TO_DEPLOY"

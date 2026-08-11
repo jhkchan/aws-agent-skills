@@ -235,28 +235,23 @@ READY_TO_DEPLOY):**
 groups and route tables. An outbound endpoint with a security group that
 blocks egress to on-prem port 53 will deploy cleanly — DNS queries from
 the VPC will time out, and the operator will blame the on-prem DNS
-server. The skill enforces the networking gate at pre-check time rather
-than at runtime.
+server. The skill enforces the networking gate at pre-check time.
 
 Driven by three Resolver realities:
 
 - **Resolver endpoints need a minimum of two subnets in two AZs.** A
   single-subnet endpoint is rejected at API time, but a two-subnet
-  endpoint where both subnets are in the same AZ is accepted and
-  silently loses the high-availability benefit. Pre-flight AZ diversity
-  validation is non-negotiable for production.
+  endpoint where both subnets are in the same AZ silently loses HA.
 
 - **Forwarding rules are evaluated in priority order against the VPC.**
   If two rules match the same domain suffix, the lower-priority integer
-  wins. A new rule with an overlapping domain and a lower priority
-  silently shadows an existing rule. The pre-flight gate flags domain
-  overlap.
+  wins. A new rule with an overlapping domain silently shadows an
+  existing rule.
 
 - **DNS Firewall rule groups stack per VPC.** Each association has a
   priority integer; a BLOCK in priority 1 is overridden by an ALLOW in
-  priority 2 for the same domain. Misordered priorities are the #1 cause
-  of "why is my block not working" tickets. The pre-flight gate checks
-  priority collisions and semantic conflicts.
+  priority 2. Misordered priorities are the #1 cause of "why is my block
+  not working" tickets.
 
 ## Pre-flight: resolver endpoint metadata gate
 
@@ -327,50 +322,34 @@ experience. Each changes a plan if ignored:
 
 - **Forwarding rules match by longest suffix.** A rule for
   `corp.example.local.` matches `api.corp.example.local.` but NOT
-  `corp.example.com.`. The `.` (root) trailing dot is significant —
-  omitting it causes no-match in some resolvers.
+  `corp.example.com.`. The trailing dot is significant.
 
-- **Forwarding rules are SYSTEM or FORWARD.** `SYSTEM` (the default AWS
+- **Forwarding rules are SYSTEM or FORWARD.** `SYSTEM` (default AWS
   rule) resolves internet domains via Route 53. `FORWARD` sends to
-  `TargetIps`. You cannot delete the SYSTEM rule; you can only
-  associate or disassociate it per VPC.
+  `TargetIps`. You cannot delete the SYSTEM rule; only associate or
+  disassociate per VPC.
 
-- **Rule associations are per-VPC.** A forwarding rule created in one
-  account must be shared via RAM (`share-resolver-rule`) before it can
-  be associated with a VPC in another account. Cross-account
-  associations are the #2 cause of "rule exists but my VPC does not
-  use it" tickets.
+- **Rule associations are per-VPC.** Cross-account associations require
+  sharing via RAM (`share-resolver-rule`) first — the #2 cause of "rule
+  exists but my VPC does not use it" tickets.
 
 - **DNS Firewall evaluates rule groups in priority order.** Priority 1
   is evaluated first; an ALLOW in priority 2 overrides a BLOCK in
-  priority 1 for the same domain. Plan the priority ordering before
-  associating multiple groups to a VPC.
+  priority 1 for the same domain. Plan ordering before associating.
 
 - **Firewall domain lists support wildcards.** `*.malware.example.`
-  matches any subdomain. A bare `malware.example.` matches the apex
-  only. Use wildcards for broad blocks; bare domains for targeted
-  blocks.
+  matches subdomains; bare `malware.example.` matches apex only.
 
-- **BLOCK actions have a response.** `BlockResponse` is `NXDOMAIN`
-  (pretend the domain does not exist), `NODATA` (empty answer), or
-  `OVERRIDE` (return a custom DNS record, e.g., a walled-garden IP).
-  `OVERRIDE` requires `BlockOverrideDnsType`, `BlockOverrideDnsValue`,
-  and `BlockOverrideTtl`.
+- **BLOCK actions have a response.** `BlockResponse` is `NXDOMAIN`,
+  `NODATA`, or `OVERRIDE` (custom DNS record — requires
+  `BlockOverrideDnsType`, `BlockOverrideDnsValue`, `BlockOverrideTtl`).
 
-- **Query logging has one association per VPC.** A VPC can be associated
-  with only one query log config. Switching log destinations requires
-  disassociating the old config first.
+- **Query logging has one association per VPC.** Switching destinations
+  requires disassociating the old config first. Destinations need a
+  resource policy granting `route53resolver.amazonaws.com` write access.
 
-- **Query log destinations need a resource policy.** The CloudWatch
-  Logs log group, S3 bucket, or Kinesis Firehose must allow
-  `route53resolver.amazonaws.com` to write. Missing resource policy =
-  silent log drop.
-
-- **Resolver cache (2024-2026).** Resolver now supports a configurable
-  cache TTL on forwarding rules via `ResolverConfig`. Lower TTL =
-  fresher data but more forwarding traffic; higher TTL = cheaper but
-  stale-on-failover. Default behavior remains uncached for backward
-  compatibility.
+- **Resolver cache (2024-2026).** Configurable cache TTL on forwarding
+  rules via `ResolverConfig`. Lower TTL = fresher data but more traffic.
 
 ### Step 1: Pre-check gate — PREREQUISITES_MISSING if any check fails
 
@@ -477,10 +456,10 @@ After the operation finishes, run post-verification:
 
 1. `get-resolver-endpoint --resolver-endpoint-id <id>` returns
    `Status: OPERATIONAL`.
-2. For inbound endpoints: the IP addresses returned are reachable from
-   on-prem (confirm with on-prem DNS admin or `dig @<ip> example.com`).
-3. For outbound endpoints: the IP addresses returned are the source IPs
-   the on-prem DNS server sees.
+2. For inbound endpoints: the IP addresses are reachable from on-prem
+   (confirm with on-prem DNS admin or `dig @<ip> example.com`).
+3. For outbound endpoints: the IP addresses are the source IPs the
+   on-prem DNS server sees.
 4. `list-resolver-rule-associations --resolver-rule-id <id>` returns
    the expected VPC associations with `Status: COMPLETE`.
 5. For DNS Firewall: `list-firewall-rule-group-associations` returns
@@ -652,14 +631,12 @@ NOTES: <networking posture, DNS strategy, rule-priority caveats>
 - NEVER omit the CONFIRM gate as the first STEPS entry for any
   state-changing operation.
 - NEVER claim success without verifying that the endpoint reached
-  `OPERATIONAL` status (via `get-resolver-endpoint`) — a partial CLI
-  sequence with missing subcommands is non-compliant.
+  `OPERATIONAL` status (via `get-resolver-endpoint`).
 - NEVER put-update an endpoint or rule without snapshotting the existing
   config first — updates to `SecurityGroupIds` and `TargetIps` overwrite
   silently.
 - NEVER silently allow a DNS Firewall rule group association with a
-  colliding priority — block it explicitly with a [FAIL] pre-check row
-  naming the existing association.
+  colliding priority — block it explicitly with a [FAIL] pre-check row.
 
 ### Perfect example output
 

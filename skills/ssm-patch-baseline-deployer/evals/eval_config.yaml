@@ -1,0 +1,48 @@
+# Eval configuration for ssm-patch-baseline-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ssm-patch-baseline-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: deploy-al2023-baseline-ready
+    difficulty: easy
+    prompt_file: prompts/deploy-al2023-baseline-ready.md
+    baseline_file: baselines/deploy-al2023-baseline-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: LOW
+  - id: deploy-windows-auto-approve-ready
+    difficulty: medium
+    prompt_file: prompts/deploy-windows-auto-approve-ready.md
+    baseline_file: baselines/deploy-windows-auto-approve-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: MODERATE
+  - id: deploy-patch-group-maintenance-window-ready
+    difficulty: medium
+    prompt_file: prompts/deploy-patch-group-maintenance-window-ready.md
+    baseline_file: baselines/deploy-patch-group-maintenance-window-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: MODERATE
+  - id: deploy-macos-baseline-missing-instance-role
+    difficulty: hard
+    prompt_file: prompts/deploy-macos-baseline-missing-instance-role.md
+    baseline_file: baselines/deploy-macos-baseline-missing-instance-role.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: HIGH
+  - id: deploy-al2023-wrong-product-filter-blocked
+    difficulty: hard
+    prompt_file: prompts/deploy-al2023-wrong-product-filter-blocked.md
+    baseline_file: baselines/deploy-al2023-wrong-product-filter-blocked.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: HIGH

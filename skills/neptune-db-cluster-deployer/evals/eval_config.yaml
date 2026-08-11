@@ -1,0 +1,49 @@
+# Eval configuration for neptune-db-cluster-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: neptune-db-cluster-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: production-multiaz-gremlin
+    difficulty: hard
+    prompt_file: prompts/production-multiaz-gremlin.md
+    baseline_file: baselines/production-multiaz-gremlin.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: dev-single-instance
+    difficulty: easy
+    prompt_file: prompts/dev-single-instance.md
+    baseline_file: baselines/dev-single-instance.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: gremlin-bulk-load-from-s3
+    difficulty: hard
+    prompt_file: prompts/gremlin-bulk-load-from-s3.md
+    baseline_file: baselines/gremlin-bulk-load-from-s3.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: analytics-redirect-boundary
+    difficulty: medium
+    prompt_file: prompts/analytics-redirect-boundary.md
+    baseline_file: baselines/analytics-redirect-boundary.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: missing-subnet-group-and-cmk
+    difficulty: easy
+    prompt_file: prompts/missing-subnet-group-and-cmk.md
+    baseline_file: baselines/missing-subnet-group-and-cmk.md
+    expected_verdict: PREREQUISITES_MISSING

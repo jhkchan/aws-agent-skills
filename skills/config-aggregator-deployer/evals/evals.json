@@ -1,0 +1,177 @@
+{
+  "skill": "config-aggregator-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Config Aggregator Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across aggregation topologies (organization aggregator with delegated admin, authorized accounts cross-region, org-level conformance packs, Lambda processor org rules, proactive rules) and prerequisite failure branches (missing delegated administrator). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "org-aggregator-delegated-admin",
+      "name": "Organization Config aggregator with delegated admin, org conformance pack, Lambda processor rule",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — OrganizationAggregationSource, delegated admin, all-region source, org conformance pack, Lambda processor org config rule",
+      "prompt": "Provision an AWS Config aggregator in us-east-1. Name: org-compliance-aggregator. Type: organization aggregator. Organization ID: o-abc123def. Delegated administrator account: 123456789012. Source: all accounts in the organization, all AWS regions. Conformance pack: OperationalBestPractices-for-Security deployed at organization level from S3 template s3://config-templates-123456789012/security-best-practices.yaml. Organization config rule: tag-policy-compliance (Lambda processor, function config-tag-policy-rule). Tags: Environment=production, Governance=compliance.",
+      "prompt_file": "prompts/org-aggregator-delegated-admin.md",
+      "baseline_file": "baselines/org-aggregator-delegated-admin.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "AGGREGATOR: org-compliance-aggregator\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Aggregator type — OrganizationAggregationSource (OrganizationID: o-abc123def)\n  [✓]      Delegated administrator — 123456789012 (Config enabled, all features)\n  [✓]      Aggregator region — us-east-1\n  [✓]      Source accounts — all accounts in Organization o-abc123def (auto-discovered)\n  [✓]      Source regions — all enabled regions\n  [✓]      Recorder — config recorder running on delegated admin\n  [✓]      Delivery channel — S3 bucket (Config enabled)\n  [✓]      Conformance packs — OperationalBestPractices-for-Security (deployed org-wide)\n  [✓]      Organization config rules — tag-policy-compliance (Lambda processor)\n  [✓]      IAM permissions — ConfigRole with AWS_ConfigRole managed policy\n  [✓]      Tags — Environment=production, Governance=compliance\n  [OPTIONAL] Aggregation authorization — not needed (organization aggregator auto-authorizes)\nVERIFICATION_COMMANDS:\n  aws configservice describe-configuration-aggregators --configuration-aggregator-names org-compliance-aggregator --region us-east-1\n  aws configservice describe-configuration-aggregator-sources-status --configuration-aggregator-name org-compliance-aggregator --region us-east-1\n  aws configservice describe-organization-conformance-packs --region us-east-1\n  aws configservice describe-config-rules --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "org-compliance-aggregator",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "OrganizationAggregationSource",
+            "delegated administrator"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "authorized-accounts-cross-region",
+      "name": "Authorized-account Config aggregator across 3 accounts and 2 regions with PutAggregationAuthorization",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — AccountAggregationSource, 3 accounts, us-east-1 + eu-west-1, per-account authorization, conformance pack on aggregator",
+      "prompt": "Provision an AWS Config aggregator in us-east-1. Name: authorized-accounts-aggregator. Type: authorized accounts. Source accounts: 111111111111, 222222222222, 333333333333. Regions: us-east-1, eu-west-1. Each source account will call PutAggregationAuthorization for aggregator account 123456789012 in both regions. Conformance pack: OperationalBestPractices-for-CloudWatch deployed on aggregator account. Tags: Environment=production.",
+      "prompt_file": "prompts/authorized-accounts-cross-region.md",
+      "baseline_file": "baselines/authorized-accounts-cross-region.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "AGGREGATOR: authorized-accounts-aggregator\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Aggregator type — AccountAggregationSource\n  [✓]      Aggregator region — us-east-1\n  [✓]      Source accounts — 111111111111, 222222222222, 333333333333\n  [✓]      Source regions — us-east-1, eu-west-1\n  [✓]      Recorder — verify recorder running on each source account\n  [✓]      Delivery channel — verify delivery channel on each source account\n  [✓]      Aggregation authorization — PutAggregationAuthorization on each source account for 123456789012 in us-east-1 and eu-west-1\n  [✓]      Conformance packs — OperationalBestPractices-for-CloudWatch (aggregator account)\n  [✓]      IAM permissions — ConfigRole on each source account\n  [✓]      Tags — Environment=production\nVERIFICATION_COMMANDS:\n  aws configservice describe-configuration-aggregators --configuration-aggregator-names authorized-accounts-aggregator --region us-east-1\n  aws configservice describe-configuration-aggregator-sources-status --configuration-aggregator-name authorized-accounts-aggregator --region us-east-1\n  aws configservice describe-conformance-packs --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "authorized-accounts-aggregator",
+            "VERDICT",
+            "CHECKLIST",
+            "AccountAggregationSource",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-organization-delegated-admin",
+      "name": "Organization Config aggregator but delegated admin not registered and Config not trusted in Organizations",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — delegated administrator required before creating organization aggregator",
+      "prompt": "Provision an AWS Config aggregator in us-east-1. Name: org-compliance-aggregator. Type: organization aggregator. Organization ID: o-abc123def. I have not yet enabled Config as a trusted service in Organizations or registered a delegated administrator. Source: all accounts, all regions. Conformance pack: OperationalBestPractices-for-Security.",
+      "prompt_file": "prompts/missing-organization-delegated-admin.md",
+      "baseline_file": "baselines/missing-organization-delegated-admin.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "AGGREGATOR: org-compliance-aggregator\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗]      Delegated administrator — NOT REGISTERED. Config must be enabled as a trusted service (enable-aws-service-access) and a delegated administrator must be registered before creating an organization aggregator.\n  [✓]      Aggregator type — OrganizationAggregationSource (OrganizationID: o-abc123def)\n  [INPUT NEEDED] Source accounts — all accounts (requires delegated admin to auto-discover)\nVERIFICATION_COMMANDS:\n  aws organizations list-aws-service-access-for-organization --filter config.amazonaws.com\n  aws organizations list-delegated-administrators --service-principal config.amazonaws.com\n  aws configservice describe-configuration-aggregators --configuration-aggregator-names org-compliance-aggregator --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "org-compliance-aggregator",
+            "VERDICT",
+            "CHECKLIST",
+            "delegated administrator"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "org-conformance-pack-deployment",
+      "name": "Deploy conformance pack at organization level with input parameters alongside existing aggregator",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — org-level conformance pack deployment with custom parameters, existing aggregator",
+      "prompt": "Deploy a conformance pack at the organization level in us-east-1 on delegated admin account 123456789012. Organization aggregator org-compliance-aggregator already exists. Conformance pack name: OperationalBestPractices-for-EC2. Template S3 URI: s3://config-templates-123456789012/ec2-best-practices.yaml. Input parameters: DesiredInstanceType=t3.medium, AllowedRegions=us-east-1. Deploy to all accounts in the organization. Tags: Environment=production.",
+      "prompt_file": "prompts/org-conformance-pack-deployment.md",
+      "baseline_file": "baselines/org-conformance-pack-deployment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "AGGREGATOR: org-compliance-aggregator\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Aggregator type — OrganizationAggregationSource (existing)\n  [✓]      Delegated administrator — 123456789012 (Config enabled)\n  [✓]      Conformance packs — OperationalBestPractices-for-EC2 (org-level, params: DesiredInstanceType=t3.medium, AllowedRegions=us-east-1)\n  [✓]      Template S3 URI — s3://config-templates-123456789012/ec2-best-practices.yaml\n  [✓]      Tags — Environment=production\nVERIFICATION_COMMANDS:\n  aws configservice describe-organization-conformance-packs --region us-east-1\n  aws configservice get-organization-conformance-pack-detailed-status --organization-conformance-pack-name OperationalBestPractices-for-EC2 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "OperationalBestPractices-for-EC2",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "proactive-rules-lambda-processor",
+      "name": "Config aggregator with proactive rules and Lambda processor organization config rule",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — proactive Config rules (StartResourceEvaluation), Lambda processor org config rule for custom compliance",
+      "prompt": "Provision an AWS Config aggregator in us-east-1. Name: org-compliance-aggregator. Organization ID: o-abc123def. Delegated admin: 123456789012. Deploy a proactive Config rule s3-bucket-versioning-proactive (Proactive mode enabled) for pre-deployment resource evaluation. Deploy an organization config rule custom-encryption-check with Lambda processor function config-encryption-evaluator (runtime python3.12, role ConfigLambdaRole). Source: all accounts, all regions. Tags: Environment=production.",
+      "prompt_file": "prompts/proactive-rules-lambda-processor.md",
+      "baseline_file": "baselines/proactive-rules-lambda-processor.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "AGGREGATOR: org-compliance-aggregator\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Aggregator type — OrganizationAggregationSource (OrganizationID: o-abc123def)\n  [✓]      Delegated administrator — 123456789012\n  [✓]      Source accounts — all accounts in Organization o-abc123def\n  [✓]      Source regions — all enabled regions\n  [✓]      Proactive rules — s3-bucket-versioning-proactive (Proactive: true, StartResourceEvaluation enabled)\n  [✓]      Organization config rules — custom-encryption-check (Lambda processor: config-encryption-evaluator, python3.12, ConfigLambdaRole)\n  [✓]      Lambda invoke permission — lambda:InvokeFunction granted to config.amazonaws.com\n  [✓]      Tags — Environment=production\nVERIFICATION_COMMANDS:\n  aws configservice describe-configuration-aggregators --configuration-aggregator-names org-compliance-aggregator --region us-east-1\n  aws configservice describe-config-rules --config-rule-names s3-bucket-versioning-proactive --region us-east-1\n  aws configservice describe-organization-config-rules --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "org-compliance-aggregator",
+            "VERDICT",
+            "CHECKLIST",
+            "proactive",
+            "Lambda",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

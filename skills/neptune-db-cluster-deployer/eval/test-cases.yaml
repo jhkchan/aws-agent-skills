@@ -1,0 +1,163 @@
+# Eval test cases for neptune-db-cluster-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across workload types
+# (production Multi-AZ, dev single-instance, Gremlin bulk load,
+#  boundary redirect to Neptune Analytics, missing prerequisites).
+skill: neptune-db-cluster-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: production-multiaz-gremlin
+    description: >-
+      Provision a production Neptune DB cluster with 1 writer + 2
+      readers across 3 AZs, customer CMK encryption at rest,
+      neptune_enforce_ssl=1, IAM database auth, neptune_query_timeout,
+      Streams enabled, snapshots 7 days, deletion protection. Gremlin
+      property-graph workload. Expects READY_TO_DEPLOY with all
+      checklist items verified.
+    input: |
+      Provision a production Amazon Neptune DB cluster named
+      "prod-graph" in us-east-1 for a Gremlin property-graph workload.
+      We need 1 writer + 2 readers across 3 AZs for Multi-AZ failover.
+      Use db.r6g.8xlarge instances. Engine version 1.3.2.0. The graph
+      is ~200M vertices + 1B edges. Customer-managed CMK
+      alias/prod-graph-kms for encryption at rest. Enable TLS
+      (neptune_enforce_ssl=1) and IAM database auth. Set
+      neptune_query_timeout=30000 (OLTP queries). Enable Neptune
+      Streams for change capture. Snapshots: 7-day retention.
+      Deletion protection enabled. Subnet group prod-neptune-subnet
+      spans 3 AZs. Security group sg-neptune123 inbound 8182 from
+      sg-app456. Tags: Environment=production, Workload=graph.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-graph"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Neptune DB"
+        - "Multi-AZ"
+        - "db.r6g.8xlarge"
+        - "neptune_enforce_ssl"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: dev-single-instance
+    description: >-
+      Provision a dev Neptune DB cluster with a single writer
+      instance (no Multi-AZ, no failover). Expects READY_TO_DEPLOY
+      with explicit "Disabled (writer-only — NO failover)" notation.
+    input: |
+      Provision a dev Neptune DB cluster named "dev-graph" in
+      us-east-1. Just a single writer instance for functional testing
+      — no Multi-AZ, no failover needed. Use db.r6g.large. Engine
+      version 1.3.2.0. Enable neptune_enforce_ssl=1 for good hygiene.
+      AWS-managed KMS key is fine (no customer CMK). Subnet group
+      dev-neptune-subnet in one AZ is OK for dev. Security group
+      sg-dev-neptune inbound 8182 from sg-dev-app. Tags:
+      Environment=dev, Workload=graph. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "dev-graph"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "db.r6g.large"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: gremlin-bulk-load-from-s3
+    description: >-
+      Provision a Neptune DB cluster and load initial graph data from
+      S3 via the Neptune Loader. Expects READY_TO_DEPLOY with the
+      bulk load source cited (same-region bucket, IAM role).
+    input: |
+      Provision a Neptune DB cluster named "analytics-graph" in
+      us-east-1 for a Gremlin property-graph workload. 1 writer + 1
+      reader for Multi-AZ, db.r6g.4xlarge. Engine version 1.3.2.0.
+      Customer CMK alias/graph-kms. neptune_enforce_ssl=1, IAM
+      database auth. Snapshots 7 days. Deletion protection enabled.
+      We need to load initial data from s3://graph-data-bucket/v1/
+      (same region us-east-1) using IAM role NeptuneLoadRole.
+      Subnet group graph-subnet spans 2 AZs. Security group
+      sg-graph inbound 8182 from sg-graph-app. Tags:
+      Environment=production, Workload=graph-bulk-load.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "analytics-graph"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "s3://graph-data-bucket/v1/"
+        - "NeptuneLoadRole"
+        - "Multi-AZ"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: analytics-redirect-boundary
+    description: >-
+      Operator asks to run PageRank on a large graph. This is a
+      Neptune Analytics workload, NOT Neptune DB. Expects the skill
+      to redirect — verdict PREREQUISITES_MISSING with the service
+      boundary cited.
+    input: |
+      I need to run PageRank and connected-components on a 500M-vertex
+      graph in AWS. Provision a Neptune cluster named "research-graph"
+      in us-east-1 with db.x2gdb.16xlarge instances for this. We want
+      Multi-AZ and snapshots. Account ID: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "research-graph"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-subnet-group-and-cmk
+    description: >-
+      Operator requests a Neptune DB cluster but has not specified
+      the subnet group, security group, or CMK. Multi-AZ requires a
+      multi-AZ subnet group; customer CMK requires a key ARN. Expects
+      PREREQUISITES_MISSING with specific gaps cited.
+    input: |
+      Help me create a new Neptune DB cluster called "user-graph"
+      in us-east-1. I want Multi-AZ failover and a customer-managed
+      CMK for encryption. We will store user-relationship data.
+      Region: us-east-1, Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "user-graph"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

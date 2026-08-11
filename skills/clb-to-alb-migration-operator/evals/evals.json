@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "clb-to-alb-migration-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CLB-to-ALB Migration Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "plan-migration-http-https-clb-ready",
+      "name": "Plan migration for HTTP/HTTPS CLB with ACM cert — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/plan-migration-http-https-clb-ready.md",
+      "baseline_file": "baselines/plan-migration-http-https-clb-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-target-group", "VERDICT", "PRE_CHECKS", "stickiness", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "plan-migration-tcp-listener-blocked",
+      "name": "Plan migration for CLB with TCP listener — ALB cannot handle TCP (BLOCKED with NLB routing)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/plan-migration-tcp-listener-blocked.md",
+      "baseline_file": "baselines/plan-migration-tcp-listener-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "TCP", "NLB", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "create-load-balancer", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cutover-proxy-protocol-blocked",
+      "name": "Cutover with Proxy Protocol backend — ALB does not emit Proxy Protocol (BLOCKED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cutover-proxy-protocol-blocked.md",
+      "baseline_file": "baselines/cutover-proxy-protocol-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "ProxyProtocolPolicyType", "X-Forwarded-For", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "change-resource-record-sets", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cutover-weighted-phase-1-ready",
+      "name": "Weighted DNS cutover Phase 1 (5% ALB) — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cutover-weighted-phase-1-ready.md",
+      "baseline_file": "baselines/cutover-weighted-phase-1-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "change-resource-record-sets", "Weight", "VERDICT", "PRE_CHECKS", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "verify-cutover-completed",
+      "name": "Verify cutover complete after 100% shift + 24h observation (COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/verify-cutover-completed.md",
+      "baseline_file": "baselines/verify-cutover-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "POST_VERIFY", "VERDICT", "describe-target-health"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

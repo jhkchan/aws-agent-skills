@@ -188,18 +188,15 @@ for READY):**
 
 **Cost/time baselines (2026):**
 
-- ALB: $0.0225/hour + $0.008 per LCU-hour. A CLB-to-ALB migration
-  typically reduces cost for L7 workloads because ALB LCUs are
-  dimensioned (new connections, active connections, processed bytes,
-  rule evaluations) and CLB is a flat hourly.
-- ALB target groups: free.
-- Route 53 weighted routing: $0.50 per million queries (first billion
-  free tier), no per-record fee.
-- ACM certificates: free if issued via ACM (not IAM-uploaded imports).
-- Cross-zone load balancing: ALB always on (free); CLB was billable
-  when enabled.
-- WAF on ALB: $5/rule/month + $1/million requests.
-- ALB Lambda target invocations: billed as Lambda (no extra ALB fee).
+- ALB: $0.0225/hour + $0.008 per LCU-hour (dimensioned on connections,
+  bytes, rule evaluations). CLB is a flat hourly — ALB usually cheaper
+  for L7 workloads.
+- ALB target groups: free. Route 53 weighted routing: $0.50/million
+  queries (first billion free).
+- ACM certificates: free if issued via ACM. Cross-zone: ALB always on
+  and free; CLB was billable.
+- WAF on ALB: $5/rule/month + $1/million requests. ALB Lambda target
+  invocations: billed as Lambda (no extra ALB fee).
 
 ## Mindset
 
@@ -218,17 +215,16 @@ Driven by three ALB realities:
 
 - **The Proxy Protocol gap.** CLB supported Proxy Protocol v1/v2 on TCP/
   SSL listeners to convey client IP/port to the backend. ALB does NOT
-  support Proxy Protocol; it always injects `X-Forwarded-For` (client IP
-  chain), `X-Forwarded-Proto` (http or https), `X-Forwarded-Port`, and
-  `X-Forwarded-Host`. Backends that parsed Proxy Protocol binary frames
-  will receive malformed data unless reconfigured. This is the #1 silent
-  breakage in CLB-to-ALB migrations.
+  support Proxy Protocol; it always injects `X-Forwarded-For`, `X-
+  Forwarded-Proto`, `X-Forwarded-Port`, and `X-Forwarded-Host`. Backends
+  that parsed Proxy Protocol binary frames will receive malformed data
+  unless reconfigured. This is the #1 silent breakage in CLB-to-ALB
+  migrations.
 
 - **Cross-zone is always on.** ALB cross-zone load balancing is always
-  enabled and free. CLB cross-zone was off by default and billable when
-  on. A CLB with cross-zone off produces uneven target distribution
-  after migration; the ALB spreads evenly. Operators expecting the old
-  pattern may misread metrics post-cutover.
+  enabled and free. CLB cross-zone was off by default and billable. A
+  CLB with cross-zone off produces uneven target distribution after
+  migration; the ALB spreads evenly.
 
 ## Pre-flight: CLB metadata gate
 
@@ -330,22 +326,20 @@ changes a plan if ignored:
   Protocol frame. Always check the CLB's `ProxyProtocolPolicyType` and
   inspect the backend's listener configuration before cutover.
 
-- **DNS cutover is not instant.** Even with a direct alias swap, clients
-  cache the CLB DNS name's underlying IP for the TTL (default 60s for
-  ALB/CLB DNS). Weighted routing cutover (5%/25%/50%/100% over hours)
-  is the safe path for high-traffic workloads. Direct swap is safe for
-  low-traffic internal services.
+- **DNS cutover is not instant.** Clients cache the CLB DNS name's
+  underlying IP for the TTL (default 60s). Weighted routing cutover
+  (5%/25%/50%/100% over hours) is the safe path for high-traffic
+  workloads. Direct swap is safe for low-traffic internal services.
 
 - **The CLB stays alive during rollback.** Do NOT delete the CLB at
-  cutover. Keep it provisioned for at least the rollback window
-  (typically 24-72 hours). Rollback = flip the Route 53 weighted record
-  back to 100/0 (CLB/ALB). Deleting the CLB prematurely is irreversible.
+  cutover. Keep it provisioned for the rollback window (typically
+  24-72 hours). Rollback = flip the Route 53 weighted record back to
+  100/0 (CLB/ALB). Deleting the CLB prematurely is irreversible.
 
 - **Cross-zone on ALB changes distribution.** A CLB with cross-zone off
-  distributes per-AZ. Targets in AZ-a get traffic only from AZ-a's CLB
-  nodes. ALB always cross-zone means traffic spreads evenly across all
-  targets regardless of AZ. If the application depended on AZ-affinity
-  (rare), this changes behavior.
+  distributes per-AZ; ALB always cross-zone spreads evenly across all
+  targets. If any target is sized for AZ-only load, it may be
+  overwhelmed by ALB's even distribution.
 
 ### Step 1: plan-migration
 
@@ -378,21 +372,13 @@ listener (the frontend).
 **CLI template:**
 
 ```bash
-aws elbv2 create-target-group \
-  --name tg-web-8080 \
-  --protocol HTTP \
-  --port 8080 \
-  --vpc-id vpc-abc123 \
-  --health-check-protocol HTTP \
-  --health-check-port 8080 \
-  --health-check-path /healthz \
-  --health-check-interval-seconds 30 \
-  --health-check-timeout-seconds 5 \
-  --healthy-threshold-count 3 \
-  --unhealthy-threshold-count 3 \
-  --matcher HttpCode 200 \
-  --target-type instance \
-  --tags Key=clb-source,Value=prod-clb
+aws elbv2 create-target-group --name tg-web-8080 \
+  --protocol HTTP --port 8080 --vpc-id vpc-abc123 \
+  --health-check-protocol HTTP --health-check-port 8080 \
+  --health-check-path /healthz --health-check-interval-seconds 30 \
+  --health-check-timeout-seconds 5 --healthy-threshold-count 3 \
+  --unhealthy-threshold-count 3 --matcher HttpCode 200 \
+  --target-type instance --tags Key=clb-source,Value=prod-clb
 ```
 
 Then set stickiness and deregistration delay:
@@ -611,8 +597,6 @@ NOTES:
     parsing and read X-Forwarded-For, OR (b) keep this listener on an
     NLB (which supports Proxy Protocol v2) and migrate only HTTP/HTTPS
     listeners to ALB.
-  - Do NOT proceed to weighted cutover until the backend is reconfigured
-    or the listener is split out to NLB.
 ```
 
 ### Worked example — verify-cutover (COMPLETED)
@@ -810,4 +794,3 @@ Migration, L7 Modernization, and DNS Cutover Operations.
 - **Authenticate users on ALB (OIDC/Cognito)** — https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html
 - **Route 53 weighted routing** — https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-weighted.html
 - **ACM certificates** — https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html
-- **ALB access logs** — https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html

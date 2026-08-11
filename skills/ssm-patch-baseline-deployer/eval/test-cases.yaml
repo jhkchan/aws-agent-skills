@@ -1,0 +1,248 @@
+# Eval test cases for ssm-patch-baseline-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ssm-patch-baseline-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: deploy-al2023-baseline-ready
+    description: >-
+      Deploy a standard Amazon Linux 2023 patch baseline with product
+      filter "Amazon Linux 2023", Security/Bugfix classifications,
+      Critical/Important severity, ApproveAfterDays 7, ComplianceLevel
+      CRITICAL, EnableNonSecurity true. Patch group "al2023-prod-web".
+      Instance role includes AmazonSSMManagedInstanceCore. All
+      pre-checks pass; plan should produce READY_TO_DEPLOY with
+      create-patch-baseline and register-patch-baseline-for-patch-group
+      CLIs.
+    input: |
+      Operation: create
+      Baseline name: al2023-prod-security
+      Region: us-east-1
+      Account: 111111111111
+      OperatingSystem: AMAZON_LINUX_2023
+      ApprovalRules:
+        PatchRules:
+          - PatchFilterGroup:
+              OperatingSystem: AMAZON_LINUX_2023
+              PatchFilters:
+                - Key: PRODUCT, Values: ["Amazon Linux 2023"]
+                - Key: CLASSIFICATION, Values: ["Security", "Bugfix"]
+                - Key: SEVERITY, Values: ["Critical", "Important"]
+            ApproveAfterDays: 7
+            ComplianceLevel: CRITICAL
+            EnableNonSecurity: true
+      Patch Group: al2023-prod-web
+
+      Pre-flight (already performed by caller):
+        aws ssm describe-patch-baselines --operating-system AMAZON_LINUX_2023:
+          no baseline named al2023-prod-security
+        aws ec2 describe-instances --filters "Name=tag:Patch Group,Values=al2023-prod-web":
+          3 instances found, instance profiles include AmazonSSMManagedInstanceCore
+        aws iam get-role --role-name SSMOperatorRole:
+          OK (holds ssm:CreatePatchBaseline)
+
+      Emit the standard VERDICT block (BASELINE, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, OPERATING_SYSTEM,
+      APPROVAL_RULES, COMPLIANCE_LEVEL, PATCH_GROUPS,
+      MAINTENANCE_WINDOW, INSTANCE_ROLE, NOTES).
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "al2023-prod-security"
+        - "create-patch-baseline"
+        - "AMAZON_LINUX_2023"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-windows-auto-approve-ready
+    description: >-
+      Deploy a Windows Server patch baseline with product
+      WindowsServer2022, Critical Updates/Security Updates
+      classifications, MSRC_SEVERITY Critical, ApproveAfterDays 0
+      (immediate), ComplianceLevel CRITICAL. Rejected patch KB5012345
+      with BLOCK_AS_PENDING. All pre-checks pass; plan should produce
+      READY_TO_DEPLOY with create-patch-baseline CLI including rejected
+      patches.
+    input: |
+      Operation: create
+      Baseline name: win-prod-critical
+      Region: us-east-1
+      Account: 111111111111
+      OperatingSystem: WINDOWS_SERVER
+      ApprovalRules:
+        PatchRules:
+          - PatchFilterGroup:
+              OperatingSystem: WINDOWS_SERVER
+              PatchFilters:
+                - Key: PRODUCT, Values: ["WindowsServer2022"]
+                - Key: CLASSIFICATION, Values: ["Critical Updates", "Security Updates"]
+                - Key: MSRC_SEVERITY, Values: ["Critical"]
+            ApproveAfterDays: 0
+            ComplianceLevel: CRITICAL
+            EnableNonSecurity: false
+      RejectedPatches: ["KB5012345"]
+      RejectedPatchesAction: BLOCK_AS_PENDING
+      Patch Group: win-prod-servers
+
+      Pre-flight:
+        aws ssm describe-patch-baselines --operating-system WINDOWS_SERVER:
+          no baseline named win-prod-critical
+        aws ec2 describe-instances --filters "Name=tag:Patch Group,Values=win-prod-servers":
+          5 instances found, instance profiles include AmazonSSMManagedInstanceCore
+        aws iam get-role --role-name SSMOperatorRole: OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "win-prod-critical"
+        - "WINDOWS_SERVER"
+        - "KB5012345"
+        - "BLOCK_AS_PENDING"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-patch-group-maintenance-window-ready
+    description: >-
+      Register a maintenance window task using AWS-RunPatchBaseline with
+      Operation Install on window mw-0abc123 targeting patch group
+      al2023-prod-web. MaxConcurrency 10%, MaxErrors 3. Service role
+      exists. All pre-checks pass; plan should produce READY_TO_DEPLOY
+      with register-target-with-maintenance-window and
+      register-task-with-maintenance-window CLIs.
+    input: |
+      Operation: maintenance-window-integration
+      Region: us-east-1
+      Account: 111111111111
+      Baseline ID: pb-0abc123 (al2023-prod-security, already created)
+      Patch Group: al2023-prod-web
+      Maintenance Window:
+        WindowId: mw-0abc123
+        Operation: Install
+        MaxConcurrency: "10%"
+        MaxErrors: "3"
+        ServiceRoleArn: arn:aws:iam::111111111111:role/MaintenanceWindowRole
+
+      Pre-flight:
+        aws ssm describe-maintenance-windows --window-id mw-0abc123:
+          OK (window exists, schedule cron(0 2 ? * SUN *))
+        aws iam get-role --role-name MaintenanceWindowRole:
+          OK (trusts ssm.amazonaws.com, has ssm:SendCommand)
+        aws iam get-role --role-name SSMOperatorRole: OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AWS-RunPatchBaseline"
+        - "register-task-with-maintenance-window"
+        - "Install"
+        - "10%"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: deploy-macos-baseline-missing-instance-role
+    description: >-
+      Attempt to deploy a macOS patch baseline and register patch group
+      macos-prod-fleet, but the target instances do not have
+      AmazonSSMManagedInstanceCore attached to their instance profile.
+      SSM agent cannot register; pre-checks must produce
+      PREREQUISITES_MISSING naming the missing instance role.
+    input: |
+      Operation: create
+      Baseline name: macos-prod-baseline
+      Region: us-east-1
+      Account: 111111111111
+      OperatingSystem: MACOS
+      ApprovalRules:
+        PatchRules:
+          - PatchFilterGroup:
+              OperatingSystem: MACOS
+              PatchFilters:
+                - Key: PRODUCT, Values: ["macOS"]
+                - Key: CLASSIFICATION, Values: ["Security"]
+            ApproveAfterDays: 3
+            ComplianceLevel: HIGH
+      Patch Group: macos-prod-fleet
+
+      Pre-flight:
+        aws ssm describe-patch-baselines --operating-system MACOS:
+          no baseline named macos-prod-baseline
+        aws ec2 describe-instances --filters "Name=tag:Patch Group,Values=macos-prod-fleet":
+          2 instances found, instance profiles do NOT include AmazonSSMManagedInstanceCore
+        aws iam get-role --role-name SSMOperatorRole: OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "AmazonSSMManagedInstanceCore"
+        - "instance"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: deploy-al2023-wrong-product-filter-blocked
+    description: >-
+      Attempt to deploy an Amazon Linux 2023 patch baseline but with the
+      product filter "Amazon Linux 2" instead of "Amazon Linux 2023".
+      This mismatch causes zero patches to match — the compliance
+      dashboard would show all instances as compliant when they are not.
+      Pre-checks must produce PREREQUISITES_MISSING flagging the
+      product-OS mismatch.
+    input: |
+      Operation: create
+      Baseline name: al2023-prod-security
+      Region: us-east-1
+      Account: 111111111111
+      OperatingSystem: AMAZON_LINUX_2023
+      ApprovalRules:
+        PatchRules:
+          - PatchFilterGroup:
+              OperatingSystem: AMAZON_LINUX_2023
+              PatchFilters:
+                - Key: PRODUCT, Values: ["Amazon Linux 2"]
+                - Key: CLASSIFICATION, Values: ["Security"]
+            ApproveAfterDays: 7
+            ComplianceLevel: CRITICAL
+      Patch Group: al2023-prod-web
+
+      Pre-flight:
+        aws ssm describe-patch-baselines --operating-system AMAZON_LINUX_2023:
+          no baseline named al2023-prod-security
+        aws ec2 describe-instances --filters "Name=tag:Patch Group,Values=al2023-prod-web":
+          3 instances found, instance profiles include AmazonSSMManagedInstanceCore
+        aws iam get-role --role-name SSMOperatorRole: OK
+
+      Emit the standard VERDICT block.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Amazon Linux 2023"
+        - "PRODUCT"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY_TO_DEPLOY"

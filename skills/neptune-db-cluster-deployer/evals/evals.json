@@ -1,0 +1,177 @@
+{
+  "skill": "neptune-db-cluster-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Neptune DB Cluster Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across workload types (production Multi-AZ Gremlin, dev single-instance, bulk load from S3, Neptune Analytics boundary redirect, missing prerequisites). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-multiaz-gremlin",
+      "name": "Production Neptune DB Multi-AZ with CMK + TLS + IAM auth + Streams",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, Multi-AZ reader promotion + customer CMK + neptune_enforce_ssl + IAM database auth + Streams + snapshots",
+      "prompt": "Provision a production Amazon Neptune DB cluster named \"prod-graph\" in us-east-1 for a Gremlin property-graph workload. We need 1 writer + 2 readers across 3 AZs for Multi-AZ failover. Use db.r6g.8xlarge instances. Engine version 1.3.2.0. The graph is ~200M vertices + 1B edges. Customer-managed CMK alias/prod-graph-kms for encryption at rest. Enable TLS (neptune_enforce_ssl=1) and IAM database auth. Set neptune_query_timeout=30000 (OLTP queries). Enable Neptune Streams for change capture. Snapshots: 7-day retention. Deletion protection enabled. Subnet group prod-neptune-subnet spans 3 AZs. Security group sg-neptune123 inbound 8182 from sg-app456. Tags: Environment=production, Workload=graph. Account ID: 123456789012.",
+      "prompt_file": "prompts/production-multiaz-gremlin.md",
+      "baseline_file": "baselines/production-multiaz-gremlin.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "NEPTUNE: prod-graph\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Service: Neptune DB (NOT Analytics)\n  [✓] Engine version: 1.3.2.0 (pinned)\n  [✓] Writer instance: db.r6g.8xlarge\n  [✓] Reader instances: 2 (across us-east-1b, us-east-1c for Multi-AZ)\n  [✓] Multi-AZ with reader promotion: Enabled\n  [✓] Subnet group: prod-neptune-subnet (3 AZs)\n  [✓] Security group: sg-neptune123 (inbound 8182 from sg-app456)\n  [✓] Encryption at rest: Enabled (customer CMK alias/prod-graph-kms)\n  [✓] TLS / neptune_enforce_ssl: Enabled\n  [✓] IAM database auth: Enabled\n  [✓] Parameter group: neptune_query_timeout=30000, neptune_streams=1\n  [✓] Snapshot retention: 7 days\n  [✓] Deletion protection: Enabled\n  [✓] Query languages: Gremlin\nVERIFICATION_COMMANDS:\n  aws neptune describe-db-clusters --db-cluster-identifier prod-graph\n  aws neptune describe-db-instances --db-instance-identifier prod-graph-instance-1\n  aws kms describe-key --key-id alias/prod-graph-kms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-graph",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Neptune DB",
+            "Multi-AZ",
+            "db.r6g.8xlarge",
+            "neptune_enforce_ssl"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dev-single-instance",
+      "name": "Dev Neptune DB single writer instance (no Multi-AZ)",
+      "difficulty": "easy",
+      "branch": "READY_TO_DEPLOY — dev cluster with single writer; explicit 'NO failover' notation; AWS-managed KMS; neptune_enforce_ssl=1 hygiene",
+      "prompt": "Provision a dev Neptune DB cluster named \"dev-graph\" in us-east-1. Just a single writer instance for functional testing — no Multi-AZ, no failover needed. Use db.r6g.large. Engine version 1.3.2.0. Enable neptune_enforce_ssl=1 for good hygiene. AWS-managed KMS key is fine (no customer CMK). Subnet group dev-neptune-subnet in one AZ is OK for dev. Security group sg-dev-neptune inbound 8182 from sg-dev-app. Tags: Environment=dev, Workload=graph. Account ID: 123456789012.",
+      "prompt_file": "prompts/dev-single-instance.md",
+      "baseline_file": "baselines/dev-single-instance.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "NEPTUNE: dev-graph\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Service: Neptune DB (NOT Analytics)\n  [✓] Engine version: 1.3.2.0 (pinned)\n  [✓] Writer instance: db.r6g.large\n  [✓] Reader instances: 0 (writer-only — NO failover)\n  [✓] Multi-AZ with reader promotion: Disabled (writer-only — NO failover)\n  [✓] Subnet group: dev-neptune-subnet\n  [✓] Security group: sg-dev-neptune (inbound 8182 from sg-dev-app)\n  [✓] Encryption at rest: Enabled (AWS-managed)\n  [✓] TLS / neptune_enforce_ssl: Enabled\nVERIFICATION_COMMANDS:\n  aws neptune describe-db-clusters --db-cluster-identifier dev-graph",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "dev-graph",
+            "VERDICT",
+            "CHECKLIST",
+            "db.r6g.large"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gremlin-bulk-load-from-s3",
+      "name": "Neptune DB with initial Gremlin data bulk load from S3",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Multi-AZ cluster with bulk load source cited (same-region S3 bucket, IAM role NeptuneLoadRole); loader prerequisites verified",
+      "prompt": "Provision a Neptune DB cluster named \"analytics-graph\" in us-east-1 for a Gremlin property-graph workload. 1 writer + 1 reader for Multi-AZ, db.r6g.4xlarge. Engine version 1.3.2.0. Customer CMK alias/graph-kms. neptune_enforce_ssl=1, IAM database auth. Snapshots 7 days. Deletion protection enabled. We need to load initial data from s3://graph-data-bucket/v1/ (same region us-east-1) using IAM role NeptuneLoadRole. Subnet group graph-subnet spans 2 AZs. Security group sg-graph inbound 8182 from sg-graph-app. Tags: Environment=production, Workload=graph-bulk-load. Account ID: 123456789012.",
+      "prompt_file": "prompts/gremlin-bulk-load-from-s3.md",
+      "baseline_file": "baselines/gremlin-bulk-load-from-s3.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "NEPTUNE: analytics-graph\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Service: Neptune DB (NOT Analytics)\n  [✓] Writer instance: db.r6g.4xlarge\n  [✓] Reader instances: 1 (Multi-AZ)\n  [✓] Multi-AZ with reader promotion: Enabled\n  [✓] Subnet group: graph-subnet (2 AZs)\n  [✓] Security group: sg-graph (inbound 8182 from sg-graph-app)\n  [✓] Encryption at rest: Enabled (customer CMK alias/graph-kms)\n  [✓] TLS / neptune_enforce_ssl: Enabled\n  [✓] IAM database auth: Enabled\n  [✓] Snapshot retention: 7 days\n  [✓] Deletion protection: Enabled\n  [✓] Bulk load source: s3://graph-data-bucket/v1/ (same region, IAM role NeptuneLoadRole)\n  [✓] Query languages: Gremlin\nVERIFICATION_COMMANDS:\n  aws neptune describe-db-clusters --db-cluster-identifier analytics-graph\n  aws kms describe-key --key-id alias/graph-kms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "analytics-graph",
+            "VERDICT",
+            "CHECKLIST",
+            "s3://graph-data-bucket/v1/",
+            "NeptuneLoadRole",
+            "Multi-AZ"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "analytics-redirect-boundary",
+      "name": "Operator requests PageRank — redirect to Neptune Analytics",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — workload is analytical (PageRank, connected-components on a large graph); Neptune DB is the wrong service; redirect to Neptune Analytics (separate aws graph API)",
+      "prompt": "I need to run PageRank and connected-components on a 500M-vertex graph in AWS. Provision a Neptune cluster named \"research-graph\" in us-east-1 with db.x2gdb.16xlarge instances for this. We want Multi-AZ and snapshots. Account ID: 123456789012.",
+      "prompt_file": "prompts/analytics-redirect-boundary.md",
+      "baseline_file": "baselines/analytics-redirect-boundary.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "NEPTUNE: research-graph\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Service: workload is analytical (PageRank, connected-components on a large graph) — Neptune DB has NO built-in algorithm library; redirect to Neptune Analytics (separate aws graph API)\n  [✗] Topology mismatch: Neptune Analytics uses a single graph (no writer/reader split, no Multi-AZ failover); the requested Multi-AZ does not apply\nVERIFICATION_COMMANDS:\n  aws graph list-graphs  # Neptune Analytics API (separate from aws neptune)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "research-graph",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-subnet-group-and-cmk",
+      "name": "Operator has not specified subnet group, security group, or CMK",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — subnet group (Multi-AZ requires multi-AZ subnet group), security group (port 8182 inbound), and customer CMK ARN all unspecified",
+      "prompt": "Help me create a new Neptune DB cluster called \"user-graph\" in us-east-1. I want Multi-AZ failover and a customer-managed CMK for encryption. We will store user-relationship data. Region: us-east-1, Account: 123456789012.",
+      "prompt_file": "prompts/missing-subnet-group-and-cmk.md",
+      "baseline_file": "baselines/missing-subnet-group-and-cmk.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "NEPTUNE: user-graph\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Subnet group: NOT specified — Multi-AZ requires subnet group spanning >=2 AZs\n  [✗] Security group: NOT specified — Neptune needs inbound 8182 from application SG\n  [✗] KMS key: NOT specified — customer-managed CMK requires a key ARN in the same region\n  [✗] Instance class / workload size: NOT specified — drives writer/reader sizing\nVERIFICATION_COMMANDS:\n  aws ec2 describe-subnets --query 'Subnets[*].AvailabilityZone' --output text\n  aws ec2 describe-security-groups --query 'SecurityGroups[*].[GroupId,GroupName]' --output text\n  aws kms list-aliases --query 'Aliases[?starts_with(AliasName, `alias/`)]'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "user-graph",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

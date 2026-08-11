@@ -9,15 +9,14 @@ description: >-
   (neptune_enforce_ssl, neptune_query_timeout), IAM database auth,
   loading data (bulk load from S3 via the Neptune Loader), querying
   (Gremlin, SPARQL, openCypher), Neptune Streams, snapshot/restore,
-  and the Neptune Analytics (separate analytics service) boundary.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating a Neptune DB cluster, sizing writer/reader instances,
-  designing a Multi-AZ graph topology, hardening TLS/IAM, loading
-  graph data from S3, or choosing between Neptune DB and Neptune
-  Analytics. Triggers: create Neptune, provision graph database,
-  Neptune cluster, Gremlin database, SPARQL endpoint, openCypher,
-  Neptune bulk load, Neptune Streams, neptune_enforce_ssl, Neptune
-  Multi-AZ, Neptune reader instance.
+  and the Neptune Analytics boundary. Emits a READY_TO_DEPLOY
+  checklist. Use when creating a Neptune DB cluster, sizing
+  writer/reader instances, designing a Multi-AZ graph topology,
+  hardening TLS/IAM, loading graph data from S3, or choosing between
+  Neptune DB and Neptune Analytics. Triggers: create Neptune,
+  provision graph database, Neptune cluster, Gremlin, SPARQL,
+  openCypher, Neptune bulk load, Neptune Streams, neptune_enforce_ssl,
+  Neptune Multi-AZ.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -141,8 +140,8 @@ create Neptune, provision Neptune, Neptune cluster, graph database,
 Gremlin, SPARQL, openCypher, Neptune Multi-AZ, Neptune reader instance,
 Neptune bulk load, Neptune Loader, Neptune Streams, Neptune parameter
 group, neptune_enforce_ssl, neptune_query_timeout, IAM database auth,
-Neptune subnet group, Neptune KMS encryption, db.r6g.large, db.r6g.8xlarge,
-db.r5.12xlarge.
+Neptune subnet group, Neptune KMS encryption, db.r6g.large,
+db.r6g.8xlarge, db.x2gdb.16xlarge.
 
 ## STRICT output contract
 
@@ -196,17 +195,17 @@ Three misconceptions dominate Neptune misdesign at provisioning time:
   writer-replica cluster, Multi-AZ failover, and Gremlin/SPARQL/
   openCypher endpoints. Neptune Analytics is a separate analytics
   (OLAP) service for graph algorithms on large datasets with its own
-  API (`create-graph`), no Multi-AZ writer/replica split, and no
-  Gremlin transactions. They share the query languages but not the
-  data plane. Pick the service before any other decision — this skill
-  only provisions Neptune DB.
+  API (`create-graph`), no writer/replica split, and no Gremlin
+  transactions. They share query languages but not the data plane.
+  Pick the service before any other decision — this skill only
+  provisions Neptune DB.
 
 - **"Set encryption at rest after the cluster is running."** Neptune
   encryption at rest is **immutable**: it MUST be set at creation via
   `--storage-encrypted` (and an optional customer CMK via
   `--kms-key-id`). Adding it later requires snapshot → restore into a
-  new encrypted cluster. Same for TLS — `neptune_enforce_ssl=1` in the
-  parameter group applied at creation locks the cluster to TLS-only.
+  new encrypted cluster. Same for TLS — `neptune_enforce_ssl=1` in
+  the parameter group applied at creation locks the cluster to TLS-only.
 
 - **"A single instance is fine for production."** Neptune's
   writer-only topology has no failover. Multi-AZ requires at least one
@@ -217,38 +216,37 @@ Three misconceptions dominate Neptune misdesign at provisioning time:
 ## Configuration dependency graph (novel heuristic)
 
 Neptune configurations are NOT independent. Many are immutable after
-creation, others silently downgrade. Use this graph to sequence
+creation, others silently downgrade. Use this graph both to sequence
 provisioning and to debug "why can't I add this?" later.
 
 | Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
 |---|---|---|---|
-| Engine version (`5.x` / `6.x`) | none — `create` argument | Engine upgrades apply in maintenance window; **rolling** with brief endpoint flapping | Gremlin 3.6+/3.7+, openCypher, server-side Gremlin plan cache |
-| Instance class | none — `create` argument | Changeable via `modify-db-instance` with rolling reboot | memory budget (large graphs), CPU for traversal depth |
+| Engine version (`1.3.x.x`) | none — `create` argument | engine upgrades apply in maintenance window; rolling with brief endpoint flapping | Gremlin 3.7+, openCypher, server-side plan cache |
+| Instance class | none — `create` argument | changeable via `modify-db-instance` with rolling reboot | memory budget, CPU for traversal depth |
 | Writer + reader replicas | DB subnet group spanning >=2 AZs (Multi-AZ) | writer-only = NO failover; promotion needs >=1 reader in different AZ | Multi-AZ, read scaling, failover |
-| Storage type / IOPS | set at cluster create | **IMMUTABLE** — change requires snapshot/restore | throughput for write-heavy graphs |
+| Storage / IOPS | set at cluster create | **IMMUTABLE** — change requires snapshot/restore | throughput for write-heavy graphs |
 | Encryption at rest (KMS) | `--storage-encrypted` + optional `--kms-key-id` at creation | **CANNOT be added post-creation** without snapshot/restore | compliance (HIPAA, PCI, SOC2) |
-| TLS / neptune_enforce_ssl | parameter group applied at creation | changing `neptune_enforce_ssl` requires instance reboot; mixed TLS is messy | TLS-only clients, network sniffing defense |
-| IAM database auth | `--enable-iam-database-authentication` at creation | can be enabled post-create via modify but triggers rolling reboot; non-IAM auth still works in parallel unless disabled | token-based access, no static passwords |
-| DB subnet group | VPC + >=1 subnet; >=3 AZs for Multi-AZ | **subnets CANNOT be removed** once added; only added | VPC-only addressing |
+| TLS / neptune_enforce_ssl | parameter group applied at creation | changing requires instance reboot; mixed TLS is messy | TLS-only clients, sniffing defense |
+| IAM database auth | `--enable-iam-database-authentication` at creation | can be enabled post-create via modify but triggers rolling reboot; non-IAM auth still works in parallel unless disabled | token-based access |
+| DB subnet group | VPC + >=1 subnet; >=3 AZs for Multi-AZ | subnets CANNOT be removed once added; only added | VPC-only addressing |
 | Security group | VPC | port 8182 inbound from application SG | network isolation |
 | Parameter group | none — `create` argument | parameter changes apply on next reboot | neptune_enforce_ssl, neptune_query_timeout, labs modes |
-| Bulk load from S3 | S3 bucket + IAM role with `neptune-load` trust + `s3:GetObject`; source must be in same region | concurrent loads on the same cluster conflict; loader is idempotent per `load_id` | initial ingest |
-| Neptune Streams | `neptune_streams=1` in parameter group + (recommended) Kinesis/ Lambda consumer | enabling/disabling streams requires instance reboot; stream records resume after reboot | change data capture, replication |
+| Bulk load from S3 | S3 bucket + IAM role with `neptune-load` trust + `s3:GetObject`; source in same region | concurrent loads on the same cluster conflict; loader is idempotent per `load_id` | initial ingest |
+| Neptune Streams | `neptune_streams=1` in parameter group + (recommended) Kinesis/Lambda consumer | enabling/disabling requires instance reboot; stream records resume after reboot | change data capture, replication |
 | Snapshot (automated) | `--backup-retention-period > 0` at cluster create | restore creates a NEW cluster; snapshot is cluster-scoped | point-in-time recovery |
 | Deletion protection | `--deletion-protection` at cluster create | with protection on, `delete-db-cluster` fails until disabled | accidental-delete defense |
 
 **The immutable rows are the ones a baseline model misses.** Engine
-version (rolling), storage config, encryption at rest, and the
-VPC/subnet placement are decided at creation time. The procedure below
-forces an explicit decision on each before the `create-db-cluster` call.
+version (rolling), storage config, encryption at rest, and VPC/subnet
+placement are decided at creation time. The procedure below forces an
+explicit decision on each before the `create-db-cluster` call.
 
-**Cross-dependency gotchas** (not visible in the table):
+**Cross-dependency gotchas:**
 - Enabling `neptune_enforce_ssl=1` on an existing cluster requires a
-  rolling instance reboot — clients using plaintext connections drop.
-  Enable at creation, not in production.
-- IAM database auth and password auth can coexist; to enforce IAM-only
-  you must NOT set a password and rely on IAM tokens. Mixed mode is a
-  common source of "why did this auth succeed?" confusion.
+  rolling instance reboot — plaintext clients drop. Enable at creation.
+- IAM auth and password auth can coexist; to enforce IAM-only, do NOT
+  set a password and rely on IAM tokens. Mixed mode is a common source
+  of "why did this auth succeed?" confusion.
 - The Neptune Loader only reads S3 buckets in the SAME region as the
   cluster. Cross-region loads require replicating the bucket first.
 - A Multi-AZ cluster with only 1 instance (writer) has NO failover
@@ -266,21 +264,18 @@ instance spec-sheet memory; this heuristic gives the real budget.
 ```text
 usable_buffer_cache = instance_memory_bytes × 0.60
 # ~60% of memory is the working buffer cache budget. Neptune reserves
-# the rest for OS, JVM (Spark/Featherstone internal), connection
-# state, and copy-on-write during snapshot.
+# the rest for OS, JVM internal state, connection state, and
+# copy-on-write during snapshot.
 
-# Gremlin/SPARQL working set rule:
+# Working set rule (Gremlin/SPARQL property graph):
 required_memory = vertices_bytes + edges_bytes + (3 × indexes_bytes)
 # Neptune maintains property + edge indexes consuming ~3x the raw
-# edge data. Indexes are what make traversals fast; never size them
-# out.
+# edge data. Indexes are what make traversals fast; never size them out.
 
-# Example: 200M vertices (200 bytes avg) + 1B edges (80 bytes avg)
-vertices_bytes   = 200e6 × 200 = 40 GB
-edges_bytes      = 1e9 × 80   = 80 GB
-indexes_bytes    = 3 × 80     = 240 GB
-required_memory  = 40 + 80 + 240 = 360 GB
-# -> db.r6g.12xlarge (384 GB) is the floor; db.r6g.16xlarge (512 GB) for headroom
+# Example: 200M vertices (200 B avg) + 1B edges (80 B avg)
+# vertices=40 GB, edges=80 GB, indexes=240 GB -> 360 GB required
+# -> db.r6g.12xlarge (384 GB) is the floor;
+#    db.r6g.16xlarge (512 GB) for headroom
 ```
 
 **Read-scaling note:** readers scale read traversals but NOT writes —
@@ -289,9 +284,9 @@ scale up the writer instance class, not out.
 
 ## Expert heuristic: failover promotion semantics
 
-A baseline model says "Multi-AZ gives you failover" without
-explaining what gets promoted and how long it takes. This is the
-load-bearing detail for production SLAs.
+A baseline model says "Multi-AZ gives you failover" without explaining
+what gets promoted and how long it takes. This is the load-bearing
+detail for production SLAs.
 
 - **Cluster endpoint is stable.** Neptune exposes a single cluster
   endpoint that always points to the current writer. On failover, the
@@ -321,12 +316,12 @@ specific gap citation.
 |---|---|---|
 | AWS account with Neptune access | Can't provision without it | `aws sts get-caller-identity` |
 | Region selected | Neptune clusters and subnet groups are region-scoped | `aws configure get region` |
-| VPC ID + at least 2 subnets in different AZs (3+ preferred for Multi-AZ) | Neptune is VPC-only; Multi-AZ requires multi-AZ subnet group | `aws ec2 describe-subnets --filters "Name=vpc-id,Values=<vpc>"` — confirm >=2 distinct `AvailabilityZone` values |
+| VPC ID + at least 2 subnets in different AZs (3+ preferred) | Neptune is VPC-only; Multi-AZ requires multi-AZ subnet group | `aws ec2 describe-subnets --filters "Name=vpc-id,Values=<vpc>"` — confirm >=2 distinct `AvailabilityZone` values |
 | Cluster name unique in this region | Names are region-unique | `aws neptune describe-db-clusters --db-cluster-identifier <name>` returns `DBClusterNotFound` |
-| KMS key ARN (if encryption at rest with customer CMK) | Custom encryption requires a CMK in the same region | `aws kms describe-key --key-id <cmk-id>` — confirm `Enabled=true` |
+| KMS key ARN (if encryption with customer CMK) | Custom encryption requires a CMK in the same region | `aws kms describe-key --key-id <cmk-id>` — confirm `Enabled=true` |
 | Security group with port 8182 inbound from application SG | Wrong port = silent connectivity failure; Neptune listens on 8182 | `aws ec2 describe-security-groups --group-ids <sg>` — verify inbound rule on 8182 |
 | Workload description (graph size, query depth, write rate) | Drives instance class, replica count, parameter group decisions | Captured in the prompt or follow-up question |
-| S3 bucket + IAM role for bulk load (if loading data) | Loader needs an IAM role with `s3:GetObject` and `neptune-load` trust policy | `aws iam get-role --role-name <role>`; bucket in same region |
+| S3 bucket + IAM role for bulk load (if loading data) | Loader needs IAM role with `s3:GetObject` and Neptune trust policy; bucket in same region | `aws iam get-role --role-name <role>`; bucket in same region |
 | Engine choice (DB vs Analytics) | Neptune Analytics is a separate service; this skill is DB only | If the user asks for graph algorithms / large-scale analytics, redirect to Neptune Analytics |
 
 If any prerequisite is missing, output `VERDICT: PREREQUISITES_MISSING`
@@ -364,7 +359,7 @@ What is the workload shape?
 | SPARQL | YES | NO |
 | openCypher | YES | YES |
 | Graph algorithms (built-in) | NO (write your own Gremlin) | YES (PageRank, BFS, etc.) |
-| Storage type | cluster-shared (6-way) | ephemeral snapshot-loaded |
+| Storage | cluster-shared (6-way) | ephemeral snapshot-loaded |
 | Pricing | instance-hour + storage + IO | GB-hour (memory) + snapshot |
 
 **Common mistake:** provisioning Neptune DB for a PageRank workload.
@@ -378,21 +373,11 @@ Neptune offers `db.r5`, `db.r6g`, `db.r6i`, `db.x2g` families.
 Memory-bound graphs favor `r6g`/`x2g`. Avoid `t3`/`t4g` burstable for
 production (Neptune is not supported on burstable in some regions).
 
-**Family selection:**
-
-| Family | Optimized for | Use when |
-|---|---|---|
-| `db.r6g.large` / `.xlarge` / `.2xlarge` | Memory, Graviton | Small-medium graphs (< 100 GB working set); dev/test |
-| `db.r6g.8xlarge` / `.12xlarge` / `.16xlarge` | Memory (max) | Large production graphs (100-500 GB working set) |
-| `db.r5.12xlarge` / `.24xlarge` | Memory (legacy gen) | Existing r5 footprints; new clusters prefer r6g |
-| `db.x2gdb.16xlarge` / `.24xlarge` | Memory (max, Graviton) | Very large graphs (500 GB+ working set) |
-| `db.r6i.large` / `.xl` / `.2xl` | Balanced | Read-heavy with deep traversals needing CPU |
-
 **Cluster size by workload:**
 
 - **Dev / test:** 1 writer instance, `db.r6g.large`. No failover.
-- **Small production (read-heavy, < 100 GB):** 1 writer + 1 reader
-  (Multi-AZ), `db.r6g.2xlarge`.
+- **Small production (read-heavy, < 100 GB working set):** 1 writer +
+  1 reader (Multi-AZ), `db.r6g.2xlarge`.
 - **Mid production (100-500 GB, mixed read/write):** 1 writer + 2
   readers across 3 AZs, `db.r6g.8xlarge`.
 - **Large production (500 GB+, deep traversals):** 1 writer + 3+
@@ -424,18 +409,6 @@ Multi-AZ is the primary resilience control for Neptune DB.
 - Clients reconnect via the cluster endpoint — no code change.
 - Data loss window: zero committed transactions (cluster-shared
   storage).
-
-**Topology examples:**
-
-```text
-# Minimum production: 1 writer + 1 reader, Multi-AZ
-#   Writer: us-east-1a   Reader: us-east-1b
-#   Promotes on writer failure (~30s)
-
-# Recommended: 1 writer + 2 readers across 3 AZs
-#   Writer: us-east-1a   Readers: us-east-1b, us-east-1c
-#   Read scaling on the reader endpoint + Multi-AZ failover
-```
 
 **Common mistake:** subnet group with only one AZ. Multi-AZ cannot
 place the reader in a different AZ, and the cluster silently degrades
@@ -481,10 +454,6 @@ aws ec2 authorize-security-group-ingress \
 this exposes the cluster to internet scanning. Always scope inbound to
 the application's SG.
 
-**Common mistake:** forgetting to attach the security group at
-cluster creation. Neptune uses the VPC's default SG otherwise, which
-typically allows no inbound — the cluster is unreachable.
-
 ## Step 5 — Encryption (KMS at creation, immutable)
 
 Neptune encryption at rest is **immutable**: set at creation via
@@ -509,12 +478,10 @@ Parameter groups control Neptune runtime behavior. Most parameters
 require an instance reboot to take effect — set them at cluster
 creation in the DB cluster parameter group.
 
-**Critical parameters:**
-
 | Parameter | Default | Recommended | Why |
 |---|---|---|---|
 | `neptune_enforce_ssl` | `0` (off) | `1` (on) for all production | Forces TLS-only connections; plaintext rejected. Defense against network sniffing. |
-| `neptune_query_timeout` | `120000` (ms) | `30000` (30s) for OLTP; `120000+` for analytics | Caps runaway traversals. Long-running queries consume CPU/memory and can starve other queries. |
+| `neptune_query_timeout` | `120000` (ms) | `30000` (30s) for OLTP; `120000+` for analytics | Caps runaway traversals. Long-running queries consume CPU/memory and starve other queries. |
 | `neptune_streams` | `0` (off) | `1` (on) if change capture needed | Enables Neptune Streams for CDC (see Step 10). |
 | `neptune_lab_mode` | varies | Leave at default unless AWS support advises | Labs features may change; do not enable in production without testing. |
 
@@ -569,8 +536,8 @@ aws neptune create-db-cluster ... \
 ```
 
 **Common gotchas:**
-- IAM auth and password auth can coexist. To enforce IAM-only, do
-  NOT set a password and rely on IAM tokens.
+- IAM auth and password auth can coexist. To enforce IAM-only, do NOT
+  set a password and rely on IAM tokens.
 - IAM tokens are SigV4-derived — short-lived (~15 minutes). The
   Gremlin/SPARQL driver must refresh tokens automatically (most modern
   drivers do; verify your client lib).
@@ -583,23 +550,10 @@ issues individual Gremlin `g.addV` calls — that is 10-100x slower).
 
 **Prerequisites:**
 - S3 bucket in the SAME region as the Neptune cluster.
-- IAM role with trust policy allowing `neptune-load` and permissions
+- IAM role with trust policy allowing Neptune and permissions
   `s3:GetObject` on the bucket.
 - Data in a supported format: Gremlin CSV/JSON/n-quad, or SPARQL
   N-Triples/RDF.
-
-**IAM role trust policy:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "rds.amazonaws.com"},
-    "Action": "sts:AssumeRole"
-  }]
-}
-```
 
 **Load:**
 
@@ -628,8 +582,8 @@ curl -X POST \
 
 ## Step 9 — Query languages (Gremlin, SPARQL, openCypher)
 
-Neptune supports three query languages on the SAME cluster (no need to
-pick at creation). Endpoints:
+Neptune supports three query languages on the SAME cluster (no need
+to pick at creation). Endpoints:
 
 | Language | Endpoint path | Use when |
 |---|---|---|
@@ -662,15 +616,11 @@ time.
   built-in algorithms (PageRank, BFS). NOT this skill — separate
   `aws graph` API. Pair with Neptune DB for batch analytic pipelines.
 - **openCypher improvements (2023-2024):** Server-side planning and
-  caching improve repeat-query latency ~30%. Enable via the latest
-  engine version.
-- **Engine version 6.x (rolling):** Gremlin 3.7+ support, better
-  SPARQL federation. Provisioning tip: pin the major version
-  explicitly (`--engine-version 1.3.x.x` or current); do not use
-  "latest" in production.
-- **Global Database (limited availability):** Cross-region read
-  replicas for DR. Provisioning tip: requires Neptune support
-  enablement per account.
+  caching improve repeat-query latency ~30%. Use the latest engine
+  version.
+- **Engine version 1.3.x.x (rolling):** Gremlin 3.7+ support, better
+  SPARQL federation. Pin the major version explicitly in production;
+  do not use "latest".
 - **Graviton (r6g) instance classes (2022-2024):** ~15% better
   price/performance over r5. Default to Graviton for new clusters.
 - **IAM database auth enhancements (2023-2024):** Fine-grained
@@ -697,8 +647,8 @@ time.
 
 5. **NEVER use a single-AZ subnet group for Multi-AZ Neptune.**
    Multi-AZ requires the promoted reader in a different AZ than the
-   writer. Verify `aws ec2 describe-subnets` shows >=2 distinct AZs
-   in the subnet group before `create-db-cluster`.
+   writer. Verify `aws ec2 describe-subnets` shows >=2 distinct AZs in
+   the subnet group before `create-db-cluster`.
 
 6. **NEVER run a Neptune DB cluster with only a writer instance in
    production.** There is no failover target. The minimum production
@@ -722,12 +672,11 @@ time.
 
 11. **NEVER disable deletion protection on a production cluster
     outside of a planned teardown.** Accidental `delete-db-cluster`
-    destroys the cluster + storage irrecoverably (snapshot retention
-    aside).
+    destroys the cluster + storage irrecoverably.
 
 12. **NEVER use the engine version "latest" in production.** Pin the
     major version explicitly; auto-upgrades during maintenance windows
-    can introduce breaking behavior. Pin `1.3.x.x` or current.
+    can introduce breaking behavior.
 
 ## Output format
 
@@ -752,7 +701,7 @@ CHECKLIST:
   [✓|✗] Query languages: Gremlin | SPARQL | openCypher
 VERIFICATION_COMMANDS:
   aws neptune describe-db-clusters --db-cluster-identifier <name>
-  aws neptune describe-db-instances --db-instance-identifier <name-instance-1>
+  aws neptune describe-db-instances --db-instance-identifier <name>-instance-1
   aws neptune describe-db-cluster-parameters --db-cluster-parameter-group-name <pg>
   aws ec2 describe-subnets --subnet-ids <subnet-ids>
   aws kms describe-key --key-id <cmk-id>
@@ -803,165 +752,33 @@ traversals, real-time app queries, frequent writes?
               Neptune Analytics for batch algorithm runs
 ```
 
-## Decision tree: instance class by working set
-
-```text
-What is the graph working set (vertices + edges + 3x indexes)?
-├── < 100 GB  → db.r6g.2xlarge (64 GB; ~38 GB cache budget)
-├── 100-300 GB → db.r6g.8xlarge (256 GB; ~154 GB cache budget)
-├── 300-500 GB → db.r6g.16xlarge (512 GB; ~307 GB cache budget)
-└── 500 GB+   → db.x2gdb.16xlarge / db.x2gdb.24xlarge (1-2 TB)
-```
-
 ## Error handling
 
 ### Cluster name already exists (`DBClusterAlreadyExists`)
 
-```bash
-aws neptune describe-db-clusters --db-cluster-identifier <name>
-```
-
-- If config matches intent: the cluster is already provisioned. Skip
-  to verification and emit READY_TO_DEPLOY.
-- If config differs: mutable settings can be changed via
-  `modify-db-cluster` (instance class, parameter group, snapshot
-  retention, security groups). Engine version, storage encryption,
-  and VPC/subnet placement CANNOT be changed — those require a new
-  cluster + snapshot/restore.
+- If config matches intent: skip to verification, emit READY_TO_DEPLOY.
+- If config differs: mutable settings (instance class, parameter group,
+  snapshot retention, security groups) change via `modify-db-cluster`.
+  Engine version, storage encryption, and VPC/subnet placement CANNOT
+  be changed — those require a new cluster + snapshot/restore.
 
 ### Multi-AZ create fails (`DBSubnetGroup does not span multiple AZs`)
 
-The subnet group has all subnets in one AZ. Multi-AZ Neptune requires
-the subnet group to span at least 2 AZs.
-
-**Fix:**
-
-```bash
-# Add subnets in different AZs to the subnet group
-aws neptune modify-db-subnet-group \
-  --db-subnet-group-name prod-neptune-subnet \
-  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc
-```
-
-Verify with `aws ec2 describe-subnets --subnet-ids ...` — confirm
-distinct `AvailabilityZone` values.
+**Fix:** add subnets in different AZs via `modify-db-subnet-group`,
+then verify distinct `AvailabilityZone` values via
+`aws ec2 describe-subnets`.
 
 ### IAM auth fails (`AccessDeniedException` from `neptune-db:Connect`)
 
-The IAM principal's policy lacks `neptune-db:Connect` on the cluster
-resource, or the SigV4 token expired.
-
-**Fix:** add the IAM statement granting `neptune-db:Connect` on
-`arn:aws:neptune:<region>:<account>:cluster/<cluster-name>`, and
-verify the client driver refreshes tokens (SigV4 tokens live ~15 min).
+**Fix:** add `neptune-db:Connect` on
+`arn:aws:neptune:<region>:<account>:cluster/<name>` to the IAM
+principal's policy; verify the client driver refreshes SigV4 tokens
+(~15 min lifetime).
 
 ### Loader fails (`Loader could not assume role`)
 
-The IAM role's trust policy does not allow the Neptune service, or
-the bucket is cross-region.
-
-**Fix:** verify the role trust policy includes `rds.amazonaws.com`
-(or `neptune.amazonaws.com` per the current docs) and that the bucket
-is in the same region as the cluster.
-
-### Cluster stuck in `MODIFYING` after `apply-immediately`
-
-A rolling instance reboot on a multi-instance cluster can take 10+
-minutes per instance. Use `--apply-immediately` only for emergencies;
-otherwise schedule modifications in the maintenance window.
-
-```bash
-aws neptune describe-db-clusters --db-cluster-identifier <name> \
-  --query 'DBClusters[0].Status'
-# Wait for "available" before issuing the next modify.
-```
-
-## Worked example — production Neptune DB cluster with Multi-AZ
-
-A production Neptune DB cluster with 1 writer + 2 readers across 3
-AZs, TLS + IAM auth + customer CMK, snapshots, and Streams enabled.
-This is the canonical production pattern.
-
-```bash
-# 1. Create the subnet group (must span >=2 AZs; 3+ preferred)
-aws neptune create-db-subnet-group \
-  --db-subnet-group-name prod-neptune-subnet \
-  --db-subnet-group-description "Multi-AZ subnet group for prod Neptune" \
-  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc
-
-# 2. Create the cluster parameter group
-aws neptune create-db-cluster-parameter-group \
-  --db-cluster-parameter-group-name prod-neptune-pg \
-  --db-parameter-group-family neptune1 \
-  --description "Production Neptune cluster parameter group"
-
-aws neptune modify-db-cluster-parameter-group \
-  --db-cluster-parameter-group-name prod-neptune-pg \
-  --parameters \
-    ParameterName=neptune_enforce_ssl,ParameterValue=1,ApplyMethod=immediate \
-    ParameterName=neptune_query_timeout,ParameterValue=30000,ApplyMethod=immediate \
-    ParameterName=neptune_streams,ParameterValue=1,ApplyMethod=pending-reboot
-
-# 3. Create the DB cluster (writer + storage + config) — encryption immutable at creation
-aws neptune create-db-cluster \
-  --db-cluster-identifier prod-graph \
-  --engine neptune \
-  --engine-version 1.3.2.0 \
-  --db-cluster-parameter-group-name prod-neptune-pg \
-  --db-subnet-group-name prod-neptune-subnet \
-  --vpc-security-group-ids sg-neptune123 \
-  --storage-encrypted \
-  --kms-key-id arn:aws:kms:us-east-1:123456789012:alias/prod-graph-kms \
-  --enable-iam-database-authentication \
-  --backup-retention-period 7 \
-  --deletion-protection \
-  --tags Key=Environment,Value=production Key=Workload,Value=graph
-
-# 4. Create the writer instance
-aws neptune create-db-instance \
-  --db-instance-identifier prod-graph-instance-1 \
-  --db-instance-class db.r6g.8xlarge \
-  --engine neptune \
-  --db-cluster-identifier prod-graph \
-  --availability-zone us-east-1a
-
-# 5. Create the reader instances (across different AZs for Multi-AZ)
-aws neptune create-db-instance \
-  --db-instance-identifier prod-graph-instance-2 \
-  --db-instance-class db.r6g.8xlarge \
-  --engine neptune \
-  --db-cluster-identifier prod-graph \
-  --availability-zone us-east-1b
-
-aws neptune create-db-instance \
-  --db-instance-identifier prod-graph-instance-3 \
-  --db-instance-class db.r6g.8xlarge \
-  --engine neptune \
-  --db-cluster-identifier prod-graph \
-  --availability-zone us-east-1c
-
-# 6. Wait for instances to become available
-aws neptune wait db-instance-available --db-instance-identifier prod-graph-instance-1
-
-# 7. Verify
-aws neptune describe-db-clusters --db-cluster-identifier prod-graph
-aws neptune describe-db-instances --db-instance-identifier prod-graph-instance-1
-aws kms describe-key --key-id alias/prod-graph-kms
-
-# 8. Bulk load initial data from S3 (same region)
-curl -X POST \
-  -H 'Content-Type: application/json' \
-  https://prod-graph.cluster-xxxxxxxxxxxx.us-east-1.neptune.amazonaws.com:8182/loader \
-  -d '{
-    "source": "s3://prod-graph-bucket/initial-load/",
-    "format": "csv",
-    "iamRoleArn": "arn:aws:iam::123456789012:role/NeptuneLoadRole",
-    "mode": "NEW",
-    "region": "us-east-1",
-    "failOnError": "TRUE",
-    "parallelism": "MEDIUM"
-  }'
-```
+**Fix:** verify the role trust policy includes `rds.amazonaws.com` and
+that the bucket is in the same region as the cluster.
 
 ## Domain
 

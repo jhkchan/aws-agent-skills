@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "route53-resolver-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Route 53 Resolver Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "deploy-inbound-endpoint-ready",
+      "name": "Deploy a standard Resolver inbound endpoint with 2 AZs, correct SG ingress, and VPC DNS enabled — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/deploy-inbound-endpoint-ready.md",
+      "baseline_file": "baselines/deploy-inbound-endpoint-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-inbound", "create-resolver-endpoint", "INBOUND", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-outbound-forwarding-rule-ready",
+      "name": "Deploy Resolver outbound endpoint with forwarding rule for corp.example.local. targeting on-prem DNS — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-outbound-forwarding-rule-ready.md",
+      "baseline_file": "baselines/deploy-outbound-forwarding-rule-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-outbound", "create-resolver-rule", "OUTBOUND", "corp.example.local.", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-dns-firewall-ready",
+      "name": "Deploy DNS Firewall rule group using managed malware domain list with BLOCK/NXDOMAIN, associated to VPC at priority 1 — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-dns-firewall-ready.md",
+      "baseline_file": "baselines/deploy-dns-firewall-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "create-firewall-rule", "create-firewall-rule-group-association", "BLOCK", "NXDOMAIN", "ENABLED", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-outbound-endpoint-single-az-blocked",
+      "name": "Outbound endpoint with both subnets in the same AZ — HA lost; pre-check gate blocks deployment (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-outbound-endpoint-single-az-blocked.md",
+      "baseline_file": "baselines/deploy-outbound-endpoint-single-az-blocked.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "AZ", "distinct", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-query-log-missing-resource-policy",
+      "name": "Query logging to CloudWatch Logs without resource policy granting route53resolver write access — logs would be silently dropped; pre-check gate blocks (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-query-log-missing-resource-policy.md",
+      "baseline_file": "baselines/deploy-query-log-missing-resource-policy.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "route53resolver.amazonaws.com", "resource policy", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

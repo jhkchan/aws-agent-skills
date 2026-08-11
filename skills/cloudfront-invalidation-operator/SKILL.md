@@ -1,22 +1,19 @@
 ---
 name: cloudfront-invalidation-operator
 description: >-
-  Operates CloudFront cache invalidation workflows end-to-end —
-  invalidation creation with path patterns (/* all, /images/*
-  directory, /images/*.css wildcard, single-path), invalidation cost
-  tiering (first 1,000 paths/month free then $0.005 per path),
-  cache-busting strategy (invalidation vs versioned filenames vs
-  managed cache policies), invalidation status polling
-  (InvalidationStatus: InProgress→Completed), bulk invalidation
-  patterns (CloudFront standard vs wildcard reduction), continuous
-  deployment staging invalidation (primary vs staging distribution),
-  and diagnostic loops (get-invalidation, list-invalidations,
-  distribution status checks). Runs deterministic pre-checks
-  (distribution Deployed, caller has cloudfront:CreateInvalidation,
-  path count under free tier threshold, path pattern syntax valid)
-  behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED
-  verdict per invalidation. Use when creating invalidations, waiting
-  for invalidation completion, choosing invalidation vs cache-busting,
+  Operates CloudFront cache invalidation workflows — invalidation
+  creation with path patterns (/* all, /images/* directory,
+  /images/*.css wildcard, single-path), invalidation cost tiering
+  (first 1,000 paths/month free then $0.005 per path), cache-busting
+  strategy (invalidation vs versioned filenames), invalidation
+  status polling (InvalidationStatus: InProgress→Completed), bulk
+  invalidation patterns, continuous deployment staging invalidation,
+  and diagnostic loops (get-invalidation, list-invalidations).
+  Runs deterministic pre-checks (distribution Deployed, caller has
+  cloudfront:CreateInvalidation, path count under free tier,
+  path syntax valid) behind a CONFIRM gate and emits a READY,
+  BLOCKED, or COMPLETED verdict. Use when creating invalidations,
+  waiting for completion, choosing invalidation vs cache-busting,
   or diagnosing invalidation cost.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
@@ -80,8 +77,8 @@ metadata:
     - "versioned filenames"
     - "CloudFront continuous deployment"
     - "staging distribution invalidation"
-    - "invalidate /* "
-       - "bulk invalidation"
+    - "invalidate /*"
+    - "bulk invalidation"
     - "CloudFront edge cache"
     - "clear CDN cache"
     - "invalidation cost"

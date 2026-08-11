@@ -1,0 +1,219 @@
+# Eval test cases for clb-to-alb-migration-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: clb-to-alb-migration-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: plan-migration-http-https-clb-ready
+    description: >-
+      Operator wants to plan a CLB-to-ALB migration for an internet-facing
+      CLB with HTTP:80 (redirect to HTTPS) and HTTPS:443 listeners, an ACM
+      cert in ISSUED state, LBCookieStickinessPolicy timeout=3600, no
+      Proxy Protocol, ConnectionDraining timeout=300, two subnets in
+      different AZs. All pre-checks pass. Plan should produce READY with
+      the ALB, target group, listener, and weighted cutover plan.
+    input: |
+      Operation: plan-migration
+      CLB name: prod-web-clb
+      Planned ALB name: prod-web-alb
+      Region: us-east-1
+      Account: 111111111111
+
+      CLB metadata (aws elb describe-load-balancers):
+        LoadBalancerName: prod-web-clb
+        Scheme: internet-facing
+        Subnets: [subnet-aaa (us-east-1a), subnet-bbb (us-east-1b)]
+        SecurityGroups: [sg-clb-old]
+        ListenerDescriptions:
+          - {Protocol: HTTP, LoadBalancerPort: 80, InstanceProtocol: HTTP, InstancePort: 8080}
+          - {Protocol: HTTPS, LoadBalancerPort: 443, InstanceProtocol: HTTP, InstancePort: 8080, SSLCertificateId: arn:aws:acm:us-east-1:111111111111:certificate/abc}
+        Policies:
+          - LBCookieStickinessPolicy: {CookieExpirationPeriod: 3600}
+        HealthCheck: {Target: "HTTP:8080/healthz", Interval: 30, Timeout: 5, HealthyThreshold: 3, UnhealthyThreshold: 3}
+        Attributes:
+          ConnectionDraining: {Enabled: true, Timeout: 300}
+          CrossZoneLoadBalancing: {Enabled: true}
+          AccessLog: {Enabled: true, S3BucketName: prod-clb-logs, EmitInterval: 5}
+          ConnectionSettings: {IdleTimeout: 60}
+
+      ACM certificate (aws acm describe-certificate):
+        CertificateArn: arn:aws:acm:us-east-1:111111111111:certificate/abc
+        Status: ISSUED
+        DomainName: app.example.com
+
+      Target SG (sg-target-web): allows sg-clb-old on tcp/8080
+      Planned ALB SG: sg-alb-prod (same ingress rules as sg-clb-old)
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-target-group"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "stickiness"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: plan-migration-tcp-listener-blocked
+    description: >-
+      Operator wants to migrate a CLB that has a TCP:4242 listener for a
+      custom binary protocol. ALB is HTTP/HTTPS only — the TCP listener
+      cannot move to ALB. Pre-checks must BLOCK and route the listener
+      to NLB planning.
+    input: |
+      Operation: plan-migration
+      CLB name: prod-game-clb
+      Planned ALB name: prod-game-alb
+      Region: us-east-1
+
+      CLB metadata:
+        Scheme: internet-facing
+        Subnets: [subnet-aaa, subnet-bbb]
+        ListenerDescriptions:
+          - {Protocol: HTTPS, LoadBalancerPort: 443, InstanceProtocol: HTTP, InstancePort: 8080, SSLCertificateId: arn:aws:acm:us-east-1:111111111111:certificate/abc}
+          - {Protocol: TCP, LoadBalancerPort: 4242, InstanceProtocol: TCP, InstancePort: 4242}
+        Policies: []
+        HealthCheck: {Target: "TCP:4242"}
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "TCP"
+        - "NLB"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "create-load-balancer"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: cutover-proxy-protocol-blocked
+    description: >-
+      Operator wants to cut over DNS from CLB to ALB, but the CLB has a
+      ProxyProtocolPolicyType enabled and the backend Go service parses
+      Proxy Protocol v2 frames. ALB does NOT emit Proxy Protocol; the
+      cutover would break 100% of requests. Pre-checks must BLOCK.
+    input: |
+      Operation: cutover-dns
+      CLB name: prod-game-clb
+      ALB name: prod-game-alb (already provisioned, State: active)
+      Region: us-east-1
+
+      CLB metadata:
+        ListenerDescriptions:
+          - {Protocol: HTTPS, LoadBalancerPort: 443, InstanceProtocol: HTTP, InstancePort: 8080}
+        Policies:
+          - ProxyProtocolPolicyType: {enabled on InstancePort: 8080}
+
+      Backend: Go service using github.com/pires/go-proxyproto listener
+      (parses Proxy Protocol v2 frames).
+
+      ALB describe-target-health: 3/3 targets healthy.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "ProxyProtocolPolicyType"
+        - "X-Forwarded-For"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "change-resource-record-sets"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: cutover-weighted-phase-1-ready
+    description: >-
+      Operator wants to begin weighted DNS cutover (Phase 1: 5% to ALB).
+      ALB is provisioned, all targets healthy, ALB responds 200 on canary
+      path, Route 53 zone identified. All pre-checks pass. Should emit
+      READY with the Route 53 weighted change command.
+    input: |
+      Operation: cutover-dns
+      CLB name: prod-web-clb
+      ALB name: prod-web-alb
+      Region: us-east-1
+      Hosted zone: Z111 (app.example.com currently aliases CLB)
+
+      ALB metadata:
+        State: active
+        DNSName: dualstack.prod-web-alb-456.us-east-1.elb.amazonaws.com
+
+      CLB metadata:
+        DNSName: dualstack.prod-web-clb-123.us-east-1.elb.amazonaws.com
+
+      describe-target-health: 3/3 targets State: healthy in tg-web-8080
+      Canary: curl https://prod-web-alb-456.../healthz returns 200
+      CloudWatch baseline: RequestCount ~5000/min, 5xx ~0
+
+      Phase: 1 (canary) — target 5% ALB / 95% CLB
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "change-resource-record-sets"
+        - "Weight"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: verify-cutover-completed
+    description: >-
+      Operator wants to verify the migration is complete after 100%
+      traffic shift to ALB 24 hours ago. Route 53 weights are ALB:100 /
+      CLB:0. All targets healthy, 5xx at zero, p99 latency within
+      baseline. Should emit COMPLETED with post-verification results.
+    input: |
+      Operation: verify-cutover
+      CLB name: prod-web-clb (still provisioned for rollback)
+      ALB name: prod-web-alb
+      Region: us-east-1
+
+      Route 53 weights: ALB 100, CLB 0 (set 24 hours ago)
+
+      describe-target-health: 3/3 targets State: healthy
+      CloudWatch (last 60 min):
+        HTTPCode_Target_5XX_Count: 0 (CLB baseline was 0-2/min)
+        TargetResponseTime p99: 85ms (CLB baseline was 90ms)
+      ALB access logs: target_status_code 2xx for 100% of /api/* requests
+      No client-reported errors in canary dashboard
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "POST_VERIFY"
+        - "VERDICT"
+        - "describe-target-health"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

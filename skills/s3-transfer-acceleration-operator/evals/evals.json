@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-transfer-acceleration-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Transfer Acceleration Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "enable-acceleration-standard-bucket-ready",
+      "name": "Enable acceleration on standard S3 bucket — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/enable-acceleration-standard-bucket-ready.md",
+      "baseline_file": "baselines/enable-acceleration-standard-bucket-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "put-bucket-accelerate-configuration", "VERDICT", "PRE_CHECKS", "CONFIRM", "s3-accelerate"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "enable-acceleration-directory-bucket-blocked",
+      "name": "Enable acceleration on S3 Express One Zone directory bucket — not supported (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/enable-acceleration-directory-bucket-blocked.md",
+      "baseline_file": "baselines/enable-acceleration-directory-bucket-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "directory bucket", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "put-bucket-accelerate-configuration", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "speed-comparison-acceleration-completed",
+      "name": "Verify acceleration enabled + speed comparison + checksum verified (COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/speed-comparison-acceleration-completed.md",
+      "baseline_file": "baselines/speed-comparison-acceleration-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "Enabled", "VERDICT", "POST_VERIFY", "BytesUploaded"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "disable-acceleration-inflight-blocked",
+      "name": "Disable acceleration with in-flight multipart uploads — must abort first (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/disable-acceleration-inflight-blocked.md",
+      "baseline_file": "baselines/disable-acceleration-inflight-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "multipart", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "Status=Suspended", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cost-analysis-bulk-transfer-ready",
+      "name": "50 TB migration cost analysis — acceleration vs Direct Connect (READY with cost comparison)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cost-analysis-bulk-transfer-ready.md",
+      "baseline_file": "baselines/cost-analysis-bulk-transfer-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "VERDICT", "0.025", "Direct Connect", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

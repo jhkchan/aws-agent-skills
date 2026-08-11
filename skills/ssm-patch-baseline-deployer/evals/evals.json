@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ssm-patch-baseline-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SSM Patch Baseline Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "deploy-al2023-baseline-ready",
+      "name": "Deploy a standard Amazon Linux 2023 patch baseline with correct product filter, 7-day auto-approve, CRITICAL compliance — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/deploy-al2023-baseline-ready.md",
+      "baseline_file": "baselines/deploy-al2023-baseline-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "al2023-prod-security", "create-patch-baseline", "AMAZON_LINUX_2023", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-windows-auto-approve-ready",
+      "name": "Deploy Windows Server patch baseline with immediate auto-approve, rejected patches, and BLOCK_AS_PENDING — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-windows-auto-approve-ready.md",
+      "baseline_file": "baselines/deploy-windows-auto-approve-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "win-prod-critical", "WINDOWS_SERVER", "KB5012345", "BLOCK_AS_PENDING", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-patch-group-maintenance-window-ready",
+      "name": "Register maintenance window task using AWS-RunPatchBaseline with Install operation, MaxConcurrency 10%, MaxErrors 3 — all pre-checks pass (READY_TO_DEPLOY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deploy-patch-group-maintenance-window-ready.md",
+      "baseline_file": "baselines/deploy-patch-group-maintenance-window-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "AWS-RunPatchBaseline", "register-task-with-maintenance-window", "Install", "10%", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-macos-baseline-missing-instance-role",
+      "name": "macOS patch baseline with target instances missing AmazonSSMManagedInstanceCore — SSM agent cannot register; pre-check gate blocks (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-macos-baseline-missing-instance-role.md",
+      "baseline_file": "baselines/deploy-macos-baseline-missing-instance-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "AmazonSSMManagedInstanceCore", "instance", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-al2023-wrong-product-filter-blocked",
+      "name": "Amazon Linux 2023 baseline with product filter Amazon Linux 2 — zero patches match; pre-check gate blocks (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-al2023-wrong-product-filter-blocked.md",
+      "baseline_file": "baselines/deploy-al2023-wrong-product-filter-blocked.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "Amazon Linux 2023", "PRODUCT", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

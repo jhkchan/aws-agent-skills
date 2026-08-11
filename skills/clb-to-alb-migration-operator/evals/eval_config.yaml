@@ -1,0 +1,47 @@
+# Eval configuration for clb-to-alb-migration-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: clb-to-alb-migration-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: plan-migration-http-https-clb-ready
+    difficulty: medium
+    prompt_file: prompts/plan-migration-http-https-clb-ready.md
+    baseline_file: baselines/plan-migration-http-https-clb-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: plan-migration-tcp-listener-blocked
+    difficulty: hard
+    prompt_file: prompts/plan-migration-tcp-listener-blocked.md
+    baseline_file: baselines/plan-migration-tcp-listener-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: cutover-proxy-protocol-blocked
+    difficulty: hard
+    prompt_file: prompts/cutover-proxy-protocol-blocked.md
+    baseline_file: baselines/cutover-proxy-protocol-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: cutover-weighted-phase-1-ready
+    difficulty: medium
+    prompt_file: prompts/cutover-weighted-phase-1-ready.md
+    baseline_file: baselines/cutover-weighted-phase-1-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: verify-cutover-completed
+    difficulty: medium
+    prompt_file: prompts/verify-cutover-completed.md
+    baseline_file: baselines/verify-cutover-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: LOW

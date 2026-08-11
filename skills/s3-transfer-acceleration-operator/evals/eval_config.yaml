@@ -1,0 +1,47 @@
+# Eval configuration for s3-transfer-acceleration-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: s3-transfer-acceleration-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: enable-acceleration-standard-bucket-ready
+    difficulty: medium
+    prompt_file: prompts/enable-acceleration-standard-bucket-ready.md
+    baseline_file: baselines/enable-acceleration-standard-bucket-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: enable-acceleration-directory-bucket-blocked
+    difficulty: hard
+    prompt_file: prompts/enable-acceleration-directory-bucket-blocked.md
+    baseline_file: baselines/enable-acceleration-directory-bucket-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: speed-comparison-acceleration-completed
+    difficulty: medium
+    prompt_file: prompts/speed-comparison-acceleration-completed.md
+    baseline_file: baselines/speed-comparison-acceleration-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: LOW
+  - id: disable-acceleration-inflight-blocked
+    difficulty: hard
+    prompt_file: prompts/disable-acceleration-inflight-blocked.md
+    baseline_file: baselines/disable-acceleration-inflight-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: cost-analysis-bulk-transfer-ready
+    difficulty: hard
+    prompt_file: prompts/cost-analysis-bulk-transfer-ready.md
+    baseline_file: baselines/cost-analysis-bulk-transfer-ready.md
+    expected_verdict: READY
+    expected_risk: HIGH

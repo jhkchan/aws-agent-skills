@@ -1,0 +1,164 @@
+# Eval test cases for ram-resource-share-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across sharing patterns (subnet sharing with account IDs,
+# Transit Gateway with Organization, Route53 Resolver rules with OU,
+# customer-managed permissions, Dedicated Host sharing) and prerequisite
+# failure branches (missing principal IDs).
+skill: ram-resource-share-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: subnet-share-with-accounts
+    description: >-
+      Provision a RAM resource share for two subnets shared with
+      two specific accounts within the same Organization. Internal
+      principals, default managed permission. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Provision a RAM resource share in us-east-1. Name:
+      shared-subnets-prod. Resource type: ec2:Subnet. Resources:
+      subnet-abc123 (arn:aws:ec2:us-east-1:123456789012:subnet/
+      subnet-abc123), subnet-def456 (arn:aws:ec2:us-east-1:
+      123456789012:subnet/subnet-def456). Principals: account IDs
+      111111111111, 222222222222. Same Organization, all features
+      enabled. Allow external principals: false. Use default AWS
+      managed permission for subnets. Tags:
+      Environment=production, Application=networking.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-subnets-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "ec2:Subnet"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: transit-gateway-share-organization
+    description: >-
+      Provision a RAM resource share for a Transit Gateway shared
+      with the entire Organization ARN. Auto-accept, all current
+      and future accounts. Expects READY_TO_DEPLOY.
+    input: |
+      Provision a RAM resource share in us-east-1. Name:
+      shared-tgw-org. Resource type: ec2:TransitGateway. Resource
+      ARN: arn:aws:ec2:us-east-1:123456789012:transit-gateway/
+      tgw-0abc123def. Principals: entire Organization
+      arn:aws:organizations::123456789012:organization/o-abc123def.
+      All features enabled. Allow external principals: false. Use
+      default managed permission. Tags: Environment=production,
+      Application=networking.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-tgw-org"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "ec2:TransitGateway"
+        - "organization"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-principal-ids
+    description: >-
+      Provision a RAM resource share for a subnet but no principal
+      account IDs or ARNs are specified. Expects
+      PREREQUISITES_MISSING — at least one principal must be
+      provided.
+    input: |
+      Provision a RAM resource share in us-east-1. Name:
+      shared-subnets-prod. Resource type: ec2:Subnet. Resource
+      ARN: arn:aws:ec2:us-east-1:123456789012:subnet/subnet-abc123.
+      I have not decided which accounts to share with yet. Allow
+      external principals: false. Use default managed permission.
+      Tags: Environment=production.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "shared-subnets-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "principal"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: route53-resolver-rules-share-ou
+    description: >-
+      Provision a RAM resource share for Route53 Resolver rules
+      shared with an OU ARN. All accounts in the OU receive the
+      share automatically. Expects READY_TO_DEPLOY.
+    input: |
+      Provision a RAM resource share in us-east-1. Name:
+      shared-resolver-rules-ou. Resource type:
+      route53resolver:ResolverRule. Resource ARN:
+      arn:aws:route53resolver:us-east-1:123456789012:resolver-rule/
+      rslvr-rr-abc123. Principals: OU
+      arn:aws:organizations::123456789012:ou/o-abc123def/ou-xyz456.
+      All features enabled. Allow external principals: false. Use
+      default managed permission for Resolver Rules. Tags:
+      Environment=production, Application=dns.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-resolver-rules-ou"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "route53resolver:ResolverRule"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: customer-managed-permissions-subnet
+    description: >-
+      Provision a RAM resource share for subnets with a
+      customer-managed permission that allows CreateNetworkInterface
+      and DescribeSubnets but restricts Delete actions. Share with
+      an OU ARN. Expects READY_TO_DEPLOY.
+    input: |
+      Provision a RAM resource share in us-east-1. Name:
+      shared-subnets-custom-perm. Resource type: ec2:Subnet.
+      Resources: arn:aws:ec2:us-east-1:123456789012:subnet/
+      subnet-abc123. Principals: OU
+      arn:aws:organizations::123456789012:ou/o-abc123def/ou-xyz456.
+      Create and associate a customer-managed permission named
+      custom-subnet-readonly that allows ec2:CreateNetworkInterface
+      and ec2:DescribeSubnets but denies ec2:DeleteNetworkInterface.
+      Allow external principals: false. Tags:
+      Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-subnets-custom-perm"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "customer-managed"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
