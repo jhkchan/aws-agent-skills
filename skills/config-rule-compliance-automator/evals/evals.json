@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "config-rule-compliance-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Config Rule Compliance Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "managed-rule-s3-encryption",
+      "name": "Managed rule S3 encryption with automatic remediation via StackSets — AUTOMATION_DEPLOYED",
+      "difficulty": "easy",
+      "prompt_file": "prompts/managed-rule-s3-encryption.md",
+      "baseline_file": "baselines/managed-rule-s3-encryption.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "managed-rule-s3-encryption", "s3-bucket-server-side-encryption-enabled", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "custom-lambda-remediation",
+      "name": "Custom Lambda rule for CIS 2.1 default SG with manual-trigger SSM remediation",
+      "difficulty": "medium",
+      "prompt_file": "prompts/custom-lambda-remediation.md",
+      "baseline_file": "baselines/custom-lambda-remediation.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "custom-lambda-remediation", "Custom", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "conformance-pack-cis-stacksets",
+      "name": "Full CIS conformance pack deployment via StackSets with auto-deployment",
+      "difficulty": "hard",
+      "prompt_file": "prompts/conformance-pack-cis-stacksets.md",
+      "baseline_file": "baselines/conformance-pack-cis-stacksets.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "conformance-pack-cis-stacksets", "CAPABILITY_IAM", "auto-deployment", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "aggregator-missing-review",
+      "name": "Multi-account compliance with missing Aggregator and disabled auto-deployment — REVIEW_REQUIRED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/aggregator-missing-review.md",
+      "baseline_file": "baselines/aggregator-missing-review.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "aggregator-missing-review", "VERDICT", "GAP", "Aggregator"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "organizational-config-rule",
+      "name": "Organizational config rule for org-wide S3 encryption with auto-propagation",
+      "difficulty": "medium",
+      "prompt_file": "prompts/organizational-config-rule.md",
+      "baseline_file": "baselines/organizational-config-rule.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "organizational-config-rule", "put-organization-config-rule", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,177 @@
+{
+  "skill": "mwaa-environment-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the MWAA Environment Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across MWAA environment scenarios (mw1.small public webserver with startup/stop, mw1.medium private webserver with all logs and KMS, custom requirements.txt with plugins ZIP, mw1.large with config overrides and KMS, missing subnet requirements with only 1 subnet). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "small-public-webserver",
+      "name": "mw1.small MWAA environment with PUBLIC_ONLY webserver and startup/stop",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — mw1.small, PUBLIC_ONLY webserver, 2 private subnets in different AZs, S3 VPC endpoint, requirements.txt, startup/stop scheduling",
+      "prompt": "Create an MWAA environment named dev-airflow. Airflow 2.9.2, execution class mw1.small, min 1 max 5 workers. Webserver access PUBLIC_ONLY. VPC vpc-aaa11122 with subnets subnet-aaa (us-east-1a) and subnet-bbb (us-east-1b), both private. Security group sg-mwaa123. S3 DAG bucket s3://my-mwaa-bucket with requirements.txt (3 exact-pinned packages) and 5 DAGs in /dags/. IAM role arn:aws:iam::123456789012:role/MwaaExecutionRole. Startup time 08:00, shutdown 20:00. Region us-east-1. Tags: Environment=dev, Team=data-platform.",
+      "prompt_file": "prompts/small-public-webserver.md",
+      "baseline_file": "baselines/small-public-webserver.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MWAA_ENVIRONMENT: dev-airflow (mw1.small, Airflow 2.9.2)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Environment name: dev-airflow\n  [✓] Execution class: mw1.small\n  [✓] Webserver access: PUBLIC_ONLY\n  [✓] VPC subnets: subnet-aaa (us-east-1a), subnet-bbb (us-east-1b) — private, different AZs\n  [✓] Security group: sg-mwaa123\n  [✓] S3 DAG bucket: s3://my-mwaa-bucket\n  [✓] requirements.txt: exact-pinned\n  [✓] Startup/stop time: 08:00-20:00",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "mw1.small",
+            "PUBLIC_ONLY",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "medium-private-logs",
+      "name": "mw1.medium MWAA environment with PRIVATE_ONLY webserver, all logs, and KMS",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — mw1.medium, PRIVATE_ONLY webserver, 4 CloudWatch log types, KMS encryption, S3 VPC endpoint",
+      "prompt": "Create an MWAA environment named prod-airflow. Airflow 2.9.2, execution class mw1.medium, min 1 max 25 workers. Webserver access PRIVATE_ONLY. VPC vpc-prod111 with subnets subnet-prov-a (us-east-1a) and subnet-prov-b (us-east-1b), both private. Security group sg-prod-mwaa. S3 VPC endpoint for S3 access. S3 DAG bucket s3://prod-mwaa-dags with 15 DAGs in /dags/. requirements.txt at root with 7 exact-pinned packages. Enable all CloudWatch Logs (DagProcessing INFO, Scheduler INFO, Webserver WARNING, Worker INFO). KMS key arn:aws:kms:us-east-1:123456789012:key/abcd1234. IAM role arn:aws:iam::123456789012:role/MwaaProdRole. Region us-east-1. Tags: Environment=production, Compliance=HIPAA.",
+      "prompt_file": "prompts/medium-private-logs.md",
+      "baseline_file": "baselines/medium-private-logs.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MWAA_ENVIRONMENT: prod-airflow (mw1.medium, Airflow 2.9.2)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Execution class: mw1.medium\n  [✓] Webserver access: PRIVATE_ONLY\n  [✓] CloudWatch Logs: DagProcessing=INFO, Scheduler=INFO, Webserver=WARNING, Worker=INFO\n  [✓] KMS key: arn:aws:kms:us-east-1:123456789012:key/abcd1234",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "mw1.medium",
+            "PRIVATE_ONLY",
+            "CloudWatch",
+            "KMS",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-requirements-plugins",
+      "name": "MWAA environment with custom requirements.txt (exact pins) and plugins ZIP",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — mw1.medium, exact-pinned requirements.txt with pandas/snowflake/psycopg2-binary, plugins ZIP, 20 DAGs",
+      "prompt": "Create an MWAA environment named etl-airflow. Airflow 2.9.2, execution class mw1.medium, min 1 max 20 workers. Webserver PUBLIC_ONLY. VPC vpc-etl222 with subnets subnet-etl-a (us-east-1a) and subnet-etl-b (us-east-1b), both private. Security group sg-etl-mwaa. S3 DAG bucket s3://etl-mwaa-bucket. requirements.txt at s3://etl-mwaa-bucket/requirements.txt with packages: pandas==1.5.3, snowflake-connector-python==3.2.0, psycopg2-binary==2.9.7, requests==2.31.0. Plugins ZIP at s3://etl-mwaa-bucket/plugins/plugins.zip. 20 DAGs in /dags/. IAM role arn:aws:iam::123456789012:role/MwaaEtlRole. Region us-east-1. Tags: Environment=production, Pipeline=etl.",
+      "prompt_file": "prompts/custom-requirements-plugins.md",
+      "baseline_file": "baselines/custom-requirements-plugins.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MWAA_ENVIRONMENT: etl-airflow (mw1.medium, Airflow 2.9.2)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] requirements.txt: s3://etl-mwaa-bucket/requirements.txt (4 packages, exact-pinned)\n  [✓] Plugins ZIP: s3://etl-mwaa-bucket/plugins/plugins.zip",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "requirements.txt",
+            "plugins",
+            "exact-pinned",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "large-config-overrides",
+      "name": "mw1.large MWAA environment with Airflow config overrides and KMS",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — mw1.large, Airflow config overrides (parallelism=64, dag_concurrency=32), PRIVATE_ONLY, KMS, all logs",
+      "prompt": "Create an MWAA environment named enterprise-airflow. Airflow 2.9.2, execution class mw1.large, min 2 max 50 workers. Webserver PRIVATE_ONLY. VPC vpc-ent333 with subnets subnet-ent-a (us-east-1a) and subnet-ent-b (us-east-1b), both private with S3 VPC endpoint. Security group sg-ent-mwaa. S3 DAG bucket s3://ent-mwaa-bucket with 50 DAGs. Airflow config overrides: core.parallelism=64, core.dag_concurrency=32, scheduler.dag_dir_list_interval=30. KMS key arn:aws:kms:us-east-1:123456789012:key/efgh5678. All CloudWatch Logs enabled. IAM role arn:aws:iam::123456789012:role/MwaaEntRole. Region us-east-1. Tags: Environment=enterprise, Scale=large.",
+      "prompt_file": "prompts/large-config-overrides.md",
+      "baseline_file": "baselines/large-config-overrides.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MWAA_ENVIRONMENT: enterprise-airflow (mw1.large, Airflow 2.9.2)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Execution class: mw1.large\n  [✓] Airflow config overrides: 3 overrides (parallelism=64, dag_concurrency=32, dag_dir_list_interval=30)\n  [✓] KMS key: arn:aws:kms:us-east-1:123456789012:key/efgh5678",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "mw1.large",
+            "parallelism",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-subnet-requirements",
+      "name": "MWAA environment with only 1 subnet (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — only 1 private subnet provided; MWAA requires 2 private subnets in different AZs",
+      "prompt": "Create an MWAA environment named test-airflow. Airflow 2.9.2, execution class mw1.small, min 1 max 5 workers. VPC vpc-test444 with subnet subnet-single (us-east-1a) — only 1 private subnet available. Security group sg-test-mwaa. S3 DAG bucket s3://test-mwaa-bucket with 3 DAGs. IAM role arn:aws:iam::123456789012:role/MwaaTestRole. Region us-east-1.",
+      "prompt_file": "prompts/missing-subnet-requirements.md",
+      "baseline_file": "baselines/missing-subnet-requirements.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "MWAA_ENVIRONMENT: test-airflow (mw1.small, Airflow 2.9.2)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] VPC subnets: subnet-single (us-east-1a) — FAIL (1 subnet provided, need 2 private subnets in different AZs)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "subnet",
+            "VERDICT",
+            "CHECKLIST",
+            "2"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 # Eval prompt: fargate-oom-jvm-heap
 
 Diagnose the following ECS task failure. Walk the OOM diagnostic tree
-(Step 4 of the decision tree) and emit the standard VERDICT block
-(INCIDENT, VERDICT, ROOT_CAUSE, EVIDENCE, ROOT_CAUSE_CATALOG,
-REMEDIATION).
+(Step 4 of the decision tree) and emit the standard diagnostic block
+(TARGET, VERDICT, ROOT_CAUSE, REASON, EVIDENCE, REMEDIATION). VERDICT
+is `ROOT_CAUSE_IDENTIFIED` or `INSUFFICIENT_DATA`.
 
 ## Scenario
 

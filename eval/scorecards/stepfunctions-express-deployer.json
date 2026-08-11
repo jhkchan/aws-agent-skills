@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides many concrete, senior\u2011engineer level details (cost break\u2011even table, exact 5\u2011minute cap, at\u2011least\u2011once semantics, .waitForTaskToken incompatibility, logging level trade\u2011offs, EventBridge target\u2011role requirement, idempotency\u2011key pattern). However it omits a few niche but useful facts such as the regional availability matrix for Express and the exact maximum concurrency limits for Distributed Map on Express (10k), so it is not a perfect 20."
+      "justification": "Adds concrete expert knowledge not usually restated by a generic model: exact 5\u2011minute Express cap, at\u2011least\u2011once vs exactly\u2011once semantics, cost break\u2011even calculation, silent\u2011failure matrix (log\u2011group omission, OFF level, missing EventBridge role, EXCLUDE_DATA misuse), precise ordering constraints, idempotency\u2011key pattern using $$.Execution.Id, and exact CLI flag syntax for loggingConfiguration and tracingConfiguration."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific 9\u2011step provisioning workflow, ordering constraints, decision table for Express vs Standard, and verification commands. A small deduction for occasional generic phrasing (e.g., \"Verify prerequisites\") that could be more AWS\u2011specific."
+      "justification": "Provides a concrete 9\u2011step AWS\u2011specific provisioning workflow, ordered constraints, and exact CLI commands. However a few steps (e.g., \"verify duration fits 5\u202fmin\") are generic sanity checks rather than AWS\u2011unique procedures, so full marks are withheld."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid \"NEVER\" list of five concrete pitfalls with clear \"why\" explanations (waitForTaskToken, missing logs, assuming exactly\u2011once, API Gateway timeout mismatch, OFF/FATAL log levels). Missing a broader set of anti\u2011patterns (e.g., default IAM role, disabling X\u2011Ray for debugging) prevents a full score."
+      "justification": "Provides a concrete NEVER list (5 items) with explicit why\u2011its\u2011wrong explanations (e.g., .waitForTaskToken, logging OFF, at\u2011least\u2011once semantics, API Gateway timeout mismatch). Missing a few common pitfalls such as forgetting X\u2011Ray permissions or retention\u2011policy for log groups, so not perfect."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete and the description clearly states WHAT the skill does, WHEN to invoke, and includes a rich keyword list. The activation triggers and invocation schema are present, but the frontmatter lacks an explicit \"activation_triggers\" field and a concise example usage block, so one point is deducted."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011structured. Slight deduction for the activation_triggers list being a free\u2011form bullet list rather than a strict schema, which could cause ambiguous routing."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Uses a quick\u2011reference table, navigation pane, and layered sections (high\u2011level, then deep heuristics, then full procedure). Critical rules (e.g., logging level must not be OFF) are buried in the \"NEVER\" list rather than highlighted early, causing some cognitive overload. Hence a modest deduction."
+      "justification": "The document layers information effectively: quick reference first, then deeper sections (reasoning, dependency graph, heuristics, full procedure). No critical rule is buried, but the \u201cRecent AWS features\u201d section is tacked at the end, which could be missed by a time\u2011pressed agent."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (state\u2011machine creation, IAM role creation) are tightly constrained with verification steps and anti\u2011patterns. Creative tasks (e.g., choosing sync vs async) have appropriate flexibility. Lacks an explicit \"dry\u2011run\" or \"preview\" mode for the most fragile steps, costing one point."
+      "justification": "Destructive actions (state\u2011machine creation, IAM role creation) are gated by prerequisite checks and a verification step, showing good calibration. However the skill still allows optional omission of logging (see batch\u2011loader example), which is unsafe for a fragile, async operation, so full credit is not given."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Navigation \u2192 Quick reference \u2192 Activation \u2192 Invocation contract \u2192 Reasoning \u2192 Procedure \u2192 NEVER \u2192 Output format). The structure is coherent, but section headings are not explicitly labeled as \"Mindset\" or \"Process\", making it slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (overview \u2192 navigation \u2192 reasoning \u2192 dependency graph \u2192 heuristics \u2192 prerequisites \u2192 step\u2011by\u2011step \u2192 anti\u2011patterns \u2192 output contract). Structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 11,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision trees, verification commands, and a strict output contract that an agent can follow. Some command syntax (e.g., logging\u2011configuration using \"level=ALL\") does not match the exact AWS CLI JSON format, and error\u2011handling for failed commands is not described, leading to a small deduction."
+      "justification": "Provides decision trees, copy\u2011pasteable CLI commands, verification commands, and a strict output contract. Deductions stem from inconsistencies: the skill\u2019s own examples allow optional logging (contradicting the NEVER rule), missing explicit X\u2011Ray IAM permissions, and the anti\u2011pattern list omits a few common failure modes. These gaps could cause an agent to emit a non\u2011working configuration."
     }
   ],
-  "total_score": 107,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49323,
-  "latency_ms": 10270,
+  "token_count": 46282,
+  "latency_ms": 10578,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

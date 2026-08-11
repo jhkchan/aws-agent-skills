@@ -1,9 +1,9 @@
 # Eval prompt: ecr-image-pull-execution-role
 
 Diagnose the following ECS image-pull failure. Walk the image-pull
-diagnostic tree (Step 7 of the decision tree) and emit the standard
-VERDICT block (INCIDENT, VERDICT, ROOT_CAUSE, EVIDENCE,
-ROOT_CAUSE_CATALOG, REMEDIATION).
+diagnostic tree (Step 2 of the decision tree) and emit the standard
+diagnostic block (TARGET, VERDICT, ROOT_CAUSE, REASON, EVIDENCE,
+REMEDIATION). VERDICT is `ROOT_CAUSE_IDENTIFIED` or `INSUFFICIENT_DATA`.
 
 ## Scenario
 

@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge such as exact PROVISIONING timeout thresholds (2\u202fmin Fargate, 1\u202fmin EC2), ENI attachment limits, Fargate spot capacity behavior, EFA support checks, service\u2011linked role requirement, and capacity\u2011provider drift detection. Missing newer 2024\u20112026 features like Service Connect troubleshooting and IAM Identity Center permission\u2011boundary nuances, so not a full 20."
+      "justification": "Adds concrete expert knowledge: exact subnet IP exhaustion threshold (AvailableIpAddressCount < desired+2), ENI trunking requirements, mandatory VPC endpoints for private\u2011subnet ECR pulls, 10\u202fGB uncompressed image size limit, precise stoppedReason\u2011to\u2011root\u2011cause mapping, and a full decision\u2011tree with real CLI probes that a senior CloudOps engineer would not memorize."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific diagnostic mindset with a step\u2011by\u2011step decision tree, ordered probing (ENI \u2192 subnet IP \u2192 capacity \u2192 logs), and precise CLI commands for each AWS service. Some procedures (e.g., \"Check logs\") are generic, but the majority are tightly scoped to ECS."
+      "justification": "Encodes AWS\u2011specific troubleshooting mindset: pre\u2011flight read\u2011only probes, stoppedReason\u2011first decision tree, exact order of AWS CLI calls (describe\u2011tasks \u2192 describe\u2011services \u2192 VPC\u2011endpoint check \u2192 IAM simulation), and explicit branching based on ENI, subnet, image\u2011pull, placement, exit\u2011code, role confusion, health\u2011check, circuit\u2011breaker, platform version, and task\u2011definition validation."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a comprehensive \"NEVER\" list with concrete reasoning (e.g., never raise container memory on Fargate, never assume stoppedReason is the root cause, never use privileged mode as a fix). Only minor gaps such as no explicit warning about editing a task definition without versioning."
+      "justification": "Provides a thorough NEVER list with concrete pitfalls (role confusion, NAT vs VPC endpoint, ENI assumptions, circuit\u2011breaker misuse) and clear reasoning for each. Missing a few additional anti\u2011patterns such as trust\u2011policy misconfigurations for task execution roles."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter includes all required fields, description clearly states WHAT it does, WHEN to invoke, and provides exhaustive keywords and activation triggers. Invocation schema is well\u2011defined. No deficiencies detected."
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata, activation triggers, invocation schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides precise keywords. Slight omission: no explicit example input payload, which would aid reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered: high\u2011level activation, quick\u2011reference table, then detailed step\u2011by\u2011step process, then deep command reference and edge\u2011case notes. The quick\u2011reference table is dense, causing slight cognitive overload, hence a small deduction."
+      "justification": "Information is layered: quick navigation table, strict output contract, NEVER list, heuristic, graph, mindset, then step\u2011by\u2011step process. Nonetheless, the top sections are dense and some critical rules (e.g., confirmation gate) are buried deep, risking cognitive overload for a first\u2011time user."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Calibrates well: destructive actions (IAM policy changes, task definition updates) are presented with verification steps, while exploratory steps (log inspection) are permissive. However, some command examples (e.g., `aws ecs update-task-definition --memory`) are inaccurate, risking unsafe execution."
+      "justification": "Calibrates freedom perfectly: all destructive actions are gated by an explicit CONFIRM prompt; diagnostic probes are read\u2011only. No over\u2011constraining of creative tasks and no loose handling of fragile operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick Reference \u2192 Process \u2192 Decision Tree \u2192 Output Format \u2192 References), matching the established skill structure."
+      "justification": "Follows a recognizable pattern (frontmatter \u2192 navigation \u2192 contract \u2192 NEVER \u2192 heuristic \u2192 graph \u2192 mindset \u2192 process). Minor ad\u2011hoc naming of steps (Step\u202f0, Step\u202f1, etc.) prevents a flawless pattern score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI commands, and output template. Gaps remain: no guidance when CloudWatch Logs are inaccessible, limited handling of cross\u2011account ECR pulls, missing Service Connect failure path, and no explicit steps for IAM Identity Center permission\u2011boundary issues."
+      "justification": "Provides actionable CLI commands, decision tree, and worked examples that an agent could execute. Some commands contain placeholders (<cluster>, <service>) that require manual substitution, and the ENI\u2011trunking remediation description is vague (\u201crequest a trunk ENI via create\u2011carrier\u2011gateway \u2026\u201d). Edge cases like missing S3 gateway endpoint for ECR layers are mentioned but not fully detailed, limiting usability."
     }
   ],
   "total_score": 109,
   "max_score": 120,
   "grade": "A",
-  "token_count": 55277,
-  "latency_ms": 12334,
+  "token_count": 43291,
+  "latency_ms": 9364,
   "assertions_passed": false,
-  "assertions_passed_count": 2,
-  "assertions_failed_count": 3
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }

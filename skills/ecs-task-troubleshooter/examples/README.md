@@ -19,12 +19,15 @@ remediation workflow.
 ## Skill output
 
 ```text
-INCIDENT: cluster prod-app / service api-svc / task arn:aws:ecs:us-east-1:111111111111:task/prod-app/6f8a...
-VERDICT: ROOT_CAUSE_FOUND
-ROOT_CAUSE: ESSENTIAL_CONTAINER_EXIT — secret injection failed because
-the execution role lacks secretsmanager:GetSecretValue on the
-referenced secret ARN. Container exited before the application process
-started (exit code 1, empty container reason).
+TARGET: cluster prod-app / service api-svc / task arn:aws:ecs:us-east-1:111111111111:task/prod-app/6f8a...
+VERDICT: ROOT_CAUSE_IDENTIFIED
+ROOT_CAUSE: CONFIG_EXECUTION_ROLE
+REASON: Secret injection failed because the execution role lacks
+  secretsmanager:GetSecretValue on the referenced secret ARN. The
+  container exited before the application process started (exit code
+  1, empty container reason). The ECS agent runs the secret fetch
+  during PROVISIONING using the execution role, so this is NOT a task
+  role issue.
 EVIDENCE:
   - describe-tasks: lastStatus STOPPED, stoppedReason "Essential
     container in task exited", startedAt→stoppedAt ~2 seconds,
@@ -39,7 +42,8 @@ EVIDENCE:
     logs:PutLogEvents; no secretsmanager:GetSecretValue
   - simulate-principal-policy on the execution role against
     secretsmanager:GetSecretValue on the secret ARN: implicitDeny
-ROOT_CAUSE_CATALOG: #3 (secret injection failure)
+  - Passing: ECR endpoint and S3 gateway are present (image pull is
+    not the issue); subnet has 22 free IPs (ENI is not the issue).
 REMEDIATION:
   1. Add a statement to the execution role's inline policy:
      {

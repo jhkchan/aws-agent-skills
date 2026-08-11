@@ -1,8 +1,10 @@
 # Eval prompt: fargate-essential-container-secret-injection
 
 Diagnose the following ECS task failure. Walk the essential-container-exit
-diagnostic tree and emit the standard VERDICT block (INCIDENT, VERDICT,
-ROOT_CAUSE, EVIDENCE, ROOT_CAUSE_CATALOG, REMEDIATION).
+diagnostic tree (Step 4 → Step 5 of the decision tree) and emit the
+standard diagnostic block (TARGET, VERDICT, ROOT_CAUSE, REASON,
+EVIDENCE, REMEDIATION). VERDICT is `ROOT_CAUSE_IDENTIFIED` or
+`INSUFFICIENT_DATA`.
 
 ## Scenario
 

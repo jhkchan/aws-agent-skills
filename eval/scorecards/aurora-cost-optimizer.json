@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides concrete break\u2011even formula for I/O\u2011Optimized, specific ACU pricing, and instance\u2011class cost numbers, but many thresholds (e.g., CPU <20%, I/O >30%) are generic CloudOps heuristics that a competent model already knows. Some pricing figures are region\u2011specific and may become stale, limiting the truly novel expert insight."
+      "justification": "Adds concrete expert heuristics (e.g., I/O\u2011Optimized break\u2011even formula, ACU $0.12/h cost, CPU\u2011threshold decision matrix, RI term selection) that a generic model would not know. However some pricing figures are approximate and region\u2011specific, limiting the absolute novelty."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Offers a detailed, AWS\u2011specific step\u2011by\u2011step workflow (data\u2011gate, Cost Explorer reconciliation, CLI commands). However a few procedures are generic, such as \u201cverify CPU after downsize\u201d without mentioning Aurora\u2011specific metrics like DBLoad or storage auto\u2011shrink checks, which would make the mindset more tightly tied to Aurora."
+      "justification": "Encodes AWS\u2011specific workflow: data\u2011gate validation, ordered steps, CLI commands, snapshot\u2011before\u2011change, one\u2011dimension\u2011per\u2011maintenance\u2011window, and batch\u2011size limit. Slightly generic in the \u201cquick start\u201d phrasing, missing an explicit ordering diagram, hence a small deduction."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never switch I/O tier without break\u2011even calc). Missing some nuanced pitfalls: no warning about using I/O\u2011Optimized with cross\u2011region replication latency, and no explicit anti\u2011pattern for combining Reserved Instances with Serverless v2 (which is unsupported)."
+      "justification": "Contains a detailed NEVER list with concrete reasoning (e.g., never switch I/O\u2011Optimized without break\u2011even, never drop Serverless min below SLA). Missing a few niche pitfalls such as updating parameter groups after a storage\u2011type change."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, activation triggers, and invocation schema are well defined. Lacks an explicit example of a full output block (including ASSUMPTIONS and CONFIRM) in the specification section, which would aid reliable activation."
+      "justification": "Full front\u2011matter, clear description, explicit when\u2011to\u2011use, activation triggers, invocation schema, and a minimal valid input example. Agent can reliably know when to invoke."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill layers information (quick start, mindset, step list) but critical anti\u2011pattern rules and break\u2011even calculations are buried deep, causing cognitive overload for an agent that must parse the whole document before acting."
+      "justification": "Layers information: high\u2011level contract, quick start, detailed step\u2011by\u2011step process, anti\u2011patterns, and deep references. No overload, but the \u201cquick reference\u201d table could be collapsed further, so one point off."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Calibrates well for destructive actions (snapshot, CONFIRM, one\u2011dimension\u2011per\u2011window, batch limit of 3). The batch limit of three clusters may still be too permissive for fragile operations; a tighter limit (e.g., one cluster per batch) would be safer."
+      "justification": "Destructive actions are tightly constrained (CONFIRM gate, snapshot, batch limit). Creative tasks (e.g., triage) are left open. Calibration matches task fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable skill pattern (metadata, contract, quick start, mindset, stepwise process, anti\u2011patterns, navigation). Minor inconsistency: the Quick Reference table mixes verdict thresholds with dimensions, slightly breaking the uniform sectioning."
+      "justification": "Follows a recognizable pattern (description \u2192 contract \u2192 mindset \u2192 stepwise process \u2192 anti\u2011patterns \u2192 navigation), aiding comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 6,
       "max": 15,
-      "justification": "Provides decision matrices, concrete CLI commands, and example blocks, enabling an agent to act. Lacks explicit handling for partial Cost Explorer data, missing I/O metrics, and does not specify error\u2011handling steps for CLI failures, which could cause execution gaps."
+      "justification": "While CLI snippets and examples are provided, the model output violates the core contract (multiple blocks per cluster, missing many dimensions, inconsistent savings calculations, e.g., $20 vs $40 break\u2011even). This shows the skill is not directly executable as\u2011is."
     }
   ],
-  "total_score": 106,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46399,
-  "latency_ms": 8307,
+  "token_count": 46719,
+  "latency_ms": 16760,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

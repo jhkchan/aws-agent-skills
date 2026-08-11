@@ -1,0 +1,70 @@
+{
+  "skill": "cloudtrail-alert-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds concrete, non\u2011trivial expert details: 15\u2011minute lookup\u2011events ceiling, SNS 256\u202fKB size cap, deterministic dedup\u2011key formula, severity matrix thresholds, explicit EventBridge case\u2011sensitivity, and multi\u2011account forwarding patterns. Most of this is beyond a generic model's baseline knowledge, though some points merely restate AWS docs."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific end\u2011to\u2011end workflow (EventBridge \u2192 Lambda \u2192 SNS/Security Hub \u2192 Slack, confirmation gate, cross\u2011account forwarding). However, several steps are generic (e.g., \"test each rule\" without AWS\u2011specific command syntax) and the IAM role creation/permission steps are omitted, leaving the procedure incomplete."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never suppress DeleteTrail, SNS size overflow). Missing are a few common pitfalls such as handling EventBridge throttling, Lambda concurrency limits, and CloudTrail pagination errors."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The invocation_schema is only a prose description rather than a strict JSON schema, which could hinder reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections (Mindset, Quick navigation, Step\u2011by\u2011step, Appendices) to avoid overload. Nonetheless, the top\u2011level document is dense and some critical rules are listed alongside many optional details, which can still cause cognitive overload for an agent."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Calibrates freedom well for destructive actions (confirmation gate, never\u2011suppress critical events, dedup windows). Lacks explicit IAM permission constraints for actions like DeleteTrail or StopLogging, leaving a gap in safety for privileged operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable Mindset \u2192 Process \u2192 Steps \u2192 Anti\u2011Patterns pattern, aiding comprehension. Minor ad\u2011hoc sections (e.g., scattered code snippets) prevent a perfectly clean pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides working CLI snippets, full Lambda code, output contract, and multiple example ALERT blocks that a model can emit. Missing edge\u2011case handling: pagination for list\u2011commands, undefined `resourceId` in dedup key, limited error handling for lookup\u2011events failures, and no explicit IAM permission set guidance. These gaps could cause deployment failures."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 41268,
+  "latency_ms": 14058,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}

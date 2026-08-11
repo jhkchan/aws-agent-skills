@@ -1,0 +1,308 @@
+# Eval test cases for sqs-throughput-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# QueueName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: sqs-throughput-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: long-polling-enablement
+    description: >-
+      Standard SQS queue with ReceiveMessageWaitTimeSeconds=0 (short
+      polling). NumberOfEmptyReceives is 85% of total ReceiveMessage calls.
+      EC2 consumer calling ReceiveMessage directly. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with long polling enablement.
+    input: |
+      QueueName: q-long-polling-enablement
+      QueueType: Standard
+      Region: us-east-1
+      Attributes:
+        ReceiveMessageWaitTimeSeconds: 0
+        VisibilityTimeout: 30
+        MessageRetentionPeriod: 345600 (4 days)
+        DelaySeconds: 0
+        RedrivePolicy: {"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:q-long-polling-enablement-dlq","maxReceiveCount":"3"}
+
+      Consumer config:
+        Type: EC2 (t3.medium) running Node.js poller
+        Uses ReceiveMessage directly (not Lambda ESM)
+        Poller count: 4 threads
+
+      Metrics (last 30 days):
+        - NumberOfEmptyReceives: 85,000,000/month
+        - NumberOfMessagesReceived: 15,000,000/month
+        - NumberOfMessagesSent: 15,200,000/month
+        - NumberOfMessagesDeleted: 14,800,000/month
+        - ApproximateNumberOfMessagesVisible: 1,500 avg
+        - ApproximateAgeOfOldestMessage: 12 seconds avg
+        - Empty receive ratio: 85%
+
+      Cost data:
+        - SQS API requests (last 30 days): 100,000,000
+        - Monthly cost: $40.00
+
+      Workload context: order events from e-commerce checkout. 4 EC2
+      poller threads calling ReceiveMessage in a tight loop. Traffic is
+      bursty (spikes during business hours, low at night).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "long-polling-enablement"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "WaitTimeSeconds"
+        - "20"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: batch-api-migration
+    description: >-
+      Standard SQS queue where the producer uses SendMessage one-at-a-time
+      and the consumer uses DeleteMessage one-at-a-time. 10M messages/month.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with batch API
+      migration.
+    input: |
+      QueueName: q-batch-api-migration
+      QueueType: Standard
+      Region: us-east-1
+      Attributes:
+        ReceiveMessageWaitTimeSeconds: 20
+        VisibilityTimeout: 60
+        MessageRetentionPeriod: 345600 (4 days)
+        RedrivePolicy: {"deadLetterTargetArn":"arn:...","maxReceiveCount":"3"}
+
+      Consumer config:
+        Type: ECS Fargate task
+        Calls DeleteMessage (not DeleteMessageBatch) after processing each message
+        Batch size: 1 message per ReceiveMessage call
+
+      Producer config:
+        Calls SendMessage (not SendMessageBatch) for each message
+
+      Metrics (last 30 days):
+        - NumberOfEmptyReceives: 500,000/month (low — long polling already enabled)
+        - NumberOfMessagesReceived: 10,000,000/month
+        - NumberOfMessagesSent: 10,100,000/month
+        - NumberOfMessagesDeleted: 9,900,000/month
+        - ApproximateNumberOfMessagesVisible: 200 avg
+        - ApproximateAgeOfOldestMessage: 5 seconds avg
+
+      Cost data:
+        - Total SQS API requests: 30,600,000/month (10M send + 10.5M receive + 9.9M delete)
+        - Monthly cost: $12.24
+
+      Workload context: notification dispatch pipeline. Producer sends
+      individual notification messages. Consumer processes and deletes
+      one at a time. Messages are small (2 KB avg). No ordering needed.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "batch-api-migration"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "SendMessageBatch"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: visibility-timeout-rightsizing
+    description: >-
+      Standard SQS queue with VisibilityTimeout=30s but the Lambda consumer
+      takes 45s p95 to process. High re-delivery rate (20%). Expected
+      verdict: FURTHER_OPTIMIZATION_AVAILABLE with visibility timeout
+      increase.
+    input: |
+      QueueName: q-visibility-timeout-rightsizing
+      QueueType: Standard
+      Region: us-east-1
+      Attributes:
+        ReceiveMessageWaitTimeSeconds: 20
+        VisibilityTimeout: 30
+        MessageRetentionPeriod: 345600 (4 days)
+        RedrivePolicy: {"deadLetterTargetArn":"arn:...","maxReceiveCount":"3"}
+
+      Consumer config:
+        Type: Lambda ESM
+        ESM BatchSize: 10
+        MaximumBatchingWindowInSeconds: 5
+        ESM VisibilityTimeout: 30 (inherits queue default)
+        FunctionResponseTypes: ["ReportBatchItemFailures"]
+
+      Consumer metrics:
+        - Duration avg: 38s, p95: 45s
+        - Re-delivery rate: 20% (messages becoming visible again before processing completes)
+
+      Metrics (last 30 days):
+        - NumberOfEmptyReceives: 2,000,000/month
+        - NumberOfMessagesReceived: 18,000,000/month (includes 3M re-deliveries)
+        - NumberOfMessagesSent: 15,000,000/month
+        - NumberOfMessagesDeleted: 14,700,000/month
+        - ApproximateNumberOfMessagesVisible: 800 avg
+        - ApproximateAgeOfOldestMessage: 35 seconds avg
+
+      Cost data:
+        - Total SQS API requests: ~33,000,000/month
+        - Monthly cost: $13.20
+
+      Workload context: PDF generation pipeline. Each message triggers
+      a Lambda that renders a PDF (35-45s processing time). The 30s
+      visibility timeout is shorter than processing time, causing
+      phantom re-deliveries.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "visibility-timeout-rightsizing"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "VisibilityTimeout"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: fifo-high-throughput-mode
+    description: >-
+      FIFO queue at the default 300 TX/s ceiling. Workload sends 500 TX/s
+      with 50 MessageGroupIds. DeduplicationScope and ThroughputLimit are
+      not set (defaults). Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE
+      with FIFO high-throughput mode enablement.
+    input: |
+      QueueName: q-fifo-high-throughput-mode.fifo
+      QueueType: FIFO
+      Region: us-east-1
+      Attributes:
+        ReceiveMessageWaitTimeSeconds: 20
+        VisibilityTimeout: 60
+        MessageRetentionPeriod: 345600 (4 days)
+        DeduplicationScope: (not set — default: queue)
+        ThroughputLimit: (not set — default: queue-level 300 TX/s)
+        ContentBasedDeduplication: true
+        RedrivePolicy: {"deadLetterTargetArn":"arn:...","maxReceiveCount":"5"}
+
+      Consumer config:
+        Type: Lambda ESM
+        ESM BatchSize: 10
+
+      Metrics (last 30 days):
+        - NumberOfMessagesSent: 1,296,000,000/month (avg 500 TX/s)
+        - NumberOfMessagesReceived: 1,280,000,000/month
+        - NumberOfMessagesDeleted: 1,275,000,000/month
+        - ApproximateNumberOfMessagesVisible: 50,000 avg (backlog growing)
+        - ApproximateAgeOfOldestMessage: 120 seconds avg (rising)
+
+      Cost data:
+        - Monthly cost: ~$516.00
+
+      Workload context: financial transaction events requiring strict
+      per-account ordering. 50,000 unique accounts partitioned across 50
+      MessageGroupIds. Current throughput is 500 TX/s but queue-level
+      limit is 300 TX/s — messages are backing up. Workload does NOT
+      need cross-group deduplication (each group is independent).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "fifo-high-throughput-mode"
+        - "RECOMMENDATION"
+        - "MIGRATION_STEPS"
+        - "PerMessageGroupId"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: already-optimized-queue
+    description: >-
+      Standard SQS queue already optimally configured: long polling
+      enabled, batch APIs in use, visibility timeout right-sized, healthy
+      DLQ. No further optimization possible. Expected verdict: OPTIMIZED.
+    input: |
+      QueueName: q-already-optimized-queue
+      QueueType: Standard
+      Region: us-east-1
+      Attributes:
+        ReceiveMessageWaitTimeSeconds: 20
+        VisibilityTimeout: 120
+        MessageRetentionPeriod: 345600 (4 days)
+        RedrivePolicy: {"deadLetterTargetArn":"arn:...","maxReceiveCount":"3"}
+
+      Consumer config:
+        Type: Lambda ESM
+        ESM BatchSize: 10
+        MaximumBatchingWindowInSeconds: 5
+        ESM VisibilityTimeout: 120
+        FunctionResponseTypes: ["ReportBatchItemFailures"]
+        Consumer uses DeleteMessageBatch internally via ESM auto-delete
+
+      Producer config:
+        Uses SendMessageBatch (10 messages per call)
+
+      Metrics (last 30 days):
+        - NumberOfEmptyReceives: 100,000/month (0.5% — long polling effective)
+        - NumberOfMessagesReceived: 20,000,000/month
+        - NumberOfMessagesSent: 20,100,000/month (via SendMessageBatch)
+        - NumberOfMessagesDeleted: 19,900,000/month
+        - ApproximateNumberOfMessagesVisible: 300 avg
+        - ApproximateAgeOfOldestMessage: 3 seconds avg
+
+      Consumer metrics:
+        - Duration avg: 800ms, p95: 1,200ms
+        - Re-delivery rate: 0.1%
+
+      DLQ metrics:
+        - ApproximateNumberOfMessagesVisible: 12 (healthy)
+        - ApproximateAgeOfOldestMessage: 30 minutes
+
+      Cost data:
+        - Total SQS API requests: ~22,100,000/month
+        - Monthly cost: $8.84
+
+      Workload context: event ingestion pipeline. Already uses long
+      polling, batch APIs, right-sized visibility timeout. DLQ is
+      healthy. No further optimization expected.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized-queue"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"

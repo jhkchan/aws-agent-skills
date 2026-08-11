@@ -20,28 +20,29 @@ evals:
     difficulty: hard
     prompt_file: prompts/fargate-essential-container-secret-injection.md
     baseline_file: baselines/fargate-essential-container-secret-injection.md
-    expected_verdict: ROOT_CAUSE_FOUND
-    expected_root_cause_category: ESSENTIAL_CONTAINER_EXIT
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_root_cause: CONFIG_EXECUTION_ROLE
   - id: fargate-oom-jvm-heap
     difficulty: medium
     prompt_file: prompts/fargate-oom-jvm-heap.md
     baseline_file: baselines/fargate-oom-jvm-heap.md
-    expected_verdict: ROOT_CAUSE_FOUND
-    expected_root_cause_category: OOM
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_root_cause: OOM
   - id: alb-health-check-path-mismatch
     difficulty: medium
     prompt_file: prompts/alb-health-check-path-mismatch.md
     baseline_file: baselines/alb-health-check-path-mismatch.md
-    expected_verdict: ROOT_CAUSE_FOUND
-    expected_root_cause_category: HEALTH_CHECK
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_root_cause: HEALTH_CHECK
   - id: ecr-image-pull-execution-role
     difficulty: medium
     prompt_file: prompts/ecr-image-pull-execution-role.md
     baseline_file: baselines/ecr-image-pull-execution-role.md
-    expected_verdict: ROOT_CAUSE_FOUND
-    expected_root_cause_category: IMAGE_PULL
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_root_cause: IMAGE_PULL_AUTH
   - id: insufficient-context-need-task-arn
     difficulty: easy
     prompt_file: prompts/insufficient-context-need-task-arn.md
     baseline_file: baselines/insufficient-context-need-task-arn.md
-    expected_verdict: NEED_MORE_INFO
+    expected_verdict: INSUFFICIENT_DATA
+    expected_root_cause: UNKNOWN

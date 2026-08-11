@@ -1,0 +1,183 @@
+# Eval test cases for cloudtrail-alert-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudtrail-alert-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: root-login-alert
+    description: >-
+      Root console login detection. The skill should produce an
+      AUTOMATION_DEPLOYED alert with EventBridge rule for root ConsoleLogin,
+      CRITICAL severity, SNS critical topic routing, Security Hub finding
+      import, Slack webhook, no suppression (root is never suppressed),
+      and zero-minute dedup window.
+    input: |
+      Design reference: root-login-alert
+      Account: 111111111111
+      Region: us-east-1
+
+      CloudTrail: management-events trail, multi-region, enabled.
+      Event to alert on: ConsoleLogin by root user (successful only).
+      Notification targets: SNS (CRITICAL tier), Security Hub, Slack #sec-incidents.
+      Suppression: root events must NEVER be suppressed.
+      Dedup window: 0 minutes (every root login independently alerted).
+
+      Emit the standard ALERT block (RULE, ENRICHMENT, ROUTING, DEDUP,
+      SUPPRESSION, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "root-login-alert"
+        - "CRITICAL"
+        - "VERDICT"
+        - "TEMPLATE"
+        - "ConsoleLogin"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: iam-change-enrichment
+    description: >-
+      Security-critical IAM changes with lookup-events enrichment. The
+      skill should produce AUTOMATION_DEPLOYED with EventBridge rule for
+      AttachRolePolicy/DetachRolePolicy/CreatePolicyVersion, Lambda
+      enrichment via lookup-events for 15-min actor context, HIGH severity,
+      SNS routing, 5-min dedup window, and CI/CD suppression list.
+    input: |
+      Design reference: iam-change-enrichment
+      Account: 111111111111
+      Region: us-east-1
+
+      CloudTrail: management-events trail, multi-region, enabled.
+      Events to alert on: AttachRolePolicy, DetachRolePolicy, CreatePolicyVersion.
+      Notification targets: SNS (HIGH tier), Security Hub, Slack #security.
+      Enrichment: lookup-events for 15-min actor context.
+      Dedup window: 5 minutes.
+      Suppression: cicd-deploy-role, CloudFormation StackSet role.
+
+      Emit the standard ALERT block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "iam-change-enrichment"
+        - "HIGH"
+        - "lookup-events"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: suppression-cicd-service
+    description: >-
+      CI/CD service account suppression logic. The skill should produce
+      AUTOMATION_DEPLOYED with a properly configured suppression list for
+      known automation roles, dedup window of 30 minutes for stack updates,
+      and audit logging to a suppressed-events topic.
+    input: |
+      Design reference: suppression-cicd-service
+      Account: 111111111111
+      Region: us-east-1
+
+      CloudTrail: management-events trail, multi-region, enabled.
+      Events: UpdateStack, CreateChangeSet (from CI/CD pipeline).
+      Known automation roles to suppress:
+        - arn:aws:sts::111111111111:assumed-role/cicd-deploy-role
+        - arn:aws:sts::111111111111:assumed-role/AWSCloudFormationStackSetExecutionRole
+        - arn:aws:iam::111111111111:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling
+      Dedup window: 30 minutes for stack updates.
+      Audit: all suppressed events must be logged.
+      Non-suppressible events: DeleteTrail, StopLogging, root.
+
+      Emit the standard ALERT block with suppression configuration.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "suppression-cicd-service"
+        - "cicd-deploy-role"
+        - "VERDICT"
+        - "SUPPRESSION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: security-hub-missing
+    description: >-
+      Security Hub integration requested but Security Hub is not enabled
+      in the target account. The skill should classify REVIEW_REQUIRED and
+      cite the missing Security Hub enablement as the gap, while noting
+      SNS and Slack are operational.
+    input: |
+      Design reference: security-hub-missing
+      Account: 111111111111
+      Region: us-east-1
+
+      CloudTrail: management-events trail, multi-region, enabled.
+      Events: AttachRolePolicy, CreateAccessKey (HIGH severity).
+      Notification targets: SNS (HIGH tier), Security Hub, Slack #security.
+      Security Hub status: NOT ENABLED (securityhub describe-hub returns ResourceNotFoundException).
+      Enrichment: lookup-events configured.
+      Dedup: 5 minutes.
+      Suppression: CI/CD role only.
+
+      Emit the standard ALERT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "security-hub-missing"
+        - "VERDICT"
+        - "GAP"
+        - "Security Hub"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: multi-account-org-trail
+    description: >-
+      Multi-account CloudTrail alerting via Organizations trail. The skill
+      should produce AUTOMATION_DEPLOYED with EventBridge rules in the
+      management account filtering on recipientAccountId, cross-account
+      SNS forwarding, and per-account suppression lists.
+    input: |
+      Design reference: multi-account-org-trail
+      Organization management account: 111111111111
+      Member accounts: 222222222222, 333333333333
+      Region: us-east-1
+
+      CloudTrail: Organizations trail in management account, all regions.
+      Events: root login (all accounts), IAM policy changes (all accounts),
+              CloudTrail tampering (all accounts).
+      Notification targets: per-account SNS routing via cross-account forwarding.
+      Security Hub: enabled in management account, member accounts via aggregation.
+      Suppression: per-account CI/CD roles.
+
+      Emit the standard ALERT block for the multi-account setup.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "multi-account-org-trail"
+        - "recipientAccountId"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

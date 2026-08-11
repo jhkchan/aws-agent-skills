@@ -258,40 +258,35 @@ These operational gotchas route a recommendation away from the obvious
 choice:
 
 - **Empty receives cost the same as non-empty receives.** SQS charges per
-  API request, not per message returned. A `ReceiveMessage` that returns
+  API request, not per message returned. A `ReceiveMessage` returning
   zero messages still costs $0.40/1M (us-east-1).
-- **Long polling caps at WaitTimeSeconds=20.** Higher values are rejected.
-  The sweet spot is 20 for most consumers; 1-5 for latency-sensitive
-  consumers where a 20s wait is unacceptable.
+- **Long polling caps at WaitTimeSeconds=20.** The sweet spot is 20 for
+  most consumers; 1-5 for latency-sensitive consumers.
 - **Batch API payload cap is 256 KB total.** A `SendMessageBatch` with 10
-  messages at 30 KB each (300 KB) will fail. Size each message before
-  batching.
-- **FIFO default is 300 TX/s per MessageGroupId (3000 batch).** The queue-
-  level throughput limit can be raised to 9000 TX/s batch (high-throughput
-  mode), but requires `DeduplicationScope=MessageGroup` AND
-  `ThroughputLimit=PerMessageGroupId`.
+  messages at 30 KB each (300 KB) will fail. Size each message first.
+- **FIFO default is 300 TX/s per MessageGroupId (3000 batch).**
+  High-throughput mode raises this to 9000 TX/s batch, but requires
+  `DeduplicationScope=MessageGroup` AND `ThroughputLimit=PerMessageGroupId`.
 - **Standard queue does NOT guarantee ordering or exactly-once.** If the
-  workload needs ordering, it needs FIFO — do not recommend "just sort by
-  a sequence number on the consumer side" as a throughput optimization.
-- **Visibility timeout that is too short causes phantom re-deliveries.**
-  Each re-delivery adds a `ReceiveMessage` and a `DeleteMessage` (if
-  idempotent), inflating request count by 2x per re-delivery.
-- **Message retention is billed as storage, not as requests.** Reducing
-  retention from 14 days to 4 days saves storage cost only when the queue
-  has high backlog volume; it does NOT reduce API request cost.
-- **SSE-KMS adds per-request KMS API cost.** Each SQS API call on a KMS-
-  encrypted queue triggers a `kms:GenerateDataKey` call ($0.03/10,000).
-  At high request volume, KMS cost can exceed SQS cost.
-- **Lambda ESM batch size cap for SQS is 10,000.** But SQS itself caps a
-  single `ReceiveMessage` at 10. Lambda's ESM issues multiple
-  `ReceiveMessage` calls internally to fill the batch up to the configured
-  batch size. The SQS-side batch is always 10 max.
+  workload needs ordering, it needs FIFO — do not recommend consumer-side
+  sorting as a throughput optimization.
+- **Visibility timeout too short causes phantom re-deliveries.** Each
+  re-delivery adds a `ReceiveMessage` + `DeleteMessage`, doubling request
+  count per re-delivery.
+- **Message retention is billed as storage, not requests.** Reducing
+  retention does NOT reduce API request cost — it limits blast radius.
+- **SSE-KMS adds per-request KMS cost.** Each SQS API call on a KMS-
+  encrypted queue triggers `kms:GenerateDataKey` ($0.03/10,000). At high
+  request volume, KMS cost can exceed SQS cost.
+- **Lambda ESM BatchSize can be set up to 10,000.** SQS caps a single
+  `ReceiveMessage` at 10; Lambda issues multiple internal calls to fill
+  the batch. Savings come from fewer Lambda invocations.
 - **Cross-region messaging is not native to SQS.** Use SNS+SQS fanout or
-  EventBridge for cross-region. Do not recommend Lambda cross-region
-  pollers — they inflate request count on both regions.
-- **Redrive is a batch operation.** `StartMessageMoveTask` (the v2 redrive
-  API) moves messages in bulk from DLQ back to source queue. The legacy
-  `Redrive` API is per-message and far more expensive.
+  EventBridge. Do not recommend Lambda cross-region pollers — they inflate
+  request count in both regions.
+- **Redrive is a batch operation.** `StartMessageMoveTask` (v2 API) moves
+  messages in bulk from DLQ back to source. The legacy per-message pattern
+  is 10x more expensive.
 
 ### Step 1: Polling strategy (the #1 lever)
 
@@ -392,7 +387,7 @@ Example: 15M received + 3M re-delivered (20% re-delivery rate)
 | 30s (default) | unknown | unknown | NEED_MORE_INFO — measure processing p95 |
 
 **Rule of thumb:** Set `VisibilityTimeout` to 6× the consumer's p95
-processing time. This covers retries and retries-after-restart.
+processing time. Covers retries and restarts.
 
 ```bash
 aws sqs set-queue-attributes \
@@ -411,10 +406,9 @@ Default is 4 days (345,600 seconds); maximum is 14 days (1,209,600
 seconds). Retention affects storage cost, not request cost.
 
 **Storage pricing:** SQS storage is included in the per-request price —
-there is no separate per-GB-month charge for messages in-flight. However,
-long retention on high-volume queues with consumer outages can lead to
-message accumulation that, when eventually drained, generates a spike in
-ReceiveMessage/DeleteMessage requests.
+no separate per-GB-month charge. However, long retention on high-volume
+queues with consumer outages leads to message accumulation that, when
+drained, generates a spike in ReceiveMessage/DeleteMessage requests.
 
 **Decision gate:**
 
@@ -484,9 +478,8 @@ aws sqs set-queue-attributes \
 ```
 
 **Do NOT recommend Standard→FIFO migration purely for "throughput
-optimization."** FIFO is for ordering guarantees, not throughput. Standard
-queues already have higher throughput. Only recommend FIFO→high-throughput
-mode (Step 6) or Standard→FIFO if the workload explicitly needs ordering.
+optimization."** FIFO is for ordering guarantees. Standard queues already
+have higher throughput. Only recommend FIFO→high-throughput mode (Step 6).
 
 ### Step 7: Impact estimation
 
@@ -684,36 +677,31 @@ is NOT at the ceiling, the verdict is `OPTIMIZED`.
 
 ```
 Queue type (Standard / FIFO)
- ├── determines: default throughput limits
- │    └── if FIFO: DeduplicationScope + ThroughputLimit → high-throughput mode
- ├── determines: deduplication behavior
- │    └── affects: redrive correctness (FIFO dedup may suppress re-sends)
- └── determines: ordering guarantees
-      └── affects: whether batch reordering is safe
+ ├─ determines: throughput limits, dedup behavior, ordering guarantees
+ ├─ if FIFO: DeduplicationScope + ThroughputLimit → high-throughput mode
+ └─ affects: redrive correctness (FIFO dedup may suppress re-sends)
 
 ReceiveMessageWaitTimeSeconds (polling)
- ├── determines: empty receive ratio
- │    └── drives: ReceiveMessage request volume (Step 1 cost)
- └── interacts with: consumer concurrency
-      └── more pollers × short polling = exponentially more empty receives
+ ├─ determines: empty receive ratio → drives ReceiveMessage request volume
+ └─ interacts with consumer concurrency (more pollers × short polling
+    = exponentially more empty receives)
 
 VisibilityTimeout
- ├── must exceed: consumer processing p95 × 6
- ├── if too short: re-deliveries inflate ReceiveMessage + DeleteMessage
- └── interacts with: Lambda ESM (ESM overrides queue default)
+ ├─ must exceed: consumer processing p95 × 6
+ ├─ if too short: re-deliveries inflate ReceiveMessage + DeleteMessage
+ └─ interacts with Lambda ESM (ESM overrides queue default)
 
 MessageRetentionPeriod
- ├── determines: max time a message persists undelivered
- └── if too long: backlog accumulation → request spike on drain
+ ├─ determines: max time undelivered messages persist
+ └─ if too long: backlog accumulation → request spike on drain
 
 RedrivePolicy (maxReceiveCount → DLQ)
- ├── determines: when messages route to DLQ
- ├── if maxReceiveCount too low: premature DLQ routing → redrive cost
- └── DLQ depth is the health signal for Step 5
+ ├─ if maxReceiveCount too low: premature DLQ routing → redrive cost
+ └─ DLQ depth is the health signal for Step 5
 
 SSE-KMS
- ├── adds: kms:GenerateDataKey per SQS API call
- └── at high request volume: KMS cost may exceed SQS cost
+ ├─ adds kms:GenerateDataKey per SQS API call
+ └─ at high request volume: KMS cost may exceed SQS cost
 ```
 
 ## Anti-Patterns — NEVER (top 5)
@@ -729,8 +717,7 @@ SSE-KMS
 
 3. **NEVER increase Lambda ESM BatchSize without verifying the consumer
    handles partial batch failures.** Ensure
-   `FunctionResponseTypes: ["ReportBatchItemFailures"]` is set on the ESM;
-   otherwise a single failure retries the entire batch.
+   `FunctionResponseTypes: ["ReportBatchItemFailures"]` is set on the ESM.
 
 4. **NEVER reduce MessageRetentionPeriod on a queue with active consumer
    outages without warning the operator.** Reducing retention drops
@@ -741,7 +728,7 @@ SSE-KMS
    `StartMessageMoveTask` (the v2 batch API). The Lambda-polls-DLQ-and-
    re-sends pattern is 10x more expensive and error-prone.
 
-Extended anti-patterns in `references/error-handling-and-edge-cases.md`.
+Extended anti-patterns in `references/worked-examples.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -788,10 +775,9 @@ Extended anti-patterns in `references/error-handling-and-edge-cases.md`.
   multipliers, cost calculation worked examples.
 - `references/worked-examples.md` — full worked examples (long polling
   enablement, batch migration, FIFO high-throughput enablement, already-
-  optimal, NEED_MORE_INFO, end-to-end walkthrough).
-- `references/error-handling-and-edge-cases.md` — CLI/data-source failure
-  handling, operational edge cases, FIFO cross-group dedup gotchas,
-  extended NEVER list, remediation guidance.
+  optimal, NEED_MORE_INFO, end-to-end walkthrough) plus error handling,
+  CLI failure recovery, FIFO cross-group dedup gotchas, and extended
+  NEVER list.
 
 ## Domain
 

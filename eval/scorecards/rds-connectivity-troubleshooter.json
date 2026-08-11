@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 18,
       "max": 20,
-      "justification": "Provides specific expert formulas (Aurora max_connections derivation), exact token TTL (15\u202fmin), CA rotation timeline, and OSI\u2011ordered diagnostic tree\u2014knowledge beyond a generic model. However, many sections restate well\u2011known best practices and omit niche details (e.g., IPv6 handling, IAM policy simulation), limiting full delta."
+      "justification": "Provides many expert\u2011level specifics not usually known to a generic model: OSI\u2011ordered timeout tree, exact NACL bidirectional rules, cross\u2011VPC SG reference limitation, Aurora max_connections derivation formulas, CA rotation timeline, IAM token 15\u2011minute TTL, and detailed Aurora endpoint behaviours. The only minor gap is omission of VPC endpoint considerations for RDS."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes senior\u2011engineer mindset (treat database as innocent, OSI ordering) and concrete AWS\u2011CLI procedures for each layer. Minor gaps: no explicit IAM policy simulation step and limited guidance for multi\u2011AZ DNS cache clearing."
+      "justification": "Provides an AWS\u2011specific step\u2011by\u2011step probe sequence (describe\u2011security\u2011groups, describe\u2011network\u2011acls, route\u2011table checks, etc.) and embeds senior\u2011engineer mindset (treat engine as innocent, OSI ordering). Only minor generic phrasing (\u201ccheck SG\u201d) remains, but overall procedure is tightly tied to AWS services."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Extensive NEVER list with concrete reasoning (e.g., SG cross\u2011VPC references, NACL statelessness, public\u2011accessible flag). Deductions for a few generic warnings and omission of anti\u2011patterns like over\u2011permissive 0.0.0.0/0 SG changes."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., cross\u2011VPC SG references are ignored, NACL statelessness, public\u2011accessible flag does not guarantee reachability, IAM token expiry vs password reset). One small omission: no explicit warning about stale client\u2011side connection\u2011pool max\u2011lifetime beyond IAM token case."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Complete frontmatter, clear description, activation triggers, invocation schema, example, and metadata. All required fields present and well\u2011formed."
+      "justification": "Complete frontmatter, clear description, exhaustive activation triggers, well\u2011defined invocation schema and example, and explicit when\u2011to\u2011use/when\u2011not\u2011to\u2011use sections. Deducted one point for the invocation_schema being a free\u2011form text block rather than a strict JSON schema."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level quick\u2011start gives concise mapping; deeper sections unfold step\u2011by\u2011step. Some critical anti\u2011patterns and deep references are buried later, causing occasional cognitive overload."
+      "justification": "Top\u2011level Quick\u2011Start and symptom\u2011to\u2011layer map give a concise entry point, but the document then presents a very long narrative (Mindset, Philosophy, extensive tables) before the actual decision tree, causing some cognitive overload for a first\u2011time reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Tight constraints on destructive actions (mandatory CONFIRM), generous freedom for read\u2011only probes. Slight over\u2011generality in batch remediation guidance (no explicit limit on batch size beyond suggestion)."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts; read\u2011only probes are unrestricted. Calibration matches fragility of operations (e.g., SG changes, instance class modifications). One point deducted for a few remediation steps that suggest immediate apply\u2011immediately without emphasizing maintenance\u2011window best practice."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a coherent pattern: Quick start \u2192 Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011patterns \u2192 Pre\u2011flight \u2192 Diagnostic steps \u2192 Output format \u2192 Remediation \u2192 Deep reference."
+      "justification": "Follows a recognizable pattern: quick start \u2192 mindset \u2192 philosophy \u2192 tables \u2192 pre\u2011flight \u2192 stepwise decision tree \u2192 output format \u2192 anti\u2011patterns \u2192 remediation. Slight deduction for occasional ad\u2011hoc headings that break the strict hierarchy."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides deterministic output format, decision tree, and concrete CLI commands enabling an agent to act. Lacks explicit error\u2011handling for CLI failures and pagination guidance, which could hinder automation."
+      "justification": "Provides concrete CLI commands, decision trees, and output template that an agent can execute. Edge cases such as RDS Proxy SG handling are mentioned but not fully integrated into the network\u2011diagnostic steps, and VPC endpoint scenarios are absent, limiting completeness."
     }
   ],
-  "total_score": 108,
+  "total_score": 109,
   "max_score": 120,
   "grade": "A",
-  "token_count": 65609,
-  "latency_ms": 36887,
+  "token_count": 65605,
+  "latency_ms": 14135,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

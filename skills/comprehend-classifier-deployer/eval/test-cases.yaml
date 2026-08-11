@@ -1,0 +1,169 @@
+# Eval test cases for comprehend-classifier-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Comprehend classifier
+# scenarios (multi-class endpoint, multi-label batch, native PDF with
+# VPC and KMS, augmented manifest from Ground Truth, insufficient
+# training data).
+skill: comprehend-classifier-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: multi-class-endpoint
+    description: >-
+      Train a multi-class document classifier in PLAIN_TEXT mode and
+      deploy a real-time endpoint with auto-scaling. Expects
+      READY_TO_DEPLOY with multi-class mode, CSV training data, endpoint
+      inference mode, and KMS encryption.
+    input: |
+      Train a Comprehend custom document classifier named
+      support-ticket-classifier. Multi-class mode, English, plain text
+      input. Training data is a CSV at
+      s3://my-bucket/comprehend/training/training.csv with 5000
+      documents across 5 classes (billing, technical, general, sales,
+      refund). Each class has at least 800 documents. Deploy a
+      real-time endpoint named ticket-endpoint with 1 inference unit
+      and auto-scaling (min 1, max 5). Encrypt model artifacts and
+      volume with KMS key arn:aws:kms:us-east-1:123456789012:key/abcd1234.
+      IAM role arn:aws:iam::123456789012:role/ComprehendTrainingRole.
+      Region us-east-1. Tags: Environment=production, Team=support.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "MULTI_CLASS"
+        - "PLAIN_TEXT"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "endpoint"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: multi-label-batch
+    description: >-
+      Train a multi-label classifier and run batch inference instead of
+      endpoint deployment. Expects READY_TO_DEPLOY with multi-label
+      mode, Augmented Manifest training data, and batch inference mode.
+    input: |
+      Train a Comprehend custom document classifier named
+      news-tag-classifier. Multi-label mode, English, plain text.
+      Training data is an Augmented Manifest at
+      s3://my-bucket/news/training/manifest.jsonl with 8000 documents.
+      Labels: politics, economy, world, sports, technology, health.
+      Each label has at least 500 documents. Use batch inference (not
+      endpoint) for cost efficiency — we process 50000 articles nightly.
+      Input at s3://my-bucket/news/input/, output at
+      s3://my-bucket/news/output/. IAM role
+      arn:aws:iam::123456789012:role/ComprehendBatchRole. Region
+      us-east-1. Tags: Environment=production, Pipeline=news-tagging.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "MULTI_LABEL"
+        - "BATCH"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: native-pdf-vpc-kms
+    description: >-
+      Train a Native PDF multi-class classifier with VPC config and KMS
+      encryption. Expects READY_TO_DEPLOY with NATIVE_PDF input mode,
+      Augmented Manifest training data, VPC subnets, and KMS keys.
+    input: |
+      Train a Comprehend custom document classifier named
+      document-type-classifier. Multi-class mode, English. Native PDF
+      input — training data is PDF documents referenced in an Augmented
+      Manifest at s3://my-bucket/docs/training/pdf_manifest.jsonl.
+      Labels: invoice, contract, report, letter, memo. 3000 documents
+      total, each class has at least 500 PDFs. Train inside VPC with
+      subnets subnet-aaa, subnet-bbb and security group sg-abc123.
+      Encrypt with KMS key
+      arn:aws:kms:us-east-1:123456789012:key/efgh5678. IAM role
+      arn:aws:iam::123456789012:role/ComprehendSecureRole. Deploy
+      endpoint doc-classifier-endpoint with 2 inference units. Region
+      us-east-1. Tags: Environment=production, Compliance=HIPAA.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "NATIVE_PDF"
+        - "VPC"
+        - "KMS"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: augmented-manifest-ground-truth
+    description: >-
+      Train a multi-class classifier using Augmented Manifest data from
+      SageMaker Ground Truth. Expects READY_TO_DEPLOY with Augmented
+      Manifest format cited and Ground Truth labeling pipeline noted.
+    input: |
+      Train a Comprehend custom document classifier named
+      review-sentiment-classifier. Multi-class mode, English. Training
+      data is an Augmented Manifest produced by SageMaker Ground Truth
+      at s3://my-bucket/reviews/labeled/manifest.jsonl. 12000 reviews
+      across 3 sentiment classes (positive, negative, neutral). Each
+      class has at least 3500 labeled reviews. Use endpoint inference
+      with endpoint name review-endpoint, 1 inference unit. IAM role
+      arn:aws:iam::123456789012:role/ComprehendRole. Region us-east-1.
+      Tags: Environment=staging, Source=ground-truth.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Augmented Manifest"
+        - "MULTI_CLASS"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: insufficient-training-data
+    description: >-
+      Operator requests a classifier but one class has fewer than 50
+      documents. This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING with the per-class document count cited.
+    input: |
+      Train a Comprehend custom document classifier named
+      email-router-classifier. Multi-class mode, English. Training data
+      is CSV at s3://my-bucket/email/training/training.csv. 4 classes:
+      sales (200 docs), support (150 docs), billing (30 docs), general
+      (180 docs). Deploy endpoint email-endpoint with 1 inference unit.
+      IAM role arn:aws:iam::123456789012:role/ComprehendRole. Region
+      us-east-1.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "billing"
+        - "50"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

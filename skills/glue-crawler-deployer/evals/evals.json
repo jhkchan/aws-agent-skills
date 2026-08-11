@@ -1,0 +1,175 @@
+{
+  "skill": "glue-crawler-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Glue Crawler Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Glue Crawler scenarios (S3 crawler with custom JSON classifier and partition projection, DynamoDB export crawl, JDBC crawler with Glue Connection, Lake Formation event-driven crawl, missing IAM role prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "s3-crawler-classifier-projection",
+      "name": "S3 crawler with custom JSON classifier and partition projection",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — S3 crawler with EventsJsonClassifier listed before built-in JSON, partition projection for year/month/day, incremental crawl, daily cron",
+      "prompt": "Create a Glue Crawler for S3 data at s3://my-data-lake/events/year=2026/. Data is JSON files with nested event_id, timestamp, event_type, and payload fields. Create a custom JSON classifier named EventsJsonClassifier. Use partition projection for year, month, and day columns. Database analytics_db. Incremental crawl. Daily schedule at 2 AM UTC. Table prefix raw_. Tags: Environment=production, DataSource=s3-events.",
+      "prompt_file": "prompts/s3-crawler-classifier-projection.md",
+      "baseline_file": "baselines/s3-crawler-classifier-projection.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GLUE_CRAWLER: events-crawler (S3: s3://my-data-lake/events/)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Classifiers: [\"EventsJsonClassifier\"] (first-match-wins)\n  [✓] Partitioning: partition-projection (year, month, day)\n  [✓] Crawl mode: incremental\n  [✓] Schedule: cron(0 2 * * ? *)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EventsJsonClassifier",
+            "partition",
+            "incremental",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dynamodb-export-crawl",
+      "name": "DynamoDB export to S3 crawl",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — DynamoDB table exported to S3 in DYNAMODB_JSON format, crawler reads from S3 export path",
+      "prompt": "Create a Glue Crawler for a DynamoDB table exported to S3. The table UserEvents was exported to s3://my-ddb-exports/dynamodb/UserEvents/ in DYNAMODB_JSON format. Database dynamo_db. Full crawl. Weekly schedule. Tags: Environment=production, Source=dynamodb.",
+      "prompt_file": "prompts/dynamodb-export-crawl.md",
+      "baseline_file": "baselines/dynamodb-export-crawl.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GLUE_CRAWLER: ddb-userevents-crawler (S3: s3://my-ddb-exports/dynamodb/UserEvents/)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Data source: DynamoDB-export (s3://my-ddb-exports/dynamodb/UserEvents/)\n  [✓] Crawl mode: full",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "DYNAMODB_JSON",
+            "s3://my-ddb-exports",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jdbc-crawler-connection",
+      "name": "JDBC crawler with Glue Connection for PostgreSQL",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — JDBC crawler using pg-connection Glue Connection, public schema, full crawl, on-demand",
+      "prompt": "Create a Glue Crawler for a PostgreSQL database. Glue Connection name pg-connection. Crawl the public schema. Database jdbc_db. Full crawl. On-demand schedule initially. IAM role GlueJdbcCrawlerRole. Tags: Environment=production, Source=postgresql.",
+      "prompt_file": "prompts/jdbc-crawler-connection.md",
+      "baseline_file": "baselines/jdbc-crawler-connection.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GLUE_CRAWLER: pg-crawler (JDBC: pg-connection)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Data source: JDBC (pg-connection)\n  [✓] Crawl mode: full",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "pg-connection",
+            "jdbc",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lake-formation-event-driven",
+      "name": "Lake Formation event-driven crawl with Grok classifier",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — LF-enabled database, LF permissions on crawler role, event-driven via S3 Event Notifications, Grok classifier, MergeNewColumns",
+      "prompt": "Create a Glue Crawler for S3 data at s3://my-data-lake/logs/. The database lf_analytics_db is Lake Formation-enabled. Crawler role GlueLFCrawlerRole needs LF permissions. Event-driven crawl triggered by S3 ObjectCreated events on the logs/ prefix. Custom Grok classifier AppLogClassifier for log parsing. MergeNewColumns schema policy. Tags: Environment=production, Governance=lake-formation.",
+      "prompt_file": "prompts/lake-formation-event-driven.md",
+      "baseline_file": "baselines/lake-formation-event-driven.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GLUE_CRAWLER: lf-logs-crawler (S3: s3://my-data-lake/logs/)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Lake Formation: enabled (LF permissions granted)\n  [✓] Classifiers: [\"AppLogClassifier\"] (first-match-wins)\n  [✓] Schedule: event-driven (S3 ObjectCreated)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Lake Formation",
+            "event-driven",
+            "AppLogClassifier",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-iam-role",
+      "name": "Glue Crawler request without IAM role or S3 path (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — operator does not provide IAM role name or S3 data source path",
+      "prompt": "Create a Glue Crawler for my S3 data. I need it to discover schema and create tables. Daily schedule. Use incremental crawl.",
+      "prompt_file": "prompts/missing-iam-role.md",
+      "baseline_file": "baselines/missing-iam-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "GLUE_CRAWLER: unknown\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] IAM role: not provided — crawler requires an IAM role with glue and s3 permissions\n  [✗] Data source: not provided — S3 path is required for the crawler to read",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "IAM",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

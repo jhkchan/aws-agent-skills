@@ -506,7 +506,7 @@ Repeated STOPPED cycles with same exit code?
   │            └── Read CloudWatch Logs for root cause
   │
   ▼
-NEED_MORE_INFO — gather more context
+INSUFFICIENT_DATA — gather more context
 ```
 
 ## Common diagnostic shortcuts

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge not typically known by a generic model: exhaustive OS/product list, exact regex for Patch Group tag values, recent 2024\u20112026 feature additions (macOS support, custom repository syntax, AWS-ApplyPatchBaseline), a decision\u2011tree of pre\u2011check priority, and a heuristic matrix for ApproveAfterDays. This depth goes beyond standard documentation restatement."
+      "justification": "Adds concrete expert knowledge not in generic model output: a full pre\u2011check decision tree, exact numeric thresholds (ApproveAfterDays 0\u2011100, name regex, limits per account), recent 2024\u20112026 feature list (macOS support, custom Sources syntax, AWS\u2011ApplyPatchBaseline), and a heuristic matrix for auto\u2011approve delay. This is specific, actionable expertise beyond a baseline model."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific workflow: ordered pre\u2011checks, CONFIRM gate, snapshot before update, post\u2011verification steps, and exact CLI syntax. Missing are explicit error\u2011handling procedures (e.g., retry on CLI failure, pagination handling for describe\u2011patch\u2011baselines) and guidance for partial\u2011success scenarios, which keeps the procedure from being fully comprehensive."
+      "justification": "Encodes AWS\u2011specific procedures: ordered pre\u2011flight checks, mandatory CONFIRM gate, snapshot of existing baseline before update, exact CLI syntax for create\u2011patch\u2011baseline, register\u2011patch\u2011baseline\u2011for\u2011patch\u2011group, maintenance\u2011window registration, and post\u2011verification steps. Procedures are tightly tied to SSM Patch Manager rather than generic security checks."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with clear rationales (product\u2011OS mismatch, missing role, UNSPECIFIED compliance, wrong document, default baseline override). Only five items are covered; additional common pitfalls (e.g., tag\u2011value length limits, IAM policy least\u2011privilege nuances) are omitted, and one item (default baseline replacement) lacks a detailed why\u2011it\u2011matters explanation."
+      "justification": "Provides a detailed NEVER list (5 top anti\u2011patterns) with explicit why, plus numerous inline warnings (product\u2011OS mismatch, default baseline override, missing instance role, wrong document, UNSPECIFIED compliance). However, it could include more edge\u2011case pitfalls such as handling API throttling or pagination errors."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description explains WHAT and WHEN, keywords, activation_triggers, and invocation_schema are present. The activation triggers are very broad, which could cause spurious activation, and there is no explicit \"when NOT to use\" clause, but overall the spec is solid enough for reliable invocation."
+      "justification": "Frontmatter is complete (name, version, author, license, compatibility, keywords, tags, dependencies, rich metadata). Description clearly states WHAT the skill does, WHEN to invoke, and provides activation_triggers and an invocation_schema. Minor omission: no explicit schema validation example, but overall sufficient for reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, patterns, output contract, NEVER, heuristic, recent features. However, the CLI examples and full tables are long and appear early, which can overload a reader before they know whether they need that depth."
+      "justification": "Uses layered layout: quick reference table, mindset section, pre\u2011flight checklist, detailed process, common patterns, strict output contract, NEVER list, heuristic, and recent features. Critical information is front\u2011loaded; deeper technical details are hidden until needed. No overload of the top\u2011level block."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained with CONFIRM gates, pre\u2011checks, and snapshotting. Creative tasks like custom repository definition are less constrained (no validation of repo file syntax or size limits), but the overall calibration matches task fragility well."
+      "justification": "Destructive actions (baseline creation, registration) are tightly constrained: pre\u2011checks must all PASS, CONFIRM gate required, snapshot before modification, and explicit limits on numeric fields. Non\u2011destructive guidance (heuristics, examples) is left open, matching task fragility appropriately."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (description \u2192 quick navigation \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 anti\u2011patterns \u2192 heuristic). The structure is consistent with other CloudOps skills, aiding comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 NEVER \u2192 Heuristic \u2192 Recent features). The structure is consistent with other CloudOps skills, aiding comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides complete CLI commands, exact output contract, and example runs that an agent can follow. Missing: explicit error\u2011handling guidance for CLI failures, pagination edge\u2011cases beyond a brief note, and guidance on retry/back\u2011off strategies. These gaps prevent a flawless execution plan."
+      "justification": "Provides working CLI commands, exact output block format, and end\u2011to\u2011end example plans. Gaps: does not specify handling of a negative CONFIRM response, nor detailed error\u2011handling if an AWS CLI call fails (e.g., throttling, pagination limits). These omissions prevent flawless autonomous execution."
     }
   ],
-  "total_score": 106,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 45900,
-  "latency_ms": 10151,
+  "grade": "A",
+  "token_count": 45209,
+  "latency_ms": 13907,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

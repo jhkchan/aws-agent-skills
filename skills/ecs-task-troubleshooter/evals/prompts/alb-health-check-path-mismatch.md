@@ -1,9 +1,9 @@
 # Eval prompt: alb-health-check-path-mismatch
 
 Diagnose the following ECS task failure. Walk the health-check
-diagnostic tree (Step 5 of the decision tree) and emit the standard
-VERDICT block (INCIDENT, VERDICT, ROOT_CAUSE, EVIDENCE,
-ROOT_CAUSE_CATALOG, REMEDIATION).
+diagnostic tree (Step 6 of the decision tree) and emit the standard
+diagnostic block (TARGET, VERDICT, ROOT_CAUSE, REASON, EVIDENCE,
+REMEDIATION). VERDICT is `ROOT_CAUSE_IDENTIFIED` or `INSUFFICIENT_DATA`.
 
 ## Scenario
 

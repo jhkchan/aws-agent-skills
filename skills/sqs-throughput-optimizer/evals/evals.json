@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "sqs-throughput-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SQS Throughput Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "long-polling-enablement",
+      "name": "Standard queue with short polling generating 85% empty receives — enable long polling",
+      "difficulty": "medium",
+      "prompt_file": "prompts/long-polling-enablement.md",
+      "baseline_file": "baselines/long-polling-enablement.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "long-polling-enablement", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "WaitTimeSeconds"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "batch-api-migration",
+      "name": "Producer and consumer using single-message APIs — migrate to batch APIs",
+      "difficulty": "hard",
+      "prompt_file": "prompts/batch-api-migration.md",
+      "baseline_file": "baselines/batch-api-migration.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "batch-api-migration", "RECOMMENDATION", "ESTIMATED_SAVINGS", "SendMessageBatch"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "visibility-timeout-rightsizing",
+      "name": "Queue with VisibilityTimeout shorter than consumer processing — increase timeout",
+      "difficulty": "hard",
+      "prompt_file": "prompts/visibility-timeout-rightsizing.md",
+      "baseline_file": "baselines/visibility-timeout-rightsizing.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "visibility-timeout-rightsizing", "RECOMMENDATION", "ESTIMATED_SAVINGS", "VisibilityTimeout"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "fifo-high-throughput-mode",
+      "name": "FIFO queue at 300 TX/s default ceiling with 500 TX/s workload — enable high-throughput mode",
+      "difficulty": "hard",
+      "prompt_file": "prompts/fifo-high-throughput-mode.md",
+      "baseline_file": "baselines/fifo-high-throughput-mode.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "fifo-high-throughput-mode", "RECOMMENDATION", "PerMessageGroupId"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized-queue",
+      "name": "Standard queue with long polling, batch APIs, right-sized visibility — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized-queue.md",
+      "baseline_file": "baselines/already-optimized-queue.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized-queue", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,176 @@
+# Eval test cases for config-rule-compliance-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: config-rule-compliance-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: managed-rule-s3-encryption
+    description: >-
+      Standard managed-rule deployment for S3 encryption compliance. The
+      skill should produce AUTOMATION_DEPLOYED with the managed rule
+      s3-bucket-server-side-encryption-enabled, SSM remediation with
+      AWS-EnableS3BucketEncryption, automatic trigger, conformance pack
+      deployment via StackSets with auto-deployment, and multi-region
+      coverage.
+    input: |
+      Design reference: managed-rule-s3-encryption
+      Account: 111111111111
+      Region: us-east-1 (multi-region required)
+
+      Config recorder: active, allSupported=true.
+      Framework: CIS AWS Foundations Benchmark (control 2.1 — S3 encryption).
+      Target rule: s3-bucket-server-side-encryption-enabled (AWS-managed).
+      Remediation: AWS-EnableS3BucketEncryption (automatic, reversible).
+      Deployment: StackSet with auto-deployment, all active regions.
+      Config Aggregator: configured, org-wide.
+
+      Emit the standard COMPLIANCE block (RULES, REMEDIATION,
+      AGGREGATOR, FRAMEWORK_DEPLOYMENT, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "managed-rule-s3-encryption"
+        - "s3-bucket-server-side-encryption-enabled"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: custom-lambda-remediation
+    description: >-
+      Custom Lambda rule for default SG no-ingress (CIS 2.1 gap) with SSM
+      remediation. The skill should produce AUTOMATION_DEPLOYED with the
+      custom rule, manual-trigger remediation (destructive fix), and the
+      custom SSM document requirement.
+    input: |
+      Design reference: custom-lambda-remediation
+      Account: 111111111111
+      Region: us-east-1
+
+      Config recorder: active, includes AWS::EC2::SecurityGroup.
+      Framework: CIS 2.1 — default security group must have no ingress rules.
+      No managed rule covers this — custom Lambda rule required.
+      Remediation: Custom SSM document (revoke default SG ingress).
+      Trigger: Manual (destructive — false positive risk on production SGs).
+      Pre-prod validation: completed (3 SGs tested).
+
+      Emit the standard COMPLIANCE block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "custom-lambda-remediation"
+        - "Custom"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: conformance-pack-cis-stacksets
+    description: >-
+      Full CIS conformance pack deployment via StackSets with
+      auto-deployment. The skill should produce AUTOMATION_DEPLOYED with
+      the StackSet deployment including CAPABILITY_IAM, SERVICE_MANAGED
+      permission model, auto-deployment enabled, and multi-region coverage.
+    input: |
+      Design reference: conformance-pack-cis-stacksets
+      Organization management account: 111111111111
+      Target OU: ou-xxxx-security (all member accounts)
+      Regions: us-east-1, us-west-2, eu-west-1, ap-southeast-2
+
+      Framework: CIS AWS Foundations Benchmark (controls 1.x, 2.x, 3.x, 4.x).
+      Deployment method: CloudFormation StackSets.
+      Permission model: SERVICE_MANAGED.
+      Auto-deployment: required for new accounts.
+      Config recorder: active in all member accounts.
+      Organizations integration: enabled (AWSServiceRoleForConfig present).
+
+      Emit the standard COMPLIANCE block. Include the StackSet deployment CLI.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "conformance-pack-cis-stacksets"
+        - "CAPABILITY_IAM"
+        - "auto-deployment"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: aggregator-missing-review
+    description: >-
+      Multi-account compliance setup where the Config Aggregator is not
+      configured and StackSet auto-deployment is disabled. The skill
+      should classify REVIEW_REQUIRED and cite both gaps.
+    input: |
+      Design reference: aggregator-missing-review
+      Account: 111111111111
+      Region: us-east-1 (single region only)
+
+      Framework: CIS AWS Foundations Benchmark.
+      Existing rules: root-account-mfa-enabled, cloudtrail-enabled (managed).
+      Config Aggregator: NOT CONFIGURED.
+      StackSet auto-deployment: DISABLED.
+      Regions covered: us-east-1 only.
+      Config recorder: active.
+
+      Emit the standard COMPLIANCE block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "aggregator-missing-review"
+        - "VERDICT"
+        - "GAP"
+        - "Aggregator"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: organizational-config-rule
+    description: >-
+      Organizational config rule deployment for org-wide S3 encryption
+      compliance. The skill should produce AUTOMATION_DEPLOYED with
+      put-organization-config-rule, org-level remediation, and the
+      AWSServiceRoleForConfig prerequisite check.
+    input: |
+      Design reference: organizational-config-rule
+      Organization management account: 111111111111
+      Member accounts: all (auto-propagated)
+
+      Rule: S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED (managed, org-level).
+      Remediation: AWS-EnableS3BucketEncryption (automatic).
+      Organizations integration: enabled.
+      AWSServiceRoleForConfig: present in management account.
+      Config recorder: active in all member accounts.
+
+      Emit the standard COMPLIANCE block. Include the org rule deployment CLI.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "organizational-config-rule"
+        - "put-organization-config-rule"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

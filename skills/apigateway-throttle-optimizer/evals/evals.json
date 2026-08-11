@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "apigateway-throttle-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the API Gateway Throttle Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "rest-to-http-api-migration",
+      "name": "REST API proxy-only with no REST-only features — migrate to HTTP API (3.5x cheaper)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/rest-to-http-api-migration.md",
+      "baseline_file": "baselines/rest-to-http-api-migration.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "rest-to-http-api-migration", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "HTTP API"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "stage-cache-enablement",
+      "name": "REST API with 70% idempotent GETs and no caching — enable stage-level response caching",
+      "difficulty": "medium",
+      "prompt_file": "prompts/stage-cache-enablement.md",
+      "baseline_file": "baselines/stage-cache-enablement.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "stage-cache-enablement", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "cach"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "usage-plan-per-client-throttling",
+      "name": "REST API with 5 clients, no usage plans, 10% 429 rate — add per-client usage plans",
+      "difficulty": "hard",
+      "prompt_file": "prompts/usage-plan-per-client-throttling.md",
+      "baseline_file": "baselines/usage-plan-per-client-throttling.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "usage-plan-per-client-throttling", "RECOMMENDATION", "MIGRATION_STEPS", "usage plan"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "payload-compression-enablement",
+      "name": "REST API with 180 KB avg payload and no compression — enable gzip + field filtering",
+      "difficulty": "medium",
+      "prompt_file": "prompts/payload-compression-enablement.md",
+      "baseline_file": "baselines/payload-compression-enablement.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "payload-compression-enablement", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "compress"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized-api",
+      "name": "HTTP API with CloudFront cache (60% hit), usage plans, gzip — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized-api.md",
+      "baseline_file": "baselines/already-optimized-api.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized-api", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"]
+        }
+      ]
+    }
+  ]
+}

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 14,
       "max": 20,
-      "justification": "Adds concrete expert knowledge (failure\u2011threshold math, exact health\u2011checker IP\u2011range limitation, a ten\u2011category diagnostic tree, and precise CLI probes) that a generic model would not enumerate, but a sizable portion restates publicly documented behavior rather than novel insight."
+      "justification": "Adds concrete expert details (health\u2011checker IP ranges, exact failure\u2011threshold math, TTL vs detection time trade\u2011off, calculated\u2011check inversion flag) and a full decision\u2011tree, but most of these facts are already known to a capable model; the delta is useful but not groundbreaking."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific step order (pre\u2011flight probes, per\u2011layer CLI commands, confirmation gate) and a clear diagnostic mindset, yet some procedures are generic (e.g., \u201calways verify with a probe\u201d) and not uniquely tied to Route\u00a053."
+      "justification": "Provides AWS\u2011specific probing order (get\u2011health\u2011check \u2192 get\u2011health\u2011check\u2011status \u2192 per\u2011region observations \u2192 routing\u2011policy checks) and concrete CLI commands, but some procedures are generic \"run a probe\" rather than a fully documented, step\u2011by\u2011step AWS troubleshooting methodology."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., health\u2011checker IP visibility, certificate SAN mismatch, inverted calculated checks). One minor shortfall is the absence of a few edge\u2011case pitfalls such as mixed\u2011protocol health checks."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never assume private IP reachability, never ignore certificate validation, never set FailureThreshold=1 without trade\u2011off). Missing a few cost\u2011related warnings (fast health checks price impact) and a reminder about stale CloudWatch alarm states, so not flawless."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are present. The activation trigger list is overly exhaustive, making precise activation slightly ambiguous."
+      "justification": "Frontmatter is complete, description, activation triggers, schema, and example are present, but the \"when_to_use\" paragraph is dense and could hinder reliable activation; still meets spec requirements."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick start \u2192 detailed decision tree \u2192 deep references), but the initial Quick\u2011start table and symptom\u2011triage matrix front\u2011load a lot of detail, which could cause cognitive overload before the agent knows what it needs."
+      "justification": "Top\u2011level Quick start gives concise entry points, deeper sections (decision tree, anti\u2011patterns, heuristics) are revealed later. However, the Quick start table is dense and mixes many details, causing some cognitive overload before deeper layers."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by explicit CONFIRM prompts and read\u2011only probes are default. Calibration is strong, though the skill relies on the operator to enforce the confirmation rather than programmatically restricting execution."
+      "justification": "Calibrates freedom well: read\u2011only probes first, explicit CONFIRM gates before any state\u2011changing CLI, and cost warnings for TTL changes; only minor gap is no explicit rate\u2011limit guard for rapid health\u2011check updates."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a coherent pattern (navigation, mindset, philosophy, decision tree, output contract, anti\u2011patterns, heuristics, graph) that aligns with the expected skill architecture."
+      "justification": "Follows a recognizable pattern (navigation table \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 anti\u2011patterns \u2192 heuristics), though the pattern is informal and not a named standard; still coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI commands, output format, and worked examples, enabling an agent to act. Lacks explicit handling for ambiguous multi\u2011layer symptoms and does not define a fallback when multiple layers appear plausible."
+      "justification": "Provides a complete decision tree, concrete CLI commands, output contract, and worked examples that an agent can follow. Minor gaps: handling of ambiguous or malformed health\u2011check types is limited to a generic INSUFFICIENT_DATA response; no explicit fallback for mixed\u2011protocol health checks."
     }
   ],
-  "total_score": 107,
+  "total_score": 102,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43338,
-  "latency_ms": 36063,
+  "token_count": 43316,
+  "latency_ms": 4800,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

@@ -1,0 +1,318 @@
+# Eval test cases for apigateway-throttle-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# ApiName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: apigateway-throttle-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: rest-to-http-api-migration
+    description: >-
+      REST API used purely as a Lambda proxy (no mapping templates, no
+      request validation, no stage caching). 200M requests/month. HTTP
+      API is 3.5x cheaper ($1.00/M vs $3.50/M). Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with REST-to-HTTP migration.
+    input: |
+      ApiName: api-rest-to-http-api-migration
+      ApiType: REST (REGIONAL)
+      Region: us-east-1
+      Stage: prod
+      Stage throttle: rate=10000 rps, burst=5000
+      Caching: disabled
+      Usage plans: none (single internal client)
+      Compression: disabled
+      WAF: not configured
+      VPC endpoint: not configured (REGIONAL)
+
+      Resources/Methods:
+        - GET /products → Lambda proxy integration (no mapping template)
+        - GET /products/{id} → Lambda proxy integration (no mapping template)
+        - POST /orders → Lambda proxy integration (no mapping template)
+        - No request validation schemas
+        - No client certificates
+        - Authorizer: Cognito User Pool (JWT)
+
+      Metrics (last 30 days):
+        - Count: 200,000,000/month
+        - 4xx: 5,000,000/month (2.5%)
+        - 5xx: 100,000/month (0.05%)
+        - Latency avg: 120 ms, p95: 250 ms
+        - IntegrationLatency avg: 95 ms
+
+      Cost data:
+        - Monthly cost: $700.00 (200M × $3.50/M)
+
+      Workload context: e-commerce product catalog + order submission.
+      All methods use Lambda proxy integration. No mapping templates,
+      no request validation, no stage caching. Cognito JWT authorizer
+      is used (supported on HTTP API).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "rest-to-http-api-migration"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "HTTP API"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: stage-cache-enablement
+    description: >-
+      REST API for a product catalog lookup. 70% of requests are
+      idempotent GETs with repeating parameters. Caching is disabled.
+      Backend IntegrationLatency is 95 ms avg. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with stage-level caching.
+    input: |
+      ApiName: api-stage-cache-enablement
+      ApiType: REST (REGIONAL)
+      Region: us-east-1
+      Stage: prod
+      Stage throttle: rate=5000 rps, burst=2000
+      Caching: disabled
+      Usage plans: none (single client)
+      Compression: disabled
+
+      Resources/Methods:
+        - GET /catalog → Lambda proxy (product lookup, changes hourly)
+        - GET /catalog/{id} → Lambda proxy (product detail, changes hourly)
+        - POST /search → Lambda proxy (dynamic search, NOT cacheable)
+
+      Metrics (last 30 days):
+        - Count: 100,000,000/month
+        - 4xx: 2,000,000/month (2%)
+        - 5xx: 50,000/month (0.05%)
+        - Latency avg: 110 ms, p95: 200 ms
+        - IntegrationLatency avg: 95 ms
+
+      Request breakdown:
+        - GET /catalog: 40M/month (idempotent, hourly change)
+        - GET /catalog/{id}: 30M/month (idempotent, hourly change)
+        - POST /search: 30M/month (dynamic, NOT cacheable)
+        - Idempotent GET ratio: 70%
+
+      Cost data:
+        - Monthly cost: $350.00 (100M × $3.50/M)
+        - Backend Lambda cost: $430.00 (100M invocations × ~95ms)
+
+      Workload context: product catalog API. GET endpoints return data
+      that changes hourly. POST search is dynamic and not cacheable.
+      No mapping templates or REST-only features beyond caching.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "stage-cache-enablement"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "cach"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: usage-plan-per-client-throttling
+    description: >-
+      REST API with 5 distinct client applications but no usage plans.
+      One aggressive client (mobile app) is consuming 80% of capacity,
+      causing 429 throttling for other clients. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with usage plan per-client throttling.
+    input: |
+      ApiName: api-usage-plan-per-client-throttling
+      ApiType: REST (REGIONAL)
+      Region: us-east-1
+      Stage: prod
+      Stage throttle: rate=2000 rps, burst=1000 (account-level only)
+      Caching: disabled
+      Usage plans: none
+      Compression: disabled
+
+      Resources/Methods:
+        - GET /users/{id} → Lambda proxy
+        - POST /data → Lambda proxy
+        - GET /reports → Lambda proxy
+
+      Metrics (last 30 days):
+        - Count: 150,000,000/month
+        - 4xx: 15,000,000/month (10% — mostly 429 Too Many Requests)
+        - 5xx: 75,000/month (0.05%)
+        - Latency avg: 80 ms, p95: 150 ms
+        - IntegrationLatency avg: 65 ms
+
+      Client breakdown:
+        - Mobile App (iOS): 120M requests/month (80% of traffic)
+        - Web Dashboard: 15M requests/month (10%)
+        - Partner Integration A: 7.5M requests/month (5%)
+        - Partner Integration B: 5.25M requests/month (3.5%)
+        - Internal CLI tool: 2.25M requests/month (1.5%)
+
+      429 throttle analysis:
+        - Mobile App consuming 80% of 2000 rps stage throttle
+        - Other clients getting 429 when mobile app spikes
+        - 15M 429 errors/month = 10% of total requests
+
+      Cost data:
+        - Monthly cost: $525.00 (150M × $3.50/M)
+
+      Workload context: multi-tenant SaaS API serving 5 distinct client
+      applications. Mobile app is the noisiest neighbor. Need per-client
+      rate limiting so one client cannot starve others.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "usage-plan-per-client-throttling"
+        - "RECOMMENDATION"
+        - "MIGRATION_STEPS"
+        - "usage plan"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: payload-compression-enablement
+    description: >-
+      REST API returning large JSON payloads (avg 180 KB) without
+      compression. 50M requests/month. Data transfer cost is significant.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with payload
+      compression and field filtering.
+    input: |
+      ApiName: api-payload-compression-enablement
+      ApiType: REST (REGIONAL)
+      Region: us-east-1
+      Stage: prod
+      Stage throttle: rate=3000 rps, burst=1500
+      Caching: disabled
+      Usage plans: 1 usage plan (single client)
+      Compression: disabled (minimumCompressionSize not set)
+
+      Resources/Methods:
+        - GET /reports/full → Lambda proxy (returns full report JSON, avg 250 KB)
+        - GET /reports/summary → Lambda proxy (returns summary JSON, avg 50 KB)
+        - GET /exports/{id} → Lambda proxy (returns export data, avg 180 KB)
+
+      Metrics (last 30 days):
+        - Count: 50,000,000/month
+        - 4xx: 500,000/month (1%)
+        - 5xx: 25,000/month (0.05%)
+        - Latency avg: 200 ms, p95: 400 ms
+        - IntegrationLatency avg: 150 ms
+
+      Payload analysis:
+        - Avg response size: 180 KB
+        - GET /reports/full: 20M req/month × 250 KB avg
+        - GET /reports/summary: 10M req/month × 50 KB avg
+        - GET /exports/{id}: 20M req/month × 180 KB avg
+        - Total data transfer: ~8.79 TB/month outbound
+
+      Cost data:
+        - API Gateway: $175.00 (50M × $3.50/M)
+        - Data transfer out: $791.10 (8,790 GB × $0.09/GB)
+        - Total: $966.10/month
+
+      Workload context: reporting API serving large JSON exports.
+      Responses include many nested fields. Clients typically only use
+      30% of returned fields. Lambda proxy integration with no mapping
+      templates.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "payload-compression-enablement"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "compress"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: already-optimized-api
+    description: >-
+      HTTP API with CloudFront caching (60% hit ratio), per-client usage
+      plans, gzip compression enabled, and optimal throttle settings.
+      No further optimization possible. Expected verdict: OPTIMIZED.
+    input: |
+      ApiName: api-already-optimized-api
+      ApiType: HTTP (REGIONAL)
+      Region: us-east-1
+      Stage: prod
+      Stage throttle: rate=5000 rps, burst=2000
+      Caching: CloudFront (1.3 GB, TTL 3600s, 60% hit ratio)
+      Usage plans: 3 tiers (Free: 5rps, Pro: 50rps, Enterprise: 500rps)
+      Compression: enabled (CloudFront gzip, minimumCompressionSize=1024)
+
+      Resources/Methods:
+        - GET /config → Lambda proxy (idempotent, cached at CloudFront, 1h TTL)
+        - GET /users/{id} → Lambda proxy (idempotent, cached at CloudFront)
+        - POST /events → Lambda proxy (NOT cached)
+
+      Metrics (last 30 days):
+        - Count: 80,000,000/month
+        - 4xx: 800,000/month (1%)
+        - 5xx: 40,000/month (0.05%)
+        - Latency avg: 45 ms, p95: 100 ms
+        - IntegrationLatency avg: 30 ms (low because 60% of calls cached)
+
+      Cache analysis:
+        - CloudFront cache hit ratio: 60%
+        - Backend Lambda calls: 32M/month (40% of 80M)
+        - Cache cost: $18.98/month (1.3 GB × $0.02 × 730)
+
+      Client breakdown:
+        - Free tier clients: 20 (5 rps each, 1M/month quota)
+        - Pro tier clients: 10 (50 rps each, 10M/month quota)
+        - Enterprise clients: 2 (500 rps each, unlimited)
+
+      Cost data:
+        - API Gateway: $80.00 (80M × $1.00/M HTTP API)
+        - CloudFront: $18.98 (cache) + $30.00 (transfer)
+        - Data transfer: $216.00 (avg 30 KB compressed × 80M)
+        - Total: $344.98/month
+
+      Workload context: configuration and user lookup API. Already on
+      HTTP API (cheapest), CloudFront caching is effective (60% hit
+      ratio), usage plans prevent noisy neighbors, compression is
+      enabled. No further optimization expected.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized-api"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"

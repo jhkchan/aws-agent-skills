@@ -1,0 +1,43 @@
+# Eval configuration for apigateway-throttle-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: apigateway-throttle-optimizer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: rest-to-http-api-migration
+    difficulty: hard
+    prompt_file: prompts/rest-to-http-api-migration.md
+    baseline_file: baselines/rest-to-http-api-migration.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: stage-cache-enablement
+    difficulty: medium
+    prompt_file: prompts/stage-cache-enablement.md
+    baseline_file: baselines/stage-cache-enablement.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: usage-plan-per-client-throttling
+    difficulty: hard
+    prompt_file: prompts/usage-plan-per-client-throttling.md
+    baseline_file: baselines/usage-plan-per-client-throttling.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: payload-compression-enablement
+    difficulty: medium
+    prompt_file: prompts/payload-compression-enablement.md
+    baseline_file: baselines/payload-compression-enablement.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: already-optimized-api
+    difficulty: easy
+    prompt_file: prompts/already-optimized-api.md
+    baseline_file: baselines/already-optimized-api.md
+    expected_verdict: OPTIMIZED

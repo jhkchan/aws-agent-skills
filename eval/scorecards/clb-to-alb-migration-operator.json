@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds substantial expert knowledge: exact CLB\u2011>ALB attribute mappings, concrete CLI command templates, cost\u2011baseline numbers, recent 2024\u20112026 ALB features (Lambda targets, OIDC, WAF, TLS\u202f1.3, weight\u2011based TG forwarding). However it omits several edge\u2011case details such as IPv6/dualstack handling, IP\u2011type target groups, ALB IP address type selection, and full health\u2011check matcher nuances beyond HTTP\u202f200, which prevents a perfect score."
+      "justification": "The skill compiles many expert\u2011level mappings (e.g., CLB ConnectionDraining \u2192 ALB deregistration_delay, sticky\u2011policy conversions, Proxy Protocol pitfalls) and a concrete pre\u2011check ordering that a senior engineer would find useful. However, a large portion restates publicly documented AWS behavior without adding new decision thresholds or novel heuristics, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific reasoning: ordered pre\u2011flight checks, mandatory CONFIRM gate, capture of pre\u2011state for audit, exact CLI sequences for each migration phase, and explicit rollback strategy. Minor gap: IAM\u2011uploaded certificate import is mentioned but not detailed step\u2011by\u2011step."
+      "justification": "Encodes an AWS\u2011specific workflow: ordered pre\u2011flight checks, mandatory CONFIRM gate, capture of pre\u2011state for audit, step\u2011by\u2011step CLI sequence, and rollback plan. Procedures are clearly tied to CLB\u2011to\u2011ALB migration rather than generic security checks."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete NEVER list with specific reasons (e.g., never migrate TCP/SSL passthrough, never cutover with Proxy Protocol, never delete CLB at cutover). Missing some common pitfalls such as security\u2011group ingress mismatches for the new ALB SG and health\u2011check matcher differences beyond 200, so not fully exhaustive."
+      "justification": "Contains concrete NEVER rules with clear reasons (e.g., never migrate TCP listeners, never cut over with Proxy Protocol enabled). Missing are anti\u2011patterns around mismatched health\u2011check protocols (TCP vs HTTP) and deeper warnings about IAM\u2011uploaded certificates beyond the brief mention, which would help avoid silent failures."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are present. The invocation schema is slightly vague about required JSON field names and types, which could cause activation ambiguity."
+      "justification": "Full frontmatter, clear description, explicit WHEN\u2011TO\u2011USE / WHEN\u2011NOT\u2011TO\u2011USE, activation triggers, and a precise invocation schema. An agent can reliably decide when to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns, heuristics) so a reader can skim or dive deeper. However, the initial sections are dense, which can cause cognitive overload before reaching the concise output contract."
+      "justification": "Top\u2011level quick reference and verdict table, then deeper Mindset, Pre\u2011flight, Process, Output contract, Anti\u2011Patterns, and Heuristics sections. Critical rules are not buried, and the initial view is lightweight."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly gated (CONFIRM, pre\u2011checks, rollback plan, weighted DNS cutover phases). Creative tasks (planning) are left freer. Only minor over\u2011constraint: the cutover example forces a specific 5/25/50/100 schedule, which may not suit all workloads."
+      "justification": "Destructive actions are tightly constrained by a CONFIRM gate, pre\u2011checks, and rollback steps; creative planning steps are left open (e.g., weighted cutover phases). Calibration matches task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Heuristics). Structure is coherent, though section titles are custom rather than a textbook template."
+      "justification": "Follows a recognizable pattern (frontmatter \u2192 What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011Patterns \u2192 Heuristics), aiding comprehension and reuse."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI commands, JSON payloads, and exact output format, enabling an agent to execute end\u2011to\u2011end. Missing full pagination loops for describe\u2011load\u2011balancers, detailed IAM\u2011cert import steps, and exhaustive error\u2011handling for edge cases (e.g., partial target registration failures)."
+      "justification": "Provides working CLI commands, decision trees, and a strict output contract, enabling cold execution. Deductions for missing ERROR verdict handling in the contract (the skill mentions emitting VERDICT: ERROR but the contract only lists READY/BLOCKED/COMPLETED) and for limited guidance on multi\u2011listener or IAM\u2011certificate import edge cases."
     }
   ],
-  "total_score": 106,
+  "total_score": 111,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 45681,
-  "latency_ms": 16528,
+  "grade": "A",
+  "token_count": 45791,
+  "latency_ms": 11941,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

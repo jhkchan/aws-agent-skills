@@ -2,9 +2,10 @@
 
 Diagnose the following ECS task failure report. The user has provided
 only a vague symptom — no task ARN, no stoppedReason, no exit code, no
-CloudWatch Logs output. Emit the standard VERDICT block. If the
-diagnostic tree cannot proceed without more evidence, emit
-NEED_MORE_INFO and list the missing inputs.
+CloudWatch Logs output. Emit the standard diagnostic block (TARGET,
+VERDICT, ROOT_CAUSE, REASON, EVIDENCE, REMEDIATION). If the diagnostic
+tree cannot proceed without more evidence, emit `INSUFFICIENT_DATA` and
+list the missing inputs and the next probe to run.
 
 ## Scenario
 

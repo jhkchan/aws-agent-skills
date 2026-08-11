@@ -11,17 +11,17 @@
       "difficulty": "hard",
       "prompt_file": "prompts/fargate-essential-container-secret-injection.md",
       "baseline_file": "baselines/fargate-essential-container-secret-injection.md",
-      "expected_verdict": "ROOT_CAUSE_FOUND",
-      "expected_root_cause_category": "ESSENTIAL_CONTAINER_EXIT",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_root_cause": "CONFIG_EXECUTION_ROLE",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["ROOT_CAUSE_FOUND", "ESSENTIAL_CONTAINER_EXIT", "secretsmanager:GetSecretValue", "execution role", "VERDICT", "REMEDIATION"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "CONFIG_EXECUTION_ROLE", "secretsmanager:GetSecretValue", "execution role", "VERDICT", "REMEDIATION"]
         },
         {
           "type": "must_not_contain",
-          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "privileged"]
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE_FOUND", "privileged"]
         }
       ]
     },
@@ -31,17 +31,17 @@
       "difficulty": "medium",
       "prompt_file": "prompts/fargate-oom-jvm-heap.md",
       "baseline_file": "baselines/fargate-oom-jvm-heap.md",
-      "expected_verdict": "ROOT_CAUSE_FOUND",
-      "expected_root_cause_category": "OOM",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_root_cause": "OOM",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["ROOT_CAUSE_FOUND", "OOM", "memory", "Xmx", "VERDICT", "REMEDIATION"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "OOM", "memory", "Xmx", "VERDICT", "REMEDIATION"]
         },
         {
           "type": "must_not_contain",
-          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "privileged"]
+          "values": ["Error:", "I cannot", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE_FOUND", "privileged"]
         }
       ]
     },
@@ -51,17 +51,17 @@
       "difficulty": "medium",
       "prompt_file": "prompts/alb-health-check-path-mismatch.md",
       "baseline_file": "baselines/alb-health-check-path-mismatch.md",
-      "expected_verdict": "ROOT_CAUSE_FOUND",
-      "expected_root_cause_category": "HEALTH_CHECK",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_root_cause": "HEALTH_CHECK",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["ROOT_CAUSE_FOUND", "HEALTH_CHECK", "/api/health", "VERDICT", "REMEDIATION"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "HEALTH_CHECK", "/api/health", "VERDICT", "REMEDIATION"]
         },
         {
           "type": "must_not_contain",
-          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+          "values": ["Error:", "I cannot", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE_FOUND"]
         }
       ]
     },
@@ -71,17 +71,17 @@
       "difficulty": "medium",
       "prompt_file": "prompts/ecr-image-pull-execution-role.md",
       "baseline_file": "baselines/ecr-image-pull-execution-role.md",
-      "expected_verdict": "ROOT_CAUSE_FOUND",
-      "expected_root_cause_category": "IMAGE_PULL",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_root_cause": "IMAGE_PULL_AUTH",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["ROOT_CAUSE_FOUND", "IMAGE_PULL", "ecr:BatchGetImage", "execution role", "VERDICT", "REMEDIATION"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "IMAGE_PULL_AUTH", "ecr:BatchGetImage", "execution role", "VERDICT", "REMEDIATION"]
         },
         {
           "type": "must_not_contain",
-          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+          "values": ["Error:", "I cannot", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE_FOUND"]
         }
       ]
     },
@@ -91,16 +91,17 @@
       "difficulty": "easy",
       "prompt_file": "prompts/insufficient-context-need-task-arn.md",
       "baseline_file": "baselines/insufficient-context-need-task-arn.md",
-      "expected_verdict": "NEED_MORE_INFO",
+      "expected_verdict": "INSUFFICIENT_DATA",
+      "expected_root_cause": "UNKNOWN",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["NEED_MORE_INFO", "VERDICT", "describe-tasks"]
+          "values": ["INSUFFICIENT_DATA", "VERDICT", "describe-tasks"]
         },
         {
           "type": "must_not_contain",
-          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "ROOT_CAUSE_FOUND", "Error:", "I cannot"]
         }
       ]
     }

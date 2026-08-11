@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudtrail-alert-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudTrail Alert Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "root-login-alert",
+      "name": "Root console login alert — CRITICAL, never suppressed, AUTOMATION_DEPLOYED",
+      "difficulty": "easy",
+      "prompt_file": "prompts/root-login-alert.md",
+      "baseline_file": "baselines/root-login-alert.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "root-login-alert", "CRITICAL", "VERDICT", "TEMPLATE", "ConsoleLogin"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "iam-change-enrichment",
+      "name": "IAM policy change with lookup-events enrichment — HIGH, AUTOMATION_DEPLOYED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/iam-change-enrichment.md",
+      "baseline_file": "baselines/iam-change-enrichment.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "iam-change-enrichment", "HIGH", "lookup-events", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "suppression-cicd-service",
+      "name": "CI/CD service role suppression with dedup and audit logging",
+      "difficulty": "medium",
+      "prompt_file": "prompts/suppression-cicd-service.md",
+      "baseline_file": "baselines/suppression-cicd-service.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "suppression-cicd-service", "cicd-deploy-role", "VERDICT", "SUPPRESSION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "security-hub-missing",
+      "name": "Security Hub not enabled — REVIEW_REQUIRED with specific gap",
+      "difficulty": "hard",
+      "prompt_file": "prompts/security-hub-missing.md",
+      "baseline_file": "baselines/security-hub-missing.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "security-hub-missing", "VERDICT", "GAP", "Security Hub"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "multi-account-org-trail",
+      "name": "Multi-account alerting via Organizations trail with cross-account forwarding",
+      "difficulty": "hard",
+      "prompt_file": "prompts/multi-account-org-trail.md",
+      "baseline_file": "baselines/multi-account-org-trail.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "multi-account-org-trail", "recipientAccountId", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

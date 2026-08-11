@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "The skill adds many expert details (silent\u2011failure table, exact IAM tag\u2011condition policy, ordering constraints, recent AWS feature notes) that a generic model would not know, but a sizable portion restates publicly documented FIS concepts without novel decision trees or thresholds, so it does not achieve full novelty."
+      "justification": "Adds concrete expert artifacts (silent\u2011failure table, 8\u2011step ordering, budgetDuration 2x rule, tag\u2011condition IAM policy) that a generic model would not enumerate, but most content restates known AWS documentation rather than novel decision trees."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides a concrete 8\u2011step AWS\u2011specific provisioning workflow and explicit verification steps, yet the initial \u201cconfirm intent\u201d and \u201cverify prerequisites\u201d steps are generic checklist habits rather than uniquely FIS\u2011centric reasoning."
+      "justification": "Provides AWS\u2011specific procedure order (target \u2192 action \u2192 stop\u2011condition \u2192 IAM \u2192 logging \u2192 budget) and concrete verification commands, yet some steps (e.g., \"verify via get\u2011experiment-template\") are generic and not uniquely AWS\u2011centric."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with clear why\u2011clauses, but only five items are enumerated and it omits other common pitfalls (e.g., cross\u2011account role trust mis\u2011configuration, missing region handling, S3 bucket policy edge cases), limiting completeness."
+      "justification": "Contains a solid NEVER list with concrete reasons and a dependency\u2011failure matrix, but omits several common pitfalls (cross\u2011account role trust, region\u2011specific action availability, missing S3 bucket encryption) that would strengthen the anti\u2011pattern coverage."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter and description are thorough, activation triggers and invocation schema are present, but the skill does not define an explicit output\u2011schema field or version tag for the strict contract, which could hinder automated validation."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present and clear; however the activation trigger list is overly verbose and could cause ambiguous routing in edge cases."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document is well\u2011structured with quick\u2011reference and deep sections, yet the full CLI command blocks and extensive tables are placed early, creating some cognitive overload before the core high\u2011level concepts are introduced."
+      "justification": "Uses layered sections (quick reference, deep heuristics, full procedure) which aid navigation, but the quick reference table already contains many details, creating some initial cognitive load."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly gated by prerequisites and NEVER rules, but the budgetDuration guidance (\u201c2\u00d7 action duration\u201d) is a generic heuristic that may be insufficient for long\u2011running or irreversible actions like terminate\u2011instances."
+      "justification": "Destructive operations are tightly constrained with explicit checks, NEVER rules, and verification steps; budgetDuration rationale is present but could be more quantitative for edge\u2011case actions."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable layout (overview, navigation, procedure, anti\u2011patterns, contract), yet it does not explicitly label the sections according to a named pattern (e.g., Mindset \u2192 Navigation \u2192 Philosophy), making the pattern slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (overview \u2192 navigation \u2192 activation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 output format); naming of sections is slightly ad\u2011hoc but overall coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides actionable CLI snippets, checklist, and verification commands, but lacks explicit error\u2011handling guidance, region/partition handling, pagination for list calls, and cross\u2011account role trust nuances, which could cause execution failures in real deployments."
+      "justification": "Provides working CLI examples, verification commands, and a strict output contract, enabling an agent to execute the skill; however it lacks explicit error\u2011handling branches for API failures or missing resources."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44379,
-  "latency_ms": 16082,
+  "token_count": 44508,
+  "latency_ms": 11404,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }
