@@ -1,0 +1,43 @@
+# Eval configuration for appconfig-deployment-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: appconfig-deployment-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: appconfig-linear-canary-start
+    difficulty: hard
+    prompt_file: prompts/appconfig-linear-canary-start.md
+    baseline_file: baselines/appconfig-linear-canary-start.md
+    expected_verdict: READY
+  - id: appconfig-rollback-alarm-blocks
+    difficulty: medium
+    prompt_file: prompts/appconfig-rollback-alarm-blocks.md
+    baseline_file: baselines/appconfig-rollback-alarm-blocks.md
+    expected_verdict: BLOCKED
+  - id: appconfig-lambda-extension-feature-flags
+    difficulty: hard
+    prompt_file: prompts/appconfig-lambda-extension-feature-flags.md
+    baseline_file: baselines/appconfig-lambda-extension-feature-flags.md
+    expected_verdict: READY
+  - id: appconfig-codedeploy-canary
+    difficulty: hard
+    prompt_file: prompts/appconfig-codedeploy-canary.md
+    baseline_file: baselines/appconfig-codedeploy-canary.md
+    expected_verdict: READY
+  - id: appconfig-terminated-deployment-recovery
+    difficulty: medium
+    prompt_file: prompts/appconfig-terminated-deployment-recovery.md
+    baseline_file: baselines/appconfig-terminated-deployment-recovery.md
+    expected_verdict: BLOCKED

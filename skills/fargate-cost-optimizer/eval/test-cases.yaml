@@ -1,0 +1,125 @@
+# Eval test cases for fargate-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: fargate-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: rightsizing-overprovisioned-cpu-memory
+    description: >-
+      Fargate task is over-provisioned: 2 vCPU / 4 GB but CPU
+      utilization averages 18% (max 35%) and memory averages 42%
+      (max 55%). Should be downsized to 1 vCPU / 2 GB.
+    input: |
+      Scenario: An ECS service on Fargate has task definition
+      order-processor:42 with cpu=2048 (2 vCPU) and memory=4096
+      (4 GB). Architecture is x86_64. 14-day CloudWatch metrics show
+      CPUUtilization average 18%, maximum 35%. MemoryUtilization
+      average 42%, maximum 55%. The service runs 10 tasks, 24/7.
+      Cost Explorer shows $636/month for this service on Fargate
+      On-Demand.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "RIGHT_SIZE"
+        - "VERDICT"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "ALREADY_OPTIMAL"
+
+  - id: fargate-spot-fault-tolerant
+    description: >-
+      Stateless, fault-tolerant ECS service running 100% On-Demand on
+      Fargate. Should evaluate Fargate Spot capacity provider.
+    input: |
+      Scenario: An ECS service processes SQS messages on Fargate.
+      Task definition: worker:8, 1 vCPU / 2 GB, x86_64. The service
+      runs 20 tasks, 24/7, all on Fargate On-Demand. The workload is
+      stateless: each task pulls from SQS, processes, deletes the
+      message. If a task is interrupted, the message returns to the
+      queue after the visibility timeout. Monthly Fargate cost is
+      $631/month.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "Spot"
+        - "VERDICT"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "ALREADY_OPTIMAL"
+
+  - id: graviton-arm64-migration
+    description: >-
+      ECS service on x86_64 Fargate running Java 21. Should be
+      evaluated for ARM64/Graviton migration (20% savings).
+    input: |
+      Scenario: An ECS service runs a Java 21 (Corretto) application
+      on Fargate. Task definition: api-server:15, 2 vCPU / 4 GB,
+      x86_64. CPUUtilization averages 55%, memory 70%. The service
+      runs 15 tasks. No Spot or Savings Plans are in use. Monthly
+      Fargate cost is $953/month. The image is built with
+      docker build and pushed to ECR.
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "ARM64"
+        - "VERDICT"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "ALREADY_OPTIMAL"
+
+  - id: already-optimal-workload
+    description: >-
+      ECS service already optimized: right-sized, ARM64, Spot
+      capacity provider, Savings Plan in place.
+    input: |
+      Scenario: An ECS service has task definition web-frontend:30,
+      0.5 vCPU / 1 GB, ARM64. CPUUtilization averages 58%, memory
+      65%. The service uses a capacity provider strategy with
+      FargateSpot weight 4, Fargate base 1. A 1-year Compute Savings
+      Plan covers the steady-state baseline. Auto scaling is enabled
+      with target 60% CPU.
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "VERDICT"
+      must_not_contain:
+        - "OPPORTUNITY_FOUND"
+        - "Error:"
+        - "I cannot"
+
+  - id: savings-plans-steady-state
+    description: >-
+      Steady-state ECS service running 24/7 on On-Demand with no
+      Savings Plan. Should evaluate a Compute Savings Plan.
+    input: |
+      Scenario: An ECS service runs a reporting daemon on Fargate.
+      Task definition: reporter:5, 1 vCPU / 2 GB, x86_64.
+      CPUUtilization averages 60%, memory 55%. The service runs 8
+      tasks, 24/7, 365 days/year. No Fargate Spot or Savings Plans
+      are in use. Monthly Fargate cost is $252/month. The workload
+      cannot tolerate interruption (long-running report generation).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "Savings Plan"
+        - "VERDICT"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "ALREADY_OPTIMAL"

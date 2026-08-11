@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "appconfig-deployment-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the AppConfig Deployment Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "appconfig-linear-canary-start",
+      "name": "Start a 5-step linear canary deployment (GrowthFactor 20, 30 min deploy + 30 min bake) with a CloudWatch rollback alarm",
+      "difficulty": "hard",
+      "prompt_file": "prompts/appconfig-linear-canary-start.md",
+      "baseline_file": "baselines/appconfig-linear-canary-start.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "start-deployment", "GrowthFactor", "BakeTimeInMinutes", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "AllAtOnce"]
+        }
+      ]
+    },
+    {
+      "id": "appconfig-rollback-alarm-blocks",
+      "name": "Start-deployment BLOCKED because the rollback CloudWatch alarm is currently in ALARM state",
+      "difficulty": "medium",
+      "prompt_file": "prompts/appconfig-rollback-alarm-blocks.md",
+      "baseline_file": "baselines/appconfig-rollback-alarm-blocks.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "ALARM", "checkout-5xx", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "appconfig-lambda-extension-feature-flags",
+      "name": "Wire the AppConfig Lambda extension for runtime feature flags on a Lambda function without redeploy",
+      "difficulty": "hard",
+      "prompt_file": "prompts/appconfig-lambda-extension-feature-flags.md",
+      "baseline_file": "baselines/appconfig-lambda-extension-feature-flags.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "AWS-AppConfig-Extension", "AWS_APPCONFIG_EXTENSION_APPLICATION_NAME", "localhost:2772", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "GetConfiguration"]
+        }
+      ]
+    },
+    {
+      "id": "appconfig-codedeploy-canary",
+      "name": "Configure a CodeDeploy deployment group using AppConfig.50Percent canary with WITH_TRAFFIC_CONTROL for an EC2 deployment",
+      "difficulty": "hard",
+      "prompt_file": "prompts/appconfig-codedeploy-canary.md",
+      "baseline_file": "baselines/appconfig-codedeploy-canary.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "AppConfig.50Percent", "WITH_TRAFFIC_CONTROL", "create-deployment-group", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "AllAtOnce"]
+        }
+      ]
+    },
+    {
+      "id": "appconfig-terminated-deployment-recovery",
+      "name": "Diagnose a TERMINATED deployment (profile deleted mid-deployment) and plan recovery via fresh start-deployment",
+      "difficulty": "medium",
+      "prompt_file": "prompts/appconfig-terminated-deployment-recovery.md",
+      "baseline_file": "baselines/appconfig-terminated-deployment-recovery.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "TERMINATED", "start-deployment", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: COMPLETED", "resume"]
+        }
+      ]
+    }
+  ]
+}

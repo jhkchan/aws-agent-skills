@@ -1,0 +1,148 @@
+# Eval test cases for lambda-layer-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across layer types
+# (Python Powertools layer, Node.js SDK layer, arm64 Graviton layer,
+#  cross-account sharing, missing runtime/architecture).
+skill: lambda-layer-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: python-powertools-layer
+    description: >-
+      Provision a Python Lambda Layer with Powertools and common
+      dependencies for arm64 functions. Expects READY_TO_DEPLOY with
+      all checklist items verified including correct zip path
+      (python/), compatible runtimes, and arm64 architecture.
+    input: |
+      Create a Python Lambda Layer named "my-powertools-layer" in
+      us-east-1. Include aws-lambda-powertools, boto3, and requests.
+      Compatible with python3.10, python3.11, python3.12, and
+      python3.13. Architecture: arm64 only (Graviton). License: MIT.
+      Attach it to function "my-api-fn" which runs on python3.12 +
+      arm64. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "my-powertools-layer"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "arm64"
+        - "python3.10"
+        - "python3.13"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: nodejs-sdk-layer
+    description: >-
+      Provision a Node.js Lambda Layer bundling the AWS SDK for
+      Node.js 22+ (which does not bundle the SDK by default). Expects
+      READY_TO_DEPLOY with Node.js runtimes, x86_64 architecture,
+      and correct zip path (nodejs/node_modules/).
+    input: |
+      I need a Node.js Lambda Layer named "sdk-layer" in us-east-1
+      that bundles @aws-sdk/client-s3, @aws-sdk/client-dynamodb, and
+      @aws-sdk/lib-dynamodb for Node.js 22 functions (which don't
+      bundle the SDK by default). Compatible runtimes: nodejs20.x and
+      nodejs22.x. Architecture: x86_64. License: Apache-2.0. Account
+      ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "sdk-layer"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "nodejs22.x"
+        - "x86_64"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: arm64-graviton-layer
+    description: >-
+      Provision a provided.al2023 Lambda Layer with a Go binary
+      compiled for arm64 (Graviton). Expects READY_TO_DEPLOY with
+      provided.al2023 runtime, arm64 architecture, and correct zip
+      path (bin/).
+    input: |
+      Create a Lambda Layer named "go-utils-layer" in us-east-1 for
+      provided.al2023 runtime. It contains a Go binary compiled for
+      arm64 (Graviton) that provides a custom data-processing tool.
+      Architecture: arm64 only. The binary is at ./layer/bin/bootstrap.
+      License: MIT. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "go-utils-layer"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "provided.al2023"
+        - "arm64"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-sharing
+    description: >-
+      Provision a Python Lambda Layer and share it cross-account with
+      account 123456789012. Expects READY_TO_DEPLOY with cross-account
+      sharing cited (resource-based policy + consumer IAM).
+    input: |
+      Create a Python Lambda Layer named "shared-utils-layer" in
+      us-east-1 with numpy and pandas for python3.12. Architecture:
+      x86_64. Share this layer with account 123456789012 so they can
+      attach it to their Lambda functions. License: BSD-3-Clause.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-utils-layer"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "123456789012"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-runtime-arch
+    description: >-
+      Operator requests a Lambda Layer but has not specified the
+      target runtime(s) or architecture(s). Lambda layers MUST
+      declare compatible runtimes and architectures for correct
+      path resolution and attachment validation. Expects
+      PREREQUISITES_MISSING with specific gaps cited.
+    input: |
+      Help me create a Lambda Layer called "my-deps-layer" in
+      us-east-1. I want to put some Python and Node.js libraries in
+      it and attach it to my functions. Account ID: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "my-deps-layer"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

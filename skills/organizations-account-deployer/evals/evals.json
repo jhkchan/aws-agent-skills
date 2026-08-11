@@ -1,0 +1,180 @@
+{
+  "skill": "organizations-account-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Organizations Account Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across creation paths (Control Tower Account Factory, Organizations create-account, consolidated billing focus, Terraform + custom baseline) and a missing-prerequisite branch. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-account-via-control-tower",
+      "name": "Production account via Control Tower Account Factory with SSO + SCP + org trail",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Account Factory vending with OU-level SCP and tag policy inheritance, CloudTrail org trail, IAM Identity Center permission set, Config aggregator, alternate contacts, budget, RAM share",
+      "prompt": "Provision a production AWS account named \"prod-workload-use1\" via Control Tower Account Factory. Root email is the distribution list aws+prod-workload@yourdomain.com. Place the account in the prod OU (ou-prod-abc). Management account 123456789012 is in ALL_FEATURES mode with SCP and tag policy types enabled. SCP \"DenyUnapprovedRegions\" and tag policy \"CostCenterRequired\" should apply via OU inheritance. The CloudTrail org trail \"org-audit-trail\" already exists. Assign the \"ProductionAdmins\" permission set to the \"Eng-Prod\" group (Identity Center instance ssoins-0123). Config aggregator \"org-aggregator\" lives in delegated admin 123456789012. Alternate contacts: Billing=finops@yourdomain.com, Security=security@yourdomain.com, Operations=ops@yourdomain.com. Budget: $5000/month alert at 80%. Share the org Transit Gateway tgw-0abc123 via RAM. Region: us-east-1.",
+      "prompt_file": "prompts/production-account-via-control-tower.md",
+      "baseline_file": "baselines/production-account-via-control-tower.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCOUNT: prod-workload-use1\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Creation path: Control Tower Account Factory\n  [✓] Root email: aws+prod-workload@yourdomain.com\n  [✓] IAM role name: OrganizationAccountAccessRole\n  [✓] Billing: Consolidated (payer: 123456789012)\n  [✓] SCP attached: DenyUnapprovedRegions (OU ou-prod-abc)\n  [✓] Tag policy attached: CostCenterRequired (OU ou-prod-abc)\n  [✓] CloudTrail org trail: org-audit-trail (inherited)\n  [✓] IAM Identity Center: ProductionAdmins assigned to group Eng-Prod\n  [✓] Config aggregator: org-aggregator (delegated admin: 123456789012)\n  [✓] Alternate contacts: Billing=finops@, Security=security@, Operations=ops@yourdomain.com\n  [✓] Budget: prod-workload-budget ($5000/month, alert at 80%)\n  [✓] RAM shares: org-tgw-share\n  [✓] Baseline: Account Factory blueprint (VPC, guardrails, SSO, Config)\nVERIFICATION_COMMANDS:\n  aws organizations describe-account --account-id <account-id>\n  aws organizations list-policies-for-target --target-id <account-id>\n  aws cloudtrail list-trails --query 'Trails[?IsOrganizationTrail==`true`]'\n  aws sso-admin list-account-assignments --instance-arn <arn> --account-id <account-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-workload-use1",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Control Tower Account Factory",
+            "OrganizationAccountAccessRole",
+            "org-audit-trail",
+            "DenyUnapprovedRegions"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workload-account-create-account-scp-tags",
+      "name": "Workload account via Organizations create-account with OU-level SCP and tag policy",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Organizations create-account with consolidated billing, OU-level SCP/tag policy inheritance, OrganizationAccountAccessRole bootstrap",
+      "prompt": "Provision a new AWS member account via Organizations create-account. Account name \"analytics-pipeline-use1\", root email aws+analytics@yourdomain.com. Management account 123456789012 in ALL_FEATURES mode. Place in the OU ou-data-abc so it inherits the \"DenyUnapprovedRegions\" SCP and the \"CostCenterRequired\" tag policy. IAM role name \"OrganizationAccountAccessRole\". Consolidated billing under the management payer. CloudTrail org trail \"org-audit-trail\" exists. Budget: $2000/month alert at 75%. Region: us-east-1.",
+      "prompt_file": "prompts/workload-account-create-account-scp-tags.md",
+      "baseline_file": "baselines/workload-account-create-account-scp-tags.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCOUNT: analytics-pipeline-use1\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Creation path: Organizations create-account\n  [✓] Root email: aws+analytics@yourdomain.com\n  [✓] IAM role name: OrganizationAccountAccessRole\n  [✓] Billing: Consolidated (payer: 123456789012)\n  [✓] SCP attached: DenyUnapprovedRegions (OU ou-data-abc)\n  [✓] Tag policy attached: CostCenterRequired (OU ou-data-abc)\n  [✓] CloudTrail org trail: org-audit-trail (inherited)\n  [✓] IAM Identity Center: N/A\n  [✓] Config aggregator: N/A\n  [✓] Alternate contacts: N/A\n  [✓] Budget: analytics-pipeline-budget ($2000/month, alert at 75%)\n  [✓] RAM shares: N/A\n  [✓] Baseline: N/A\nVERIFICATION_COMMANDS:\n  aws organizations describe-account --account-id <account-id>\n  aws organizations list-policies-for-target --target-id <account-id>\n  aws cloudtrail list-trails --query 'Trails[?IsOrganizationTrail==`true`]'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "analytics-pipeline-use1",
+            "VERDICT",
+            "CHECKLIST",
+            "OrganizationAccountAccessRole",
+            "create-account",
+            "Consolidated"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-root-email-and-iam-role",
+      "name": "Operator has not specified root email, IAM role name, OU placement, or SSO",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — root email (immutable identity), IAM role name (consistency), OU placement (SCP/tag policy inheritance), SSO permission set all unspecified",
+      "prompt": "Help me create a new AWS account for our dev team. Just call it \"dev-sandbox\". We want it under our existing organization in us-east-1. Management account is 123456789012.",
+      "prompt_file": "prompts/missing-root-email-and-iam-role.md",
+      "baseline_file": "baselines/missing-root-email-and-iam-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ACCOUNT: dev-sandbox\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Root email: NOT specified — needs a unique distribution list email (acts as the new account's root identity)\n  [✗] IAM role name: NOT specified — default OrganizationAccountAccessRole recommended for cross-org consistency\n  [✗] OU placement: NOT specified — OU placement determines SCP and tag policy inheritance\n  [✗] CloudTrail org trail: NOT verified — new account inherits only if the org trail already exists\n  [✗] IAM Identity Center: NOT specified — new account is silent and inaccessible until a permission set is assigned\nVERIFICATION_COMMANDS:\n  aws organizations describe-organization --query 'Organization.FeatureSet'\n  aws organizations list-roots --query 'Roots[0].PolicyTypes'\n  aws organizations list-organizational-units-for-parent --parent-id <root-id>\n  aws cloudtrail list-trails --query 'Trails[?IsOrganizationTrail==`true`]'\n  aws sso-admin list-instances",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "dev-sandbox",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "consolidated-billing-budget-account",
+      "name": "Member account with consolidated billing, budget, alternate billing contact, Cost Explorer",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Organizations create-account with consolidated billing focus, $500/month budget, billing alternate contact, Cost Explorer opt-in",
+      "prompt": "Provision an AWS member account \"marketing-sandbox-use1\" via Organizations create-account. Root email aws+marketing@yourdomain.com. IAM role name \"OrganizationAccountAccessRole\". Management account 123456789012 is the payer with consolidated billing. Place in OU ou-sandbox-abc. CloudTrail org trail exists. Set the billing alternate contact to finops@yourdomain.com. Define a budget of $500/month with an alert at 90%. Enable Cost Explorer. Region: us-east-1.",
+      "prompt_file": "prompts/consolidated-billing-budget-account.md",
+      "baseline_file": "baselines/consolidated-billing-budget-account.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCOUNT: marketing-sandbox-use1\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Creation path: Organizations create-account\n  [✓] Root email: aws+marketing@yourdomain.com\n  [✓] IAM role name: OrganizationAccountAccessRole\n  [✓] Billing: Consolidated (payer: 123456789012)\n  [✓] SCP attached: N/A\n  [✓] Tag policy attached: N/A\n  [✓] CloudTrail org trail: org-audit-trail (inherited)\n  [✓] IAM Identity Center: N/A\n  [✓] Config aggregator: N/A\n  [✓] Alternate contacts: Billing=finops@yourdomain.com\n  [✓] Budget: marketing-sandbox-budget ($500/month, alert at 90%)\n  [✓] RAM shares: N/A\n  [✓] Baseline: N/A\nVERIFICATION_COMMANDS:\n  aws organizations describe-account --account-id <account-id>\n  aws account get-alternate-contact --account-id <account-id> --alternate-contact-type BILLING\n  aws budgets describe-budget --account-id <account-id> --budget-name marketing-sandbox-budget",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "marketing-sandbox-use1",
+            "VERDICT",
+            "CHECKLIST",
+            "Consolidated",
+            "OrganizationAccountAccessRole"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "terraform-account-factory-baseline",
+      "name": "Production account via Terraform aws_organizations_account + Account Factory custom baseline",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Terraform vending with Control Tower Account Factory custom baseline (SecurityBaseline StackSet, VPC, Config conformance pack), permission set assignment, org trail",
+      "prompt": "Provision a production AWS account \"payments-prod-use1\" via Terraform aws_organizations_account. Root email aws+payments@yourdomain.com. Use the Control Tower Account Factory custom baseline that applies the \"SecurityBaseline\" StackSet, VPC, and Config conformance pack at vending. IAM role name \"OrganizationAccountAccessRole\". Place in OU ou-prod-abc (inherits \"DenyUnapprovedRegions\" SCP and \"CostCenterRequired\" tag policy). Management account 123456789012. CloudTrail org trail \"org-audit-trail\" exists. Assign the \"PaymentsAdmins\" permission set to the \"Eng-Payments\" group. Region: us-east-1.",
+      "prompt_file": "prompts/terraform-account-factory-baseline.md",
+      "baseline_file": "baselines/terraform-account-factory-baseline.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCOUNT: payments-prod-use1\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Creation path: Terraform aws_organizations_account + Account Factory custom baseline\n  [✓] Root email: aws+payments@yourdomain.com\n  [✓] IAM role name: OrganizationAccountAccessRole\n  [✓] Billing: Consolidated (payer: 123456789012)\n  [✓] SCP attached: DenyUnapprovedRegions (OU ou-prod-abc)\n  [✓] Tag policy attached: CostCenterRequired (OU ou-prod-abc)\n  [✓] CloudTrail org trail: org-audit-trail (inherited)\n  [✓] IAM Identity Center: PaymentsAdmins assigned to group Eng-Payments\n  [✓] Config aggregator: org-aggregator (Config conformance pack applied at vending)\n  [✓] Alternate contacts: N/A\n  [✓] Budget: N/A\n  [✓] RAM shares: N/A\n  [✓] Baseline: SecurityBaseline StackSet + VPC + Config conformance pack\nVERIFICATION_COMMANDS:\n  aws organizations describe-account --account-id <account-id>\n  aws organizations list-policies-for-target --target-id <account-id>\n  aws cloudtrail list-trails --query 'Trails[?IsOrganizationTrail==`true`]'\n  aws sso-admin list-account-assignments --instance-arn <arn> --account-id <account-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "payments-prod-use1",
+            "VERDICT",
+            "CHECKLIST",
+            "OrganizationAccountAccessRole",
+            "Terraform"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

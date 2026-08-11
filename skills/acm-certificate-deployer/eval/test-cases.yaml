@@ -1,0 +1,143 @@
+# Eval test cases for acm-certificate-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across certificate types
+# (public DNS-validated with CloudFront, wildcard cert, imported
+#  third-party cert, private cert via PCA, missing prerequisites).
+skill: acm-certificate-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-dns-cloudfront
+    description: >-
+      Provision a public ACM certificate with DNS validation for
+      CloudFront. Expects READY_TO_DEPLOY with all checklist items
+      verified including us-east-1 region, apex + wildcard domains,
+      DNS validation, and CloudFront integration.
+    input: |
+      Request a public ACM certificate for example.com and
+      *.example.com with DNS validation in us-east-1. Attach it to
+      CloudFront distribution E1234567890ABC. Route53 hosted zone
+      Z2KVMGOMGDOOU2. Key algorithm RSA_2048. Tags:
+      Environment=production, Service=website. Account ID:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "us-east-1"
+        - "DNS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: wildcard-san-certificate
+    description: >-
+      Provision a public wildcard ACM certificate with multiple SANs
+      including multi-level subdomains. Expects READY_TO_DEPLOY with
+      wildcard + apex + multi-level SANs cited.
+    input: |
+      I need a public ACM certificate in us-east-1 for *.example.com,
+      example.com, and *.api.example.com. DNS validation using Route53
+      zone Z2KVMGOMGDOOU2. This is for an ALB in us-east-1. Key
+      algorithm RSA_2048. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "*.example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "*.api.example.com"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: import-third-party-cert
+    description: >-
+      Import a third-party certificate from an external CA into ACM.
+      Expects READY_TO_DEPLOY with imported cert type, PEM format
+      noted, and manual renewal (NOT auto-renewed) flagged.
+    input: |
+      Import a third-party TLS certificate into ACM in us-east-1. I
+      have the PEM certificate at ./certs/certificate.pem, the private
+      key at ./certs/private-key.pem, and the chain at
+      ./certs/chain.pem. The certificate is from DigiCert and covers
+      api.example.com. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Imported"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "PEM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: private-cert-via-pca
+    description: >-
+      Request a private ACM certificate via AWS Private CA for
+      internal mTLS. Expects READY_TO_DEPLOY with private cert type,
+      PCA ARN cited, and internal-use notation.
+    input: |
+      Request a private ACM certificate for internal.api.example.com
+      via our AWS Private CA
+      arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc-123.
+      This is for internal mTLS between microservices. DNS validation.
+      Region us-east-1. Tags: Environment=internal, UseCase=mTLS.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Private"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "internal.api.example.com"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-region-cloudfront
+    description: >-
+      Operator requests a CloudFront certificate but has not specified
+      the region. CloudFront requires us-east-1; the default region
+      may be wrong. Expects PREREQUISITES_MISSING with the us-east-1
+      requirement cited.
+    input: |
+      I need an ACM certificate for my CloudFront distribution. The
+      domain is www.example.com. My AWS CLI is configured for
+      us-west-2. Just use whatever region is fine. Account ID:
+      123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "www.example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "us-east-1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

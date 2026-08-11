@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "sagemaker-model-registry-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SageMaker Model Registry Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "sagemaker-register-group-package",
+      "name": "Register a versioned model package in an existing group with PendingManualApproval, full InferenceSpecification, and ModelMetrics",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sagemaker-register-group-package.md",
+      "baseline_file": "baselines/sagemaker-register-group-package.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-model-package", "PendingManualApproval", "ModelPackageGroupName", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "standalone"]
+        }
+      ]
+    },
+    {
+      "id": "sagemaker-approve-for-production",
+      "name": "Approve a model package (PendingManualApproval to Approved) for production deployment via the SageMaker Projects pipeline",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sagemaker-approve-for-production.md",
+      "baseline_file": "baselines/sagemaker-approve-for-production.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "update-model-package", "Approved", "approval-description", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "Rejected"]
+        }
+      ]
+    },
+    {
+      "id": "sagemaker-approve-blocked-no-inference-spec",
+      "name": "Approve BLOCKED because the package has no InferenceSpecification (documentation-only); approving cannot enable deployment",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sagemaker-approve-blocked-no-inference-spec.md",
+      "baseline_file": "baselines/sagemaker-approve-blocked-no-inference-spec.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "InferenceSpecification", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "sagemaker-model-card-auto-populate",
+      "name": "Create a SageMaker Model Card auto-populated from a registered model package via --source-uri-type ModelPackage",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sagemaker-model-card-auto-populate.md",
+      "baseline_file": "baselines/sagemaker-model-card-auto-populate.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-model-card", "ModelPackage", "source-uri", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "Draft"]
+        }
+      ]
+    },
+    {
+      "id": "sagemaker-projects-pipeline-not-triggered",
+      "name": "Diagnose why the SageMaker Projects deploy pipeline did not trigger after approval (EventBridge EventPattern wrong group)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sagemaker-projects-pipeline-not-triggered.md",
+      "baseline_file": "baselines/sagemaker-projects-pipeline-not-triggered.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "EventBridge", "fraud-detection-research", "put-rule", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: COMPLETED", "READY"]
+        }
+      ]
+    }
+  ]
+}

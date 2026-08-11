@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-logs-insights-troubshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Logs Insights Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "no-results-wrong-log-group",
+      "name": "Query returns 0 rows — wrong log group name (/aws/lambda/my-api vs /aws/lambda/my-api-prod)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/no-results-wrong-log-group.md",
+      "baseline_file": "baselines/no-results-wrong-log-group.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "NO_RESULTS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "NO_RESULTS", "log group", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "timeout-no-early-filter",
+      "name": "Query cancelled (timeout) — scans 7 days with no filter before sort, parse on every event",
+      "difficulty": "hard",
+      "prompt_file": "prompts/timeout-no-early-filter.md",
+      "baseline_file": "baselines/timeout-no-early-filter.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "TIMEOUT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "TIMEOUT", "filter", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "syntax-error-command-ordering",
+      "name": "Query fails with syntax error — limit placed before sort",
+      "difficulty": "medium",
+      "prompt_file": "prompts/syntax-error-command-ordering.md",
+      "baseline_file": "baselines/syntax-error-command-ordering.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "SYNTAX_ERROR",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "SYNTAX_ERROR", "sort", "limit", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "contributor-insights-not-enabled",
+      "name": "Contributor Insights tab empty — no rule created for the log group",
+      "difficulty": "medium",
+      "prompt_file": "prompts/contributor-insights-not-enabled.md",
+      "baseline_file": "baselines/contributor-insights-not-enabled.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "CONTRIBUTOR_INSIGHTS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "CONTRIBUTOR_INSIGHTS", "put-insight-rule", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot"]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-context-no-query",
+      "name": "Vague report of Logs Insights not working — request query text + log group name",
+      "difficulty": "easy",
+      "prompt_file": "prompts/insufficient-context-no-query.md",
+      "baseline_file": "baselines/insufficient-context-no-query.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "query"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

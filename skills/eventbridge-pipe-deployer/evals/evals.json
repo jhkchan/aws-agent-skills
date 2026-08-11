@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "eventbridge-pipe-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EventBridge Pipe Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "ddb-streams-lambda-filter-dlq",
+      "name": "Standard DynamoDB Streams pipe to Lambda with filter pattern and pipe-level DLQ",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ddb-streams-lambda-filter-dlq.md",
+      "baseline_file": "baselines/ddb-streams-lambda-filter-dlq.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-orders-pipe", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "DynamoDB Streams"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "kinesis-stepfunctions-batch-window",
+      "name": "Kinesis source to Step Functions Standard target with 30s batch window and AUTOMATIC_BISECT",
+      "difficulty": "medium",
+      "prompt_file": "prompts/kinesis-stepfunctions-batch-window.md",
+      "baseline_file": "baselines/kinesis-stepfunctions-batch-window.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-events-orchestration", "VERDICT", "Kinesis", "Step Functions", "AUTOMATIC_BISECT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "sqs-source-missing-redrive-policy",
+      "name": "SQS source with pipe-level DeadLetterConfig but no RedrivePolicy on source queue — silent poison-pill failure mode",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sqs-source-missing-redrive-policy.md",
+      "baseline_file": "baselines/sqs-source-missing-redrive-policy.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "prod-jobs-pipe", "VERDICT", "RedrivePolicy"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "enrichment-lambda-transformation",
+      "name": "DynamoDB Streams to Step Functions with Lambda enrichment that joins customer data — dual IAM grants",
+      "difficulty": "hard",
+      "prompt_file": "prompts/enrichment-lambda-transformation.md",
+      "baseline_file": "baselines/enrichment-lambda-transformation.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-orders-enriched", "VERDICT", "enrichment", "orders-enrich"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "aws-batch-target-from-msk",
+      "name": "MSK source to AWS Batch target with Kafka consumer group and SCRAM auth — exercises recent Batch target feature",
+      "difficulty": "hard",
+      "prompt_file": "prompts/aws-batch-target-from-msk.md",
+      "baseline_file": "baselines/aws-batch-target-from-msk.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-batch-pipeline", "VERDICT", "AWS Batch", "MSK", "ConsumerGroupID"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    }
+  ]
+}

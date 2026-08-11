@@ -1,0 +1,175 @@
+{
+  "skill": "acm-certificate-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the ACM Certificate Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across certificate types (public DNS-validated with CloudFront, wildcard multi-SAN, imported third-party PEM, private cert via Private CA, missing region for CloudFront). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "public-dns-cloudfront",
+      "name": "Public ACM certificate with DNS validation for CloudFront in us-east-1",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — public cert, DNS validation, us-east-1 (CloudFront requirement), apex + wildcard domains, CloudFront integration",
+      "prompt": "Request a public ACM certificate for example.com and *.example.com with DNS validation in us-east-1. Attach it to CloudFront distribution E1234567890ABC. Route53 hosted zone Z2KVMGOMGDOOU2. Key algorithm RSA_2048. Tags: Environment=production, Service=website. Account ID: 123456789012.",
+      "prompt_file": "prompts/public-dns-cloudfront.md",
+      "baseline_file": "baselines/public-dns-cloudfront.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACM_CERTIFICATE: *.example.com (arn:aws:acm:us-east-1:123456789012:certificate/abc-123)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Certificate type: Public\n  [✓] Domain names: example.com, *.example.com\n  [✓] Validation method: DNS (recommended)\n  [✓] DNS validation CNAME: added to Route53 zone Z2KVMGOMGDOOU2\n  [✓] Certificate status: ISSUED\n  [✓] Key algorithm: RSA_2048\n  [✓] Renewal: Automatic (ACM-managed, 60 days before expiry)\n  [✓] Region: us-east-1 (required for CloudFront)\n  [✓] CloudFront integration: E1234567890ABC → cert in us-east-1\n  [✓] Tags: Environment=production, Service=website\nVERIFICATION_COMMANDS:\n  aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/abc-123 --region us-east-1\n  aws route53 list-resource-record-sets --hosted-zone-id Z2KVMGOMGDOOU2\n  aws cloudfront get-distribution-config --id E1234567890ABC",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "example.com",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "us-east-1",
+            "DNS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wildcard-san-certificate",
+      "name": "Public wildcard cert with multi-level SANs for ALB",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — wildcard + apex + multi-level SAN (*.api.example.com), DNS validation, for ALB in us-east-1",
+      "prompt": "I need a public ACM certificate in us-east-1 for *.example.com, example.com, and *.api.example.com. DNS validation using Route53 zone Z2KVMGOMGDOOU2. This is for an ALB in us-east-1. Key algorithm RSA_2048. Account ID: 123456789012.",
+      "prompt_file": "prompts/wildcard-san-certificate.md",
+      "baseline_file": "baselines/wildcard-san-certificate.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACM_CERTIFICATE: *.example.com (arn:aws:acm:us-east-1:123456789012:certificate/def-456)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Certificate type: Public\n  [✓] Domain names: example.com, *.example.com, *.api.example.com\n  [✓] Validation method: DNS (recommended)\n  [✓] DNS validation CNAME: added to Route53 zone Z2KVMGOMGDOOU2\n  [✓] Certificate status: ISSUED\n  [✓] Key algorithm: RSA_2048\n  [✓] Renewal: Automatic (ACM-managed, 60 days before expiry)\n  [✓] Region: us-east-1\nVERIFICATION_COMMANDS:\n  aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/def-456 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "*.example.com",
+            "VERDICT",
+            "CHECKLIST",
+            "*.api.example.com"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "import-third-party-cert",
+      "name": "Import third-party certificate (PEM) from DigiCert into ACM",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — imported certificate with PEM cert + key + chain, manual renewal noted (NOT auto-renewed)",
+      "prompt": "Import a third-party TLS certificate into ACM in us-east-1. I have the PEM certificate at ./certs/certificate.pem, the private key at ./certs/private-key.pem, and the chain at ./certs/chain.pem. The certificate is from DigiCert and covers api.example.com. Account ID: 123456789012.",
+      "prompt_file": "prompts/import-third-party-cert.md",
+      "baseline_file": "baselines/import-third-party-cert.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACM_CERTIFICATE: api.example.com (arn:aws:acm:us-east-1:123456789012:certificate/ghi-789)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Certificate type: Imported (third-party: DigiCert)\n  [✓] Domain names: api.example.com\n  [✓] PEM certificate: ./certs/certificate.pem\n  [✓] PEM private key: ./certs/private-key.pem\n  [✓] PEM chain: ./certs/chain.pem\n  [✓] Renewal: Manual (imported — NOT auto-renewed; monitor DaysToExpiry)\n  [✓] Region: us-east-1\nVERIFICATION_COMMANDS:\n  aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/ghi-789 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Imported",
+            "VERDICT",
+            "CHECKLIST",
+            "PEM"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "private-cert-via-pca",
+      "name": "Private ACM certificate via AWS Private CA for internal mTLS",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — private certificate via Private CA, internal mTLS use case, NOT browser-trusted",
+      "prompt": "Request a private ACM certificate for internal.api.example.com via our AWS Private CA arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc-123. This is for internal mTLS between microservices. DNS validation. Region us-east-1. Tags: Environment=internal, UseCase=mTLS. Account ID: 123456789012.",
+      "prompt_file": "prompts/private-cert-via-pca.md",
+      "baseline_file": "baselines/private-cert-via-pca.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACM_CERTIFICATE: internal.api.example.com (arn:aws:acm:us-east-1:123456789012:certificate/jkl-012)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Certificate type: Private (via Private CA arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc-123)\n  [✓] Domain names: internal.api.example.com\n  [✓] Validation method: DNS\n  [✓] Certificate status: ISSUED\n  [✓] Renewal: Automatic (ACM-managed; PCA must remain ACTIVE)\n  [✓] Region: us-east-1\n  [✓] Tags: Environment=internal, UseCase=mTLS\nVERIFICATION_COMMANDS:\n  aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/jkl-012 --region us-east-1\n  aws acm-pca describe-certificate-authority --certificate-authority-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc-123",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Private",
+            "VERDICT",
+            "CHECKLIST",
+            "internal.api.example.com"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-region-cloudfront",
+      "name": "Operator requests CloudFront cert in wrong region (us-west-2)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — CloudFront requires us-east-1; operator's default region is us-west-2 and they said 'whatever region is fine'",
+      "prompt": "I need an ACM certificate for my CloudFront distribution. The domain is www.example.com. My AWS CLI is configured for us-west-2. Just use whatever region is fine. Account ID: 123456789012.",
+      "prompt_file": "prompts/missing-region-cloudfront.md",
+      "baseline_file": "baselines/missing-region-cloudfront.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ACM_CERTIFICATE: www.example.com\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Region: CloudFront requires the certificate to be in us-east-1; current default is us-west-2. Re-request in us-east-1.\n  [✗] Validation method: NOT specified — DNS validation is recommended (email is deprecated)\n  [✗] Route53 hosted zone: NOT specified — needed for DNS validation CNAME\nVERIFICATION_COMMANDS:\n  aws configure get region\n  aws route53 list-hosted-zones-by-name --dns-name example.com",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "www.example.com",
+            "VERDICT",
+            "CHECKLIST",
+            "us-east-1"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

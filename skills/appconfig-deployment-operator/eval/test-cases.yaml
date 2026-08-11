@@ -1,0 +1,153 @@
+# Eval test cases for appconfig-deployment-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: appconfig-deployment-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: appconfig-linear-canary-start
+    description: Start a 5-step linear canary deployment (GrowthFactor 20, 30 min deploy + 30 min bake) with a CloudWatch rollback alarm wired
+    input: |
+      Scenario: An operator wants to start an AppConfig
+      deployment "checkout-timeout-2026-08" in us-east-1 for
+      application "checkout-service" (id abc123), environment
+      "prod" (id env-456), configuration profile "checkout-config"
+      (id prof-789, type AWS.Freeform), configuration version 7.
+      The payload raises the checkout timeout from 1000 ms to
+      5000 ms. The deployment strategy is a custom
+      "linear-20-percent-30min-bake" (GrowthFactor 20,
+      DeploymentDurationInMinutes 30, BakeTimeInMinutes 30,
+      FinalBakeTimeInMinutes 30). The rollback alarm is
+      arn:aws:cloudwatch:us-east-1:111122223333:alarm:checkout-5xx
+      (currently OK). The caller holds appconfig:StartDeployment
+      and appconfig:GetDeployment. No active DEPLOYING deployment
+      exists on env-456. The KMS key
+      arn:aws:kms:us-east-1:111122223333:key/abc is decryptable
+      by the caller.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "start-deployment"
+        - "GrowthFactor"
+        - "BakeTimeInMinutes"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "AllAtOnce"
+
+  - id: appconfig-rollback-alarm-blocks
+    description: Start-deployment BLOCKED because the rollback CloudWatch alarm is currently in ALARM state
+    input: |
+      Scenario: An operator wants to start an AppConfig
+      deployment in us-east-1 for application "checkout-service"
+      (id abc123), environment "prod" (id env-456), profile
+      "checkout-config" (id prof-789), version 8. Deployment
+      strategy "linear-20-percent-30min-bake" with rollback alarm
+      arn:aws:cloudwatch:us-east-1:111122223333:alarm:checkout-5xx.
+      However, cloudwatch describe-alarms reports the alarm is
+      currently in ALARM state (5xx error rate at 3.2% over the
+      last 10 minutes). The operator wants to start the
+      deployment anyway.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "ALARM"
+        - "checkout-5xx"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: appconfig-lambda-extension-feature-flags
+    description: Wire the AppConfig Lambda extension for runtime feature flags on a checkout-handler Lambda function without redeploy
+    input: |
+      Scenario: An operator wants to adopt the AppConfig Lambda
+      extension so a Lambda function "checkout-handler" in
+      us-east-1 reads a feature-flag configuration
+      "checkout-flags" (profile id prof-flags-001, type
+      AWS.AppConfig.FeatureFlags) at runtime, polling every 45
+      seconds, without redeploying the function on each flag
+      change. Application "checkout-service" (id abc123),
+      environment "prod" (id env-456). The function's execution
+      role already holds the required AppConfig read permissions
+      and kms:Decrypt on the configured KMS key. The operator
+      needs the exact update-function-configuration command and
+      the function code pattern for reading the flag.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "AWS-AppConfig-Extension"
+        - "AWS_APPCONFIG_EXTENSION_APPLICATION_NAME"
+        - "localhost:2772"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "GetConfiguration"
+
+  - id: appconfig-codedeploy-canary
+    description: Configure a CodeDeploy deployment group using AppConfig.50Percent canary with pre/post traffic hooks for an EC2 deployment
+    input: |
+      Scenario: An operator wants to use CodeDeploy to orchestrate
+      an AppConfig deployment in us-east-1, using the
+      "AppConfig.50Percent" deployment config (2-step canary).
+      Application "payments-service" (id pay-abc), environment
+      "prod" (id env-pay). The CodeDeploy application
+      "payments-codedeploy" exists; the service role
+      arn:aws:iam::111122223333:role/codedeploy-role has the
+      required appconfig and codedeploy permissions. The
+      operator wants the create-deployment-group command and
+      confirmation that deploymentStyle is WITH_TRAFFIC_CONTROL.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "AppConfig.50Percent"
+        - "WITH_TRAFFIC_CONTROL"
+        - "create-deployment-group"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "AllAtOnce"
+
+  - id: appconfig-terminated-deployment-recovery
+    description: Diagnose a TERMINATED deployment (configuration profile deleted mid-deployment) and plan the recovery via a fresh start-deployment
+    input: |
+      Scenario: An operator reports that AppConfig deployment
+      #14 on application "checkout-service" (id abc123),
+      environment "prod" (id env-456) entered State TERMINATED
+      after 18 minutes. get-deployment EventLog shows
+      "Configuration profile prof-789 was deleted during
+      deployment." The operator wants to know why the deployment
+      terminated and what to do next. The configuration profile
+      has been re-created (new id prof-789-restored), the latest
+      hosted configuration version is 9, and no active DEPLOYING
+      deployment exists on env-456.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "TERMINATED"
+        - "start-deployment"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: COMPLETED"
+        - "resume"

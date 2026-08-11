@@ -1,0 +1,176 @@
+# Eval test cases for organizations-account-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across creation paths
+# (Control Tower Account Factory, Organizations create-account,
+# consolidated billing, Terraform vending) and a missing-prerequisite
+# branch.
+skill: organizations-account-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: production-account-via-control-tower
+    description: >-
+      Provision a production member account via Control Tower Account
+      Factory with SSO permission set, OU-level SCP and tag policy,
+      CloudTrail org trail, Config aggregator, alternate contacts,
+      budget, and RAM share. Expects READY_TO_DEPLOY with all
+      checklist items verified.
+    input: |
+      Provision a production AWS account named "prod-workload-use1"
+      via Control Tower Account Factory. Root email is the
+      distribution list aws+prod-workload@yourdomain.com. Place the
+      account in the prod OU (ou-prod-abc). Management account
+      123456789012 is in ALL_FEATURES mode with SCP and tag policy
+      types enabled. SCP "DenyUnapprovedRegions" and tag policy
+      "CostCenterRequired" should apply via OU inheritance. The
+      CloudTrail org trail "org-audit-trail" already exists.
+      Assign the "ProductionAdmins" permission set to the "Eng-Prod"
+      group (Identity Center instance ssoins-0123). Config aggregator
+      "org-aggregator" lives in delegated admin 123456789012.
+      Alternate contacts: Billing=finops@yourdomain.com,
+      Security=security@yourdomain.com,
+      Operations=ops@yourdomain.com. Budget: $5000/month alert at
+      80%. Share the org Transit Gateway tgw-0abc123 via RAM. Region:
+      us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-workload-use1"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Control Tower Account Factory"
+        - "OrganizationAccountAccessRole"
+        - "org-audit-trail"
+        - "DenyUnapprovedRegions"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: workload-account-create-account-scp-tags
+    description: >-
+      Provision a member account via Organizations create-account with
+      explicit SCP and tag policy attachment at OU scope,
+      consolidated billing under the management payer, and
+      OrganizationAccountAccessRole bootstrap. Expects READY_TO_DEPLOY.
+    input: |
+      Provision a new AWS member account via Organizations
+      create-account. Account name "analytics-pipeline-use1", root
+      email aws+analytics@yourdomain.com. Management account
+      123456789012 in ALL_FEATURES mode. Place in the OU ou-data-abc
+      so it inherits the "DenyUnapprovedRegions" SCP and the
+      "CostCenterRequired" tag policy. IAM role name
+      "OrganizationAccountAccessRole". Consolidated billing under the
+      management payer. CloudTrail org trail "org-audit-trail" exists.
+      Budget: $2000/month alert at 75%. Region: us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "analytics-pipeline-use1"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "OrganizationAccountAccessRole"
+        - "create-account"
+        - "Consolidated"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-root-email-and-iam-role
+    description: >-
+      Operator requests a new Organizations member account but has not
+      specified the unique root email, IAM role name, OU placement, or
+      SSO permission set. Expects PREREQUISITES_MISSING with specific
+      gaps cited.
+    input: |
+      Help me create a new AWS account for our dev team. Just call it
+      "dev-sandbox". We want it under our existing organization in
+      us-east-1. Management account is 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "dev-sandbox"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: consolidated-billing-budget-account
+    description: >-
+      Provision a member account focused on consolidated billing
+      posture: cost allocation tags, monthly budget, alternate billing
+      contact, Cost Explorer opt-in. Medium difficulty. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Provision an AWS member account "marketing-sandbox-use1" via
+      Organizations create-account. Root email
+      aws+marketing@yourdomain.com. IAM role name
+      "OrganizationAccountAccessRole". Management account 123456789012
+      is the payer with consolidated billing. Place in OU
+      ou-sandbox-abc. CloudTrail org trail exists. Set the billing
+      alternate contact to finops@yourdomain.com. Define a budget of
+      $500/month with an alert at 90%. Enable Cost Explorer. Region:
+      us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "marketing-sandbox-use1"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Consolidated"
+        - "OrganizationAccountAccessRole"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: terraform-account-factory-baseline
+    description: >-
+      Provision a production member account via Terraform
+      aws_organizations_account with an Account Factory custom
+      baseline (VPC, guardrails, SSO, Config), permission set
+      assignment, and org trail. Latest-feature path. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Provision a production AWS account "payments-prod-use1" via
+      Terraform aws_organizations_account. Root email
+      aws+payments@yourdomain.com. Use the Control Tower Account
+      Factory custom baseline that applies the "SecurityBaseline"
+      StackSet, VPC, and Config conformance pack at vending. IAM role
+      name "OrganizationAccountAccessRole". Place in OU ou-prod-abc
+      (inherits "DenyUnapprovedRegions" SCP and "CostCenterRequired"
+      tag policy). Management account 123456789012. CloudTrail org
+      trail "org-audit-trail" exists. Assign the "PaymentsAdmins"
+      permission set to the "Eng-Payments" group. Region: us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "payments-prod-use1"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "OrganizationAccountAccessRole"
+        - "Terraform"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

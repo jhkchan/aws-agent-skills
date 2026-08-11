@@ -1,0 +1,177 @@
+{
+  "skill": "lambda-layer-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Lambda Layer Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across layer types (Python Powertools layer, Node.js SDK layer, arm64 Graviton provided.al2023 layer, cross-account sharing, missing prerequisites). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "python-powertools-layer",
+      "name": "Python Powertools layer with arm64 for multiple Python runtimes",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, correct zip path (python/), compatible runtimes (python3.10-3.13), arm64 architecture, version ARN, function attachment",
+      "prompt": "Create a Python Lambda Layer named \"my-powertools-layer\" in us-east-1. Include aws-lambda-powertools, boto3, and requests. Compatible with python3.10, python3.11, python3.12, and python3.13. Architecture: arm64 only (Graviton). License: MIT. Attach it to function \"my-api-fn\" which runs on python3.12 + arm64. Account ID: 123456789012.",
+      "prompt_file": "prompts/python-powertools-layer.md",
+      "baseline_file": "baselines/python-powertools-layer.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_LAYER: my-powertools-layer\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Layer name: my-powertools-layer (region: us-east-1)\n  [✓] Zip source: local (./layer/my-powertools-layer.zip)\n  [✓] Zip structure: python/ (verified: pip install -t python/)\n  [✓] Compatible runtimes: python3.10, python3.11, python3.12, python3.13\n  [✓] Compatible architectures: arm64\n  [✓] Layer size: within 50 MB compressed limit\n  [✓] Version: 1 (immutable; ARN: arn:aws:lambda:us-east-1:123456789012:layer:my-powertools-layer:1)\n  [✓] License info: MIT\n  [✓] Cross-account sharing: Same account (no sharing config needed)\n  [✓] Function attachment: my-api-fn → layer version 1\nVERIFICATION_COMMANDS:\n  aws lambda list-layers\n  aws lambda get-layer-version --layer-name my-powertools-layer --version-number 1\n  aws lambda get-function-configuration --function-name my-api-fn",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "my-powertools-layer",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "arm64",
+            "python3.10",
+            "python3.13"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nodejs-sdk-layer",
+      "name": "Node.js SDK layer bundling @aws-sdk for Node.js 22+ (no bundled SDK)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Node.js SDK layer for nodejs20.x + nodejs22.x (which don't bundle the AWS SDK by default), x86_64, correct zip path (nodejs/node_modules/)",
+      "prompt": "I need a Node.js Lambda Layer named \"sdk-layer\" in us-east-1 that bundles @aws-sdk/client-s3, @aws-sdk/client-dynamodb, and @aws-sdk/lib-dynamodb for Node.js 22 functions (which don't bundle the SDK by default). Compatible runtimes: nodejs20.x and nodejs22.x. Architecture: x86_64. License: Apache-2.0. Account ID: 123456789012.",
+      "prompt_file": "prompts/nodejs-sdk-layer.md",
+      "baseline_file": "baselines/nodejs-sdk-layer.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_LAYER: sdk-layer\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Layer name: sdk-layer (region: us-east-1)\n  [✓] Zip source: local (./layer/sdk-layer.zip)\n  [✓] Zip structure: nodejs/node_modules/ (verified: npm install --prefix nodejs/)\n  [✓] Compatible runtimes: nodejs20.x, nodejs22.x\n  [✓] Compatible architectures: x86_64\n  [✓] Layer size: within 50 MB compressed limit\n  [✓] Version: 1 (immutable; ARN: arn:aws:lambda:us-east-1:123456789012:layer:sdk-layer:1)\n  [✓] License info: Apache-2.0\n  [✓] Cross-account sharing: Same account (no sharing config needed)\nVERIFICATION_COMMANDS:\n  aws lambda list-layers\n  aws lambda get-layer-version --layer-name sdk-layer --version-number 1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "sdk-layer",
+            "VERDICT",
+            "CHECKLIST",
+            "nodejs22.x",
+            "x86_64"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "arm64-graviton-layer",
+      "name": "provided.al2023 Go binary layer compiled for arm64 (Graviton)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — provided.al2023 layer with Go binary for arm64, correct zip path (bin/), architecture-specific compiled code",
+      "prompt": "Create a Lambda Layer named \"go-utils-layer\" in us-east-1 for provided.al2023 runtime. It contains a Go binary compiled for arm64 (Graviton) that provides a custom data-processing tool. Architecture: arm64 only. The binary is at ./layer/bin/bootstrap. License: MIT. Account ID: 123456789012.",
+      "prompt_file": "prompts/arm64-graviton-layer.md",
+      "baseline_file": "baselines/arm64-graviton-layer.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_LAYER: go-utils-layer\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Layer name: go-utils-layer (region: us-east-1)\n  [✓] Zip source: local (./layer/go-utils-layer.zip)\n  [✓] Zip structure: bin/ (verified: provided.al2023 convention)\n  [✓] Compatible runtimes: provided.al2023\n  [✓] Compatible architectures: arm64\n  [✓] Layer size: within 50 MB compressed limit\n  [✓] Version: 1 (immutable; ARN: arn:aws:lambda:us-east-1:123456789012:layer:go-utils-layer:1)\n  [✓] License info: MIT\n  [✓] Cross-account sharing: Same account (no sharing config needed)\nVERIFICATION_COMMANDS:\n  aws lambda list-layers\n  aws lambda get-layer-version --layer-name go-utils-layer --version-number 1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "go-utils-layer",
+            "VERDICT",
+            "CHECKLIST",
+            "provided.al2023",
+            "arm64"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-sharing",
+      "name": "Python layer shared cross-account with resource-based policy + consumer IAM",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — layer shared with account 123456789012 via resource-based policy (add-permission) with consumer IAM noted",
+      "prompt": "Create a Python Lambda Layer named \"shared-utils-layer\" in us-east-1 with numpy and pandas for python3.12. Architecture: x86_64. Share this layer with account 123456789012 so they can attach it to their Lambda functions. License: BSD-3-Clause. Account ID: 123456789012.",
+      "prompt_file": "prompts/cross-account-sharing.md",
+      "baseline_file": "baselines/cross-account-sharing.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_LAYER: shared-utils-layer\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Layer name: shared-utils-layer (region: us-east-1)\n  [✓] Zip source: local (./layer/shared-utils-layer.zip)\n  [✓] Zip structure: python/ (verified: pip install -t python/)\n  [✓] Compatible runtimes: python3.12\n  [✓] Compatible architectures: x86_64\n  [✓] Layer size: within 50 MB compressed limit\n  [✓] Version: 1 (immutable; ARN: arn:aws:lambda:us-east-1:123456789012:layer:shared-utils-layer:1)\n  [✓] License info: BSD-3-Clause\n  [✓] Cross-account sharing: shared with 123456789012 (resource-based policy + consumer IAM lambda:GetLayerVersion)\nVERIFICATION_COMMANDS:\n  aws lambda list-layers\n  aws lambda get-layer-version --layer-name shared-utils-layer --version-number 1\n  aws lambda get-layer-version-policy --layer-name shared-utils-layer --version-number 1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-utils-layer",
+            "VERDICT",
+            "CHECKLIST",
+            "123456789012"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-runtime-arch",
+      "name": "Operator has not specified compatible runtimes or architectures",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — compatible runtimes (path resolution), compatible architectures (x86_64 default vs arm64), and specific dependencies all unspecified",
+      "prompt": "Help me create a Lambda Layer called \"my-deps-layer\" in us-east-1. I want to put some Python and Node.js libraries in it and attach it to my functions. Account ID: 123456789012.",
+      "prompt_file": "prompts/missing-runtime-arch.md",
+      "baseline_file": "baselines/missing-runtime-arch.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "LAMBDA_LAYER: my-deps-layer\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Compatible runtimes: NOT specified — Lambda layers MUST declare compatible runtimes for correct /opt path resolution and attach-time validation\n  [✗] Compatible architectures: NOT specified — default is x86_64; arm64 functions will reject the layer\n  [✗] Specific dependencies: NOT specified — drives the zip content and size estimate\n  [✗] Target functions: NOT specified — need runtime + architecture to match the layer declarations\nVERIFICATION_COMMANDS:\n  aws lambda list-functions --query 'Functions[*].[FunctionName,Runtime,Architectures]' --output text\n  aws lambda list-layers",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "my-deps-layer",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

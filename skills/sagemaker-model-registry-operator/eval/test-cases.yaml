@@ -1,0 +1,149 @@
+# Eval test cases for sagemaker-model-registry-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: sagemaker-model-registry-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: sagemaker-register-group-package
+    description: Register a versioned model package in an existing group with PendingManualApproval, full InferenceSpecification, and ModelMetrics wired
+    input: |
+      Scenario: An operator wants to register a trained XGBoost
+      model "fraud-detection-2026-08-v1" in us-east-1 as version
+      5 of model package group "fraud-detection-classifier"
+      (group exists, status Completed, latest version 4). The
+      model artifact is at
+      s3://ml-models/fraud-detection/2026-08/output/model.tar.gz
+      (caller role has s3:GetObject). The inference image is
+      763104351884.dkr.ecr.us-east-1.amazonaws.com/xgboost-inference:1.7-1-cpu-py3
+      (exists in ECR). ModelMetrics JSON files exist in
+      s3://ml-metrics/fraud-detection/2026-08/ (quality, bias,
+      explainability, data-quality). The caller holds
+      sagemaker:CreateModelPackage. KMS key
+      arn:aws:kms:us-east-1:111122223333:key/abc decryptable.
+      The operator wants the package to require manual approval
+      before production deployment.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-model-package"
+        - "PendingManualApproval"
+        - "ModelPackageGroupName"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "standalone"
+
+  - id: sagemaker-approve-for-production
+    description: Approve a model package (PendingManualApproval to Approved) for production deployment via the SageMaker Projects pipeline
+    input: |
+      Scenario: An operator wants to approve model package
+      version 5 of group "fraud-detection-classifier"
+      (arn arn:aws:sagemaker:us-east-1:111122223333:model-package/fraud-detection-classifier/5)
+      in us-east-1. The package is currently
+      PendingManualApproval. The package has an
+      InferenceSpecification with supported instance types
+      ml.m5.large / ml.m5.xlarge. A SageMaker Project
+      "fraud-detection-deploy" is wired to this group with an
+      EventBridge rule that triggers the deploy pipeline on
+      Approved transitions. The caller holds
+      sagemaker:UpdateModelPackage. The reviewer is the
+      risk-platform review board; AUC=0.94 with no bias drift.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "update-model-package"
+        - "Approved"
+        - "approval-description"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "Rejected"
+
+  - id: sagemaker-approve-blocked-no-inference-spec
+    description: Approve BLOCKED because the registered package has no InferenceSpecification (documentation-only); approving cannot enable deployment
+    input: |
+      Scenario: An operator wants to approve model package
+      version 7 of group "research-classifier" in us-east-1.
+      The package is currently PendingManualApproval, but it
+      was registered without an InferenceSpecification — it is
+      intended only as a Model Card source (documentation). The
+      caller holds sagemaker:UpdateModelPackage. The operator
+      wants to know whether approval is safe.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "InferenceSpecification"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: sagemaker-model-card-auto-populate
+    description: Create a SageMaker Model Card auto-populated from a registered model package via --source-uri-type ModelPackage
+    input: |
+      Scenario: An operator wants to create a Model Card
+      "fraud-detection-2026-08-card" in us-east-1, auto-populated
+      from registered package
+      arn:aws:sagemaker:us-east-1:111122223333:model-package/fraud-detection-classifier/5
+      (Approved). The card should include the model overview
+      (creator: risk-platform), intended uses (real-time fraud
+      scoring for checkout), and inherit the inference spec /
+      metrics from the package. The card status should be
+      PendingReview. The caller holds sagemaker:CreateModelCard.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-model-card"
+        - "ModelPackage"
+        - "source-uri"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "Draft"
+
+  - id: sagemaker-projects-pipeline-not-triggered
+    description: Diagnose why the SageMaker Projects deploy pipeline did not trigger after a package was approved
+    input: |
+      Scenario: An operator reports that after approving model
+      package version 5 of group "fraud-detection-classifier"
+      in us-east-1, the SageMaker Projects deploy pipeline
+      "fraud-detection-deploy" did not trigger. describe-model-package
+      confirms ModelApprovalStatus Approved. The EventBridge
+      rule "fraud-detection-approved" exists but its
+      EventPattern.detail.ModelPackageGroupName is set to
+      "fraud-detection-research" (wrong group). The CodePipeline
+      has no recent executions. The operator wants the
+      remediation.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "EventBridge"
+        - "fraud-detection-research"
+        - "put-rule"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: COMPLETED"
+        - "READY"

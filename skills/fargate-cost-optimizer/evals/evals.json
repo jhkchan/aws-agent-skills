@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "fargate-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Fargate Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "rightsizing-overprovisioned-cpu-memory",
+      "name": "Over-provisioned Fargate task — 2 vCPU / 4 GB at 18% avg CPU, should downsize to 1 vCPU / 2 GB",
+      "difficulty": "medium",
+      "prompt_file": "prompts/rightsizing-overprovisioned-cpu-memory.md",
+      "baseline_file": "baselines/rightsizing-overprovisioned-cpu-memory.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "expected_root_cause_category": "RIGHT_SIZE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "RIGHT_SIZE", "VERDICT", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "ALREADY_OPTIMAL"]
+        }
+      ]
+    },
+    {
+      "id": "fargate-spot-fault-tolerant",
+      "name": "Stateless SQS worker on 100% On-Demand Fargate — should use Fargate Spot capacity provider",
+      "difficulty": "medium",
+      "prompt_file": "prompts/fargate-spot-fault-tolerant.md",
+      "baseline_file": "baselines/fargate-spot-fault-tolerant.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "expected_root_cause_category": "SPOT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "Spot", "VERDICT", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "ALREADY_OPTIMAL"]
+        }
+      ]
+    },
+    {
+      "id": "graviton-arm64-migration",
+      "name": "Java 21 ECS task on x86_64 Fargate — should migrate to ARM64/Graviton for 20% savings",
+      "difficulty": "hard",
+      "prompt_file": "prompts/graviton-arm64-migration.md",
+      "baseline_file": "baselines/graviton-arm64-migration.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "expected_root_cause_category": "ARM64",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "ARM64", "VERDICT", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "ALREADY_OPTIMAL"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-workload",
+      "name": "Already-optimized service — right-sized, ARM64, Spot capacity provider, Savings Plan, auto scaling",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-workload.md",
+      "baseline_file": "baselines/already-optimal-workload.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["OPPORTUNITY_FOUND", "Error:", "I cannot"]
+        }
+      ]
+    },
+    {
+      "id": "savings-plans-steady-state",
+      "name": "Steady-state 24/7 service on On-Demand — should evaluate Compute Savings Plans",
+      "difficulty": "medium",
+      "prompt_file": "prompts/savings-plans-steady-state.md",
+      "baseline_file": "baselines/savings-plans-steady-state.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "expected_root_cause_category": "SAVINGS_PLANS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "Savings Plan", "VERDICT", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "ALREADY_OPTIMAL"]
+        }
+      ]
+    }
+  ]
+}

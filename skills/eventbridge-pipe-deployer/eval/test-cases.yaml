@@ -1,0 +1,172 @@
+# Eval test cases for eventbridge-pipe-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: eventbridge-pipe-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ddb-streams-lambda-filter-dlq
+    description: >-
+      Standard DynamoDB Streams source pipe to Lambda target with a
+      filter pattern matching status=CONFIRMED, batch window 5s,
+      retry 3, DLQ on the pipe. All checklist dimensions pass.
+    input: |
+      Design a deployment plan for an EventBridge Pipe. Emit the
+      standard VERDICT block (PIPE_SPEC, VERDICT, ARCHITECTURE,
+      CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Pipe name: prod-orders-pipe
+      - Source: DynamoDB Streams arn:aws:dynamodb:us-east-1:111111111111:table/Orders/stream/2026-08-01T00:00:00.000 (state=ENABLED)
+      - Filter: NewImage.status.S = CONFIRMED
+      - Enrichment: none
+      - Target: Lambda arn:aws:lambda:us-east-1:111111111111:function:orders-processor (Active, resource policy grants lambda:InvokeFunction to pipes.amazonaws.com)
+      - Batch: window 5s, size 100, retry 3, record age 3600s
+      - DLQ: arn:aws:sqs:us-east-1:111111111111:prod-pipe-dlq (policy grants sqs:SendMessage to pipe role)
+      - IAM: pipe role arn:aws:iam::111111111111:role/EventBridgePipes-prod-orders with SourceAccount+SourceArn conditions
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-orders-pipe"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "DynamoDB Streams"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: kinesis-stepfunctions-batch-window
+    description: >-
+      Kinesis source pipe to Step Functions target with 30s batch
+      window and AUTOMATIC_BISECT. Validates streaming source batch
+      config and Standard state machine target.
+    input: |
+      Design a deployment plan for an EventBridge Pipe. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Pipe name: prod-events-orchestration
+      - Source: Kinesis arn:aws:kinesis:us-east-1:111111111111:stream/events-stream (state=ACTIVE)
+      - Filter: none
+      - Enrichment: none
+      - Target: Step Functions arn:aws:states:us-east-1:111111111111:stateMachine:EventsOrchestration (ACTIVE, Standard workflow)
+      - Batch: window 30s, size 100, retry 5, record age 7200s, OnPartialBatchItemFailure=AUTOMATIC_BISECT
+      - DLQ: arn:aws:sqs:us-east-1:111111111111:prod-pipe-dlq
+      - IAM: pipe role has kinesis:GetRecords, states:StartExecution, sqs:SendMessage on DLQ
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-events-orchestration"
+        - "VERDICT"
+        - "Kinesis"
+        - "Step Functions"
+        - "AUTOMATIC_BISECT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: sqs-source-missing-redrive-policy
+    description: >-
+      SQS source pipe with a pipe-level DeadLetterConfig configured
+      but the source queue has NO RedrivePolicy. The pipe-level DLQ
+      is ignored for SQS sources — must emit PREREQUISITES_MISSING
+      because poison-pill handling is unconfigured.
+    input: |
+      Design a deployment plan for an EventBridge Pipe. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Pipe name: prod-jobs-pipe
+      - Source: SQS arn:aws:sqs:us-east-1:111111111111:jobs-queue (queue has NO RedrivePolicy configured)
+      - Target: Lambda arn:aws:lambda:us-east-1:111111111111:function:jobs-processor
+      - Batch: size 10
+      - DLQ: arn:aws:sqs:us-east-1:111111111111:prod-pipe-dlq (configured via pipe DeadLetterConfig)
+
+      The user assumes the pipe-level DLQ will catch poison messages.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "prod-jobs-pipe"
+        - "VERDICT"
+        - "RedrivePolicy"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: enrichment-lambda-transformation
+    description: >-
+      DynamoDB Streams source pipe with Lambda enrichment (joins
+      customer data) before Step Functions target. Validates the
+      enrichment stage, dual IAM grants, and batched payload behavior.
+    input: |
+      Design a deployment plan for an EventBridge Pipe. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Pipe name: prod-orders-enriched
+      - Source: DynamoDB Streams arn:aws:dynamodb:us-east-1:111111111111:table/Orders/stream/2026-08-01T00:00:00.000 (ENABLED)
+      - Filter: NewImage.status.S = CONFIRMED
+      - Enrichment: Lambda arn:aws:lambda:us-east-1:111111111111:function:orders-enrich (Active; joins customer data; resource policy grants invoke to pipes.amazonaws.com)
+      - Target: Step Functions arn:aws:states:us-east-1:111111111111:stateMachine:OrderWorkflow (ACTIVE Standard)
+      - Batch: window 10s, size 50, retry 3
+      - DLQ: arn:aws:sqs:us-east-1:111111111111:prod-pipe-dlq
+      - IAM: pipe role has dynamodbstreams:GetRecords, lambda:InvokeFunction on enrichment, states:StartExecution on target, sqs:SendMessage on DLQ
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-orders-enriched"
+        - "VERDICT"
+        - "enrichment"
+        - "orders-enrich"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: aws-batch-target-from-msk
+    description: >-
+      MSK source pipe to AWS Batch target. Validates Kafka source
+      config (consumer group, auth), Batch target with job definition
+      and queue, and the recent Batch target support feature.
+    input: |
+      Design a deployment plan for an EventBridge Pipe. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Pipe name: prod-batch-pipeline
+      - Source: MSK arn:aws:kafka:us-east-1:111111111111:cluster/prod-msk/abc (ACTIVE), topic orders-events, ConsumerGroupID pipe-batch-consumer, StartingPosition LATEST, AuthType SASL_SCRAM_512_AUTH
+      - Filter: none
+      - Enrichment: none
+      - Target: AWS Batch job queue arn:aws:batch:us-east-1:111111111111:job-queue/prod-queue with job definition prod-batch-job:5
+      - Batch: window 60s, size 500, retry 5
+      - DLQ: arn:aws:sqs:us-east-1:111111111111:prod-pipe-dlq
+      - IAM: pipe role has kafka-cluster:ReadData on topic, kafka-cluster:AlterGroup on consumer group, batch:SubmitJob on queue, iam:PassRole on job role
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-batch-pipeline"
+        - "VERDICT"
+        - "AWS Batch"
+        - "MSK"
+        - "ConsumerGroupID"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

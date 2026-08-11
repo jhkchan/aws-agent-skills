@@ -1,0 +1,124 @@
+# Eval test cases for cloudwatch-logs-insights-troubshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-logs-insights-troubshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: no-results-wrong-log-group
+    description: >-
+      Logs Insights query returns 0 rows because the user is querying
+      the wrong log group name (/aws/lambda/my-api instead of
+      /aws/lambda/my-api-prod).
+    input: |
+      Scenario: A CloudWatch Logs Insights query on
+      /aws/lambda/my-api returns 0 rows. The query is:
+      fields @timestamp, @message | filter @message like /ERROR/
+      | limit 100. Time range is "last 15 minutes". The user
+      confirms the application is running and logging errors.
+      describe-log-streams on /aws/lambda/my-api shows
+      lastIngestionTime is 2025-03-01 (stale). describe-log-groups
+      reveals /aws/lambda/my-api-prod exists and its
+      lastIngestionTime is 2 minutes ago.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "NO_RESULTS"
+        - "log group"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: timeout-no-early-filter
+    description: >-
+      Logs Insights query is cancelled (timeout) because it scans 7
+      days of data with no filter before sort, and parse runs on every
+      event.
+    input: |
+      Scenario: A Logs Insights query on /ecs/prod-app has status
+      Cancelled. The query is: fields @timestamp, level, msg | parse
+      @message "* * *" as ts, level, msg | sort @timestamp desc |
+      limit 1000. Time range is last 7 days. describe-queries shows
+      status Cancelled. The IncomingBytes metric shows 50 GB/day
+      (350 GB total scan).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "TIMEOUT"
+        - "filter"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: syntax-error-command-ordering
+    description: >-
+      Logs Insights query fails with a syntax error because limit is
+      placed before sort.
+    input: |
+      Scenario: A Logs Insights query on /aws/lambda/order-processor
+      fails with "Unexpected token" error. The query is: fields
+      @timestamp, @message | limit 10 | sort @timestamp desc. The
+      error message points to the sort line.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "SYNTAX_ERROR"
+        - "sort"
+        - "limit"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+
+  - id: contributor-insights-not-enabled
+    description: >-
+      Contributor Insights tab is empty because no rule has been
+      created for the log group.
+    input: |
+      Scenario: The Contributor Insights tab for log group
+      /aws/vpc/flow-logs is empty. describe-contributor-insights for
+      this log group returns no rules. The user expected Contributor
+      Insights to work automatically after enabling Logs Insights.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "CONTRIBUTOR_INSIGHTS"
+        - "put-insight-rule"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+
+  - id: insufficient-context-no-query
+    description: >-
+      Vague report of Logs Insights not working — the user has not
+      provided the query text or log group name.
+    input: |
+      Scenario: A user says "my CloudWatch Logs query is broken and
+      returns nothing." No query text, log group name, or error
+      message is provided.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "query"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"
