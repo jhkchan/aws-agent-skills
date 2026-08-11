@@ -8,8 +8,8 @@ description: >-
   connector errors (DLQ config, retry exhaustion), schema registry
   connectivity (Avro/JSON/Protobuf, Confluent, Glue Schema Registry),
   IAM auth for MSK (kafka-cluster principal), plugin or connector
-  class not found (custom plugin, Debezium), connector configuration
-  errors (wrong topics, bootstrap servers, converter mismatch), and
+  class not found (custom plugin, Debezium), config errors (wrong
+  topics, bootstrap servers, converter mismatch), and
   Single Message Transforms (SMT chain, Cast, ExtractTopic). Reads
   describe-connector or REST API status, CloudWatch logs
   (/aws/kafkaconnect/), and MSK describe-cluster for bootstrap and

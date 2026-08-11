@@ -1,0 +1,285 @@
+# Eval test cases for kafka-connect-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per Kafka Connect failure category.
+# Each case's scenario name embeds the test-case id so the model
+# naturally echoes it (avoids assertion-token mismatch).
+skill: kafka-connect-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: sink-dlq-avro-protobuf-converter-mismatch
+    description: >-
+      MSK Connect sink connector (s3-sink) is RUNNING but tasks
+      FAILED, sending records to the DLQ at ~200/min. DLQ record
+      headers show AvroConverter cannot decode the value; the
+      producer uses Protobuf. Expected verdict: ROOT_CAUSE_FOUND
+      with CATEGORY=SINK_DLQ.
+    input: |
+      Connector: s3-sink-connector
+        (case sink-dlq-avro-protobuf-converter-mismatch)
+      ConnectorArn: arn:aws:kafkaconnect:us-east-1:111122223333:connector/s3-sink-connector/abc-123
+      Region: us-east-1
+
+      describe-connector output:
+        connector.state: RUNNING
+        tasks[0].state: FAILED
+        tasks[0].trace: ""
+
+      CloudWatch Logs (filter-pattern "Exception"):
+        org.apache.kafka.common.errors.SerializationException: Error
+          deserializing Avro message
+        Errors routed to topic s3-sink-dlq at ~200 records/min
+
+      DLQ record header __connect.errors.exception:
+        "org.apache.kafka.common.errors.SerializationException:
+         Error deserializing Avro message for partition 3"
+
+      Producer config (verified separately):
+        value.converter: io.confluent.connect.protobuf.ProtobufConverter
+        value.converter.schema.registry.url: http://registry:8081
+
+      Connector config:
+        value.converter: io.confluent.connect.avro.AvroConverter
+        value.converter.schema.registry.url: http://registry:8081
+        errors.tolerance: all
+        errors.deadletterqueue.topic.name: s3-sink-dlq
+
+      MSK brokers: ACTIVE; consumer group healthy; no rebalance churn.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "sink-dlq-avro-protobuf-converter-mismatch"
+        - "SINK_DLQ"
+        - "AvroConverter"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: iam-auth-sasl-not-logged-in-msk
+    description: >-
+      MSK Connect source connector (postgres-source) FAILED with
+      SASL_NOT_LOGGED_IN. MSK ClientAuthentication.Sasl.Iam is not
+      enabled; the connector uses sasl.iam mechanism. SG egress to
+      9094 is OK; IAM policy grants kafka-cluster:* on the cluster
+      ARN. Expected verdict: ROOT_CAUSE_FOUND with CATEGORY=IAM_AUTH.
+    input: |
+      Connector: postgres-source-connector
+        (case iam-auth-sasl-not-logged-in-msk)
+      ConnectorArn: arn:aws:kafkaconnect:us-east-1:111122223333:connector/postgres-source-connector/def-456
+      ClusterArn: arn:aws:kafka:us-east-1:111122223333:cluster/my-msk/abc-999
+      Region: us-east-1
+
+      describe-connector output:
+        connector.state: FAILED
+        tasks[0].state: FAILED
+
+      CloudWatch Logs:
+        "ClusterAuthorizationException: SASL_NOT_LOGGED_IN"
+        "Error while fetching metadata with correlation id 42"
+
+      MSK describe-cluster ClientAuthentication.Sasl:
+        returns {} (Iam.enabled: false; only Scram enabled)
+
+      Connector config:
+        security.protocol: SASL_SSL
+        sasl.mechanism: AWS_MSK_IAM
+
+      Connector execution role IAM simulate-principal-policy:
+        kafka-cluster:Connect on cluster ARN: allowed
+        kafka-cluster:ReadData on topic ARNs: allowed
+        kafka-cluster:WriteData on topic ARNs: allowed
+
+      Worker SG egress: port 9094 to MSK SG (verified)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "iam-auth-sasl-not-logged-in-msk"
+        - "IAM_AUTH"
+        - "SASL_NOT_LOGGED_IN"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: source-lag-hot-partition-skew
+    description: >-
+      MSK Connect source connector (events-stream-source) is RUNNING
+      but LagMax grows on partition 7 only (~480k records); other
+      partitions have <2k lag. Producer key-based partitioner
+      concentrates "ACME-001" records on partition 7. Expected
+      verdict: ROOT_CAUSE_FOUND with CATEGORY=SOURCE_LAG.
+    input: |
+      Connector: events-stream-source
+        (case source-lag-hot-partition-skew)
+      Region: us-east-1
+      WorkerType: MCU.2 (2 worker units)
+
+      describe-connector output:
+        connector.state: RUNNING
+        tasks: all RUNNING (no FAILED)
+
+      MSK consumer group lag (events-stream-source group):
+        partition 0: 1,800 records lag
+        partition 1: 1,500 records lag
+        ...
+        partition 7: 480,000 records lag  <-- hot
+        ...
+        partition 15: 1,200 records lag
+
+      Per-task throughput:
+        task for partition 7: 5 records/s
+        tasks for other partitions: ~200 records/s each
+
+      Producer config:
+        partitioner: default key-based (murmur2)
+        Most frequent key: "ACME-001" (60% of records)
+
+      No rebalance churn; source DB healthy; no error logs.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "source-lag-hot-partition-skew"
+        - "SOURCE_LAG"
+        - "skew"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: plugin-missing-debezium-class-not-found
+    description: >-
+      MSK Connect Debezium MySQL source connector FAILED on creation
+      with ClassNotFoundException for
+      io.debezium.connector.mysql.MySqlConnector. The custom plugin
+      ARN references a fat JAR missing the Debezium MySQL module;
+      plugin state is FAILED. Expected verdict: ROOT_CAUSE_FOUND
+      with CATEGORY=PLUGIN_MISSING.
+    input: |
+      Connector: debezium-mysql-source
+        (case plugin-missing-debezium-class-not-found)
+      ConnectorArn: arn:aws:kafkaconnect:us-east-1:111122223333:connector/debezium-mysql-source/ghi-789
+      Region: us-east-1
+
+      describe-connector output:
+        connector.state: FAILED
+        tasks: none (no tasks created)
+        statusDescription: "Connector class instantiation failed"
+
+      CloudWatch Logs (filter-pattern "ClassNotFoundException"):
+        java.lang.ClassNotFoundException:
+          io.debezium.connector.mysql.MySqlConnector
+
+      describe-custom-plugin (the referenced plugin ARN):
+        state: FAILED
+        failureDescription: "missing manifest dependencies"
+
+      Connector config:
+        connector.class: io.debezium.connector.mysql.MySqlConnector
+        plugin.arn: arn:aws:kafkaconnect:us-east-1:111122223333:custom-plugin/debezium-thin/xyz
+
+      MSK reachable; IAM valid; source DB reachable from the worker
+        subnet.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "plugin-missing-debezium-class-not-found"
+        - "PLUGIN_MISSING"
+        - "ClassNotFoundException"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: schema-registry-connection-refused-vpc
+    description: >-
+      MSK Connect sink connector (jdbc-sink) FAILED with
+      SchemaRegistryException: Connection refused to the Confluent
+      Schema Registry URL. The registry URL is reachable from the
+      operator's laptop but not from the worker subnet (no SG egress
+      to the registry host on port 8081). Expected verdict:
+      ROOT_CAUSE_FOUND with CATEGORY=SCHEMA_REGISTRY.
+    input: |
+      Connector: jdbc-sink-connector
+        (case schema-registry-connection-refused-vpc)
+      Region: us-east-1
+      Worker subnet: subnet-private-1a, SG sg-worker-123
+
+      describe-connector output:
+        connector.state: FAILED
+        tasks[0].state: FAILED
+        tasks[0].trace: "io.confluent.common.config.ConfigException:
+          Missing schema registry url"
+
+      CloudWatch Logs:
+        "io.confluent.kafka.schemaregistry.client.rest.exceptions
+         .RestClientException: Connection refused"
+        "SchemaRegistryException: Could not find schema"
+
+      Connector config:
+        value.converter: io.confluent.connect.avro.AvroConverter
+        value.converter.schema.registry.url: http://10.50.10.20:8081
+
+      Worker SG (sg-worker-123) egress rules:
+        - 0.0.0.0/0 port 443 (HTTPS)
+        - MSK SG on port 9094
+        (NO rule for the registry host 10.50.10.20 on port 8081)
+
+      Operator verification:
+        curl http://10.50.10.20:8081/subjects from laptop
+        → returns the subjects list (200 OK)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      CATEGORY, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "schema-registry-connection-refused-vpc"
+        - "SCHEMA_REGISTRY"
+        - "Connection refused"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"

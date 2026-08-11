@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "kafka-connect-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Kafka Connect Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "sink-dlq-avro-protobuf-converter-mismatch",
+      "name": "Sink DLQ filling — producer writes Protobuf, connector configured with AvroConverter",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sink-dlq-avro-protobuf-converter-mismatch.md",
+      "baseline_file": "baselines/sink-dlq-avro-protobuf-converter-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "sink-dlq-avro-protobuf-converter-mismatch", "SINK_DLQ", "AvroConverter", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "iam-auth-sasl-not-logged-in-msk",
+      "name": "MSK Connect connector FAILED with SASL_NOT_LOGGED_IN — MSK IAM auth not enabled on the cluster",
+      "difficulty": "medium",
+      "prompt_file": "prompts/iam-auth-sasl-not-logged-in-msk.md",
+      "baseline_file": "baselines/iam-auth-sasl-not-logged-in-msk.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "iam-auth-sasl-not-logged-in-msk", "IAM_AUTH", "SASL_NOT_LOGGED_IN", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "source-lag-hot-partition-skew",
+      "name": "Source connector LagMax growing on one partition only — producer hot key ACME-001 hashes to partition 7",
+      "difficulty": "hard",
+      "prompt_file": "prompts/source-lag-hot-partition-skew.md",
+      "baseline_file": "baselines/source-lag-hot-partition-skew.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "source-lag-hot-partition-skew", "SOURCE_LAG", "skew", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "plugin-missing-debezium-class-not-found",
+      "name": "Debezium MySQL connector ClassNotFoundException — custom plugin uploaded without Debezium dependencies",
+      "difficulty": "medium",
+      "prompt_file": "prompts/plugin-missing-debezium-class-not-found.md",
+      "baseline_file": "baselines/plugin-missing-debezium-class-not-found.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "plugin-missing-debezium-class-not-found", "PLUGIN_MISSING", "ClassNotFoundException", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "schema-registry-connection-refused-vpc",
+      "name": "Schema registry Connection refused — worker SG lacks egress to the registry host on 8081",
+      "difficulty": "medium",
+      "prompt_file": "prompts/schema-registry-connection-refused-vpc.md",
+      "baseline_file": "baselines/schema-registry-connection-refused-vpc.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "schema-registry-connection-refused-vpc", "SCHEMA_REGISTRY", "Connection refused", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    }
+  ]
+}

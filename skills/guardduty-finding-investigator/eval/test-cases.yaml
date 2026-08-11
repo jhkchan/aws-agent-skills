@@ -1,0 +1,273 @@
+# Eval test cases for guardduty-finding-investigator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per finding-family verdict arc. Each
+# case's TARGET embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The finding-type-driven ordering
+# in SKILL.md produces exactly the expected verdicts below.
+skill: guardduty-finding-investigator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cryptocurrency-ec2-true-positive
+    description: >-
+      CryptoCurrency:EC2/BitcoinTool.B!DNS finding on i-app-1 with DNS
+      hit, sustained 95% CPU, and outbound traffic on port 3333 to a
+      known mining pool. Application is a Node.js API with no legitimate
+      mining-pool dependency. Expected layer: CRYPTO_MINING.
+    input: |
+      Symptom: GuardDuty finding a1b2c3d4 in detector 12ab34cd
+      (us-east-1). Type CryptoCurrency:EC2/BitcoinTool.B!DNS, severity
+      7.5 (High). Resource i-app-1 (Node.js API server in prod VPC).
+
+      aws guardduty get-findings:
+        service.action.dnsRequestAction.domain: "miningpool.example"
+        resource.instanceDetails.instanceId: i-app-1
+        service.additionalInfo.threatListName: "MiningDomains"
+      CloudWatch CPUUtilization on i-app-1 (last 90 min):
+        Average 95.2%, Maximum 99.8%
+      VPC Flow Logs query (last 60 min):
+        srcAddr=10.0.5.12 (i-app-1) dstAddr=203.0.113.55 dstPort=3333
+        sum(bytes)=2.1 MB
+      Application dependency scan (package.json):
+        no reference to "miningpool.example" or any mining library
+      Target SG sg-app: allows 0.0.0.0/0 on tcp/3333 (misconfigured
+        egress rule from a prior incident).
+
+      Emit the standard diagnostic block (FINDING, VERDICT, REASON,
+      LAYER, SEVERITY, EVIDENCE, SUPPRESSION, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "cryptocurrency-ec2-true-positive"
+        - "CRYPTO_MINING"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+        - "LAYER: FALSE_POSITIVE"
+
+  - id: recon-portprobe-authorized-scanner
+    description: >-
+      Recurring Recon:EC2/PortProbe from 198.51.100.10 — the corporate
+      Qualys scanner CIDR. Trusted IP list does not yet include this
+      CIDR. Source organization.org matches "Qualys, Inc." and the
+      scan window aligns with the weekly vulnerability scan. Expected
+      layer: FALSE_POSITIVE.
+    input: |
+      Symptom: GuardDuty finding e5f6g7h8 in detector 12ab34cd
+      (us-east-1). Type Recon:EC2/PortProbe, severity 0.5 (Low).
+      Recurring weekly for the last 4 weeks; SOC asks whether to
+      suppress.
+
+      aws guardduty get-findings:
+        service.action.portProbeAction.remoteIpDetails.ipAddressV4:
+          "198.51.100.10"
+        organization.asn: "AS19894"
+        organization.org: "Qualys, Inc."
+        location.country: "United States"
+        portProbeDetail: scanned ports 1-1024 across 47 EC2 instances
+          in prod VPC between 02:00-02:15 UTC Sunday
+      aws guardduty list-ip-sets:
+        (empty — no trusted IP list configured)
+      Network team runbook documents 198.51.100.10/32 as the corporate
+        Qualys scanner CIDR (weekly vulnerability scan, Sunday 02:00
+        UTC).
+      VPC Flow Logs: only inbound SYN from 198.51.100.10 to multiple
+        instances on ports 22, 80, 443, 3306 — no established
+        connections, no outbound traffic from instances to 198.51.100.10.
+
+      Emit the standard diagnostic block (FINDING, VERDICT, REASON,
+      LAYER, SEVERITY, EVIDENCE, SUPPRESSION, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "recon-portprobe-authorized-scanner"
+        - "FALSE_POSITIVE"
+        - "VERDICT"
+        - "SUPPRESSION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "LAYER: CREDENTIAL_ABUSE"
+        - "LAYER: RUNTIME_ANOMALY"
+
+  - id: consolelogin-credential-abuse
+    description: >-
+      UnauthorizedAccess:IAMUser/ConsoleLogin for user alice from
+      203.0.113.99 (Country X), no MFA, after 45 days of inactivity.
+      Alice's documented pattern is SSO with MFA from 198.18.0.0/15.
+      Expected layer: CREDENTIAL_ABUSE.
+    input: |
+      Symptom: GuardDuty finding i9j0k1l2 in detector 12ab34cd
+      (us-east-1). Type UnauthorizedAccess:IAMUser/ConsoleLogin,
+      severity 7.0 (High).
+
+      aws guardduty get-findings:
+        service.action.awsApiCallAction.api: "ConsoleLogin"
+        service.action.awsApiCallAction.remoteIpDetails.ipAddressV4:
+          "203.0.113.99"
+        service.action.awsApiCallAction.remoteIpDetails.location.country:
+          "Country X"
+        resource.accessKeyDetails.principalId: "AIDACKCEVSQALICE"
+        service.additionalInfo.loginMeta.notConsole: false
+      CloudTrail lookup-events (ConsoleLogin in finding window):
+        sourceIPAddress: 203.0.113.99
+        userIdentity.arn: arn:aws:iam::111111111111:user/alice
+        userIdidentity.type: IAMUser
+        additionalEventData.MFAUsed: No
+        responseElements.ConsoleLogin: Success
+      aws iam get-credential-report (alice row):
+        password_last_used: 45 days ago
+        access_key_1_last_used_date: 45 days ago
+        mfa_active: true (MFA registered but not used in this login)
+      Corporate identity provider logs:
+        no SAML assertion issued for alice in the finding window
+        alice's expected corporate egress CIDR: 198.18.0.0/15
+      aws guardduty list-ip-sets:
+        (empty — 203.0.113.99 not in any trusted list)
+
+      Emit the standard diagnostic block (FINDING, VERDICT, REASON,
+      LAYER, SEVERITY, EVIDENCE, SUPPRESSION, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "consolelogin-credential-abuse"
+        - "CREDENTIAL_ABUSE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+        - "LAYER: FALSE_POSITIVE"
+
+  - id: runtime-eks-process-anomaly
+    description: >-
+      Runtime:EKS/ProcessA finding on EKS cluster prod-eks — process
+      xmrig discovered in pod billing-api with parent process the
+      container entrypoint (node). GuardDuty Security Agent is enabled.
+      Expected layer: RUNTIME_ANOMALY.
+    input: |
+      Symptom: GuardDuty finding m3n4o5p6 in detector 12ab34cd
+      (us-east-1). Type Runtime:EKS/ProcessA, severity 7.5 (High).
+      Resource: EKS cluster prod-eks, container billing-api in
+      namespace payments.
+
+      aws guardduty list-features:
+        EKS Protection: ENABLED
+        Runtime Monitoring: ENABLED (EKS coverage)
+      aws guardduty get-findings:
+        service.runtimeData.processDetails:
+          name: "xmrig"
+          path: "/tmp/xmrig"
+          pid: 7
+          user: "node"
+          cmdline: "./xmrig -o pool.miningpool.example:3333 -u wallet"
+          parentProcessName: "node"  (container entrypoint — shimming)
+          parentUser: "node"
+        service.runtimeData.networkConnection:
+          direction: "OUTBOUND"
+          local: "10.50.3.12:54321"
+          remote: "203.0.113.77:3333"
+        resource.eksClusterDetails.name: "prod-eks"
+        resource.containerDetails.name: "billing-api"
+        resource.containerDetails.image: "111111111111.dkr.ecr.us-east-1.amazonaws.com/billing-api:v2.3.1"
+      CloudWatch Container Insights on billing-api pod:
+        CPU usage 99% of pod limit (last 30 min)
+        Network out: 4.2 MB sustained (vs baseline 200 KB/min)
+      Container image scan (Inspector):
+        no known CVEs; image was last built 2 hours ago from main branch
+      billing-api source code review:
+        no xmrig binary in the repo or the Dockerfile
+
+      Emit the standard diagnostic block (FINDING, VERDICT, REASON,
+      LAYER, SEVERITY, EVIDENCE, SUPPRESSION, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "runtime-eks-process-anomaly"
+        - "RUNTIME_ANOMALY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "LAYER: FALSE_POSITIVE"
+        - "LAYER: CRYPTO_MINING"
+
+  - id: exfiltration-s3-needs-logs
+    description: >-
+      Exfiltration:S3/AnomalousBehavior.S3 finding on bucket
+      customer-data-prod. CloudTrail data events are NOT enabled on
+      the bucket and the S3 access log is not configured either — the
+      operator cannot corroborate the GetObject burst. Expected
+      verdict: NEED_MORE_INFO.
+    input: |
+      Symptom: GuardDuty finding q7r8s9t0 in detector 12ab34cd
+      (us-east-1). Type Exfiltration:S3/AnomalousBehavior.S3,
+      severity 7.5 (High). Resource: S3 bucket customer-data-prod.
+
+      aws guardduty get-findings:
+        service.action.awsApiCallAction.api: "GetObject"
+        service.action.awsApiCallAction.callCount: 12480
+        service.action.awsApiCallImage.firstSeen: "2026-08-09T03:14:00Z"
+        service.action.awsApiCallImage.lastSeen: "2026-08-09T03:58:00Z"
+        resource.s3BucketDetails.name: "customer-data-prod"
+        resource.accessKeyDetails.principalId:
+          "AROA-DataWarehouseLoadRole"
+      CloudTrail lookup-events (GetObject in finding window):
+        (no results — data events NOT enabled on customer-data-prod)
+      aws s3api get-bucket-logging customer-data-prod:
+        (no logging configured — S3 access logs off)
+      aws s3api get-bucket-versioning customer-data-prod:
+        Versioning: Enabled, MFA Delete: Disabled
+      aws cloudtrail describe-trails:
+        Trail "mgmt-only": IncludeGlobalServiceEvents=true,
+          IsLogging=true, but eventSelectors targetOnly management
+          events (no data events for s3).
+      Known about the principal: DataWarehouseLoadRole is an
+        application role used by the analytics team for nightly
+        ETL — but the operator cannot confirm whether this burst is
+        the normal nightly load or an anomaly.
+
+      Emit the standard diagnostic block (FINDING, VERDICT, REASON,
+      LAYER, SEVERITY, EVIDENCE, SUPPRESSION, REMEDIATION).
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "exfiltration-s3-needs-logs"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ROOT_CAUSE_FOUND"
+        - "VERDICT: ESCALATE"
+        - "LAYER: DATA_EXFILTRATION"
+        - "LAYER: FALSE_POSITIVE"

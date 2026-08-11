@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "guardduty-finding-investigator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the GuardDuty Finding Investigator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cryptocurrency-ec2-true-positive",
+      "name": "CryptoCurrency:EC2/BitcoinTool.B!DNS with sustained CPU and outbound port 3333 — true positive crypto miner on Node.js API server",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cryptocurrency-ec2-true-positive.md",
+      "baseline_file": "baselines/cryptocurrency-ec2-true-positive.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "CRYPTO_MINING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "cryptocurrency-ec2-true-positive", "CRYPTO_MINING", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "LAYER: FALSE_POSITIVE"]
+        }
+      ]
+    },
+    {
+      "id": "recon-portprobe-authorized-scanner",
+      "name": "Recon:EC2/PortProbe recurring from Qualys scanner CIDR — false positive, recommend trusted IP list over suppression",
+      "difficulty": "medium",
+      "prompt_file": "prompts/recon-portprobe-authorized-scanner.md",
+      "baseline_file": "baselines/recon-portprobe-authorized-scanner.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "FALSE_POSITIVE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "recon-portprobe-authorized-scanner", "FALSE_POSITIVE", "VERDICT", "SUPPRESSION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "LAYER: CREDENTIAL_ABUSE", "LAYER: RUNTIME_ANOMALY"]
+        }
+      ]
+    },
+    {
+      "id": "consolelogin-credential-abuse",
+      "name": "UnauthorizedAccess:IAMUser/ConsoleLogin no-MFA from new country after 45 days of inactivity — credential compromise",
+      "difficulty": "hard",
+      "prompt_file": "prompts/consolelogin-credential-abuse.md",
+      "baseline_file": "baselines/consolelogin-credential-abuse.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "CREDENTIAL_ABUSE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "consolelogin-credential-abuse", "CREDENTIAL_ABUSE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "LAYER: FALSE_POSITIVE"]
+        }
+      ]
+    },
+    {
+      "id": "runtime-eks-process-anomaly",
+      "name": "Runtime:EKS/ProcessA xmrig in billing-api pod with CPU 99% and outbound to mining pool — runtime compromise",
+      "difficulty": "hard",
+      "prompt_file": "prompts/runtime-eks-process-anomaly.md",
+      "baseline_file": "baselines/runtime-eks-process-anomaly.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "RUNTIME_ANOMALY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "runtime-eks-process-anomaly", "RUNTIME_ANOMALY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: FALSE_POSITIVE", "LAYER: CRYPTO_MINING"]
+        }
+      ]
+    },
+    {
+      "id": "exfiltration-s3-needs-logs",
+      "name": "Exfiltration:S3/AnomalousBehavior.S3 with CloudTrail data events off and S3 access logs off — cannot corroborate, NEED_MORE_INFO",
+      "difficulty": "medium",
+      "prompt_file": "prompts/exfiltration-s3-needs-logs.md",
+      "baseline_file": "baselines/exfiltration-s3-needs-logs.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "expected_layer": "UNKNOWN",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "exfiltration-s3-needs-logs", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ROOT_CAUSE_FOUND", "VERDICT: ESCALATE", "LAYER: DATA_EXFILTRATION", "LAYER: FALSE_POSITIVE"]
+        }
+      ]
+    }
+  ]
+}

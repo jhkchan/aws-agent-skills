@@ -1,0 +1,43 @@
+# Eval configuration for kafka-connect-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the
+# same case can run with-skill (SKILL.md loaded) vs without-skill
+# (baseline only) for delta comparison. This is the canonical
+# structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer
+# shim discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: kafka-connect-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: sink-dlq-avro-protobuf-converter-mismatch
+    difficulty: hard
+    prompt_file: prompts/sink-dlq-avro-protobuf-converter-mismatch.md
+    baseline_file: baselines/sink-dlq-avro-protobuf-converter-mismatch.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: iam-auth-sasl-not-logged-in-msk
+    difficulty: medium
+    prompt_file: prompts/iam-auth-sasl-not-logged-in-msk.md
+    baseline_file: baselines/iam-auth-sasl-not-logged-in-msk.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: source-lag-hot-partition-skew
+    difficulty: hard
+    prompt_file: prompts/source-lag-hot-partition-skew.md
+    baseline_file: baselines/source-lag-hot-partition-skew.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: plugin-missing-debezium-class-not-found
+    difficulty: medium
+    prompt_file: prompts/plugin-missing-debezium-class-not-found.md
+    baseline_file: baselines/plugin-missing-debezium-class-not-found.md
+    expected_verdict: ROOT_CAUSE_FOUND
+  - id: schema-registry-connection-refused-vpc
+    difficulty: medium
+    prompt_file: prompts/schema-registry-connection-refused-vpc.md
+    baseline_file: baselines/schema-registry-connection-refused-vpc.md
+    expected_verdict: ROOT_CAUSE_FOUND

@@ -1,0 +1,48 @@
+# Eval configuration for guardduty-finding-investigator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: guardduty-finding-investigator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: cryptocurrency-ec2-true-positive
+    difficulty: medium
+    prompt_file: prompts/cryptocurrency-ec2-true-positive.md
+    baseline_file: baselines/cryptocurrency-ec2-true-positive.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: CRYPTO_MINING
+  - id: recon-portprobe-authorized-scanner
+    difficulty: medium
+    prompt_file: prompts/recon-portprobe-authorized-scanner.md
+    baseline_file: baselines/recon-portprobe-authorized-scanner.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: FALSE_POSITIVE
+  - id: consolelogin-credential-abuse
+    difficulty: hard
+    prompt_file: prompts/consolelogin-credential-abuse.md
+    baseline_file: baselines/consolelogin-credential-abuse.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: CREDENTIAL_ABUSE
+  - id: runtime-eks-process-anomaly
+    difficulty: hard
+    prompt_file: prompts/runtime-eks-process-anomaly.md
+    baseline_file: baselines/runtime-eks-process-anomaly.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: RUNTIME_ANOMALY
+  - id: exfiltration-s3-needs-logs
+    difficulty: medium
+    prompt_file: prompts/exfiltration-s3-needs-logs.md
+    baseline_file: baselines/exfiltration-s3-needs-logs.md
+    expected_verdict: NEED_MORE_INFO
+    expected_layer: UNKNOWN
