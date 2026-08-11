@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "dynamodb-capacity-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DynamoDB Capacity Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "provisioned-to-ondemand-crossover",
+      "name": "Provisioned table consumed at 15% with sporadic traffic — switch to on-demand",
+      "difficulty": "medium",
+      "prompt_file": "prompts/provisioned-to-ondemand-crossover.md",
+      "baseline_file": "baselines/provisioned-to-ondemand-crossover.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "provisioned-to-ondemand-crossover", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "autoscaling-target-tuning",
+      "name": "Provisioned table with auto-scaling target at 90% causing throttling — lower target, raise max",
+      "difficulty": "hard",
+      "prompt_file": "prompts/autoscaling-target-tuning.md",
+      "baseline_file": "baselines/autoscaling-target-tuning.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "autoscaling-target-tuning", "RECOMMENDATION", "ESTIMATED_SAVINGS", "target"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "gsi-projection-bloat",
+      "name": "Table with 3 GSIs using ALL projection, 300 GB total — switch to INCLUDE or KEYS_ONLY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/gsi-projection-bloat.md",
+      "baseline_file": "baselines/gsi-projection-bloat.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "gsi-projection-bloat", "RECOMMENDATION", "ESTIMATED_SAVINGS", "GSI"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-table",
+      "name": "On-demand table with correct billing mode, optimized GSI, TTL enabled, no skew — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-table.md",
+      "baseline_file": "baselines/already-optimal-table.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-table", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "hot-partition-skew",
+      "name": "Provisioned table throttling despite 36% consumed — hot partition key with 80% traffic skew",
+      "difficulty": "hard",
+      "prompt_file": "prompts/hot-partition-skew.md",
+      "baseline_file": "baselines/hot-partition-skew.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "hot-partition-skew", "RECOMMENDATION", "ESTIMATED_SAVINGS", "partition"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

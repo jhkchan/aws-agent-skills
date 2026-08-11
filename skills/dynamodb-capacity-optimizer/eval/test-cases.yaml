@@ -1,0 +1,241 @@
+# Eval test cases for dynamodb-capacity-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# TableName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: dynamodb-capacity-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: provisioned-to-ondemand-crossover
+    description: >-
+      Provisioned table with 5000 RCU / 2000 WCU consumed at only 15%
+      utilization. Sporadic traffic (batch processing). On-demand would
+      be cheaper at this utilization. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with capacity mode switch.
+    input: |
+      TableName: tbl-provisioned-to-ondemand-crossover
+      Region: us-east-1
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5000
+        WriteCapacityUnits: 2000
+      AutoScaling:
+        Read: target=70, min=5000, max=5000 (static, no scaling)
+        Write: target=70, min=2000, max=2000 (static, no scaling)
+      GSIs: 1 (projected size: 20 GB, KEYS_ONLY)
+      TTL: not enabled
+      Table Class: STANDARD
+      Streams: disabled
+      Metrics (last 30 days):
+        - ConsumedReadCapacityUnits: avg 750/s, max 1100/s, p99 980/s
+        - ConsumedWriteCapacityUnits: avg 300/s, max 450/s, p99 420/s
+        - ThrottledRequests: 0
+        - SystemErrors: 0
+      Table size: 150 GB
+      Workload context: batch report generator triggered by scheduled
+      jobs. Traffic is sporadic — bursts every 4 hours for 30 minutes,
+      idle in between. No latency-sensitive queries.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "provisioned-to-ondemand-crossover"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: autoscaling-target-tuning
+    description: >-
+      Provisioned table with auto-scaling target at 90% causing
+      frequent throttling during traffic spikes. Lowering target to
+      60% with higher max would eliminate throttling. Expected
+      verdict: FURTHER_OPTIMIZATION_AVAILABLE with auto-scaling tuning.
+    input: |
+      TableName: tbl-autoscaling-target-tuning
+      Region: us-east-1
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 3000 (current scaled value)
+        WriteCapacityUnits: 1500 (current scaled value)
+      AutoScaling:
+        Read: target=90, min=1000, max=5000, ScaleOutCooldown=60
+        Write: target=90, min=500, max=3000, ScaleOutCooldown=60
+      GSIs: 0
+      TTL: not enabled
+      Table Class: STANDARD
+      Streams: disabled
+      Metrics (last 30 days):
+        - ConsumedReadCapacityUnits: avg 2400/s, max 3200/s, p99 2900/s
+        - ConsumedWriteCapacityUnits: avg 1200/s, max 1600/s, p99 1450/s
+        - ThrottledRequests: 145,000 (on Read), 12,000 (on Write)
+        - SystemErrors: 0
+      Table size: 80 GB
+      Traffic variability: CV = 0.8 (bursty, latency-sensitive API)
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "autoscaling-target-tuning"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "target"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: gsi-projection-bloat
+    description: >-
+      Table with 3 GSIs using ALL projection, each consuming significant
+      storage. Switching to INCLUDE projection would reduce GSI storage
+      and cost. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with
+      GSI optimization.
+    input: |
+      TableName: tbl-gsi-projection-bloat
+      Region: us-east-1
+      BillingMode: PAY_PER_REQUEST
+      GSIs: 3
+        - gsi-by-status: projection=ALL, size=120 GB
+        - gsi-by-category: projection=ALL, size=95 GB
+        - gsi-by-date: projection=ALL, size=85 GB
+        (Total GSI storage: 300 GB)
+      Base table storage: 200 GB, avg item size 8 KB
+      TTL: not enabled
+      Table Class: STANDARD
+      Streams: NEW_IMAGES
+      Metrics (last 30 days):
+        - ConsumedReadCapacityUnits: avg 2000/s
+        - ConsumedWriteCapacityUnits: avg 800/s
+        - GSI queries: gsi-by-status 5000/d, gsi-by-category 200/d,
+          gsi-by-date 50/d
+      Workload context: gsi-by-status is heavily queried and needs 5
+      attributes. gsi-by-category and gsi-by-date are rarely queried
+      and only need partition + sort key. All GSIs use ALL projection
+      unnecessarily.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "gsi-projection-bloat"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "GSI"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-table
+    description: >-
+      On-demand table with correct billing mode, right-sized GSIs with
+      INCLUDE projection, TTL enabled, no throttling, no partition skew.
+      No optimization dimension has positive savings. Expected verdict:
+      ALREADY_OPTIMAL.
+    input: |
+      TableName: tbl-already-optimal-table
+      Region: us-east-1
+      BillingMode: PAY_PER_REQUEST
+      GSIs: 1 (gsi-by-status, projection=INCLUDE, 3 attributes, size=8 GB)
+      TTL: enabled (attribute: expires_at, 30-day expiry)
+      Table Class: STANDARD
+      Streams: disabled
+      Table size: 50 GB (stable — TTL keeps growth flat)
+      Metrics (last 30 days):
+        - ConsumedReadCapacityUnits: avg 500/s, p99 1200/s
+        - ConsumedWriteCapacityUnits: avg 200/s, p99 600/s
+        - ThrottledRequests: 0
+        - SystemErrors: 0
+      Partition key distribution: uniform (user_id with random suffix)
+      Workload context: high-traffic API with unpredictable spikes.
+      On-demand confirmed optimal (consumed > 50% of equivalent
+      provisioned cost during peak hours). GSI queried 50K/day with
+      only 3 projected attributes. TTL eliminates 80% of items at
+      30-day boundary.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-table"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: hot-partition-skew
+    description: >-
+      Provisioned table with ThrottledRequests despite consumed capacity
+      being below provisioned. Root cause is hot partition key (80% of
+      traffic to one partition). Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with partition skew remediation.
+    input: |
+      TableName: tbl-hot-partition-skew
+      Region: us-east-1
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5000
+        WriteCapacityUnits: 3000
+      AutoScaling: disabled (static provisioning)
+      GSIs: 0
+      TTL: not enabled
+      Table Class: STANDARD
+      Streams: disabled
+      Metrics (last 30 days):
+        - ConsumedReadCapacityUnits: avg 1800/s (36% of provisioned)
+        - ConsumedWriteCapacityUnits: avg 1200/s (40% of provisioned)
+        - ThrottledRequests: 890,000 (significant, on both Read and Write)
+        - SystemErrors: 0
+      Partition key: "status" with values: "active" (80% of items),
+      "pending" (15%), "completed" (5%)
+      Table size: 120 GB
+      Workload context: order processing table. Partition key is
+      "status" which creates extreme skew — nearly all traffic goes
+      to the "active" partition.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "hot-partition-skew"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "partition"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"

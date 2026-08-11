@@ -599,82 +599,54 @@ TEMPLATE: (partial — install agents, then re-run)
 
 ## Anti-Patterns — NEVER do these things
 
-- NEVER start an assessment with less than 7 days of Discovery data. The
-  right-sizing and 6R classification rely on utilization percentiles. A
-  short window produces noisy recommendations that over-provision or
-  under-provision, undermining stakeholder confidence in the migration.
+- NEVER start an assessment with less than 7 days of Discovery data.
+  Right-sizing and 6R classification rely on utilization percentiles.
+  A short window produces noisy recommendations.
 
 - NEVER rely on agentless-only discovery for wave planning. The Collector
   VM provides inventory but NOT inter-host dependencies. Without the
-  dependency graph, every server is a standalone application and wave
-  sequencing is impossible. Install agents on critical hosts before the
-  assessment.
+  dependency graph, wave sequencing is impossible. Install agents on
+  critical hosts.
 
 - NEVER rehost an end-of-life OS without flagging the anti-pattern.
-  Strategy Recommendations detects EOL OS versions and recommends
-  replatform. Ignoring this and rehosting produces an EC2 instance that
-  fails compliance and security baseline checks on day one. Always
-  surface anti-patterns in the wave plan.
+  Strategy Recommendations detects EOL OS and recommends replatform.
+  Ignoring this produces an EC2 instance that fails compliance on day one.
 
-- NEVER assume the 6R strategy is final. Strategy Recommendations
-  classifies from runtime telemetry; it does not know business context.
-  A "rehost" recommendation for an application the business wants to
-  refactor is a starting point for discussion, not a directive. Always
-  validate the 6R with stakeholders.
+- NEVER assume the 6R strategy is final. It is derived from runtime
+  telemetry, not business context. Validate each recommendation with
+  stakeholders.
 
-- NEVER skip the MGN test cutover. A rehost strategy is not complete
-  until MGN replication is healthy AND a test cutover produces a
-  bootable, functional EC2 instance. A production cutover without a
-  test is a single point of failure.
+- NEVER skip the MGN test cutover. A rehost is not complete until MGN
+  replication is healthy AND a test cutover produces a bootable,
+  functional EC2 instance.
 
 - NEVER skip AWS SCT for heterogeneous database migrations. DMS
   replicates data; it does NOT convert schema objects or stored
   procedures. An Oracle-to-Aurora replatform without SCT produces a
   database with tables but no triggers, views, or procedures.
 
-- NEVER deploy the Collector VM without verifying vCenter and AWS
-  network reachability. A Collector that cannot reach vCenter cannot
-  import; a Collector that cannot reach AWS cannot upload. Both paths
-  must be open before the OVA is deployed.
+- NEVER deploy the Collector VM without verifying vCenter AND AWS
+  network reachability (both paths on 443). A Collector that cannot
+  reach either endpoint appears healthy but never reports data.
 
 - NEVER change the Migration Hub home region after collection starts.
-  All Discovery data is region-scoped. Changing the home region requires
-  re-importing all data and re-deploying all agents. Confirm the region
-  with stakeholders before starting.
-
-- NEVER assume the Discovery agent's OS version data matches vCenter.
-  vCenter tools may report a stale OS version (especially after a
-  guest-side upgrade that did not update VMware tools). Anti-pattern
-  detection is only as accurate as the OS version source. Always
-  cross-check with agent-based data on critical hosts.
+  All Discovery data is region-scoped. Confirm the region with
+  stakeholders before starting.
 
 - NEVER wave-plan without the dependency graph. A wave that splits a
-  dependency cluster (application A in wave 2 depends on application B
-  in wave 3) creates a broken state where A cannot reach B across the
-  on-premises/AWS boundary. The dependency graph defines the minimum
-  wave count.
+  dependency cluster creates a broken state where applications cannot
+  reach each other across the on-premises/AWS boundary.
 
 - NEVER start DMS replication without validating data parity after the
-  full load. A full load that completes with row-count mismatches
-  produces a target database that is silently incomplete. Always
-  compare row counts and checksums before the cutover.
+  full load. Compare row counts and checksums before cutover.
 
-- NEVER interpret "retain" as "do nothing." A retain strategy means the
-  application stays on-premises (or is deferred). It still requires a
-  connectivity plan (VPN/Direct Connect) to reach migrated applications
-  in AWS. Include retained applications in the network architecture.
+- NEVER interpret "retain" as "do nothing." Retained applications still
+  require a connectivity plan (VPN/Direct Connect) to reach migrated
+  applications in AWS.
 
 - NEVER use Migration Hub Orchestrator managed templates without
-  verifying they fit the application profile. The Windows rehost
-  template assumes a specific MGN configuration; a Windows application
-  with a custom service account or non-standard drive layout may need a
-  custom workflow. Validate the template against one pilot application
-  first.
-
-- NEVER forget that Discovery data is eventually consistent in the
-  Migration Hub console. A newly installed agent may take 15-30 minutes
-  to appear in the console. Do not assume the agent failed; verify with
-  `aws discovery describe-agents` before troubleshooting.
+  verifying they fit the application profile. Validate against one pilot
+  application first.
 
 ## Configuration dependency graph
 
@@ -805,7 +777,7 @@ interpretation guide and wave planning templates, see
   replication instance sizes. Useful for replatform waves with
   unpredictable data volumes.
 
-## Expert heuristic: agent-based vs agentless trade-off + 6R from telemetry + wave sequencing from dependency mapping
+## Expert heuristic: agent-based vs agentless trade-off + 6R from telemetry + wave sequencing
 
 The most common migration assessment failure is NOT a missing Collector
 — it is an assessment that produces unreliable output because
@@ -816,58 +788,41 @@ the dependency graph.
 
 > ALWAYS deploy agent-based discovery on all critical hosts (those with
 > inter-host dependencies, databases, or right-sizing uncertainty)
-> BEFORE starting the assessment. The 6R classification is only as good
-> as the underlying telemetry: without agent data, every server defaults
-> to standalone "rehost," anti-pattern detection may be based on stale
+> BEFORE starting the assessment. Without agent data, every server
+> defaults to standalone "rehost," anti-pattern detection may use stale
 > vCenter OS data, and wave planning is blocked. The collection window
-> must be at least 7 days (14 preferred) for reliable right-sizing.
+> must be at least 7 days (14 preferred).
 
 **Why this rule exists:** Strategy Recommendations derives the 6R
-strategy from three data sources: inventory (what the server is),
-performance (how hard it works), and network (what it depends on).
-Agentless discovery provides inventory and VM-level performance but
-NOT network dependencies. Without dependencies, the service cannot
-group servers into applications — every server is standalone, and the
-6R output is per-server rehost. This produces a migration plan that
-ignores inter-application dependencies and breaks on the first wave.
+strategy from three sources: inventory, performance, and network
+dependencies. Agentless provides inventory and VM-level performance but
+NOT dependencies. Without dependencies, every server is standalone and
+the 6R output is per-server rehost, producing a plan that ignores
+inter-application dependencies and breaks on the first wave.
 
 **Agent-based vs agentless decision matrix:**
 
 | Application profile | Agent-based | Agentless | Rationale |
 |---|---|---|---|
-| Multi-tier with dependencies | Required | Optional (for inventory baseline) | Dependency graph is mandatory for wave planning |
-| Standalone VM, no dependencies | Optional | Sufficient | No dependencies to map; inventory + performance is enough |
-| Database server | Required | Optional | DB engine version must come from the guest for accurate anti-pattern detection |
-| EOL OS candidate | Required | Optional | OS version from vCenter tools may be stale; agent data is current |
-| Right-sizing candidate | Required | Optional | Process-level utilization percentiles need agent data |
-| Large fleet (500+ VMs) | Critical hosts only | All VMs | Agent on all 500 is invasive; prioritize by criticality |
+| Multi-tier with dependencies | Required | Optional | Dependency graph mandatory for wave planning |
+| Standalone VM | Optional | Sufficient | No dependencies to map |
+| Database server | Required | Optional | DB engine version must come from guest |
+| EOL OS candidate | Required | Optional | vCenter OS data may be stale |
+| Large fleet (500+) | Critical hosts only | All VMs | Prioritize by criticality |
 
-**Wave sequencing from dependency mapping:**
+**Wave sequencing from dependency mapping:** the dependency graph has
+nodes (servers) and edges (network connections). Wave planning finds
+connected components and migrates each as a unit. Standalone servers go
+in Wave 0 (pilot). Shared services (DNS, AD) go in Wave 1 (foundation).
+Connected clusters migrate together. Cross-cluster edges force clusters
+into the same wave.
 
-The dependency graph is a directed graph where nodes are servers and
-edges are network connections (from agent data). Wave planning finds
-connected components and migrates each component as a unit. The
-minimum wave count is the number of connected components that cannot
-be parallelized due to shared dependencies.
+**Detection of insufficient telemetry:** if the 6R output is 100%
+rehost with low confidence and the wave plan is empty, the assessment
+ran without dependency data. Verify with `aws discovery describe-agents`.
 
-| Dependency pattern | Wave strategy | Risk |
-|---|---|---|
-| Standalone (no edges) | Wave 0 (pilot) | Low — no dependencies to break |
-| Shared service (DNS, AD) | Wave 1 (foundation) | High — downstream apps depend on these; must migrate first |
-| Connected cluster (N apps) | Wave N (whole cluster) | Medium — entire cluster migrates together; schedule a single cutover |
-| Cross-cluster edge | Merge waves | High — a dependency across clusters forces them into the same wave |
-
-**Detection of insufficient telemetry post-assessment:** if the 6R
-output is 100% rehost with low confidence and the wave plan is empty,
-the assessment ran without dependency data. Verify with
-`aws discovery describe-agents` that agents reported data during the
-collection window. If agent count is zero or data is sparse, re-run
-the assessment after installing agents.
-
-**Surface in the output:** for any recommended migration plan, include
-`DISCOVERY_COVERAGE: <agent-based | agentless-only | mixed>`,
-`COLLECTION_WINDOW: <days>`, `DEPENDENCY_GRAPH: <available | missing>`,
-and `WAVE_CONFIDENCE: <high | medium | low>`. If
+**Surface in the output:** include `DISCOVERY_COVERAGE`,
+`COLLECTION_WINDOW`, `DEPENDENCY_GRAPH`, and `WAVE_CONFIDENCE`. If
 `DISCOVERY_COVERAGE` is `agentless-only` or `DEPENDENCY_GRAPH` is
 `missing`, do NOT mark the plan as READY_TO_DEPLOY.
 

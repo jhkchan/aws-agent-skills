@@ -106,41 +106,30 @@ metadata:
 ## Mindset
 
 **One-line takeaway:** tag compliance is a four-layer pipeline —
-**define** (Organizations TagPolicy sets case-sensitive key/value rules
-with `enforced_for` scoping) → **detect** (Config `required-tags` and
-`allowed-tag-values` rules flag non-compliant resources; Config
-configuration-item changes catch tag drift) → **propagate** (EventBridge
-+ Lambda auto-tags new resources on creation and propagates inherited
-tags from EC2 to child EBS volumes and ENIs) → **remediate** (SSM
-Automation or Lambda adds or corrects missing tags; Config re-evaluates
-and flips COMPLIANT). A gap in ANY layer produces a silent failure: the
-policy is published but advisory, auto-tagging stamps tags that humans
-later overwrite, drift goes undetected, or cost allocation reports stay
-empty because no one activated the tag keys in Billing.
+**define** (Organizations TagPolicy with `enforced_for` and case-sensitive
+key/value rules) → **detect** (Config `required-tags` and
+`allowed-tag-values` rules flag non-compliant resources; Config CI changes
+catch tag drift) → **propagate** (EventBridge + Lambda auto-tags new
+resources and propagates inherited tags from EC2 to EBS volumes and ENIs)
+→ **remediate** (SSM Automation adds or corrects missing tags; Config
+re-evaluates and flips COMPLIANT). A gap in ANY layer produces a silent
+failure: the policy is published but advisory, auto-tagging stamps tags
+that humans later overwrite, drift goes undetected, or cost allocation
+reports stay empty because no one activated the tag keys in Billing.
 
-- **Organizations TagPolicy** without `enforced_for` is advisory only:
-  the policy declares that `Environment` must be `dev`, `staging`, or
-  `prod`, but if no resource type is listed under `enforced_for`, AWS
-  does not block non-compliant tag operations on those resources. The
-  policy is documentation, not enforcement.
+- **Organizations TagPolicy** without `enforced_for` is advisory only.
+  AWS does not block non-compliant tag operations. The policy is
+  documentation, not enforcement.
 - **Case sensitivity** is a silent gap. A TagPolicy with
   `case_sensitive: true` treats `Environment` and `environment` as
-  different keys. A Config rule checking for `Environment` does not flag
-  a resource tagged `environment=prod`. Auto-taggers that derive the key
-  name from an EventBridge event detail must match the policy's casing
-  exactly, or the tag is stamped but the resource still shows
-  NON_COMPLIANT.
-- **Tag propagation is NOT automatic.** When an operator launches an EC2
-  instance with tags, the tags do NOT propagate to the EBS volumes or
-  ENIs created in the same `RunInstances` call. The volumes and ENIs are
-  untagged, which breaks cost allocation and ABAC. An EventBridge rule
-  on `RunInstances` must invoke a Lambda that calls
-  `ec2:create-tags` on the child resources.
+  different keys. Config `required-tags` checks the exact key name in
+  InputParameters. Auto-taggers must normalize casing before stamping.
+- **EC2 tags do NOT propagate to EBS volumes or ENIs.** The `RunInstances`
+  API tags only the instance. An EventBridge Lambda must call
+  `ec2:create-tags` on child resources.
 - **Cost allocation tags are NOT active by default.** A perfectly tagged
-  fleet produces zero cost-dimension data in CUR and Cost Explorer until
-  an administrator activates the tag keys via the Billing API or console.
-  This is the number-one "we tagged everything and Cost Explorer is still
-  empty" issue.
+  fleet produces zero cost-dimension data until an administrator activates
+  the tag keys via the Billing API or console.
 
 ## Quick navigation
 
@@ -155,38 +144,29 @@ empty because no one activated the tag keys in Billing.
 | Activate cost allocation tags programmatically | Step 8 |
 | Enforce cross-account tag consistency via StackSets | Step 9 |
 | Avoid common tag-policy and propagation pitfalls | Anti-Patterns |
-| Recent features (tag-policy enforced_for expansion, StackSets drift) | Recent AWS features |
 
 ## Critical rules at a glance (do NOT bury these)
 
 1. **`enforced_for` is the only enforcement hook in a TagPolicy.** A
    policy with `allowed_values` but no `enforced_for` entries is
-   advisory — AWS does not block non-compliant operations. Always list
-   the resource types under `enforced_for` for every tag key you want
-   enforced.
+   advisory. Always list resource types under `enforced_for` for every
+   tag key you want enforced.
 2. **`case_sensitive` defaults to `true` and mismatches break
-   silently.** If the policy declares `Environment` (capital E) and a
-   resource is tagged `environment` (lowercase), the policy does NOT
-   match the key. Config `required-tags` also checks the exact key name.
-   Normalize casing in the auto-tagger before stamping.
+   silently.** If the policy declares `Environment` and a resource is
+   tagged `environment`, the policy does not match. Config
+   `required-tags` also checks the exact key name. Normalize casing in
+   the auto-tagger before stamping.
 3. **Config `required-tags` checks at most 5 tag keys per rule.** To
-   enforce 6+ required keys, deploy a second rule (`required-tags-ext`)
-   or a custom Lambda rule. The managed rule silently ignores keys
-   beyond the 5th.
+   enforce 6+ keys, deploy a second rule (`required-tags-ext`) or a
+   custom Lambda rule.
 4. **EC2 tags do NOT propagate to EBS volumes or ENIs.** The
-   `RunInstances` API tags only the instance. Child resources are
-   untagged. An EventBridge-driven Lambda must call
-   `ec2:create-tags` on `VolumeId` and `NetworkInterfaceId` values from
-   the `RunInstances` response.
+   `RunInstances` API tags only the instance. An EventBridge-driven
+   Lambda must call `ec2:create-tags` on child resources.
 5. **Cost allocation tag activation is account-scoped and per-key.** The
    `ce update-cost-allocation-tags-status` API activates a tag key for
-   the payer account only. Member-account tags roll up via the payer,
-   but the key must be activated on the payer before it appears as a
-   Cost Explorer dimension.
+   the payer account only. Propagation delay is up to 24 hours.
 
 ## Pre-flight: data requirements
-
-Designing a tag compliance automation pipeline requires these inputs:
 
 | Input | Source | Why |
 |---|---|---|
@@ -196,9 +176,7 @@ Designing a tag compliance automation pipeline requires these inputs:
 | Config recorder status | `configservice describe-configuration-recorders` | Rules cannot evaluate without a recorder |
 | Current cost allocation tag status | `ce list-cost-allocation-tags` | Avoid redundant activation calls |
 | Sample resource tag coverage | `resourcegroupstaggingapi get-resources` | Baseline before enforcement |
-| Existing EventBridge rules on EC2/S3 | `events list-rules` | Avoid duplicate auto-tagger rules |
 | SSM service role ARN | `iam get-role` on the SSM automation role | Remediation execution identity |
-| StackSet admin role | `cloudformation describe-stack-set` | Cross-account tag-policy deployment |
 
 **If the input is malformed** (missing tag schema, ambiguous resource
 type list), emit:
@@ -214,72 +192,46 @@ GAP: Re-supply the required tag keys, allowed values, and the resource types in 
 
 ### Step 0: Expert knowledge — non-obvious TagPolicy and Config behaviors
 
-These behaviors change the design if ignored:
-
 - **A TagPolicy attached to the org root cascades to all OUs and
-  accounts, but a policy attached to a specific OU overrides (not
-  merges) the root policy for accounts under that OU.** The effective
-  tag policy for an account is the policy attached to the closest
-  ancestor (root or OU). Merging is NOT the model. To add a key to a
-  child OU without losing root keys, the child policy must re-declare
-  every parent key.
+  accounts, but a policy attached to a specific OU OVERRIDES (not
+  merges) the root policy.** The effective tag policy is the policy
+  attached to the closest ancestor. To add a key at the OU level
+  without losing root keys, re-declare every parent key in the child.
 
-- **`enforced_for` accepts resource types in the
-  `AWS::service::resource` format (e.g., `AWS::EC2::Instance`).** A
-  typo like `AWS::EC2::instance` (lowercase) is silently ignored. The
-  enforcement does not fire. Always cross-reference the canonical
-  resource-type list in the AWS documentation.
+- **`enforced_for` accepts resource types in `AWS::service::resource`
+  format.** A typo like `AWS::EC2::instance` (lowercase) is silently
+  ignored. Cross-reference the canonical resource-type list.
 
 - **Config `required-tags` uses `InputParameters` as a JSON-encoded
-  string, not a YAML map.** A common Terraform / CloudFormation failure
-  is passing a map where the API expects `"{\"tag1Key\":\"Environment\"}"`.
-  The rule deploys but never evaluates — the input is silently dropped.
+  string.** Passing a map where the API expects
+  `"{\"tag1Key\":\"Environment\"}"` silently drops the input.
 
-- **The Resource Groups Tagging API `tag-resources` is eventually
-  consistent for some services.** Tagging an S3 bucket returns
-  `SUCCESS` immediately, but a follow-up `get-resources` within seconds
-  may not reflect the new tags. For validation, sleep 10-15 seconds
-  before re-querying.
+- **The Resource Groups Tagging API is eventually consistent.** Tagging
+  returns `SUCCESS` immediately but a follow-up `get-resources` within
+  seconds may not reflect new tags. Sleep 10-15 seconds before re-querying.
 
 - **EventBridge auto-taggers that derive Owner from the IAM principal
   must handle assumed-role sessions.** The `userIdentity.sessionContext`
-  in the CloudTrail event has `sessionIssuer.arn` (the role) and
-  `sessionContext.attributes.mfaAuthenticated`. Deriving a human owner
-  from a role ARN requires a mapping table. Tagging the resource with
-  the role ARN as Owner works for ABAC but produces noisy cost reports.
+  has `sessionIssuer.arn` (the role). Deriving a human owner from a role
+  ARN requires a mapping table.
 
-- **`allowed-tag-values` is a Config managed rule that checks a tag
-  key's value against an allowlist.** It accepts one tag key per rule
-  invocation. To validate 4 tag keys' values, deploy 4 separate
-  `allowed-tag-values` rules. A single rule cannot validate multiple
-  keys' values.
-
-- **CloudFormation StackSets for tag policies require the
-  `AWSCloudFormationStackSetAdministrationRole` and a per-target
-  execution role.** A StackSet deploy without the execution role in a
-  target account fails with `AccessDenied` on the target, not on the
-  deployer. Pre-provision both roles via the StackSet admin template.
+- **`allowed-tag-values` is a Config managed rule that accepts ONE tag
+  key per invocation.** For 4 tag keys' value validation, deploy 4
+  separate rules.
 
 - **The `ce update-cost-allocation-tags-status` API has a propagation
-  delay of up to 24 hours.** Activating a tag key returns immediately,
-  but Cost Explorer and CUR do not reflect the new dimension until the
-  next processing cycle. Do not re-activate or assume failure within
-  that window.
+  delay of up to 24 hours.** Do not re-activate or assume failure within
+  that window. Poll the `ProcessingStatus` field.
 
-- **Config configuration-item change events on tag updates fire for
-  recorded resource types only.** A resource type not in the recorder's
-  recording group does not emit configuration-item changes. Tag drift
-  on such resources is invisible to Config. Extend the recorder scope
-  before wiring drift detection.
+- **Config configuration-item change events fire only for recorded
+  resource types.** Tag drift on an unrecorded type is invisible.
+  Extend the recorder scope before wiring drift detection.
 
 ### Step 1: Design the Organizations TagPolicy
 
-The TagPolicy JSON declares, per tag key: `TagKey` (the key name),
-`Targets` (optional: specific values that are allowed), and
-`EnforcedFor` (the resource types that must comply). Wrap per-key
-declarations under a `tags` object.
-
-Tag policy JSON structure:
+The TagPolicy JSON declares per tag key: `TagKey`, `ExpectedStringValues`
+(optional allowed values), and `EnforcedFor` (resource types that must
+comply). Wrap under a `tags` object.
 
 ```json
 {
@@ -287,20 +239,11 @@ Tag policy JSON structure:
     "Environment": {
       "TagKey": "Environment",
       "ExpectedStringValues": ["dev", "staging", "prod"],
-      "EnforcedFor": [
-        "AWS::EC2::Instance",
-        "AWS::S3::Bucket",
-        "AWS::RDS::DBInstance",
-        "AWS::Lambda::Function"
-      ]
+      "EnforcedFor": ["AWS::EC2::Instance", "AWS::S3::Bucket", "AWS::RDS::DBInstance", "AWS::Lambda::Function"]
     },
     "Owner": {
       "TagKey": "Owner",
-      "EnforcedFor": [
-        "AWS::EC2::Instance",
-        "AWS::S3::Bucket",
-        "AWS::RDS::DBInstance"
-      ]
+      "EnforcedFor": ["AWS::EC2::Instance", "AWS::S3::Bucket"]
     },
     "CostCenter": {
       "TagKey": "CostCenter",
@@ -319,38 +262,25 @@ CLI deployment:
 
 ```bash
 aws organizations enable-policy-type --root-id r-xxxx --policy-type TAG_POLICY
-
-aws organizations create-policy \
-  --type TAG_POLICY \
-  --name baseline-compliance-tag-policy \
-  --description "Enforced tag keys: Environment, Owner, CostCenter, Project" \
-  --content file://tag-policy.json
-
+aws organizations create-policy --type TAG_POLICY --name baseline-compliance-tag-policy \
+  --description "Enforced tag keys: Environment, Owner, CostCenter, Project" --content file://tag-policy.json
 aws organizations attach-policy --policy-id p-xxxxxxx --target-id r-xxxx
 ```
-
-Decision table — enforcement vs advisory:
 
 | TagPolicy shape | Behavior | Verdict impact |
 |---|---|---|
 | `allowed_values` set, `enforced_for` empty | Advisory — no operation blocked | REVIEW_REQUIRED (enforcement gap) |
-| `allowed_values` set, `enforced_for` populated | Enforced — non-compliant tag op returns `ConstraintViolation` | AUTOMATION_DEPLOYED |
+| `allowed_values` set, `enforced_for` populated | Enforced — non-compliant op returns `ConstraintViolation` | AUTOMATION_DEPLOYED |
 | No `allowed_values`, `enforced_for` populated | Key presence enforced, value not validated | AUTOMATION_DEPLOYED (presence only) |
-| `case_sensitive: false` declared | Case-insensitive match on key name | AUTOMATION_DEPLOYED (note: Config rules still match exact case) |
-
-**Decision rule:** default to including `enforced_for` for every
-production resource type. Advisory policies (no `enforced_for`) are
-acceptable for a soft-launch phase but MUST be flagged
-`REVIEW_REQUIRED` until enforcement is on.
 
 ### Step 2: Choose the Config rule pattern
 
 | Pattern | Rule type | Use case | Limit |
 |---|---|---|---|
-| Required keys presence | `required-tags` (managed) | Enforce that N tag keys exist on a resource | Max 5 keys per rule |
-| Allowed values per key | `allowed-tag-values` (managed) | Enforce that a tag key's value is in an allowlist | One key per rule |
-| Custom multi-key validation | Custom Lambda rule | 6+ required keys, regex value matching, conditional logic | Lambda maintenance overhead |
-| Tag drift detection | Custom Lambda on Config CI change | Detect tag removal or value change after creation | Requires recorder coverage of the resource type |
+| Required keys presence | `required-tags` (managed) | Enforce N tag keys exist | Max 5 keys per rule |
+| Allowed values per key | `allowed-tag-values` (managed) | Enforce value allowlist | One key per rule |
+| Custom multi-key validation | Custom Lambda rule | 6+ required keys, regex, conditional logic | Lambda maintenance |
+| Tag drift detection | Custom Lambda on Config CI change | Detect tag removal or value change | Requires recorder coverage |
 
 Deploy `required-tags` for the first 5 keys:
 
@@ -358,43 +288,18 @@ Deploy `required-tags` for the first 5 keys:
 aws configservice put-config-rule --config-rule '{
   "ConfigRuleName": "required-tags-core",
   "Source": {"Owner": "AWS", "SourceIdentifier": "REQUIRED_TAGS"},
-  "Scope": {
-    "ComplianceResourceTypes": [
-      "AWS::EC2::Instance",
-      "AWS::S3::Bucket",
-      "AWS::RDS::DBInstance",
-      "AWS::Lambda::Function"
-    ]
-  },
+  "Scope": {"ComplianceResourceTypes": ["AWS::EC2::Instance", "AWS::S3::Bucket", "AWS::RDS::DBInstance", "AWS::Lambda::Function"]},
   "InputParameters": "{\"tag1Key\":\"Environment\",\"tag2Key\":\"Owner\",\"tag3Key\":\"Project\",\"tag4Key\":\"CostCenter\",\"tag5Key\":\"Application\"}"
 }'
 ```
 
-Deploy `allowed-tag-values` for the Environment key:
-
-```bash
-aws configservice put-config-rule --config-rule '{
-  "ConfigRuleName": "allowed-tag-values-environment",
-  "Source": {"Owner": "AWS", "SourceIdentifier": "ALLOWED_TAG_VALUES"},
-  "Scope": {
-    "ComplianceResourceTypes": ["AWS::EC2::Instance", "AWS::S3::Bucket"]
-  },
-  "InputParameters": "{\"tagKey\":\"Environment\",\"values\":[\"dev\",\"staging\",\"prod\"]}"
-}'
-```
-
-For the 6th+ required key or conditional logic, deploy a custom Lambda
-rule. The rule's evaluation payload includes the resource's tags; the
-Lambda returns `COMPLIANT` or `NON_COMPLIANT` with an annotation.
+For the 6th+ required key, deploy a second rule (`required-tags-ext`)
+or a custom Lambda rule.
 
 ### Step 3: Wire the EventBridge auto-tagger
 
 The auto-tagger fires on resource-creation events and stamps inherited
-or derived tags. It must be idempotent (a replayed event must not error
-on duplicate tags) and case-normalized (keys must match the TagPolicy
-exactly).
-
-EventBridge rule for EC2, S3, Lambda creation:
+or derived tags. It must be idempotent and case-normalized.
 
 ```bash
 aws events put-rule --name auto-tag-on-create --event-pattern '{
@@ -407,68 +312,27 @@ aws events put-rule --name auto-tag-on-create --event-pattern '{
 }'
 ```
 
-Lambda handler sketch (Python):
-
-```python
-import boto3, os, json
-
-ec2 = boto3.client("ec2")
-s3 = boto3.client("s3")
-lam = boto3.client("lambda")
-
-ACCOUNT_ENV_MAP = json.loads(os.environ["ACCOUNT_ENV_MAP"])  # {"111111111111": "prod", ...}
-
-def lambda_handler(event, context):
-    detail = event["detail"]
-    service = detail["eventSource"].split(".")[0]
-    name = detail["eventName"]
-    acct = detail["userIdentity"]["accountId"]
-    env = ACCOUNT_ENV_MAP.get(acct, "unknown")
-    owner = derive_owner(detail["userIdentity"])
-
-    if service == "ec2" and name == "RunInstances":
-        for item in detail.get("responseElements", {}).get("instancesSet", {}).get("items", []):
-            instance_id = item["instanceId"]
-            ec2.create_tags(Resources=[instance_id], Tags=[
-                {"Key": "Environment", "Value": env},
-                {"Key": "Owner", "Value": owner},
-            ])
-            # Propagate to child EBS and ENI (Step 4)
-            propagate_to_children(instance_id, env, owner)
-    elif service == "s3" and name == "CreateBucket":
-        bucket = detail["requestParameters"]["bucketName"]
-        s3.put_bucket_tagging(Bucket=bucket, Tagging={"TagSet": [
-            {"Key": "Environment", "Value": env},
-            {"Key": "Owner", "Value": owner},
-        ]})
-    elif service == "lambda" and name == "CreateFunction20150331":
-        fn = detail["requestParameters"]["functionName"]
-        lam.tag_resource(Resource=fn, Tags={"Environment": env, "Owner": owner})
-```
-
-Common auto-tagger errors and fixes:
+Lambda handler must: (a) derive Environment from an account-to-env map,
+(b) derive Owner from the IAM identity (normalize role sessions via
+lookup), (c) normalize key casing before calling `create-tags`, and
+(d) propagate to child resources (Step 4). Common errors:
 
 | Error | Cause | Fix |
 |---|---|---|
-| `AccessDenied` on `create-tags` | Lambda execution role missing `ec2:CreateTags` | Add an inline policy granting `ec2:CreateTags` and `ec2:DescribeTags` on `*` |
-| Tag stamped but resource still NON_COMPLIANT | Key casing mismatch (Lambda wrote `environment`, Config expects `Environment`) | Normalize the key name in the Lambda before calling `create-tags` |
-| EventBridge rule fires but Lambda not invoked | Target not attached or wrong permission | `events:put-targets` plus a `lambda:InvokePermission` for `events.amazonaws.com` |
-| Duplicate tags error on replay | `create-tags` is idempotent for the same key/value but errors on different value | Read current tags first; merge; only set deltas |
+| `AccessDenied` on `create-tags` | Lambda role missing `ec2:CreateTags` | Add inline policy for `ec2:CreateTags` on `*` |
+| Tag stamped but resource still NON_COMPLIANT | Key casing mismatch | Normalize key name in Lambda before `create-tags` |
+| EventBridge rule fires but Lambda not invoked | Target not attached or wrong permission | `events:put-targets` plus `lambda:InvokePermission` |
 
 ### Step 4: Propagate tags from EC2 to EBS volumes and ENIs
 
-The `RunInstances` API returns instance IDs, volume IDs, and network
-interface IDs. The auto-tagger Lambda must call `ec2:create-tags` on
-each child resource. This is the single most common gap in tag
-automation — the instance is tagged but the volumes and ENIs are not,
-which breaks cost allocation by volume and ABAC on network interfaces.
-
-Propagation logic (extends the Lambda in Step 3):
+The `RunInstances` API returns instance IDs, volume IDs, and ENI IDs.
+The auto-tagger Lambda must call `ec2:create-tags` on each child
+resource. This is the most common propagation gap — the instance is
+tagged but volumes and ENIs are not.
 
 ```python
-def propagate_to_children(instance_id, env, owner):
+def propagate_to_children(instance_id, tags):
     desc = ec2.describe_instances(InstanceIds=[instance_id])
-    tags = [{"Key": "Environment", "Value": env}, {"Key": "Owner", "Value": owner}]
     for r in desc["Reservations"]:
         for i in r["Instances"]:
             volume_ids = [v["Ebs"]["VolumeId"] for v in i.get("BlockDeviceMappings", []) if "Ebs" in v]
@@ -479,31 +343,22 @@ def propagate_to_children(instance_id, env, owner):
                 ec2.create_tags(Resources=eni_ids, Tags=tags)
 ```
 
-Propagation coverage matrix:
-
-| Parent resource | Child resources that inherit | API |
+| Parent | Child inherits | API |
 |---|---|---|
-| EC2 Instance | EBS volumes, ENIs | `ec2:describe-instances` → `ec2:create-tags` |
-| RDS DB Instance | Automated snapshots (if tagging enabled) | `rds:add-tags-to-resource` |
-| Lambda Function | Versions and aliases (inherit function tags) | No action — automatic |
-| S3 Bucket | Objects (only via Bucket Tagging Policy, not direct inheritance) | Configure S3 Bucket Tagging Set, not per-object |
+| EC2 Instance | EBS volumes, ENIs | `ec2:create-tags` on `VolumeId` and `NetworkInterfaceId` |
+| RDS DB Instance | Automated snapshots | `rds:add-tags-to-resource` |
+| Lambda Function | Versions, aliases | Automatic — no action needed |
 
 ### Step 5: Detect tag drift via Config
 
-Tag drift occurs when a resource's tags are modified after creation —
-a human removes `Environment`, or changes `CostCenter` to a non-allowed
-value. Config emits a configuration-item change event when recorded tag
-state changes.
-
-EventBridge rule on tag drift:
+Tag drift occurs when tags are modified after creation. Config emits a
+configuration-item change event when recorded tag state changes.
 
 ```bash
 aws events put-rule --name tag-drift-detector --event-pattern '{
   "source": ["aws.config"],
   "detail-type": ["Config Configuration Item Change"],
-  "detail": {
-    "configurationItem": {"resourceType": ["AWS::EC2::Instance", "AWS::S3::Bucket"]}
-  }
+  "detail": {"configurationItem": {"resourceType": ["AWS::EC2::Instance", "AWS::S3::Bucket"]}}
 }'
 ```
 
@@ -514,29 +369,19 @@ SSM Automation (Step 6).
 ### Step 6: Remediate non-compliant and drifted tags via SSM Automation
 
 For each Config rule emitting NON_COMPLIANT on tags, wire a remediation
-configuration pointing at an SSM Automation runbook. The managed
-`AWS-AttachIAMTags` runbook handles IAM resources; for EC2/S3/RDS, use
-a custom runbook or `AWS-ModifyTags` (region availability varies).
-
-Custom runbook sketch (adds the missing tag with a placeholder value):
+configuration pointing at an SSM Automation runbook. The custom runbook
+adds the missing tag with a placeholder value:
 
 ```yaml
 ---
 schemaVersion: '0.3'
 assumeRole: '{{ AutomationAssumeRole }}'
-description: 'Add a missing required tag to an EC2 instance (placeholder value)'
+description: 'Add a missing required tag (placeholder value)'
 parameters:
-  ResourceId:
-    type: String
-    description: 'EC2 instance ID (injected by Config via RESOURCE_ID)'
-  TagKey:
-    type: String
-    description: 'The missing tag key'
-  TagValue:
-    type: String
-    description: 'Placeholder value; secondary human-correction queue required'
-  AutomationAssumeRole:
-    type: String
+  ResourceId: {type: String, description: 'Injected by Config via RESOURCE_ID'}
+  TagKey: {type: String}
+  TagValue: {type: String, description: 'Placeholder; secondary human-correction queue required'}
+  AutomationAssumeRole: {type: String}
 mainSteps:
   - name: AddTag
     action: aws:executeAwsApi
@@ -544,14 +389,12 @@ mainSteps:
       Service: ec2
       Api: CreateTags
       Resources: ['{{ ResourceId }}']
-      Tags:
-        - Key: '{{ TagKey }}'
-          Value: '{{ TagValue }}'
+      Tags: [{Key: '{{ TagKey }}', Value: '{{ TagValue }}'}]
     isCritical: true
     onFailure: abort
 ```
 
-Wire the remediation configuration:
+Wire the remediation:
 
 ```bash
 aws configservice put-remediation-configurations --remediation-configurations '[{
@@ -570,58 +413,31 @@ aws configservice put-remediation-configurations --remediation-configurations '[
 }]'
 ```
 
-**Trigger decision:** default to `Automatic: false` for tag
-remediation. Placeholder values (`Environment=unknown`) satisfy Config
-but pollute cost reports and ABAC. A secondary human-correction queue
-must review and set the correct value. Switch to `Automatic: true` only
-for derived-value remediations where the Lambda or runbook can compute
-the correct value from the resource context.
+**Trigger decision:** default to `Automatic: false` for tag remediation.
+Placeholder values (`Environment=unknown`) satisfy Config but pollute
+cost reports and ABAC. Switch to `Automatic: true` only for
+derived-value remediations where the runbook can compute the correct
+value from resource context.
 
 ### Step 7: Bulk-tag existing backlog via Resource Groups Tagging API
-
-For the existing NON_COMPLIANT backlog, use the Resource Groups Tagging
-API. It supports up to 100 resources per `tag-resources` call and
-handles cross-service tagging uniformly.
 
 ```bash
 aws resourcegroupstaggingapi tag-resources \
   --resource-arn-list \
     arn:aws:ec2:us-east-1:111111111111:instance/i-0abc123 \
-    arn:aws:ec2:us-east-1:111111111111:instance/i-0def456 \
     arn:aws:s3:::app-uploads-bucket-prod \
   --tags Environment=prod,Owner=platform-team
-```
 
-Enumerate untagged resources by tag filter (returns resources missing
-the specified tag key):
-
-```bash
 aws resourcegroupstaggingapi get-resources \
   --tag-filters Key=Environment,Values=[] \
   --resources-per-page 50
 ```
 
-Bulk operations in a Lambda (rate-limit aware):
-
-```python
-import boto3, time
-rgta = boto3.client("resourcegroupstaggingapi")
-
-def bulk_tag(arns, tags, batch_size=20):
-    for i in range(0, len(arns), batch_size):
-        batch = arns[i:i+batch_size]
-        resp = rgta.tag_resources(ResourceARNList=batch, Tags=tags)
-        for arn, err in resp.get("FailedResourcesMap", {}).items():
-            print(f"FAILED {arn}: {err}")
-        time.sleep(0.5)  # avoid throttling
-```
+The API supports up to 100 resources per call. Always check
+`FailedResourcesMap` in the response — partial failures are silent if
+the caller does not inspect.
 
 ### Step 8: Activate cost allocation tags programmatically
-
-Cost allocation tags must be activated on the payer account before they
-appear as Cost Explorer dimensions. User-defined tags (custom keys)
-require explicit activation; AWS-generated tags (`aws:createdBy`) are
-active by default.
 
 ```bash
 aws ce update-cost-allocation-tags-status --cost-allocation-tags-status '[
@@ -632,25 +448,13 @@ aws ce update-cost-allocation-tags-status --cost-allocation-tags-status '[
 ]'
 ```
 
-Verify activation:
-
-```bash
-aws ce list-cost-allocation-tags --status Active
-```
-
-**Gap class — manual Billing-console step:** some payer accounts have
-the IAM `ce:UpdateCostAllocationTagsStatus` permission gated behind the
-Billing console's "IAM User and Role Access to Billing Information"
-setting. If the API returns `AccessDeniedException`, the account
-administrator must enable the setting in the Billing console — this
-cannot be automated via API. The verdict MUST be `REVIEW_REQUIRED` with
-this specific gap.
+**Gap class — manual Billing-console step:** some payer accounts gate
+`ce:UpdateCostAllocationTagsStatus` behind the Billing console's "IAM
+User and Role Access to Billing Information" setting. If the API
+returns `AccessDeniedException`, an administrator must enable it in the
+Billing console. The verdict MUST be `REVIEW_REQUIRED`.
 
 ### Step 9: Enforce cross-account tag consistency via CloudFormation StackSets
-
-For multi-account organizations, deploy the same Config rules and SSM
-remediation documents to all accounts via CloudFormation StackSets.
-This avoids per-account `put-config-rule` calls and ensures consistency.
 
 ```bash
 aws cloudformation create-stack-set \
@@ -666,10 +470,8 @@ aws cloudformation create-stack-instances \
   --regions us-east-1 us-west-2
 ```
 
-The StackSet template deploys the Config rules and an SSM document
-across all target accounts. For the Organizations TagPolicy, attach it
-at the root via `organizations attach-policy` — it cascades natively;
-no StackSet is needed for the policy itself.
+The Organizations TagPolicy itself cascades natively; the StackSet is
+for Config rules and SSM documents across accounts.
 
 ## Output format
 
@@ -723,7 +525,7 @@ DETECTION:
 AUTOMATION:
   - Auto-tagging: EventBridge + Lambda on RunInstances, CreateBucket, CreateFunction20150331
   - Tag propagation: EC2 -> EBS volumes, EC2 -> ENIs (covered)
-  - Remediation: SSM Custom-AddRequiredTagEC2, manual trigger (placeholder values require human correction)
+  - Remediation: SSM Custom-AddRequiredTagEC2, manual trigger
 PROPAGATION:
   - EC2 -> EBS: covered
   - EC2 -> ENI: covered
@@ -733,21 +535,16 @@ COST:
 CROSS_ACCOUNT:
   - StackSet: tag-compliance-baseline, OUs ou-xxxx-xxxxxxxx, regions us-east-1 us-west-2
 VERDICT: AUTOMATION_DEPLOYED
-GAP: None
+GAP: None — placeholder remediation values require a secondary human-correction queue.
 TEMPLATE:
-  # 1. Enable and attach TagPolicy
   aws organizations enable-policy-type --root-id r-xxxx --policy-type TAG_POLICY
   aws organizations create-policy --type TAG_POLICY --name baseline-compliance-tag-policy --content file://tag-policy.json
   aws organizations attach-policy --policy-id p-xxxxxxx --target-id r-xxxx
-  # 2. Deploy Config rules
   aws configservice put-config-rule --config-rule <see Step 2>
-  # 3. Deploy auto-tagger
   aws events put-rule --name auto-tag-on-create --event-pattern <see Step 3>
   aws lambda create-function --function-name auto-tagger --runtime python3.12 --handler auto_tag.lambda_handler --role arn:aws:iam::111111111111:role/AutoTaggerRole --zip-file fileb://auto_tag.zip
-  # 4. Deploy remediation
   aws ssm create-document --name Custom-AddRequiredTagEC2 --document-type Automation --document-format YAML --content file://add-tag-ec2.yaml
   aws configservice put-remediation-configurations --remediation-configurations <see Step 6>
-  # 5. Activate cost allocation tags
   aws ce update-cost-allocation-tags-status --cost-allocation-tags-status <see Step 8>
 ```
 
@@ -756,116 +553,64 @@ TEMPLATE:
 ```text
 COMPLIANCE: org-tag-compliance-partial
 SCOPE: org root r-xxxx, all member accounts, us-east-1
-SCHEMA:
-  - Required keys: Environment, Owner, CostCenter, Project
-  - Allowed values: Environment=[dev,staging,prod]
-  - Case sensitivity: true
 POLICY:
   - Type: Organizations TagPolicy (baseline-compliance-tag-policy)
-  - Attached to: root r-xxxx
   - enforced_for: AWS::EC2::Instance, AWS::S3::Bucket
-DETECTION:
-  - Config rules: required-tags-core
-  - Drift detection: disabled (recorder scope missing S3)
 AUTOMATION:
   - Auto-tagging: EventBridge + Lambda on RunInstances
   - Tag propagation: EC2 -> EBS only (ENI propagation missing)
-  - Remediation: SSM Custom-AddRequiredTagEC2, manual trigger
 PROPAGATION:
   - EC2 -> EBS: covered
   - EC2 -> ENI: NOT covered
 COST:
   - Cost allocation tags: inactive
   - Activation method: BLOCKED — API returns AccessDeniedException (Billing console IAM access not enabled)
-CROSS_ACCOUNT:
-  - StackSet: not deployed
 VERDICT: REVIEW_REQUIRED
-GAP: Three blockers: (1) ENI tag propagation missing in auto-tagger Lambda; (2) cost allocation tag activation blocked — payer account administrator must enable "IAM User and Role Access to Billing Information" in the Billing console before the API can activate tags; (3) Config recorder scope excludes S3, so drift detection on S3 buckets is blind.
+GAP: Three blockers: (1) ENI tag propagation missing in auto-tagger Lambda; (2) cost allocation tag activation blocked — payer account administrator must enable "IAM User and Role Access to Billing Information" in the Billing console; (3) Config recorder scope excludes S3, so drift detection on S3 is blind.
 TEMPLATE: (partial — see Steps 3, 5, 8 for the missing pieces)
 ```
 
 ## Anti-Patterns — NEVER do these things
 
 - NEVER deploy a TagPolicy without `enforced_for` for any key you intend
-  to enforce. Without `enforced_for`, the policy is advisory — operators
-  can stamp any value and AWS does not block the operation. The
-  "compliance" is documentation theater.
+  to enforce. Without it, the policy is advisory and AWS does not block
+  non-compliant operations.
 
-- NEVER assume the `required-tags` managed Config rule validates more
-  than 5 keys. It silently ignores keys beyond the 5th. To enforce 6+
-  required keys, deploy a second rule or a custom Lambda rule.
+- NEVER assume `required-tags` validates more than 5 keys. It silently
+  ignores keys beyond the 5th. Deploy a second rule or a custom Lambda.
 
 - NEVER wire an auto-tagger Lambda without idempotency. EventBridge
   replays events on failure recovery; a non-idempotent Lambda errors on
-  duplicate tags or, worse, overwrites a corrected value with a stale
-  derived value. Always read current tags first and merge deltas.
+  duplicate tags or overwrites corrected values with stale derived ones.
 
 - NEVER propagate tags from EC2 to EBS and ENIs without verifying the
-  Lambda execution role has `ec2:CreateTags` on the child resource ARNs.
-  A role scoped to instances only produces `AccessDenied` on volumes and
-  network interfaces silently.
+  Lambda execution role has `ec2:CreateTags` on child resource ARNs. A
+  role scoped to instances only produces silent `AccessDenied`.
 
 - NEVER activate cost allocation tags and expect immediate Cost Explorer
-  updates. The `ce update-cost-allocation-tags-status` API has up to a
-  24-hour propagation delay. Re-activating within the window does not
-  speed it up and may reset the timer.
+  updates. The API has a 24-hour propagation delay.
 
 - NEVER rely on Config `required-tags` for tag value validation. The
-  managed rule checks key presence only. To validate that
-  `Environment=prod` (not `Environment=production`), deploy
-  `allowed-tag-values` per key or a custom Lambda rule.
+  managed rule checks key presence only. Use `allowed-tag-values` or a
+  custom Lambda rule for value enforcement.
 
-- NEVER attach a TagPolicy to a child OU expecting it to merge with the
-  root policy. Child-OU policies override root policies for accounts
-  under that OU. The effective policy is the closest ancestor's
-  declaration. To add a key at the OU level without losing root keys,
-  re-declare every parent key in the child policy.
+- NEVER attach a TagPolicy to a child OU expecting merge with the root
+  policy. Child-OU policies OVERRIDE root policies. To add a key without
+  losing root keys, re-declare every parent key.
 
-- NEVER deploy a StackSet for Config rules without verifying the
-  StackSet execution role exists in every target account. The deploy
-  fails per-target with `AccessDenied`, and StackSets reports partial
-  failure without a clear per-account error in the top-level output.
-
-- NEVER set `Automatic: true` on a tag-remediation SSM runbook that
-  stamps placeholder values. The placeholders satisfy Config but pollute
-  Cost Explorer and ABAC. Use manual trigger plus a human-correction
-  queue, or a derived-value runbook that computes the correct tag from
-  resource context.
+- NEVER set `Automatic: true` on a tag-remediation runbook that stamps
+  placeholder values. Placeholders satisfy Config but pollute Cost
+  Explorer and ABAC. Use manual trigger plus a human-correction queue.
 
 - NEVER assume `case_sensitive: false` in a TagPolicy makes Config
   `required-tags` case-insensitive. They are independent systems. Config
-  matches the exact key name in `InputParameters`. If the TagPolicy is
-  case-insensitive but Config checks `Environment`, a resource tagged
-  `environment` is policy-compliant but Config-NON_COMPLIANT.
-
-- NEVER forget to extend the Config recorder scope before wiring drift
-  detection for a new resource type. Configuration-item change events
-  fire only for recorded types. Tag drift on an unrecorded type is
-  invisible.
-
-- NEVER bulk-tag via `tag-resources` without a per-batch failure check.
-  The API returns `FailedResourcesMap` per batch; a partial failure is
-  silent if the caller does not inspect the response. Always log and
-  retry failed ARNs.
-
-- NEVER derive Owner from a service-linked role or EC2 instance profile
-  ARN in the auto-tagger. These ARNs identify the launch role, not the
-  human owner. Map role ARNs to teams via a lookup table, or require
-  the caller to pass an `Owner` tag in the launch request.
-
-- NEVER assume a single `allowed-tag-values` rule validates multiple tag
-  keys. The managed rule accepts one `tagKey` per invocation. For N keys
-  with allowed-value lists, deploy N rules.
+  always matches the exact key name in `InputParameters`.
 
 - NEVER ship an auto-tagger without a DLQ on the EventBridge target.
-  EventBridge drops events on Lambda failure after the retry policy is
-  exhausted. A missing DLQ produces silent tag gaps — the resource is
-  created untagged and no one knows.
+  EventBridge drops events on Lambda failure after retry exhaustion,
+  producing silent tag gaps.
 
 ## Configuration dependency graph
-
-The tag-compliance automation stack has strict ordering dependencies.
-Deploy out of order and components fail silently or noisily.
 
 ```
 [Organizations: enable TAG_POLICY]
@@ -876,85 +621,52 @@ Deploy out of order and components fail silently or noisily.
         +-----------------------------+
         |                             |
         v                             v
-[Config: recorder scope covers target types]   [IAM: auto-tagger Lambda role with ec2/s3/lambda tag perms]
+[Config: recorder scope covers target types]   [IAM: auto-tagger Lambda role]
         |                             |
         v                             v
-[Config: put required-tags + allowed-tag-values rules]   [EventBridge: put-rule on creation events]
+[Config: put required-tags + allowed-tag-values rules]   [EventBridge: put-rule + Lambda + DLQ]
         |                             |
         v                             v
-[Config: put-remediation-configurations (manual trigger)]   [Lambda: create-function auto-tagger (with EC2->EBS/ENI propagation)]
-        |                             |
-        v                             v
-[SSM: create-document Custom-AddRequiredTag]   [EventBridge: put-targets (Lambda + DLQ)]
-        |                             |
-        +-----------------------------+
+[Config: put-remediation-configurations (manual)]   [SSM: create-document Custom-AddRequiredTag]
         |
         v
 [Cost Explorer: update-cost-allocation-tags-status (payer)]
         |
         v
-[CloudFormation: create-stack-set tag-compliance-baseline (OU-wide)]
+[CloudFormation: create-stack-set (OU-wide)]
 ```
 
 **Hard ordering constraints:**
 
-1. The Organizations TagPolicy type MUST be enabled on the root before
-   `create-policy --type TAG_POLICY` succeeds.
-2. The Config recorder scope MUST include the target resource types
-   before Config rules are deployed, or the rules never evaluate.
-3. The auto-tagger Lambda execution role MUST exist and have
-   `ec2:CreateTags`, `s3:PutBucketTagging`, and `lambda:TagResource`
-   before the EventBridge target is attached, or the first event fails
-   with `AccessDenied`.
-4. The SSM document MUST exist before `put-remediation-configurations`
-   references it, or the remediation config is created but the first
-   execution fails with `SSM document not found`.
-5. Cost allocation tag activation is independent of the enforcement
-   stack but MUST run on the payer account. It can run in parallel with
-   the StackSet deployment.
+1. TAG_POLICY type MUST be enabled before `create-policy`.
+2. Config recorder scope MUST include target types before rules deploy.
+3. Auto-tagger Lambda role MUST exist before EventBridge target attaches.
+4. SSM document MUST exist before `put-remediation-configurations`.
+5. Cost allocation activation runs independently on the payer account.
 
-**Parallelizable:** (a) TagPolicy creation and Config rule creation
-are independent; (b) the auto-tagger Lambda and the SSM remediation
-document can be deployed in parallel once their IAM roles exist.
+## Pre-flight safety checks
 
-## Pre-flight safety checks (run before applying any compliance CLI)
-
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`create-policy`, `attach-policy`, `put-config-rule`,
-  `put-remediation-configurations`, `update-cost-allocation-tags-status`),
-  emit:
-  `CONFIRM: About to <action> for tag compliance in account/OU <target>.
+- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
+  emit: `CONFIRM: About to <action> for tag compliance in <target>.
   This affects <consequence>. Proceed? (yes/no)`
-
 - **Back up the current TagPolicy** before modifying:
-  `aws organizations describe-policy --policy-id p-xxxxxxx > /tmp/tag-policy-backup-$(date +%s).json`
-
-- **Before flipping a TagPolicy from advisory to enforced** (adding
-  `enforced_for`), dry-run by listing NON_COMPLIANT resources via Config
-  first. Enforcement blocks non-compliant tag operations, which can
-  break CI/CD pipelines that create resources without tags.
-
-- **Before deploying a remediation configuration with `Automatic: true`**,
-  test the SSM runbook manually against at least 3 sample NON_COMPLIANT
-  resources and verify the tag is applied correctly.
-
-- **For StackSet deployment**, verify the admin and execution roles
-  exist in every target account before invoking `create-stack-instances`.
+  `aws organizations describe-policy --policy-id p-xxxxxxx > /tmp/tag-policy-backup.json`
+- **Before flipping from advisory to enforced**, dry-run by listing
+  NON_COMPLIANT resources via Config first.
+- **For StackSet deployment**, verify admin and execution roles exist in
+  every target account.
 
 ## Appendix A — TagPolicy JSON reference
-
-The full structure of a TagPolicy `content` field:
 
 | Field | Purpose | Required |
 |---|---|---|
 | `tags.<Key>.TagKey` | The tag key name (must match `<Key>`) | Yes |
-| `tags.<Key>.ExpectedStringValues` | Allowed values list | No (presence-only if omitted) |
+| `tags.<Key>.ExpectedStringValues` | Allowed values list | No |
 | `tags.<Key>.EnforcedFor` | Resource types that MUST comply | Yes for enforcement |
-| `tags.<Key>.CaseSensitive` | Whether key/value matching is case-sensitive (default: true) | No |
+| `tags.<Key>.CaseSensitive` | Key/value case sensitivity (default: true) | No |
 
-For the full resource-type list and `enforced_for` syntax, see
-**references/organizations-tag-policies.md**. For the auto-tagger Lambda
-patterns and the EC2-to-EBS/ENI propagation handler, see
+For the full resource-type list and auto-tagger Lambda patterns, see
+**references/organizations-tag-policies.md** and
 **references/auto-tagging-and-propagation.md**.
 
 ## Appendix B — Decision tree (which enforcement layer)
@@ -962,102 +674,61 @@ patterns and the EC2-to-EBS/ENI propagation handler, see
 ```
 Is the tag key required on all resources of a type?
 ├─ Yes → Does the value need an allowlist?
-│       ├─ Yes → Deploy TagPolicy with ExpectedStringValues + EnforcedFor
-│       │         AND Config allowed-tag-values rule for drift detection
-│       └─ No  → Deploy TagPolicy with EnforcedFor only (presence enforcement)
-│                 AND Config required-tags rule
-└─ No  → Is the tag optional but cost-reportable?
-        ├─ Yes → Auto-tagger stamps on creation; cost allocation activation
-        └─ No  → No enforcement needed; advisory only
+│       ├─ Yes → TagPolicy with ExpectedStringValues + EnforcedFor
+│       │         AND Config allowed-tag-values for drift detection
+│       └─ No  → TagPolicy with EnforcedFor (presence) + Config required-tags
+└─ No  → Auto-tagger stamps on creation; cost allocation activation
 ```
 
 ## Recent AWS features (2024-2026)
 
-- **TagPolicy `enforced_for` resource-type expansion (2024-2025):**
-  AWS added support for additional resource types in `enforced_for`,
-  including Lambda layers, Step Functions state machines, and EventBridge
-  schemas. Re-check the supported-types list quarterly.
-- **Config `allowed-tag-values` enhanced input (2024):** The managed rule
-  now accepts regex-style value lists in some regions. Verify region
-  availability before relying on regex.
-- **Resource Groups Tagging API pagination (2025):** `get-resources` now
-  supports a `PaginationToken` with a longer TTL, reducing the need to
-  restart bulk enumeration from page 1 on transient failures.
-- **Cost Explorer API activation propagation (2025):** The 24-hour
-  propagation delay for `update-cost-allocation-tags-status` is now
-  visible in the API response as a `ProcessingStatus` field. Poll this
-  instead of guessing.
-- **CloudFormation StackSets drift detection (2024-2025):** StackSets
-  now report per-account drift on the deployed Config rules. Use
-  `detect-stack-set-drift` after deployment to catch member-account
-  modifications.
+- **TagPolicy `enforced_for` resource-type expansion:** Additional
+  types including Lambda layers, Step Functions state machines. Re-check
+  the supported-types list quarterly.
+- **Cost Explorer API `ProcessingStatus`:** The 24-hour propagation
+  delay is now visible in the API response. Poll instead of guessing.
+- **CloudFormation StackSets drift detection:** Per-account drift on
+  deployed Config rules via `detect-stack-set-drift`.
+- **Resource Groups Tagging API pagination:** Longer TTL on
+  `PaginationToken`, reducing bulk-enumeration restarts.
 
 ## Expert heuristic: tag-policy case sensitivity + EventBridge auto-tagger + Config detection
 
 The most common tag-compliance failure is NOT a missing policy — it is a
 policy that looks correct but silently does not enforce, because of
-case sensitivity mismatches and missing propagation to child resources.
+case-sensitivity mismatches and missing propagation to child resources.
 
 **The rule (non-negotiable):**
 
-> ALWAYS declare `case_sensitive` explicitly in the TagPolicy (do not
-> rely on the default), ALWAYS normalize tag-key casing in the
-> EventBridge auto-tagger Lambda before calling `create-tags`, and
-> ALWAYS propagate tags from EC2 instances to their child EBS volumes
-> and ENIs in the same Lambda handler. A policy that declares
-> `Environment` but an auto-tagger that stamps `environment` produces
-> a fleet that is TagPolicy-compliant but Config-NON_COMPLIANT — and
-> the operator sees conflicting reports with no obvious cause.
+> ALWAYS declare `case_sensitive` explicitly in the TagPolicy, ALWAYS
+> normalize tag-key casing in the EventBridge auto-tagger Lambda before
+> calling `create-tags`, and ALWAYS propagate tags from EC2 instances to
+> their child EBS volumes and ENIs in the same Lambda handler. A policy
+> that declares `Environment` but an auto-tagger that stamps
+> `environment` produces a fleet that is TagPolicy-compliant but
+> Config-NON_COMPLIANT.
 
-**Why this rule exists:** AWS Organizations Tag Policies, Config
-`required-tags`, Config `allowed-tag-values`, and Cost Explorer are
-four independent systems that each interpret tag keys independently.
-The TagPolicy may be case-insensitive (`case_sensitive: false`) while
-Config `required-tags` always checks the exact key name in
-`InputParameters`. A resource tagged `environment=prod` is
-TagPolicy-compliant but Config-NON_COMPLIANT if the Config rule checks
-for `Environment`. The auto-tagger is the bridge — it must normalize
-casing to match ALL downstream systems.
+**Case-sensitivity matrix:**
 
-**Concrete case-sensitivity matrix:**
-
-| System | Default case sensitivity | Override mechanism |
+| System | Default case sensitivity | Override |
 |---|---|---|
-| Organizations TagPolicy | `case_sensitive: true` | Set `case_sensitive: false` per key |
-| Config `required-tags` | Exact match on `InputParameters` key name | No override — must match exactly |
+| Organizations TagPolicy | `case_sensitive: true` | `CaseSensitive: false` per key |
+| Config `required-tags` | Exact match on InputParameters key | No override |
 | Config `allowed-tag-values` | Exact match on key and value | No override |
-| Cost Explorer (user-defined tags) | Case-insensitive on key, case-sensitive on value | No override |
+| Cost Explorer (user-defined) | Case-insensitive on key, case-sensitive on value | No override |
 | Resource Groups Tagging API | Case-sensitive on key | No override |
 
-**EC2-to-child propagation diagnostic:**
+**EC2-to-child propagation diagnostic:** if Cost Explorer shows instance
+costs tagged but EBS volume costs untagged, the auto-tagger is not
+propagating. Verify the Lambda reads `BlockDeviceMappings[].Ebs.VolumeId`
+and `NetworkInterfaces[].NetworkInterfaceId`, calls `ec2:create-tags`
+in batch, and has `ec2:CreateTags` on `volume/*` and
+`network-interface/*`.
 
-If Cost Explorer shows instance costs tagged but EBS volume costs
-untagged, the auto-tagger is not propagating to child resources. Verify
-the Lambda handler:
-
-1. Reads `BlockDeviceMappings[].Ebs.VolumeId` from
-   `ec2:describe-instances` for each new instance.
-2. Reads `NetworkInterfaces[].NetworkInterfaceId` from the same call.
-3. Calls `ec2:create-tags` with all volume IDs and all ENI IDs in
-   batch (the API accepts up to 100 resources per call).
-4. Has `ec2:CreateTags` permission on `arn:aws:ec2:*:*:volume/*` and
-   `arn:aws:ec2:*:*:network-interface/*`, not just `instance/*`.
-
-**Detection of enforcement-scope breach post-deploy:** CloudWatch alarm
-on `Config.ComplianceNonCompliantResources` for `required-tags-core`
-increasing by > N% in one evaluation cycle (suggests a new resource
-type in scope but the auto-tagger is not firing on its creation event).
-Also alarm on EventBridge `Invocations` vs `FailedInvocations` for the
-auto-tagger rule — a spike in failures means the Lambda role lost a
-permission or the EventBridge target was detached.
-
-**Surface in the output:** for any recommended tag-compliance
-automation, include `CASE_SENSITIVITY: <true | false>` (the TagPolicy
-setting), `CASE_NORMALIZATION: <yes | no>` (whether the auto-tagger
-normalizes key casing), `PROPAGATION_COVERAGE: <parent -> child list>`,
-and `VALIDATION_STATUS: <advisory | enforced>`. If
-`VALIDATION_STATUS` is `advisory` or `PROPAGATION_COVERAGE` is
-incomplete, do NOT mark the recommendation as AUTOMATION_DEPLOYED.
+**Surface in the output:** include `CASE_SENSITIVITY`, `CASE_NORMALIZATION`,
+`PROPAGATION_COVERAGE`, and `VALIDATION_STATUS`. If
+`VALIDATION_STATUS` is advisory or `PROPAGATION_COVERAGE` is incomplete,
+do NOT mark the recommendation as AUTOMATION_DEPLOYED.
 
 ## Domain
 
