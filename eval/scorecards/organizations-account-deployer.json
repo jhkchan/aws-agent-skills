@@ -1,0 +1,70 @@
+{
+  "skill": "organizations-account-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 14,
+      "max": 20,
+      "justification": "The skill largely restates standard AWS account\u2011provisioning knowledge (root email immutability, role name, SCP attachment, etc.) that a competent model already knows. It adds some useful heuristics (e.g., decision tree between Organizations create\u2011account vs Control Tower) but no truly novel thresholds, exceptions, or insider tips that a senior CloudOps engineer would learn for the first time."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (CLI commands, Terraform resources, ordering of steps) and convey expert thinking, but a few steps are generic (e.g., \u201cverify prerequisites\u201d) and the decision tree could be more detailed about Control\u202fTower landing\u2011zone pre\u2011checks. Hence a small deduction."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a concrete \u201cNEVER\u201d list with clear reasoning (root email, role name, org\u2011trail timing, SCP removal, etc.). One point deducted because it omits a few common pitfalls such as mis\u2011configured trust policies for OrganizationAccountAccessRole or forgetting to enable Cost Explorer per account."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete and includes description, when_to_use, keywords, and triggers. However the activation condition is expressed only via a paragraph and keyword list; a more explicit, machine\u2011readable trigger (e.g., a JSON schema) is missing, and the when_to_use narrative is somewhat verbose."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The document contains a lot of detail up front (full reasoning, tables, heuristics) before the concise checklist. Critical anti\u2011pattern warnings are buried later, which can overload an agent that only needs the top\u2011level flow. A tighter layering (summary first, deep references later) would improve the score."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (account creation) are guarded by a prerequisite checklist and a decision tree, showing good calibration. Nonetheless the skill leaves some freedom (e.g., it does not enforce verification of email uniqueness or quota limits) that could lead to irreversible failures, so a modest deduction."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Quick navigation \u2192 Reasoning framework \u2192 Step\u2011by\u2011step procedure \u2192 NEVER list \u2192 Output format). The pattern is slightly ad\u2011hoc because sections like \u201cRecent AWS features\u201d and \u201cError handling\u201d are inserted without a strict template, preventing a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, Terraform examples, a ready\u2011to\u2011deploy checklist, and an error\u2011handling table, enabling an agent to execute the skill. Missing coverage of some edge cases (account quota exhaustion, region\u2011specific limits, Control\u202fTower service\u2011quota errors) and no explicit retry logic, leading to a small deduction."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 48350,
+  "latency_ms": 4830,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

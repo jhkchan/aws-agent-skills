@@ -1,0 +1,70 @@
+{
+  "skill": "cloudwatch-logs-insights-troubshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides concrete expert knowledge not usually known by a generic model: specific AWS CLI command sequences, exact ordering of Logs Insights commands, thresholds for data\u2011scan volume (e.g., 50\u202fGB/day), recent feature details (pattern command, anomaly detection) and a detailed root\u2011cause catalog. However, much of the content restates official documentation, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides AWS\u2011specific troubleshooting procedures (order of query commands, early\u2011filter rule, CLI diagnostics, rule creation for Contributor Insights). Missing a dedicated procedure for IAM permission failures or cross\u2011account access, which are common blockers."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a robust NEVER list with concrete reasons (e.g., never use glob in `like`, never assume Contributor Insights shares syntax). Missing some common pitfalls such as IAM permission errors or cross\u2011account log group access, which would have completed the anti\u2011pattern coverage."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are present. The invocation_schema is written in prose rather than a strict JSON schema, which could hinder automated parsing."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: quick reference, then detailed step\u2011by\u2011step process, then deep anti\u2011pattern and reference sections. However, the initial sections are dense, risking cognitive overload before the agent knows which part to apply."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately for a diagnostic skill: only read\u2011only CLI commands are suggested; no destructive actions are permitted. Slight over\u2011freedom in allowing arbitrary `start-query` without explicit guardrails for cost or rate\u2011limit concerns."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process \u2192 Anti\u2011patterns \u2192 Output contract). Minor ad\u2011hoc naming of steps (e.g., \u201cStep 0\u201d, \u201cStep 1\u201d) prevents a perfectly clean pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a usable decision tree, concrete CLI snippets, and a strict output contract, enabling an agent to act. Lacks explicit handling for permission errors, data\u2011protection policies, and other edge cases that could cause the workflow to fail."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 43201,
+  "latency_ms": 13444,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

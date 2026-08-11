@@ -1,0 +1,70 @@
+{
+  "skill": "appconfig-deployment-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 13,
+      "max": 20,
+      "justification": "The skill repeats many standard AppConfig concepts (e.g., growth factor, bake time) that a competent CloudOps model already knows. It adds a few specific formulas (e.g., expected wall\u2011clock = ceil(100 / GrowthFactor) * (DeploymentDurationInMinutes + BakeTimeInMinutes) * ReplicaMultiplier) and a non\u2011obvious sanity check (GrowthFactor * DeploymentDurationInMinutes * ReplicaMultiplier >= BakeTimeInMinutes), but overall the majority of the content is restated documentation rather than novel expert insight."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill outlines an AWS\u2011specific pre\u2011flight sequence (list\u2011applications, list\u2011environments, validate KMS, check alarms) and a clear CONFIRM gate, but some steps are generic (e.g., \u201crun pre\u2011checks\u201d) and the ordering of IAM permission verification after resource existence is not justified. The procedure lacks a decision tree for choosing between linear vs. all\u2011at\u2011once based on risk metrics."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "A solid NEVER list is provided (e.g., never use AllAtOnce without an alarm, never skip bake time in production) with concrete reasons. However, it omits a few common pitfalls such as forgetting to set `replicate-to` for cross\u2011region strategies or ignoring pagination limits on list\u2011operations, which would have strengthened the anti\u2011pattern coverage."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are present. The \"when_to_use\" section is detailed, but the activation triggers list many overlapping phrases that could cause false positives, and the skill does not explicitly define a minimal required input schema (e.g., required fields, types)."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The document is well\u2011sectioned (quick reference, mindset, pre\u2011flight, process, patterns) but the quick reference table already contains most of the critical formulas and thresholds, forcing the reader to absorb a lot before drilling down. Critical safety rules (e.g., CONFIRM gate) are repeated later, indicating sub\u2011optimal layering."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive operations are tightly constrained: mandatory CONFIRM gate, snapshot before changes, exhaustive pre\u2011checks, and explicit rollback conditions. The only shortfall is the lack of a configurable safety\u2011margin flag for high\u2011risk deployments (e.g., auto\u2011abort after X minutes), but overall calibration is strong."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Anti\u2011Patterns \u2192 Output contract) that aligns with the reference framework, making it easy to navigate. Minor inconsistency: the \"Common deployment patterns\" section mixes CLI snippets with prose, slightly breaking the uniform pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete decision trees, full CLI commands, and a strict output contract that an agent can follow. Some example commands omit optional but often\u2011required flags (e.g., `--replicate-to` for deployment strategies) and pagination handling is only mentioned in prose, which could cause runtime failures. Nonetheless, an agent could execute the core flows successfully."
+    }
+  ],
+  "total_score": 99,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 45698,
+  "latency_ms": 20444,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}

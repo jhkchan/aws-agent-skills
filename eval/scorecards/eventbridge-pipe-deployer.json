@@ -1,0 +1,70 @@
+{
+  "skill": "eventbridge-pipe-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many expert\u2011level specifics not usually known by a generic model: exact limits for MaximumBatchingWindowInSeconds, MaximumBatchSize per source, OnPartialBatchItemFailure behavior, consumer\u2011group implications for MSK/Kafka, detailed IAM permission matrix, and nuanced DLQ handling per source type. Deductions for omitting cost considerations of source services and a brief mention of cross\u2011region source limitations."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific workflow: pre\u2011flight ARN validation, IAM trust\u2011policy construction, source\u2011parameter ordering, batch\u2011window configuration, and confirmation gate before any destructive CLI call. Minor generic phrasing (\u201cverify IAM permissions\u201d) prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list with clear why\u2011statements (e.g., SQS DLQ misuse, missing target resource policy). Lacks a few common pitfalls such as forgetting to adjust SQS VisibilityTimeout for latency\u2011critical pipelines, so two points are deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are well\u2011defined. Activation triggers are somewhat over\u2011inclusive, which could cause spurious activation, but overall the spec is solid."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered: high\u2011level overview, quick reference, pre\u2011flight checklist, detailed process steps, and deep references. The quick\u2011reference table is dense, causing a slight cognitive overload, hence a one\u2011point deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions (IAM role creation, pipe creation) are gated by explicit CONFIRM steps and exhaustive PRE_CHECKS. Creative planning steps are left open, matching task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Quick navigation \u2192 Process \u2192 Output contract \u2192 NEVER \u2192 Heuristic). The \u201cRecent AWS features\u201d section is a slight deviation from the core pattern, costing one point."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides decision trees, exact CLI commands, pre\u2011check rows, and sample outputs that an agent can execute. Inconsistencies around SQS DLQ handling (conflicting statements about batch window) and a missing explicit warning about VisibilityTimeout for SQS cause two points of deduction."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 54732,
+  "latency_ms": 12136,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
