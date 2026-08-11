@@ -1,0 +1,70 @@
+{
+  "skill": "s3-bucket-policy-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides concrete expert heuristics not commonly known: correct Bool operator for aws:SecureTransport, detailed differences between aws:SourceVpce/aws:SourceVpc/aws:SourceIp, 20\u202fKB size limit mitigation strategies, Access Points and MRAP policy nuances. Adds genuine actionable knowledge beyond a baseline model."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines an AWS\u2011specific step\u2011by\u2011step workflow (prerequisite checks, policy structure validation, pattern\u2011specific statements, CLI commands). Procedures are detailed but some steps are phrased generically (e.g., \"verify prerequisites\") rather than enumerating exact AWS calls for every case."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never use StringNotEquals for aws:SecureTransport, never rely on ACLs, never omit object ARN). Lacks a few additional pitfalls such as forgetting to enable Block Public Access when required."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Full front\u2011matter, clear description, explicit WHEN\u2011TO\u2011USE, trigger keywords, and strict output contract. Minor shortfall: the 'when_to_use' field repeats information already in description, but activation criteria are still unambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Top\u2011level quick navigation, then detailed sections, then deep references. Information is layered appropriately, though some deep details (e.g., full condition syntax tables) are embedded early, adding slight cognitive load."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (put\u2011bucket\u2011policy) are gated by prerequisite checks, size limits, and explicit verification commands. Creative tasks (policy design) are given flexibility, showing good calibration."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Stepwise process \u2192 Heuristics \u2192 NEVER list \u2192 Output format. Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working examples, CLI commands, and error handling, but lacks guidance for some edge cases (e.g., bucket does not exist, IAM role trust policy for cross\u2011account access, MRAP policy size verification) and does not show how to resolve conflicting IAM policies."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 41226,
+  "latency_ms": 12195,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

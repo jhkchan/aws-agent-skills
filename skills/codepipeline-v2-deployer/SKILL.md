@@ -119,14 +119,13 @@ based on filter conditions. The trigger configuration and the
 cross-account IAM/KMS wiring are the load-bearing decisions; the
 stages themselves are deterministic once those are correct.
 
-Three facts make V2 pipeline provisioning different from V1:
+Three facts make V2 provisioning different from V1:
 
-- **V2 is event-driven by design — polling is gone.** V1 pipelines
-  polled CodeCommit / S3 on a schedule (average 17-second latency, cost
-  per PollForSourceChanges call). V2 pipelines use triggers that fire
-  on CloudWatch Events from the source — sub-second latency, no
-  polling cost. A V2 pipeline with NO trigger configured never runs
-  automatically.
+- **V2 is event-driven by design — polling is gone.** V1 polled
+  CodeCommit / S3 on a schedule (avg 17s latency, per-poll cost). V2
+  uses triggers that fire on CloudWatch Events from the source —
+  sub-second latency, no polling cost. A V2 pipeline with NO trigger
+  never runs automatically.
 
 - **Triggers have filter conditions (branches, file paths, tags).**
   V2 triggers accept a JSON filter that scopes which pushes start a
@@ -135,11 +134,10 @@ Three facts make V2 pipeline provisioning different from V1:
   Always scope to `refs/heads/main` (or your production branch).
 
 - **Namespace variables pass data between stages.** V2 introduces
-  stage-level variables (`Namespace`) that downstream stages can
-  consume. This replaces V1 hacks like "stash the value in an SSM
-  Parameter from CodeBuild and read it in the next stage." Variables
-  flow forward only (a stage cannot read variables from a stage that
-  runs later).
+  stage-level variables (`Namespace`) that downstream stages consume.
+  This replaces V1 hacks like "stash the value in an SSM Parameter
+  from CodeBuild and read it in the next stage." Variables flow
+  forward only.
 
 ## Quick reference — deployment checklist
 
@@ -164,26 +162,24 @@ spec produces a non-functional or insecure pipeline.
 
 **Live-account pre-flight checks (skip if doing offline plan):**
 1. Verify IAM permissions for `codepipeline:CreatePipeline`,
-   `UpdatePipeline`, `GetPipeline`, `codebuild:CreateProject` (or
-   existing project ARN), `iam:CreateRole`, `iam:AttachRolePolicy`,
-   `kms:CreateKey`, `kms:PutKeyPolicy`, `s3:CreateBucket`,
-   `s3:PutBucketPolicy`, `s3:PutPublicAccessBlock`.
+   `UpdatePipeline`, `codebuild:CreateProject` (or existing project
+   ARN), `iam:CreateRole`, `iam:AttachRolePolicy`, `kms:CreateKey`,
+   `kms:PutKeyPolicy`, `s3:CreateBucket`, `s3:PutBucketPolicy`,
+   `s3:PutPublicAccessBlock`.
 2. For GitHub source, verify a CodeConnections connection exists in
    `us-east-1` (the connection must be in us-east-1 even if the
    pipeline is in another region) and is in `AVAILABLE` state.
-3. For cross-account deploy, verify the target account ID, KMS key ARN,
-   and the cross-account IAM role ARN. The KMS key policy MUST grant
+3. For cross-account deploy, verify the target account ID, KMS key
+   ARN, and cross-account IAM role ARN. The KMS key policy MUST grant
    the pipeline role `kms:GenerateDataKey` and `kms:Decrypt`.
 4. For CloudFormation deploy, verify the target stack name and the IAM
-   execution role in the target account.
-5. For ECS deploy, verify the ECS cluster, service, and task definition
-  family exist.
+   execution role in the target account. For ECS, verify the cluster,
+   service, and task definition family exist.
 
 | Attribute | Value | Effect on plan |
 |---|---|---|
-| `pipelineType` | `V2` | Event-driven, triggers required, namespace variables supported. |
-| `pipelineType` | `V1` | Polling-based, no triggers, no variables. Re-evaluate fit. |
-| Source | `CodeCommit` / `S3` / `GitHub` (CodeConnections) / `CodeStarSourceConnection` | Determines trigger type and connection ARN. |
+| `pipelineType` | `V2` / `V1` | V2 = event-driven, triggers required, namespace variables supported. V1 = polling, no triggers, no variables. |
+| Source | `CodeCommit` / `S3` / `GitHub` (CodeConnections) | Determines trigger type and connection ARN. |
 | Trigger | `event-driven` filter | Required for V2 — without one, the pipeline never auto-runs. |
 | Deploy | `CloudFormation` / `ECS` / `S3` / `ServiceCatalog` / `CodeDeploy` | Determines IAM role policy scope and (for CFN) change-set mode. |
 | Cross-account | `true` / `false` | If true, requires KMS key policy + cross-account IAM role. |
@@ -229,15 +225,10 @@ verdicts are mutually exclusive.
 | Pre-flight specification gate | Always — verify before planning |
 | Step 0 — Expert heuristic: V1 → V2 migration | Migrating from polling |
 | Step 1 — Pipeline type confirmation (V2) | Boundary call |
-| Step 2 — Source action | CodeCommit / S3 / GitHub |
-| Step 3 — Trigger configuration | Event filter, branch scoping |
-| Step 4 — Build (CodeBuild) | Build action wiring |
-| Step 5 — Deploy actions | CFN / ECS / S3 / SC / CodeDeploy |
-| Step 6 — Manual approval gate | Gated releases |
-| Step 7 — Namespace variables | Stage-to-stage data passing |
-| Step 8 — Cross-account deployment | KMS + IAM wiring |
-| Step 9 — Artifact bucket security | S3 + KMS hardening |
-| Step 10 — Pipeline IAM role | Least-privilege scoping |
+| Step 2-3 — Source + Trigger | CodeCommit / S3 / GitHub + filter scoping |
+| Step 4-5 — Build (CodeBuild) + Deploy actions | Action wiring |
+| Step 6-7 — Manual approval + Namespace variables | Gated releases, stage-to-stage data |
+| Step 8-10 — Cross-account + Artifact bucket + Pipeline role | Security + IAM |
 | NEVER do these things | Review before signing off |
 | Output format | The literal plan template |
 | references/triggers-and-namespace-variables-reference.md | Trigger filter + variable deep dive |
@@ -395,14 +386,14 @@ phases:
 
 ### Step 5: Deploy actions
 
-| Deploy type | Provider | Action configuration |
+| Deploy type | Provider | Key configuration |
 |---|---|---|
 | CloudFormation | `CloudFormation` | `ActionMode: CREATE_REPLACE`, `StackName`, `RoleArn` (target account), `TemplatePath` |
-| ECS | `ECS` | `ClusterName`, `ServiceName`, `TaskDefinitionTemplatePath` or `Image1` for direct image deploy |
+| ECS | `ECS` | `ClusterName`, `ServiceName`, `TaskDefinitionTemplatePath` or `Image1` (direct image) |
 | S3 deploy | `S3` | `BucketName`, `Extract: true` (unzip artifact) |
 | Service Catalog | `ServiceCatalog` | `ProductId`, `ProvisionedProductName` |
-| CodeDeploy | `CodeDeploy` | `ApplicationName`, `DeploymentGroupName`, `DeploymentStyle: BLUE_GREEN` or `IN_PLACE` |
-| Manual approval | `Manual` | `ExternalEntityLink` (optional), `NoApprovalTemplate` (optional) |
+| CodeDeploy | `CodeDeploy` | `ApplicationName`, `DeploymentGroupName`, `DeploymentStyle: BLUE_GREEN` / `IN_PLACE` |
+| Manual approval | `Manual` | `ExternalEntityLink` (optional), `CustomData` (reviewer context) |
 
 **CloudFormation deploy action:**
 ```yaml
@@ -421,7 +412,7 @@ phases:
 ```
 
 For cross-account, `RoleArn` points to a role in the TARGET account
-that CloudFormation assumes. The pipeline role in the source account
+that CloudFormation assumes; the pipeline role in the source account
 needs `sts:AssumeRole` on that role.
 
 **ECS deploy action (direct image):** uses `Image1:
@@ -430,7 +421,7 @@ the deploy action cannot start until the build's exported variable is
 resolved. Configure `ClusterName`, `ServiceName`, `Image1`.
 
 **CodeDeploy for EC2 (in-place or blue/green):** configure
-`ApplicationName`, `DeploymentGroupName`, and `DeploymentStyle`
+`ApplicationName`, `DeploymentGroupName`, `DeploymentStyle`
 (`IN_PLACE` or `BLUE_GREEN`). EC2 instances must have the CodeDeploy
 agent installed and the CodeDeploy service role configured.
 
@@ -665,10 +656,8 @@ aws codepipeline list-action-executions --pipeline-name <name> --region <region>
 aws s3api get-public-access-block --bucket <bucket>
 aws s3api get-bucket-encryption --bucket <bucket>
 aws s3api get-bucket-versioning --bucket <bucket>
-aws kms describe-key --key-id <key-id>
-aws kms get-key-policy --key-id <key-id> --policy-name default
-aws iam get-role --role-name <pipeline-role>
-aws iam list-attached-role-policies --role-name <pipeline-role>
+aws kms describe-key --key-id <key-id> && aws kms get-key-policy --key-id <key-id> --policy-name default
+aws iam get-role --role-name <pipeline-role> && aws iam list-attached-role-policies --role-name <pipeline-role>
 
 # Trigger a test execution
 aws codepipeline start-pipeline-execution --name <name>
@@ -753,20 +742,19 @@ pipeline role `iam:PassRole` on `*` (privilege escalation).
   `CONFIRM: About to create pipeline <name> in <region>. This
   provisions IAM roles, KMS keys, and an S3 artifact bucket. Proceed?
   (yes/no)`
-- **Trigger filter verification.** Verify the trigger has at least
-  one of `Branches.Includes`, `FilePaths.Includes`, or `Tags.Includes`.
-- **Cross-account KMS verification.** Verify the KMS key policy grants
-  the target role `kms:Decrypt` and `kms:GenerateDataKey`. Verify the
-  artifact bucket policy grants `s3:GetObject` to the target role.
-- **Pipeline IAM role scope.** Verify no wildcard resources on S3,
-  KMS, CodeBuild, or CodeCommit. Verify `iam:PassRole` is scoped to
-  the CloudFormation execution role.
-- **CodeConnections state.** For GitHub / GitLab / Bitbucket sources,
-  verify the connection is in `AVAILABLE` state (not `PENDING`).
+- **Trigger filter.** Verify the trigger has at least one of
+  `Branches.Includes`, `FilePaths.Includes`, `Tags.Includes`.
+- **Cross-account KMS.** KMS key policy grants the target role
+  `kms:Decrypt` and `kms:GenerateDataKey`; artifact bucket policy
+  grants `s3:GetObject` to the target role.
+- **Pipeline IAM role.** No wildcard resources on S3, KMS, CodeBuild,
+  or CodeCommit. `iam:PassRole` scoped to the CloudFormation
+  execution role.
+- **CodeConnections state.** For GitHub / GitLab / Bitbucket, verify
+  the connection is in `AVAILABLE` state (not `PENDING`).
 - **Cost estimate.** V2 pipeline $0.002/execution + $1/active
-  pipeline/month; CodeBuild $0.01/build-minute (Linux, gp);
-  CloudFormation free; S3 artifacts $0.023/GB-month + KMS $1/key/month;
-  cross-account KMS API $0.03/10K requests.
+  pipeline/month; CodeBuild $0.01/build-minute; S3 artifacts
+  $0.023/GB-month + KMS $1/key/month.
 
 ## Remediation guidance
 
@@ -775,20 +763,17 @@ cross-account KMS/IAM wiring (deploy failures), then artifact bucket
 hardening (security), then variable validation (silent failures),
 then optimization (lifecycle rules, approval timeouts).
 
-- **PREREQUISITES_MISSING — CodeConnections PENDING:** open the
-  CodeConnections console in us-east-1, click "Update pending
-  connection," authorize via the GitHub OAuth flow, verify state
-  changes to AVAILABLE.
-- **PREREQUISITES_MISSING — KMS key policy missing cross-account
-  grants:** update the key policy to grant the target role
-  `kms:Decrypt` and `kms:GenerateDataKey`; verify with
-  `aws kms get-key-policy`.
-- **PREREQUISITES_MISSING — artifact bucket allows public access:**
-  apply `block-public-access` with all four sub-settings true, enable
-  KMS encryption with the customer-managed CMK, and enable versioning.
-- **PREREQUISITES_MISSING — V2 with stale `PollForSourceChanges:
-  true`:** set `DetectOptions: false` and add a trigger block with
-  branch/path/tag filter.
+- **CodeConnections PENDING:** open the CodeConnections console in
+  us-east-1, click "Update pending connection," authorize via the
+  GitHub OAuth flow, verify state changes to AVAILABLE.
+- **KMS key policy missing cross-account grants:** update the key
+  policy to grant the target role `kms:Decrypt` and
+  `kms:GenerateDataKey`; verify with `aws kms get-key-policy`.
+- **Artifact bucket allows public access:** apply
+  `block-public-access` with all four sub-settings true, enable KMS
+  encryption with the customer-managed CMK, enable versioning.
+- **V2 with stale `PollForSourceChanges: true`:** set `DetectOptions:
+  false` and add a trigger block with branch/path/tag filter.
 
 ## Domain
 
@@ -822,11 +807,8 @@ AWS CloudOps / CodePipeline V2 Provisioning.
 
 ## AWS documentation
 
-- **CodePipeline User Guide** — https://docs.aws.amazon.com/codepipeline/latest/userguide/welcome.html
-- **Pipeline types (V1 vs V2)** — https://docs.aws.amazon.com/codepipeline/latest/userguide/pipeline-types.html
-- **V2 triggers reference** — https://docs.aws.amazon.com/codepipeline/latest/userguide/triggers-v2.html
-- **Namespace variables** — https://docs.aws.amazon.com/codepipeline/latest/userguide/reference-variables.html
-- **Cross-account actions** — https://docs.aws.amazon.com/codepipeline/latest/userguide/cross-account.html
+- **CodePipeline User Guide + Pipeline types (V1 vs V2)** — https://docs.aws.amazon.com/codepipeline/latest/userguide/welcome.html
+- **V2 triggers / Namespace variables / Cross-account actions** — https://docs.aws.amazon.com/codepipeline/latest/userguide/triggers-v2.html
 - **CodeConnections** — https://docs.aws.amazon.com/codeconnections/latest/userguide/welcome.html
 - **CodePipeline CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/codepipeline/
 - **Tutorial: V2 pipeline with manual approval** — https://docs.aws.amazon.com/codepipeline/latest/userguide/tutorials-simple-deploy.html

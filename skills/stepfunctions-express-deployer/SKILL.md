@@ -146,15 +146,14 @@ the first failed execution is invisible — no alarm, no log, and the
 |---|---|---|
 | **Quick reference** | Provisioning summary (9 steps), verdict thresholds | Before any operation |
 | **Activation keywords** | Phrases that route to this skill | Disambiguating routing |
-| **Invocation contract** | Required literal labels in the response | Formatting the response |
 | **Reasoning framework** | Why Express is a cost + semantics decision | Choosing Express vs Standard |
 | **Dependency graph** | Which configs silently no-op without their prerequisite | Debugging "logs are empty" |
-| **Expert heuristic** | The waitForTaskToken Express block; at-least-once idempotency; sync API Gateway timeouts | Pre-empt production incidents |
+| **Expert heuristic** | waitForTaskToken block; at-least-once idempotency; sync API Gateway timeouts | Pre-empt incidents |
 | **Prerequisites** | What to verify before emitting any command | Avoid PREREQUISITES_MISSING rework |
 | **9-step procedure** | The actual provisioning with copy-pasteable CLI | Executing the deploy |
 | **NEVER (top 5)** | Hard rules that prevent silent exposure / data-plane bugs | Review before deploy |
 | **STRICT output contract** | Required EXPRESS_WORKFLOW / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block | Formatting the response |
-| **Recent AWS features** | Express + Distributed Map, Typed integrations, AWS SDK direct calls | Stay current |
+| **Recent AWS features** | Express + Distributed Map, AWS SDK direct calls | Stay current |
 
 ## Quick reference — provisioning summary (9 steps)
 
@@ -186,12 +185,11 @@ to avoid 504). Rationale and the silent-failure table are below.
 Express workflow, create Express state machine, Step Functions
 EXPRESS, sync express execution, start-sync-execution, async
 express, Express workflow logging, Step Functions CloudWatch Logs,
-INCLUDE_DATA, EXCLUDE_DATA, FATAL / ERROR / ALL log levels,
-EventBridge Step Functions target, EventBridge schedule Express,
-Distributed Map Express, Inline Map Express, Standard-to-Express
-migration, at-least-once Step Functions, Express idempotency,
-Express sync API Gateway, .sync integration Express, AWS SDK
-integration Step Functions, X-Ray tracing Step Functions.
+INCLUDE_DATA, EXCLUDE_DATA, FATAL / ERROR / ALL levels, EventBridge
+Step Functions target, Distributed Map Express, Inline Map Express,
+Standard-to-Express migration, at-least-once Step Functions, Express
+idempotency, Express sync API Gateway, .sync integration Express,
+AWS SDK integration, X-Ray tracing Step Functions.
 
 ## Invocation contract (hard requirement)
 
@@ -387,8 +385,6 @@ enforced at runtime; executions fail with `States.Timeout`.
 
 ### Step 3 — Verify all service integrations are Express-compatible
 
-Grep the ASL definition for incompatible patterns:
-
 ```bash
 # Reject if any match
 grep -E ':waitForTaskToken' definition.json && echo "INCOMPATIBLE"
@@ -396,8 +392,7 @@ grep -E ':waitForTaskToken' definition.json && echo "INCOMPATIBLE"
 
 Express-compatible integration patterns:
 - RequestResponse (default): invoke and return immediately
-- `.sync`: invoke and wait for completion (Glue, Batch, ECS,
-  SageMaker, Comprehend, etc.)
+- `.sync`: invoke and wait for completion (Glue, Batch, ECS, SageMaker, Comprehend)
 - AWS SDK integrations: direct API calls without Lambda
 
 Express-INCOMPATIBLE patterns:
@@ -405,7 +400,7 @@ Express-INCOMPATIBLE patterns:
 
 **Common mistake:** converting a Standard workflow that uses
 `.waitForTaskToken` for the human-approval step. Replace with a
-DynamoDB polling loop (`.sync` on a Lambda that checks approval
+DynamoDB polling loop (`.sync` on a Lambda that polls approval
 status) or split into two workflows.
 
 ### Step 4 — Define the ASL with Express-compatible patterns
@@ -496,12 +491,11 @@ aws logs put-retention-policy --log-group-name /aws/states/<NAME> \
   --retention-in-days 30
 ```
 
-Attach the log group at create-time (or via update):
+Attach the log group at create-time:
 
 ```bash
 aws stepfunctions create-state-machine \
-  --name <NAME> \
-  --definition file://definition.json \
+  --name <NAME> --definition file://definition.json \
   --role-arn arn:aws:iam::<ACCOUNT>:role/<ROLE_NAME> \
   --type EXPRESS \
   --logging-configuration \
@@ -510,13 +504,12 @@ aws stepfunctions create-state-machine \
 ```
 
 The level choices:
-- `ALL`: log Start, StateEntered, StateExited, End. Highest volume; needed for full RCA.
+- `ALL`: log Start, StateEntered, StateExited, End. Highest volume; full RCA.
 - `ERROR`: log only failures and state errors. Lower cost; cannot debug successful-path issues.
 - `FATAL`: log only workflow-level fatal errors. Near-useless for debugging.
 - `OFF`: no logging. NEVER for async Express — failures are invisible.
 
-`includeExecutionData=true` records input/output at each transition.
-Without it, logs show only metadata.
+`includeExecutionData=true` records input/output at each transition. Without it, logs show only metadata.
 
 **Common mistake:** setting `includeExecutionData=false` to save
 cost on a PII workflow, then being unable to RCA a production
@@ -527,16 +520,13 @@ data wholesale.
 
 | Mode | Caller | Use when |
 |---|---|---|
-| Sync | API Gateway, direct start-sync-execution | Caller needs the result synchronously, workflow < 29s p99 |
-| Async | EventBridge, S3, SQS, start-execution | High throughput, fire-and-forget, workflow up to 5 min |
+| Sync | API Gateway, direct start-sync-execution | Caller needs result synchronously, workflow < 29s p99 |
+| Async | EventBridge, S3, SQS, start-execution | High throughput, fire-and-forget, up to 5 min |
 
 ```bash
-# Sync invocation
 aws stepfunctions start-sync-execution \
   --state-machine-arn arn:aws:states:<REGION>:<ACCOUNT>:stateMachine:<NAME> \
   --input '{"amount": 100}'
-
-# Async invocation
 aws stepfunctions start-execution \
   --state-machine-arn arn:aws:states:<REGION>:<ACCOUNT>:stateMachine:<NAME> \
   --input '{"amount": 100}'
@@ -544,7 +534,7 @@ aws stepfunctions start-execution \
 
 **Common mistake:** fronting an Express workflow with API Gateway
 sync and not aligning timeouts. API Gateway times out at 29s;
-Express sync can run to 5 minutes. Set the API Gateway integration
+Express sync can run to 5 min. Set the API Gateway integration
 timeout to 29000 ms and alarm on p99 execution duration > 25s.
 
 ### Step 8 — Configure EventBridge scheduling + observability

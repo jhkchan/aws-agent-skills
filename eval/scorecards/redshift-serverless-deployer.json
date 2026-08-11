@@ -1,0 +1,70 @@
+{
+  "skill": "redshift-serverless-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete, expert\u2011level details not usually known by a generic model: exact RPU multiples, daily 500\u202fRPU\u2011hour budget, precise KMS key policy JSON, cross\u2011Region snapshot copy grant syntax, and a workload\u2011matrix with capacity recommendations. Some content merely restates AWS docs, so full 20 is not awarded."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific deployment order (namespace \u2192 KMS \u2192 subnet group \u2192 IAM role \u2192 Secrets Manager \u2192 workgroup \u2192 usage limits \u2192 snapshots) and exact CLI flags for each step. A few steps are generic \"verify\" actions without AWS\u2011specific nuance, costing a small deduction."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides a concrete NEVER list with reasons (public access, disable breach\u2011action, cross\u2011Region CMK reuse, etc.). The list is useful but not exhaustive; notable pitfalls such as forgetting log\u2011exports or omitting IAM trust policies are absent, leading to a moderate deduction."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, triggers, and when_to_use are clear, and the output contract is well defined. However, the skill lacks an explicit input schema or parameter validation section, which would improve reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document layers information well: quick navigation, high\u2011level contract, then detailed procedures and references. Nonetheless, the main body contains long CLI blocks that could overload the initial read, and some deep\u2011dive content (full policy JSON) is not deferred to the reference files."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated by the PREREQUISITES_MISSING verdict and explicit pre\u2011flight checks. The only shortfall is the lack of an explicit RPU\u2011range constraint in the output block, which would further limit unsafe values."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (contract \u2192 reasoning \u2192 prerequisites \u2192 procedure \u2192 anti\u2011patterns \u2192 matrix \u2192 references). The ordering of some sections is slightly ad\u2011hoc, costing one point."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Agents can follow the checklist and CLI commands to perform a deployment, and the verification block is complete. Missing are explicit handling of existing namespaces/workgroups, idempotent command options, and error\u2011handling guidance (e.g., what to do if a usage\u2011limit creation fails). These gaps could cause execution failures in real deployments."
+    }
+  ],
+  "total_score": 102,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 40757,
+  "latency_ms": 7504,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
