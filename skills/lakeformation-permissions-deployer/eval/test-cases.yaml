@@ -1,0 +1,186 @@
+# Eval test cases for lakeformation-permissions-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across data lake admin registration, LF-tag based access
+# control (tag keys/values, tag attachment to databases and tables), LF-tag
+# based permission grants, column-level security (column grant with PII
+# exclusion, data cells filter with row filter), resource links for
+# cross-database access, and prerequisite failure branches (missing data
+# lake admin, missing LF-tag on target table).
+skill: lakeformation-permissions-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: lf-tag-based-access
+    description: >-
+      Deploy a complete LF-tag based access control deployment: data
+      lake admin registration, LF-tag keys (environment, department,
+      sensitivity) with values, LF-tag attachment to database
+      analytics_db and table transactions, LF-tag-based SELECT/DESCRIBE
+      grant to AnalyticsTeamRole on environment=production AND
+      department=finance, CloudWatch auditing. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy Lake Formation LF-tag based access control for the
+      analytics team. Register data lake admin
+      arn:aws:iam::123456789012:role/LFDataLakeAdmin (already exists
+      in IAM). Create LF-tag keys: environment (values: production,
+      staging, dev), department (values: finance, engineering,
+      marketing), sensitivity (values: public, internal, restricted,
+      pii). Attach LF-tags to database analytics_db:
+      environment=production, department=finance. Attach LF-tags to
+      table analytics_db.transactions: environment=production,
+      department=finance, sensitivity=restricted. Grant LF-tag-based
+      SELECT and DESCRIBE to principal
+      arn:aws:iam::123456789012:role/AnalyticsTeamRole on TABLE
+      resources matching environment=production AND department=finance.
+      Target Glue database analytics_db and table transactions both
+      exist. Account: 123456789012. Region: us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "lf-tag-based-access"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "data lake admin"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: column-level-security
+    description: >-
+      Deploy column-level security with data cells filter for row and
+      column filtering on the transactions table. Column grant
+      excludes PII columns (ssn, credit_card). Row filter restricts
+      to region=us-east-1. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy column-level security for the RegionalAnalystRole on the
+      transactions table. Data lake admin
+      arn:aws:iam::123456789012:role/LFDataLakeAdmin is registered.
+      Database analytics_db and table transactions exist with LF-tags
+      already attached. Principal:
+      arn:aws:iam::123456789012:role/RegionalAnalystRole. Grant
+      column-level SELECT on columns [transaction_id, amount,
+      currency, timestamp, merchant, region] — explicitly EXCLUDE
+      PII columns [ssn, credit_card]. Create data cells filter
+      regional_access_filter on table analytics_db.transactions with
+      row filter region = 'us-east-1' and column wildcard excluding
+      [ssn, credit_card]. Grant SELECT on the data cells filter to
+      RegionalAnalystRole. Account: 123456789012. Region: us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "column-level-security"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "column"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-data-lake-admin
+    description: >-
+      Deploy LF-tag based access control but no data lake admin is
+      registered (the operator forgot to register an admin principal).
+      Expects PREREQUISITES_MISSING — data lake admin required for
+      LF-tag creation and permission grants.
+    input: |
+      Deploy Lake Formation LF-tag based access control for the
+      analytics team. Data lake admin: NONE REGISTERED (the operator
+      forgot to register an admin — list-data-lake-settings returns
+      empty DataLakeAdmins list). Create LF-tag keys: environment
+      (production, staging), department (finance, engineering).
+      Attach LF-tags to database analytics_db and table transactions.
+      Grant LF-tag-based SELECT to principal
+      arn:aws:iam::123456789012:role/AnalyticsTeamRole. Target Glue
+      database analytics_db and table transactions both exist.
+      Account: 123456789012. Region: us-east-1.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-data-lake-admin"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "data lake admin"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: resource-link-cross-database
+    description: >-
+      Deploy a cross-database resource link for the reporting team.
+      Create resource link finance_transactions_link in reporting_db
+      pointing to analytics_db.transactions. Grant DESCRIBE on the
+      link and SELECT on the underlying table to ReportingTeamRole.
+      Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a cross-database resource link for the reporting team.
+      Data lake admin
+      arn:aws:iam::123456789012:role/LFDataLakeAdmin is registered.
+      Create resource link finance_transactions_link in database
+      reporting_db pointing to table analytics_db.transactions. Both
+      databases (reporting_db, analytics_db) and the target table
+      (transactions) exist. Grant DESCRIBE on the resource link
+      finance_transactions_link in reporting_db to principal
+      arn:aws:iam::123456789012:role/ReportingTeamRole. Grant SELECT
+      on the underlying table analytics_db.transactions to the same
+      principal. Account: 123456789012. Region: us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "resource-link-cross-database"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "resource link"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-lf-tag-on-resource
+    description: >-
+      Deploy an LF-tag-based grant but the target table has NO LF-tags
+      attached (the operator created the table but forgot to attach
+      LF-tags). Expects PREREQUISITES_MISSING — LF-tags must be
+      attached to resources before tag-based grants can match.
+    input: |
+      Deploy Lake Formation LF-tag based access control for the
+      analytics team. Data lake admin
+      arn:aws:iam::123456789012:role/LFDataLakeAdmin is registered.
+      LF-tag keys environment (production, staging) and department
+      (finance, engineering) are created. Attach LF-tags to database
+      analytics_db: environment=production. The target table
+      analytics_db.transactions HAS NO LF-TAGS ATTACHED (the operator
+      created the table but forgot to attach LF-tags —
+      get-resource-lf-tags returns empty). Grant LF-tag-based SELECT
+      to arn:aws:iam::123456789012:role/AnalyticsTeamRole on
+      environment=production AND department=finance. Database and
+      table exist. Account: 123456789012. Region: us-east-1.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-lf-tag-on-resource"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "LF-tag"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"

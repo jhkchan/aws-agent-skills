@@ -1,0 +1,186 @@
+# Eval test cases for bedrock-guardrail-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: bedrock-guardrail-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: full-guardrail-applied-ready
+    description: >-
+      Standard guardrail deployment with all filter categories
+      configured (content filters, denied topics, word filters, PII
+      filters with BLOCK, contextual grounding), KMS encryption, and
+      explicitly applied to a Bedrock Agent. All checklist dimensions
+      pass.
+    input: |
+      Design a deployment plan for an Amazon Bedrock Guardrail. Emit
+      the standard VERDICT block (GUARDRAIL_SPEC, VERDICT, CHECKLIST,
+      VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Guardrail name: customer-app-guardrail
+      - Region: us-east-1
+      - KMS key: arn:aws:kms:us-east-1:111111111111:key/abc-123
+      - Content filters: sexual=HIGH, violence=MEDIUM, hate=MEDIUM,
+        insults=MEDIUM (input+output), misconduct=MEDIUM
+      - Denied topics: Financial_Advice, Medical_Diagnosis (with
+        definitions and examples)
+      - Word filters: managed PROFANITY + 3 custom words
+      - PII filters: BLOCK for EMAIL, PHONE, SSN, CREDIT_DEBIT_CARD_NUMBER
+      - Contextual grounding: GROUNDING=0.75, RESPONSE_RELEVANCE=0.75
+      - Applied to Agent: agentId=agt-xyz, version=DRAFT
+      - Account: 111111111111
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "full-guardrail-applied-ready"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "create-guardrail"
+        - "BLOCK"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: unapplied-guardrail-missing
+    description: >-
+      Comprehensive guardrail with all filters configured but never
+      applied to any model invocation or Agent. Must emit
+      PREREQUISITES_MISSING because the guardrail is inert without
+      application.
+    input: |
+      Design a deployment plan for an Amazon Bedrock Guardrail. Emit
+      the standard VERDICT block (GUARDRAIL_SPEC, VERDICT, CHECKLIST,
+      VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Guardrail name: prod-safety-guardrail
+      - Region: us-east-1
+      - Content filters: sexual=HIGH, violence=HIGH, hate=HIGH,
+        insults=HIGH
+      - Denied topics: 3 topics defined
+      - Word filters: managed PROFANITY + custom words
+      - PII filters: BLOCK for SSN, EMAIL, PHONE
+      - NOT applied to any model or Agent yet
+      - Application: "we'll apply it later after testing"
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "unapplied-guardrail-missing"
+        - "VERDICT"
+        - "applied"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: pii-audit-instead-of-block-missing
+    description: >-
+      Guardrail where all PII entities are set to AUDIT instead of
+      BLOCK for a compliance workload (GDPR). Must emit
+      PREREQUISITES_MISSING because AUDIT logs but does not block —
+      PII would leak in responses.
+    input: |
+      Design a deployment plan for an Amazon Bedrock Guardrail. Emit
+      the standard VERDICT block (GUARDRAIL_SPEC, VERDICT, CHECKLIST,
+      VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Guardrail name: gdpr-compliance-guardrail
+      - Region: eu-west-1
+      - Content filters: all HIGH
+      - PII filters: ALL entities (EMAIL, PHONE, SSN, NAME, ADDRESS,
+        CREDIT_DEBIT_CARD_NUMBER) set to AUDIT
+      - Compliance requirement: GDPR — PII must NOT appear in model
+        responses
+      - Applied to model: anthropic.claude-3-5-sonnet-20241022-v2:0
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "pii-audit-instead-of-block-missing"
+        - "VERDICT"
+        - "BLOCK"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: cross-region-guardrail-ready
+    description: >-
+      Cross-region guardrail deployment across us-east-1, eu-west-1,
+      and ap-southeast-2 with identical configurations in each region.
+      All checklist dimensions pass.
+    input: |
+      Design a deployment plan for a cross-region Amazon Bedrock
+      Guardrail. Emit the standard VERDICT block (GUARDRAIL_SPEC,
+      VERDICT, CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Guardrail name: global-app-guardrail (one per region)
+      - Regions: us-east-1, eu-west-1, ap-southeast-2
+      - Content filters: sexual=HIGH, violence=HIGH, hate=HIGH,
+        insults=MEDIUM
+      - Denied topics: 2 topics (Illegal_Activity, Self_Harm)
+      - PII filters: BLOCK for EMAIL, PHONE, SSN,
+        CREDIT_DEBIT_CARD_NUMBER
+      - Applied to per-region Bedrock Agents: agt-us, agt-eu, agt-ap
+      - KMS: per-region customer-managed keys
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-region-guardrail-ready"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "eu-west-1"
+        - "ap-southeast-2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: severity-none-all-categories-missing
+    description: >-
+      Guardrail where all content filter categories are set to NONE
+      (explicitly disabled). Must emit PREREQUISITES_MISSING because
+      the guardrail appears configured but filters nothing for content
+      categories.
+    input: |
+      Design a deployment plan for an Amazon Bedrock Guardrail. Emit
+      the standard VERDICT block (GUARDRAIL_SPEC, VERDICT, CHECKLIST,
+      VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Guardrail name: minimal-guardrail
+      - Region: us-east-1
+      - Content filters: sexual=NONE, violence=NONE, hate=NONE,
+        insults=NONE (operator says "we'll set severity later")
+      - Denied topics: none
+      - Word filters: managed PROFANITY only
+      - PII filters: BLOCK for SSN only
+      - Applied to model: anthropic.claude-3-5-sonnet-20241022-v2:0
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "severity-none-all-categories-missing"
+        - "VERDICT"
+        - "NONE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

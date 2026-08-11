@@ -1,0 +1,154 @@
+# Eval test cases for kinesis-stream-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across stream configurations
+# (on-demand stream with enhanced fan-out and SSE-KMS, provisioned
+# stream with shard sizing, enhanced fan-out consumer registration,
+# cross-account resource policy, missing stream mode decision).
+skill: kinesis-stream-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: on-demand-enhanced-fanout-sse
+    description: >-
+      Provision an on-demand Kinesis stream with enhanced fan-out consumer
+      and SSE-KMS encryption. Expects READY_TO_DEPLOY with on-demand mode,
+      enhanced fan-out consumer cited, SSE-KMS enabled with CMK, and
+      CloudWatch IteratorAge alarm.
+    input: |
+      Create a Kinesis Data Stream named telemetry-ingest in us-east-1.
+      Use on-demand capacity mode. Register an enhanced fan-out consumer
+      named realtime-processor. Enable SSE-KMS with customer-managed key
+      alias/kinesis/telemetry-ingest. Set retention to 168 hours. Producer
+      is EC2 role EC2-producer-role. Consumer is Lambda role
+      Lambda-consumer-role. CloudWatch alarm for IteratorAge > 300000ms to
+      SNS topic arn:aws:sns:us-east-1:123456789012:alerts. Tags:
+      Environment=production, Service=telemetry. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ON_DEMAND"
+        - "telemetry-ingest"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "SubscribeToShard"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: provisioned-shard-sizing
+    description: >-
+      Provision a provisioned Kinesis stream with shard count sized to
+      throughput requirements. Expects READY_TO_DEPLOY with provisioned
+      mode, correct shard count from write throughput, and standard
+      GetRecords consumer.
+    input: |
+      Create a Kinesis Data Stream named events-stream in us-east-1.
+      Use provisioned capacity mode. Expected write throughput is
+      5 MiB/sec and 3000 records/sec. Use standard GetRecords consumer
+      (no enhanced fan-out). Retention 48 hours. Producer is ECS task
+      role events-producer-role. Consumer is EC2 role events-consumer-role.
+      CloudWatch alarms for IteratorAge and WriteProvisionedThroughputExceeded
+      to SNS arn:aws:sns:us-east-1:123456789012:alerts. Tags:
+      Environment=staging, Service=events. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "PROVISIONED"
+        - "events-stream"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: enhanced-fanout-registration
+    description: >-
+      Provision a provisioned Kinesis stream and register multiple
+      enhanced fan-out consumers for dedicated read throughput. Expects
+      READY_TO_DEPLOY with enhanced fan-out consumers cited and the
+      SubscribeToShard IAM requirement noted.
+    input: |
+      Create a Kinesis Data Stream named clickstream in us-east-1.
+      Provisioned mode, 10 shards. I have 4 consumer applications that
+      each need dedicated read throughput with low latency. Register
+      enhanced fan-out consumers: realtime-analytics, ml-feature-pipeline,
+      audit-logger, data-archive. Retention 72 hours. SSE-KMS with
+      AWS-managed key alias/aws/kinesis. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "enhanced"
+        - "clickstream"
+        - "SubscribeToShard"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-resource-policy
+    description: >-
+      Provision a Kinesis stream that needs cross-account read access
+      for a consumer in a different account. Expects READY_TO_DEPLOY with
+      the stream ARN resource policy cited for cross-account access.
+    input: |
+      Create a Kinesis Data Stream named shared-events in us-east-1.
+      On-demand mode. Account 123456789012 owns the stream. A consumer
+      application in account 999999999999 needs to read records (GetRecords
+      and GetShardIterator). Retention 24 hours. No enhanced fan-out.
+      Use a stream resource policy for cross-account access. Producer is
+      in account 123456789012 role stream-producer-role. Tags:
+      Environment=production, SharedWith=analytics-org.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-events"
+        - "999999999999"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-stream-mode
+    description: >-
+      Operator requests a Kinesis stream but has not specified the stream
+      mode (provisioned vs on-demand) or shard count. The capacity model
+      is a prerequisite decision. Expects PREREQUISITES_MISSING with the
+      stream mode requirement cited.
+    input: |
+      I need a Kinesis stream for my new application. Name it app-events.
+      Region us-east-1. I'm not sure about the throughput yet — just
+      create it and I'll figure out capacity later. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "app-events"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "stream mode"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

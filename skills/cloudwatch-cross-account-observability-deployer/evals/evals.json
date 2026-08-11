@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-cross-account-observability-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Cross-Account Observability Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "oam-sink-and-link-two-source-accounts",
+      "name": "Create an OAM sink and attach two source accounts sharing metrics, logs, traces, Application Signals",
+      "difficulty": "hard",
+      "prompt_file": "prompts/oam-sink-and-link-two-source-accounts.md",
+      "baseline_file": "baselines/oam-sink-and-link-two-source-accounts.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "create-sink", "put-sink-policy", "create-link", "VERDICT", "MONITORING_ACCOUNT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "PREREQUISITES_MISSING", "AccessKey"]
+        }
+      ]
+    },
+    {
+      "id": "oam-org-wide-sink-policy-fleet",
+      "name": "Org-wide sink policy with aws:PrincipalOrgID and CloudFormation StackSets for fleet deployment",
+      "difficulty": "hard",
+      "prompt_file": "prompts/oam-org-wide-sink-policy-fleet.md",
+      "baseline_file": "baselines/oam-org-wide-sink-policy-fleet.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "aws:PrincipalOrgID", "StackSets", "create-stack-set", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "oam-sink-policy-missing-source-principal",
+      "name": "PREREQUISITES_MISSING because the sink policy omits the source account principal",
+      "difficulty": "medium",
+      "prompt_file": "prompts/oam-sink-policy-missing-source-principal.md",
+      "baseline_file": "baselines/oam-sink-policy-missing-source-principal.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "sink policy", "444455556666", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "oam-cross-account-application-signals-gap",
+      "name": "PREREQUISITES_MISSING because Application Signals is desired but not enabled in the source workload",
+      "difficulty": "medium",
+      "prompt_file": "prompts/oam-cross-account-application-signals-gap.md",
+      "baseline_file": "baselines/oam-cross-account-application-signals-gap.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "Application Signals", "list-services", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "oam-managed-grafana-and-amp-cross-account",
+      "name": "Wire Managed Grafana and an AMP workspace for cross-account queries alongside the OAM sink",
+      "difficulty": "hard",
+      "prompt_file": "prompts/oam-managed-grafana-and-amp-cross-account.md",
+      "baseline_file": "baselines/oam-managed-grafana-and-amp-cross-account.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "GrafanaCrossAccountReadRole", "AMPQueryRole", "grafana update-workspace", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "PREREQUISITES_MISSING"]
+        }
+      ]
+    }
+  ]
+}

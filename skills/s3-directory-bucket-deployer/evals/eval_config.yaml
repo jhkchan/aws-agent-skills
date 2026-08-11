@@ -1,0 +1,43 @@
+# Eval configuration for s3-directory-bucket-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: s3-directory-bucket-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: zone-affinity-directory-bucket-ready
+    difficulty: easy
+    prompt_file: prompts/zone-affinity-directory-bucket-ready.md
+    baseline_file: baselines/zone-affinity-directory-bucket-ready.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: invalid-bucket-name-format-missing
+    difficulty: hard
+    prompt_file: prompts/invalid-bucket-name-format-missing.md
+    baseline_file: baselines/invalid-bucket-name-format-missing.md
+    expected_verdict: PREREQUISITES_MISSING
+  - id: zone-mismatch-compute-missing
+    difficulty: hard
+    prompt_file: prompts/zone-mismatch-compute-missing.md
+    baseline_file: baselines/zone-mismatch-compute-missing.md
+    expected_verdict: PREREQUISITES_MISSING
+  - id: table-bucket-iceberg-ready
+    difficulty: medium
+    prompt_file: prompts/table-bucket-iceberg-ready.md
+    baseline_file: baselines/table-bucket-iceberg-ready.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: unsupported-crr-requested-missing
+    difficulty: medium
+    prompt_file: prompts/unsupported-crr-requested-missing.md
+    baseline_file: baselines/unsupported-crr-requested-missing.md
+    expected_verdict: PREREQUISITES_MISSING

@@ -1,0 +1,139 @@
+# Eval test cases for cloudwatch-cross-account-observability-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-cross-account-observability-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: oam-sink-and-link-two-source-accounts
+    description: Create an OAM sink in the monitoring account and attach two source accounts sharing metrics, logs, traces, and Application Signals
+    input: |
+      Scenario: An operator wants to set up CloudWatch cross-account
+      observability in us-east-1. Monitoring account 111122223333
+      hosts the sink. Source accounts 444455556666 (checkout) and
+      777788889999 (payments) should share CloudWatch metrics
+      (AWS/EC2, AWS/ECS, AWS/Lambda, AWS/ApplicationSignals), log
+      groups (/aws/ecs/prod-app, /aws/lambda/payments-api), X-Ray
+      traces (services checkout, payments), and Application Signals
+      service data. The sink policy should allow both source
+      accounts. Each source account has an IAM role OAMLinkRole
+      with oam:CreateLink on the sink ARN. The operator needs the
+      sink creation, sink policy, link creation, and verification
+      sequence.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "create-sink"
+        - "put-sink-policy"
+        - "create-link"
+        - "VERDICT"
+        - "MONITORING_ACCOUNT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"
+        - "AccessKey"
+
+  - id: oam-org-wide-sink-policy-fleet
+    description: Deploy an org-wide sink policy using aws:PrincipalOrgID for a fleet of source accounts via CloudFormation StackSets
+    input: |
+      Scenario: An operator with org o-abcdef1234 wants to deploy
+      CloudWatch cross-account observability for a fleet of 60+
+      source accounts. The monitoring account is 111122223333,
+      us-east-1. The operator wants an org-wide sink policy using
+      aws:PrincipalOrgID so new accounts auto-attach. Each source
+      account needs CloudWatch metrics (AWS/EC2, AWS/ECS,
+      AWS/Lambda) and log groups (prefix /aws/) shared. The
+      operator wants the StackSets template to deploy the link
+      across the org.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws:PrincipalOrgID"
+        - "StackSets"
+        - "create-stack-set"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"
+
+  - id: oam-sink-policy-missing-source-principal
+    description: PREREQUISITES_MISSING because the sink policy does not list the source account principal, blocking CreateLink
+    input: |
+      Scenario: An operator tries to attach source account
+      444455556666 to sink
+      arn:aws:oam:us-east-1:111122223333:sink/ProdObservabilitySink.
+      The source account IAM role OAMLinkRole has oam:CreateLink
+      on the sink ARN. However, the sink policy currently lists
+      only the monitoring account 111122223333 as principal — it
+      does NOT include 444455556666. The operator runs
+      oam create-link and expects it to succeed.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "sink policy"
+        - "444455556666"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "READY_TO_DEPLOY"
+
+  - id: oam-cross-account-application-signals-gap
+    description: PREREQUISITES_MISSING because Application Signals is desired in the monitoring account but not enabled in the source workload
+    input: |
+      Scenario: An operator wants cross-account Application Signals
+      service maps in monitoring account 111122223333. Source
+      account 444455556666 has the OAM link with
+      AWS::ApplicationSignals::Service in ResourceTypes, and the
+      sink policy allows it. However,
+      `aws application-signals list-services` in the source account
+      returns an empty list — Application Signals is not enabled on
+      the checkout ECS workload. The operator expects the
+      AWS/ApplicationSignals namespace to populate in the
+      monitoring account.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Application Signals"
+        - "list-services"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "READY_TO_DEPLOY"
+
+  - id: oam-managed-grafana-and-amp-cross-account
+    description: Wire Managed Grafana and an AMP workspace for cross-account queries alongside the OAM sink
+    input: |
+      Scenario: An operator has a working OAM topology — sink in
+      monitoring account 111122223333 (us-east-1), two source
+      accounts attached, metrics / logs / traces / Application
+      Signals flowing. Now the operator wants to wire Amazon
+      Managed Grafana workspace g-abcdef1234 to query via the sink
+      (assume a GrafanaCrossAccountReadRole with read perms), and
+      an AMP workspace prod-prometheus in source account
+      444455556666 to be queryable from Grafana via a cross-account
+      AMPQueryRole. Provide the wiring steps and verification.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "GrafanaCrossAccountReadRole"
+        - "AMPQueryRole"
+        - "grafana update-workspace"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"

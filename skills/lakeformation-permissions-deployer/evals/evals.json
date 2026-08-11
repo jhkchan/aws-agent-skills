@@ -1,0 +1,173 @@
+{
+  "skill": "lakeformation-permissions-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Lake Formation Permissions Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across data lake admin registration, LF-tag based access control (tag keys/values, tag attachment to databases and tables), LF-tag based permission grants, column-level security (column grant with PII exclusion, data cells filter with row and column filtering), resource links for cross-database access, and prerequisite failure branches (missing data lake admin, missing LF-tag on target table). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "lf-tag-based-access",
+      "name": "Complete LF-tag based access control deployment with admin, tags, and grants",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — full checklist with admin, LF-tag keys, tag attachment, tag-based grant",
+      "prompt": "Deploy Lake Formation LF-tag based access control for the analytics team. Register data lake admin arn:aws:iam::123456789012:role/LFDataLakeAdmin (already exists in IAM). Create LF-tag keys: environment (values: production, staging, dev), department (values: finance, engineering, marketing), sensitivity (values: public, internal, restricted, pii). Attach LF-tags to database analytics_db: environment=production, department=finance. Attach LF-tags to table analytics_db.transactions: environment=production, department=finance, sensitivity=restricted. Grant LF-tag-based SELECT and DESCRIBE to principal arn:aws:iam::123456789012:role/AnalyticsTeamRole on TABLE resources matching environment=production AND department=finance. Target Glue database analytics_db and table transactions both exist. Account: 123456789012. Region: us-east-1.",
+      "prompt_file": "prompts/lf-tag-based-access.md",
+      "baseline_file": "baselines/lf-tag-based-access.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PERMISSION_DEPLOYMENT: lf-tag-based-access\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Data lake admin — arn:aws:iam::123456789012:role/LFDataLakeAdmin (registered)\n  [✓]      LF-tag keys — environment (production, staging, dev), department (finance, engineering, marketing), sensitivity (public, internal, restricted, pii)\n  [✓]      LF-tag on database — analytics_db: environment=production, department=finance\n  [✓]      LF-tag on table — analytics_db.transactions: environment=production, department=finance, sensitivity=restricted\n  [✓]      Principal — arn:aws:iam::123456789012:role/AnalyticsTeamRole\n  [✓]      LF-tag-based grant — SELECT, DESCRIBE on TABLE resources: environment=production AND department=finance\n  [✓]      Tags — Environment=production, Governance=lake-formation\nVERIFICATION_COMMANDS:\n  aws lakeformation list-permissions --principal arn:aws:iam::123456789012:role/AnalyticsTeamRole\n  aws lakeformation get-resource-lf-tags --resource '{\"Database\": {\"Name\": \"analytics_db\"}}'\n  aws lakeformation get-resource-lf-tags --resource '{\"Table\": {\"DatabaseName\": \"analytics_db\", \"Name\": \"transactions\"}}'\n  aws lakeformation list-lf-tags",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "lf-tag-based-access",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "data lake admin"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "column-level-security",
+      "name": "Column-level security with data cells filter for PII exclusion and row filtering",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — column grant, data cells filter, row filter, PII exclusion",
+      "prompt": "Deploy column-level security for the RegionalAnalystRole on the transactions table. Data lake admin arn:aws:iam::123456789012:role/LFDataLakeAdmin is registered. Database analytics_db and table transactions exist with LF-tags already attached. Principal: arn:aws:iam::123456789012:role/RegionalAnalystRole. Grant column-level SELECT on columns [transaction_id, amount, currency, timestamp, merchant, region] — explicitly EXCLUDE PII columns [ssn, credit_card]. Create data cells filter regional_access_filter on table analytics_db.transactions with row filter region = 'us-east-1' and column wildcard excluding [ssn, credit_card]. Grant SELECT on the data cells filter to RegionalAnalystRole. Account: 123456789012. Region: us-east-1.",
+      "prompt_file": "prompts/column-level-security.md",
+      "baseline_file": "baselines/column-level-security.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PERMISSION_DEPLOYMENT: column-level-security\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Data lake admin — arn:aws:iam::123456789012:role/LFDataLakeAdmin (registered)\n  [✓]      Principal — arn:aws:iam::123456789012:role/RegionalAnalystRole\n  [✓]      Column-level grant — SELECT on columns [transaction_id, amount, currency, timestamp, merchant, region] (PII columns [ssn, credit_card] EXCLUDED)\n  [✓]      Data cells filter — regional_access_filter on analytics_db.transactions, row filter region = 'us-east-1'\n  [✓]      Column wildcard exclusion — [ssn, credit_card] excluded from data cells filter\n  [✓]      Data cells filter grant — SELECT on regional_access_filter to RegionalAnalystRole\n  [✓]      Tags — Environment=production, Governance=lake-formation\nVERIFICATION_COMMANDS:\n  aws lakeformation list-permissions --principal arn:aws:iam::123456789012:role/RegionalAnalystRole\n  aws lakeformation describe-resource --resource-arn arn:aws:glue:us-east-1:123456789012:table/analytics_db/transactions",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "column-level-security",
+            "VERDICT",
+            "CHECKLIST",
+            "column"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-data-lake-admin",
+      "name": "LF-tag deployment with no data lake admin registered",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — data lake admin required for LF-tag creation and permission grants",
+      "prompt": "Deploy Lake Formation LF-tag based access control for the analytics team. Data lake admin: NONE REGISTERED (the operator forgot to register an admin — list-data-lake-settings returns empty DataLakeAdmins list). Create LF-tag keys: environment (production, staging), department (finance, engineering). Attach LF-tags to database analytics_db and table transactions. Grant LF-tag-based SELECT to principal arn:aws:iam::123456789012:role/AnalyticsTeamRole. Target Glue database analytics_db and table transactions both exist. Account: 123456789012. Region: us-east-1.",
+      "prompt_file": "prompts/missing-data-lake-admin.md",
+      "baseline_file": "baselines/missing-data-lake-admin.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "PERMISSION_DEPLOYMENT: missing-data-lake-admin\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗]      Data lake admin — REQUIRED but NONE REGISTERED. The data lake admin is an IAM principal registered in Lake Formation. Only admins can create LF-tags, register data locations, and grant permissions. Without an admin, all LF-tag and grant operations fail with AccessDeniedException. Register at least one admin via put-data-lake-settings.\n  [✓]      LF-tag keys planned — environment (production, staging), department (finance, engineering)\n  [✓]      Target database — analytics_db exists\n  [✓]      Target table — transactions exists\nVERIFICATION_COMMANDS:\n  aws lakeformation list-data-lake-settings --query 'DataLakeSettings.DataLakeAdmins'\n  aws iam get-role --role-name LFDataLakeAdmin",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "missing-data-lake-admin",
+            "VERDICT",
+            "CHECKLIST",
+            "data lake admin"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resource-link-cross-database",
+      "name": "Cross-database resource link with DESCRIBE on link and SELECT on target table",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — resource link, cross-database access, dual grants",
+      "prompt": "Deploy a cross-database resource link for the reporting team. Data lake admin arn:aws:iam::123456789012:role/LFDataLakeAdmin is registered. Create resource link finance_transactions_link in database reporting_db pointing to table analytics_db.transactions. Both databases (reporting_db, analytics_db) and the target table (transactions) exist. Grant DESCRIBE on the resource link finance_transactions_link in reporting_db to principal arn:aws:iam::123456789012:role/ReportingTeamRole. Grant SELECT on the underlying table analytics_db.transactions to the same principal. Account: 123456789012. Region: us-east-1.",
+      "prompt_file": "prompts/resource-link-cross-database.md",
+      "baseline_file": "baselines/resource-link-cross-database.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PERMISSION_DEPLOYMENT: resource-link-cross-database\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Data lake admin — arn:aws:iam::123456789012:role/LFDataLakeAdmin (registered)\n  [✓]      Resource link — finance_transactions_link in reporting_db → analytics_db.transactions\n  [✓]      Principal — arn:aws:iam::123456789012:role/ReportingTeamRole\n  [✓]      Link DESCRIBE grant — DESCRIBE on reporting_db.finance_transactions_link to ReportingTeamRole\n  [✓]      Target table SELECT grant — SELECT on analytics_db.transactions to ReportingTeamRole\n  [✓]      Tags — Environment=production, Governance=lake-formation\nVERIFICATION_COMMANDS:\n  aws lakeformation list-permissions --principal arn:aws:iam::123456789012:role/ReportingTeamRole\n  aws glue get-table --database-name reporting_db --name finance_transactions_link\n  aws glue get-table --database-name analytics_db --name transactions",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "resource-link-cross-database",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "resource link"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-lf-tag-on-resource",
+      "name": "LF-tag-based grant on a table with no LF-tags attached",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — LF-tags must be attached to resources before tag-based grants can match",
+      "prompt": "Deploy Lake Formation LF-tag based access control for the analytics team. Data lake admin arn:aws:iam::123456789012:role/LFDataLakeAdmin is registered. LF-tag keys environment (production, staging) and department (finance, engineering) are created. Attach LF-tags to database analytics_db: environment=production. The target table analytics_db.transactions HAS NO LF-TAGS ATTACHED (the operator created the table but forgot to attach LF-tags — get-resource-lf-tags returns empty). Grant LF-tag-based SELECT to arn:aws:iam::123456789012:role/AnalyticsTeamRole on environment=production AND department=finance. Database and table exist. Account: 123456789012. Region: us-east-1.",
+      "prompt_file": "prompts/missing-lf-tag-on-resource.md",
+      "baseline_file": "baselines/missing-lf-tag-on-resource.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "PERMISSION_DEPLOYMENT: missing-lf-tag-on-resource\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Data lake admin — arn:aws:iam::123456789012:role/LFDataLakeAdmin (registered)\n  [✓]      LF-tag keys — environment (production, staging), department (finance, engineering)\n  [✓]      LF-tag on database — analytics_db: environment=production\n  [✗]      LF-tag on table — analytics_db.transactions HAS NO LF-TAGS ATTACHED. Without LF-tags on the target table, the LF-tag-based grant on environment=production AND department=finance matches NOTHING. The principal receives zero access — a silent failure. Attach LF-tags to the table via add-lf-tags-to-resource before granting tag-based permissions.\n  [✓]      Principal — arn:aws:iam::123456789012:role/AnalyticsTeamRole\nVERIFICATION_COMMANDS:\n  aws lakeformation get-resource-lf-tags --resource '{\"Table\": {\"DatabaseName\": \"analytics_db\", \"Name\": \"transactions\"}}'\n  aws lakeformation list-lf-tags",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "missing-lf-tag-on-resource",
+            "VERDICT",
+            "CHECKLIST",
+            "LF-tag"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-directory-bucket-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Directory Bucket Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "zone-affinity-directory-bucket-ready",
+      "name": "Standard directory bucket with correct name format, AZ ID, zone-affinity compute, SSE-KMS — all dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/zone-affinity-directory-bucket-ready.md",
+      "baseline_file": "baselines/zone-affinity-directory-bucket-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "zone-affinity-directory-bucket-ready", "VERDICT", "CHECKLIST", "VERIFICATION_COMMANDS", "create-directory-bucket", "use1-az1"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "invalid-bucket-name-format-missing",
+      "name": "Bucket name without double-dash --x-s3 format — operator will fall back to create-bucket (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/invalid-bucket-name-format-missing.md",
+      "baseline_file": "baselines/invalid-bucket-name-format-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "invalid-bucket-name-format-missing", "VERDICT", "format"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "zone-mismatch-compute-missing",
+      "name": "Directory bucket in use1-az1 but compute deployed in use1-az2 — cross-AZ latency + transfer fees (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/zone-mismatch-compute-missing.md",
+      "baseline_file": "baselines/zone-mismatch-compute-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "zone-mismatch-compute-missing", "VERDICT", "use1-az1"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "table-bucket-iceberg-ready",
+      "name": "S3 Tables table bucket for Apache Iceberg with zone-affinity EMR/Spark compute — all pass",
+      "difficulty": "medium",
+      "prompt_file": "prompts/table-bucket-iceberg-ready.md",
+      "baseline_file": "baselines/table-bucket-iceberg-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "table-bucket-iceberg-ready", "VERDICT", "CHECKLIST", "VERIFICATION_COMMANDS", "s3tables", "use1-az1"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "unsupported-crr-requested-missing",
+      "name": "Operator requests CRR + versioning + Object Lock on a directory bucket — all unsupported (PREREQUISITES_MISSING)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/unsupported-crr-requested-missing.md",
+      "baseline_file": "baselines/unsupported-crr-requested-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "unsupported-crr-requested-missing", "VERDICT", "replication"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

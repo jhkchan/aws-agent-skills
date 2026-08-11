@@ -1,0 +1,175 @@
+# Eval test cases for s3-directory-bucket-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-directory-bucket-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: zone-affinity-directory-bucket-ready
+    description: >-
+      Standard directory bucket deployment with correct name format,
+      explicit AZ ID, zone-affinity EC2 compute in the same AZ, SSE-KMS
+      encryption, and confirmed absence of unsupported features (CRR,
+      versioning, Object Lock). All checklist dimensions pass.
+    input: |
+      Design a deployment plan for an S3 Express One Zone directory
+      bucket. Emit the standard VERDICT block (DIRECTORY_BUCKET_SPEC,
+      VERDICT, CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Base bucket name: ml-cache-data
+      - AZ: us-east-1a (resolve to AZ ID)
+      - Region: us-east-1
+      - Encryption: SSE-KMS with key arn:aws:kms:us-east-1:111111111111:key/abc-123
+      - Compute: 4 x c7n.large EC2 instances, already deployed in use1-az1 (subnet subnet-aaa)
+      - Workload: ML training data cache (object-level reads/writes)
+      - No CRR, no versioning, no Object Lock needed
+      - Account: 111111111111
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "zone-affinity-directory-bucket-ready"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "create-directory-bucket"
+        - "use1-az1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: invalid-bucket-name-format-missing
+    description: >-
+      Operator provides a bucket name that does NOT follow the
+      directory bucket name format (base--az-id--x-s3). The name uses
+      single-dash delimiters. Must emit PREREQUISITES_MISSING because
+      the API will reject the name or the operator will fall back to
+      create-bucket and get a standard bucket.
+    input: |
+      Design a deployment plan for an S3 Express One Zone directory
+      bucket. Emit the standard VERDICT block (DIRECTORY_BUCKET_SPEC,
+      VERDICT, CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Desired bucket name: my-fast-bucket-use1-az1
+      - AZ: us-east-1a
+      - Region: us-east-1
+      - Operator wants to use aws s3api create-bucket because the name
+        doesn't seem to need special formatting
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "invalid-bucket-name-format-missing"
+        - "VERDICT"
+        - "format"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: zone-mismatch-compute-missing
+    description: >-
+      Directory bucket is created in use1-az1 but compute (EC2) is
+      deployed in use1-az2. Must emit PREREQUISITES_MISSING because
+      the zone mismatch negates the latency benefit and incurs
+      cross-AZ transfer fees.
+    input: |
+      Design a deployment plan for an S3 Express One Zone directory
+      bucket. Emit the standard VERDICT block (DIRECTORY_BUCKET_SPEC,
+      VERDICT, CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Base bucket name: analytics-cache
+      - AZ: us-east-1a (resolve to AZ ID use1-az1)
+      - Region: us-east-1
+      - Compute: 6 x c7n.xlarge EC2 instances in subnet subnet-bbb
+        (subnet-bbb is in use1-az2)
+      - Workload: real-time analytics cache
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "zone-mismatch-compute-missing"
+        - "VERDICT"
+        - "use1-az1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: table-bucket-iceberg-ready
+    description: >-
+      S3 Tables table bucket for Apache Iceberg, created via the
+      s3tables API, with zone-affinity compute (EMR/Spark) in the same
+      AZ. All checklist dimensions pass.
+    input: |
+      Design a deployment plan for an S3 Tables table bucket for
+      Apache Iceberg analytics. Emit the standard VERDICT block
+      (DIRECTORY_BUCKET_SPEC, VERDICT, CHECKLIST,
+      VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Table bucket name: events-iceberg-tables
+      - AZ: us-east-1a (resolve to AZ ID)
+      - Region: us-east-1
+      - Format: Apache Iceberg
+      - Compute: EMR Spark cluster in use1-az1 (subnet subnet-aaa)
+      - Query engines: Athena + Spark
+      - No CRR, no versioning, no Object Lock needed
+      - Account: 111111111111
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "table-bucket-iceberg-ready"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "s3tables"
+        - "use1-az1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: unsupported-crr-requested-missing
+    description: >-
+      Operator requests cross-region replication on a directory bucket.
+      Must emit PREREQUISITES_MISSING because directory buckets do NOT
+      support CRR — the operator must redesign the DR strategy or use
+      standard S3 buckets instead.
+    input: |
+      Design a deployment plan for an S3 Express One Zone directory
+      bucket. Emit the standard VERDICT block (DIRECTORY_BUCKET_SPEC,
+      VERDICT, CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - Base bucket name: production-data
+      - AZ: us-east-1a
+      - Region: us-east-1
+      - Cross-region replication to eu-west-1 for disaster recovery
+      - Versioning enabled for rollback
+      - Object Lock for compliance retention
+      - Compute: 4 x c7n.large in use1-az1
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "unsupported-crr-requested-missing"
+        - "VERDICT"
+        - "replication"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

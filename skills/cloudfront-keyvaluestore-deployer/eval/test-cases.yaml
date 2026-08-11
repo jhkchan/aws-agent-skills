@@ -1,0 +1,146 @@
+# Eval test cases for cloudfront-keyvaluestore-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across KVS use cases
+# (A/B testing with Functions integration, feature flags,
+#  IP allowlist, missing runtime, over-size store).
+skill: cloudfront-keyvaluestore-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ab-testing-kvs-function
+    description: >-
+      Provision a CloudFront KeyValueStore for A/B testing with a
+      CloudFront Function integration. Expects READY_TO_DEPLOY with
+      cloudfront-js-2.0 runtime, KVS-function linkage, and eventual
+      consistency acknowledged.
+    input: |
+      Create a CloudFront KeyValueStore named ab-testing-kvs for A/B
+      testing. I need a CloudFront Function named ab-test-router that
+      reads the KVS to route traffic between variant-a and variant-b
+      based on a percentage stored in the KVS. The distribution is
+      E1234567890ABC. I want to change the split without redeploying
+      the function. Account ID: 123456789012. Tags:
+      Environment=production, UseCase=ab-testing.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cloudfront-js-2.0"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "ab-testing-kvs"
+        - "ab-test-router"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: feature-flags-kvs
+    description: >-
+      Provision a KVS for edge-side feature flags. Expects
+      READY_TO_DEPLOY with flag schema, read-only function note, and
+      toggle-via-KVS pattern documented.
+    input: |
+      I want to use CloudFront KeyValueStore to manage feature flags at
+      the edge. I need flags for flag-new-checkout, flag-beta-api, and
+      flag-maintenance-mode. Create a KVS named feature-flags-kvs and a
+      CloudFront Function named flag-evaluator that reads these flags.
+      Distribution E987654321DEF. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "feature-flags-kvs"
+        - "cloudfront-js-2.0"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "flag-new-checkout"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ip-allowlist-kvs
+    description: >-
+      Provision a KVS for IP blocklist logic in a CloudFront Function.
+      Expects READY_TO_DEPLOY with IP blocklist schema, function code
+      referencing event.viewer.ip, and WAF-vs-KVS tradeoff noted.
+    input: |
+      Create a CloudFront KeyValueStore named ip-blocklist-kvs for
+      blocking specific IPs at the edge. I need to block
+      192.168.1.10, 10.0.0.5, and 172.16.0.3. Create a CloudFront
+      Function named ip-blocker that checks viewer IP against the KVS
+      and returns 403 for blocked IPs. Distribution E456789012GHI.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ip-blocklist-kvs"
+        - "cloudfront-js-2.0"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "403"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: wrong-runtime-js-1
+    description: >-
+      Operator created a CloudFront Function with cloudfront-js-1.0
+      runtime and wants to use KVS. The 1.0 runtime does not support
+      cf.openKvs(). Expects PREREQUISITES_MISSING citing the runtime.
+    input: |
+      I have a CloudFront Function named edge-router that I created
+      with the cloudfront-js-1.0 runtime. I want to read from a
+      KeyValueStore inside it using cf.openKvs(). The KVS is named
+      config-kvs. It's attached to distribution E111111111AAA.
+      Account ID: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "cloudfront-js-2.0"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "cloudfront-js-1.0"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: kvs-size-limit-exceeded
+    description: >-
+      Operator wants to store 8000 IP entries in a single KVS, which
+      would exceed the 1 MB store limit. Expects PREREQUISITES_MISSING
+      with the size constraint cited and alternatives suggested.
+    input: |
+      I want to store a blocklist of 8000 IP addresses in a CloudFront
+      KeyValueStore. Each IP is about 20 characters. I need the function
+      to check each incoming request against all 8000 entries. Create a
+      KVS named big-blocklist-kvs. Account ID: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "1 MB"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "big-blocklist-kvs"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

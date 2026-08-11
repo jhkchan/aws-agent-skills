@@ -1,0 +1,173 @@
+{
+  "skill": "kinesis-analytics-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Kinesis Data Analytics Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across application creation (Flink, SQL, Zeppelin runtime), source configuration (Kinesis Data Stream), destination configuration (Kinesis Data Stream), checkpointing, parallelism and KPU tuning, CloudWatch logging, application snapshots, Studio notebooks with Zeppelin, session window SQL patterns, and prerequisite failure branches (missing execution role, missing source stream). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "flink-production-streaming",
+      "name": "Production Flink streaming application with checkpointing, parallelism, snapshots",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — full checklist with execution role, checkpointing, parallelism, source, destination",
+      "prompt": "Deploy a production Kinesis Data Analytics Flink application named \"fraud-detection-flink\" in us-east-1. Runtime environment FLINK-1_19. Service execution role KDAExecutionRole with Kinesis GetRecords/GetShardIterator on stream transactions, Kinesis PutRecord/PutRecords on stream alerts, S3 GetObject on s3://kda-apps/fraud-detection-1.0.0.jar, CloudWatch Logs on /aws/kinesis-analytics/fraud-detection-flink. Source: Kinesis Data Stream transactions (4 shards, ACTIVE), starting position LATEST. Destination: Kinesis Data Stream alerts. Checkpointing: interval 60000 ms, min pause 5000 ms. Parallelism: 4, parallelismPerKPU 1. Application snapshots enabled. Auto-scaling off. CloudWatch log group /aws/kinesis-analytics/fraud-detection-flink. Account: 123456789012.",
+      "prompt_file": "prompts/flink-production-streaming.md",
+      "baseline_file": "baselines/flink-production-streaming.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APPLICATION: fraud-detection-flink\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Runtime environment — FLINK-1_19, application mode STREAMING\n  [✓]      Service execution role — arn:aws:iam::123456789012:role/KDAExecutionRole (Kinesis read, Kinesis write, S3 code, CloudWatch Logs)\n  [✓]      Source — Kinesis Data Stream arn:aws:kinesis:us-east-1:123456789012:stream/transactions, starting position LATEST\n  [✓]      Destination — Kinesis Data Stream arn:aws:kinesis:us-east-1:123456789012:stream/alerts\n  [✓]      Application code — s3://kda-apps/fraud-detection-1.0.0.jar (pinned version)\n  [✓]      Checkpointing — interval 60000 ms, min pause 5000 ms, configuration CUSTOM\n  [✓]      Parallelism — 4 (parallelismPerKPU 1, 5 KPUs total)\n  [✓]      CloudWatch logging — enabled, log group /aws/kinesis-analytics/fraud-detection-flink\n  [✓]      Application snapshots — enabled for stateful recovery\n  [✓]      Tags — Environment=production, Application=fraud-detection\nVERIFICATION_COMMANDS:\n  aws kinesisanalyticsv2 describe-application --application-name fraud-detection-flink\n  aws iam get-role --role-name KDAExecutionRole\n  aws kinesis describe-stream --stream-name transactions\n  aws logs describe-log-groups --log-group-name-prefix /aws/kinesis-analytics/fraud-detection-flink",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "fraud-detection-flink",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "execution role"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sql-session-windows",
+      "name": "Production SQL application with session window analytics",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SQL runtime, session windows, Kinesis source and destination",
+      "prompt": "Deploy a production Kinesis Data Analytics SQL application named \"session-windows-sql\" in us-east-1. Runtime environment SQL-1_0. Service execution role KDAExecutionRole with Kinesis GetRecords on stream clicks, Kinesis PutRecord on stream sessions-out, CloudWatch Logs on /aws/kinesis-analytics/session-windows-sql. Source: Kinesis Data Stream clicks (ACTIVE), JSON record format, columns event_time (TIMESTAMP), user_id (VARCHAR(64)), event_type (VARCHAR(32)). Starting position NOW. Destination: Kinesis Data Stream sessions-out. Application code: session window pump using SESSION(event_time, INTERVAL '60' SECONDS) grouping by user_id with COUNT(*) aggregate. CloudWatch log group /aws/kinesis-analytics/session-windows-sql. Account: 123456789012.",
+      "prompt_file": "prompts/sql-session-windows.md",
+      "baseline_file": "baselines/sql-session-windows.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APPLICATION: session-windows-sql\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Runtime environment — SQL-1_0\n  [✓]      Service execution role — arn:aws:iam::123456789012:role/KDAExecutionRole (Kinesis read, Kinesis write, CloudWatch Logs)\n  [✓]      Source — Kinesis Data Stream arn:aws:kinesis:us-east-1:123456789012:stream/clicks, starting position NOW\n  [✓]      Destination — Kinesis Data Stream arn:aws:kinesis:us-east-1:123456789012:stream/sessions-out\n  [✓]      Application code — inline SQL with SESSION(event_time, INTERVAL '60' SECONDS) session window\n  [✓]      CloudWatch logging — enabled, log group /aws/kinesis-analytics/session-windows-sql\n  [✓]      Tags — Environment=production, Application=session-windows\nVERIFICATION_COMMANDS:\n  aws kinesisanalyticsv2 describe-application --application-name session-windows-sql\n  aws iam get-role --role-name KDAExecutionRole\n  aws kinesis describe-stream --stream-name clicks\n  aws logs describe-log-groups --log-group-name-prefix /aws/kinesis-analytics/session-windows-sql",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "session-windows-sql",
+            "VERDICT",
+            "CHECKLIST",
+            "SQL"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-execution-role",
+      "name": "Flink application with no service execution role provided",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — execution role required for runtime AWS API calls",
+      "prompt": "Deploy a Kinesis Data Analytics Flink application named \"report-flink-prod\" in us-east-1. Runtime environment FLINK-1_19. Service execution role: NONE PROVIDED (the operator forgot to create the IAM role). Source: Kinesis Data Stream events (ACTIVE). Destination: Kinesis Data Stream report-out. Checkpointing: interval 60000 ms. Parallelism: 2. Application code s3://kda-apps/report-1.0.0.jar. CloudWatch log group /aws/kinesis-analytics/report-flink-prod. Account: 123456789012.",
+      "prompt_file": "prompts/missing-execution-role.md",
+      "baseline_file": "baselines/missing-execution-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "APPLICATION: report-flink-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗]      Service execution role — REQUIRED but NONE PROVIDED. The execution role is assumed by the KDA application for all runtime AWS API calls (Kinesis reads, Kinesis writes, S3 code retrieval, CloudWatch logging). Without it, the application fails with AccessDeniedException on the first Kinesis GetRecords call. Create a role trusting kinesisanalytics.amazonaws.com with scoped Kinesis/S3/CloudWatch permissions.\n  [✓]      Runtime environment — FLINK-1_19\n  [✓]      Source — Kinesis Data Stream events (ACTIVE)\n  [✓]      Destination — Kinesis Data Stream report-out\nVERIFICATION_COMMANDS:\n  aws iam get-role --role-name KDAExecutionRole\n  aws kinesisanalyticsv2 describe-application --application-name report-flink-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "report-flink-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "execution role"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "studio-notebook-zeppelin",
+      "name": "Studio notebook with Apache Zeppelin for interactive streaming analysis",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Zeppelin runtime, Glue Data Catalog, deploy-as-application",
+      "prompt": "Deploy a Kinesis Data Analytics Studio notebook named \"fraud-explore-notebook\" in us-east-1. Runtime environment ZEPPELIN-FLINK-1_0. Service execution role KDAExecutionRole with Kinesis GetRecords on stream transactions, S3 GetObject on s3://kda-apps/custom-udf-1.0.0.jar, CloudWatch Logs on /aws/kinesis-analytics/fraud-explore-notebook. Source: Kinesis Data Stream transactions (ACTIVE). Glue Data Catalog integration with database default. Deploy-as-application enabled (notebook can be promoted to a STREAMING application). Log level INFO. Account: 123456789012.",
+      "prompt_file": "prompts/studio-notebook-zeppelin.md",
+      "baseline_file": "baselines/studio-notebook-zeppelin.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APPLICATION: fraud-explore-notebook\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Runtime environment — ZEPPELIN-FLINK-1_0 (Studio notebook)\n  [✓]      Service execution role — arn:aws:iam::123456789012:role/KDAExecutionRole (Kinesis read, S3 code, CloudWatch Logs)\n  [✓]      Source — Kinesis Data Stream arn:aws:kinesis:us-east-1:123456789012:stream/transactions\n  [✓]      Glue Data Catalog — database default\n  [✓]      Custom artifacts — s3://kda-apps/custom-udf-1.0.0.jar\n  [✓]      CloudWatch logging — enabled, log group /aws/kinesis-analytics/fraud-explore-notebook\n  [✓]      Deploy-as-application — enabled (notebook can be promoted to STREAMING application)\n  [✓]      Tags — Environment=dev, Application=fraud-explore\nVERIFICATION_COMMANDS:\n  aws kinesisanalyticsv2 describe-application --application-name fraud-explore-notebook\n  aws iam get-role --role-name KDAExecutionRole\n  aws kinesis describe-stream --stream-name transactions\n  aws logs describe-log-groups --log-group-name-prefix /aws/kinesis-analytics/fraud-explore-notebook",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "fraud-explore-notebook",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Zeppelin"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-source-stream",
+      "name": "Flink application referencing a non-existent source stream",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — source stream required for the application to read records",
+      "prompt": "Deploy a Kinesis Data Analytics Flink application named \"etl-flink-prod\" in us-east-1. Runtime environment FLINK-1_19. Service execution role KDAExecutionRole with Kinesis GetRecords on stream ingestion-events, S3 GetObject on s3://kda-apps/etl-1.0.0.jar, CloudWatch Logs. Source: Kinesis Data Stream ingestion-events — DOES NOT EXIST (the operator referenced a stream name that was never created; describe-stream returns ResourceNotFoundException). Destination: Kinesis Data Stream etl-out. Checkpointing: interval 60000 ms. Parallelism: 4. Application code s3://kda-apps/etl-1.0.0.jar. Account: 123456789012.",
+      "prompt_file": "prompts/missing-source-stream.md",
+      "baseline_file": "baselines/missing-source-stream.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "APPLICATION: etl-flink-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Runtime environment — FLINK-1_19\n  [✓]      Service execution role — arn:aws:iam::123456789012:role/KDAExecutionRole (Kinesis read, S3 code, CloudWatch Logs)\n  [✗]      Source — Kinesis Data Stream ingestion-events DOES NOT EXIST (describe-stream returns ResourceNotFoundException). The source stream MUST exist and be ACTIVE before the application can read records. Create the stream or correct the stream name.\n  [✓]      Destination — Kinesis Data Stream etl-out\nVERIFICATION_COMMANDS:\n  aws kinesis describe-stream --stream-name ingestion-events\n  aws kinesisanalyticsv2 describe-application --application-name etl-flink-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "etl-flink-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "source"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    }
+  ]
+}

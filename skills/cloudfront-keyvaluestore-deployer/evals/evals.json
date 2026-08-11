@@ -1,0 +1,177 @@
+{
+  "skill": "cloudfront-keyvaluestore-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the CloudFront KeyValueStore Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across KVS use cases (A/B testing with Functions integration, feature flags, IP allowlist, wrong runtime, over-size store). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "ab-testing-kvs-function",
+      "name": "A/B testing KVS with CloudFront Functions integration",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — KVS for A/B testing, cloudfront-js-2.0 function, KVS-function linkage, viewer-request event, eventual consistency acknowledged",
+      "prompt": "Create a CloudFront KeyValueStore named ab-testing-kvs for A/B testing. I need a CloudFront Function named ab-test-router that reads the KVS to route traffic between variant-a and variant-b based on a percentage stored in the KVS. The distribution is E1234567890ABC. I want to change the split without redeploying the function. Account ID: 123456789012. Tags: Environment=production, UseCase=ab-testing.",
+      "prompt_file": "prompts/ab-testing-kvs-function.md",
+      "baseline_file": "baselines/ab-testing-kvs-function.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KVS_DEPLOYMENT: ab-testing-kvs (arn:aws:cloudfront::123456789012:key-value-store/abc-123)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] KVS store: ab-testing-kvs — created\n  [✓] Store size: ~200 bytes / 1 MB\n  [✓] Key count: 4 keys\n  [✓] Key schema: kebab-case with ab- prefix\n  [✓] Use case: A/B testing\n  [✓] Function name: ab-test-router\n  [✓] Function runtime: cloudfront-js-2.0 (REQUIRED for KVS)\n  [✓] Function stage: LIVE (published)\n  [✓] KVS-function link: associated via --key-value-store-associations\n  [✓] Distribution: E1234567890ABC — viewer-request event\n  [✓] Write path: CLI (put-key for traffic-split changes)\n  [✓] etag handling: re-fetch before each write\n  [✓] Propagation: eventual consistency acknowledged\n  [✓] Tags: Environment=production, UseCase=ab-testing\nVERIFICATION_COMMANDS:\n  aws cloudfront-keyvaluestore describe-key-value-store --kvs-arn arn:aws:cloudfront::123456789012:key-value-store/abc-123\n  aws cloudfront-keyvaluestore list-keys --kvs-arn arn:aws:cloudfront::123456789012:key-value-store/abc-123\n  aws cloudfront describe-function --name ab-test-router\n  aws cloudfront get-distribution-config --id E1234567890ABC",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cloudfront-js-2.0",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "ab-testing-kvs",
+            "ab-test-router"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "feature-flags-kvs",
+      "name": "Feature flags KVS with edge-side toggle via put-key",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — KVS for feature flags, read-only function notes, toggle-via-put-key pattern, flat key-value schema",
+      "prompt": "I want to use CloudFront KeyValueStore to manage feature flags at the edge. I need flags for flag-new-checkout, flag-beta-api, and flag-maintenance-mode. Create a KVS named feature-flags-kvs and a CloudFront Function named flag-evaluator that reads these flags. Distribution E987654321DEF. Account ID: 123456789012.",
+      "prompt_file": "prompts/feature-flags-kvs.md",
+      "baseline_file": "baselines/feature-flags-kvs.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KVS_DEPLOYMENT: feature-flags-kvs (arn:aws:cloudfront::123456789012:key-value-store/def-456)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] KVS store: feature-flags-kvs — created\n  [✓] Store size: ~150 bytes / 1 MB\n  [✓] Key count: 3 keys\n  [✓] Key schema: flag- prefix, kebab-case\n  [✓] Use case: Feature flags\n  [✓] Function name: flag-evaluator\n  [✓] Function runtime: cloudfront-js-2.0 (REQUIRED for KVS)\n  [✓] Function stage: LIVE (published)\n  [✓] KVS-function link: associated\n  [✓] Distribution: E987654321DEF — viewer-request event\n  [✓] Write path: CLI (put-key for flag toggles)\n  [✓] etag handling: re-fetch before each write\n  [✓] Propagation: eventual consistency acknowledged\nVERIFICATION_COMMANDS:\n  aws cloudfront-keyvaluestore describe-key-value-store --kvs-arn arn:aws:cloudfront::123456789012:key-value-store/def-456\n  aws cloudfront-keyvaluestore list-keys --kvs-arn arn:aws:cloudfront::123456789012:key-value-store/def-456\n  aws cloudfront describe-function --name flag-evaluator\n  aws cloudfront get-distribution-config --id E987654321DEF",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "feature-flags-kvs",
+            "cloudfront-js-2.0",
+            "VERDICT",
+            "CHECKLIST",
+            "flag-new-checkout"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ip-allowlist-kvs",
+      "name": "IP blocklist KVS with CloudFront Function for edge-side 403",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — KVS for IP blocklist, function checks viewer.ip, 403 response, KVS-vs-WAF tradeoff noted",
+      "prompt": "Create a CloudFront KeyValueStore named ip-blocklist-kvs for blocking specific IPs at the edge. I need to block 192.168.1.10, 10.0.0.5, and 172.16.0.3. Create a CloudFront Function named ip-blocker that checks viewer IP against the KVS and returns 403 for blocked IPs. Distribution E456789012GHI. Account ID: 123456789012.",
+      "prompt_file": "prompts/ip-allowlist-kvs.md",
+      "baseline_file": "baselines/ip-allowlist-kvs.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KVS_DEPLOYMENT: ip-blocklist-kvs (arn:aws:cloudfront::123456789012:key-value-store/ghi-789)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] KVS store: ip-blocklist-kvs — created\n  [✓] Store size: ~100 bytes / 1 MB\n  [✓] Key count: 4 keys (blocklist-mode + 3 IPs)\n  [✓] Key schema: ip-block- prefix\n  [✓] Use case: IP blocklist\n  [✓] Function name: ip-blocker\n  [✓] Function runtime: cloudfront-js-2.0 (REQUIRED for KVS)\n  [✓] Function stage: LIVE (published)\n  [✓] KVS-function link: associated\n  [✓] Distribution: E456789012GHI — viewer-request event\n  [✓] Write path: CLI (put-key for IP changes)\n  [✓] etag handling: re-fetch before each write\n  [✓] Propagation: eventual consistency acknowledged (use WAF for instant IP blocking)\nVERIFICATION_COMMANDS:\n  aws cloudfront-keyvaluestore describe-key-value-store --kvs-arn arn:aws:cloudfront::123456789012:key-value-store/ghi-789\n  aws cloudfront-keyvaluestore list-keys --kvs-arn arn:aws:cloudfront::123456789012:key-value-store/ghi-789\n  aws cloudfront describe-function --name ip-blocker\n  aws cloudfront get-distribution-config --id E456789012GHI",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ip-blocklist-kvs",
+            "cloudfront-js-2.0",
+            "VERDICT",
+            "CHECKLIST",
+            "403"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wrong-runtime-js-1",
+      "name": "Operator uses cloudfront-js-1.0 runtime (no KVS support)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — function created with cloudfront-js-1.0 which does not support cf.openKvs(); must update to cloudfront-js-2.0",
+      "prompt": "I have a CloudFront Function named edge-router that I created with the cloudfront-js-1.0 runtime. I want to read from a KeyValueStore inside it using cf.openKvs(). The KVS is named config-kvs. It's attached to distribution E111111111AAA. Account ID: 123456789012.",
+      "prompt_file": "prompts/wrong-runtime-js-1.md",
+      "baseline_file": "baselines/wrong-runtime-js-1.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "KVS_DEPLOYMENT: config-kvs\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Function runtime: edge-router is cloudfront-js-1.0 — cf.openKvs() does NOT exist in this runtime. Update the function to cloudfront-js-2.0 and republish.\n  [✗] Function stage: Must be LIVE after runtime update. Verify with publish-function.\n  [✗] KVS-function link: Must associate config-kvs with edge-router via --key-value-store-associations during the update.\nVERIFICATION_COMMANDS:\n  aws cloudfront describe-function --name edge-router --query 'FunctionSummary.FunctionConfig.Runtime'\n  aws cloudfront-keyvaluestore describe-key-value-store --kvs-arn <config-kvs-arn>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "cloudfront-js-2.0",
+            "VERDICT",
+            "CHECKLIST",
+            "cloudfront-js-1.0"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kvs-size-limit-exceeded",
+      "name": "Operator wants 8000 IPs in KVS (exceeds 1 MB limit)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — 8000 IPs at ~50 bytes each = ~400 KB keys + ~50 bytes each value = ~520 KB, but function iteration over 8000 keys exceeds function execution limits; also approaches store size; recommend WAF IP sets",
+      "prompt": "I want to store a blocklist of 8000 IP addresses in a CloudFront KeyValueStore. Each IP is about 20 characters. I need the function to check each incoming request against all 8000 entries. Create a KVS named big-blocklist-kvs. Account ID: 123456789012.",
+      "prompt_file": "prompts/kvs-size-limit-exceeded.md",
+      "baseline_file": "baselines/kvs-size-limit-exceeded.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "KVS_DEPLOYMENT: big-blocklist-kvs\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Store size: 8000 entries × ~50 bytes each = ~400 KB — within 1 MB, BUT iterating 8000 keys per request exceeds the 1 ms function execution limit. Use AWS WAF IP sets for large IP lists (native CIDR support, instant propagation, 10000+ entries).\n  [✗] Function execution time: CloudFront Functions have a 1 ms max execution time. Iterating 8000 KVS keys per request is not feasible. Use exact-match key lookups (kvs.get) for small lists only.\n  [✗] Alternative: AWS WAF IP sets handle 10000+ entries with native CIDR matching and near-instant propagation. Recommended for this use case.\nVERIFICATION_COMMANDS:\n  aws wafv2 list-ip-sets --scope CLOUDFRONT\n  aws cloudfront-keyvaluestore describe-key-value-store --kvs-arn <arn>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "1 MB",
+            "VERDICT",
+            "CHECKLIST",
+            "big-blocklist-kvs"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

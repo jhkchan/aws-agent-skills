@@ -1,0 +1,150 @@
+# Eval test cases for vpc-peering-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across peering topologies
+# (same-account same-region with DNS resolution and SG cross-ref,
+# cross-account same-region with CIDR-based SG rules, inter-region
+# peering, IPv6 peering, missing CIDR overlap check).
+skill: vpc-peering-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: same-account-same-region-dns
+    description: >-
+      Provision a same-account, same-region VPC peering connection with
+      DNS resolution enabled and security group cross-VPC references.
+      Expects READY_TO_DEPLOY with both-sides route tables, DNS
+      resolution flag on both sides, and SG cross-reference noted.
+    input: |
+      Create a VPC peering connection between VPC vpc-aaa11122
+      (10.0.0.0/16) and VPC vpc-bbb22233 (10.1.0.0/16) in us-east-1.
+      Same account 123456789012. Enable DNS resolution across the
+      peered VPCs. Requester route table rtb-app111. Accepter route
+      table rtb-data222. Security group sg-app should reference sg-data
+      from the accepter VPC for port 443. Tags: Environment=production,
+      Topology=app-to-data.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "vpc-aaa11122"
+        - "vpc-bbb22233"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "AllowDnsResolutionFromPeeredVpc"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-same-region
+    description: >-
+      Provision a cross-account VPC peering connection within the same
+      region. Expects READY_TO_DEPLOY with cross-account acceptance step
+      noted and CIDR-based security group rules (SG cross-references not
+      supported cross-account).
+    input: |
+      Create a VPC peering connection between VPC vpc-prod111
+      (10.0.0.0/16) in account 123456789012 and VPC vpc-dev222
+      (10.2.0.0/16) in account 999999999999. Same region us-east-1.
+      Requester route table rtb-prod-rt. Accepter route table rtb-dev-rt.
+      No DNS resolution needed. Security group rules should use CIDR
+      (cross-account). Tags: Environment=prod-to-dev.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-account"
+        - "999999999999"
+        - "123456789012"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: inter-region-peering
+    description: >-
+      Provision an inter-region VPC peering connection. Expects
+      READY_TO_DEPLOY with inter-region noted, peer-region specified,
+      and cross-region data transfer cost implication flagged.
+    input: |
+      Create a VPC peering connection between VPC vpc-useast111
+      (172.16.0.0/16) in us-east-1 account 123456789012 and VPC
+      vpc-uswest222 (172.17.0.0/16) in us-west-2 account 123456789012.
+      This is for cross-region DR replication. Enable DNS resolution.
+      Requester route table rtb-useast-rt. Accepter route table
+      rtb-uswest-rt. Tags: Environment=dr, Topology=useast-to-uswest.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "inter-region"
+        - "us-west-2"
+        - "us-east-1"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ipv6-peering
+    description: >-
+      Provision a VPC peering connection with IPv6 routing support.
+      Expects READY_TO_DEPLOY with IPv6 routes noted on both sides in
+      addition to IPv4 routes.
+    input: |
+      Create a VPC peering connection between VPC vpc-app-v6
+      (10.10.0.0/16, IPv6 2600:1f18:4113:a100::/56) and VPC vpc-data-v6
+      (10.11.0.0/16, IPv6 2600:1f18:4113:b200::/56) in us-east-1, account
+      123456789012. Both IPv4 and IPv6 traffic needed. Requester route
+      table rtb-app-v6. Accepter route table rtb-data-v6. Tags:
+      Environment=production, Protocol=dualstack.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "IPv6"
+        - "2600:1f18:4113:a100::/56"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-cidr-overlap-check
+    description: >-
+      Operator requests a VPC peering connection between two VPCs but
+      the CIDR blocks overlap. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the CIDR overlap cited.
+    input: |
+      Create a VPC peering connection between VPC vpc-alpha
+      (10.0.0.0/16) and VPC vpc-beta (10.0.0.0/16) in us-east-1. Both
+      in account 123456789012. The VPCs use the same CIDR block. Route
+      tables rtb-alpha and rtb-beta.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "overlap"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "10.0.0.0/16"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

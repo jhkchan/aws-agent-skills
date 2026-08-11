@@ -1,0 +1,179 @@
+# Eval test cases for kinesis-analytics-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across application creation (Flink/SQL/Zeppelin runtime),
+# source configuration (Kinesis Data Stream, Firehose), destination
+# configuration (Kinesis Data Stream, Firehose, S3), checkpointing,
+# parallelism and KPU tuning, CloudWatch logging, application snapshots,
+# Studio notebooks with Zeppelin, session window SQL patterns, and
+# prerequisite failure branches (missing execution role, missing source
+# stream).
+skill: kinesis-analytics-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: flink-production-streaming
+    description: >-
+      Deploy a production Managed Service for Apache Flink application
+      with checkpointing (60s interval), parallelism (4, matching the
+      4-shard source stream), service execution role scoped for
+      Kinesis read/write, CloudWatch logging, application snapshots,
+      and S3-pinned application code. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a production Kinesis Data Analytics Flink application
+      named "fraud-detection-flink" in us-east-1. Runtime environment
+      FLINK-1_19. Service execution role KDAExecutionRole with
+      Kinesis GetRecords/GetShardIterator on stream transactions,
+      Kinesis PutRecord/PutRecords on stream alerts, S3 GetObject on
+      s3://kda-apps/fraud-detection-1.0.0.jar, CloudWatch Logs on
+      /aws/kinesis-analytics/fraud-detection-flink. Source: Kinesis
+      Data Stream transactions (4 shards, ACTIVE), starting position
+      LATEST. Destination: Kinesis Data Stream alerts. Checkpointing:
+      interval 60000 ms, min pause 5000 ms. Parallelism: 4,
+      parallelismPerKPU 1. Application snapshots enabled. Auto-scaling
+      off. CloudWatch log group /aws/kinesis-analytics/fraud-detection-flink.
+      Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "fraud-detection-flink"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "execution role"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: sql-session-windows
+    description: >-
+      Deploy a production KDA SQL application with session window
+      analytics (SESSION() function, 60-second inactivity gap),
+      Kinesis source, Kinesis destination, and CloudWatch logging.
+      Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a production Kinesis Data Analytics SQL application
+      named "session-windows-sql" in us-east-1. Runtime environment
+      SQL-1_0. Service execution role KDAExecutionRole with Kinesis
+      GetRecords on stream clicks, Kinesis PutRecord on stream
+      sessions-out, CloudWatch Logs on
+      /aws/kinesis-analytics/session-windows-sql. Source: Kinesis Data
+      Stream clicks (ACTIVE), JSON record format, columns event_time
+      (TIMESTAMP), user_id (VARCHAR(64)), event_type (VARCHAR(32)).
+      Starting position NOW. Destination: Kinesis Data Stream
+      sessions-out. Application code: session window pump using
+      SESSION(event_time, INTERVAL '60' SECONDS) grouping by user_id
+      with COUNT(*) aggregate. CloudWatch log group
+      /aws/kinesis-analytics/session-windows-sql. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "session-windows-sql"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "SQL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-execution-role
+    description: >-
+      Deploy a KDA Flink application but no service execution role is
+      provided (the operator forgot to create the IAM role). Expects
+      PREREQUISITES_MISSING — execution role required for runtime AWS
+      API calls.
+    input: |
+      Deploy a Kinesis Data Analytics Flink application named
+      "report-flink-prod" in us-east-1. Runtime environment
+      FLINK-1_19. Service execution role: NONE PROVIDED (the operator
+      forgot to create the IAM role). Source: Kinesis Data Stream
+      events (ACTIVE). Destination: Kinesis Data Stream report-out.
+      Checkpointing: interval 60000 ms. Parallelism: 2. Application
+      code s3://kda-apps/report-1.0.0.jar. CloudWatch log group
+      /aws/kinesis-analytics/report-flink-prod. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "report-flink-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "execution role"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: studio-notebook-zeppelin
+    description: >-
+      Deploy a KDA Studio notebook with Apache Zeppelin runtime for
+      interactive streaming analysis connected to a Kinesis Data
+      Stream, with Glue Data Catalog integration. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Deploy a Kinesis Data Analytics Studio notebook named
+      "fraud-explore-notebook" in us-east-1. Runtime environment
+      ZEPPELIN-FLINK-1_0. Service execution role KDAExecutionRole
+      with Kinesis GetRecords on stream transactions, S3 GetObject
+      on s3://kda-apps/custom-udf-1.0.0.jar, CloudWatch Logs on
+      /aws/kinesis-analytics/fraud-explore-notebook. Source: Kinesis
+      Data Stream transactions (ACTIVE). Glue Data Catalog
+      integration with database default. Deploy-as-application
+      enabled (notebook can be promoted to a STREAMING application).
+      Log level INFO. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "fraud-explore-notebook"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Zeppelin"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-source-stream
+    description: >-
+      Deploy a KDA Flink application but the source Kinesis Data
+      Stream does not exist (the operator referenced a stream name
+      that was never created). Expects PREREQUISITES_MISSING — source
+      stream required for the application to read records.
+    input: |
+      Deploy a Kinesis Data Analytics Flink application named
+      "etl-flink-prod" in us-east-1. Runtime environment FLINK-1_19.
+      Service execution role KDAExecutionRole with Kinesis
+      GetRecords on stream ingestion-events, S3 GetObject on
+      s3://kda-apps/etl-1.0.0.jar, CloudWatch Logs. Source: Kinesis
+      Data Stream ingestion-events — DOES NOT EXIST (the operator
+      referenced a stream name that was never created; describe-stream
+      returns ResourceNotFoundException). Destination: Kinesis Data
+      Stream etl-out. Checkpointing: interval 60000 ms. Parallelism:
+      4. Application code s3://kda-apps/etl-1.0.0.jar. Account:
+      123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "etl-flink-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "source"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"

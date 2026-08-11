@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "bedrock-guardrail-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Bedrock Guardrail Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "full-guardrail-applied-ready",
+      "name": "Full guardrail with all filters configured, KMS, and applied to a Bedrock Agent — all dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/full-guardrail-applied-ready.md",
+      "baseline_file": "baselines/full-guardrail-applied-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "full-guardrail-applied-ready", "VERDICT", "CHECKLIST", "VERIFICATION_COMMANDS", "create-guardrail", "BLOCK"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "unapplied-guardrail-missing",
+      "name": "Comprehensive guardrail never applied to any model or Agent — guardrail is inert (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/unapplied-guardrail-missing.md",
+      "baseline_file": "baselines/unapplied-guardrail-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "unapplied-guardrail-missing", "VERDICT", "applied"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "pii-audit-instead-of-block-missing",
+      "name": "All PII entities set to AUDIT for a GDPR compliance workload — PII leaks in responses (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/pii-audit-instead-of-block-missing.md",
+      "baseline_file": "baselines/pii-audit-instead-of-block-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "pii-audit-instead-of-block-missing", "VERDICT", "BLOCK"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "cross-region-guardrail-ready",
+      "name": "Cross-region guardrail across 3 regions with identical configs and per-region Agent application — all pass",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cross-region-guardrail-ready.md",
+      "baseline_file": "baselines/cross-region-guardrail-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "cross-region-guardrail-ready", "VERDICT", "CHECKLIST", "VERIFICATION_COMMANDS", "eu-west-1", "ap-southeast-2"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "severity-none-all-categories-missing",
+      "name": "All content filter categories set to NONE — guardrail appears configured but filters nothing (PREREQUISITES_MISSING)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/severity-none-all-categories-missing.md",
+      "baseline_file": "baselines/severity-none-all-categories-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "severity-none-all-categories-missing", "VERDICT", "NONE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}
