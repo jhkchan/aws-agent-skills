@@ -1,0 +1,43 @@
+# Eval configuration for transit-gateway-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: transit-gateway-deployer
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: single-region-hub-spoke
+    difficulty: easy
+    prompt_file: prompts/single-region-hub-spoke.md
+    baseline_file: baselines/single-region-hub-spoke.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: inter-region-peering-pending-accept
+    difficulty: medium
+    prompt_file: prompts/inter-region-peering-pending-accept.md
+    baseline_file: baselines/inter-region-peering-pending-accept.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: cross-account-ram-share-not-accepted
+    difficulty: medium
+    prompt_file: prompts/cross-account-ram-share-not-accepted.md
+    baseline_file: baselines/cross-account-ram-share-not-accepted.md
+    expected_verdict: PREREQUISITES_MISSING
+  - id: connect-sdwan-gre-bgp
+    difficulty: hard
+    prompt_file: prompts/connect-sdwan-gre-bgp.md
+    baseline_file: baselines/connect-sdwan-gre-bgp.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: cloud-wan-integration-migration
+    difficulty: hard
+    prompt_file: prompts/cloud-wan-integration-migration.md
+    baseline_file: baselines/cloud-wan-integration-migration.md
+    expected_verdict: READY_TO_DEPLOY

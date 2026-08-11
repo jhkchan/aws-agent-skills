@@ -1,0 +1,183 @@
+# Eval test cases for transit-gateway-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: transit-gateway-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: single-region-hub-spoke
+    description: >-
+      Standard single-region hub-and-spoke TGW with three VPC
+      attachments (app1, app2, shared), default route table with
+      auto-association and auto-propagation. Validates basic
+      topology creation and route table wiring.
+    input: |
+      Design a deployment plan for an AWS Transit Gateway. Emit the
+      standard VERDICT block (TGW_SPEC, VERDICT, ARCHITECTURE,
+      CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - TGW name: prod-tgw-us-east-1, ASN 64512
+      - DNS support: enabled
+      - Multicast: disabled
+      - AutoAcceptSharedAttachments: disable
+      - DefaultRouteTableAssociation: enable
+      - DefaultRouteTablePropagation: enable
+      - VPC attachment 1: vpc-0app1, subnets subnet-0a1/subnet-0b1/subnet-0c1 (all available, us-east-1a/b/c)
+      - VPC attachment 2: vpc-0app2, subnets subnet-0a2/subnet-0b2/subnet-0c2 (all available, us-east-1a/b/c)
+      - VPC attachment 3: vpc-shared, subnets subnet-0a3/subnet-0b3/subnet-0c3 (all available, us-east-1a/b/c)
+      - All VPCs should route to each other (single-tier flat topology)
+      - No peering, no Connect, no multicast, no RAM share
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-tgw-us-east-1"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "64512"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: inter-region-peering-pending-accept
+    description: >-
+      Inter-region TGW peering topology where the peer-region TGW
+      has NOT yet accepted the peering request. The peer-region TGW
+      exists in the peer account and is ACTIVE, but the peering is
+      in pendingAcceptance state. Topology should still be
+      READY_TO_DEPLOY since acceptance is the peer owner's
+      responsibility (documented as a POST_VERIFY step).
+    input: |
+      Design a deployment plan for an inter-region Transit Gateway
+      topology with peering. Emit the standard VERDICT block.
+
+      Requirements:
+      - Source TGW: prod-tgw-us-east-1 (ASN 64512, us-east-1, ACTIVE)
+      - Peer TGW: prod-tgw-eu-west-1 (ASN 64513, eu-west-1, ACTIVE, account 111111111111)
+      - VPC attachment in us-east-1: vpc-0app1 (subnets in us-east-1a/b/c)
+      - VPC attachment in eu-west-1: vpc-0app1-eu (subnets in eu-west-1a/b/c)
+      - Route tables: default route table in each TGW with auto-association + auto-propagation
+      - Peering between the two TGWs (request from us-east-1)
+      - Existing state: peering request was created and is in
+        pendingAcceptance state; peer owner has not yet accepted
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VERDICT"
+        - "peering"
+        - "pendingAcceptance"
+        - "eu-west-1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-ram-share-not-accepted
+    description: >-
+      Cross-account TGW topology where the RAM share is in PENDING
+      state (consumer has not accepted). Consumer cannot create the
+      VPC attachment until the share is ACTIVE. Must emit
+      PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a cross-account Transit Gateway
+      topology. Emit the standard VERDICT block.
+
+      Requirements:
+      - TGW owner: account 111111111111, TGW prod-tgw-shared (ASN 64512, us-east-1)
+      - Consumer: account 222222222222 with VPC vpc-0consumer (subnets subnet-0c1/subnet-0c2/subnet-0c3)
+      - AutoAcceptSharedAttachments: disable
+      - Existing state: aws ram get-resource-shares returns the
+        share in state PENDING — the consumer account has NOT yet
+        accepted the share
+      - The consumer expects to create the VPC attachment today
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "RAM"
+        - "222222222222"
+        - "ACTIVE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: connect-sdwan-gre-bgp
+    description: >-
+      TGW with a Connect attachment backed by a VPC transport
+      attachment. Connect peer terminates GRE on a Cisco SD-WAN
+      controller with BGP. Validates Connect attachment + peer
+      creation, the dual-layer model, and the "not a VPN replacement"
+      constraint.
+    input: |
+      Design a deployment plan for a Transit Gateway with a Connect
+      attachment for SD-WAN. Emit the standard VERDICT block.
+
+      Requirements:
+      - TGW: prod-tgw-us-east-1 (ASN 64512, us-east-1, ACTIVE)
+      - Transport attachment: VPC attachment to vpc-0sdwan-transit (subnets subnet-0a1/subnet-0b1/subnet-0c1, us-east-1a/b/c)
+      - Connect attachment: Protocol=GRE, on top of the transport attachment
+      - Connect peer: PeerAddress=10.0.1.10 (private IP of the Cisco SD-WAN controller in vpc-0sdwan-transit), PeerAsn=65000, InsideCidr=169.254.0.0/29
+      - BGP authentication: enabled (MD5 key configured)
+      - Route table: default route table; Connect attachment propagates its BGP-learned routes
+      - The SD-WAN controller handles encryption (DMVPN/IPsec); Connect is just GRE transport
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VERDICT"
+        - "Connect"
+        - "GRE"
+        - "65000"
+        - "BGP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cloud-wan-integration-migration
+    description: >-
+      Existing multi-region TGW topology (us-east-1 + eu-west-1)
+      being attached to a Cloud WAN core network for policy-driven
+      segmentation. Validates the non-disruptive attach and the
+      segment policy model.
+    input: |
+      Design a deployment plan for attaching two existing Transit
+      Gateways to an AWS Cloud WAN core network. Emit the standard
+      VERDICT block.
+
+      Requirements:
+      - Existing TGW 1: prod-tgw-us-east-1 (ASN 64512, us-east-1, ACTIVE, 3 VPC attachments, default route table)
+      - Existing TGW 2: prod-tgw-eu-west-1 (ASN 64513, eu-west-1, ACTIVE, 2 VPC attachments, default route table)
+      - Global network: global-network-0abc (exists)
+      - Core network: core-network-0abc (exists, created from the global network)
+      - Core network policy defines two segments: prod, non-prod
+      - Attach both TGWs to the core network as TRANSIT_GATEWAY attachments
+      - Migration is non-disruptive: existing TGW route tables
+        remain until the operator re-associates attachments to
+        Cloud WAN-managed route tables
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VERDICT"
+        - "Cloud WAN"
+        - "core-network"
+        - "segment"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "transit-gateway-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Transit Gateway Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "single-region-hub-spoke",
+      "name": "Standard single-region hub-and-spoke TGW with three VPC attachments and default route table",
+      "difficulty": "easy",
+      "prompt_file": "prompts/single-region-hub-spoke.md",
+      "baseline_file": "baselines/single-region-hub-spoke.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "prod-tgw-us-east-1", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "64512"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "inter-region-peering-pending-accept",
+      "name": "Inter-region TGW peering where peer-region acceptance is pending — READY_TO_DEPLOY with POST_VERIFY reminder",
+      "difficulty": "medium",
+      "prompt_file": "prompts/inter-region-peering-pending-accept.md",
+      "baseline_file": "baselines/inter-region-peering-pending-accept.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "VERDICT", "peering", "pendingAcceptance", "eu-west-1"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-ram-share-not-accepted",
+      "name": "Cross-account TGW with RAM share in PENDING state — consumer cannot create attachment, hard blocker",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cross-account-ram-share-not-accepted.md",
+      "baseline_file": "baselines/cross-account-ram-share-not-accepted.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "VERDICT", "RAM", "222222222222", "ACTIVE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "connect-sdwan-gre-bgp",
+      "name": "TGW Connect attachment with GRE tunnels and BGP for SD-WAN — exercises the dual-layer Connect model",
+      "difficulty": "hard",
+      "prompt_file": "prompts/connect-sdwan-gre-bgp.md",
+      "baseline_file": "baselines/connect-sdwan-gre-bgp.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "VERDICT", "Connect", "GRE", "65000", "BGP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "cloud-wan-integration-migration",
+      "name": "Existing multi-region TGW topology attached to Cloud WAN core network for policy-driven segmentation",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cloud-wan-integration-migration.md",
+      "baseline_file": "baselines/cloud-wan-integration-migration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "VERDICT", "Cloud WAN", "core-network", "segment"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    }
+  ]
+}
