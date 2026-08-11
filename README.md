@@ -368,6 +368,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | sts-cross-account-role-auditor | amazon.nova-pro-v1:0 | 114/120 | A | 6/6 | 9.3s | 47639 |
 | tag-governance-automator | amazon.nova-pro-v1:0 | 109/120 | A | 2/5 | 16.5s | 54948 |
 | transfer-family-deployer | amazon.nova-pro-v1:0 | 106/120 | B | 5/5 | 14.4s | 47131 |
+| transit-gateway-deployer | amazon.nova-pro-v1:0 | 97/120 | B | 3/5 | 16.7s | 53864 |
 | trustedadvisor-check-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 16.1s | 40241 |
 | verified-permissions-policy-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 10.6s | 40262 |
 | vpc-connectivity-troubleshooter | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 39.9s | 71520 |
