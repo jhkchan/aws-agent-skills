@@ -272,60 +272,49 @@ These behaviors are easy to misjudge without operational DMS experience.
 Each changes a diagnosis if ignored:
 
 - **`LastFailureMessage` is the starting point, not the root cause.**
-  The task's `LastFailureMessage` is a high-level signal (e.g., "Last
-  error instance: Task 'TASK001' was suspended"). The actual error is
-  in the task's CloudWatch Logs under the timestamp near the failure.
-  Always pull task logs (`aws logs filter-log-events --log-group-name
-  dms-task-<id>`) before diagnosing — the logs contain the engine-
-  specific error (binlog disabled, constraint name, column type, LOB
-  size) that the `LastFailureMessage` omits.
+  The task's `LastFailureMessage` is a high-level signal ("Task was
+  suspended"). The actual error is in CloudWatch Logs near the failure
+  timestamp. Always pull task logs (`aws logs filter-log-events`) before
+  diagnosing — the logs contain the engine-specific error that
+  `LastFailureMessage` omits.
 
-- **RDS MySQL binlog retention defaults to 0 hours.** This means DMS
-  cannot read changes older than the current binlog. If the DMS task
-  restarts or falls behind, the binlog may have been purged and the
-  task cannot recover. Set `binlog_retention` via the RDS parameter
-  group (e.g., `binlog_retention_hours=24`) before starting a CDC task.
-  This is the #1 silent CDC stall on RDS MySQL sources.
+- **RDS MySQL binlog retention defaults to 0 hours.** DMS cannot read
+  changes older than the current binlog. If the task restarts or falls
+  behind, the binlog may be purged and unrecoverable. Set
+  `binlog_retention_hours=24` via the RDS parameter group BEFORE
+  starting a CDC task. This is the #1 silent CDC stall on RDS MySQL.
 
 - **PostgreSQL source needs `wal_level=logical` BEFORE the task starts.**
-  Changing `wal_level` requires an RDS/PostgreSQL reboot. If the task
-  is started with `wal_level=replica`, logical replication fails
-  immediately with "logical decoding requires wal_level >= logical."
-  Always check the parameter group BEFORE starting a CDC task.
+  Changing `wal_level` requires an RDS reboot. Started with `replica`,
+  logical replication fails immediately with "logical decoding requires
+  wal_level >= logical." Check the parameter group BEFORE starting.
 
 - **The DMS user needs `EXECUTE on DBMS_LOGMNR` for Oracle, not just
-  SELECT.** Oracle LogMiner CDC requires the DMS user to have the
-  `LOGMINING` role (12c+) or explicit `EXECUTE on DBMS_LOGMNR` (11g).
-  Missing this produces "ORA-01331: LogMiner session does not exist"
-  in the task logs — a permissions error, not a binary-logging error.
+  SELECT.** Oracle LogMiner CDC requires the `LOGMINING` role (12c+) or
+  explicit `EXECUTE on DBMS_LOGMNR` (11g). Missing this produces
+  "ORA-01331: LogMiner session does not exist" — a permissions error,
+  not a binary-logging error.
 
 - **Table-mapping rules can silently exclude tables.** A `selection`
-  rule with `include` and a `filter` can exclude tables the operator
-  expects to migrate. `describe-table-statistics` shows the tables DMS
-  actually loaded — compare against the expected table list. A table
-  that "wasn't migrated" is almost always a table-mapping issue, not a
-  DMS bug.
+  rule with `filter` can exclude tables the operator expects to migrate.
+  `describe-table-statistics` shows what DMS actually loaded — compare
+  against the expected list. A "wasn't migrated" table is almost always
+  a table-mapping issue, not a DMS bug.
 
-- **LOB columns default to `LIMITED` mode (32KB) on DMS.** Oracle CLOB,
-  MySQL TEXT, and PostgreSQL TEXT columns larger than the `LobMaxSize`
-  (default 32KB) are truncated or cause the task to fail. For LOB-
-  heavy migrations, set `LobMaxSize=0` (unlimited, slower) or use
-  `InlineLob` mode. The failure shows in task logs as "LOB size exceeds
-  maximum."
+- **LOB columns default to `LIMITED` mode (32KB).** CLOB/TEXT/BLOB
+  columns larger than `LobMaxSize` (default 32KB) are truncated or fail.
+  For LOB-heavy migrations, set `LobMaxSize=0` (unlimited, slower) or
+  use `InlineLob`. Failure shows as "LOB size exceeds maximum."
 
 - **CDC latency is measured from the source, not the target.**
-  `CDCLatencySource` is the lag between the source's current time and
-  the last change DMS read from the source. `CDCLatencyTarget` is the
-  lag between the last change DMS read and the last change applied to
-  the target. High `CDCLatencySource` means the source can't keep up
-  (binlog/pglogical bottleneck); high `CDCLatencyTarget` means the
-  target can’t keep up (constraint checks, trigger overhead).
+  `CDCLatencySource` = lag between source's current time and last change
+  DMS read. `CDCLatencyTarget` = lag between last read and last applied.
+  High source = binlog/pglogical bottleneck; high target = constraint
+  checks/trigger overhead.
 
-- **The replication instance is shared across tasks.** A single DMS
-  instance runs multiple replication tasks. One task's heavy CDC load
-  can starve other tasks' memory and CPU. `FreeableMemory` near zero
-  and `SwapUsage` climbing on the instance indicates capacity
-  exhaustion, not a per-task issue.
+- **The replication instance is shared across tasks.** One task's heavy
+  CDC load can starve others. `FreeableMemory` near zero and `SwapUsage`
+  climbing indicates capacity exhaustion, not a per-task issue.
 
 ### Step 1: task-failed-at-start
 
@@ -680,26 +669,24 @@ CONFIRM: "About to upgrade <inst-id> dms.r5.large -> dms.r5.xlarge.
 
 - NEVER start a CDC task on a MySQL source without verifying
   `binlog_format=ROW` AND `binlog_retention_hours >= 24`. RDS MySQL
-  defaults to `binlog_retention_hours=0`, which causes binlogs to be
-  purged before DMS reads them. The task runs for hours then silently
-  stalls with no recoverable changes.
+  defaults to `binlog_retention_hours=0`, causing binlogs to be purged
+  before DMS reads them. The task runs for hours then silently stalls.
 
 - NEVER start a CDC task on a PostgreSQL source without verifying
-  `wal_level=logical`. Changing `wal_level` requires an RDS/PostgreSQL
-  reboot, so the task fails immediately if it's still `replica`. Check
-  the parameter group BEFORE starting the task.
+  `wal_level=logical`. Changing `wal_level` requires a reboot; the task
+  fails immediately if it's still `replica`. Check the parameter group
+  BEFORE starting the task.
 
 - NEVER assume the DMS task `Logging` setting is `DETAILED` by default.
-  The default is `ESSENTIAL` (minimal logging). Without `DETAILED`
-  logging, engine-specific errors are absent from CloudWatch Logs and
-  the diagnosis is impossible. Set `Logging` to `DETAILED` as the
-  first remediation step when logs are empty.
+  The default is `ESSENTIAL`. Without `DETAILED` logging, engine-
+  specific errors are absent from CloudWatch Logs and diagnosis is
+  impossible. Set `Logging` to `DETAILED` first when logs are empty.
 
 - NEVER assume a replication instance has capacity headroom. A single
   dms.r5.large (8GB RAM) running 3+ CDC tasks will exhaust memory and
   swap to disk. Always check `FreeableMemory`, `SwapUsage`, and
-  `CPUUtilization` before diagnosing per-task latency — the root cause
-  may be the instance, not the task.
+  `CPUUtilization` before per-task latency — the root cause may be the
+  instance, not the task.
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 

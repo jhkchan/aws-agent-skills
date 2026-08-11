@@ -1,0 +1,70 @@
+{
+  "skill": "neptune-db-cluster-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides several expert\u2011level details not usually known by a baseline model: immutable encryption at creation, exact buffer\u2011cache heuristic (60% of instance memory) with a concrete required\u2011memory formula, detailed configuration dependency graph, precise failover promotion timing (~30\u202fs) and data\u2011loss semantics, and a decision tree separating Neptune DB vs Neptune Analytics. Missing: cost\u2011impact discussion, explicit snapshot\u2011restore steps, and region\u2011specific limits, which prevents a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific provisioning workflow (subnet\u2011group \u2192 security\u2011group \u2192 parameter\u2011group \u2192 cluster \u2192 instances) with exact CLI commands and decision\u2011tree reasoning. The prerequisite verification steps are somewhat generic, preventing a full score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., immutable encryption, opening port 8182, single\u2011AZ subnet groups). Missing a few common pitfalls such as least\u2011privilege IAM role design and default backup\u2011retention omissions, so not maximal."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Front\u2011matter contains all required fields (name, description, version, triggers, keywords, metadata, when_to_use). The description clearly states WHAT the skill does, WHEN to invoke, and provides activation keywords and output contract. Fully compliant."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a quick\u2011navigation table and layered sections (mindset, heuristics, steps, NEVER list, output format). However the main body front\u2011loads many dense tables and heuristics, creating some cognitive overload before the agent reaches the actionable checklist."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates tightly for the fragile create\u2011cluster operation: prerequisite checks, immutable\u2011setting warnings, and strict output contract. Lacks explicit guardrails for later destructive actions (e.g., modify\u2011cluster or delete\u2011cluster) which would merit a perfect score."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable skill pattern (activation, contract, mindset, step\u2011by\u2011step process, NEVER list, output format, error handling). Minor ad\u2011hoc ordering of sections prevents a perfect rating."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides decision trees, concrete CLI snippets, a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling guidance, enabling an agent to act. Missing explicit guidance for handling partial user input and a few edge\u2011case branches (e.g., snapshot\u2011restore flow) reduces the score."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 46048,
+  "latency_ms": 15664,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

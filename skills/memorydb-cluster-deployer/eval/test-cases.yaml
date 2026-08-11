@@ -1,0 +1,159 @@
+# Eval test cases for memorydb-cluster-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across workload types
+# (production Multi-AZ, data-tiering cost-optimized, dev single-shard,
+#  boundary redirect to ElastiCache, missing prerequisites).
+skill: memorydb-cluster-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: production-multiaz-durable
+    description: >-
+      Provision a production MemoryDB cluster with 3 shards x 1
+      replica each for Multi-AZ failover, TLS (on by default), named
+      ACL (not open-access), snapshots, customer CMK. Expects
+      READY_TO_DEPLOY with all checklist items verified.
+    input: |
+      Provision a production Amazon MemoryDB for Redis cluster named
+      "prod-memorydb" in us-east-1. This is a durable in-memory
+      database — the data MUST survive node failure. Use 3 shards
+      with 1 replica per shard for Multi-AZ failover. db.r6g.24xlarge
+      nodes. Engine version 7.0. Customer-managed CMK
+      alias/prod-memorydb-kms. TLS should be on (default). Create a
+      named ACL "prod-acl" with users app-rw (read-write) and
+      analytics-ro (read-only). Snapshots: 7-day retention, window
+      03:00-05:00 UTC. Maintenance window sun:05:00-sun:07:00.
+      Subnet group prod-memorydb-subnet spans 3 AZs. Security group
+      sg-memorydb123 inbound 6379 from sg-app456. Tags:
+      Environment=production, Workload=in-memory-db.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-memorydb"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "MemoryDB"
+        - "Multi-AZ"
+        - "db.r6g.24xlarge"
+        - "prod-acl"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: data-tiering-cost-optimized
+    description: >-
+      Provision a MemoryDB cluster with data tiering (db.r6gd family)
+      for a large dataset with a hot/cold access pattern. Expects
+      READY_TO_DEPLOY with data tiering cited as Enabled.
+    input: |
+      Provision a MemoryDB for Redis cluster named "analytics-db" in
+      us-east-1 for a 1.5 TB dataset with a 30/70 hot/cold access
+      split. Use db.r6gd.24xlarge nodes with data tiering enabled
+      (the cold set should go to SSD). 3 shards with 1 replica each
+      for Multi-AZ. Engine version 7.0. Named ACL "analytics-acl"
+      with user app-rw. Snapshots 7 days. Subnet group
+      analytics-subnet spans 3 AZs. Security group sg-analytics
+      inbound 6379 from sg-analytics-app. Tags: Environment=production,
+      Workload=analytics-tiered. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "analytics-db"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "db.r6gd.24xlarge"
+        - "Data tiering"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: dev-single-shard
+    description: >-
+      Provision a dev MemoryDB cluster with a single shard and no
+      replicas (no Multi-AZ, no failover). Expects READY_TO_DEPLOY
+      with explicit "NO failover" notation.
+    input: |
+      Provision a dev MemoryDB for Redis cluster named "dev-memorydb"
+      in us-east-1. Just a single shard with no replicas for
+      functional testing — no Multi-AZ, no failover needed. Use
+      db.r6g.large. Engine version 7.0. TLS on (default). Create a
+      simple ACL "dev-acl" with user dev-user (read-write). Snapshots
+      1 day. Subnet group dev-memorydb-subnet. Security group
+      sg-dev-memorydb inbound 6379 from sg-dev-app. Tags:
+      Environment=dev, Workload=dev-db. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "dev-memorydb"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "db.r6g.large"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: elasticache-redirect-boundary
+    description: >-
+      Operator asks for a disposable cache with cache-miss acceptable.
+      This is an ElastiCache workload, NOT MemoryDB. Expects the skill
+      to redirect — verdict PREREQUISITES_MISSING with the service
+      boundary cited.
+    input: |
+      I need a simple Redis cache in AWS. The data is disposable —
+      cache-miss is fine, we'll just recompute. Provision a MemoryDB
+      cluster named "app-cache" in us-east-1 with db.r6g.large nodes.
+      Account ID: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "app-cache"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-subnet-group-and-acl
+    description: >-
+      Operator requests a MemoryDB cluster but has not specified the
+      subnet group, security group, or a named ACL. Multi-AZ requires
+      a multi-AZ subnet group; MemoryDB requires a named ACL (not
+      open-access). Expects PREREQUISITES_MISSING with specific gaps
+      cited.
+    input: |
+      Help me create a new MemoryDB for Redis cluster called
+      "session-db" in us-east-1. I want Multi-AZ failover for
+      durability. We will store user session data. Region: us-east-1,
+      Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "session-db"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

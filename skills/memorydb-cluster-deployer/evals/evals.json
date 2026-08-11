@@ -1,0 +1,176 @@
+{
+  "skill": "memorydb-cluster-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the MemoryDB Cluster Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across workload types (production Multi-AZ durable, data-tiering cost-optimized, dev single-shard, ElastiCache boundary redirect, missing prerequisites). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-multiaz-durable",
+      "name": "Production MemoryDB Multi-AZ with TLS + named ACL + CMK + snapshots",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — all checklist items verified, Multi-AZ shard-level failover + TLS (on by default) + named ACL (not open-access) + customer CMK + snapshots",
+      "prompt": "Provision a production Amazon MemoryDB for Redis cluster named \"prod-memorydb\" in us-east-1. This is a durable in-memory database — the data MUST survive node failure. Use 3 shards with 1 replica per shard for Multi-AZ failover. db.r6g.24xlarge nodes. Engine version 7.0. Customer-managed CMK alias/prod-memorydb-kms. TLS should be on (default). Create a named ACL \"prod-acl\" with users app-rw (read-write) and analytics-ro (read-only). Snapshots: 7-day retention, window 03:00-05:00 UTC. Maintenance window sun:05:00-sun:07:00. Subnet group prod-memorydb-subnet spans 3 AZs. Security group sg-memorydb123 inbound 6379 from sg-app456. Tags: Environment=production, Workload=in-memory-db. Account ID: 123456789012.",
+      "prompt_file": "prompts/production-multiaz-durable.md",
+      "baseline_file": "baselines/production-multiaz-durable.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MEMORYDB: prod-memorydb\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Service: MemoryDB (durable in-memory database, NOT ElastiCache cache)\n  [✓] Engine version: 7.0\n  [✓] Node type: db.r6g.24xlarge (612.30 GiB nominal; 306.15 GiB usable per shard)\n  [✓] Shard count: 3 (918.45 GiB total usable)\n  [✓] Replicas per shard: 1 (Multi-AZ failover)\n  [✓] Multi-AZ with shard-level failover: Enabled\n  [✓] Subnet group: prod-memorydb-subnet (spans 3 AZs)\n  [✓] Security group: sg-memorydb123 (inbound port 6379 from sg-app456)\n  [✓] TLS at rest: Enabled (customer CMK alias/prod-memorydb-kms)\n  [✓] TLS in transit: Enabled\n  [✓] ACL: prod-acl (users: app-rw, analytics-ro; NOT open-access)\n  [✓] Snapshot retention: 7 days (window: 03:00-05:00 UTC)\n  [✓] Maintenance window: sun:05:00-sun:07:00\nVERIFICATION_COMMANDS:\n  aws memorydb describe-clusters --cluster-name prod-memorydb --show-shard-node-info\n  aws memorydb describe-acls --acl-name prod-acl\n  aws kms describe-key --key-id alias/prod-memorydb-kms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-memorydb",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "MemoryDB",
+            "Multi-AZ",
+            "db.r6g.24xlarge",
+            "prod-acl"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data-tiering-cost-optimized",
+      "name": "MemoryDB with data tiering (db.r6gd) for large hot/cold dataset",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — data tiering enabled at creation (one-way door) with db.r6gd.24xlarge; Multi-AZ; named ACL",
+      "prompt": "Provision a MemoryDB for Redis cluster named \"analytics-db\" in us-east-1 for a 1.5 TB dataset with a 30/70 hot/cold access split. Use db.r6gd.24xlarge nodes with data tiering enabled (the cold set should go to SSD). 3 shards with 1 replica each for Multi-AZ. Engine version 7.0. Named ACL \"analytics-acl\" with user app-rw. Snapshots 7 days. Subnet group analytics-subnet spans 3 AZs. Security group sg-analytics inbound 6379 from sg-analytics-app. Tags: Environment=production, Workload=analytics-tiered. Account ID: 123456789012.",
+      "prompt_file": "prompts/data-tiering-cost-optimized.md",
+      "baseline_file": "baselines/data-tiering-cost-optimized.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MEMORYDB: analytics-db\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Service: MemoryDB (durable in-memory database, NOT ElastiCache cache)\n  [✓] Engine version: 7.0\n  [✓] Node type: db.r6gd.24xlarge (612.30 GiB nominal; 306.15 GiB usable per shard in-memory)\n  [✓] Shard count: 3\n  [✓] Replicas per shard: 1 (Multi-AZ failover)\n  [✓] Multi-AZ with shard-level failover: Enabled\n  [✓] Subnet group: analytics-subnet (spans 3 AZs)\n  [✓] Security group: sg-analytics (inbound port 6379 from sg-analytics-app)\n  [✓] TLS at rest: Enabled (AWS-managed)\n  [✓] TLS in transit: Enabled\n  [✓] ACL: analytics-acl (users: app-rw; NOT open-access)\n  [✓] Snapshot retention: 7 days\n  [✓] Data tiering: Enabled (db.r6gd.24xlarge, ~1224 GiB SSD tier per node)\nVERIFICATION_COMMANDS:\n  aws memorydb describe-clusters --cluster-name analytics-db --show-shard-node-info\n  aws memorydb describe-acls --acl-name analytics-acl",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "analytics-db",
+            "VERDICT",
+            "CHECKLIST",
+            "db.r6gd.24xlarge",
+            "Data tiering"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dev-single-shard",
+      "name": "Dev MemoryDB single shard with no replicas (no failover)",
+      "difficulty": "easy",
+      "branch": "READY_TO_DEPLOY — dev cluster with single shard; explicit 'NO failover' notation; named ACL; TLS on",
+      "prompt": "Provision a dev MemoryDB for Redis cluster named \"dev-memorydb\" in us-east-1. Just a single shard with no replicas for functional testing — no Multi-AZ, no failover needed. Use db.r6g.large. Engine version 7.0. TLS on (default). Create a simple ACL \"dev-acl\" with user dev-user (read-write). Snapshots 1 day. Subnet group dev-memorydb-subnet. Security group sg-dev-memorydb inbound 6379 from sg-dev-app. Tags: Environment=dev, Workload=dev-db. Account ID: 123456789012.",
+      "prompt_file": "prompts/dev-single-shard.md",
+      "baseline_file": "baselines/dev-single-shard.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MEMORYDB: dev-memorydb\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Service: MemoryDB (durable in-memory database, NOT ElastiCache cache)\n  [✓] Engine version: 7.0\n  [✓] Node type: db.r6g.large\n  [✓] Shard count: 1\n  [✓] Replicas per shard: 0 (no Multi-AZ — NO failover)\n  [✓] Multi-AZ with shard-level failover: Disabled (single shard, no replicas — NO failover)\n  [✓] Subnet group: dev-memorydb-subnet\n  [✓] Security group: sg-dev-memorydb (inbound port 6379 from sg-dev-app)\n  [✓] TLS at rest: Enabled (AWS-managed)\n  [✓] TLS in transit: Enabled\n  [✓] ACL: dev-acl (users: dev-user; NOT open-access)\n  [✓] Snapshot retention: 1 day\nVERIFICATION_COMMANDS:\n  aws memorydb describe-clusters --cluster-name dev-memorydb",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "dev-memorydb",
+            "VERDICT",
+            "CHECKLIST",
+            "db.r6g.large"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "elasticache-redirect-boundary",
+      "name": "Operator requests disposable cache — redirect to ElastiCache",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — workload is a disposable cache (cache-miss acceptable); MemoryDB is the wrong service (durable database, higher cost); redirect to ElastiCache (use elasticache-cache-deployer)",
+      "prompt": "I need a simple Redis cache in AWS. The data is disposable — cache-miss is fine, we'll just recompute. Provision a MemoryDB cluster named \"app-cache\" in us-east-1 with db.r6g.large nodes. Account ID: 123456789012.",
+      "prompt_file": "prompts/elasticache-redirect-boundary.md",
+      "baseline_file": "baselines/elasticache-redirect-boundary.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "MEMORYDB: app-cache\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Service: workload is a disposable cache (cache-miss acceptable) — MemoryDB is a durable database (higher cost, transaction log overhead); redirect to ElastiCache (use elasticache-cache-deployer)\n  [✗] Durability overhead: MemoryDB's Multi-AZ transaction log is unnecessary for disposable cache data\nVERIFICATION_COMMANDS:\n  aws elasticache describe-replication-groups  # ElastiCache API (separate from aws memorydb)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "app-cache",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-subnet-group-and-acl",
+      "name": "Operator has not specified subnet group, security group, or named ACL",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — subnet group (Multi-AZ requires multi-AZ subnet group), security group (port 6379 inbound), and named ACL (MemoryDB requires an ACL; default open-access NOT for production) all unspecified",
+      "prompt": "Help me create a new MemoryDB for Redis cluster called \"session-db\" in us-east-1. I want Multi-AZ failover for durability. We will store user session data. Region: us-east-1, Account: 123456789012.",
+      "prompt_file": "prompts/missing-subnet-group-and-acl.md",
+      "baseline_file": "baselines/missing-subnet-group-and-acl.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "MEMORYDB: session-db\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Subnet group: NOT specified — Multi-AZ requires subnet group spanning >=2 AZs\n  [✗] Security group: NOT specified — MemoryDB needs inbound 6379 from application SG\n  [✗] ACL: NOT specified — MemoryDB requires a named ACL (the default open-access is NOT for production)\n  [✗] Node type / workload size: NOT specified — drives shard/replica sizing\nVERIFICATION_COMMANDS:\n  aws ec2 describe-subnets --query 'Subnets[*].AvailabilityZone' --output text\n  aws ec2 describe-security-groups --query 'SecurityGroups[*].[GroupId,GroupName]' --output text\n  aws memorydb describe-acls",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "session-db",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

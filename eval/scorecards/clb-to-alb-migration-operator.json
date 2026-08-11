@@ -1,0 +1,70 @@
+{
+  "skill": "clb-to-alb-migration-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many concrete mappings (e.g., ConnectionDraining \u2192 deregistration_delay, ProxyProtocol \u2192 X-Forwarded-For) and a full cutover plan, but most of the information is already documented in AWS guides; the skill does not introduce a novel decision tree or undocumented exception."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: ordered pre\u2011flight checks, mandatory CONFIRM gate, capture of pre\u2011state for audit, precise pagination handling, and step\u2011by\u2011step CLI sequences for each migration phase. Only a minor generic element (\u201ccheck security\u201d) prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons (proxy protocol, TCP listeners, deleting CLB, sticky\u2011cookie mismatch, direct DNS swap). Missing two common pitfalls: (a) cross\u2011zone off on CLB causing AZ\u2011specific overload after ALB migration, and (b) Route\u00a053 TTL caching beyond weighted cutover, which could delay rollback."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. Deducted 1 point because the \"when to invoke\" clause could be more explicit (e.g., a concise trigger rule rather than a paragraph) and the input schema lacks a formal JSON schema definition."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns) so readers can skim or dive deep. However, the initial sections are dense, placing a moderate amount of detail early and slightly reducing progressive disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom well: destructive actions are gated by CONFIRM and strict pre\u2011checks; planning steps are permissive. Minor gap: planning operation could benefit from an explicit \u201cdry\u2011run only\u201d mode flag."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (What, Quick navigation, Mindset, Pre\u2011flight, Process, Output contract, Anti\u2011patterns, Heuristics). Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a strict output contract, working CLI examples, error handling for malformed input, and verification steps. Missing detailed guidance for IAM\u2011uploaded certificate import and for IPv6/alb\u2011dualstack scenarios, which limits full practical coverage."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 46106,
+  "latency_ms": 13605,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}
