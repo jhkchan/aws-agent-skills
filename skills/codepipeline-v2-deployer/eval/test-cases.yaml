@@ -1,0 +1,204 @@
+# Eval test cases for codepipeline-v2-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: codepipeline-v2-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: codecommit-codebuild-cloudformation
+    description: >-
+      Standard V2 pipeline with CodeCommit source, CodeBuild build
+      exporting namespace variables (IMAGE_URI, IMAGE_TAG),
+      CloudFormation CREATE_REPLACE deploy in the same account,
+      event-driven trigger scoped to main and release/* branches,
+      path filter excluding docs. All checklist dimensions pass.
+    input: |
+      Design a deployment plan for a production CodePipeline V2.
+      Emit the standard VERDICT block (PIPELINE_SPEC, VERDICT,
+      ARCHITECTURE, CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Pipeline type: V2 (event-driven, no polling)
+      - Region: us-east-1
+      - Source: CodeCommit repository my-service, branch main
+      - Build: CodeBuild project my-service-build, exports IMAGE_URI
+        and IMAGE_TAG via buildspec exported-variables
+      - Deploy: CloudFormation CREATE_REPLACE on stack prod-my-service
+        in same account, template at BuildOutput::template.yaml
+      - Trigger: branch filter Includes=[main, "release/*"],
+        FilePaths Excludes=[docs/**, README.md]
+      - Namespace variables: IMAGE_URI flows from Build to Deploy
+        (used in ParameterOverrides)
+      - Artifact bucket: my-pipeline-artifacts with block-public-access,
+        KMS CMK encryption, versioning
+      - Pipeline role: scoped to the CodeCommit repo, CodeBuild project,
+        CloudFormation stack, KMS key, and S3 artifact bucket (no
+        wildcards)
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "codecommit-codebuild-cloudformation"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "V2"
+        - "trigger"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: manual-approval-flow
+    description: >-
+      V2 pipeline with manual approval gate between Build and Deploy
+      stages. Approval action has ExternalEntityLink (Change ticket)
+      and SNS notification. Demonstrates the approval action contract
+      and the "no enforced timeout" caveat.
+    input: |
+      Design a deployment plan for a V2 pipeline with a manual
+      approval gate. Emit the standard VERDICT block.
+
+      Requirements:
+      - Pipeline type: V2
+      - Region: us-east-1
+      - Source: CodeCommit my-service, branch main
+      - Build: CodeBuild my-service-build
+      - Approval stage between Build and Deploy:
+        - ExternalEntityLink: https://internal.example.com/CHG12345
+        - CustomData: "Approve to deploy to prod"
+        - SNS topic: arn:aws:sns:us-east-1:111111111111:prod-approval
+      - Deploy: CloudFormation CREATE_REPLACE on prod-my-service
+      - Trigger: branch filter main only
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "manual-approval-flow"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Approval"
+        - "ExternalEntityLink"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-deployment
+    description: >-
+      V2 pipeline deploying to a different (target) account via
+      CloudFormation. Requires KMS key policy granting the target
+      role kms:Decrypt, cross-account IAM role in target with trust
+      policy for the pipeline role, and S3 bucket policy granting
+      target role s3:GetObject. Demonstrates the cross-account
+      contract.
+    input: |
+      Design a deployment plan for a cross-account V2 pipeline.
+      Emit the standard VERDICT block.
+
+      Requirements:
+      - Pipeline type: V2
+      - Region: us-east-1
+      - Source account: 111111111111 (where the pipeline lives)
+      - Target account: 222222222222 (where CloudFormation deploys)
+      - Source: CodeCommit my-service, branch main
+      - Build: CodeBuild my-service-build in source account
+      - Deploy: CloudFormation CREATE_REPLACE on prod-my-service in
+        TARGET account 222222222222
+      - Cross-account role:
+        arn:aws:iam::222222222222:role/CrossAccountCFNExecution
+        (trust policy: pipeline role in 111111111111)
+      - KMS key: arn:aws:kms:us-east-1:111111111111:key/abc-123
+        (existing, key policy grants pipeline role AND target role)
+      - Artifact bucket: my-pipeline-artifacts (bucket policy grants
+        target role s3:GetObject)
+      - Trigger: branch main, paths src/**
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-account-deployment"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "KMS"
+        - "CrossAccountCFNExecution"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: github-codeconnections-ecs
+    description: >-
+      V2 pipeline with GitHub source via CodeConnections (connection
+      in us-east-1) and ECS deploy action using namespace variable
+      Image1=#{BuildVars.IMAGE_URI}. Demonstrates the CodeConnections
+      contract and the ECS deploy action.
+    input: |
+      Design a deployment plan for a V2 pipeline with GitHub source
+      and ECS deploy. Emit the standard VERDICT block.
+
+      Requirements:
+      - Pipeline type: V2
+      - Region: us-east-1
+      - Source: GitHub via CodeConnections
+        - ConnectionArn:
+          arn:aws:codeconnections:us-east-1:111111111111:connection/abc-123
+          (state: AVAILABLE)
+        - FullRepositoryId: my-org/my-service
+        - BranchName: main
+      - Build: CodeBuild my-service-build, exports IMAGE_URI
+      - Deploy: ECS, ClusterName=prod-cluster, ServiceName=my-service,
+        Image1=#{BuildVars.IMAGE_URI}
+      - Trigger: branch main, tags Includes=["deploy=prod"]
+      - ECS cluster, service, and task definition family exist
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "github-codeconnections-ecs"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "CodeConnections"
+        - "ECS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-source-config
+    description: >-
+      V2 pipeline spec without a source action. Cannot produce a
+      deployment plan — source is required. Must emit
+      PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a V2 pipeline. Emit the standard
+      VERDICT block.
+
+      Requirements:
+      - Pipeline type: V2
+      - Region: us-east-1
+      - Build: CodeBuild my-service-build
+      - Deploy: CloudFormation on prod-my-service
+
+      The user did NOT specify: source (CodeCommit / S3 / GitHub),
+      branch, repository name, or trigger configuration. The skill
+      must catch this as PREREQUISITES_MISSING.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-source-config"
+        - "VERDICT"
+        - "source"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

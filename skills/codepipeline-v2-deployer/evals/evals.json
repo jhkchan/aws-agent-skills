@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "codepipeline-v2-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CodePipeline V2 Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "codecommit-codebuild-cloudformation",
+      "name": "Standard V2 pipeline with CodeCommit source, CodeBuild build, CloudFormation deploy, namespace variables, trigger with branch/path filter",
+      "difficulty": "easy",
+      "prompt_file": "prompts/codecommit-codebuild-cloudformation.md",
+      "baseline_file": "baselines/codecommit-codebuild-cloudformation.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "codecommit-codebuild-cloudformation", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "V2", "trigger"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "manual-approval-flow",
+      "name": "V2 pipeline with manual approval gate between Build and Deploy (ExternalEntityLink + SNS notification)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/manual-approval-flow.md",
+      "baseline_file": "baselines/manual-approval-flow.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "manual-approval-flow", "VERDICT", "CHECKLIST", "Approval", "ExternalEntityLink"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-deployment",
+      "name": "V2 pipeline deploying CloudFormation to a target account via KMS-encrypted artifacts + cross-account IAM role",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-deployment.md",
+      "baseline_file": "baselines/cross-account-deployment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "cross-account-deployment", "VERDICT", "CHECKLIST", "KMS", "CrossAccountCFNExecution"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "github-codeconnections-ecs",
+      "name": "V2 pipeline with GitHub source via CodeConnections and ECS deploy action with namespace variable Image1",
+      "difficulty": "medium",
+      "prompt_file": "prompts/github-codeconnections-ecs.md",
+      "baseline_file": "baselines/github-codeconnections-ecs.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "github-codeconnections-ecs", "VERDICT", "CHECKLIST", "CodeConnections", "ECS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "missing-source-config",
+      "name": "V2 pipeline spec without a source action — PREREQUISITES_MISSING",
+      "difficulty": "easy",
+      "prompt_file": "prompts/missing-source-config.md",
+      "baseline_file": "baselines/missing-source-config.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-source-config", "VERDICT", "source"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}
