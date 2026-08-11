@@ -1,0 +1,70 @@
+{
+  "skill": "s3-directory-bucket-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete expert details not usually in a baseline model: exact bucket name syntax (`base--az-id--x-s3`), account\u2011specific AZ\u2011ID resolution, silent\u2011failure matrix, and precise anti\u2011pattern reasons. However, much of the content (e.g., that S3 Express One Zone exists, that it lacks versioning) is already documented, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific 8\u2011step provisioning workflow with exact CLI commands and ordering rationale (AZ ID before name, bucket before compute, etc.). Some steps remain generic (e.g., \u201cverify compute placement\u201d) and could list concrete API calls or filters, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list of five pitfalls, each with a clear \u2018why it\u2019s wrong\u2019 explanation. Missing are additional common pitfalls such as KMS key region mismatches, bucket\u2011name collisions when the base name contains \u2018--\u2019, and IAM role misconfigurations, so the anti\u2011pattern coverage is good but not exhaustive."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Full frontmatter, clear description, activation triggers, invocation schema, and a strict output contract with required literal labels. The only shortfall is the absence of an explicit example of a PREREQUISITES_MISSING response in the skill body, which would aid reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: quick reference, navigation table, detailed heuristics, and deep sections. The quick\u2011reference table packs many details early, which could overload the agent before it knows whether it needs that depth, thus deducting a point."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (bucket creation) are tightly gated by verification commands and checklist constraints. However, table\u2011bucket creation lacks explicit uniqueness checks and the skill does not enforce limits on optional parameters, leaving a small freedom gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (overview \u2192 navigation \u2192 procedure \u2192 heuristics \u2192 anti\u2011patterns \u2192 contract). The structure is consistent and aids comprehension, missing only a formalized header hierarchy that some patterns prescribe."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, a strict output contract, and example responses. Some example outputs omit verification commands for every checklist item or use mismatched instance tags, indicating a small usability gap for an agent executing the skill cold."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 42921,
+  "latency_ms": 14164,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

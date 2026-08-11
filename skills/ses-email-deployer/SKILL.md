@@ -14,7 +14,7 @@ description: >-
   identity, verifying DKIM, configuring a configuration set with
   event publishing, setting up dedicated IP pools, creating
   email templates, managing the suppression list, or wiring SES
-  VPC endpoints. Triggers: amazon ses, ses v2, domain identity,
+  VPC endpoints. Triggers: amazon ses, sesv2, domain identity,
   dkim, spf, dmarc, mail-from domain, configuration set, event
   publishing, bounce complaint, dedicated ip pool, ip warmup,
   email template, suppression list, ses vpc endpoint, mail
@@ -622,72 +622,62 @@ the SES sending pipeline.
 
 - **Domain identity stuck in Pending:** DKIM CNAME records not
   published or not propagated. Verify with `dig CNAME
-  abc123._domainkey.example.com`. Third-party DNS providers may
-  take longer than Route 53.
+  abc123._domainkey.example.com`. Third-party DNS may take longer.
 - **DKIM verification fails after CNAME published:** the CNAME
-  record name may have `_domainkey` doubled or the trailing dot
-  missing. SES auto-appends the domain; do not double it.
-- **SPF alignment fails:** the MAIL FROM domain TXT record is
-  missing `include:amazonses.com` or the `~all` mechanism is too
-  strict (`-all` causes hard fail on forwarded mail).
+  record name may have `_domainkey` doubled. SES auto-appends the
+  domain; do not double it.
+- **SPF alignment fails:** the MAIL FROM TXT is missing
+  `include:amazonses.com` or `~all` is too strict (`-all` hard
+  fails on forwarded mail).
 - **DMARC reports show misalignment:** the MAIL FROM domain does
-  not match the `From:` header domain. Use the same organizational
-  domain for both, or set `adkim=r; aspf=r` (relaxed).
+  not match the `From:` header domain. Use the same org domain,
+  or set `adkim=r; aspf=r` (relaxed).
 - **Bounce notifications not arriving in SNS:** the configuration
   set is not associated with the send (`--configuration-set-name`
   omitted), or the SNS destination is disabled.
-- **Dedicated IP throttled by inbox provider:** warmup was skipped
-  or disabled. Re-enable automatic warmup and reduce send volume.
+- **Dedicated IP throttled:** warmup was skipped or disabled.
+  Re-enable automatic warmup and reduce send volume.
 - **Template variables not rendering:** `TemplateData` is a JSON
-  string, not a JSON object. The `{{varName}}` syntax must match
-  the keys in `TemplateData` exactly.
-- **Sandbox limit error (ThrottlingException):** the account is
-  still in the sandbox. Request production access via the SES
-  console. Sandbox limits sends to verified addresses at 1/sec.
+  string, not a JSON object. `{{varName}}` keys must match exactly.
+- **Sandbox limit (ThrottlingException):** account is still in
+  sandbox. Request production access via the SES console.
 - **VPC endpoint private DNS not resolving:** the VPC
   `enableDnsHostnames` and `enableDnsSupport` must both be `true`.
-  Private DNS for interface endpoints requires a dedicated
-  private hosted zone.
 - **Mail Manager ingress not receiving:** the MX record for the
   ingress domain must point at the Mail Manager ingress endpoint,
-  NOT at the standard SES feedback endpoint.
+  NOT the standard SES feedback endpoint.
 
 ## Recent AWS features (2024-2026)
 
 - **SES Mail Manager (2024-2025):** a separate SES feature for
   inbound email analysis and egress rule management. Distinct from
   the standard SES sending pipeline. Use `sesv2
-  create-email-traffic-policy` and `create-ingress-point` to
-  configure.
+  create-email-traffic-policy` and `create-ingress-point`.
 
 - **SES VPC endpoint for sesv2 (2024-2025):** interface VPC
-  endpoints now support the sesv2 API with private DNS. Enables
+  endpoints support the sesv2 API with private DNS. Enables
   private SES API access from VPCs without internet egress.
 
-- **Configuration set Virtual Deliverability Manager (2024-2025):**
-  VDM options on the configuration set (`VdmOptions`) provide
-  engagement tracking and optimized delivery recommendations
-  per-configuration-set.
+- **Virtual Deliverability Manager (2024-2025):** VDM options on
+  the configuration set (`VdmOptions`) provide engagement tracking
+  and optimized delivery recommendations per-configuration-set.
 
 - **Dedicated IP automatic warmup enhancements (2024-2025):**
-  automatic warmup now supports per-IP stage visibility via
-  `get-dedicated-ip` (`WarmupStatus`, `WarmupPercentage`). The
-  ramp schedule is tunable.
+  per-IP stage visibility via `get-dedicated-ip` (`WarmupStatus`,
+  `WarmupPercentage`). The ramp schedule is tunable.
 
 - **Suppression list account-level management (2024-2025):**
-  `put-suppression-attributes` toggles `BOUNCE` and `COMPLAINT`
+  `put-suppression-attributes` toggles `BOUNCE` / `COMPLAINT`
   suppression at the account level. Per-address management via
-  `put-suppressed-destination` and `delete-suppressed-destination`.
+  `put-suppressed-destination` / `delete-suppressed-destination`.
 
 - **SES template Handlebars enhancements (2024-2025):** template
-  variables support conditional rendering (`{{#if}}`), loops
-  (`{{#each}}`), and helpers. Template size limit raised to 500 KB
-  (HTML + text).
+  variables support `{{#if}}`, `{{#each}}`, and helpers. Template
+  size limit raised to 500 KB (HTML + text).
 
 - **EventBridge integration for SES events (2024-2025):** SES
-  event publishing now natively supports EventBridge as a
-  destination (`EventBridgeDestination`), alongside CloudWatch,
-  SNS, and Firehose.
+  event publishing natively supports EventBridge as a destination
+  (`EventBridgeDestination`), alongside CloudWatch, SNS, Firehose.
 
 - **SES v2 API as canonical surface (2024-2025):** the v1 SES API
   (`ses`) is in maintenance mode. All new features ship on
@@ -696,47 +686,42 @@ the SES sending pipeline.
 
 ## NEVER (top 5 — full list in references)
 
-- NEVER send from an unverified domain identity. SES rejects the
-  send with `MessageRejected`. Verify the identity (`Pending` →
-  `Success`) before sending.
+- NEVER send from an unverified domain identity. SES rejects with
+  `MessageRejected`. Verify (`Pending` → `Success`) before sending.
 - NEVER disable dedicated IP warmup on a new IP. Inbox providers
   throttle or reject email from IPs with no reputation history.
   Let automatic warmup run the full ~45-day cycle.
 - NEVER use `-all` (hard fail) in the SPF record for the MAIL FROM
-  domain. Forwarded mail fails SPF and may be rejected. Use `~all`
-  (soft fail) unless you have a specific reason.
+  domain. Forwarded mail fails SPF and may be rejected. Use `~all`.
 - NEVER omit `--configuration-set-name` on the send call if you
   need event publishing. Without the configuration set, no events
   flow to CloudWatch / SNS / Firehose / EventBridge, and bounces
   do not trigger suppression.
-- NEVER publish a DMARC `p=reject` policy on day one. Start with
-  `p=none` (monitor), verify alignment via aggregate reports,
-  escalate to `p=quarantine`, then `p=reject` after 2-4 weeks of
-  clean reports.
+- NEVER publish DMARC `p=reject` on day one. Start with `p=none`
+  (monitor), verify alignment via aggregate reports, escalate to
+  `p=quarantine`, then `p=reject` after 2-4 weeks of clean reports.
 
 ## Expert heuristic — designing SES infrastructure
 
 - **One configuration set per workload type.** Transactional,
   marketing, and onboarding emails have different deliverability
-  profiles. Separate configuration sets let you isolate sender
-  reputation and event routing.
+  profiles. Separate sets isolate sender reputation and event
+  routing.
 - **Dedicated IPs for high volume ( > 100K/day); shared pool for
   low volume.** Dedicated IPs give predictable reputation but
-  require warmup. Shared pool is fine for low-volume transactional
-  email.
+  require warmup. Shared pool is fine for low-volume transactional.
 - **Always set a custom MAIL FROM domain.** The default
   `amazonses.com` envelope sender breaks SPF alignment with your
   `From:` header. Custom MAIL FROM enables alignment and improves
   deliverability.
 - **DMARC monitoring first, enforcement later.** Publish
-  `p=none` with `rua=mailto:...` for 2-4 weeks. Review aggregate
-  reports. Escalate to `p=quarantine` then `p=reject`.
+  `p=none` with `rua=mailto:...` for 2-4 weeks. Review reports.
+  Escalate to `p=quarantine` then `p=reject`.
 - **Suppression list on BOUNCE and COMPLAINT.** Suppressing on
-  both protects sender reputation. Manual suppression for known
-  spam traps.
+  both protects sender reputation. Manual suppression for spam
+  traps.
 - **Warmup is non-negotiable for dedicated IPs.** Even if you
   migrate an existing workload, the IP is new and needs warmup.
-  Ramp volume over the automatic warmup schedule.
 - **SES v2 API is the canonical surface.** All new features ship
   on v2. Migrate from v1 for any new provisioning.
 

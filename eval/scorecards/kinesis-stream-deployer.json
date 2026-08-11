@@ -1,0 +1,70 @@
+{
+  "skill": "kinesis-stream-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds expert\u2011level heuristics not usually known to a baseline model: concrete cost\u2011crossover calculation with shard cost vs on\u2011demand per\u2011GB pricing, iterator\u2011age alarm thresholds tied to retention period, explicit 15\u2011minute mode\u2011switch throttling rule, and a decision\u2011tree for enhanced fan\u2011out based on consumer count and latency needs. Some content merely restates documentation, preventing a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedural flow: prerequisite verification, mode decision tree, shard\u2011count sizing, exact CLI commands in correct order (create, wait, set retention, register consumer, enable SSE\u2011KMS, IAM policies, CloudWatch alarms). Minor omission: no explicit step for validating KMS key policy before enabling encryption, but overall highly specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never specify shard count for on\u2011demand, never grant kinesis:* on *, never skip IteratorAge alarm). Could be stronger by adding pitfalls like forgetting to update KMS key policies after rotation or handling existing streams."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete (name, description, version, author, license, keywords, tags, dependencies, metadata, verdict shape, activation triggers). The \"when_to_use\" clause clearly defines invocation scope. Slight vagueness in trigger phrasing (e.g., \"create kinesis stream\" could match unrelated intents) keeps it from full marks."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections: quick navigation, mindset, configuration graph, heuristics, step\u2011by\u2011step guide, never list, output format, worked example, error handling. Some sections (heuristics, configuration graph) are dense and could overwhelm a first\u2011time reader, so not optimal progressive disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by a prerequisite checklist and explicit \u2018NEVER\u2019 constraints, matching the fragility of provisioning. Slightly under\u2011constrained on scaling limits (e.g., no hard cap on shard\u2011count jumps beyond the advisory \u2018no >2x\u2019)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows the established CloudOps skill pattern (metadata, activation keywords, strict output contract, mindset, stepwise process, never list, output format, examples). Section ordering is slightly ad\u2011hoc (e.g., heuristics appear after mindset but before steps), preventing a perfect pattern score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Agent can execute the checklist and commands as written. Missing explicit error\u2011handling branches (e.g., stream already exists, missing SNS topic for alarms, IAM policy validation failures) and no guidance for partial\u2011configuration updates, which could cause runtime failures."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 49108,
+  "latency_ms": 15423,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

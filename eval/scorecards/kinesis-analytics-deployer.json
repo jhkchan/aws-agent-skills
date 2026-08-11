@@ -1,0 +1,70 @@
+{
+  "skill": "kinesis-analytics-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides production\u2011grade defaults, recent feature timeline, exact IAM policy JSON, checkpoint interval thresholds, KPU calculations, and a decision matrix \u2013 concrete details a senior CloudOps engineer would learn, not just restated knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes the exact AWS\u2011specific order of operations (pre\u2011flight checks, role trust, scoped policies, checkpoint and parallelism tuning, snapshot workflow, notebook promotion) rather than generic \"check security\" steps."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Lists concrete NEVER rules with specific reasons (e.g., never use AdministratorAccess, never disable checkpointing, never mismatch parallelism) and references a full 12\u2011item list, showing experience\u2011driven pitfalls."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, triggers, and a detailed \"when_to_use\" section are present; the strict output contract defines required labels and order."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Uses a clear top\u2011level navigation table, isolates the mandatory output contract, and pushes detailed CLI sequences, deep references, and extensive heuristics to later sections. Critical rules are visible early; no cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (IAM role creation, application creation) are tightly constrained with NEVER rules, version\u2011pinned S3 keys, and explicit permission scoping. Creative or exploratory tasks (studio notebooks) are marked OPTIONAL, giving the agent appropriate freedom."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (frontmatter \u2192 navigation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 heuristics \u2192 edge cases \u2192 references) that aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 10,
+      "max": 15,
+      "justification": "Model output contains factual errors: first example uses invalid \"configuration UPDATE\" for checkpointing and omits checkpoint type in the second example, reducing reliability for an agent executing the skill."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 41558,
+  "latency_ms": 10019,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

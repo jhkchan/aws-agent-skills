@@ -1,0 +1,70 @@
+{
+  "skill": "cloudwatch-cross-account-observability-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill provides many concrete details (e.g., OAM filter syntax, specific sink\u2011policy JSON with oam:ResourceTypes condition, recent 2024\u20112026 feature changes) that go beyond a generic model's knowledge, but a portion of the content merely restates standard OAM procedures that a competent CloudOps model would already know, limiting the delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill outlines an AWS\u2011specific, ordered provisioning workflow, exact CLI commands, and IAM role trust policies, demonstrating expert mindset. It loses one point because it does not present an explicit decision\u2011tree for handling errors (e.g., what to do if a link remains in CREATED state)."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "A solid \"NEVER\" list is included with concrete reasons (e.g., never use wildcard sink policy, never create links from the monitoring account). However, the list is limited to five items and omits other common pitfalls such as forgetting to enable Application Signals in source workloads or mis\u2011configuring cross\u2011region sinks, reducing completeness."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter, description, keywords, triggers, and a precise output contract are all present, enabling reliable invocation. One point is deducted because the \"when_to_use\" narrative could be tighter; it mixes positive and negative use\u2011cases, making the activation cue slightly ambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a top\u2011level navigation table, then layers details (reasoning, prerequisites, step\u2011by\u2011step, edge\u2011cases, references). However, the full CLI command block is embedded in the main body rather than deferred to a reference file, adding some cognitive load."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (sink creation, role creation) are gated by prerequisite tables and verification commands, showing good calibration. Nonetheless, the skill does not enforce an explicit confirmation step before creating resources, leaving a small amount of freedom for irreversible operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable CloudOps pattern (navigation table, output contract, reasoning framework, procedure, anti\u2011patterns, heuristics, safety checks). The ordering of sections is slightly ad\u2011hoc (e.g., \"Wiring steps\" appear after the final checklist), costing one point."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides end\u2011to\u2011end CLI sequences, JSON templates, verification commands, and a ready\u2011to\u2011deploy checklist, enabling an agent to execute the deployment. Missing are explicit remediation steps for cross\u2011region topologies and a concrete example of handling a failed link attachment, which would improve real\u2011world usability."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 43859,
+  "latency_ms": 5386,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
