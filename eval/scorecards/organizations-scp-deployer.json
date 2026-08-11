@@ -1,0 +1,70 @@
+{
+  "skill": "organizations-scp-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill adds useful expert details (e.g., aws:CalledVia chain conditions, recent 2024\u20112026 feature list, concrete anti\u2011pattern warnings) but much of the content restates standard SCP concepts that a capable model already knows. It lacks a clear decision\u2011tree or quantitative thresholds for choosing guardrail vs delegate strategies, so the knowledge gain is moderate rather than maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a thorough AWS\u2011specific procedure (enable policy type, author JSON, attach, verify, rollback) and mindset framing. The only shortfall is a few generic steps (e.g., \u201cverify caller IAM role holds permissions\u201d) that are not expressed as concrete CLI commands or IAM policy checks."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid \"NEVER\" list with concrete reasoning (e.g., never remove FullAWSAccess without an allowlist). Missing are some common pitfalls such as SCP size limits, interactions with cross\u2011account trusted access, and subtle tag\u2011policy vs SCP overlaps, which would have completed the anti\u2011pattern coverage."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Front\u2011matter, description, activation triggers, and invocation schema are present, enabling reliable activation. However, the input schema is described only in prose, not as a formal JSON schema, and the activation triggers could be ambiguous for an automated parser."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick navigation, checklist, then deep sections) but front\u2011loads a large amount of detail; critical \"NEVER\" warnings appear later, which can cause cognitive overload for a first\u2011time user."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are guarded by a confirmation gate, dry\u2011run validation, and rollback documentation, showing good calibration. The confirmation step is described but not enforced programmatically (no timeout or forced yes/no handling), leaving a slight gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Checklist \u2192 Process \u2192 Library \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Edge cases \u2192 Remediation). The pattern is not explicitly labeled, and a few sections (e.g., recent features) break the strict order, costing a point."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, example outputs, and a deployment checklist, enabling an agent to act. Lacks handling of AWS CLI error codes, does not auto\u2011populate placeholders like <POLICY_ID>, and omits guidance for multi\u2011region StackSets deployment, which limits full practical execution."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 39560,
+  "latency_ms": 14028,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}

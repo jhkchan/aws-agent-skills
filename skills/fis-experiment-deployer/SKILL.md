@@ -2,21 +2,19 @@
 name: fis-experiment-deployer
 description: >-
   Provisions AWS Fault Injection Service (FIS) experiment templates with
-  production-safe defaults: action targets (resource tags, ARNs, filters),
-  fault actions across EC2 (stop-instances, send-api-error, terminate-
-  instances), ECS (stop-task), network (blackhole, latency, loss via SSM
-  on EC2/ECS ENIs), RDS (failover-db-cluster for Aurora), and Lambda
-  (invoke-async), CloudWatch alarm-based stop conditions, IAM execution
-  role with the FIS trust policy + least-privilege action scopes,
-  experiment logging to S3 and CloudWatch Logs, and the latest primitives
-  (Aurora failover, EKS pod disruption via SSM, network blackhole/
-  latency/loss). Emits a READY_TO_DEPLOY / PREREQUISITES_MISSING plan
-  with verified targets, actions, stop conditions, and copy-pasteable
-  fis + cloudwatch commands. Use when provisioning chaos/fault
-  injection experiments for game days, DR drills, resilience validation,
-  or pre-prod gate checks. Triggers: FIS, fault injection, chaos
-  engineering, experiment template, stop condition, Aurora failover,
-  EKS pod kill, network blackhole, game day.
+  production-safe defaults: action targets (tags, ARNs, filters), fault
+  actions across EC2 (stop-instances, send-api-error, terminate),
+  ECS (stop-task), network (blackhole/latency/loss via SSM), Aurora
+  (failover-db-cluster), Lambda (invoke-async), CloudWatch alarm-based
+  stop conditions, IAM execution role with FIS trust + least-privilege
+  tag-scoped permissions, experiment logging to S3 + CloudWatch Logs,
+  and latest primitives (Aurora failover, EKS pod disruption, network
+  faults). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with verified
+  targets, actions, stop conditions, and copy-pasteable fis + cloudwatch
+  commands. Use when provisioning chaos experiments for game days, DR
+  drills, resilience validation, or pre-prod gates. Triggers: FIS, fault
+  injection, chaos engineering, experiment template, stop condition,
+  Aurora failover, EKS pod kill, network blackhole, game day.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
