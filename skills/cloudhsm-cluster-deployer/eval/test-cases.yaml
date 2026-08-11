@@ -1,0 +1,28 @@
+skill: cloudhsm-cluster-deployer
+model_id: amazon.nova-pro-v1:0
+cases:
+- id: ha-cluster-two-az
+  must_contain:
+  - READY_TO_DEPLOY
+  must_not_contain:
+  - PREREQUISITES_MISSING
+- id: crypto-officer-setup
+  must_contain:
+  - READY_TO_DEPLOY
+  must_not_contain:
+  - PREREQUISITES_MISSING
+- id: backup-and-restore
+  must_contain:
+  - READY_TO_DEPLOY
+  must_not_contain:
+  - PREREQUISITES_MISSING
+- id: single-az-no-ha
+  must_contain:
+  - PREREQUISITES_MISSING
+  must_not_contain:
+  - READY_TO_DEPLOY
+- id: missing-subnet-creation
+  must_contain:
+  - PREREQUISITES_MISSING
+  must_not_contain:
+  - READY_TO_DEPLOY

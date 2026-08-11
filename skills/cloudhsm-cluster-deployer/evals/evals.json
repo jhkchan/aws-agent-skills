@@ -1,0 +1,39 @@
+{
+  "evals": [
+    {
+      "id": "ha-cluster-two-az",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ha-cluster-two-az.md",
+      "baseline_file": "baselines/ha-cluster-two-az.md"
+    },
+    {
+      "id": "crypto-officer-setup",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/crypto-officer-setup.md",
+      "baseline_file": "baselines/crypto-officer-setup.md"
+    },
+    {
+      "id": "backup-and-restore",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/backup-and-restore.md",
+      "baseline_file": "baselines/backup-and-restore.md"
+    },
+    {
+      "id": "single-az-no-ha",
+      "verdict": "PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/single-az-no-ha.md",
+      "baseline_file": "baselines/single-az-no-ha.md"
+    },
+    {
+      "id": "missing-subnet-creation",
+      "verdict": "PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-subnet-creation.md",
+      "baseline_file": "baselines/missing-subnet-creation.md"
+    }
+  ]
+}
