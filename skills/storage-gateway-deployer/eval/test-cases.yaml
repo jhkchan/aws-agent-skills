@@ -1,0 +1,151 @@
+# Eval test cases for storage-gateway-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Storage Gateway types
+# (S3 File Gateway with NFS, Volume Gateway cached iSCSI, SMB with
+# Active Directory, Tape Gateway VTL, missing activation key).
+skill: storage-gateway-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: s3-file-gateway-nfs
+    description: >-
+      Deploy an S3 File Gateway with an NFS file share mapping to an
+      S3 bucket. Expects READY_TO_DEPLOY with cache and upload buffer
+      sized independently, gateway region matching S3 bucket region,
+      and NFS client list restricted.
+    input: |
+      Deploy an S3 File Gateway in us-east-1. Gateway name:
+      prod-s3-file-gateway. Activation key: ABCDE-12345-FGHIJ-67890-KLMNO.
+      S3 bucket: my-data-bucket (us-east-1). IAM role:
+      arn:aws:iam::123456789012:role/StorageGatewayS3Role. Cache disk:
+      500 GB. Upload buffer disk: 300 GB. Create an NFS file share with
+      client list 10.0.0.0/16. Default storage class S3_STANDARD. Tags:
+      Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "FILE_S3"
+        - "cache"
+        - "upload buffer"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "my-data-bucket"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: volume-gateway-iscsi
+    description: >-
+      Deploy a Volume Gateway in cached mode with an iSCSI volume.
+      Expects READY_TO_DEPLOY with cache and upload buffer allocated,
+      iSCSI target named, and cached mode noted.
+    input: |
+      Deploy a Volume Gateway in cached mode in us-east-1. Gateway name:
+      prod-volume-gateway. Activation key: VWXYZ-98765-QRSTU-43210-PQRSX.
+      Cache disk: 1 TB. Upload buffer: 500 GB. Create a cached iSCSI
+      volume of 1 TB. Target name: prod-volume-01. Network interface:
+      eni-xxxx12345. Tags: Environment=production, Storage=cached.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VOLUME"
+        - "cached"
+        - "iSCSI"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "upload buffer"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: smb-active-directory
+    description: >-
+      Deploy an S3 File Gateway with an SMB file share joined to
+      Active Directory. Expects READY_TO_DEPLOY with AD domain join
+      noted, authenticated SMB access, and audit logging.
+    input: |
+      Deploy an S3 File Gateway in us-east-1 with an SMB file share.
+      Gateway name: prod-smb-gateway. Activation key: ABCDE-11111-FGHIJ-22222-KLMNO.
+      S3 bucket: smb-share-bucket (us-east-1). Join Active Directory:
+      domain corp.example.com, OU OU=Servers,DC=corp,DC=example,DC=com,
+      username sgw-service. Create an authenticated SMB file share with
+      admin user corp\sgw-admins. Enable audit logging to CloudWatch.
+      Tags: Environment=production, Protocol=smb.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ActiveDirectory"
+        - "corp.example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "SMB"
+        - "audit"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: tape-gateway-vtl
+    description: >-
+      Deploy a Tape Gateway with a VTL and tape pool configured for
+      S3 Glacier archiving. Expects READY_TO_DEPLOY with virtual tapes
+      created and tape pool noted.
+    input: |
+      Deploy a Tape Gateway in us-east-1. Gateway name: backup-tape-gateway.
+      Activation key: TAPEK-99999-VTLXX-88888-YYYYY. Cache: 200 GB.
+      Upload buffer: 400 GB. Create a tape pool named GlacierPool with
+      GLACIER storage class and 365-day governance retention. Create
+      10 virtual tapes of 1 TB each with barcode prefix TAPE. Tags:
+      Environment=production, Purpose=backup.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Tape Gateway"
+        - "VTL"
+        - "GlacierPool"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-activation-key
+    description: >-
+      Operator requests a Storage Gateway deployment but the activation
+      key is missing. This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING with the activation key gap cited.
+    input: |
+      Deploy an S3 File Gateway in us-east-1. Gateway name:
+      prod-s3-gateway. I have the gateway VM running but haven't
+      generated the activation key yet. S3 bucket: my-bucket. Cache:
+      500 GB. Upload buffer: 300 GB.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "activation key"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

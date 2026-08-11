@@ -1,0 +1,144 @@
+# Eval test cases for snowball-edge-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Snowball Edge scenarios
+# (import job with NFS, cluster mode compute, NFS data transfer,
+# export job, missing shipping address).
+skill: snowball-edge-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: import-job-s3
+    description: >-
+      Create a Snowball Edge import job to migrate on-premises data
+      to S3. Expects READY_TO_DEPLOY with device type selected, S3
+      destination bucket verified, and data flow (device → S3 after
+      return) noted.
+    input: |
+      Create a Snowball Edge import job to migrate 150 TB of
+      on-premises data to S3 bucket my-migration-bucket in us-east-1.
+      Shipping address: addr-aaaabbbb. Device type: Edge Storage
+      Optimized. Shipping option: NEXT_DAY. Tags: Environment=migration,
+      Project=data-lift.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "IMPORT"
+        - "EDGE_STORAGE_OPTIMIZED"
+        - "my-migration-bucket"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cluster-mode-compute
+    description: >-
+      Deploy a 5-node Snowball Edge cluster for edge compute with EKS
+      Anywhere. Expects READY_TO_DEPLOY with cluster quorum noted,
+      all nodes unlocked, and EKS Anywhere requiring min 5 nodes.
+    input: |
+      Deploy a 5-node Snowball Edge cluster for edge compute in
+      us-east-1. Device type: Edge Compute Optimized. I need EKS
+      Anywhere for persistent Kubernetes at the edge. All 5 devices
+      are on network 192.168.1.0/24. Shipping address: addr-cluster01.
+      Tags: Environment=edge, Purpose=eks-anywhere.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cluster"
+        - "EDGE_COMPUTE_OPTIMIZED"
+        - "EKS"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: nfs-data-transfer
+    description: >-
+      Configure NFS data transfer on an unlocked Snowball Edge device.
+      Expects READY_TO_DEPLOY with NFS interface started, mount path
+      noted, and parallel copy strategy recommended.
+    input: |
+      I have a Snowball Edge device unlocked at IP 192.168.1.100.
+      I need to transfer 50 TB of data via NFS. Manifest file:
+      manifest.bin. Unlock code: ABCD-1234-WXYZ-5678. Endpoint:
+      https://192.168.1.100:9091. Provide the NFS setup and parallel
+      copy strategy.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "NFS"
+        - "192.168.1.100"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "parallel"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: export-job-s3
+    description: >-
+      Create a Snowball Edge export job to download data from S3
+      to on-premises. Expects READY_TO_DEPLOY with export job type,
+      source bucket noted, and data pre-loaded on device before
+      shipping.
+    input: |
+      Create a Snowball Edge export job to download 60 TB of data
+      from S3 bucket my-export-bucket in us-east-1 to on-premises.
+      Shipping address: addr-export01. Device type: Edge Storage
+      Optimized. Shipping option: NEXT_DAY. Tags: Environment=export,
+      Project=data-distribution.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "EXPORT"
+        - "my-export-bucket"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-shipping-address
+    description: >-
+      Operator requests a Snowball Edge import job but has not
+      provided a shipping address. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the shipping address gap
+      cited.
+    input: |
+      Create a Snowball Edge import job to migrate 100 TB of data
+      to S3 bucket my-import-bucket in us-east-1. Device type: Edge
+      Storage Optimized. I need to figure out the shipping address
+      later. Tags: Environment=migration.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "shipping address"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

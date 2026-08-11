@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge not usually known by a generic model: a detailed version\u2011compatibility matrix with risk levels, explicit migration timing baselines, a plugin\u2011equivalence table, snapshot\u2011repository verification steps, and precise AWS\u2011CLI command sequences. This information would teach a senior CloudOps engineer new decision points."
+      "justification": "Adds concrete expert knowledge: a detailed version\u2011compatibility matrix, plugin\u2011equivalence table, exact AWS CLI commands, snapshot\u2011repository JSON, and nuanced heuristics (e.g., snapshot format limits, in\u2011place upgrade only for ES\u202f7.10). A capable model could list generic steps but would not have this specific decision tree. Deducted 3 points for missing explicit rollback procedure and a few edge\u2011case details."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: exact order of pre\u2011checks, required IAM permissions, AWS CLI commands for domain config updates, S3 repository registration, blue/green deployment steps, and network\u2011connectivity validation for reindex\u2011from\u2011remote. Procedures are concrete rather than generic."
+      "justification": "Encodes AWS\u2011specific thinking: ordered pre\u2011flight checks, precise procedures for in\u2011place upgrade via `aws opensearch update-domain-config`, blue/green deployment steps, reindex\u2011from\u2011remote network requirements, and client\u2011compatibility verification. Deducted 1 point because IAM role creation steps are only mentioned briefly, not as a full procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a focused NEVER list (5 anti\u2011patterns) with clear reasoning (e.g., snapshot before upgrade, removing ES\u2011only plugins). However, it omits other common pitfalls such as snapshot size limits, IAM trust\u2011policy nuances, and handling of partial snapshot failures."
+      "justification": "Provides a concrete NEVER list of 5 anti\u2011patterns with clear reasoning (e.g., never migrate without a verified snapshot, never keep ES\u2011only plugins, never skip version matrix). Deducted 2 points for limited coverage\u2014no warnings about DNS updates, lingering IAM policies, or forgetting to adjust endpoint references after migration."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, activation triggers, invocation schema, and example inputs are all present and well\u2011structured. The \"when_to_use\" narrative is slightly verbose and could be tighter, but overall the skill is reliably discoverable."
+      "justification": "Frontmatter is complete, activation triggers, invocation schema, and a valid example are present. The \u2018when_to_use\u2019 description is thorough, though a bit verbose; otherwise the spec would be flawless."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick reference, strict output contract, mindset, pre\u2011flight, process, heuristics, anti\u2011patterns. Some duplication (heuristics repeated later) adds minor cognitive load, but critical rules are still near the top."
+      "justification": "Uses quick navigation, concise top\u2011level tables, and layered sections (quick reference, mindset, process, heuristics). However, the expert\u2011heuristic section is long and could be moved to a reference file, causing slight cognitive overload. Deducted 2 points."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained by a CONFIRM gate, full pre\u2011check suite, and mandatory snapshot backup. Non\u2011destructive planning steps are left flexible, matching task fragility."
+      "justification": "Destructive operations are tightly constrained by a mandatory CONFIRM gate, exhaustive pre\u2011checks, and snapshot\u2011before\u2011upgrade requirement. Creative tasks (planning) are left flexible. Calibration is spot\u2011on."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (overview \u2192 quick reference \u2192 strict contract \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 heuristics \u2192 anti\u2011patterns). Structure is consistent and aids comprehension."
+      "justification": "Follows a coherent pattern: overview, quick navigation, strict output contract, mindset, pre\u2011flight, process, heuristics, anti\u2011patterns. Structure is recognizable and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 12,
       "max": 15,
-      "justification": "Provides concrete CLI snippets, JSON payloads, and a mandatory output block, enabling an agent to act. However, the output contract omits the VERDICT: ERROR state that the narrative mentions, and error\u2011handling branches are sparse, leaving ambiguity for failure paths."
+      "justification": "Provides decision trees, concrete CLI/API snippets, and worked examples, enabling an agent to act. Inconsistencies (e.g., VERDICT: ERROR not defined in the contract, CONFIRM field placed outside the block in some examples) and missing edge\u2011case handling (cross\u2011region snapshots, IAM role creation) reduce reliability."
     }
   ],
-  "total_score": 105,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 43559,
-  "latency_ms": 14777,
+  "grade": "A",
+  "token_count": 43541,
+  "latency_ms": 16534,
   "assertions_passed": false,
-  "assertions_passed_count": 2,
-  "assertions_failed_count": 3
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }

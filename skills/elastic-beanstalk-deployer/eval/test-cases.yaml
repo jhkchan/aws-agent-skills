@@ -1,0 +1,165 @@
+# Eval test cases for elastic-beanstalk-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Elastic Beanstalk
+# scenarios (web server with immutable deployment, worker tier with
+# SQS, blue-green CNAME swap, .ebextensions with RDS, missing
+# service role prerequisite failure).
+skill: elastic-beanstalk-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: web-server-nodejs-alb
+    description: >-
+      Provision a web server Elastic Beanstalk environment with Node.js
+      on Amazon Linux 2023, ALB, immutable deployment policy, and
+      enhanced health reporting. Expects READY_TO_DEPLOY with platform,
+      service role, instance profile, deployment policy, and VPC
+      configuration all cited.
+    input: |
+      Create an Elastic Beanstalk environment named myapp-prod for
+      application myapp in us-east-1. Platform: 64bit Amazon Linux 2023
+      v6.0.4 running Node.js 20. Application version v2 from
+      s3://myapp-deploy/app-v2.zip. Load balancer: ALB. Deployment
+      policy: immutable. Enhanced health reporting: enabled. Managed
+      updates: enabled, minor level, Mon:02:00 window. VPC vpc-aaa11122
+      with subnets subnet-aaa, subnet-bbb. Security group sg-app-prod.
+      ASG: min=2, max=8, CPUUtilization 20-80%. Tags:
+      Environment=production, App=myapp.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "myapp-prod"
+        - "Amazon Linux 2023"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Immutable"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: worker-tier-sqs
+    description: >-
+      Provision a worker tier Elastic Beanstalk environment with Python
+      on Amazon Linux 2023 and SQS queue integration. Expects
+      READY_TO_DEPLOY with Worker tier, SQS queue ARN, and queue-depth
+      auto scaling noted.
+    input: |
+      Create a worker tier Elastic Beanstalk environment named
+      myapp-worker for application myapp in us-east-1. Platform: 64bit
+      Amazon Linux 2023 v6.0.4 running Python 3.11. Application version
+      v1 from s3://myapp-deploy/app-worker-v1.zip. SQS queue:
+      arn:aws:sqs:us-east-1:123456789012:myapp-jobs. Auto scaling on
+      queue depth: lower=1, upper=10. ASG: min=1, max=4. Service role:
+      aws-elasticbeanstalk-service-role. Instance profile:
+      aws-elasticbeanstalk-ec2-role. Tags: Environment=production,
+      Tier=worker.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Worker"
+        - "SQS"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Python"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: blue-green-cname-swap
+    description: >-
+      Configure a blue-green deployment using CNAME swap for an Elastic
+      Beanstalk environment. Expects READY_TO_DEPLOY with both green
+      and blue environments, CNAME swap procedure, and rollback path
+      noted.
+    input: |
+      Set up a blue-green deployment for Elastic Beanstalk application
+      myapp in us-east-1. Blue environment myapp-blue is currently
+      serving traffic (environment-id e-blue123). Deploy green
+      environment myapp-green with version v2 using the same
+      configuration template myapp-prod-template. Platform: 64bit Amazon
+      Linux 2023 v6.0.4 running Node.js 20. ALB, immutable deployment
+      policy, enhanced health enabled. Once green is Ready and Green
+      health, swap CNAMEs.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "swap-environment-cnames"
+        - "myapp-green"
+        - "myapp-blue"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ebextensions-rds-config
+    description: >-
+      Provision an Elastic Beanstalk environment with .ebextensions for
+      infrastructure as code including RDS creation and deployment
+      hooks. Expects READY_TO_DEPLOY with .ebextensions file listing,
+      RDS with DeletionPolicy Retain, and container_commands noted.
+    input: |
+      Create an Elastic Beanstalk environment named myapp-api for
+      application myapp in us-east-1. Platform: 64bit Amazon Linux 2023
+      v6.0.4 running Node.js 20. The source bundle includes
+      .ebextensions/01-options.config (NODE_ENV=production),
+      .ebextensions/02-rds.config (PostgreSQL db.t3.micro,
+      DeletionPolicy Retain), and .ebextensions/03-hooks.config (npm
+      run migrate, leader_only). Deployment policy: rolling with
+      additional batch. ALB, enhanced health. ASG: min=2, max=6. VPC
+      vpc-aaa11122, subnets subnet-aaa, subnet-bbb.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - ".ebextensions"
+        - "DeletionPolicy"
+        - "Retain"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-service-role
+    description: >-
+      Operator requests an Elastic Beanstalk environment but the
+      service role does not exist. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the missing service role cited.
+    input: |
+      Create an Elastic Beanstalk environment named myapp-prod for
+      application myapp in us-east-1. Platform: 64bit Amazon Linux 2023
+      v6.0.4 running Node.js 20. Application version v2 from
+      s3://myapp-deploy/app-v2.zip. The service role
+      aws-elasticbeanstalk-service-role does not exist yet. VPC
+      vpc-aaa11122, subnets subnet-aaa, subnet-bbb.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "service role"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

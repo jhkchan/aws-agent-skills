@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides many concrete thresholds (retention 90\u20113653 days, INDEFINITE literal, default termination protection, multi\u2011column partitioning, replication RPO, partner registration flow) and decision trees that a generic model would not know. Missing expert details such as the per\u2011account limit on number of Event Data Stores and the maximum concurrent query limit, which reduces the delta."
+      "justification": "Adds many concrete expert details (retention limits 90\u20113653 days, INDEFINITE literal, KMS key\u2011policy grant specifics, partition\u2011or\u2011perish rule, multi\u2011column partitioning, undelete 7\u2011day window, default termination protection) that a generic model would not know. However, a portion restates publicly documented behavior without new insight (e.g., basic CLI syntax) and omits deeper IAM permission nuances, preventing a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedural flow: ordered pre\u2011checks, CONFIRM gate, capture of pre\u2011state, exact CLI flag ordering, and region\u2011alignment rules. Only minor generic phrasing (e.g., \"run CLI\") prevents a full score."
+      "justification": "Provides an AWS\u2011specific step\u2011by\u2011step mindset, pre\u2011flight checklist, confirm gate, capture pre\u2011state, and post\u2011verification flow that mirrors real CloudTrail Lake operations. Missing only a brief procedure for handling pagination and API throttling, which would make the process fully comprehensive."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never run without eventTime filter, never assume global scope). Lacks a few common pitfalls such as missing S3 bucket policies for Athena result locations and the nuance that Lake Formation grants are not inherited by IAM alone."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never query without eventTime filter, never assume global scope, never delete protected EDS). Lacks a few cost\u2011related anti\u2011patterns (e.g., unchecked data\u2011event volume leading to runaway storage costs), so it falls just short of maximum."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present, enabling reliable activation. The invocation_schema lacks a formal JSON schema example, which slightly weakens strict compliance."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present and clear. Activation triggers are extensive but some are overly generic (e.g., \"CloudTrail Lake query slow\"), which could cause ambiguous activation in edge cases."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, anti\u2011patterns, etc. Yet some sections (e.g., the full Mindset narrative) are dense and could overload the agent before deeper details are needed."
+      "justification": "Content is layered into quick reference, mindset, pre\u2011flight, process, anti\u2011patterns, etc., allowing agents to skim before diving deeper. The sheer length of the initial sections may still overload a model that expects a concise top\u2011level summary."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained by CONFIRM gates and pre\u2011checks. Creative query tasks retain flexibility. Slight gap: the skill does not explicitly list a pre\u2011check for termination\u2011protection before a delete\u2011eds operation."
+      "justification": "Destructive actions are tightly constrained with mandatory CONFIRM gates and pre\u2011check blocking. Creative query tasks are given freedom but still require partition pruning. The skill does not enforce limits on result size or scan\u2011budget for queries, a minor freedom\u2011calibration gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a clear, recognizable pattern (What it does, Quick navigation, Strict output contract, Mindset, Pre\u2011flight, Process, Anti\u2011patterns, etc.) that aligns with the established skill template."
+      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011Patterns). A few sections (e.g., cost baselines) feel ad\u2011hoc rather than part of the core pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI examples, and a strict output contract that an agent can follow. Deficiencies include: the contract does not define handling of malformed input (VERDICT: ERROR is mentioned only in narrative, not in the contract), and some examples omit optional verification fields (e.g., PARTITION_PRUNING) that could aid automation."
+      "justification": "Agent can execute operations using the provided contract and examples. However, the skill mentions a non\u2011allowed `VERDICT: ERROR` value, which conflicts with the strict output contract, and some sections (e.g., malformed\u2011input handling) are ambiguous."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 54012,
-  "latency_ms": 6917,
+  "token_count": 53486,
+  "latency_ms": 5639,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

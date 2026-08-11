@@ -1,0 +1,181 @@
+{
+  "skill": "global-accelerator-endpoint-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Global Accelerator Endpoint Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Global Accelerator topologies (single-region ALB with client IP preservation, multi-region active-passive failover, traffic dial canary, BYOIP integration, missing BYOIP pool prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "single-region-alb",
+      "name": "Single-region Global Accelerator with ALB endpoint and client IP preservation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — single endpoint group, ALB endpoint, TCP listener 80/443, client IP preservation, health check HTTPS",
+      "prompt": "Create a Global Accelerator in us-west-2 with two static anycast IP addresses. Listener TCP ports 80 and 443. Endpoint group in us-east-1 with traffic dial 1.0. Endpoint: ALB arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/50dc6c495c0c9188 with weight 128. Enable client IP preservation. Health check HTTPS on /health port 443, interval 10 seconds, threshold 3. Tags: Environment=production.",
+      "prompt_file": "prompts/single-region-alb.md",
+      "baseline_file": "baselines/single-region-alb.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GLOBAL_ACCELERATOR: my-accelerator (arn:aws:globalaccelerator::123456789012:accelerator/abcd1234)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Accelerator: my-accelerator — ENABLED\n  [✓] Anycast IPs: two static IPs — PINNED at creation\n  [✓] Listener: TCP ports 80, 443 — client affinity NONE\n  [✓] Endpoint group (us-east-1): traffic dial 1.0, health 10s/HTTPS//health\n  [✓] Endpoints: ALB arn:...:loadbalancer/app/my-alb/50dc weight 128\n  [✓] Client IP preservation: ENABLED\nVERIFICATION_COMMANDS:\n  aws globalaccelerator describe-accelerator --accelerator-arn <arn>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "anycast",
+            "traffic dial",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "client IP preservation"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-region-active-passive",
+      "name": "Multi-region Global Accelerator with active-passive failover",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — two endpoint groups, us-east-1 primary (dial 1.0), us-west-2 DR (dial 0.0), flow logs, failover",
+      "prompt": "Create a Global Accelerator with two endpoint groups for active-passive failover. Primary: us-east-1 with traffic dial 1.0, ALB endpoint arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb-east/abc123. DR: us-west-2 with traffic dial 0.0, ALB endpoint arn:aws:elasticloadbalancing:us-west-2:123456789012:loadbalancer/app/prod-alb-west/def456. Listener TCP port 443. Health check HTTPS /health port 443. Enable flow logs to CloudWatch log group /aws/globalaccelerator/prod. Tags: Environment=production, Topology=active-passive.",
+      "prompt_file": "prompts/multi-region-active-passive.md",
+      "baseline_file": "baselines/multi-region-active-passive.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GLOBAL_ACCELERATOR: prod-accelerator (arn:aws:globalaccelerator::123456789012:accelerator/abcd1234)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Accelerator: prod-accelerator — ENABLED\n  [✓] Anycast IPs: two static IPs — PINNED at creation\n  [✓] Endpoint group (us-east-1): traffic dial 1.0 — primary\n  [✓] Endpoint group (us-west-2): traffic dial 0.0 — DR\n  [✓] Failover strategy: Active-passive\n  [✓] Flow logs: /aws/globalaccelerator/prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "active-passive",
+            "traffic dial",
+            "us-east-1",
+            "us-west-2",
+            "VERDICT",
+            "CHECKLIST",
+            "failover"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "traffic-dial-canary",
+      "name": "Traffic dial canary deployment across two regions",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — canary with traffic dial 0.9 us-east-1 and 0.1 eu-west-1, NLB endpoints",
+      "prompt": "Create a Global Accelerator with a traffic dial canary configuration. Endpoint group 1: us-east-1 with traffic dial 0.9, NLB endpoint arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/prod-nlb/aaa111. Endpoint group 2: eu-west-1 with traffic dial 0.1, NLB endpoint arn:aws:elasticloadbalancing:eu-west-1:123456789012:loadbalancer/net/prod-nlb-eu/bbb222. Listener TCP port 443. Health check TCP port 443, interval 10. Tags: Environment=staging, Strategy=canary.",
+      "prompt_file": "prompts/traffic-dial-canary.md",
+      "baseline_file": "baselines/traffic-dial-canary.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GLOBAL_ACCELERATOR: canary-accelerator\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Endpoint group (us-east-1): traffic dial 0.9\n  [✓] Endpoint group (eu-west-1): traffic dial 0.1\n  [✓] Endpoints: NLB weight 128 each",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "traffic dial",
+            "0.9",
+            "0.1",
+            "eu-west-1",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "byoip-accelerator",
+      "name": "Global Accelerator with BYOIP integration (pool READY)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — BYOIP pool 203.0.113.0/24 in READY state, EC2 IP endpoint",
+      "prompt": "Create a Global Accelerator using BYOIP pool 203.0.113.0/24 which is already provisioned and advertised (READY state). Listener TCP ports 80 and 443. Endpoint group in us-east-1 with traffic dial 1.0. Endpoint: EC2 instance 10.0.1.10 with weight 128. Health check TCP port 80, interval 10. Tags: Environment=prod, IPType=byoip.",
+      "prompt_file": "prompts/byoip-accelerator.md",
+      "baseline_file": "baselines/byoip-accelerator.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GLOBAL_ACCELERATOR: byoip-accelerator\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] BYOIP: 203.0.113.0/24 (pool READY)\n  [✓] Anycast IPs: from BYOIP pool — PINNED at creation\n  [✓] Endpoint group (us-east-1): traffic dial 1.0",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "BYOIP",
+            "203.0.113.0/24",
+            "anycast",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-byoip-pool",
+      "name": "Global Accelerator with unprovisioned BYOIP pool (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — BYOIP pool 198.51.100.0/24 not provisioned (not in READY state)",
+      "prompt": "Create a Global Accelerator using BYOIP pool 198.51.100.0/24. The BYOIP pool has not been provisioned yet (it is not in READY state). Listener TCP port 443. Endpoint group in us-east-1. Tags: Environment=prod.",
+      "prompt_file": "prompts/missing-byoip-pool.md",
+      "baseline_file": "baselines/missing-byoip-pool.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "GLOBAL_ACCELERATOR: byoip-accelerator\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] BYOIP pool: 198.51.100.0/24 — NOT in READY state; must be provisioned and advertised before accelerator creation",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "BYOIP",
+            "VERDICT",
+            "CHECKLIST",
+            "198.51.100.0/24"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

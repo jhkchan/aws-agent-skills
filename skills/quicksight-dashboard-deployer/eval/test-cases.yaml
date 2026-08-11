@@ -1,0 +1,159 @@
+# Eval test cases for quicksight-dashboard-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across QuickSight scenarios
+# (Enterprise SPICE dashboard with Athena, template-based multi-tenant
+# deployment, private RDS via VPC connection, Direct Query on Redshift,
+# VPC connection with Standard edition prerequisite failure).
+skill: quicksight-dashboard-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: enterprise-spice-athena-dashboard
+    description: >-
+      Provision an Enterprise edition QuickSight dashboard backed by
+      Athena with SPICE ingestion, hourly refresh, and RLS. Expects
+      READY_TO_DEPLOY with SPICE mode, refresh schedule, and RLS
+      dataset noted.
+    input: |
+      Create a QuickSight dashboard in us-east-1 (aws-account-id
+      123456789012, Enterprise edition). Data source: Athena workgroup
+      "primary". Dataset "sales_metrics" with SPICE mode, hourly refresh.
+      Analysis with 2 sheets. Dashboard "sales-dashboard". Enable
+      row-level security using a rules dataset mapping users to region
+      values. Tags: Environment=production, Domain=sales.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SPICE"
+        - "ds-athena-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "row-level security"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: template-multi-tenant-deployment
+    description: >-
+      Provision a template-based multi-tenant dashboard deployment.
+      Expects READY_TO_DEPLOY with template creation, per-tenant dataset
+      and dashboard creation, and template-based update propagation.
+    input: |
+      Create a QuickSight template "sales-template" from analysis
+      "sales-analysis" in us-east-1, aws-account-id 123456789012,
+      Enterprise edition. Deploy dashboards for Tenant A and Tenant B
+      from the template, each with its own dataset (ds-tenant-a-sales,
+      ds-tenant-b-sales) and RLS rules per tenant. Tags:
+      Environment=production, Pattern=multi-tenant.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "template"
+        - "multi-tenant"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "tenant-a"
+        - "tenant-b"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: vpc-connection-private-rds
+    description: >-
+      Provision a QuickSight dashboard connecting to a private RDS
+      PostgreSQL instance via a VPC connection. Expects READY_TO_DEPLOY
+      with VPC connection, IAM role for ENI management, and SPICE
+      dataset.
+    input: |
+      Create a QuickSight dashboard in us-east-1, aws-account-id
+      123456789012, Enterprise edition. Data source: private RDS
+      PostgreSQL at prod-db.cluster-abc123.us-east-1.rds.amazonaws.com
+      port 5432, database "analytics". VPC connection using subnets
+      subnet-aaa111, subnet-bbb222 and security group sg-quicksight.
+      IAM role arn:aws:iam::123456789012:role/QuickSightVpcRole.
+      Dataset "ops_metrics" with SPICE mode, daily refresh.
+      Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VPC connection"
+        - "POSTGRESQL"
+        - "SPICE"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "QuickSightVpcRole"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: direct-query-redshift
+    description: >-
+      Provision a QuickSight dashboard using Direct Query on Redshift.
+      Expects READY_TO_DEPLOY with Direct Query mode selected (Redshift
+      designed for analytical load), no SPICE refresh schedule, and
+      dashboard sharing noted.
+    input: |
+      Create a QuickSight dashboard in us-east-1, aws-account-id
+      123456789012, Enterprise edition. Data source: Redshift cluster
+      "analytics-cluster" at analytics.redshift.amazonaws.com port 5439,
+      database "warehouse". Dataset "executive_metrics" with Direct
+      Query mode (Redshift is designed for analytical queries).
+      Dashboard "exec-dashboard" shared with reader@example.com and
+      analyst@example.com as READERs. Tags: Environment=production,
+      Audience=executive.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "DIRECT_QUERY"
+        - "Redshift"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "N/A"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: standard-edition-vpc-prerequisite-fail
+    description: >-
+      Operator requests a VPC connection for a private RDS data source
+      but the QuickSight account is on Standard edition. VPC connections
+      require Enterprise. Expects PREREQUISITES_MISSING with the edition
+      gap cited.
+    input: |
+      Create a QuickSight dashboard connecting to a private RDS MySQL
+      instance via VPC connection. AWS account 123456789012, us-east-1,
+      Standard edition. Data source: private MySQL at
+      db.internal.example.com port 3306. Dashboard "internal-dashboard".
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Enterprise"
+        - "VPC connection"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Standard"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

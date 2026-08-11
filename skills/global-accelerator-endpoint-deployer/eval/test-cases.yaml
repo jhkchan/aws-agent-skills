@@ -1,0 +1,157 @@
+# Eval test cases for global-accelerator-endpoint-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Global Accelerator
+# topologies (single-region ALB, multi-region active-passive,
+# traffic dial canary, BYOIP integration, missing BYOIP pool).
+skill: global-accelerator-endpoint-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-west-2
+temperature: 0.0
+
+test_cases:
+  - id: single-region-alb
+    description: >-
+      Provision a Global Accelerator with a single endpoint group in
+      us-east-1, an ALB endpoint, TCP listener on ports 80/443, and
+      client IP preservation enabled. Expects READY_TO_DEPLOY.
+    input: |
+      Create a Global Accelerator in us-west-2 with two static anycast
+      IP addresses. Listener TCP ports 80 and 443. Endpoint group in
+      us-east-1 with traffic dial 1.0. Endpoint: ALB
+      arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/50dc6c495c0c9188
+      with weight 128. Enable client IP preservation. Health check
+      HTTPS on /health port 443, interval 10 seconds, threshold 3.
+      Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "anycast"
+        - "traffic dial"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "client IP preservation"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: multi-region-active-passive
+    description: >-
+      Provision a multi-region Global Accelerator with active-passive
+      failover: us-east-1 primary (traffic dial 1.0) and us-west-2 DR
+      (traffic dial 0.0). Expects READY_TO_DEPLOY with failover noted.
+    input: |
+      Create a Global Accelerator with two endpoint groups for
+      active-passive failover. Primary: us-east-1 with traffic dial
+      1.0, ALB endpoint
+      arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb-east/abc123.
+      DR: us-west-2 with traffic dial 0.0, ALB endpoint
+      arn:aws:elasticloadbalancing:us-west-2:123456789012:loadbalancer/app/prod-alb-west/def456.
+      Listener TCP port 443. Health check HTTPS /health port 443.
+      Enable flow logs to CloudWatch log group
+      /aws/globalaccelerator/prod. Tags: Environment=production,
+      Topology=active-passive.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "active-passive"
+        - "traffic dial"
+        - "us-east-1"
+        - "us-west-2"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "failover"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: traffic-dial-canary
+    description: >-
+      Provision a Global Accelerator with traffic dial canary: 90%
+      to us-east-1 and 10% to eu-west-1. Expects READY_TO_DEPLOY with
+      traffic dial values noted.
+    input: |
+      Create a Global Accelerator with a traffic dial canary
+      configuration. Endpoint group 1: us-east-1 with traffic dial
+      0.9, NLB endpoint
+      arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/prod-nlb/aaa111.
+      Endpoint group 2: eu-west-1 with traffic dial 0.1, NLB endpoint
+      arn:aws:elasticloadbalancing:eu-west-1:123456789012:loadbalancer/net/prod-nlb-eu/bbb222.
+      Listener TCP port 443. Health check TCP port 443, interval 10.
+      Tags: Environment=staging, Strategy=canary.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "traffic dial"
+        - "0.9"
+        - "0.1"
+        - "eu-west-1"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: byoip-accelerator
+    description: >-
+      Provision a Global Accelerator with BYOIP integration. The BYOIP
+      pool 203.0.113.0/24 is already in READY state. Expects
+      READY_TO_DEPLOY with BYOIP cited.
+    input: |
+      Create a Global Accelerator using BYOIP pool 203.0.113.0/24 which
+      is already provisioned and advertised (READY state). Listener
+      TCP ports 80 and 443. Endpoint group in us-east-1 with traffic
+      dial 1.0. Endpoint: EC2 instance 10.0.1.10 with weight 128.
+      Health check TCP port 80, interval 10. Tags: Environment=prod,
+      IPType=byoip.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "BYOIP"
+        - "203.0.113.0/24"
+        - "anycast"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-byoip-pool
+    description: >-
+      Operator requests a BYOIP Global Accelerator but the BYOIP pool
+      is not yet provisioned. This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING.
+    input: |
+      Create a Global Accelerator using BYOIP pool 198.51.100.0/24.
+      The BYOIP pool has not been provisioned yet (it is not in READY
+      state). Listener TCP port 443. Endpoint group in us-east-1.
+      Tags: Environment=prod.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "BYOIP"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "198.51.100.0/24"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

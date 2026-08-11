@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides many expert heuristics (cost crossover formula, mode\u2011switch throttling, exact iterator\u2011age thresholds, consumer\u2011count decision tree). However it omits region\u2011specific cost numbers, exact on\u2011demand scaling limits, and the precise data\u2011retrieval fee per consumer\u2011shard\u2011hour, so the knowledge is not completely novel."
+      "justification": "Provides several expert\u2011level specifics not in a baseline model: cost\u2011crossover formula with concrete $ values, mode\u2011switch throttling (15\u202fmin), exact shard\u2011sizing formula, consumer\u2011count decision tree for enhanced fan\u2011out, and precise IteratorAge alarm thresholds tied to retention period. Missing only a few niche limits (e.g., max streams per account)."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Defines a clear AWS\u2011specific provisioning workflow (prerequisite checks, mode decision, shard sizing, CLI/IaC commands, consumer registration, encryption, IAM, CloudWatch alarms). Missing a step to detect an existing stream or handle creation\u2011failure retries, and no explicit guidance for creating IAM roles/policies, which are needed in practice."
+      "justification": "Encodes AWS\u2011specific workflow: decision tree for mode selection, shard\u2011count calculation, ordered CLI steps (create, wait, set retention, register consumer, enable encryption, create alarms, tag). Includes mindset misconceptions. Deducted 1 point because IAM policy creation is referenced but not placed in the procedural sequence."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never specify shard count for on\u2011demand, never grant kinesis:* on *, never skip IteratorAge alarm, never use CMK without service\u2011principal). Only minor omission: no explicit warning about TLS\u202f1.2 enforcement or the soft\u2011limit of 20 enhanced\u2011fan\u2011out consumers."
+      "justification": "Robust NEVER list with specific reasons (e.g., never specify shard count for on\u2011demand, never grant * on *, never skip iterator\u2011age alarm). Omits a warning about using the default AWS\u2011managed KMS key versus a customer\u2011managed CMK and the associated security implications."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is thorough and includes when\u2011to\u2011use, triggers, keywords, and output contract. The specification lacks a formal schema for the checklist (e.g., required fields, data types) and does not explicitly document error\u2011handling output beyond the verdict, which could cause activation ambiguity."
+      "justification": "Front\u2011matter is complete, description clearly states WHAT it does, WHEN to invoke, and provides rich keywords and triggers. Output contract is precisely defined. Deducted 1 point because the \"when_to_use\" paragraph could be more succinct; the activation triggers are listed but not tied to a formal schema that an agent could parse reliably."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick navigation, mindset, heuristics, step\u2011by\u2011step, NEVER list, output format). Critical anti\u2011pattern warnings are placed near the end, risking they are missed, and the initial sections are dense, causing some cognitive overload."
+      "justification": "Uses a navigation table, separates mindset, heuristics, step\u2011by\u2011step instructions, and NEVER list, allowing readers to skim or dive deeper. Slight overload in early sections (large heuristic blocks before the checklist) prevents perfect layering."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (stream creation) are gated by a prerequisite checklist and explicit mode decisions. However the skill permits any stream name without enforcing naming constraints beyond length, and it does not restrict shard\u2011count ranges, leaving some freedom too loose for a fragile operation."
+      "justification": "Calibrates freedom well: destructive actions (stream creation) are gated by a prerequisite checklist, NEVER list restricts unsafe defaults, and the output format is strict. Lost 1 point because the skill does not explicitly limit the magnitude of shard\u2011count updates (e.g., warns against >2\u00d7 scaling in a single call) in the procedural steps."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 dependency graph \u2192 heuristics \u2192 procedural steps \u2192 NEVER list \u2192 output format). The structure is mostly consistent, but the inclusion of ad\u2011hoc sections like \u2018Recent features\u2019 and \u2018Error handling\u2019 slightly breaks the uniformity."
+      "justification": "Follows the established skill pattern (activation keywords, strict output contract, quick navigation, mindset, configuration graph, stepwise process, NEVER list, output format, examples, error handling). Minor ad\u2011hoc ordering of heuristics before steps costs one point."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides decision trees, ready\u2011to\u2011run CLI commands, checklist, verification commands, and error\u2011handling tips. Lacks guidance for handling pre\u2011existing streams, attaching IAM policies, region overrides, and detailed KMS policy creation, which are common edge cases in real deployments."
+      "justification": "Provides working CLI commands, checklist template, verification commands, and error handling. Gaps: no explicit commands for creating the required IAM policies, no guidance for handling an already\u2011existing stream, and tagging steps are only in examples, not in the main procedure."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47674,
-  "latency_ms": 7665,
+  "token_count": 48319,
+  "latency_ms": 11852,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

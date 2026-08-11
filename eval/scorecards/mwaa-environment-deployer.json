@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 18,
+      "score": 16,
       "max": 20,
-      "justification": "Provides concrete expert heuristics not commonly known: exact VPC requirement of 2 private subnets in different AZs, NAT gateway or S3 VPC endpoint check tree, precise execution\u2011class sizing thresholds (<100, 100\u2011500, >500 concurrent tasks), exact cost figures, KMS encryption scope, package\u2011size limit, and detailed IAM permission list. This is genuine delta beyond a baseline model."
+      "justification": "Provides expert\u2011level heuristics not usually known to a baseline model (exact 2\u2011private\u2011subnet requirement, execution\u2011class sizing thresholds, exact version\u2011pinning rules, IAM permission matrix). Missing deeper delta such as KMS key rotation best\u2011practice and cross\u2011region S3 bucket limitations, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific step\u2011by\u2011step procedures: CLI commands for subnet verification, NAT/VPC\u2011endpoint discovery, environment creation with all required flags, and update commands. Procedure is specific to MWAA, not generic \"check security\". Slightly deducts for missing explicit rollback or update\u2011environment procedure for changing execution class."
+      "justification": "Encodes AWS\u2011specific ordering (VPC readiness \u2192 IAM role \u2192 S3 bucket \u2192 environment creation) and decision trees. Some steps are described generically (e.g., \"verify with aws cli\") without explicit AWS\u2011only ordering nuances, leading to a small deduction."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list (10 items) with concrete reasons (e.g., unpinned requirements, single subnet, missing logs). Provides rationale for each anti\u2011pattern. Deducts one point because it could include a warning about forgetting the trust policy in the IAM role."
+      "justification": "The NEVER list enumerates concrete pitfalls with clear reasoning (e.g., never use a single subnet, never leave requirements.txt unpinned). One minor omission: it does not warn against using a public S3 bucket for DAGs, which is a common security anti\u2011pattern."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete and description explains WHAT, WHEN, and KEYWORDS. Missing a concise, machine\u2011readable \"activation\" field and the trigger list is embedded in prose, which could cause unreliable activation."
+      "justification": "Front\u2011matter is complete, description, keywords, triggers, and output contract are well defined. The only shortfall is the absence of an explicit \"activation trigger\" field beyond keywords, which could affect reliable invocation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Information is layered: high\u2011level overview, quick navigation, detailed heuristics, step\u2011by\u2011step guide, NEVER list, and then output format. However, the skill packs many tables and code blocks early, which can cause some cognitive overload for a first\u2011time reader."
+      "justification": "Information is layered into sections and a quick\u2011navigation table, but the initial part of the skill is dense with heuristics, causing potential cognitive overload before the checklist is reached."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (environment creation) are tightly gated by prerequisite checks and a strict output contract. Slight deduction because optional fields like startup/stop time are left loosely constrained."
+      "justification": "Destructive actions (environment creation) are guarded by a prerequisite checklist, but parameter constraints are loose\u2014min/max workers are not validated against the chosen execution class limits, and the skill does not enforce region consistency for the S3 bucket versus the MWAA environment."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Steps \u2192 NEVER \u2192 Output format). Deducted one point because the mix of tables, prose, and code blocks feels a bit ad\u2011hoc rather than a single unified template."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). Minor inconsistency in section labeling prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides a working CLI command, checklist, verification commands, and error\u2011handling guidance, enabling an agent to execute the skill. Deducted three points for missing handling of region parameter propagation, lack of explicit validation for plugin\u2011zip naming, and limited guidance on IAM permission errors."
+      "justification": "Provides working CLI examples and a ready\u2011to\u2011use checklist, but lacks handling for common edge cases such as updating an existing environment, dealing with API failures, or automatically adjusting for different AWS regions. Error\u2011handling branches are missing."
     }
   ],
-  "total_score": 107,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43757,
-  "latency_ms": 12029,
+  "token_count": 43149,
+  "latency_ms": 11013,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

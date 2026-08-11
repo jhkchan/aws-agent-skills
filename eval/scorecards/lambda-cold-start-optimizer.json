@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill consolidates many concrete AWS\u2011specific data points (e.g., 1769\u202fMB = 1\u202fvCPU, SnapStart restores init in ~200\u202fms, hyperplane ENI <100\u202fms, memory\u2011to\u2011CPU latency curve, Power Tuning latency\u2011optimal memory) that a generic model would not enumerate together. However, most of these facts are publicly documented and a capable model could already retrieve them, so the added delta is valuable but not revolutionary."
+      "justification": "The skill provides many concrete numbers (e.g., SnapStart restores to ~200\u202fms, hyperplane ENI <100\u202fms, memory\u2011vCPU breakpoint at 1769\u202fMB) and a full decision matrix, which a junior model would not know. However, most of the content restates official AWS documentation (memory\u2011CPU mapping, SnapStart availability, provisioned concurrency cost) without adding novel heuristics or unpublished thresholds, so the genuine delta is limited."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific decision flow (SnapStart \u2192 init\u2011phase \u2192 provisioned concurrency \u2192 memory \u2192 runtime \u2192 package) and exact CLI sequences for each lever, including version publishing for SnapStart and autoscaling registration for provisioned concurrency. The only shortfall is the lack of a single, explicit \u201cprocedure checklist\u201d that could be invoked verbatim."
+      "justification": "Defines a clear, AWS\u2011specific decision flow (SnapStart \u2192 init\u2011phase \u2192 provisioned concurrency \u2192 memory \u2192 runtime \u2192 package) and supplies exact CLI commands for each step. Some procedures are still generic (e.g., \u201ccheck cost envelope\u201d) and could be more detailed for sizing provisioned concurrency."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never recommend SnapStart for non\u2011Java, never enable PC for async workloads, never attribute VPC latency without ENI health). Missing: a deeper explanation of why increasing memory without Power Tuning data is risky, and no explicit cost\u2011only anti\u2011pattern section."
+      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never recommend SnapStart for non\u2011Java, never enable PC for async workloads, never attribute VPC latency without ENI health). Missing a specific anti\u2011pattern for mis\u2011reporting SLO compliance, which caused an error in a sample output."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, description, activation triggers, invocation schema, and example are all present and well\u2011formed. The \"when_to_use\" paragraph is a bit verbose and could be tighter, but it still enables reliable activation."
+      "justification": "Full front\u2011matter, detailed description, clear when_to_use / when_not_to_use, activation triggers, invocation schema, and example. Only minor weakness: the description could more explicitly state the exact trigger conditions for the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level quick start, then mindset, then step\u2011by\u2011step details, then anti\u2011patterns \u2013 a good layering. However the Quick\u2011Reference table and some CLI snippets are dense, causing a slight cognitive overload early on."
+      "justification": "Uses layered sections (quick start, mindset, step\u2011by\u2011step, deep references) so the agent gets just\u2011enough at each level. However, the Quick reference matrix is dense and could overload a first\u2011pass reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (SnapStart enable, provisioned concurrency, memory update) are gated behind an explicit CONFIRM prompt and pre\u2011flight safety checks. The only minor gap is that cost\u2011justification thresholds (e.g., max idle PC cost) are described qualitatively, not as hard limits."
+      "justification": "Destructive actions (CLI changes) are gated by a CONFIRM step and safety checks; creative analysis steps are left open. Calibration is appropriate for the fragility of state\u2011changing operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Process \u2192 Steps \u2192 Output format \u2192 Anti\u2011Patterns). The structure is consistent across sections, though the naming of sections (e.g., \"Step 0 non\u2011obvious behaviours\") is slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Process steps \u2192 Output format \u2192 Anti\u2011Patterns). Structure is coherent, though some headings (e.g., \u201cStep 0 non\u2011obvious behaviours\u201d) feel ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Model outputs are largely executable with correct math and CLI commands. However, the provisioned\u2011concurrency example omits the required version/alias publish step, violating the safety procedure described in the skill. This missing step reduces usability."
+      "justification": "Agents can execute the skill: all CLI commands, decision matrix, and output format are provided. Weaknesses: Power Tuning invocation details are only referenced, not inlined, forcing the agent to locate external docs; the fallback when InitDuration metrics are missing is described but lacks a concrete alternative metric calculation, leaving edge\u2011case handling vague."
     }
   ],
-  "total_score": 106,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47012,
-  "latency_ms": 13931,
+  "token_count": 47114,
+  "latency_ms": 17914,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

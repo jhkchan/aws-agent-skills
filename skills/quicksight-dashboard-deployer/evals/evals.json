@@ -1,0 +1,177 @@
+{
+  "skill": "quicksight-dashboard-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the QuickSight Dashboard Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across QuickSight scenarios (Enterprise SPICE dashboard with Athena + RLS, template-based multi-tenant deployment, private RDS via VPC connection, Direct Query on Redshift, VPC connection with Standard edition prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "enterprise-spice-athena-dashboard",
+      "name": "Enterprise SPICE dashboard with Athena data source and RLS",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Enterprise edition, SPICE ingestion from Athena, hourly refresh schedule, row-level security via rules dataset",
+      "prompt": "Create a QuickSight dashboard in us-east-1 (aws-account-id 123456789012, Enterprise edition). Data source: Athena workgroup primary. Dataset sales_metrics with SPICE mode, hourly refresh. Analysis with 2 sheets. Dashboard sales-dashboard. Enable row-level security using a rules dataset mapping users to region values. Tags: Environment=production, Domain=sales.",
+      "prompt_file": "prompts/enterprise-spice-athena-dashboard.md",
+      "baseline_file": "baselines/enterprise-spice-athena-dashboard.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QUICKSIGHT_DASHBOARD: sales-dashboard (version 1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] QuickSight account: my-org-quicksight (edition: Enterprise, region: us-east-1)\n  [✓] Data source: ds-athena-prod (type: Athena)\n  [✓] Dataset: ds-sales-metrics (mode: SPICE)\n  [✓] SPICE refresh schedule: HOURLY\n  [✓] Row-level security: ENABLED\nVERIFICATION_COMMANDS:\n  aws quicksight describe-dashboard --aws-account-id 123456789012 --dashboard-id sales-dashboard --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SPICE",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "row-level security"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template-multi-tenant-deployment",
+      "name": "Template-based multi-tenant dashboard deployment",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — template creation from analysis, per-tenant datasets and dashboards from template, RLS per tenant, template update propagation",
+      "prompt": "Create a QuickSight template sales-template from analysis sales-analysis in us-east-1, aws-account-id 123456789012, Enterprise edition. Deploy dashboards for Tenant A and Tenant B from the template, each with its own dataset (ds-tenant-a-sales, ds-tenant-b-sales) and RLS rules per tenant. Tags: Environment=production, Pattern=multi-tenant.",
+      "prompt_file": "prompts/template-multi-tenant-deployment.md",
+      "baseline_file": "baselines/template-multi-tenant-deployment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QUICKSIGHT_DASHBOARD: tenant-a-sales (version 1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Template: sales-template (version: 1)\n  [✓] Dataset: ds-tenant-a-sales (mode: SPICE)\n  [✓] Row-level security: ENABLED\nVERIFICATION_COMMANDS:\n  aws quicksight describe-template --aws-account-id 123456789012 --template-id sales-template --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "template",
+            "multi-tenant",
+            "VERDICT",
+            "CHECKLIST",
+            "tenant-a"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vpc-connection-private-rds",
+      "name": "Private RDS PostgreSQL via VPC connection with SPICE dataset",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Enterprise edition, VPC connection for private RDS, IAM role for ENI management, SPICE dataset with daily refresh",
+      "prompt": "Create a QuickSight dashboard in us-east-1, aws-account-id 123456789012, Enterprise edition. Data source: private RDS PostgreSQL at prod-db.cluster-abc123.us-east-1.rds.amazonaws.com port 5432, database analytics. VPC connection using subnets subnet-aaa111, subnet-bbb222 and security group sg-quicksight. IAM role arn:aws:iam::123456789012:role/QuickSightVpcRole. Dataset ops_metrics with SPICE mode, daily refresh. Tags: Environment=production.",
+      "prompt_file": "prompts/vpc-connection-private-rds.md",
+      "baseline_file": "baselines/vpc-connection-private-rds.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QUICKSIGHT_DASHBOARD: ops-dashboard (version 1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Data source: ds-rds-prod (type: PostgreSQL)\n  [✓] VPC connection: vpc-conn-prod (status: AVAILABLE)\n  [✓] Dataset: ds-ops-metrics (mode: SPICE)\n  [✓] IAM service role: arn:aws:iam::123456789012:role/QuickSightVpcRole\nVERIFICATION_COMMANDS:\n  aws quicksight describe-vpc-connection --aws-account-id 123456789012 --vpc-connection-id vpc-conn-prod --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "VPC connection",
+            "POSTGRESQL",
+            "SPICE",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "direct-query-redshift",
+      "name": "Direct Query dashboard on Redshift for executive analytics",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Direct Query on Redshift (analytical store designed for this load), no SPICE refresh schedule, dashboard shared with readers",
+      "prompt": "Create a QuickSight dashboard in us-east-1, aws-account-id 123456789012, Enterprise edition. Data source: Redshift cluster analytics-cluster at analytics.redshift.amazonaws.com port 5439, database warehouse. Dataset executive_metrics with Direct Query mode (Redshift is designed for analytical queries). Dashboard exec-dashboard shared with reader@example.com and analyst@example.com as READERs. Tags: Environment=production, Audience=executive.",
+      "prompt_file": "prompts/direct-query-redshift.md",
+      "baseline_file": "baselines/direct-query-redshift.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QUICKSIGHT_DASHBOARD: exec-dashboard (version 1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Data source: ds-redshift-prod (type: Redshift)\n  [✓] Dataset: ds-executive-metrics (mode: DIRECT_QUERY)\n  [✓] SPICE refresh schedule: N/A (Direct Query)\n  [✓] Dashboard sharing: 2 users, roles: READER\nVERIFICATION_COMMANDS:\n  aws quicksight describe-dashboard --aws-account-id 123456789012 --dashboard-id exec-dashboard --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "DIRECT_QUERY",
+            "VERDICT",
+            "CHECKLIST",
+            "N/A"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "standard-edition-vpc-prerequisite-fail",
+      "name": "VPC connection requested with Standard edition (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Standard edition does not support VPC connections; Enterprise required",
+      "prompt": "Create a QuickSight dashboard connecting to a private RDS MySQL instance via VPC connection. AWS account 123456789012, us-east-1, Standard edition. Data source: private MySQL at db.internal.example.com port 3306. Dashboard internal-dashboard.",
+      "prompt_file": "prompts/standard-edition-vpc-prerequisite-fail.md",
+      "baseline_file": "baselines/standard-edition-vpc-prerequisite-fail.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "QUICKSIGHT_DASHBOARD: internal-dashboard\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] QuickSight account: Standard edition — VPC connection requires Enterprise edition",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "Enterprise",
+            "VPC connection",
+            "VERDICT",
+            "CHECKLIST",
+            "Standard"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

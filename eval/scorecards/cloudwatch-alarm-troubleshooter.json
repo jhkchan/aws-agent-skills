@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 15,
+      "score": 14,
       "max": 20,
-      "justification": "The skill compiles many known CloudWatch alarm quirks but adds little truly novel expert insight (e.g., no new decision thresholds, no unpublished AWS nuances). It restates information a capable model could already generate, so it falls short of the full 20."
+      "justification": "The skill compiles many known CloudWatch alarm quirks (case\u2011sensitive dimensions, period\u2011resolution rules, permission requirements) but largely restates information that a senior CloudOps engineer could already cite; it does not introduce a novel decision matrix, threshold values, or previously undocumented exception."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and well\u2011ordered (pre\u2011flight, symptom\u2011driven steps, confirmation gate), yet some steps remain generic \u2013 e.g., \"run get-metric-data\" without guidance on pagination, error handling, or retry logic, and no explicit ordering when multiple complex layers (composite vs math) coexist."
+      "justification": "Provides a solid AWS\u2011specific diagnostic flow (pre\u2011flight gate, stepwise probes, CLI command order) yet the ordering of some probes (e.g., checking alarm\u2011history before metric\u2011data) is not optimally justified, leaving a small procedural gap."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The NEVER section lists many concrete pitfalls with clear reasoning, but a few entries (e.g., the SEARCH function warning) lack an explicit \"why it fails\" explanation, leaving a minor gap in depth."
+      "justification": "The NEVER section lists many concrete pitfalls with clear reasoning, but it omits a few common anti\u2011patterns such as forgetting to disable an alarm before overwriting it, or neglecting to validate cross\u2011account role permissions."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present and mostly precise. However, activation triggers omit some synonym phrases (e.g., \"alarm stuck\" vs \"alarm hanging\"), and the when_to_use paragraph could be tighter, causing slight ambiguity for automated activation."
+      "justification": "Front\u2011matter is complete, the description clearly states WHAT the skill does, WHEN to invoke it, and provides precise activation triggers and an invocation schema; the skill meets all specification requirements."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill provides a quick\u2011navigation table and layered sections, but the initial bulk of detailed tables and command blocks can overwhelm the reader before the most critical rules are highlighted."
+      "justification": "The document is well\u2011structured with a quick\u2011navigation table, but critical anti\u2011pattern rules and some deep\u2011dive tables are buried in long sections, causing a slight cognitive overload before the agent reaches the most actionable guidance."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 15,
       "max": 15,
-      "justification": "Destructive operations are gated behind explicit CONFIRM prompts; the calibration between read\u2011only probes and state\u2011changing fixes is precise."
+      "justification": "Destructive operations are gated behind explicit CONFIRM prompts, read\u2011only probes are prioritized, and the skill calibrates freedom appropriately for fragile alarm modifications."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "The overall structure follows a recognizable troubleshooting pattern, but the ordering of sections (e.g., mixing mindset with quick navigation) is slightly ad\u2011hoc rather than a strict template, preventing a perfect score."
+      "justification": "The skill follows a recognizable pattern (quick navigation, mindset, triage table, pre\u2011flight, diagnostic tree, output contract, NEVER list, remediation), making it easy to follow and consistent with other CloudOps skill templates."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "The skill supplies concrete CLI commands, decision branches, and output contracts, enabling an agent to act. However, it lacks guidance for handling CLI errors, pagination, rate\u2011limiting, and malformed inputs beyond a generic INSUFFICIENT_DATA fallback, which could cause execution failures."
+      "justification": "Provides concrete CLI commands, decision trees, and example outputs that an agent can execute, but it lacks explicit handling for malformed inputs, cross\u2011account alarm references, and some edge\u2011case error messages, leaving a few usability gaps."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46910,
-  "latency_ms": 12069,
+  "token_count": 46598,
+  "latency_ms": 17469,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

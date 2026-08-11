@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 14,
       "max": 20,
-      "justification": "The skill adds some expert insight (e.g., the cert\u2011policy\u2011thing triple binding, a detailed configuration dependency graph, and specific IAM permission nuances) but the majority of the content restates standard AWS IoT provisioning steps that a capable model already knows."
+      "justification": "Provides specific expert heuristics (cert\u2011policy\u2011thing triple binding, topic\u2011rule SQL on payload, shadow delta state) that go beyond generic documentation, but much of the content restates known AWS docs without deeper novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides a clear AWS\u2011specific procedural flow (CLI order, attachment sequence, verification commands) yet omits explicit rollback or idempotency procedures for existing resources, which limits its completeness."
+      "justification": "Lists the correct AWS\u2011specific order (thing \u2192 cert \u2192 policy \u2192 attach\u2011thing\u2011principal \u2192 attach\u2011policy) and includes detailed CLI steps, but some steps (e.g., \"verify prerequisites\") are generic and not tied to a concrete AWS check."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasons, but it could be richer (e.g., warning about overly permissive policy wildcards) and therefore loses one point."
+      "justification": "Contains a solid NEVER list with concrete pitfalls (e.g., never attach policy to a thing, never store private key insecurely) and reasons, yet a few items lack deeper explanation of failure modes (e.g., why attaching policy to thing silently fails)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS, and activation triggers are well defined. No missing elements."
+      "justification": "Front\u2011matter is complete, description and when\u2011to\u2011use are clear, and output contract is defined. However, activation triggers rely only on keyword lists; no explicit schema or example of the literal block that guarantees reliable skill invocation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The skill layers information (summary, quick\u2011navigation, detailed steps) but the initial sections are dense, causing some cognitive overload before the navigation table."
+      "justification": "Information is layered (mindset, graph, heuristics, step\u2011by\u2011step), but the document front\u2011loads a large amount of detail before the concise checklist, creating cognitive overload for quick reference."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Calibrates freedom appropriately for provisioning tasks (prerequisite checks, binding constraints) but lacks an explicit safeguard for destructive actions such as deleting a thing or certificate."
+      "justification": "Destructive actions are guarded by prerequisite checks and NEVER rules, yet optional components (Greengrass, custom authorizer) are left loosely constrained, allowing unnecessary freedom in some scenarios."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 heuristics \u2192 stepwise CLI \u2192 anti\u2011patterns \u2192 output format) though the mix of tables, code blocks, and narrative makes the structure slightly ad\u2011hoc."
+      "justification": "Follows a recognizable structure (mindset \u2192 dependency graph \u2192 heuristics \u2192 steps \u2192 NEVER \u2192 output format) but does not explicitly label the pattern (e.g., Mindset\u2011Process\u2011Checklist) and mixes tables with free text."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 8,
       "max": 15,
-      "justification": "Provides decision trees, CLI commands, and verification steps, enabling an agent to act, but lacks guidance for handling pre\u2011existing resources, error handling, and consistent region propagation; some example snippets omit critical attach\u2011policy steps."
+      "justification": "Model output shows mismatches: verification commands use get\u2011policy instead of get\u2011topic\u2011rule, checklist omits required items (topic rule, shadow) yet still returns READY_TO_DEPLOY, and optional fields are inconsistently handled, indicating the skill cannot be executed reliably without errors."
     }
   ],
-  "total_score": 107,
+  "total_score": 95,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42681,
-  "latency_ms": 27663,
+  "token_count": 40362,
+  "latency_ms": 11962,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

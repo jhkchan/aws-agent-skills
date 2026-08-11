@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill aggregates a large number of concrete Cognito thresholds (e.g., password length \u226512, token validity ranges, deletion\u2011protection default, ACM cert region requirement) and orders 14 pre\u2011checks into a decision tree. This is information a generic model may know in parts but not as a single, ready\u2011to\u2011execute checklist, providing genuine expert delta. However, most of the facts are publicly documented and not novel, so the score is below the maximum."
+      "justification": "The skill aggregates many documented Cognito limits, defaults, and best\u2011practice thresholds, but much of this information is already available in AWS docs. It does not introduce a novel decision tree for choosing MFA modes beyond the heuristic, nor does it provide new cost\u2011analysis data or undocumented edge\u2011case exceptions, so the expert delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "The skill encodes AWS\u2011specific procedures: pagination of list\u2011user\u2011pools, IAM permission checks, SNS role validation for SMS MFA, explicit CONFIRM gate, snapshot before update, and post\u2011verify steps. These are clearly Cognito\u2011centric rather than generic security steps. A minor deduction for occasional generic phrasing (e.g., \"run all pre\u2011checks\") but overall the procedure is highly specific."
+      "justification": "Procedures are AWS\u2011specific (pre\u2011flight checks, confirm gate, snapshot, post\u2011verify) and reflect senior\u2011engineer thinking. The only shortfall is a missing explicit step for handling pagination when listing user pools beyond a brief note, which could cause incomplete name\u2011collision checks."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "A concrete \"NEVER (top 5)\" list is provided with detailed security reasoning for each anti\u2011pattern (implicit flow, ALLOW_ADMIN_USER_PASSWORD_AUTH, missing deletion protection, etc.). The list is useful but limited to five items; additional common pitfalls (e.g., mis\u2011configured token revocation, overly permissive Lambda resource policies) are omitted, preventing a perfect score."
+      "justification": "The skill provides a concrete top\u20115 NEVER list with clear security reasoning. However, it omits other common pitfalls (e.g., never set token validity >1\u202fhour, never reuse client secrets across environments), reducing the completeness of anti\u2011pattern coverage."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "The skill includes complete front\u2011matter, a concise description, explicit activation triggers, an invocation schema, and a well\u2011defined output contract. All required metadata fields are present and correctly formatted, enabling reliable activation."
+      "justification": "Frontmatter, description, activation triggers, and invocation schema are well\u2011formed. The activation trigger list is very broad, which could cause accidental invocation in unrelated contexts, so a slight deduction is applied."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, common patterns, then the strict output contract. Critical rules are surfaced early, while deep technical examples are deferred. Slight deduction because the \"Common pool patterns\" section is fairly long and could overload a first\u2011time reader."
+      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process, patterns, output contract) effectively, but the full CLI examples appear early and may overload the reader before they have decided to proceed. A more staged reveal would be ideal."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained with a mandatory CONFIRM gate, pre\u2011checks, and snapshotting. Creative tasks (e.g., choosing MFA strategy) are left to heuristics. However, the example output still contains placeholder tokens (\"<returned-id>\") despite the rule against placeholders, indicating a calibration slip."
+      "justification": "Destructive actions are guarded by a mandatory CONFIRM gate and extensive pre\u2011checks, showing good calibration. The skill mentions delete only in a warning but does not provide a full delete\u2011flow plan, a minor gap for the most fragile operation."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern: overview, quick navigation, mindset, detailed process, output contract, anti\u2011pattern list, heuristics, and references. This coherent structure aids comprehension. One point deducted for occasional ad\u2011hoc ordering of sections (e.g., \"Recent AWS features\" appears after heuristics) which slightly breaks the flow."
+      "justification": "The document follows a recognizable pattern (overview \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 never list \u2192 heuristic). It is slightly ad\u2011hoc because sections like 'Quick navigation' and 'Common pool patterns' are not part of a canonical framework, costing one point."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 11,
       "max": 15,
-      "justification": "Provides exact CLI commands, decision trees, and verification steps, enabling an agent to act. However, the skill contains contradictory guidance: the strict output contract forbids placeholders, yet the \"Perfect example output\" uses <returned-id> placeholders, creating ambiguity. Update\u2011operation details are sparse, and edge\u2011case handling (e.g., immutable schema migration) is only mentioned briefly. These gaps reduce practical usability."
+      "justification": "Provides working CLI snippets, decision trees, and a strict output contract. However the example READY_TO_DEPLOY outputs contain placeholders like <returned-id>, violating the \u2018no placeholders\u2019 rule, and post\u2011verify steps are marked only as pending without concrete error\u2011handling branches."
     }
   ],
-  "total_score": 107,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 48827,
-  "latency_ms": 15161,
+  "token_count": 49142,
+  "latency_ms": 14114,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

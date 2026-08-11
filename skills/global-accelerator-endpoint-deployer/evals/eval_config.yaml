@@ -1,0 +1,49 @@
+# Eval configuration for global-accelerator-endpoint-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: global-accelerator-endpoint-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-west-2
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: single-region-alb
+    difficulty: hard
+    prompt_file: prompts/single-region-alb.md
+    baseline_file: baselines/single-region-alb.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: multi-region-active-passive
+    difficulty: hard
+    prompt_file: prompts/multi-region-active-passive.md
+    baseline_file: baselines/multi-region-active-passive.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: traffic-dial-canary
+    difficulty: medium
+    prompt_file: prompts/traffic-dial-canary.md
+    baseline_file: baselines/traffic-dial-canary.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: byoip-accelerator
+    difficulty: medium
+    prompt_file: prompts/byoip-accelerator.md
+    baseline_file: baselines/byoip-accelerator.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-byoip-pool
+    difficulty: easy
+    prompt_file: prompts/missing-byoip-pool.md
+    baseline_file: baselines/missing-byoip-pool.md
+    expected_verdict: PREREQUISITES_MISSING
