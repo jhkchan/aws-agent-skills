@@ -1,0 +1,153 @@
+# Eval test cases for pinpoint-segment-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across the segment-first
+# Pinpoint surface (dynamic segment with recompute behavior,
+# event-conditional journey branch, A/B test sample-size gate,
+# SMS sender ID vs long code number-type selection, segment-zero-
+# endpoints prerequisite failure).
+skill: pinpoint-segment-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: dynamic-segment-recompute
+    description: >-
+      Provision a Pinpoint dynamic segment with Behavior (DAY_7 ACTIVE)
+      and Demographic (Channel=GCM,APNS) dimensions, plus a campaign that
+      fires 7 days later. Expects READY_TO_DEPLOY with the dynamic-
+      recompute behavior flagged (segment size will differ at send time).
+    input: |
+      Create a Pinpoint dynamic segment on project app-abc123 named
+      "active-mobile-7d". Use Behavior: Recency DAY_7 ACTIVE. Use
+      Demographic: Channel INCLUSIVE [GCM, APNS]. Create a scheduled
+      campaign firing 7 days from now targeting this segment via email
+      template welcome-email. The email channel is already verified
+      (SES identity arn example.com). Project ID app-abc123.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "dynamic"
+        - "Behavior"
+        - "DAY_7"
+        - "GCM"
+        - "APNS"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: journey-event-conditional-branch
+    description: >-
+      Provision a multi-step journey with a CONDITIONAL_SPLIT on the
+      "purchase" event (7-day wait). Expects READY_TO_DEPLOY with the
+      WaitTime present on the conditional split and every path reaching
+      END.
+    input: |
+      Build a Pinpoint journey on project app-abc123 named
+      "onboarding-7d". ENTRY → Send welcome-email → WAIT 3d →
+      CONDITIONAL_SPLIT on event "purchase" (wait 7 days): YES branch
+      → Send thanks-email → END; NO branch → MULTIVARIATE_SPLIT
+      (50/50: discount-email → END, nudge-email → END). Email channel
+      verified. Segment active-mobile-7d.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "CONDITIONAL_SPLIT"
+        - "MULTIVARIATE_SPLIT"
+        - "WaitTime"
+        - "END"
+        - "purchase"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ab-test-sample-size
+    description: >-
+      Provision an A/B test with 3 treatments and a 20% holdout on a
+      segment with 18,000 endpoints. MDE is 2%. Expects READY_TO_DEPLOY
+      with sample-size gate passing (18,000 / 3 treatments = 6,000 per
+      treatment ≥ 5,000 threshold for 2-3% MDE).
+    input: |
+      Build an A/B test email campaign on project app-abc123. Segment
+      active-mobile-7d resolves to 18,000 endpoints. Three treatments
+      (subject-a, subject-b, subject-c) plus a 20% holdout. Treatment
+      percentages: 40/20/20 (holdout 20). Target MDE is 2%. Verify
+      sample-size adequacy before emitting create-campaign.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "holdout"
+        - "18,000"
+        - "MDE"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: sms-sender-id-and-long-code
+    description: >-
+      Provision an SMS campaign for US recipients with a long code
+      (10DLC) and verify the SMS channel is enabled. Expects
+      READY_TO_DEPLOY with long code + 10DLC campaign registry noted
+      (sender ID is NOT supported in the US).
+    input: |
+      Create an SMS campaign on project app-abc123 targeting US
+      recipients. Use the long code +1 555-123-4567 (10DLC, campaign
+      registry complete). Segment us-mobile-users resolves to 42,500
+      endpoints. Template otp-sms. Quiet time 22:00-08:00
+      America/Los_Angeles.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "long code"
+        - "10DLC"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "sender ID"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: segment-zero-endpoints-prereq
+    description: >-
+      Operator requests a campaign targeting a segment that resolves
+      to 0 endpoints. Expects PREREQUISITES_MISSING with the 0-endpoint
+      gap cited.
+    input: |
+      Create a campaign on project app-abc123 targeting segment
+      empty-segment-001. The segment resolves to 0 endpoints via
+      get-segment-estimate. Template welcome-email. Schedule immediate.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "0 endpoints"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

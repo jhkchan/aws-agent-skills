@@ -1,0 +1,49 @@
+# Eval configuration for connect-instance-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: connect-instance-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: contact-flow-with-lambda
+    difficulty: hard
+    prompt_file: prompts/contact-flow-with-lambda.md
+    baseline_file: baselines/contact-flow-with-lambda.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: routing-profile-skill-requirements
+    difficulty: hard
+    prompt_file: prompts/routing-profile-skill-requirements.md
+    baseline_file: baselines/routing-profile-skill-requirements.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: lex-bot-ivr-integration
+    difficulty: medium
+    prompt_file: prompts/lex-bot-ivr-integration.md
+    baseline_file: baselines/lex-bot-ivr-integration.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: phone-number-claim
+    difficulty: medium
+    prompt_file: prompts/phone-number-claim.md
+    baseline_file: baselines/phone-number-claim.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-instance-id-prereq
+    difficulty: easy
+    prompt_file: prompts/missing-instance-id-prereq.md
+    baseline_file: baselines/missing-instance-id-prereq.md
+    expected_verdict: PREREQUISITES_MISSING

@@ -188,154 +188,106 @@ provisioning time:
   measured: `vCPU` counts total vCPUs across associated instances,
   `Instance` counts each running instance, `Core` counts physical CPU
   cores. A license count of 100 with `vCPU` counting means 100 vCPUs
-  total — NOT 100 instances. Mixing these up causes silent over-
-  licensing or under-licensing.
+  total — NOT 100 instances.
 
 - **"Associating a license configuration with a resource automatically
   tracks it."** Only partially. The license configuration must be
-  associated with a resource (EC2 instance, AMI, launch template, or
-  SSM-managed instance), AND Systems Manager inventory must be enabled
-  for discovery of non-EC2 resources. For EC2, License Manager tracks
-  via the instance launch association. For on-premises or SSM-managed
-  instances, SSM inventory with the `Aws:SoftwareInventory` plugin is
-  REQUIRED for License Manager to discover and count them.
+  associated with a resource, AND Systems Manager inventory must be
+  enabled for discovery of non-EC2 resources. For on-premises or SSM-
+  managed instances, SSM inventory with the `Aws:SoftwareInventory`
+  plugin is REQUIRED for License Manager to discover them.
 
 - **"Cross-account license sharing works out of the box."** It does
-  NOT. Cross-account sharing requires: (1) AWS Organizations with all-
-  features enabled, (2) License Manager enabled as a trusted service
-  in Organizations, (3) a delegated administrator account, and (4) the
-  license configuration explicitly shared with member accounts via
-  `create-license-configuration-cross-account`. Without Organizations
-  integration, license configurations are account-local.
+  NOT. Cross-account sharing requires: (1) Organizations with all-
+  features enabled, (2) License Manager enabled as a trusted service,
+  (3) a delegated administrator account, and (4) explicit sharing to
+  member accounts. Without Organizations integration, configurations
+  are account-local.
 
 ## Configuration dependency graph (novel heuristic)
 
-License Manager configurations are NOT independent. The counting type
-determines the license rule syntax. Resource association depends on
-SSM enablement for non-EC2 resources. Cross-account sharing depends on
-Organizations. Use this graph to sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
+| Configuration | Hard dependencies | Silent failure | Enables |
 |---|---|---|---|
-| License configuration | license type known; count > 0; license rule syntax valid for the vendor | license rule syntax errors are only caught at enforcement time (not at creation) | the license tracking entity |
-| License rules | counting type selected; vendor rule format known | Oracle rules require `Tenancy` and `HonorVcpuOptimization`; wrong syntax = silent non-enforcement | enforcement at launch |
-| Resource association (EC2) | EC2 instance exists (or AMI/launch template) | association to a stopped instance still counts; association is a tracking link, not a billing link | consumption tracking |
-| Resource association (SSM/on-prem) | SSM managed instance active; SSM inventory configured | without SSM inventory, on-prem instances are invisible to License Manager | on-prem license tracking |
-| Cross-account sharing | Organizations all-features; License Manager trusted service; delegated admin configured | sharing to an account NOT in the Org silently fails; sharing requires explicit accept in target account | multi-account license distribution |
-| Violation detection | license configuration has a hard limit; resources associated | soft limit (enforce=false) NEVER triggers violations; alerting requires SNS/CloudWatch Events setup | compliance alerting |
-| Self-service grants | grant created with allowed operations; principal has IAM permission | grants without an expiry create permanent access security risk | delegated license management |
+| License configuration | license type known; count > 0; rule syntax valid | rule errors only caught at enforcement | the tracking entity |
+| License rules | counting type selected; vendor rule format known | wrong syntax = silent non-enforcement | enforcement at launch |
+| Resource association (EC2) | EC2 instance / AMI / launch template exists | association to stopped instance still counts | consumption tracking |
+| Resource association (SSM) | SSM managed instance active; inventory configured | without inventory, on-prem invisible | on-prem tracking |
+| Cross-account sharing | Organizations all-features; trusted service; delegated admin | sharing to non-Org account fails | multi-account distribution |
+| Violation detection | hard limit; resources associated | soft limit never triggers violations | compliance alerting |
+| Grants | allowed operations; principal has IAM permission | grants without expiry = permanent risk | delegated management |
 
-**The license-rules-row is the one a baseline model misses.** Creating
-a license configuration without the correct `LicenseRules` (the vendor-
-specific rule string) means License Manager accepts the configuration
-but does NOT enforce vendor-specific conditions (e.g., Oracle tenancy,
-SQL Server core factor). The procedure below forces an explicit
-decision on license rules per vendor.
-
-**Cross-dependency gotchas:**
-- License counting type and license rules MUST be consistent. An Oracle
-  database license with `Instance` counting but Oracle rules referencing
-  vCPU tenancy will not enforce correctly. Oracle is vCPU-counted.
-- Cross-account sharing requires the target account to accept the share.
-  The share is a request, not an automatic push.
-- SSM discovery for on-premises resources requires the `Aws:SoftwareInventory`
-  SSM document association with `Applications` collection enabled.
-- Hard limit (enforce=true) prevents new EC2 instance launches that
-  exceed the count. Soft limit (enforce=false) only alerts. This is a
-  critical decision that depends on compliance posture.
+**The license-rules row is the one a baseline model misses.** Creating
+a configuration without the correct `LicenseRules` means License Manager
+accepts it but does NOT enforce vendor-specific conditions. The
+procedure below forces an explicit decision on rules per vendor.
 
 ## Expert heuristic: vCPU vs instance-based vs cores-based counting
 
 A baseline model says "set the license count." The correct heuristic
-recognizes that the counting type fundamentally changes what is being
-measured and which vendor rules apply.
+recognizes that the counting type fundamentally changes what is measured.
 
 ```text
 LicenseCountingType:
-  ├── vCPU      → counts total vCPUs across all associated running instances
+  ├── vCPU      → counts total vCPUs across running associated instances
   │                Used for: Oracle, many per-vCPU commercial products
   │                License count = total vCPUs entitled
-  │                Example: 100 vCPUs = 50 instances of 2 vCPU each
+  │                100 vCPUs = 50 instances of 2 vCPU each
   │
   ├── Instance  → counts each running associated instance as 1 license
-  │                Used for: per-instance software (some middleware, ISV tools)
+  │                Used for: per-instance software (middleware, ISV tools)
   │                License count = total instances entitled
-  │                Example: 100 instances = 100 EC2 instances regardless of size
   │
-  └── Core      → counts physical CPU cores (NOT vCPUs; NOT hyperthreading)
-                   Used for: SQL Server, Windows Server (core-based licensing)
+  └── Core      → counts physical CPU cores (NOT vCPUs)
+                   Used for: SQL Server, Windows Server
                    License count = total cores entitled
-                   Example: 100 cores = 6 instances of 16 cores each
 ```
 
-**Key implication:** Oracle Database licenses are vCPU-counted (with
-specific tenancy and honor-vcpu-optimization rules). SQL Server licenses
-are core-counted (with a core factor of 0.5 for Standard, applies the
-core-factor table). Generic per-instance licenses use Instance counting.
+**Key implication:** Oracle Database is vCPU-counted. SQL Server is
+core-counted. Generic per-instance licenses use Instance counting.
 Choosing the wrong type makes the entire configuration non-compliant.
 
-## Expert heuristic: cross-Org license distribution via Organizations
-
-A baseline model says "share the license configuration." The correct
-heuristic recognizes that cross-account sharing via Organizations is a
-multi-step enablement, not a single API call.
+## Expert heuristic: cross-Org distribution via Organizations
 
 ```text
 Cross-account license sharing flow:
   1. Organization exists with ALL features enabled
      aws organizations describe-organization --query 'Organization.FeatureSet'
      → Must be "ALL" (not "CONSOLIDATED_BILLING")
-  2. License Manager is a trusted service in Organizations
+  2. License Manager is a trusted service
      aws organizations enable-aws-service-access \
        --service-principal license-manager.amazonaws.com
-  3. (Recommended) Delegated administrator for License Manager
+  3. (Recommended) Delegated administrator
      aws organizations register-delegated-administrator \
        --account-id <delegated-acct> \
        --service-principal license-manager.amazonaws.com
-  4. License configuration is shared cross-account
+  4. License configuration shared cross-account
      aws license-manager create-license-configuration-cross-account \
        --license-configuration-arn arn:aws:license-manager:... \
        --target-organization-structure '{"OrganizationalUnits":["ou-xxx"]}'
-     OR share to specific accounts
-  5. Target accounts accept the share (automatic for Org-shared configs)
-  6. Target accounts associate the shared configuration with their resources
+  5. Target accounts receive the share (automatic for OU-shared)
+  6. Target accounts associate the config with their resources
 ```
 
-**Key implication:** Without step 1-3, step 4 fails. The Organizations
-enablement is a prerequisite, not an option. The delegated administrator
-centralizes license management in a designated account (e.g., a
-governance/CTO account).
+**Key implication:** Without steps 1-3, step 4 fails. The Organizations
+enablement is a prerequisite, not an option.
 
 ## Expert heuristic: SSM managed instance discovery
 
-A baseline model says "associate the license config with instances."
-The correct heuristic recognizes that on-premises and non-EC2 resources
-require SSM managed instances with inventory enabled for License Manager
-to discover them.
+For EC2, the license configuration is associated at launch. For on-
+premises or SSM-managed instances, SSM inventory is the discovery
+mechanism.
 
 ```text
-SSM discovery for License Manager:
-  1. On-prem server is activated as an SSM managed instance
-     aws ssm create-activation --iam-role SSMServiceRole ...
-     → Server runs SSM agent, registers as mi-xxxx
-  2. SSM Inventory association collects software + OS data
-     aws ssm create-association \
-       --name AWS-InventoryManagement ...
-       → Targets: mi-xxxx
-       → Collect: Applications, "AWS:InstanceInformation"
+SSM discovery flow:
+  1. On-prem server activated as SSM managed instance (mi-xxxx)
+  2. SSM Inventory association collects software data
+     aws ssm create-association --name AWS-InventoryManagement ...
   3. License Manager reads SSM inventory to discover software
-     → Configuration → Discovery Settings → link to SSM inventory
-  4. License configuration associated with discovered resources
-     → Resource discovered by SSM shows in License Manager console
-  5. Consumption tracked against license count
+  4. Consumption tracked against license count
 ```
 
-**Key implication:** for EC2 instances, the license configuration can
-be associated at launch (via launch template or run-instances
---license-specifications) and License Manager tracks automatically. For
-on-premises or SSM-managed instances, SSM inventory is the discovery
-mechanism — without it, those resources are invisible to License
-Manager.
+**Key implication:** without SSM inventory, on-premises resources are
+invisible to License Manager.
 
 ## Prerequisites (verify before provisioning)
 
@@ -347,33 +299,32 @@ any are missing, the verdict is **PREREQUISITES_MISSING**.
 | License counting type identified | Determines measurement method | Confirm vCPU, Instance, or Core |
 | License count known | Total entitlement to track | Confirm owned license count |
 | License rule syntax (if vendor-specific) | Vendor rules enforced at launch | Validate rule format for Oracle/SQL Server |
-| Enforcement decision (hard vs soft limit) | Hard limit blocks launches; soft only alerts | Confirm `LicenseRulesEnforce` choice |
-| AWS Organizations all-features (if cross-account) | Required for Org-based sharing | `aws organizations describe-organization` |
-| License Manager trusted in Organizations (if cross-account) | Service access for cross-account sharing | `aws organizations list-aws-service-access-for-organization` |
-| Delegated administrator (if cross-account, recommended) | Centralized license management | `aws organizations list-delegated-administrators` |
-| SSM inventory configured (if on-premises discovery) | Required for non-EC2 resource discovery | `aws ssm describe-instance-information` |
-| SNS topic ARN (if violation alerting) | Alerting destination | `aws sns list-topics` |
+| Enforcement decision (hard vs soft) | Hard blocks launches; soft only alerts | Confirm `LicenseRulesEnforce` choice |
+| Organizations all-features (if cross-account) | Required for Org-based sharing | `aws organizations describe-organization` |
+| License Manager trusted (if cross-account) | Service access for sharing | `aws organizations list-aws-service-access-for-organization` |
+| Delegated administrator (if cross-account) | Centralized license management | `aws organizations list-delegated-administrators` |
+| SSM inventory configured (if on-prem) | Required for non-EC2 discovery | `aws ssm describe-instance-information` |
+| SNS topic ARN (if alerting) | Alerting destination | `aws sns list-topics` |
 
 If any prerequisite is missing, output `VERDICT: PREREQUISITES_MISSING`
 and cite the specific gap.
 
 ## Step 1 — License configuration model
 
-A license configuration is the central entity in License Manager. It
-defines the license type, count, rules, and enforcement behavior.
+A license configuration is the central entity in License Manager.
 
 | Element | Description | API field |
 |---|---|---|
 | Name | Configuration identifier | `--name` |
 | License type | Counting method (vCPU/Instance/Core) | `--license-counting-type` |
 | License count | Total entitlement | `--license-count` |
-| License rules | Vendor-specific rule string (JSON) | `--license-rules` |
-| Enforcement | Hard limit (block) or soft (alert) | `--license-rules-enforce` (true/false) |
+| License rules | Vendor-specific rule string | `--license-rules` |
+| Enforcement | Hard limit or soft (alert only) | `--license-rules-enforce` |
 
 **Create a license configuration:**
 
 ```bash
-LIC_CONFIG_ID=$(aws license-manager create-license-configuration \
+LIC_CONFIG_ARN=$(aws license-manager create-license-configuration \
   --name "oracle-db-vcpu-tracking" \
   --license-counting-type vCPU \
   --license-count 100 \
@@ -381,16 +332,6 @@ LIC_CONFIG_ID=$(aws license-manager create-license-configuration \
   --license-rules-enforce \
   --region us-east-1 \
   --query 'LicenseConfigurationArn' --output text)
-
-echo "License configuration ARN: $LIC_CONFIG_ID"
-```
-
-**Verify the configuration:**
-
-```bash
-aws license-manager get-license-configuration \
-  --license-configuration-arn "$LIC_CONFIG_ID" \
-  --region us-east-1
 ```
 
 ## Step 2 — License type selection (vCPU, instance, cores)
@@ -401,71 +342,63 @@ aws license-manager get-license-configuration \
 | `Instance` | Each running associated instance = 1 | Per-instance middleware/tools | Total instances |
 | `Core` | Physical CPU cores (not vCPUs) | SQL Server, Windows Server | Total cores |
 
-**Critical:** the counting type determines what `LicenseCount` means.
-A count of 100 with vCPU counting = 100 vCPUs total. With Instance
-counting, 100 = 100 instances. With Core counting, 100 = 100 cores.
-Misunderstanding this is the #1 cause of silent over/under-licensing.
+**Critical:** the counting type determines what `LicenseCount` means. A
+count of 100 with vCPU = 100 vCPUs. With Instance = 100 instances. With
+Core = 100 cores. Misunderstanding this is the #1 cause of silent
+over/under-licensing.
 
 ## Step 3 — License rules (vendor-specific syntax)
 
 License rules are vendor-specific conditions expressed as a comma-
-separated key=value string. Different vendors have different rule
-schemas.
+separated key=value string.
 
 ### Oracle Database license rules
 
 ```bash
-# Oracle Database — vCPU counting, shared tenancy, honor vCPU optimization
+# Oracle Database — vCPU counting, shared tenancy, honor vCPU opt
 LICENSE_RULES='Tenancy=Shared,HonorVcpuOptimization=true'
 
-# Oracle Database — dedicated host (Bring Your Own License to a Dedicated Host)
+# Oracle Database — dedicated host (BYOL)
 LICENSE_RULES='Tenancy=Host,HonorVcpuOptimization=true'
-
-# Oracle Database — dedicated instance
-LICENSE_RULES='Tenancy=Instance,HonorVcpuOptimization=true'
 ```
 
 | Rule key | Values | Effect |
 |---|---|---|
 | `Tenancy` | `Shared`, `Instance`, `Host` | Resource tenancy constraint |
-| `HonorVcpuOptimization` | `true`, `false` | If true, treats 4 vCPUs as 1 license when thread scheduling is enabled |
+| `HonorVcpuOptimization` | `true`, `false` | If true, treats 4 vCPUs as 1 license (matches Oracle model) |
 
 ### SQL Server license rules
 
 ```bash
-# SQL Server — core-based with 0.5 core factor for Standard Edition
+# SQL Server Standard — core-based with 0.5 core factor
 LICENSE_RULES='location=EC2,coreFactor=0.5'
 
-# SQL Server — core-based with 1.0 core factor for Enterprise Edition
+# SQL Server Enterprise — core-based with 1.0 core factor
 LICENSE_RULES='location=EC2,coreFactor=1.0'
 ```
 
 | Rule key | Values | Effect |
 |---|---|---|
 | `location` | `EC2`, `Host` | Resource location constraint |
-| `coreFactor` | Decimal (0.5, 1.0) | Multiplier applied to physical cores for counting |
+| `coreFactor` | Decimal (0.5, 1.0) | Multiplier applied to physical cores |
 
-**Common mistake:** creating a license configuration without
-`--license-rules`. The configuration is created but no vendor-specific
-enforcement occurs. This is the #2 cause of silent non-compliance (the
-#1 being wrong counting type).
+**Common mistake:** creating a configuration without `--license-rules`.
+It is accepted but no vendor-specific enforcement occurs. This is the
+#2 cause of silent non-compliance.
 
 ## Step 4 — Resource associations (EC2, SSM, on-prem)
-
-A license configuration must be associated with resources for
-consumption tracking.
 
 ### Association at EC2 instance launch (recommended)
 
 ```bash
-# Associate via launch template (recommended)
+# Associate via launch template
 aws ec2 create-launch-template \
   --launch-template-name oracle-workload-template \
   --launch-template-data '{
     "ImageId":"ami-xxx",
     "InstanceType":"m5.2xlarge",
     "LicenseSpecifications":[
-      {"LicenseConfigurationArn":"'"$LIC_CONFIG_ID"'"}
+      {"LicenseConfigurationArn":"'"$LIC_CONFIG_ARN"'"}
     ]
   }'
 
@@ -473,63 +406,34 @@ aws ec2 create-launch-template \
 aws ec2 run-instances \
   --image-id ami-xxx \
   --instance-type m5.2xlarge \
-  --license-specifications "LicenseConfigurationArn=$LIC_CONFIG_ID" \
-  --region us-east-1
+  --license-specifications "LicenseConfigurationArn=$LIC_CONFIG_ARN"
 ```
 
-### Association with existing resources
+### Association with existing AMI
 
 ```bash
-# Associate with an existing AMI (inherits to all instances launched from it)
 aws license-manager associate-license-to-ami \
-  --license-configuration-arn "$LIC_CONFIG_ID" \
-  --resource-id ami-xxx \
-  --region us-east-1
-
-# License Manager tracks EC2 instances via SSM inventory
-# For non-EC2 (on-premises), see references/cross-account-and-discovery.md
+  --license-configuration-arn "$LIC_CONFIG_ARN" \
+  --resource-id ami-xxx
 ```
 
-### SSM managed instance discovery
-
-For on-premises or SSM-managed instances, SSM inventory MUST be enabled:
-
-```bash
-# Verify SSM inventory is configured
-aws ssm describe-instance-information \
-  --filters "Key=ResourceType,Values=ManagedInstance" \
-  --region us-east-1
-
-# Check inventory association (must include Applications collection)
-aws ssm describe-association \
-  --association-id "$ASSOC_ID" --region us-east-1
-```
+For on-premises or SSM-managed instances, SSM inventory MUST be enabled
+(see references/cross-account-and-discovery.md).
 
 ## Step 5 — Cross-account sharing via Organizations
 
-Cross-account sharing requires Organizations enablement. The sharing
-flow is multi-step.
-
-### Verify Organizations prerequisites
+### Verify and enable prerequisites
 
 ```bash
 # Check Organization feature set (must be ALL)
 aws organizations describe-organization \
   --query 'Organization.FeatureSet' --output text
 
-# Check License Manager service access
-aws organizations list-aws-service-access-for-organization \
-  --query 'EnabledServicePrincipals[?ServicePrincipal==`license-manager.amazonaws.com`]'
-```
-
-### Enable License Manager in Organizations
-
-```bash
 # Enable License Manager as a trusted service
 aws organizations enable-aws-service-access \
   --service-principal license-manager.amazonaws.com
 
-# (Recommended) Register a delegated administrator
+# Register a delegated administrator
 aws organizations register-delegated-administrator \
   --account-id 999999999999 \
   --service-principal license-manager.amazonaws.com
@@ -538,143 +442,91 @@ aws organizations register-delegated-administrator \
 ### Share the license configuration
 
 ```bash
-# Share to specific accounts
+# Share to an Organizational Unit (auto-accepted)
 aws license-manager create-license-configuration-cross-account \
-  --license-configuration-arn "$LIC_CONFIG_ID" \
-  --target-organization-structure '{"Accounts":["111122223333","111122224444"]}' \
+  --license-configuration-arn "$LIC_CONFIG_ARN" \
+  --target-organization-structure '{"OrganizationalUnits":["ou-app-abcdef"]}' \
   --region us-east-1
 
-# Share to an Organizational Unit
+# Share to specific accounts (requires acceptance)
 aws license-manager create-license-configuration-cross-account \
-  --license-configuration-arn "$LIC_CONFIG_ID" \
-  --target-organization-structure '{"OrganizationalUnits":["ou-xxx-yyyyyyyy"]}' \
+  --license-configuration-arn "$LIC_CONFIG_ARN" \
+  --target-organization-structure '{"Accounts":["111122223333"]}' \
   --region us-east-1
 ```
 
-**Critical:** cross-account sharing requires explicit acceptance by the
-target account if the share is to specific accounts. For Organization-
-wide sharing via OU, acceptance is automatic.
-
 ## Step 6 — Automated discovery via Systems Manager
 
-License Manager uses Systems Manager (SSM) inventory to discover
-resources and count license consumption automatically.
-
-### Configure SSM discovery settings
+License Manager uses SSM inventory to discover resources and count
+consumption automatically.
 
 ```bash
-# Configure License Manager discovery settings
+# Enable License Manager integration with SSM
 aws license-manager update-service-settings \
   --organization-configuration '{"EnableIntegration":true}' \
   --region us-east-1
 
-# Verify discovery is enabled
-aws license-manager get-service-settings \
-  --query 'OrganizationConfiguration.EnableIntegration' --region us-east-1
-```
-
-### Verify SSM inventory is collecting data
-
-```bash
-# List managed instances with inventory
+# Verify SSM inventory is collecting data
 aws ssm get-inventory \
   --query 'Entities[*].{Id:Id,Type:Data.\"AWS:InstanceInformation\".Content[0].ResourceType}' \
   --region us-east-1
 ```
 
 **Critical:** without SSM inventory, License Manager cannot discover
-on-premises or cross-account resources. EC2 instances are tracked via
-the association at launch (not SSM inventory).
+on-premises or cross-account resources.
 
 ## Step 7 — License violations detection and alerting
 
-License Manager detects violations against the hard limit
-(`LicenseRulesEnforce=true`). When a new EC2 instance launch would
-exceed the license count, the launch is BLOCKED and a violation event
-is emitted. Alerting requires CloudWatch Events / EventBridge + SNS.
-
-### CloudWatch Events rule for license violations
+Hard-limit violations (`LicenseRulesEnforce=true`) BLOCK non-compliant
+launches and emit events. Alerting requires EventBridge + SNS.
 
 ```bash
-# Create EventBridge rule matching License Manager violations
+# Create EventBridge rule for license violations
 aws events put-rule \
   --name license-manager-violations \
   --event-pattern '{
     "source": ["aws.license-manager"],
     "detail-type": ["License Manager License Configuration Violation"]
-  }' \
-  --region us-east-1
+  }'
 
 # Add SNS target
 aws events put-targets \
   --rule license-manager-violations \
-  --targets '{"Id":"1","Arn":"arn:aws:sns:us-east-1:123456789012:license-alerts"}' \
-  --region us-east-1
-```
-
-### List recent violations
-
-```bash
-aws license-manager list-license-specifications-for-resources \
-  --resource-arns arn:aws:ec2:us-east-1:123456789012:instance/i-xxx \
-  --region us-east-1
+  --targets '{"Id":"1","Arn":"arn:aws:sns:us-east-1:123456789012:license-alerts"}'
 
 # List usage records (consumption)
 aws license-manager list-usage-records-for-license-configuration \
-  --license-configuration-arn "$LIC_CONFIG_ID" \
-  --region us-east-1
+  --license-configuration-arn "$LIC_CONFIG_ARN" --region us-east-1
 ```
 
 ## Step 8 — Self-service portal grants
 
-License Manager grants allow delegated users to consume licenses
-without direct console access to the license configuration.
-
-### Create a grant
+Grants allow delegated users to consume licenses without direct console
+access.
 
 ```bash
-# Grant a principal (IAM entity) permission to use licenses
+# Create a grant with expiry (recommended)
 aws license-manager create-grant \
   --grant-name "dev-team-oracle-grant" \
-  --license-configuration-arn "$LIC_CONFIG_ID" \
+  --license-configuration-arn "$LIC_CONFIG_ARN" \
   --principals '["arn:aws:iam::123456789012:role/DevTeamRole"]' \
   --allowed-operations '["CreateGrant","CheckoutLicense","ViewGrant","ListLicenses"]' \
-  --region us-east-1
-```
-
-### Grant with expiry (security best practice)
-
-```bash
-# Time-limited grant (recommended for temporary access)
-aws license-manager create-grant \
-  --grant-name "contractor-grant-30d" \
-  --license-configuration-arn "$LIC_CONFIG_ID" \
-  --principals '["arn:aws:iam::123456789012:role/ContractorRole"]' \
-  --allowed-operations '["CheckoutLicense","ViewGrant"]' \
   --expiration "2026-09-05T00:00:00Z" \
   --region us-east-1
 ```
 
 **Security note:** grants without an expiry create permanent access.
-Always set an expiry for non-permanent roles.
+Always set `--expiration` for non-permanent roles.
 
 ## Step 9 — Oracle license tracking specifics
 
-Oracle Database licensing is the most common License Manager use case.
-Key specifics:
-
-- **Counting type:** `vCPU` (Oracle is licensed per vCPU, with a
-  minimum of 2 vCPUs per instance).
-- **HonorVcpuOptimization:** when true, License Manager treats 4 vCPUs
-  as 1 license when thread scheduling is enabled on the EC2 instance
-  (i.e., 2 vCPUs count as 1 for licensing purposes if hyperthreading
-  is on). This matches Oracle's standard processor licensing model.
-- **Tenancy:** `Shared` (default, runs on shared EC2 hardware),
-  `Instance` (dedicated instance), `Host` (dedicated host — required
-  for some Oracle BYOL scenarios).
+- **Counting type:** `vCPU` (Oracle is licensed per vCPU, minimum 2).
+- **HonorVcpuOptimization:** when true, treats 4 vCPUs as 1 license
+  when thread scheduling is enabled (matches Oracle's processor model).
+- **Tenancy:** `Shared` (default), `Instance` (dedicated instance),
+  `Host` (dedicated host — required for some Oracle BYOL scenarios).
 
 ```bash
-# Oracle Database Standard Edition — vCPU, shared tenancy, honor opt
 LIC_ARN=$(aws license-manager create-license-configuration \
   --name "oracle-db-se-vcpu" \
   --license-counting-type vCPU \
@@ -687,16 +539,12 @@ LIC_ARN=$(aws license-manager create-license-configuration \
 
 ## Step 10 — SQL Server licensing specifics
 
-SQL Server uses core-based licensing with a core factor:
-
 - **Counting type:** `Core` (physical cores, not vCPUs).
-- **Core factor:** 0.5 for Standard Edition, 1.0 for Enterprise
-  Edition. The core factor multiplies physical cores to compute
-  license consumption (e.g., 8 physical cores × 0.5 = 4 licenses).
-- **Minimum:** 4 cores per physical processor (SQL Server minimum).
+- **Core factor:** 0.5 for Standard, 1.0 for Enterprise. Multiplies
+  physical cores to compute consumption.
+- **Minimum:** 4 cores per physical processor.
 
 ```bash
-# SQL Server Standard — core-based, 0.5 factor
 LIC_ARN=$(aws license-manager create-license-configuration \
   --name "sqlserver-std-core" \
   --license-counting-type Core \
@@ -711,86 +559,60 @@ LIC_ARN=$(aws license-manager create-license-configuration \
 
 **Recent AWS features (2023-2026):**
 
-- **License Manager integration with AWS IAM Identity Center (2023-
-  2024):** Self-service portal now supports IAM Identity Center (SSO)
-  for end-user authentication, simplifying grant access for non-IAM
-  users.
-
-- **Enhanced violation reporting (2023-2024):** License Manager now
-  emits richer violation details in EventBridge, including the
-  specific resource ARN, license configuration ARN, and violation
-  reason code, enabling more granular alerting and remediation.
-
-- **Cross-Region license tracking (2023-2024):** License Manager now
-  tracks resource consumption across regions within the same account,
-  with aggregated usage reporting in the home region.
-
-- **Terraform provider improvements (2023-2024):** The Terraform
-  `aws_licensemanager_license_configuration` resource now supports
-  `license_rule` as a structured map (not just a raw string),
-  improving readability and validation.
-
-- **License Manager Marketplace integration (2024-2025):** Enhanced
-  integration with AWS Marketplace for subscription-based licenses,
-  allowing License Manager to track Marketplace-purchased software
-  alongside BYOL configurations.
-
-- **CloudWatch metric enhancements (2024-2025):** License Manager now
-  publishes consumption metrics to CloudWatch (license count consumed,
-  license count remaining), enabling dashboards and threshold alarms
-  beyond violation-only alerting.
+- **IAM Identity Center integration (2023-2024):** Self-service portal
+  supports SSO for non-IAM users, simplifying grant access.
+- **Enhanced violation reporting (2023-2024):** Richer EventBridge
+  details — resource ARN, configuration ARN, violation reason code.
+- **Cross-Region license tracking (2023-2024):** Aggregated usage
+  reporting across regions within the same account.
+- **Terraform provider improvements (2023-2024):** `license_rule`
+  now supports structured map, improving readability.
+- **Marketplace integration (2024-2025):** Tracks Marketplace-
+  purchased software alongside BYOL configurations.
+- **CloudWatch metric enhancements (2024-2025):** Consumption metrics
+  published to CloudWatch (consumed, remaining), enabling dashboards.
 
 ## NEVER do these things
 
 1. **NEVER confuse license count with vCPU count.** The
    `LicenseCountingType` determines what is measured. A count of 100
-   with vCPU counting means 100 vCPUs total, NOT 100 instances. Always
-   confirm the counting type before setting the count.
+   with vCPU counting = 100 vCPUs, NOT 100 instances.
 
-2. **NEVER create a license configuration without license rules for
-   vendor-specific licenses.** Oracle and SQL Server require specific
-   rule strings (`Tenancy`, `HonorVcpuOptimization` for Oracle;
-   `coreFactor` for SQL Server). Without rules, the configuration
-   exists but does NOT enforce vendor conditions.
+2. **NEVER create a configuration without license rules for vendor-
+   specific licenses.** Oracle and SQL Server require specific rule
+   strings. Without rules, the configuration exists but does NOT
+   enforce vendor conditions.
 
 3. **NEVER assume cross-account sharing works without Organizations.**
-   Cross-account license sharing requires Organizations all-features,
-   License Manager as a trusted service, and (recommended) a delegated
-   administrator. Without these, the share API call fails.
+   Cross-account sharing requires Organizations all-features, License
+   Manager as a trusted service, and a delegated administrator.
 
 4. **NEVER forget SSM inventory for on-premises discovery.** EC2
-   instances are tracked via launch association, but on-premises and
-   SSM-managed instances require SSM inventory with the `Applications`
-   collection. Without it, those resources are invisible.
+   instances are tracked via launch association, but on-premises
+   requires SSM inventory with `Aws:SoftwareInventory`.
 
-5. **NEVER use soft limit (enforce=false) when compliance requires
-   blocking.** Soft limit only alerts on violations; it does NOT block
-   non-compliant launches. For compliance-critical licenses (Oracle,
-   SQL Server), use hard limit (enforce=true).
+5. **NEVER use soft limit when compliance requires blocking.** Soft
+   limit (enforce=false) only alerts. For compliance-critical licenses,
+   use hard limit (enforce=true).
 
-6. **NEVER create grants without an expiry for temporary roles.**
-   Grants without expiry create permanent access. Always set
+6. **NEVER create grants without an expiry for temporary roles.** Set
    `--expiration` for contractor, developer, or temporary roles.
 
-7. **NEVER assume license rule syntax errors are caught at creation.**
-   License Manager accepts the configuration but enforcement may
-   silently fail if the rule syntax is wrong. Validate rules against
-   the vendor documentation before deploying.
+7. **NEVER assume rule syntax errors are caught at creation.** License
+   Manager accepts the configuration but enforcement may silently fail.
+   Validate rules against vendor documentation.
 
-8. **NEVER skip the delegated administrator for multi-account
-   Organizations.** Without a delegated administrator, license
-   management must be done from the management account, which violates
-   least-privilege best practices.
+8. **NEVER skip the delegated administrator for multi-account Orgs.**
+   Without it, license management must be from the management account,
+   violating least-privilege.
 
-9. **NEVER forget to set up CloudWatch Events for violation alerting.**
-   Hard-limit violations emit events, but without an EventBridge rule +
-   SNS target, no one is notified. Violation detection without alerting
-   is useless.
+9. **NEVER forget CloudWatch Events for violation alerting.** Hard-
+   limit violations emit events, but without EventBridge + SNS, no one
+   is notified.
 
-10. **NEVER mix counting types within the same vendor's licensing
-    model.** Oracle is vCPU-counted. SQL Server is core-counted.
-    Creating an Oracle configuration with Core counting or SQL Server
-    with vCPU counting produces non-compliant tracking.
+10. **NEVER mix counting types within the same vendor's model.** Oracle
+    is vCPU-counted. SQL Server is core-counted. Cross-assigning
+    produces non-compliant tracking.
 
 ## Output format
 
@@ -832,43 +654,37 @@ CHECKLIST:
   [✓] Delegated administrator: 999999999999
   [✓] SSM discovery: Enabled (inventory configured for managed instances)
   [✓] Violation alerting: EventBridge rule license-manager-violations + SNS arn:aws:sns:us-east-1:123456789012:license-alerts
-  [✓] Grants: 1 grant (dev-team-oracle-grant, principal DevTeamRole, no expiry)
-  [✓] Tags: Vendor=Oracle, Environment=production, ManagedBy=license-manager
+  [✓] Grants: 1 grant (dev-team-oracle-grant, principal DevTeamRole)
+  [✓] Tags: Vendor=Oracle, Environment=production
 VERIFICATION_COMMANDS:
   aws license-manager get-license-configuration --license-configuration-arn arn:aws:license-manager:us-east-1:123456789012:license-configuration:lic-aaa111222333444aaa --region us-east-1
   aws license-manager list-usage-records-for-license-configuration --license-configuration-arn arn:aws:license-manager:us-east-1:123456789012:license-configuration:lic-aaa111222333444aaa --region us-east-1
-  aws license-manager list-license-specifications-for-resources --resource-arns arn:aws:ec2:us-east-1:123456789012:launch-template/lt-aaa111222333 --region us-east-1
 ```
 
 ## Error handling
 
 ### License configuration creation fails with validation error
-- Verify `--license-counting-type` is one of `vCPU`, `Instance`,
-  `Core`. Verify `--license-count` is a positive integer. Verify
-  `--license-rules` syntax matches the vendor rule format.
+- Verify `--license-counting-type` is one of `vCPU`, `Instance`, `Core`.
+  Verify `--license-count` is a positive integer. Verify `--license-rules`
+  syntax matches the vendor rule format.
 
 ### Cross-account sharing fails
 - Verify Organizations is all-features enabled. Verify License Manager
-  is a trusted service. Verify the target account/OU exists in the
-  Organization. Use `describe-organization` and `list-roots` to
-  verify.
+  is a trusted service. Verify the target account/OU exists in the Org.
 
 ### SSM discovery not finding on-premises resources
-- Verify the on-premises server is an active SSM managed instance
-  (`describe-instance-information`). Verify the SSM inventory
-  association includes the `Applications` collection. Verify License
-  Manager discovery settings have `EnableIntegration=true`.
+- Verify the server is an active SSM managed instance. Verify the SSM
+  inventory association includes `Aws:SoftwareInventory`. Verify
+  `EnableIntegration=true` in discovery settings.
 
 ### Violations not being alerted
-- Verify `LicenseRulesEnforce=true` (soft limit never blocks). Verify
-  the EventBridge rule matches `aws.license-manager` source and the
-  correct `detail-type`. Verify the SNS topic policy allows
+- Verify `LicenseRulesEnforce=true`. Verify the EventBridge rule matches
+  `aws.license-manager` source. Verify the SNS topic policy allows
   EventBridge to publish.
 
 ### License consumption not updating
-- Verify the license configuration is associated with running
-  resources (not stopped). For EC2, verify the association via launch
-  template or `--license-specifications` at launch. For SSM, verify
+- Verify the configuration is associated with running resources. For
+  EC2, verify the association via launch template. For SSM, verify
   inventory is collecting.
 
 ## Domain

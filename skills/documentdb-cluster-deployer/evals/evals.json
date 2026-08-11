@@ -1,0 +1,179 @@
+{
+  "skill": "documentdb-cluster-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the DocumentDB Cluster Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across DocumentDB topologies (production multi-AZ with change streams and KMS, CDC pipeline cluster with 3-day change stream retention, t3 development cluster, global cluster for cross-region DR, missing subnet group prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-multi-az-changestreams",
+      "name": "Production multi-AZ DocumentDB cluster with change streams, KMS, and indexing",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — multi-AZ cluster, r5.large primary + 2 replicas, change streams 2-day retention, KMS customer-managed key, 7-day backup, storage autoscaling ceiling, compound + single indexes",
+      "prompt": "Create a DocumentDB cluster named orders-docdb in us-east-1. Engine version 5.0. Instance class db.r5.large with 1 primary and 2 replicas across 3 AZs. Enable change streams with 2-day retention. KMS key arn:aws:kms:us-east-1:123456789012:key/abc123. Backup retention 7 days. Storage autoscaling ceiling 10 TB. Subnet group docdb-subnet-group. Security group sg-docdb-001 (port 27017 from 10.0.0.0/16). Indexes on {status, created_at} compound and {email} single. Tags: Environment=production, Application=orders.",
+      "prompt_file": "prompts/production-multi-az-changestreams.md",
+      "baseline_file": "baselines/production-multi-az-changestreams.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DOCUMENTDB_CLUSTER: orders-docdb (5.0.0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster identifier: orders-docdb\n  [✓] Engine version: 5.0.0 (MongoDB 5.0 compatibility)\n  [✓] Instance class: db.r5.large — production\n  [✓] Instance count: 1 primary + 2 replicas (multi-AZ: yes)\n  [✓] Parameter group: change_streams enabled, retention 2 days\n  [✓] KMS encryption: customer-managed\n  [✓] Backup retention: 7 days (PITR: enabled)\n  [✓] Storage autoscaling ceiling: 10 TB\n  [✓] Indexing strategy: compound {status, created_at} + single {email}\nVERIFICATION_COMMANDS:\n  aws docdb describe-db-clusters --db-cluster-identifier orders-docdb --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "orders-docdb",
+            "5.0.0",
+            "db.r5.large",
+            "change_streams",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "multi-AZ"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "change-streams-cdc",
+      "name": "DocumentDB cluster for CDC pipeline with 3-day change stream retention",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — CDC-focused cluster, r5.xlarge, change streams 3-day retention (259200s), KMS encryption, 14-day backup",
+      "prompt": "Create a DocumentDB cluster named events-cdc in us-east-1 for a change data capture pipeline. Engine 5.0. Instance class db.r5.xlarge with 1 primary and 1 replica. Change streams with 3-day retention (259200 seconds). KMS encryption with customer key arn:aws:kms:us-east-1:123456789012:key/def456. Backup 14 days. Subnet group docdb-events-sg. Security group sg-events-001. Tags: Environment=production, Pipeline=CDC.",
+      "prompt_file": "prompts/change-streams-cdc.md",
+      "baseline_file": "baselines/change-streams-cdc.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DOCUMENTDB_CLUSTER: events-cdc (5.0.0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster identifier: events-cdc\n  [✓] Engine version: 5.0.0\n  [✓] Instance class: db.r5.xlarge — production\n  [✓] Change streams: enabled (retention: 3 days / 259200 seconds)\n  [✓] KMS encryption: customer-managed\n  [✓] Backup retention: 14 days\nVERIFICATION_COMMANDS:\n  aws docdb describe-db-clusters --db-cluster-identifier events-cdc --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "events-cdc",
+            "change_streams",
+            "259200",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "t3-development-cluster",
+      "name": "Development DocumentDB cluster with t3.medium instances",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — dev cluster, t3.medium single instance, engine 4.0, 1-day backup, no change streams",
+      "prompt": "Create a DocumentDB cluster named dev-docdb in us-east-1 for development. Engine 4.0. Instance class db.t3.medium with 1 instance only. Backup 1 day. Subnet group docdb-dev-subnet. Security group sg-dev-docdb (port 27017 from 10.99.0.0/16). Tags: Environment=development.",
+      "prompt_file": "prompts/t3-development-cluster.md",
+      "baseline_file": "baselines/t3-development-cluster.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DOCUMENTDB_CLUSTER: dev-docdb (4.0.0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster identifier: dev-docdb\n  [✓] Engine version: 4.0.0\n  [✓] Instance class: db.t3.medium — development\n  [✓] Backup retention: 1 day\nVERIFICATION_COMMANDS:\n  aws docdb describe-db-clusters --db-cluster-identifier dev-docdb --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "dev-docdb",
+            "db.t3.medium",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "global-cluster-dr",
+      "name": "DocumentDB global cluster for cross-region disaster recovery",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — global cluster, primary us-east-1, secondary eu-west-1, r5.2xlarge, failover scripting noted",
+      "prompt": "Create a DocumentDB global cluster named orders-global. Primary cluster orders-docdb-primary in us-east-1 with db.r5.2xlarge, 1 primary + 2 replicas. Secondary cluster orders-docdb-secondary in eu-west-1 with db.r5.2xlarge, 1 primary + 2 replicas. Engine 5.0. KMS encryption. Backup 7 days. Tags: Environment=production, DR=active-active.",
+      "prompt_file": "prompts/global-cluster-dr.md",
+      "baseline_file": "baselines/global-cluster-dr.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DOCUMENTDB_CLUSTER: orders-global (5.0.0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Global cluster: orders-global\n  [✓] Primary: us-east-1 (orders-docdb-primary)\n  [✓] Secondary: eu-west-1 (orders-docdb-secondary)\n  [✓] Instance class: db.r5.2xlarge\n  [✓] Failover: NOT automatic — requires scripting\nVERIFICATION_COMMANDS:\n  aws docdb describe-global-clusters --global-cluster-identifier orders-global --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "global",
+            "us-east-1",
+            "eu-west-1",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-subnet-group",
+      "name": "DocumentDB cluster with missing subnet group (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — subnet group docdb-missing-subnet does not exist; cluster creation will fail",
+      "prompt": "Create a DocumentDB cluster named orders-docdb in us-east-1. Engine 5.0. Instance class db.r5.large. Use subnet group docdb-missing-subnet. Security group sg-docdb-001.",
+      "prompt_file": "prompts/missing-subnet-group.md",
+      "baseline_file": "baselines/missing-subnet-group.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "DOCUMENTDB_CLUSTER: orders-docdb\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Subnet group: docdb-missing-subnet — NOT FOUND; cluster creation requires a valid subnet group spanning at least 2 AZs",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "subnet",
+            "VERDICT",
+            "CHECKLIST",
+            "docdb-missing-subnet"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

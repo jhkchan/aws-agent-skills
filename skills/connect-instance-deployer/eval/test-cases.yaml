@@ -1,0 +1,151 @@
+# Eval test cases for connect-instance-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across the Amazon Connect
+# provisioning surface (contact flow with Lambda invoke block +
+# resource policy, routing profile with skill requirements, Lex V2
+# IVR integration, toll-free phone number claim, missing-instance-
+# id prerequisite failure).
+skill: connect-instance-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: contact-flow-with-lambda
+    description: >-
+      Provision a Connect contact flow with an InvokeLambda block
+      (lookup-customer function) and exceptions handled. Expects
+      READY_TO_DEPLOY with the Lambda resource policy granting
+      connect.amazonaws.com invoke permission explicitly cited.
+    input: |
+      Create an Amazon Connect contact flow on instance inst-abc123
+      named "inbound-main-flow". The flow should invoke Lambda
+      function lookup-customer
+      (arn:aws:lambda:us-east-1:123456789012:function:lookup-customer)
+      and branch on the returned "department" attribute. Handle
+      Lambda.AccessDenied and Lambda.Timeout exceptions by
+      transferring to the default queue. Instance ARN
+      arn:aws:connect:us-east-1:123456789012:instance/inst-abc123.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "InvokeLambda"
+        - "lookup-customer"
+        - "connect.amazonaws.com"
+        - "AccessDenied"
+        - "Timeout"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: routing-profile-skill-requirements
+    description: >-
+      Provision a routing profile with skill requirements (Sales
+      proficiency ≥ 4, Support proficiency ≥ 4). Expects
+      READY_TO_DEPLOY with skills explicitly cited and the agent-
+      proficiency model explained.
+    input: |
+      Create a routing profile on instance inst-abc123 named
+      "tier-1-sales-support". Associate queues sales-queue
+      (priority 1) and support-queue (priority 2). Skill
+      requirements: Sales (proficiency ≥ 4), Support (proficiency
+      ≥ 4). Voice channel concurrency 1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "skill"
+        - "proficiency"
+        - "Sales"
+        - "Support"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: lex-bot-ivr-integration
+    description: >-
+      Provision a contact flow with an InvokeAmazonLex block for
+      conversational IVR. Expects READY_TO_DEPLOY with Lex V2
+      (published alias, locale matches) cited.
+    input: |
+      Add a Lex IVR block to the inbound-main-flow on instance
+      inst-abc123. Use Lex V2 bot CustomerService, alias Prod
+      (arn:aws:lex:us-east-1:123456789012:bot-alias/CustomerService:Prod).
+      Intent RouteCall, slot "department". Branch on department
+      value to sales-queue or support-queue.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "InvokeAmazonLex"
+        - "Lex V2"
+        - "published"
+        - "RouteCall"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "Lex V1"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: phone-number-claim
+    description: >-
+      Claim a toll-free phone number for the Connect instance.
+      Expects READY_TO_DEPLOY with toll-free type and us-east-1
+      region cited.
+    input: |
+      Claim the toll-free number +18005551234 for Connect instance
+      inst-abc123 in us-east-1. Description: Main inbound toll-free.
+      Tag Project=inbound.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "toll-free"
+        - "+18005551234"
+        - "us-east-1"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-instance-id-prereq
+    description: >-
+      Operator requests a contact flow but the instance ID is
+      missing. Expects PREREQUISITES_MISSING with the missing
+      instance ID cited.
+    input: |
+      Create a contact flow named inbound-main-flow. The flow should
+      invoke Lambda function lookup-customer. No instance ID is
+      provided. Queues sales-queue and support-queue.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "instance"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
