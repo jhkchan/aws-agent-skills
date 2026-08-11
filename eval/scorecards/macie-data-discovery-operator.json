@@ -1,0 +1,70 @@
+{
+  "skill": "macie-data-discovery-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 14,
+      "max": 20,
+      "justification": "Adds some expert specifics (e.g., max\u2011match\u2011distance 50, RECOMMENDED selector, automated discovery scope controls) that a generic model may not recall, but the majority of the content restates AWS documentation without novel decision trees or thresholds."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a clear AWS\u2011specific procedure order (enable admin \u2192 enable session \u2192 configure auto\u2011enable, etc.) and detailed CLI sequences, yet a few steps are generic (e.g., \u201ccheck IAM role\u201d) and not fully broken out for every operation."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains concrete NEVER items with reasoning (e.g., never use ALL identifiers, never omit keywords), but the anti\u2011pattern list is limited to five items and omits other common pitfalls such as cost impact of broad scans."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, and when_to_use are complete; the output contract is explicit. Activation triggers rely on natural\u2011language cues rather than a strict schema, but are still reliable enough."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a navigation table and layered sections (Mindset \u2192 Pre\u2011flight \u2192 Steps \u2192 NEVER \u2192 Output) to avoid overload, though some sections (e.g., Mindset, Step 10) are dense, slightly reducing optimal layering."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive operations are gated by CONFIRM and pre\u2011checks, and creative tasks receive fully populated CLI flags; however there are no explicit limits on regex complexity, maximum custom identifier count, or cost caps for large classification jobs."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Pre\u2011flight \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output), aiding comprehension; minor ad\u2011hoc sections (Expert heuristic) slightly break the uniform pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 9,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, verification steps, and examples, yet the sample model outputs contain logical errors: a PASS flag on a failed Macie enable check, missing VERDICT: ERROR for malformed input, and use of [PENDING] instead of required PASS/FAIL, showing practical execution gaps."
+    }
+  ],
+  "total_score": 98,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 34932,
+  "latency_ms": 18539,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

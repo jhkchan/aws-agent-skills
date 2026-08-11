@@ -1,0 +1,70 @@
+{
+  "skill": "kinesis-firehose-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 14,
+      "max": 20,
+      "justification": "The skill compiles many known Firehose troubleshooting steps but adds little truly novel expert insight. Most of the decision tree, CLI snippets, and anti\u2011patterns are restatements of official documentation; it lacks unique thresholds (e.g., exact DataFreshnessSec values that trigger a specific root\u2011cause) or proprietary heuristics a senior engineer would contribute."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "The 5\u2011layer health check and step\u2011by\u2011step destination diagnostics are AWS\u2011specific, but the ordering of some procedures (e.g., when to run `update-destination` vs. `simulate-principal-policy`) is described only generically. A few steps are phrased as \"run health check first\" without detailing the exact AWS\u2011ordered sequence of IAM \u2192 KMS \u2192 bucket checks."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER list contains concrete pitfalls with reasons, yet several warnings lack deep reasoning (e.g., why the 6\u202fMB Lambda payload cap causes silent batch drops). More experience\u2011driven explanations would strengthen the anti\u2011pattern section."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter includes description, when_to_use, activation_triggers, and invocation_schema, satisfying basic compliance. The activation_triggers are overly verbose and the invocation_schema lacks a precise example, making reliable activation slightly weaker."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (mindset, quick navigation, detailed steps, appendix) but the initial description already contains a dense 8\u2011symptom decision tree, which can overload the agent before it knows which branch to follow."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive operations (e.g., `update-destination`) are guarded by safety notes and confirmation gates, but the skill does not enforce version\u2011ID checks or require a snapshot before changes, leaving a small risk for irreversible updates."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The document follows a recognizable Mindset \u2192 Navigation \u2192 Process pattern, but section headings are occasionally inconsistent (e.g., \"Quick navigation\" vs. \"Process - Diagnostic decision tree\"), which slightly reduces pattern clarity."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill provides concrete CLI commands, output contracts, and worked examples, enabling an agent to act. Missing are handling of multi\u2011destination streams and ambiguous symptom inputs; the fallback for malformed input is present but could be richer (e.g., prompting for missing fields)."
+    }
+  ],
+  "total_score": 102,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 55992,
+  "latency_ms": 12052,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

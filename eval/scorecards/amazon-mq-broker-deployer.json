@@ -1,0 +1,70 @@
+{
+  "skill": "amazon-mq-broker-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides expert\u2011level artifacts not usually known to a generic model: concrete connection\u2011count tables per mq.t3/m5 size, an immutable\u2011configuration dependency graph, precise decision\u2011trees for engine and HA mode, and exact port\u2011to\u2011protocol mappings. Most of this restates AWS docs, but the quantitative sizing heuristics and immutability table constitute genuine delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "The 10\u2011step provisioning order, decision trees, and prerequisite checklist are AWS\u2011specific and reflect real\u2011world workflow. Some steps (e.g., \"verify prerequisites\") are generic CloudOps checks and not uniquely Amazon MQ, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list with specific reasons (e.g., IAM auth is creation\u2011time\u2011only, single\u2011AZ HA is invalid, opening ports to 0.0.0.0/0 is unsafe). No generic warnings; only minor omission of a pitfall around modifying audit\u2011log settings post\u2011creation."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, triggers, keywords, and activation contract are present. Missing an explicit input schema or JSON\u2011schema for required parameters, which would make automated validation less reliable."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill is well\u2011sectioned (mindset, quick navigation, step\u2011by\u2011step, NEVER, output format) but the initial narrative is dense, forcing the agent to read many details before reaching the checklist. Slight overload reduces the score."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (create\u2011broker) are tightly gated by a mandatory checklist and explicit decision points. Creative tasks (e.g., choosing instance size) retain appropriate freedom. No over\u2011constrained sections."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Navigation \u2192 Reasoning \u2192 10\u2011step procedure \u2192 NEVER \u2192 Output format. Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 9,
+      "max": 15,
+      "justification": "Examples contain critical CLI errors: RabbitMQ IAM example uses '--authentication-strategy ldap' instead of the correct IAM flag, includes an invalid '--host-instance-type' parameter, and uses a possibly wrong '--deployment-mode CLUSTER' flag. These mistakes would cause provisioning failures, indicating the skill is not fully usable without correction."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 46807,
+  "latency_ms": 17164,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
