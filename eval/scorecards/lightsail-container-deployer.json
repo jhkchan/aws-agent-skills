@@ -1,0 +1,70 @@
+{
+  "skill": "lightsail-container-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides several expert\u2011level heuristics not found in generic docs (power\u2011scale vs node\u2011count trade\u2011off, cost equivalence table, ECR auth flow, recent Lightsail features like VPC peering and deployment version history). However, a portion of the content merely restates official documentation, preventing a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Lists AWS\u2011specific ordering (service \u2192 deployment \u2192 auth \u2192 endpoint) and concrete CLI commands for each step. Minor inconsistency around where ECR credentials are registered (service vs deployment) and lack of a single definitive command for credential registration cause a small deduction."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed \"NEVER\" list with concrete pitfalls and reasons (e.g., confusing power scale with node count, deploying with scale\u202f1 in prod). Some items are generic warnings (e.g., \"Never use Lightsail for complex orchestration\") and could be deeper, so not a full 15."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers and \"when_to_use\" are well defined. Slight vagueness in the phrasing of \"Triggers\" (mix of free\u2011text and keywords) prevents a perfect score."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill layers information (quick navigation, mindset, heuristics, step\u2011by\u2011step, NEVER, output format), but the initial sections are dense and some critical rules (e.g., exact checklist symbols) are buried later, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (service creation, scaling) are gated by a prerequisite checklist and explicit CLI commands, while read\u2011only or exploratory steps are left flexible. No over\u2011constraining of creative tasks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Dependency Graph \u2192 Expert Heuristics \u2192 Step\u2011by\u2011step Procedure \u2192 NEVER list \u2192 Output contract. The structure is coherent, earning near\u2011max."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides working CLI snippets, checklist template, verification commands, and error\u2011handling guidance. Deductions stem from contradictory statements about ECR credential registration, missing exact command for credential update after rotation, and minor formatting inconsistencies in example outputs."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 38681,
+  "latency_ms": 11731,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

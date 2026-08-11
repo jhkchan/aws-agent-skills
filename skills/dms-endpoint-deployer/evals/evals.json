@@ -1,0 +1,177 @@
+{
+  "skill": "dms-endpoint-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the DMS Endpoint Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across DMS endpoint scenarios (PostgreSQL source with CDC + Secrets Manager, Oracle source with Binary Reader + verify-full SSL, S3 target with Parquet format, MongoDB source with replica set CDC, PostgreSQL CDC with wal_level=replica prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "postgresql-source-cdc-secrets-manager",
+      "name": "PostgreSQL source endpoint with CDC, Secrets Manager, and verify-full SSL",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — PostgreSQL source with pglogical plugin, Secrets Manager credentials, verify-full SSL, KMS encryption, wal_level=logical prerequisite verified",
+      "prompt": "Create a DMS source endpoint for PostgreSQL at prod-db.cluster-abc123.us-east-1.rds.amazonaws.com port 5432, database analytics, us-east-1. Use Secrets Manager secret arn:aws:secretsmanager:us-east-1:123456789012:secret:dms-pg-prod. SSL mode verify-full with certificate prod-ca-cert. CDC enabled with pglogical plugin, slot name dms_replication_slot. KMS key arn:aws:kms:us-east-1:123456789012:key/abc123. Replication instance rep-instance-prod. Tags: Environment=production, MigrationType=cdc.",
+      "prompt_file": "prompts/postgresql-source-cdc-secrets-manager.md",
+      "baseline_file": "baselines/postgresql-source-cdc-secrets-manager.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DMS_ENDPOINT: pg-source-prod (postgres, source)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: postgres (port: 5432, database: analytics)\n  [✓] Credentials: Secrets Manager\n  [✓] SSL mode: verify-full\n  [✓] Extra connection attributes: PluginName=pglogical;slotName=dms_replication_slot\n  [✓] CDC prerequisites: MET (wal_level=logical)\nVERIFICATION_COMMANDS:\n  aws dms describe-endpoints --filters Name=endpoint-id,Values=pg-source-prod --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PluginName=pglogical",
+            "verify-full",
+            "Secrets Manager",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "oracle-source-binary-reader-ssl",
+      "name": "Oracle source endpoint with Binary Reader CDC and verify-full SSL",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Oracle source with Binary Reader, archived log tuning, verify-full SSL with imported certificate, supplemental logging prerequisite noted",
+      "prompt": "Create a DMS source endpoint for Oracle at oracle-prod.example.com port 1521, SID ORCL, us-east-1. Use Binary Reader for CDC (useLogminerReader=N, AdditionalArchivedLogDestId=1). SSL mode verify-full with certificate oracle-ca-cert. KMS key arn:aws:kms:us-east-1:123456789012:key/oracle-key. Replication instance rep-instance-prod. Tags: Environment=production, Engine=oracle.",
+      "prompt_file": "prompts/oracle-source-binary-reader-ssl.md",
+      "baseline_file": "baselines/oracle-source-binary-reader-ssl.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DMS_ENDPOINT: oracle-source-prod (oracle, source)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: oracle (port: 1521, SID: ORCL)\n  [✓] SSL mode: verify-full (certificate: oracle-ca-cert)\n  [✓] Extra connection attributes: useLogminerReader=N;AdditionalArchivedLogDestId=1\n  [✓] CDC prerequisites: MET (supplemental logging enabled, ARCHIVELOG mode)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "useLogminerReader=N",
+            "verify-full",
+            "supplemental logging",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s3-target-parquet-format",
+      "name": "S3 target endpoint with Parquet format and Snappy compression",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — S3 target with Parquet DataFormat, Snappy CompressionType, RLE dictionary encoding, column names included",
+      "prompt": "Create a DMS target endpoint for S3 in us-east-1. Bucket my-dms-target-bucket, folder /migration-data/. Data format Parquet with Snappy compression and RLE dictionary encoding. Include column names in output. Service access role arn:aws:iam::123456789012:role/dms-s3-role. KMS key arn:aws:kms:us-east-1:123456789012:key/s3-key. Replication instance rep-instance-prod. Tags: Environment=production, Format=parquet.",
+      "prompt_file": "prompts/s3-target-parquet-format.md",
+      "baseline_file": "baselines/s3-target-parquet-format.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DMS_ENDPOINT: s3-target-parquet (s3, target)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: s3 (target)\n  [✓] Extra connection attributes: DataFormat=parquet;CompressionType=snappy;EncodingType=rle-dictionary;AddColumnName=true\n  [✓] Service access role: arn:aws:iam::123456789012:role/dms-s3-role",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "DataFormat=parquet",
+            "CompressionType=snappy",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mongodb-source-replica-set-cdc",
+      "name": "MongoDB source endpoint with replica set for CDC",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — MongoDB source with replica set requirement noted, change streams CDC, NestingLevel=ONE, ExtractDocId=true",
+      "prompt": "Create a DMS source endpoint for MongoDB at mongo-prod.example.com port 27017, us-east-1. Replica set rs0. CDC via change streams. NestingLevel=ONE, ExtractDocId=true, DocsToInvestigate=50. SSL mode require. Replication instance rep-instance-prod. Tags: Environment=production, Engine=mongodb.",
+      "prompt_file": "prompts/mongodb-source-replica-set-cdc.md",
+      "baseline_file": "baselines/mongodb-source-replica-set-cdc.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DMS_ENDPOINT: mongo-source-prod (mongodb, source)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: mongodb (port: 27017, replica set: rs0)\n  [✓] Extra connection attributes: NestingLevel=ONE;ExtractDocId=true;DocsToInvestigate=50\n  [✓] CDC prerequisites: MET (replica set, change streams enabled)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "NestingLevel=ONE",
+            "replica set",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "postgresql-cdc-wal-level-prerequisite-fail",
+      "name": "PostgreSQL CDC endpoint with wal_level=replica (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — PostgreSQL CDC requires wal_level=logical but source has wal_level=replica",
+      "prompt": "Create a DMS source endpoint for PostgreSQL at staging-db.example.com port 5432, database staging, us-east-1. Enable CDC with pglogical plugin. The source database has wal_level=replica. Replication instance rep-instance-prod. Tags: Environment=staging.",
+      "prompt_file": "prompts/postgresql-cdc-wal-level-prerequisite-fail.md",
+      "baseline_file": "baselines/postgresql-cdc-wal-level-prerequisite-fail.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "DMS_ENDPOINT: pg-source-staging (postgres, source)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] CDC prerequisites: FAIL — wal_level=replica; CDC requires wal_level=logical",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "wal_level",
+            "logical",
+            "VERDICT",
+            "CHECKLIST",
+            "replica"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

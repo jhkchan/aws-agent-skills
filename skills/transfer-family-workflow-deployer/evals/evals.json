@@ -1,0 +1,180 @@
+{
+  "skill": "transfer-family-workflow-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Transfer Family Workflow Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Transfer Family scenarios (SFTP service-managed PUBLIC, SFTP custom Lambda VPC_ENDPOINT, managed workflow for file processing, AS2 connector for trading partner, missing IAM role prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "sftp-service-managed-public",
+      "name": "SFTP server with service-managed auth and PUBLIC endpoint",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SFTP, service-managed IDP, PUBLIC endpoint, per-user session policy, custom host key",
+      "prompt": "Create a Transfer Family SFTP server in us-east-1 for B2B partner file exchange. Protocol: SFTP. Endpoint type: PUBLIC. Identity provider: service-managed. S3 bucket: partner-exchange. Users: partner-a and partner-b, each with LOGICAL home directory mapping to /partner-exchange/home/<user>. IAM role: TransferFamilyS3Access with trust policy for transfer.amazonaws.com. Session policy per user scoped to /partner-exchange/home/<user>/*. Server host key: custom RSA. Tags: Environment=production, App=partner-exchange.",
+      "prompt_file": "prompts/sftp-service-managed-public.md",
+      "baseline_file": "baselines/sftp-service-managed-public.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TRANSFER_FAMILY: s-xxx (SFTP) — PUBLIC\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Server: s-xxx (SFTP)\n  [✓] Endpoint type: PUBLIC\n  [✓] Identity provider: Service-managed\n  [✓] Session policy: attached per-user (scoped to /partner-exchange/home/<user>/*)\nVERIFICATION_COMMANDS:\n  aws transfer describe-server --server-id s-xxx\n  aws transfer list-users --server-id s-xxx",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SFTP",
+            "PUBLIC",
+            "service-managed",
+            "session policy",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sftp-custom-lambda-vpc",
+      "name": "SFTP server with custom Lambda IDP and VPC_ENDPOINT",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — VPC_ENDPOINT, custom Lambda IDP, PrivateLink, session policy, structured logging",
+      "prompt": "Create a Transfer Family SFTP server in us-east-1 for internal file transfers. Protocol: SFTP. Endpoint type: VPC_ENDPOINT. VPC vpc-aaa11122, subnets subnet-aaa, subnet-bbb, security group sg-sftp-internal. Identity provider: custom Lambda function transfer-idp-auth. S3 bucket: file-landing-zone. Users provisioned dynamically by Lambda with LOGICAL home directory mapping. IAM role: TransferFamilyS3Access. Session policy: per-user scoped to /file-landing-zone/home/<user>/*. Structured JSON logging to CloudWatch Logs /aws/transfer/sftp. Tags: Environment=production, App=file-landing-zone.",
+      "prompt_file": "prompts/sftp-custom-lambda-vpc.md",
+      "baseline_file": "baselines/sftp-custom-lambda-vpc.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TRANSFER_FAMILY: s-xxx (SFTP) — VPC_ENDPOINT\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Endpoint type: VPC_ENDPOINT (PrivateLink)\n  [✓] Identity provider: Custom Lambda (transfer-idp-auth)\n  [✓] VPC: vpc-aaa11122 (subnets: subnet-aaa, subnet-bbb)\n  [✓] Session policy: attached per-user (S3 scoped)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "VPC_ENDPOINT",
+            "Lambda",
+            "session policy",
+            "VERDICT",
+            "CHECKLIST",
+            "vpc-aaa11122"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-workflow-file-processing",
+      "name": "Managed workflow for automated file processing",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — managed workflow with COPY, TAG, CUSTOM Lambda steps, on-exception steps",
+      "prompt": "Create a managed workflow for Transfer Family server s-abc123 in us-east-1. The workflow should process incoming files: Step 1: COPY from /file-landing-zone/incoming/ to /processed-data/landing/. Step 2: TAG with Status=Processed. Step 3: CUSTOM Lambda virus-scan-file. On-exception: TAG with Status=Failed and send SNS notification. Attach the workflow to server s-abc123. S3 bucket: file-landing-zone.",
+      "prompt_file": "prompts/managed-workflow-file-processing.md",
+      "baseline_file": "baselines/managed-workflow-file-processing.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TRANSFER_FAMILY: s-abc123 (workflow w-def456)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Managed workflow: w-def456 (COPY → TAG → CUSTOM Lambda scan)\n  [✓] On-exception: TAG Status=Failed, SNS notification\n  [✓] Workflow attached to server: s-abc123",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "workflow",
+            "COPY",
+            "TAG",
+            "VERDICT",
+            "CHECKLIST",
+            "on-exception"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "as2-connector-trading-partner",
+      "name": "AS2 connector for B2B trading partner file exchange",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — AS2 connector, local/partner profiles, certificate exchange, MDN SYNC",
+      "prompt": "Create an AS2 connector for trading partner Acme Corp in us-east-1. Partner AS2 URL: https://as2.acme.com. Local AS2 profile: local-profile-xxx. Partner AS2 profile: partner-profile-yyy. Compression: ZLIB. Encryption: AES256_CBC. Signing: SHA256. MDN response: SYNC. MDN signing: SHA256. Trading partner certificate verified. Tags: Partner=acme, Environment=production.",
+      "prompt_file": "prompts/as2-connector-trading-partner.md",
+      "baseline_file": "baselines/as2-connector-trading-partner.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TRANSFER_FAMILY: AS2 connector c-xxx (Acme Corp)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] AS2 connector: c-xxx (partner: Acme Corp)\n  [✓] Local profile: local-profile-xxx\n  [✓] Partner profile: partner-profile-yyy\n  [✓] Certificate: verified (partner public cert)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AS2",
+            "connector",
+            "VERDICT",
+            "CHECKLIST",
+            "certificate"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-iam-role",
+      "name": "SFTP server without IAM role for S3 access (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — IAM role TransferFamilyS3Access does not exist; users cannot access S3",
+      "prompt": "Create a Transfer Family SFTP server in us-east-1. Protocol: SFTP. Endpoint type: PUBLIC. Identity provider: service-managed. S3 bucket: file-exchange. The IAM role TransferFamilyS3Access does not exist yet. Users: partner-a with home directory /file-exchange/home/partner-a.",
+      "prompt_file": "prompts/missing-iam-role.md",
+      "baseline_file": "baselines/missing-iam-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "TRANSFER_FAMILY: SFTP server (pending)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] IAM role: TransferFamilyS3Access — MISSING; without it, users cannot access S3",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "IAM role",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

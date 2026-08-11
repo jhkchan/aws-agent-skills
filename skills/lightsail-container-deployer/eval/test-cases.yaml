@@ -1,0 +1,159 @@
+# Eval test cases for lightsail-container-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Lightsail Container
+# topologies (public image with managed TLS, ECR private with auth,
+# scale and power trade-off, custom domain, missing ECR credentials).
+skill: lightsail-container-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: public-image-managed-tls
+    description: >-
+      Provision a Lightsail Container Service with a public Docker Hub
+      image, managed TLS, public endpoint with health check, and
+      environment variables. Expects READY_TO_DEPLOY.
+    input: |
+      Create a Lightsail Container Service named web-frontend in
+      us-east-1. Power: small. Scale: 2 nodes. Container image:
+      nginx:latest from Docker Hub. Container port 80 mapped to HTTP.
+      Public endpoint with health check on / every 5 seconds,
+      threshold 2. Environment variables: ENV=production,
+      LOG_LEVEL=info. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "power"
+        - "scale"
+        - "managed TLS"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "public endpoint"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ecr-private-with-auth
+    description: >-
+      Provision a Lightsail Container Service pulling from ECR private
+      registry with IAM access key authentication. Expects READY_TO_DEPLOY
+      with ECR auth noted.
+    input: |
+      Create a Lightsail Container Service named api-service in
+      us-east-1. Power: medium. Scale: 3 nodes. Container image:
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/api-service:v2.1
+      from ECR private registry. ECR access key: AKIAABCDE12345 with
+      secret key provided. Container port 8080 mapped to HTTP. Public
+      endpoint with health check on /health every 5 seconds. Enable
+      CloudWatch Logs. Tags: Environment=production, Team=backend.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ECR"
+        - "power"
+        - "scale"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "managed TLS"
+        - "8080"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: scale-power-tradeoff
+    description: >-
+      Provision a Lightsail Container Service optimized for cost-vs-HA
+      trade-off: medium with 2 nodes instead of large with 1 node.
+      Expects READY_TO_DEPLOY with redundancy noted.
+    input: |
+      Create a Lightsail Container Service named worker-service in
+      us-east-1. I want high availability at moderate cost. Power:
+      medium. Scale: 2 nodes (for redundancy). Container image:
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/worker:v1.0 from
+      ECR. ECR credentials configured. Container port 3000 mapped to
+      HTTP. Health check on /health. Environment variables:
+      WORKER_CONCURRENCY=10. Tags: Environment=production,
+      Strategy=cost-ha-balance.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "medium"
+        - "2 nodes"
+        - "redundancy"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "power"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: custom-domain-deployment
+    description: >-
+      Provision a Lightsail Container Service with a custom domain via
+      CNAME to the managed TLS endpoint. Expects READY_TO_DEPLOY with
+      custom domain and CNAME noted.
+    input: |
+      Create a Lightsail Container Service named app-prod in
+      us-east-1. Power: large. Scale: 3 nodes. Container image:
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/app:v3.0 from ECR
+      (credentials configured). Container port 443 mapped to HTTP.
+      Public endpoint with health check on /healthz. Custom domain:
+      app.example.com via CNAME to the Lightsail public endpoint.
+      Enable CloudWatch Logs. Tags: Environment=production,
+      Domain=custom.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "custom domain"
+        - "CNAME"
+        - "app.example.com"
+        - "managed TLS"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-ecr-credentials
+    description: >-
+      Operator requests a Lightsail Container Service pulling from ECR
+      but does not provide ECR registry credentials. This is a
+      prerequisite failure. Expects PREREQUISITES_MISSING.
+    input: |
+      Create a Lightsail Container Service named data-processor in
+      us-east-1. Power: small. Scale: 1 node. Container image:
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/processor:v1.0
+      from ECR private registry. No ECR credentials have been provided.
+      Container port 8080. Tags: Environment=dev.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "ECR"
+        - "credentials"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "123456789012.dkr.ecr"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

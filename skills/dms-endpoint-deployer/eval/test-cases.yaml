@@ -1,0 +1,162 @@
+# Eval test cases for dms-endpoint-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across DMS endpoint scenarios
+# (PostgreSQL source with CDC and Secrets Manager, Oracle source
+# with Binary Reader and verify-full SSL, S3 target with Parquet,
+# MongoDB source with replica set CDC, PostgreSQL CDC with
+# wal_level=replica prerequisite failure).
+skill: dms-endpoint-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: postgresql-source-cdc-secrets-manager
+    description: >-
+      Provision a PostgreSQL source endpoint with CDC enabled using
+      Secrets Manager for credentials, verify-full SSL, and the
+      pglogical plugin. Expects READY_TO_DEPLOY with CDC prerequisites
+      noted, Secrets Manager credential management, and extra
+      connection attributes configured.
+    input: |
+      Create a DMS source endpoint for PostgreSQL at
+      prod-db.cluster-abc123.us-east-1.rds.amazonaws.com port 5432,
+      database "analytics", us-east-1. Use Secrets Manager secret
+      arn:aws:secretsmanager:us-east-1:123456789012:secret:dms-pg-prod.
+      SSL mode verify-full with certificate prod-ca-cert. CDC enabled
+      with pglogical plugin, slot name dms_replication_slot. KMS key
+      arn:aws:kms:us-east-1:123456789012:key/abc123. Replication
+      instance rep-instance-prod. Tags: Environment=production,
+      MigrationType=cdc.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "PluginName=pglogical"
+        - "verify-full"
+        - "Secrets Manager"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "wal_level"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: oracle-source-binary-reader-ssl
+    description: >-
+      Provision an Oracle source endpoint with Binary Reader for CDC,
+      verify-full SSL with an imported certificate, and extra connection
+      attributes for archived log tuning. Expects READY_TO_DEPLOY with
+      supplemental logging prerequisite noted.
+    input: |
+      Create a DMS source endpoint for Oracle at
+      oracle-prod.example.com port 1521, SID ORCL, us-east-1. Use
+      Binary Reader for CDC (useLogminerReader=N,
+      AdditionalArchivedLogDestId=1). SSL mode verify-full with
+      certificate oracle-ca-cert. KMS key
+      arn:aws:kms:us-east-1:123456789012:key/oracle-key. Replication
+      instance rep-instance-prod. Tags: Environment=production,
+      Engine=oracle.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "useLogminerReader=N"
+        - "verify-full"
+        - "supplemental logging"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: s3-target-parquet-format
+    description: >-
+      Provision an S3 target endpoint with Parquet format, Snappy
+      compression, and column names in the output. Expects
+      READY_TO_DEPLOY with extra connection attributes for format
+      and compression noted.
+    input: |
+      Create a DMS target endpoint for S3 in us-east-1. Bucket
+      my-dms-target-bucket, folder /migration-data/. Data format
+      Parquet with Snappy compression and RLE dictionary encoding.
+      Include column names in output. Service access role
+      arn:aws:iam::123456789012:role/dms-s3-role. KMS key
+      arn:aws:kms:us-east-1:123456789012:key/s3-key. Replication
+      instance rep-instance-prod. Tags: Environment=production,
+      Format=parquet.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "DataFormat=parquet"
+        - "CompressionType=snappy"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: mongodb-source-replica-set-cdc
+    description: >-
+      Provision a MongoDB source endpoint using a replica set for CDC
+      with oplog capture. Expects READY_TO_DEPLOY with replica set
+      requirement noted and extra connection attributes for document
+      extraction configured.
+    input: |
+      Create a DMS source endpoint for MongoDB at
+      mongo-prod.example.com port 27017, us-east-1. Replica set
+      rs0. CDC via change streams. NestingLevel=ONE, ExtractDocId=true,
+      DocsToInvestigate=50. SSL mode require. Replication instance
+      rep-instance-prod. Tags: Environment=production, Engine=mongodb.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "NestingLevel=ONE"
+        - "replica set"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: postgresql-cdc-wal-level-prerequisite-fail
+    description: >-
+      Operator requests a PostgreSQL CDC endpoint but the source
+      database has wal_level=replica (not logical). CDC requires
+      wal_level=logical. Expects PREREQUISITES_MISSING with the
+      wal_level gap cited.
+    input: |
+      Create a DMS source endpoint for PostgreSQL at
+      staging-db.example.com port 5432, database "staging", us-east-1.
+      Enable CDC with pglogical plugin. The source database has
+      wal_level=replica. Replication instance rep-instance-prod.
+      Tags: Environment=staging.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "wal_level"
+        - "logical"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "replica"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

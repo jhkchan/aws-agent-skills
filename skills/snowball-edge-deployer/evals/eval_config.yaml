@@ -1,0 +1,49 @@
+# Eval configuration for snowball-edge-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: snowball-edge-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: import-job-s3
+    difficulty: hard
+    prompt_file: prompts/import-job-s3.md
+    baseline_file: baselines/import-job-s3.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: cluster-mode-compute
+    difficulty: hard
+    prompt_file: prompts/cluster-mode-compute.md
+    baseline_file: baselines/cluster-mode-compute.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: nfs-data-transfer
+    difficulty: medium
+    prompt_file: prompts/nfs-data-transfer.md
+    baseline_file: baselines/nfs-data-transfer.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: export-job-s3
+    difficulty: medium
+    prompt_file: prompts/export-job-s3.md
+    baseline_file: baselines/export-job-s3.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-shipping-address
+    difficulty: easy
+    prompt_file: prompts/missing-shipping-address.md
+    baseline_file: baselines/missing-shipping-address.md
+    expected_verdict: PREREQUISITES_MISSING

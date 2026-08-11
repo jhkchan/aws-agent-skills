@@ -1,0 +1,180 @@
+{
+  "skill": "storage-gateway-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Storage Gateway Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across gateway types (S3 File Gateway with NFS, Volume Gateway cached iSCSI, SMB with Active Directory, Tape Gateway VTL, missing activation key). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "s3-file-gateway-nfs",
+      "name": "S3 File Gateway with NFS file share",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — S3 File Gateway, NFS file share, cache and upload buffer sized independently, gateway region matches S3 bucket region",
+      "prompt": "Deploy an S3 File Gateway in us-east-1. Gateway name: prod-s3-file-gateway. Activation key: ABCDE-12345-FGHIJ-67890-KLMNO. S3 bucket: my-data-bucket (us-east-1). IAM role: arn:aws:iam::123456789012:role/StorageGatewayS3Role. Cache disk: 500 GB. Upload buffer disk: 300 GB. Create an NFS file share with client list 10.0.0.0/16. Default storage class S3_STANDARD. Tags: Environment=production.",
+      "prompt_file": "prompts/s3-file-gateway-nfs.md",
+      "baseline_file": "baselines/s3-file-gateway-nfs.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "STORAGE_GATEWAY: prod-s3-file-gateway (FILE_S3) — arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-AAAAA\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Gateway type: S3 File Gateway\n  [✓] Activation: gateway RUNNING\n  [✓] Gateway region: us-east-1 (matches S3 bucket region: us-east-1)\n  [✓] Cache: 500 GB — allocated\n  [✓] Upload buffer: 300 GB — allocated\n  [✓] S3 bucket: my-data-bucket (region: us-east-1)\n  [✓] File share (NFS): share → s3://my-data-bucket (clients: 10.0.0.0/16)\nVERIFICATION_COMMANDS:\n  aws storagegateway describe-gateway-information --gateway-arn <arn> --region us-east-1\n  aws storagegateway list-file-shares --gateway-arn <arn> --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "FILE_S3",
+            "cache",
+            "upload buffer",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "my-data-bucket"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "volume-gateway-iscsi",
+      "name": "Volume Gateway cached mode with iSCSI volume",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Volume Gateway cached mode, iSCSI target, cache and upload buffer allocated",
+      "prompt": "Deploy a Volume Gateway in cached mode in us-east-1. Gateway name: prod-volume-gateway. Activation key: VWXYZ-98765-QRSTU-43210-PQRSX. Cache disk: 1 TB. Upload buffer: 500 GB. Create a cached iSCSI volume of 1 TB. Target name: prod-volume-01. Network interface: eni-xxxx12345. Tags: Environment=production, Storage=cached.",
+      "prompt_file": "prompts/volume-gateway-iscsi.md",
+      "baseline_file": "baselines/volume-gateway-iscsi.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "STORAGE_GATEWAY: prod-volume-gateway (VOLUME) — arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-BBBBB\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Gateway type: Volume Gateway (Cached)\n  [✓] Cache: 1 TB — allocated\n  [✓] Upload buffer: 500 GB — allocated\n  [✓] iSCSI volume: prod-volume-01 (1 TB)\nVERIFICATION_COMMANDS:\n  aws storagegateway describe-gateway-information --gateway-arn <arn> --region us-east-1\n  aws storagegateway list-volumes --gateway-arn <arn> --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "VOLUME",
+            "cached",
+            "iSCSI",
+            "VERDICT",
+            "CHECKLIST",
+            "upload buffer"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "smb-active-directory",
+      "name": "SMB file share with Active Directory integration",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — S3 File Gateway, SMB file share, Active Directory domain join, authenticated access, audit logging",
+      "prompt": "Deploy an S3 File Gateway in us-east-1 with an SMB file share. Gateway name: prod-smb-gateway. Activation key: ABCDE-11111-FGHIJ-22222-KLMNO. S3 bucket: smb-share-bucket (us-east-1). Join Active Directory: domain corp.example.com, OU OU=Servers,DC=corp,DC=example,DC=com, username sgw-service. Create an authenticated SMB file share with admin user corp\\sgw-admins. Enable audit logging to CloudWatch. Tags: Environment=production, Protocol=smb.",
+      "prompt_file": "prompts/smb-active-directory.md",
+      "baseline_file": "baselines/smb-active-directory.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "STORAGE_GATEWAY: prod-smb-gateway (FILE_S3)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Gateway type: S3 File Gateway\n  [✓] Active Directory: joined (domain: corp.example.com)\n  [✓] File share (SMB): authenticated (ActiveDirectory)\n  [✓] Audit logging: CloudWatch Logs",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ActiveDirectory",
+            "corp.example.com",
+            "VERDICT",
+            "CHECKLIST",
+            "SMB",
+            "audit"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tape-gateway-vtl",
+      "name": "Tape Gateway with VTL and Glacier tape pool",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Tape Gateway, VTL with virtual tapes, Glacier tape pool with governance retention",
+      "prompt": "Deploy a Tape Gateway in us-east-1. Gateway name: backup-tape-gateway. Activation key: TAPEK-99999-VTLXX-88888-YYYYY. Cache: 200 GB. Upload buffer: 400 GB. Create a tape pool named GlacierPool with GLACIER storage class and 365-day governance retention. Create 10 virtual tapes of 1 TB each with barcode prefix TAPE. Tags: Environment=production, Purpose=backup.",
+      "prompt_file": "prompts/tape-gateway-vtl.md",
+      "baseline_file": "baselines/tape-gateway-vtl.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "STORAGE_GATEWAY: backup-tape-gateway (VTL)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Gateway type: Tape Gateway\n  [✓] Tape pool: GlacierPool (GLACIER, 365-day governance)\n  [✓] Virtual tapes: 10 tapes (1 TB each, prefix TAPE)\nVERIFICATION_COMMANDS:\n  aws storagegateway describe-gateway-information --gateway-arn <arn> --region us-east-1\n  aws storagegateway list-tapes --gateway-arn <arn> --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Tape Gateway",
+            "VTL",
+            "GlacierPool",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-activation-key",
+      "name": "Storage Gateway deployment without activation key (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no activation key provided; gateway cannot be activated",
+      "prompt": "Deploy an S3 File Gateway in us-east-1. Gateway name: prod-s3-gateway. I have the gateway VM running but haven't generated the activation key yet. S3 bucket: my-bucket. Cache: 500 GB. Upload buffer: 300 GB.",
+      "prompt_file": "prompts/missing-activation-key.md",
+      "baseline_file": "baselines/missing-activation-key.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "STORAGE_GATEWAY: prod-s3-gateway\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Activation key: missing — gateway cannot be activated without an activation key from the gateway VM activation endpoint",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "activation key",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

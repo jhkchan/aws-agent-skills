@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Introduces several expert\u2011level details not in a baseline model: immutable layer version lifecycle, exact zip path conventions per runtime, cross\u2011account sharing matrix, and the subtle default of x86_64 architecture. These constitute genuine delta, though some nuances (e.g., Lambda@Edge region constraints) are omitted."
+      "justification": "Provides many expert details (immutable version model, cross\u2011account sharing matrix, zip path conventions, recent runtime changes) that a baseline model would not know, but omits some advanced limits such as the maximum number of layer versions, layer policy statement limits, and best\u2011practice for safe deletion of old versions."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: CLI commands, decision tree for choosing layers vs containers, and step\u2011by\u2011step publishing flow. Minor gap: the ordering of permission steps for cross\u2011account sharing (resource\u2011based policy before consumer IAM) is not explicitly enforced."
+      "justification": "Includes AWS\u2011specific decision tree, step\u2011by\u2011step packaging, publishing, sharing, and attachment procedures. However, it lacks an explicit pre\u2011publish validation step for the target function's runtime/architecture and does not embed error\u2011handling steps (e.g., retry on ResourceConflictException) into the main workflow."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., omitting runtimes, architectures, wrong zip root, assuming auto\u2011update). Missing a few common pitfalls such as the need to detach a layer before deleting its version and the special region requirement for Lambda@Edge layers."
+      "justification": "Contains a solid NEVER list with concrete reasons, but misses a few common pitfalls: exceeding the total uncompressed size limit (250\u202fMB) and the per\u2011layer version limit (typically 100). These omissions reduce the anti\u2011pattern coverage."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, and activation triggers are present. The \"when_to_use\" section is verbose but could be more succinct; activation keywords are listed but there is no explicit pattern for automatic skill matching beyond free\u2011text keywords."
+      "justification": "Frontmatter is complete, description explains WHAT and WHEN, and keywords are exhaustive. The only shortfall is the lack of a formal \"activation\" field; triggers are described in prose, which could be ambiguous for automated activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011navigation tables and layered sections, but the initial tables (runtime matrix, sharing matrix) are large and may overload the agent before it knows which part is needed. Critical rules are sometimes buried in deep tables rather than surfaced early."
+      "justification": "The skill layers information (quick navigation, detailed tables, NEVER list) but the initial sections are dense, pushing critical anti\u2011pattern warnings deeper into the document rather than surfacing them early, causing potential cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 12,
       "max": 15,
-      "justification": "Calibrates freedom well: destructive actions (publish\u2011layer\u2011version) are gated by a prerequisite checklist and a PREREQUISITES_MISSING verdict. Slight over\u2011flexibility in cross\u2011account sharing steps where both owner and consumer permissions must be verified."
+      "justification": "Destructive actions (publish\u2011layer\u2011version, add\u2011permission) are allowed with minimal constraints; there is no mandatory size check, no explicit confirmation before making a layer public, and no guardrails to prevent accidental cross\u2011account exposure."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset, Steps, NEVER list, Output format) that aligns with other CloudOps skills. The inclusion of an ad\u2011hoc \u201cWorked example\u201d section is a minor deviation but does not break the overall pattern."
+      "justification": "Follows a recognizable overall pattern (Mindset, Steps, NEVER, Output), but the mixture of narrative, tables, and ad\u2011hoc sections deviates from a single, clean template, making the structure slightly inconsistent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a ready\u2011to\u2011use checklist, concrete CLI commands, error\u2011handling guidance, and multiple worked examples. However, the model output for the Go utils layer marks missing sharing and attachment yet still returns VERDICT: READY_TO_DEPLOY, showing inconsistency that could mislead an agent."
+      "justification": "Provides a ready\u2011to\u2011use checklist, CLI commands, and worked examples, enabling an agent to act. However, it does not include a decision branch for missing prerequisites (the model must infer) and lacks guidance for handling partial or ambiguous inputs."
     }
   ],
-  "total_score": 105,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40506,
-  "latency_ms": 10571,
+  "token_count": 41530,
+  "latency_ms": 32464,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

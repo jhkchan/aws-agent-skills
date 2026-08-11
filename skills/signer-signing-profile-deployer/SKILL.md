@@ -116,7 +116,7 @@ metadata:
 
 An AWS CloudOps agent skill that provisions AWS Signer signing
 profiles and Lambda code signing configurations with correct
-production defaults. The skill walks the platform selection (which
+production defaults. The skill walks platform selection (which
 determines the cryptographic algorithm), profile creation, Lambda
 code signing config enforcement, signing job submission, certificate
 validation, signature verification, profile versioning, and
@@ -128,9 +128,8 @@ checklist with copy-pasteable verification commands.
 
 create signer signing profile, AWSLambda-SHA384-ECDSA, AmazonFreeRTOS
 signing, AWSIoT signing, Lambda code signing config, signer signing
-job, code signing config ARN, allowed publishing profiles, untrusted
-artifact on violation, signer certificate validation, signature
-verification Lambda, profile versioning, trusted profile management.
+job, allowed publishing profiles, untrusted artifact on violation,
+profile versioning, trusted profile management.
 
 ## STRICT output contract
 
@@ -138,13 +137,12 @@ When this skill is invoked with a Signer-provisioning request
 (create a signing profile, configure Lambda code signing, start a
 signing job, validate a signer certificate, or manage profile
 versions), the agent MUST respond with the READY_TO_DEPLOY checklist
-defined in the "Output format" section using the literal all-caps
-labels `SIGNER:`, `VERDICT:`, `CHECKLIST:`, and
-`VERIFICATION_COMMANDS:`. Do NOT preface the checklist with prose,
-headings, or disclaimers — emit the block as the first lines of the
-response. This contract is what assertion-based evals and downstream
-provisioning pipelines rely on; deviating from the literal labels
-breaks automation silently.
+defined in "Output format" using the literal all-caps labels
+`SIGNER:`, `VERDICT:`, `CHECKLIST:`, and `VERIFICATION_COMMANDS:`.
+Do NOT preface the checklist with prose, headings, or disclaimers —
+emit the block as the first lines of the response. This contract is
+what assertion-based evals and downstream provisioning pipelines rely
+on; deviating from the literal labels breaks automation silently.
 
 If any prerequisite is missing, the verdict is
 `PREREQUISITES_MISSING` with a specific gap citation in the checklist
@@ -157,24 +155,24 @@ If any prerequisite is missing, the verdict is
 2. `VERDICT: READY_TO_DEPLOY` OR `VERDICT: PREREQUISITES_MISSING`.
 3. `CHECKLIST:` followed by indented lines with status markers
    (`[✓]`, `[✗]`, `[OPTIONAL]`, `[INPUT NEEDED]`).
-4. `VERIFICATION_COMMANDS:` followed by indented `aws signer ...` and
-   `aws lambda ...` commands.
+4. `VERIFICATION_COMMANDS:` followed by indented `aws signer ...`
+   and `aws lambda ...` commands.
 
 ## Quick navigation
 
 | Section | When to read |
 |---|---|
 | Prerequisites | Always — verify before provisioning |
-| Step 1 — Platform selection (determines crypto algorithm) | Core model |
+| Step 1 — Platform selection (crypto algorithm) | Core model |
 | Step 2 — Profile creation and versioning | Provisioning step |
-| Step 3 — Lambda code signing config (enforces at UPDATE) | Lambda integration |
-| Step 4 — Signing job creation (immutable once created) | Signing artifacts |
-| Step 5 — Certificate validation via Signer | Trust chain |
-| Step 6 — Signature verification at Lambda deploy time | Runtime enforcement |
+| Step 3 — Lambda CSC (enforces at UPDATE) | Lambda integration |
+| Step 4 — Signing job (immutable once created) | Signing artifacts |
+| Step 5 — Certificate validation | Trust chain |
+| Step 6 — Signature verification at deploy | Runtime enforcement |
 | Step 7 — Revocation tracking | Revocation posture |
-| Step 8 — IAM permissions for Signer | Least privilege |
-| Step 9 — IoT device management integration | IoT firmware signing |
-| Step 10 — CloudTrail audit of signing operations | Auditability |
+| Step 8 — IAM permissions | Least privilege |
+| Step 9 — IoT device management | IoT firmware signing |
+| Step 10 — CloudTrail audit | Auditability |
 | Step 11 — Trusted profile management | Lifecycle governance |
 | NEVER do these things | Review before signing off |
 | Output format | The literal checklist template |
@@ -185,59 +183,56 @@ If any prerequisite is missing, the verdict is
 
 **One-line takeaway:** An AWS Signer signing profile is a named,
 versioned identity that bundles a platform (which fixes the
-cryptographic algorithm) with a signing certificate that AWS
-generates and rotates on your behalf. Lambda code signing configs
-reference one or more allowed publishing profiles and reject any
-deployment package whose signature is missing, untrusted, or stale —
-enforcement happens at function CREATE and UPDATE, never at runtime.
-A signing job is immutable once started: the signed artifact in the
-destination S3 bucket cannot be re-signed under the same job.
+cryptographic algorithm) with a signing certificate AWS generates
+and rotates for you. Lambda code signing configs reference one or
+more allowed publishing profiles and reject any deployment package
+whose signature is missing, untrusted, or stale — enforcement
+happens at function CREATE and UPDATE, never at runtime. A signing
+job is immutable once started: the signed artifact cannot be
+re-signed under the same job.
 
 Three misconceptions dominate Signer misdesign at provisioning time:
 
 - **"Any signing profile works for any workload."** It does not.
   Signer platforms are workload-scoped. `AWSLambda-SHA384-ECDSA` is
-  the ONLY valid platform for Lambda code signing and produces ECDSA
-  over SHA-384. `AmazonFreeRTOS` and `AWSIoT` are microcontroller /
-  firmware scopes with their own hash and signature primitives.
-  Picking the wrong platform produces a profile that Lambda's
-  verifier rejects at `UpdateFunctionCode` time.
+  the ONLY valid platform for Lambda code signing (ECDSA on P-384
+  over SHA-384). `AmazonFreeRTOS` and `AWSIoT` are firmware scopes
+  with their own primitives. Picking the wrong platform produces a
+  profile that Lambda's verifier rejects at `UpdateFunctionCode`.
 
 - **"Lambda code signing is enforced at runtime."** It is not.
-  Lambda checks the signature of a deployment package ONLY when the
-  function or layer version is created or updated. Once a version is
-  published, runtime invocation does not re-verify. If the trusted
-  profile is later revoked, the already-published version keeps
-  running until the operator redeploys — the control is a deploy
-  gate, not a runtime gate.
+  Lambda checks the signature ONLY when the function or layer
+  version is created or updated. Once published, runtime invocation
+  does not re-verify. If the trusted profile is later revoked, the
+  already-published version keeps running until the operator
+  redeploys — the control is a deploy gate, not a runtime gate.
 
 - **"A signing job can be re-run or patched."** It cannot. A signing
-  job, once `Succeeded`, is immutable. The signed artifact in the
+  job, once `Succeeded`, is immutable: the signed artifact in the
   destination S3 prefix is fixed, the job ARN is fixed, and the
   profile version used is fixed. To re-sign after a profile rotation
-  or certificate revocation, you MUST start a new job with a new (or
-  revocation-aware) profile version. There is no
+  or cert revocation, you MUST start a new job. There is no
   `UpdateSigningJob` API.
 
 ## Configuration dependency graph (novel heuristic)
 
 Signer configurations are NOT independent. The platform fixes the
-crypto algorithm. The Lambda code signing config references allowed
-publishing profiles by ARN (with version). The signing job references
-the profile version and produces an immutable signed artifact.
-Signature verification at Lambda deploy time uses the same CSC. Use
-this graph to sequence provisioning.
+crypto algorithm; the CSC references allowed publishing profiles by
+ARN (with version); the signing job references the profile version
+and produces an immutable signed artifact; signature verification at
+Lambda deploy time uses the same CSC. Use this graph to sequence
+provisioning.
 
 | Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
 |---|---|---|---|
-| Signing profile | platform chosen; caller has `signer:PutSigningProfile` | profile version is immutable once created; `Status=Active` after first successful job | profile ARN + version for CSC and jobs |
-| Profile version | profile exists; platform fixes the algorithm | version cannot be re-targeted at a different platform; revocation invalidates jobs that used the version AFTER publish, not retroactively | stable reference for CSC and audit |
-| Lambda code signing config (CSC) | at least one allowed publishing profile ARN; `untrusted-artifact-on-violation` set | `Enforce` rejects the deploy; `Warn` logs only — silent if mis-set | deploy-time gate on `UpdateFunctionCode` |
-| CSC → function association | CSC ARN exists; function exists | association via `UpdateFunctionConfiguration`; takes effect on NEXT deploy, not in-place | every subsequent function update must pass signature check |
-| Signing job | profile ARN+version; source S3 object exists; destination bucket exists and has signer write grant | signed artifact at destination is immutable; job ID is fixed; cannot retry in place | signed artifact consumed by Lambda deploy / OTA client |
-| Certificate validation | profile is Active; AWS-generated signer cert chain present | signer rotates the signing certificate periodically; verification MUST re-fetch on each check | trust chain for offline verifiers and Lambda deploy-time check |
-| Signature verification at Lambda deploy | function has CSC with the profile in `AllowedPublishingProfiles` | verification happens on `UpdateFunctionCode` / `PublishLayerVersion`, never on invoke; stale profile version = `SignatureMismatchException` | deploy gate blocking unsigned or untrusted code |
-| IAM for Signer | caller has `signer:StartSigningJob`, `signer:PutSigningProfile`; Lambda role trusts `lambda:UpdateFunctionCode` | missing `signer:StartSigningJob` on the CI role is the most common CI failure; profile permission is separate from signing permission | least-privilege CI pipeline |
+| Signing profile | platform chosen; `signer:PutSigningProfile` | version immutable once created; Active after first successful job | profile ARN + version for CSC and jobs |
+| Profile version | profile exists; platform fixes algorithm | version cannot be re-targeted; revocation invalidates jobs that used the version AFTER publish, not retroactively | stable reference for CSC and audit |
+| Lambda CSC | ≥1 allowed publishing profile ARN; `untrusted-artifact-on-violation` set | `Enforce` rejects the deploy; `Warn` logs only — silent if mis-set | deploy-time gate on `UpdateFunctionCode` |
+| CSC → function | CSC ARN exists; function exists | association via `UpdateFunctionConfiguration`; takes effect on NEXT deploy, not in-place | every subsequent update must pass signature check |
+| Signing job | profile ARN+version; source S3 object; destination bucket with signer write grant | signed artifact is immutable; job ID fixed; cannot retry in place | signed artifact for Lambda deploy / OTA client |
+| Certificate validation | profile Active; AWS-generated signer cert chain | signer rotates the cert periodically; verification MUST re-fetch each check | trust chain for offline verifiers and Lambda deploy-time check |
+| Signature verification at deploy | function has CSC with the profile in `AllowedPublishingProfiles` | verification on `UpdateFunctionCode` / `PublishLayerVersion`, never on invoke; stale version = `SignatureMismatchException` | deploy gate blocking unsigned/untrusted code |
+| IAM for Signer | `signer:StartSigningJob`, `signer:PutSigningProfile`; Lambda role trusts `lambda:UpdateFunctionCode` | missing `signer:StartSigningJob` on the CI role is the most common CI failure | least-privilege CI pipeline |
 | CloudTrail audit | Signer is a CloudTrail-logged service in all commercial regions | `StartSigningJob` and `PutSigningProfile` appear in CloudTrail; CSC changes appear under `lambda:` events | audit trail of who signed what, when, with which profile version |
 
 **The platform-fixes-algorithm row is the one a baseline model
@@ -245,8 +240,8 @@ misses.** A naive answer lists platforms as interchangeable. In
 reality the platform string is the single source of truth for the
 hash and signature algorithm — there is no separate `--algorithm`
 flag. The CSC enforcement-at-UPDATE-only row is the second most
-missed: operators assume runtime enforcement and are surprised when a
-revoked-profile version keeps serving traffic.
+missed: operators assume runtime enforcement and are surprised when
+a revoked-profile version keeps serving traffic.
 
 **Cross-dependency gotchas:**
 - A CSC references a profile ARN WITH version suffix. Promoting a
@@ -274,33 +269,32 @@ AmazonFreeRTOS                  SHA-256     RSA-3072         FreeRTOS OTA firmwa
 AWSIoT                          SHA-256     RSA-3072/ECDSA   AWS IoT device firmware
 ```
 
-**Key implication:** for Lambda code signing, the ONLY valid platform
-is `AWSLambda-SHA384-ECDSA`. Picking `AWSIoT` or `AmazonFreeRTOS`
-produces a profile that `CreateCodeSigningConfig` will accept (the
-CSC itself is profile-agnostic) but Lambda will reject at
-`UpdateFunctionCode` time, because the Lambda verifier expects
-ECDSA/P-384 over SHA-384.
+**Key implication:** for Lambda, the ONLY valid platform is
+`AWSLambda-SHA384-ECDSA`. Picking `AWSIoT` or `AmazonFreeRTOS`
+produces a profile that `CreateCodeSigningConfig` accepts (the CSC is
+profile-agnostic) but Lambda rejects at `UpdateFunctionCode` because
+the verifier expects ECDSA/P-384 over SHA-384.
 
 ## Expert heuristic: Lambda code signing config enforces at UPDATE, not at runtime
 
 Lambda code signing is a deploy-time gate, not a runtime gate. The
 verifier runs against the deployment package only when a new function
-version or layer version is published.
+or layer version is published.
 
 ```text
-Event                            Signature checked?   Action on mismatch
-───────────────────────────────  ───────────────────  ─────────────────────────
-CreateFunction                   YES (if CSC set)     rejected
-UpdateFunctionCode               YES                  Enforce → rejected; Warn → logged
-PublishLayerVersion              YES                  Enforce → rejected; Warn → logged
-Invoke / runtime invocation      NO                   Already-published version keeps running
-PublishVersion                   NO (uses prior pkg)  Version pins the previously-validated pkg
+Event                            Checked?  Action on mismatch
+───────────────────────────────  ────────  ─────────────────────────
+CreateFunction                   YES       rejected
+UpdateFunctionCode               YES       Enforce → rejected; Warn → logged
+PublishLayerVersion              YES       Enforce → rejected; Warn → logged
+Invoke / runtime invocation      NO        Already-published version keeps running
+PublishVersion                   NO        Version pins the previously-validated pkg
 ```
 
 **Key implication:** if a trusted profile is revoked AFTER a function
 version is published, that version keeps running until the operator
 redeploys with a CSC that no longer lists the revoked profile. Treat
-code signing as a CI/CD gate, not as a runtime attestation.
+code signing as a CI/CD gate, not a runtime attestation.
 
 ## Expert heuristic: a signing job is immutable once created
 
@@ -311,35 +305,33 @@ signed artifact at the destination is fixed.
 ```text
 signing job lifecycle:
   InProgress → Succeeded | Failed
-  Once Succeeded:
-    ├── destination object is immutable (cannot be re-signed in place)
-    ├── job ID is fixed and surfaces in CloudTrail
-    ├── profile version used is recorded (cannot be retroactively swapped)
-    └── re-signing requires a NEW StartSigningJob call
+  Once Succeeded: destination object, job ID, and profile version
+  are all immutable. Re-signing requires a NEW StartSigningJob.
 ```
 
-**Key implication:** after a profile rotation or certificate
-revocation, you MUST start a new signing job against the same source
-with the new profile version, then redeploy the function pointing at
-the new destination object. The previous job ID is for audit only.
+**Key implication:** after a profile rotation or revocation, you
+MUST start a new signing job against the same source with the new
+profile version, then redeploy the function pointing at the new
+destination object. The previous job ID is for audit only.
 
 ## Prerequisites (verify before provisioning)
 
 Before emitting provisioning commands, verify these prerequisites. If
-any are missing, the verdict is **PREREQUISITES_MISSING**.
+any are missing, the verdict is **PREREQUISITES_MISSING** and the
+specific gap must be cited.
 
 | Prerequisite | Why it matters | How to verify |
 |---|---|---|
 | Platform chosen (`AWSLambda-SHA384-ECDSA`, `AmazonFreeRTOS`, `AWSIoT`) | Platform fixes the crypto algorithm | Confirm workload matches platform scope |
-| Source S3 bucket + key (if signing job requested) | `StartSigningJob` requires `source.s3.bucketName` and `source.s3.key` | `aws s3api head-object --bucket <b> --key <k>` |
-| Destination S3 bucket + prefix | Signer writes the signed artifact here; bucket must grant Signer write | `aws s3api list-objects --bucket <b> --prefix <p>` |
+| Source S3 bucket + key (if signing job) | `StartSigningJob` requires `source.s3.bucketName` and `source.s3.key` | `aws s3api head-object --bucket <b> --key <k>` |
+| Destination S3 bucket + prefix | Signer writes here; bucket must grant Signer write | `aws s3api list-objects --bucket <b> --prefix <p>` |
 | Caller IAM: `signer:PutSigningProfile` | Required to create the profile | `aws iam simulate-principal-policy ...` |
 | Caller IAM: `signer:StartSigningJob` (if signing job) | Required to start a job | `aws iam simulate-principal-policy ...` |
-| Lambda function exists (if associating a CSC) | CSC is associated per-function via `UpdateFunctionConfiguration` | `aws lambda get-function-configuration --function-name <f>` |
-| CSC ARN known (if updating an existing CSC) | CSCs are referenced by ARN | `aws lambda list-code-signing-configs` |
+| Lambda function exists (if associating CSC) | CSC is per-function via `UpdateFunctionConfiguration` | `aws lambda get-function-configuration --function-name <f>` |
+| CSC ARN known (if updating existing CSC) | CSCs are referenced by ARN | `aws lambda list-code-signing-configs` |
 | `AllowedPublishingProfiles` decision | Determines which profile ARNs (with version) are trusted | Confirm profile version ARNs |
-| `UntrustedArtifactOnViolation` decision | `Enforce` blocks deploy on mismatch; `Warn` only logs | Confirm policy intent |
-| CloudTrail trail present in the region | Signer events (`StartSigningJob`, `PutSigningProfile`) appear in CloudTrail | `aws cloudtrail describe-trails` |
+| `UntrustedArtifactOnViolation` decision | `Enforce` blocks on mismatch; `Warn` only logs | Confirm policy intent |
+| CloudTrail trail present in the region | Signer events appear in CloudTrail | `aws cloudtrail describe-trails` |
 
 If any prerequisite is missing, output
 `VERDICT: PREREQUISITES_MISSING` and cite the specific gap.
@@ -355,10 +347,10 @@ algorithm. Choose by workload. There is no `--algorithm` override.
 | FreeRTOS OTA firmware | `AmazonFreeRTOS` | SHA-256 | RSA-3072 |
 | AWS IoT device firmware | `AWSIoT` | SHA-256 | RSA-3072 or ECDSA |
 
-**Lambda constraint:** Lambda code signing configurations REQUIRE a
-profile on the `AWSLambda-SHA384-ECDSA` platform. Any other platform
-in `AllowedPublishingProfiles` will fail Lambda's deploy-time
-verification with `SignatureMismatchException`.
+**Lambda constraint:** Lambda CSCs REQUIRE a profile on the
+`AWSLambda-SHA384-ECDSA` platform. Any other platform in
+`AllowedPublishingProfiles` fails Lambda's deploy-time verification
+with `SignatureMismatchException`.
 
 ## Step 2 — Profile creation and versioning
 
@@ -371,8 +363,7 @@ records reference.
 # Create the signing profile (platform fixes the algorithm)
 aws signer put-signing-profile \
   --profile-name lambda-signing-prod \
-  --platform-id AWSLambda-SHA384-ECDSA \
-  --region us-east-1
+  --platform-id AWSLambda-SHA384-ECDSA --region us-east-1
 
 # Verify the profile exists and is Active
 aws signer get-signing-profile \
@@ -382,7 +373,7 @@ aws signer get-signing-profile \
 ```
 
 **Versioning notes:**
-- The profile starts in `Active` status after `PutSigningProfile`.
+- Profile starts in `Active` status after `PutSigningProfile`.
 - The `profileVersion` appears in the ARN's last path segment after
   a successful signing job.
 - Promoting a new version: call `PutSigningProfile` with the same
@@ -392,8 +383,7 @@ aws signer get-signing-profile \
 ## Step 3 — Lambda code signing config (enforces at UPDATE)
 
 The code signing config (CSC) is the deploy-time gate. It lists the
-allowed publishing profile ARNs and what to do on a validation
-violation.
+allowed publishing profile ARNs and what to do on a violation.
 
 ```bash
 # Create the code signing config (CSC)
@@ -404,22 +394,18 @@ CSC_ARN=$(aws lambda create-code-signing-config \
   --description "Production Lambda CSC — Enforce on violation" \
   --query 'CodeSigningConfig.CodeSigningConfigArn' --output text)
 
-echo "CSC ARN: $CSC_ARN"
-
-# Associate the CSC with a Lambda function (takes effect on next UpdateFunctionCode)
+# Associate CSC with the function (takes effect on next UpdateFunctionCode)
 aws lambda update-function-configuration \
   --function-name my-prod-function \
-  --code-signing-config-arn-arn "$CSC_ARN" \
-  --region us-east-1
+  --code-signing-config-arn-arn "$CSC_ARN" --region us-east-1
 
 # This is where signature verification runs
 aws lambda update-function-code \
   --function-name my-prod-function \
   --s3-bucket my-signed-artifacts \
   --s3-key lambda/my-prod-function.zip \
-  --s3-object-version <version-id> \
-  --region us-east-1
-# Expect: success if the object was signed by a profile in AllowedPublishingProfiles
+  --s3-object-version <version-id> --region us-east-1
+# Expect: success if signed by a profile in AllowedPublishingProfiles
 # Expect: ResourceConflictException if Enforce and signature fails
 ```
 
@@ -447,11 +433,8 @@ JOB_ID=$(aws signer start-signing-job \
   --profile-name lambda-signing-prod \
   --query 'jobId' --output text --region us-east-1)
 
-echo "Signing job ID: $JOB_ID"
-
 # Poll for completion (signing is asynchronous)
-aws signer describe-signing-job \
-  --job-id "$JOB_ID" \
+aws signer describe-signing-job --job-id "$JOB_ID" \
   --query '{Status:status, Source:source, Destination:destination, Profile:profileName, CompletedAt:completedAt}' \
   --output table --region us-east-1
 # Expected status: Succeeded
@@ -460,8 +443,8 @@ aws signer describe-signing-job \
 **Immutability constraints:**
 - Once `status == Succeeded`, the destination object is fixed. There
   is no `UpdateSigningJob` API.
-- Re-signing after a profile rotation or certificate revocation
-  requires a new `StartSigningJob` call.
+- Re-signing after a profile rotation or revocation requires a new
+  `StartSigningJob` call.
 - The job ID is what CloudTrail records and what downstream verifiers
   use for provenance.
 
@@ -483,42 +466,38 @@ aws signer get-signing-profile \
   --output table --region us-east-1
 
 # For a specific signing job, the certificate used is in describe-signing-job
-aws signer describe-signing-job \
-  --job-id "$JOB_ID" \
-  --query '{Signature:signature, SignedObject:signedObject, JobInvoker:jobInvoker, ProfileVersion:profileVersion}' \
+aws signer describe-signing-job --job-id "$JOB_ID" \
+  --query '{Signature:signature, SignedObject:signedObject, ProfileVersion:profileVersion}' \
   --output table --region us-east-1
 ```
 
 **Key implication:** Signer rotates certificates on its own schedule.
-Always re-fetch the active certificate via `GetSigningProfile` for
-verification; do not pin a cached certificate indefinitely.
+Always re-fetch the active certificate via `GetSigningProfile`; do
+not pin a cached certificate indefinitely.
 
 ## Step 6 — Signature verification at Lambda deploy time
 
 Lambda verifies the signature of a deployment package when
 `UpdateFunctionCode` or `PublishLayerVersion` runs against a
-function or layer that has a CSC association. The check is:
+function or layer that has a CSC association. The check:
 
-1. Extract the signature block from the deployment package.
+1. Extract the signature block from the package.
 2. Resolve the profile version that produced the signature.
 3. Verify the profile version is in the CSC's
    `AllowedPublishingProfiles`.
-4. If the profile version is revoked → block (Enforce) or log (Warn).
-5. Verify the signature over the package using the profile's active
-   certificate.
+4. If revoked → block (Enforce) or log (Warn).
+5. Verify the signature using the profile's active certificate.
 
 ```bash
 # Update function code — this is where signature verification runs
 aws lambda update-function-code \
   --function-name my-prod-function \
-  --zip-file fileb://./signed-package.zip \
-  --region us-east-1
+  --zip-file fileb://./signed-package.zip --region us-east-1
 
 # Confirm the function's CSC association
 aws lambda get-function-configuration \
   --function-name my-prod-function \
   --query 'CodeSigningConfigArn' --region us-east-1
-# Expected: the CSC ARN
 ```
 
 **Critical:** runtime invocation does NOT re-verify. A previously
@@ -541,77 +520,46 @@ aws signer get-signing-profile \
 # Audit CloudTrail for revocation events
 aws cloudtrail lookup-events \
   --lookup-attributes AttributeKey=EventName,AttributeValue=CancelSigningProfile \
-  --max-results 10 \
-  --region us-east-1
+  --max-results 10 --region us-east-1
 ```
 
 **Operational rule:** when a profile is revoked, immediately (a)
 remove its ARN from any CSC's `AllowedPublishingProfiles`, (b)
-identify functions whose last successful deploy used that profile
-version (via CloudTrail), and (c) redeploy from a known-good signed
-artifact under a new profile version.
+identify functions whose last deploy used that version (via
+CloudTrail), and (c) redeploy from a known-good signed artifact
+under a new profile version.
 
 ## Step 8 — IAM permissions for Signer
 
 Least-privilege IAM for a CI pipeline that signs and deploys Lambda
-code.
+code. Minimum action set:
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "signer:PutSigningProfile",
-        "signer:GetSigningProfile",
-        "signer:ListSigningProfiles",
-        "signer:StartSigningJob",
-        "signer:DescribeSigningJob",
-        "signer:ListSigningJobs"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "lambda:CreateCodeSigningConfig",
-        "lambda:UpdateCodeSigningConfig",
-        "lambda:GetCodeSigningConfig",
-        "lambda:ListCodeSigningConfigs",
-        "lambda:UpdateFunctionConfiguration",
-        "lambda:UpdateFunctionCode",
-        "lambda:GetFunctionConfiguration"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:PutObject"],
-      "Resource": [
-        "arn:aws:s3:::my-unsigned-artifacts/*",
-        "arn:aws:s3:::my-signed-artifacts/*"
-      ]
-    }
-  ]
-}
-```
+- **Signer:** `signer:PutSigningProfile`,
+  `signer:GetSigningProfile`, `signer:ListSigningProfiles`,
+  `signer:StartSigningJob`, `signer:DescribeSigningJob`,
+  `signer:ListSigningJobs`.
+- **Lambda:** `lambda:CreateCodeSigningConfig`,
+  `lambda:UpdateCodeSigningConfig`, `lambda:GetCodeSigningConfig`,
+  `lambda:ListCodeSigningConfigs`,
+  `lambda:UpdateFunctionConfiguration`,
+  `lambda:UpdateFunctionCode`, `lambda:GetFunctionConfiguration`.
+- **S3:** `s3:GetObject` on the unsigned source bucket;
+  `s3:PutObject` on the signed destination bucket.
 
 **Common pitfall:** granting `signer:*` instead of the call sites
-above. Signer permissions are job-scoped and profile-scoped; use
-resource ARNs to narrow further in multi-tenant CI.
+above. Use resource ARNs to narrow further in multi-tenant CI.
 
 ## Step 9 — IoT device management integration
 
-For IoT firmware signing (`AWSIoT`, `AmazonFreeRTOS` platforms), the
-signed artifact is consumed by OTA (over-the-air) update jobs and by
-the IoT device's code-signing verification extension.
+For IoT firmware signing (`AWSIoT`, `AmazonFreeRTOS`), the signed
+artifact is consumed by OTA (over-the-air) update jobs and by the
+device's code-signing verification extension.
 
 ```text
 1. Signer signs the firmware image → signed artifact in S3.
 2. IoT OTA job references the signed artifact (S3 URL or stream).
-3. Device receives the image, verifies the signature against a
-   pinned Signer root certificate (provisioned at manufacturing).
+3. Device receives the image, verifies against a pinned Signer root
+   certificate (provisioned at manufacturing).
 4. Device applies the update or rejects on signature failure.
 ```
 
@@ -619,8 +567,7 @@ the IoT device's code-signing verification extension.
 # Create an IoT-signing profile (NOT valid for Lambda CSC)
 aws signer put-signing-profile \
   --profile-name iot-firmware-prod \
-  --platform-id AWSIoT \
-  --region us-east-1
+  --platform-id AWSIoT --region us-east-1
 
 # Start a signing job for the firmware image
 aws signer start-signing-job \
@@ -631,8 +578,8 @@ aws signer start-signing-job \
 ```
 
 **Constraint:** IoT and FreeRTOS profiles CANNOT be referenced by a
-Lambda code signing config. They produce signatures in a different
-format that Lambda's verifier does not understand.
+Lambda CSC. They produce signatures in a format Lambda's verifier
+does not understand.
 
 ## Step 10 — CloudTrail audit of signing operations
 
@@ -640,8 +587,8 @@ Signer is a CloudTrail-logged service. The key events:
 
 | Event name | When | Recorded fields |
 |---|---|---|
-| `PutSigningProfile` | Profile created or new version promoted | profileName, platformId, profileVersion |
-| `StartSigningJob` | Signing job submitted | jobId, profileName, source S3, destination S3 |
+| `PutSigningProfile` | Profile created or version promoted | profileName, platformId, profileVersion |
+| `StartSigningJob` | Job submitted | jobId, profileName, source S3, destination S3 |
 | `GetSigningProfile` | Profile retrieved | profileName |
 | `CancelSigningProfile` | Profile revoked | profileName, profileVersion |
 | `TagResource` / `UntagResource` | Tags changed | profileArn |
@@ -652,14 +599,12 @@ aws cloudtrail lookup-events \
   --lookup-attributes AttributeKey=EventSource,AttributeValue=signer.amazonaws.com \
   --start-time $(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ) \
   --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --max-results 50 \
-  --region us-east-1
+  --max-results 50 --region us-east-1
 
 # Audit CSC changes (Lambda service events)
 aws cloudtrail lookup-events \
   --lookup-attributes AttributeKey=EventName,AttributeValue=UpdateCodeSigningConfig \
-  --max-results 20 \
-  --region us-east-1
+  --max-results 20 --region us-east-1
 ```
 
 ## Step 11 — Trusted profile management
@@ -667,15 +612,14 @@ aws cloudtrail lookup-events \
 Treat signing profiles as a trust graph, not just configuration:
 
 - Maintain an allow-list of profile ARNs (with versions) that are
-  permitted in each CSC. Any ARN outside the allow-list must not be
-  in `AllowedPublishingProfiles`.
+  permitted in each CSC. ARNs outside the allow-list must not be in
+  `AllowedPublishingProfiles`.
 - Use Signer tags to classify profiles (`Environment=prod`,
   `Workload=lambda`, `Owner=platform-team`).
-- Rotate profiles on a fixed cadence (e.g., annually) by promoting a
-  new version, updating the CSC, re-signing artifacts, and verifying
-  before retiring the old version.
-- Revoke immediately on compromise; never leave a known-compromised
-  profile version in `AllowedPublishingProfiles`.
+- Rotate profiles on a fixed cadence (e.g., annually): promote a new
+  version, update the CSC, re-sign artifacts, verify, then retire
+  the old version.
+- Revoke immediately on compromise.
 
 ```bash
 # Tag a signing profile for governance
@@ -692,66 +636,60 @@ aws signer list-signing-profiles \
 
 ## Recent features
 
-- **Signer profile permission resource (2023-2024):** the
-  `AWS::Signer::ProfilePermission` CloudFormation resource and
-  `aws_signer_signing_profile_permission` Terraform resource allow
-  declarative cross-account profile sharing — previously CLI-only.
-- **Lambda CSC enhancements (2023-2024):** the CSC now supports
-  multiple `AllowedPublishingProfiles` entries and per-profile
-  version pinning, enabling canary rollouts of new profile versions.
-- **Signer CloudTrail coverage expansion (2023-2024):** read events
-  (`GetSigningProfile`, `DescribeSigningJob`) are now logged in all
+- **Signer profile permission resource (2023-2024):**
+  `AWS::Signer::ProfilePermission` and the Terraform
+  `aws_signer_signing_profile_permission` resource allow declarative
+  cross-account profile sharing (previously CLI-only).
+- **Lambda CSC enhancements (2023-2024):** CSC supports multiple
+  `AllowedPublishingProfiles` and per-profile version pinning,
+  enabling canary rollouts of new profile versions.
+- **CloudTrail coverage expansion (2023-2024):** read events
+  (`GetSigningProfile`, `DescribeSigningJob`) now logged in all
   commercial regions.
-- **Signer tag-based access control (2024-2025):** `aws:ResourceTag`
-  conditions are honored on `signer:StartSigningJob` and
+- **Tag-based access control (2024-2025):** `aws:ResourceTag`
+  conditions honored on `signer:StartSigningJob` and
   `signer:PutSigningProfile`, enabling ABAC for multi-tenant CI.
-- **Signer cross-region signing (2024-2025):** Signer is available
-  in additional regions; signing profiles can be shared cross-region
-  via profile permissions.
-- **IoT job document signer integration (2024-2025):** AWS IoT now
-  consumes Signer-produced signatures directly in OTA job documents,
-  removing the manual signature-extraction step.
+- **Cross-region signing (2024-2025):** Signer available in more
+  regions; profiles can be shared cross-region.
+- **IoT job document integration (2024-2025):** AWS IoT consumes
+  Signer-produced signatures directly in OTA job documents.
 
 ## NEVER do these things
 
 1. **NEVER use a non-`AWSLambda-SHA384-ECDSA` profile in a Lambda
-   code signing config.** Lambda's verifier expects ECDSA on P-384
-   over SHA-384. Any other platform produces a signature that
-   `UpdateFunctionCode` will reject.
+   CSC.** Lambda's verifier expects ECDSA on P-384 over SHA-384.
+   Other platforms are rejected at `UpdateFunctionCode`.
 
 2. **NEVER assume Lambda code signing is enforced at runtime.**
    Verification runs ONLY on `UpdateFunctionCode` and
    `PublishLayerVersion`. Once a version is published, invocation
-   does NOT re-verify. Treat code signing as a deploy gate.
+   does NOT re-verify.
 
 3. **NEVER treat a signing job as mutable.** A job, once Succeeded,
-   is immutable. Re-signing requires a new `StartSigningJob` call.
-   There is no `UpdateSigningJob` API.
+   is immutable. Re-signing requires a new `StartSigningJob`. There
+   is no `UpdateSigningJob` API.
 
 4. **NEVER set `UntrustedArtifactOnViolation=Warn` in production
-   without an explicit exception.** Warn only logs; it does not
-   block. Enforce is the production default.
+   without an exception.** Warn only logs; Enforce is the production
+   default.
 
 5. **NEVER pin a cached Signer certificate indefinitely.** Signer
-   rotates signing certificates on its own schedule. Always re-fetch
-   via `GetSigningProfile` for offline verification.
+   rotates signing certificates on its own schedule. Re-fetch via
+   `GetSigningProfile`.
 
 6. **NEVER leave a revoked profile version in
    `AllowedPublishingProfiles`.** A revoked version blocks new
-   deploys (Enforce) but does NOT roll back already-published
-   versions. Remove the ARN on revoke and redeploy from a known-good
-   artifact.
+   deploys but does NOT roll back already-published versions. Remove
+   the ARN on revoke and redeploy.
 
 7. **NEVER assume `signer:*` is the right IAM scope for CI.** Use
    the minimum set (`PutSigningProfile`, `GetSigningProfile`,
-   `StartSigningJob`, `DescribeSigningJob`) and narrow by ARN in
-   multi-tenant CI.
+   `StartSigningJob`, `DescribeSigningJob`) and narrow by ARN.
 
-8. **NEVER confuse Signer with KMS asymmetric signing.** Signer is a
-   managed code-signing service with AWS-generated certificates and
-   platform-scoped algorithms. KMS asymmetric keys give you
-   Bring-Your-Own key material and a free-form algorithm choice but
-   no Lambda CSC integration.
+8. **NEVER confuse Signer with KMS asymmetric signing.** Signer is
+   a managed code-signing service with AWS-generated certificates
+   and platform-scoped algorithms. KMS asymmetric keys give you
+   BYO key material but no Lambda CSC integration.
 
 9. **NEVER point `UpdateFunctionCode` at the unsigned source object
    after a signing job completes.** Lambda expects the SIGNED
@@ -769,11 +707,11 @@ SIGNER: <profile-name> (<platform-id>)
 VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
 CHECKLIST:
   [✓|✗] Profile name: <name>
-  [✓|✗] Platform: <AWSLambda-SHA384-ECDSA | AmazonFreeRTOS | AWSIoT> (determines hash + signature)
+  [✓|✗] Platform: <AWSLambda-SHA384-ECDSA | AmazonFreeRTOS | AWSIoT> (fixes hash + signature)
   [✓|✗] Profile status: Active | Pending | Canceled
-  [✓|✗] Profile version: <version-id> (if signing job completed)
+  [✓|✗] Profile version: <version-id>
   [✓|✗] Profile ARN: arn:aws:signer:<region>:<acct>:/signing-profiles/<name>
-  [✓|✗] Lambda code signing config: <csc-name> (arn:aws:lambda:<region>:<acct>:code-signing-config:<id>)
+  [✓|✗] Lambda code signing config: <csc-name> (<csc-arn>)
   [✓|✗] AllowedPublishingProfiles: <profile-arn-list>
   [✓|✗] UntrustedArtifactOnViolation: Enforce | Warn
   [✓|✗] CSC → function association: <function-name>
@@ -783,7 +721,7 @@ CHECKLIST:
   [✓|✗] Certificate validation: Signer-managed cert chain (re-fetch on each verify)
   [✓|✗] Signature verification at deploy: UpdateFunctionCode gates on signature (Enforce)
   [✓|✗] Revocation tracking: <profile-version-revocation-status>
-  [✓|✗] IAM permissions: signer:PutSigningProfile, signer:StartSigningJob (caller)
+  [✓|✗] IAM: signer:PutSigningProfile, signer:StartSigningJob (caller)
   [✓|✗] CloudTrail audit: trail present in <region>; signer events logged
   [✓|✗] Trusted profile governance: tags applied, allow-list current
   [✓|✗] Tags: <key=value list>
@@ -806,7 +744,7 @@ CHECKLIST:
   [✓] Profile status: Active
   [✓] Profile version: IVYAAABRQEXAMPLE
   [✓] Profile ARN: arn:aws:signer:us-east-1:111122223333:/signing-profiles/lambda-signing-prod
-  [✓] Lambda code signing config: lambda-csc-prod (arn:aws:lambda:us-east-1:111122223333:code-signing-config:csc-aaa111222)
+  [✓] Lambda CSC: lambda-csc-prod (arn:aws:lambda:us-east-1:111122223333:code-signing-config:csc-aaa111222)
   [✓] AllowedPublishingProfiles: arn:aws:signer:us-east-1:111122223333:/signing-profiles/lambda-signing-prod/IVYAAABRQEXAMPLE
   [✓] UntrustedArtifactOnViolation: Enforce
   [✓] CSC → function association: my-prod-function
@@ -814,9 +752,9 @@ CHECKLIST:
   [✓] Signing job source: s3://my-unsigned-artifacts/lambda/my-prod-function.zip
   [✓] Signing job destination: s3://my-signed-artifacts/lambda/signed/
   [✓] Certificate validation: Signer-managed cert chain (re-fetched via GetSigningProfile)
-  [✓] Signature verification at deploy: UpdateFunctionCode gates on signature (Enforce)
+  [✓] Signature verification at deploy: Enforce
   [✓] Revocation tracking: no active revocations
-  [✓] IAM permissions: signer:PutSigningProfile, signer:StartSigningJob (caller)
+  [✓] IAM: signer:PutSigningProfile, signer:StartSigningJob (caller)
   [✓] CloudTrail audit: trail present in us-east-1; signer events logged
   [✓] Trusted profile governance: tags applied, allow-list current
   [✓] Tags: Environment=production, Workload=lambda, Owner=platform-team
@@ -867,8 +805,8 @@ Signing Configuration.
 - **AWS Signer developer guide** — https://docs.aws.amazon.com/signer/latest/developerguide/Welcome.html
 - **Signing profiles** — https://docs.aws.amazon.com/signer/latest/developerguide/signing-profiles.html
 - **Signing jobs** — https://docs.aws.amazon.com/signer/latest/developerguide/signing-jobs.html
-- **Lambda code signing config** — https://docs.aws.amazon.com/lambda/latest/dg/configuration-codesigning.html
+- **Lambda code signing** — https://docs.aws.amazon.com/lambda/latest/dg/configuration-codesigning.html
 - **CreateCodeSigningConfig API** — https://docs.aws.amazon.com/lambda/latest/api/API_CreateCodeSigningConfig.html
-- **Signer IAM permissions** — https://docs.aws.amazon.com/signer/latest/developerguide/auth-and-access-control.html
-- **Signer CloudTrail events** — https://docs.aws.amazon.com/signer/latest/developerguide/logging-using-cloudtrail.html
+- **Signer IAM** — https://docs.aws.amazon.com/signer/latest/developerguide/auth-and-access-control.html
+- **Signer CloudTrail** — https://docs.aws.amazon.com/signer/latest/developerguide/logging-using-cloudtrail.html
 - **IoT code signing** — https://docs.aws.amazon.com/iot/latest/developerguide/code-signing.html

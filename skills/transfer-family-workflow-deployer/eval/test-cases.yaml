@@ -1,0 +1,163 @@
+# Eval test cases for transfer-family-workflow-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Transfer Family
+# scenarios (SFTP with service-managed PUBLIC, SFTP with custom Lambda
+# VPC_ENDPOINT, managed workflow for file processing, AS2 connector for
+# trading partner exchange, missing IAM role prerequisite failure).
+skill: transfer-family-workflow-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: sftp-service-managed-public
+    description: >-
+      Provision a SFTP Transfer Family server with service-managed
+      authentication and PUBLIC endpoint. Expects READY_TO_DEPLOY with
+      SSH key authentication, S3 home directory, IAM role with
+      session policy for per-user scoping, and server host key noted.
+    input: |
+      Create a Transfer Family SFTP server in us-east-1 for B2B
+      partner file exchange. Protocol: SFTP. Endpoint type: PUBLIC.
+      Identity provider: service-managed. S3 bucket:
+      partner-exchange. Users: partner-a and partner-b, each with
+      LOGICAL home directory mapping to /partner-exchange/home/<user>.
+      IAM role: TransferFamilyS3Access with trust policy for
+      transfer.amazonaws.com. Session policy per user scoped to
+      /partner-exchange/home/<user>/*. Server host key: custom RSA.
+      Tags: Environment=production, App=partner-exchange.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SFTP"
+        - "PUBLIC"
+        - "service-managed"
+        - "session policy"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: sftp-custom-lambda-vpc
+    description: >-
+      Provision a SFTP Transfer Family server with custom Lambda
+      identity provider and VPC_ENDPOINT for private connectivity.
+      Expects READY_TO_DEPLOY with VPC_ENDPOINT type, Lambda function
+      IDP, security group, and session policy noted.
+    input: |
+      Create a Transfer Family SFTP server in us-east-1 for internal
+      file transfers. Protocol: SFTP. Endpoint type: VPC_ENDPOINT.
+      VPC vpc-aaa11122, subnets subnet-aaa, subnet-bbb, security group
+      sg-sftp-internal. Identity provider: custom Lambda function
+      transfer-idp-auth. S3 bucket: file-landing-zone. Users provisioned
+      dynamically by Lambda with LOGICAL home directory mapping. IAM
+      role: TransferFamilyS3Access. Session policy: per-user scoped to
+      /file-landing-zone/home/<user>/*. Structured JSON logging to
+      CloudWatch Logs /aws/transfer/sftp. Tags: Environment=production,
+      App=file-landing-zone.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VPC_ENDPOINT"
+        - "Lambda"
+        - "session policy"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "vpc-aaa11122"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: managed-workflow-file-processing
+    description: >-
+      Deploy a managed workflow for automated file processing on a
+      Transfer Family server. Expects READY_TO_DEPLOY with workflow
+      steps (COPY, TAG, CUSTOM Lambda), on-exception steps, and
+      workflow attached to server.
+    input: |
+      Create a managed workflow for Transfer Family server s-abc123
+      in us-east-1. The workflow should process incoming files:
+      Step 1: COPY from /file-landing-zone/incoming/ to
+      /processed-data/landing/. Step 2: TAG with Status=Processed.
+      Step 3: CUSTOM Lambda virus-scan-file. On-exception: TAG with
+      Status=Failed and send SNS notification. Attach the workflow to
+      server s-abc123. S3 bucket: file-landing-zone.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "workflow"
+        - "COPY"
+        - "TAG"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "on-exception"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: as2-connector-trading-partner
+    description: >-
+      Configure an AS2 connector for B2B trading partner file exchange.
+      Expects READY_TO_DEPLOY with AS2 connector, local and partner
+      profiles, certificate exchange, and compression/encryption noted.
+    input: |
+      Create an AS2 connector for trading partner Acme Corp in
+      us-east-1. Partner AS2 URL: https://as2.acme.com. Local AS2
+      profile: local-profile-xxx. Partner AS2 profile:
+      partner-profile-yyy. Compression: ZLIB. Encryption: AES256_CBC.
+      Signing: SHA256. MDN response: SYNC. MDN signing: SHA256.
+      Trading partner certificate verified. Tags: Partner=acme,
+      Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AS2"
+        - "connector"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "certificate"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-iam-role
+    description: >-
+      Operator requests a Transfer Family SFTP server but the IAM role
+      for S3 access does not exist. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the missing IAM role cited.
+    input: |
+      Create a Transfer Family SFTP server in us-east-1. Protocol:
+      SFTP. Endpoint type: PUBLIC. Identity provider: service-managed.
+      S3 bucket: file-exchange. The IAM role TransferFamilyS3Access
+      does not exist yet. Users: partner-a with home directory
+      /file-exchange/home/partner-a.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "IAM role"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

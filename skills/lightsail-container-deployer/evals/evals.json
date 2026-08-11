@@ -1,0 +1,184 @@
+{
+  "skill": "lightsail-container-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Lightsail Container Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Lightsail Container topologies (public image with managed TLS, ECR private with IAM auth, cost-vs-HA scale/power trade-off, custom domain via CNAME, missing ECR credentials prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "public-image-managed-tls",
+      "name": "Lightsail container with public Docker Hub image and managed TLS",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — public image (nginx), small power, 2 nodes, managed TLS, health check, environment variables",
+      "prompt": "Create a Lightsail Container Service named web-frontend in us-east-1. Power: small. Scale: 2 nodes. Container image: nginx:latest from Docker Hub. Container port 80 mapped to HTTP. Public endpoint with health check on / every 5 seconds, threshold 2. Environment variables: ENV=production, LOG_LEVEL=info. Tags: Environment=production.",
+      "prompt_file": "prompts/public-image-managed-tls.md",
+      "baseline_file": "baselines/public-image-managed-tls.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LIGHTSAIL_CONTAINER: web-frontend\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Container service: web-frontend — power small, 2 nodes\n  [✓] Container image: nginx:latest — public (Docker Hub)\n  [✓] ECR auth: Not needed (public image)\n  [✓] Container port: 80 → HTTP\n  [✓] Public endpoint: HTTPS, managed TLS\n  [✓] Health check: / — interval 5s, threshold 2\n  [✓] Environment variables: 2 variables\n  [✓] Managed TLS: auto-provisioned\nVERIFICATION_COMMANDS:\n  aws lightsail get-container-services --service-name web-frontend",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "power",
+            "scale",
+            "managed TLS",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "public endpoint"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ecr-private-with-auth",
+      "name": "Lightsail container with ECR private image and IAM auth",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — ECR private image, medium power, 3 nodes, ECR access key, CloudWatch Logs",
+      "prompt": "Create a Lightsail Container Service named api-service in us-east-1. Power: medium. Scale: 3 nodes. Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/api-service:v2.1 from ECR private registry. ECR access key: AKIAABCDE12345 with secret key provided. Container port 8080 mapped to HTTP. Public endpoint with health check on /health every 5 seconds. Enable CloudWatch Logs. Tags: Environment=production, Team=backend.",
+      "prompt_file": "prompts/ecr-private-with-auth.md",
+      "baseline_file": "baselines/ecr-private-with-auth.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LIGHTSAIL_CONTAINER: api-service\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Container service: api-service — power medium, 3 nodes\n  [✓] Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/api-service:v2.1 — ECR private\n  [✓] ECR auth: access key configured\n  [✓] Container port: 8080 → HTTP\n  [✓] Public endpoint: HTTPS, managed TLS\n  [✓] CloudWatch Logs: enabled",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ECR",
+            "power",
+            "scale",
+            "VERDICT",
+            "CHECKLIST",
+            "managed TLS",
+            "8080"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scale-power-tradeoff",
+      "name": "Lightsail container with cost-vs-HA scale/power trade-off",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — medium power with 2 nodes for redundancy instead of large x 1, ECR image",
+      "prompt": "Create a Lightsail Container Service named worker-service in us-east-1. I want high availability at moderate cost. Power: medium. Scale: 2 nodes (for redundancy). Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/worker:v1.0 from ECR. ECR credentials configured. Container port 3000 mapped to HTTP. Health check on /health. Environment variables: WORKER_CONCURRENCY=10. Tags: Environment=production, Strategy=cost-ha-balance.",
+      "prompt_file": "prompts/scale-power-tradeoff.md",
+      "baseline_file": "baselines/scale-power-tradeoff.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LIGHTSAIL_CONTAINER: worker-service\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Container service: worker-service — power medium, 2 nodes\n  [✓] Scale: 2 nodes — production redundancy\n  [✓] Container port: 3000 → HTTP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "medium",
+            "2 nodes",
+            "redundancy",
+            "VERDICT",
+            "CHECKLIST",
+            "power"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-domain-deployment",
+      "name": "Lightsail container with custom domain via CNAME",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — large power, 3 nodes, ECR image, custom domain app.example.com via CNAME, managed TLS extended",
+      "prompt": "Create a Lightsail Container Service named app-prod in us-east-1. Power: large. Scale: 3 nodes. Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/app:v3.0 from ECR (credentials configured). Container port 443 mapped to HTTP. Public endpoint with health check on /healthz. Custom domain: app.example.com via CNAME to the Lightsail public endpoint. Enable CloudWatch Logs. Tags: Environment=production, Domain=custom.",
+      "prompt_file": "prompts/custom-domain-deployment.md",
+      "baseline_file": "baselines/custom-domain-deployment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LIGHTSAIL_CONTAINER: app-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Container service: app-prod — power large, 3 nodes\n  [✓] Custom domain: app.example.com (CNAME configured)\n  [✓] Managed TLS: auto-provisioned, extended to custom domain",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "custom domain",
+            "CNAME",
+            "app.example.com",
+            "managed TLS",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-ecr-credentials",
+      "name": "Lightsail container with ECR image but no credentials (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — ECR private image requested but no registry credentials provided",
+      "prompt": "Create a Lightsail Container Service named data-processor in us-east-1. Power: small. Scale: 1 node. Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/processor:v1.0 from ECR private registry. No ECR credentials have been provided. Container port 8080. Tags: Environment=dev.",
+      "prompt_file": "prompts/missing-ecr-credentials.md",
+      "baseline_file": "baselines/missing-ecr-credentials.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "LIGHTSAIL_CONTAINER: data-processor\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] ECR auth: credentials NOT provided — IAM access key with ECR read permissions required for private image pull",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "ECR",
+            "credentials",
+            "VERDICT",
+            "CHECKLIST",
+            "123456789012.dkr.ecr"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

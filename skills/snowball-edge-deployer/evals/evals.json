@@ -1,0 +1,176 @@
+{
+  "skill": "snowball-edge-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Snowball Edge Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Snowball Edge scenarios (import job with NFS, cluster mode for EKS Anywhere, NFS data transfer setup, export job, missing shipping address). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "import-job-s3",
+      "name": "Snowball Edge import job to migrate on-premises data to S3",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — import job, Edge Storage Optimized, S3 destination bucket verified, data flow device → S3 after return noted",
+      "prompt": "Create a Snowball Edge import job to migrate 150 TB of on-premises data to S3 bucket my-migration-bucket in us-east-1. Shipping address: addr-aaaabbbb. Device type: Edge Storage Optimized. Shipping option: NEXT_DAY. Tags: Environment=migration, Project=data-lift.",
+      "prompt_file": "prompts/import-job-s3.md",
+      "baseline_file": "baselines/import-job-s3.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SNOWBALL_EDGE: <job-id> (IMPORT) — EDGE_STORAGE_OPTIMIZED\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Job type: Import (on-premises → S3)\n  [✓] Device type: Edge Storage Optimized (210 TB usable)\n  [✓] S3 bucket: my-migration-bucket (region: us-east-1) — destination\n  [✓] Shipping address: addr-aaaabbbb — verified\n  [✓] Data transfer plan: NFS parallel copy\nVERIFICATION_COMMANDS:\n  aws snowball describe-job --job-id <job-id> --region us-east-1\n  aws snowball list-jobs --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "IMPORT",
+            "EDGE_STORAGE_OPTIMIZED",
+            "my-migration-bucket",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-mode-compute",
+      "name": "5-node Snowball Edge cluster for EKS Anywhere edge compute",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — 5-node cluster, Edge Compute Optimized, EKS Anywhere, quorum tolerates 2 failures",
+      "prompt": "Deploy a 5-node Snowball Edge cluster for edge compute in us-east-1. Device type: Edge Compute Optimized. I need EKS Anywhere for persistent Kubernetes at the edge. All 5 devices are on network 192.168.1.0/24. Shipping address: addr-cluster01. Tags: Environment=edge, Purpose=eks-anywhere.",
+      "prompt_file": "prompts/cluster-mode-compute.md",
+      "baseline_file": "baselines/cluster-mode-compute.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SNOWBALL_EDGE: <job-id> (LOCAL_USE) — EDGE_COMPUTE_OPTIMIZED\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Device type: Edge Compute Optimized\n  [✓] Cluster mode: 5 nodes (quorum: tolerates 2 failures)\n  [✓] EKS Anywhere: supported (min 5 nodes)\nVERIFICATION_COMMANDS:\n  aws snowball describe-job --job-id <job-id> --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cluster",
+            "EDGE_COMPUTE_OPTIMIZED",
+            "EKS",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nfs-data-transfer",
+      "name": "NFS data transfer configuration on unlocked Snowball Edge",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — device unlocked, NFS interface started, parallel copy strategy, mount path provided",
+      "prompt": "I have a Snowball Edge device unlocked at IP 192.168.1.100. I need to transfer 50 TB of data via NFS. Manifest file: manifest.bin. Unlock code: ABCD-1234-WXYZ-5678. Endpoint: https://192.168.1.100:9091. Provide the NFS setup and parallel copy strategy.",
+      "prompt_file": "prompts/nfs-data-transfer.md",
+      "baseline_file": "baselines/nfs-data-transfer.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SNOWBALL_EDGE: device at 192.168.1.100 (NFS_TRANSFER)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Device unlock: device UNLOCKED\n  [✓] NFS interface: started (IP: 192.168.1.100)\n  [✓] Data transfer plan: NFS parallel copy (16 threads)\nVERIFICATION_COMMANDS:\n  snowballEdge describe-device --endpoint https://192.168.1.100:9091",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "NFS",
+            "192.168.1.100",
+            "VERDICT",
+            "CHECKLIST",
+            "parallel"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "export-job-s3",
+      "name": "Snowball Edge export job to download S3 data to on-premises",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — export job, data pre-loaded by AWS before shipping, source bucket noted",
+      "prompt": "Create a Snowball Edge export job to download 60 TB of data from S3 bucket my-export-bucket in us-east-1 to on-premises. Shipping address: addr-export01. Device type: Edge Storage Optimized. Shipping option: NEXT_DAY. Tags: Environment=export, Project=data-distribution.",
+      "prompt_file": "prompts/export-job-s3.md",
+      "baseline_file": "baselines/export-job-s3.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SNOWBALL_EDGE: <job-id> (EXPORT) — EDGE_STORAGE_OPTIMIZED\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Job type: Export (S3 → on-premises)\n  [✓] S3 bucket: my-export-bucket (region: us-east-1) — source\n  [✓] Shipping address: addr-export01 — verified\nVERIFICATION_COMMANDS:\n  aws snowball describe-job --job-id <job-id> --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EXPORT",
+            "my-export-bucket",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-shipping-address",
+      "name": "Snowball Edge import job without shipping address (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no shipping address provided; AWS cannot ship the device",
+      "prompt": "Create a Snowball Edge import job to migrate 100 TB of data to S3 bucket my-import-bucket in us-east-1. Device type: Edge Storage Optimized. I need to figure out the shipping address later. Tags: Environment=migration.",
+      "prompt_file": "prompts/missing-shipping-address.md",
+      "baseline_file": "baselines/missing-shipping-address.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SNOWBALL_EDGE: import job\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Shipping address: missing — AWS cannot ship the device without a valid physical shipping address",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "shipping address",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,21 +1,21 @@
 ---
 name: quicksight-dashboard-deployer
 description: >-
-  Provisions Amazon QuickSight dashboards with production defaults: account
-  creation (Standard/Enterprise edition), data source connection (Athena,
-  RDS, Redshift, S3, Aurora), dataset (SQL/custom query, join, calculated
-  field), analysis (visual types, sheet layout), dashboard creation and
-  sharing, template-based deployment, row-level security (RLS via dataset
-  permissions), SPICE engine vs Direct Query, VPC connection for private
-  data stores, IAM service role, email-based user provisioning, namespace
-  and groups, dataset refresh schedules, and parameterized dashboards.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a QuickSight dashboard, connecting QuickSight to a data source,
-  setting up SPICE ingestion, configuring row-level security, deploying
-  template-based multi-tenant dashboards, or provisioning QuickSight users.
-  Triggers: create quicksight dashboard, quicksight data source, quicksight
-  SPICE, quicksight template, quicksight row-level security, quicksight VPC
-  connection, quicksight user provisioning, quicksight enterprise.
+  Provisions Amazon QuickSight dashboards with production defaults:
+  account creation (Standard/Enterprise), data source (Athena, RDS,
+  Redshift, S3, Aurora), dataset (SQL, join, calculated field),
+  analysis (visual types, sheet layout), dashboard creation and sharing,
+  template-based deployment, row-level security (RLS via dataset
+  permissions), SPICE vs Direct Query, VPC connection for private data
+  stores, IAM service role, email-based user provisioning, namespace
+  and groups, refresh schedules, parameterized dashboards. Emits a
+  READY_TO_DEPLOY checklist with verification commands. Use when
+  creating a QuickSight dashboard, connecting QuickSight to a data
+  source, setting up SPICE ingestion, configuring row-level security,
+  deploying multi-tenant dashboards, or provisioning QuickSight users.
+  Triggers: create quicksight dashboard, quicksight data source,
+  quicksight SPICE, quicksight template, quicksight row-level security,
+  quicksight VPC connection, quicksight enterprise.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Adds concrete, expert\u2011level details such as the exact OCU floor (4), per\u2011OCU cost ($0.204/hr), auto\u2011scaling thresholds, specific JSON structures for encryption and network policies, and a heuristic matrix for collection\u2011type selection. These are not generic knowledge and would teach a senior CloudOps engineer new actionable thresholds. Deducted 4 points because most of the information is restated from official docs rather than novel insight."
+      "justification": "The skill supplies concrete, non\u2011trivial expert details that a generic model would not automatically know: exact OCU floor (4), cost per OCU ($0.204/hr), immutable KMS key requirement, precise ordering of encryption\u2011then\u2011network\u2011then\u2011collection, specific k\u2011NN engine choices (faiss vs nmslib), and the exact auto\u2011scaling thresholds (70% CPU up, 30% down). These constitute genuine delta, though many points are restatements of official docs, so full 20 is not awarded."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow: encryption policy must exist before collection, network policy before collection, then collection creation, followed by VPC endpoint and access policy. Includes detailed pre\u2011flight CLI checks. Missing explicit rollback or error\u2011handling steps for failed CLI calls, so 2 points deducted."
+      "justification": "Provides an AWS\u2011specific procedural flow (encryption policy \u2192 network policy \u2192 collection \u2192 VPC endpoint \u2192 access policy \u2192 optional SAML) and embeds the rationale behind each step. The procedure is detailed and ordered, but a few steps (e.g., handling of immutable fields on collection updates) are only mentioned briefly, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Includes a solid top\u20115 NEVER list with reasoning, but it omits other common pitfalls (e.g., forgetting lifecycle policy for SEARCH collections, handling async policy propagation delays) and therefore is not exhaustive."
+      "justification": "Includes a concrete \"NEVER\" list of five high\u2011impact anti\u2011patterns with clear explanations (e.g., creating collection before encryption policy, using asymmetric KMS keys). However, the list could be expanded (e.g., pitfalls around lifecycle policy mis\u2011configuration or over\u2011provisioning OCU) and lacks explicit references to real\u2011world incident examples."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, activation triggers, and invocation schema are present, but the \"when NOT to use\" clause is missing, making the trigger definition slightly ambiguous."
+      "justification": "Frontmatter is complete with description, version, keywords, activation triggers, and invocation schema. The \"when_to_use\" and \"activation_triggers\" sections are thorough, but the skill does not provide a concise, machine\u2011readable trigger predicate (e.g., a JSON schema) and the description of \"WHEN to invoke\" could be tighter, so it falls short of a perfect 15."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, output contract, NEVER list, and heuristics. The 'Expert heuristic' section is dense and could overload the initial read, so 2 points deducted for sub\u2011optimal layering."
+      "justification": "The document layers information (quick reference, mindset, process, detailed CLI examples) and defers deep details to later sections. Nonetheless, the opening \"What this skill does\" paragraph already contains many dense specifics, which can overload the reader before they reach the \"Quick reference\" table."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained by a CONFIRM gate and exhaustive pre\u2011checks, matching the fragility of the operations. Slight over\u2011freedom: the skill does not guard against re\u2011creating policies that already exist (idempotency), costing 1 point."
+      "justification": "Destructive actions are gated behind an explicit CONFIRM step, pre\u2011checks are mandatory, and the skill enforces strict ordering for policy creation. The only shortfall is the lack of a configurable safety margin for cost\u2011sensitive environments (e.g., optional standby replica toggle), which prevents a perfect score."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (overview \u2192 mindset \u2192 process \u2192 contract \u2192 anti\u2011patterns \u2192 heuristics). Minor ad\u2011hoc ordering of sections prevents a perfect score."
+      "justification": "The skill follows a recognizable pattern (overview \u2192 quick navigation \u2192 mindset \u2192 process \u2192 output contract \u2192 anti\u2011patterns \u2192 heuristics). The structure is logical and aids comprehension, earning near\u2011max points."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides complete CLI command sequence, exact output format, cost estimation, and edge\u2011case handling. Lacks explicit failure handling/retry logic for each CLI step, which could cause execution gaps. Deducted 2 points."
+      "justification": "Provides a complete decision tree, exact CLI commands, output format template, cost estimation, and edge\u2011case handling (e.g., asymmetric KMS key, missing policies). The example model outputs demonstrate correct usage. Missing are explicit handling of collection updates that modify immutable fields and a fallback verification step if batch\u2011get\u2011collection returns a non\u2011ACTIVE state."
     }
   ],
-  "total_score": 105,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 38680,
-  "latency_ms": 20148,
+  "token_count": 36838,
+  "latency_ms": 24867,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5
