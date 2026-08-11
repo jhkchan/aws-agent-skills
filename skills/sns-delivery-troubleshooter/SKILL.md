@@ -348,50 +348,41 @@ aws sns get-subscription-attributes \
 ```
 
 If `PendingConfirmation`, ROOT_CAUSE_IDENTIFIED,
-`LAYER: HTTP_SUBSCRIPTION_CONFIRMATION`. Fix: retrieve the
-confirmation token (from the endpoint's access logs or by re-sending
-via `aws sns subscribe` with the same endpoint) and call
-`ConfirmSubscription`.
-
-If `Confirmed`, proceed to Step 2b.
+`LAYER: HTTP_SUBSCRIPTION_CONFIRMATION`. Fix: retrieve the token from
+the endpoint's access logs or re-send via `aws sns subscribe`; then
+call `ConfirmSubscription`. If `Confirmed`, proceed to Step 2b.
 
 ### Step 2b: HTTP/HTTPS endpoint — retry and 4xx/5xx
 
 ```bash
 aws cloudwatch get-metric-statistics --namespace AWS/SNS \
   --metric-name NumberOfNotificationsFailed \
-  --dimensions Name=TopicName,Value=<topic> \
-  Name=Endpoint,Value=<endpoint-url> \
+  --dimensions Name=TopicName,Value=<topic> Name=Endpoint,Value=<endpoint-url> \
   --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
   --period 300 --statistics Sum --output json
 ```
 
-If NumberOfNotificationsFailed > 0, SNS is reporting delivery failures.
-Cross-check the endpoint's access logs for 4xx / 5xx in the same
-window:
+If NumberOfNotificationsFailed > 0, SNS reports delivery failures.
+Cross-check the endpoint access logs for 4xx / 5xx:
 
-| HTTP response | SNS behaviour | Likely cause |
+| HTTP | SNS behaviour | Likely cause |
 |---|---|---|
 | 2xx | Delivered | — |
-| 3xx | Followed (up to 5 redirects); failure if loop | Redirect loop |
-| 4xx | Retried (4 attempts default); then permanently dropped | Auth expired (401/403), rate limited (429), endpoint decommissioned (404) |
-| 5xx | Retried (4 attempts default); then dropped | Endpoint overloaded, upstream dependency down |
-| Timeout (no response within DeliveryPolicy) | Retried; then dropped | Endpoint too slow; network partition |
+| 3xx | Followed (up to 5); loop = failure | Redirect loop |
+| 4xx | Retried (4 default); then permanently dropped | Auth (401/403), rate-limited (429), decommissioned (404) |
+| 5xx | Retried (4 default); then dropped | Endpoint overloaded; upstream down |
+| Timeout | Retried; then dropped | Endpoint too slow; network partition |
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: HTTP_4XX_5XX_RETRY`. Fix:
-address the endpoint-side issue (raise rate limit, refresh auth, scale
-the endpoint). Adjust the subscription DeliveryPolicy if more retries
-are needed.
+address the endpoint-side issue; adjust DeliveryPolicy for more retries.
 
 ### Step 2c: HTTP signature verification failure
 
-If the endpoint reports "signature verification failed," the endpoint's
-validation code is either using an outdated AWS certificate, checking
-the wrong certificate chain, or not handling the
-`SigningCertURL` correctly. ROOT_CAUSE_IDENTIFIED,
-`LAYER: HTTP_SIGNATURE_VERIFICATION`. Fix: update the validation code
-to fetch the certificate from the `SigningCertURL` in the message
-and verify the signature per the SNS message format spec.
+If the endpoint reports "signature verification failed," the
+validation code is using an outdated cert, wrong chain, or not handling
+`SigningCertURL`. ROOT_CAUSE_IDENTIFIED,
+`LAYER: HTTP_SIGNATURE_VERIFICATION`. Fix: update the code to fetch
+the cert from `SigningCertURL` and verify per the SNS message spec.
 
 ### Step 3: Lambda subscription
 
@@ -440,19 +431,14 @@ aws sqs get-queue-attributes --queue-url <queue-url> \
 
 ```bash
 aws sns get-subscription-attributes \
-  --subscription-arn <subscription-arn> --output json | \
-  jq '.Attributes'
-
-# Check SES for bounce/complaint rates
+  --subscription-arn <subscription-arn> --output json | jq '.Attributes'
 aws ses get-send-statistics --output json
 ```
 
-If the recipient's email provider bounces (permanent) or the recipient
-marks complaint, SES suppresses the address. SNS delivery to that
-recipient fails permanently. ROOT_CAUSE_IDENTIFIED,
-`LAYER: EMAIL_BOUNCE_COMPLAINT`. Fix: remove the bounced address from
-the subscription; implement bounce/complaint handling via SNS
-notifications from SES.
+If SES suppresses the recipient (permanent bounce or complaint), SNS
+delivery fails permanently. ROOT_CAUSE_IDENTIFIED,
+`LAYER: EMAIL_BOUNCE_COMPLAINT`. Fix: remove the bounced address;
+implement SES bounce/complaint handling via SNS notifications.
 
 ### Step 6: Platform endpoint (mobile push)
 
@@ -494,11 +480,9 @@ Common filter-policy failures:
 | Filter policy | Message attribute | Match? |
 |---|---|---|
 | `{"event": ["order.created"]}` | `event=order.created` | Yes |
-| `{"event": ["order.created"]}` | `event=order.created.v2` | No (exact match, no prefix) |
+| `{"event": ["order.created"]}` | `event=order.created.v2` | No (exact; no prefix) |
 | `{"event": ["order.created"]}` | (no `event` attribute) | No (attribute missing) |
-| `{"event": [{"prefix": "order."}]}` | `event=order.created` | Yes (prefix match) |
-| `{"event": [{"anything-but": ["order.cancelled"]}]}` | `event=order.created` | Yes (anything-but) |
-| `{"event": [{"exists": true}]}` | `event=order.created` | Yes (existence) |
+| `{"event": [{"prefix": "order."}]}` | `event=order.created` | Yes (prefix) |
 | `{"event": [{"exists": false}]}` | (no `event` attribute) | Yes (non-existence) |
 
 ### Step 8: Message attribute preservation
@@ -595,23 +579,19 @@ CONFIRM: Before re-subscribing, emit and await:
 TARGET: arn:aws:sns:us-east-1:111111111111:order-events
   (subscription: arn:aws:sns:us-east-1:111111111111:order-events:abc)
 VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: Subscription has a filter policy
-  {"event": ["order.created"]} but the publisher is sending messages
-  with attribute event=order.updated. The filter policy silently
-  drops non-matching messages — no error, no DLQ entry (Step 7).
+REASON: Subscription filter policy {"event": ["order.created"]} drops
+  messages with attribute event=order.updated. Filter policies silently
+  drop non-matching messages — no error, no DLQ entry (Step 7).
 LAYER: FILTER_POLICY_MISMATCH
 EVIDENCE:
   - Symptom: consumer reports ~40% of expected messages never arrive.
     No errors in SNS delivery metrics.
   - Probe: aws sns get-subscription-attributes returns FilterPolicy:
     {"event": ["order.created"]}.
-  - Probe: aws cloudwatch get-metric-statistics on AWS/SNS
-    NumberOfNotificationsDelivered for this subscription shows
-    ~60% of NumberOfNotificationsPublished — the drop ratio matches
-    the order.created vs order.updated split.
-  - Probe: test publish with message-attribute event=order.updated;
-    NumberOfNotificationsDelivered does NOT increment. Test publish
-    with event=order.created; it does increment.
+  - Probe: NumberOfNotificationsDelivered for this subscription is
+    ~60% of Published — the drop ratio matches the order.created vs
+    order.updated split. Test publish with event=order.updated does
+    NOT increment Delivered; event=order.created does.
   - Passing: ConfirmationStatus is Confirmed; Lambda resource policy
     grants sns.amazonaws.com lambda:InvokeFunction.
 REMEDIATION:
@@ -621,8 +601,8 @@ REMEDIATION:
        --attribute-name FilterPolicy \
        --attribute-value '{"event": ["order.created", "order.updated"]}' \
        --profile <p>
-  2. Verify by publishing a test message with event=order.updated and
-     confirming NumberOfNotificationsDelivered increments.
+  2. Verify by publishing event=order.updated and confirming
+     NumberOfNotificationsDelivered increments.
 CONFIRM: Before updating the filter policy, emit and await:
   "CONFIRM: About to add order.updated to the filter policy on
    subscription <sub-arn>. Proceed? (yes/no)"
@@ -824,17 +804,16 @@ dropping messages (not counted as Failed).
 
 ## Domain
 
-AWS CloudOps / SNS Pub-Sub Messaging, Subscription Lifecycle, Delivery
-Retry Semantics, Filter Policy Evaluation, and Fan-Out Durability.
+AWS CloudOps / SNS Pub-Sub Messaging, Subscription Lifecycle, Delivery Retry, Filter Policy Evaluation, Fan-Out Durability.
 
 ## AWS documentation
 
-- **Amazon SNS Developer Guide — Getting started** — https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html
-- **SNS subscription filter policies** — https://docs.aws.amazon.com/sns/latest/dg/sns-subscription-filter-policies.html
-- **HTTP/HTTPS endpoint delivery and signature verification** — https://docs.aws.amazon.com/sns/latest/dg/SendMessageToHttp.html
+- **SNS Developer Guide** — https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html
+- **Subscription filter policies** — https://docs.aws.amazon.com/sns/latest/dg/sns-subscription-filter-policies.html
+- **HTTP/HTTPS delivery and signature** — https://docs.aws.amazon.com/sns/latest/dg/SendMessageToHttp.html
 - **SNS message attributes** — https://docs.aws.amazon.com/sns/latest/dg/sns-message-attributes.html
 - **SNS FIFO topics** — https://docs.aws.amazon.com/sns/latest/dg/fifo-topics.html
-- **SNS delivery status logging** — https://docs.aws.amazon.com/sns/latest/dg/sns-topic-attributes.html#message-delivery-status
+- **Delivery status logging** — https://docs.aws.amazon.com/sns/latest/dg/sns-topic-attributes.html#message-delivery-status
 - **SNS CloudWatch metrics** — https://docs.aws.amazon.com/sns/latest/dg/sns-monitoring.html
-- **SNS dead-letter queues (subscription RedrivePolicy)** — https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html
+- **SNS dead-letter queues** — https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html
 - **Mobile push notifications** — https://docs.aws.amazon.com/sns/latest/dg/sns-mobile-application-as-subscriber.html

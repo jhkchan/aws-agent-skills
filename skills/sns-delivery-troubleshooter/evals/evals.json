@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "sns-delivery-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SNS Delivery Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "http-subscription-pending-confirmation",
+      "name": "HTTP endpoint receives nothing — SubscriptionConfirmation never confirmed (PendingConfirmation status)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/http-subscription-pending-confirmation.md",
+      "baseline_file": "baselines/http-subscription-pending-confirmation.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "HTTP_SUBSCRIPTION_CONFIRMATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "http-subscription-pending-confirmation", "HTTP_SUBSCRIPTION_CONFIRMATION", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: HTTP_4XX_5XX_RETRY"]
+        }
+      ]
+    },
+    {
+      "id": "filter-policy-silent-drop",
+      "name": "Filter policy drops 40% of messages silently — order.created policy vs order.updated attribute",
+      "difficulty": "hard",
+      "prompt_file": "prompts/filter-policy-silent-drop.md",
+      "baseline_file": "baselines/filter-policy-silent-drop.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "FILTER_POLICY_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "filter-policy-silent-drop", "FILTER_POLICY_MISMATCH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: SQS_REDRIVE"]
+        }
+      ]
+    },
+    {
+      "id": "http-endpoint-4xx-rate-limited",
+      "name": "HTTP endpoint 429 rate-limited under load; SNS retries then permanently drops 4xx — ~5% loss",
+      "difficulty": "hard",
+      "prompt_file": "prompts/http-endpoint-4xx-rate-limited.md",
+      "baseline_file": "baselines/http-endpoint-4xx-rate-limited.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "HTTP_4XX_5XX_RETRY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "http-endpoint-4xx", "HTTP_4XX_5XX_RETRY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: HTTP_SUBSCRIPTION_CONFIRMATION"]
+        }
+      ]
+    },
+    {
+      "id": "lambda-subscription-no-invoke-permission",
+      "name": "Lambda subscription never invokes — function resource policy missing sns.amazonaws.com grant (Terraform-created)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/lambda-subscription-no-invoke-permission.md",
+      "baseline_file": "baselines/lambda-subscription-no-invoke-permission.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "LAMBDA_ASYNC_INVOCATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "lambda-subscription-no-invoke", "LAMBDA_ASYNC_INVOCATION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: FILTER_POLICY_MISMATCH"]
+        }
+      ]
+    },
+    {
+      "id": "sqs-message-size-envelope-exceeded",
+      "name": "SNS-to-SQS fan-out — 254 KB body + JSON envelope exceeds 256 KB SQS cap; RawMessageDelivery false",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sqs-message-size-envelope-exceeded.md",
+      "baseline_file": "baselines/sqs-message-size-envelope-exceeded.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SQS_MESSAGE_SIZE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "sqs-message-size", "SQS_MESSAGE_SIZE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: SQS_REDRIVE"]
+        }
+      ]
+    }
+  ]
+}

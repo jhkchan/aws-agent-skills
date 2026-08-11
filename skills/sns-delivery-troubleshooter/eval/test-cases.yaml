@@ -1,0 +1,272 @@
+# Eval test cases for sns-delivery-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: sns-delivery-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: http-subscription-pending-confirmation
+    description: >-
+      HTTP/HTTPS subscription to an SNS topic never delivers because
+      ConfirmationStatus is PendingConfirmation. The endpoint never
+      confirmed the SubscriptionConfirmation token. Lambda and SQS
+      auto-confirm; HTTP/HTTPS do not. Expected layer:
+      HTTP_SUBSCRIPTION_CONFIRMATION.
+    input: |
+      Symptom: partner webhook
+      https://api.partner.com/webhook receives zero messages since
+      the subscription was created 2 hours ago. The partner has
+      checked their access logs and sees no POST requests from AWS
+      SNS after the initial SubscriptionConfirmation attempt.
+
+      TopicArn: arn:aws:sns:us-east-1:111111111111:orders-events
+      Protocol: https
+      Endpoint: https://api.partner.com/webhook
+      SubscriptionArn: arn:aws:sns:us-east-1:111111111111:orders-events:abc-def
+      ConfirmationStatus: PendingConfirmation
+
+      CloudWatch metrics (last 2 hours):
+        - NumberOfNotificationsPublished: 12000 (steady)
+        - NumberOfNotificationsDelivered: 0 (for this Endpoint)
+        - NumberOfNotificationsFailed: 0 (for this Endpoint)
+
+      Other subscriptions on the same topic:
+        - Lambda subscription (fn-orders-processor): Confirmed,
+          receiving normally (NumberOfNotificationsDelivered matches
+          Published).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "http-subscription-pending-confirmation"
+        - "HTTP_SUBSCRIPTION_CONFIRMATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: HTTP_4XX_5XX_RETRY"
+
+  - id: filter-policy-silent-drop
+    description: >-
+      Subscription filter policy {"event": ["order.created"]} drops
+      messages with attribute event=order.updated. Filter policies
+      silently drop non-matching messages — no error, no DLQ entry.
+      The only signal is NumberOfNotificationsDelivered being lower
+      than NumberOfNotificationsPublished for the subscription.
+      Expected layer: FILTER_POLICY_MISMATCH.
+    input: |
+      Symptom: consumer reports ~40% of expected messages never arrive.
+      No errors in SNS delivery metrics. The publisher sends both
+      order.created and order.updated events to the same topic.
+
+      TopicArn: arn:aws:sns:us-east-1:111111111111:order-events
+      SubscriptionArn: arn:aws:sns:us-east-1:111111111111:order-events:abc
+      Protocol: sqs
+      Endpoint: arn:aws:sqs:us-east-1:111111111111:order-queue
+      ConfirmationStatus: Confirmed
+      FilterPolicy: {"event": ["order.created"]}
+      RawMessageDelivery: false
+
+      Publisher message attributes:
+        - 60% of messages: event=order.created
+        - 40% of messages: event=order.updated
+
+      CloudWatch metrics (last hour):
+        - NumberOfNotificationsPublished: 10000 (for the topic)
+        - NumberOfNotificationsDelivered: 6000 (for this subscription)
+        - NumberOfNotificationsFailed: 0
+
+      Test: publish with event=order.updated; Delivered does NOT
+      increment. Publish with event=order.created; it does.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "filter-policy-silent-drop"
+        - "FILTER_POLICY_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SQS_REDRIVE"
+
+  - id: http-endpoint-4xx-rate-limited
+    description: >-
+      HTTP endpoint returns 429 (rate limited) under load. SNS retries
+      (4 immediate + delayed) then permanently drops 4xx. ~5% of
+      messages lost. NumberOfNotificationsFailed > 0. Expected layer:
+      HTTP_4XX_5XX_RETRY.
+    input: |
+      Symptom: SNS topic orders-events publishes 200 messages/sec to
+      https://api.partner.com/webhook. The partner reports ~5% of
+      messages are never received. CloudWatch shows
+      NumberOfNotificationsFailed at ~10/sec consistently.
+
+      TopicArn: arn:aws:sns:us-east-1:111111111111:orders-events
+      Protocol: https
+      Endpoint: https://api.partner.com/webhook
+      ConfirmationStatus: Confirmed
+      DeliveryPolicy: default (4 immediate retries + 3 delayed)
+
+      CloudWatch metrics (last hour):
+        - NumberOfNotificationsPublished: 720000 (steady at 200/sec)
+        - NumberOfNotificationsDelivered: 684000 (95% delivery rate)
+        - NumberOfNotificationsFailed: 36000 (5% failure rate)
+
+      Endpoint access logs (partner-side):
+        - During traffic peaks, the endpoint returns HTTP 429
+          (Too Many Requests) for ~5% of inbound POST requests.
+        - The endpoint's rate limiter is set to 190 req/sec; SNS is
+          publishing at 200 req/sec.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "http-endpoint-4xx"
+        - "HTTP_4XX_5XX_RETRY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: HTTP_SUBSCRIPTION_CONFIRMATION"
+
+  - id: lambda-subscription-no-invoke-permission
+    description: >-
+      Lambda subscription never invokes because the function's
+      resource-based policy does not grant lambda:InvokeFunction to
+      sns.amazonaws.com. The subscription was created via Terraform
+      (IaC), which does NOT auto-add the permission. Expected layer:
+      LAMBDA_ASYNC_INVOCATION.
+    input: |
+      Symptom: Lambda subscription on topic order-events never invokes
+      the function fn-order-processor. The function has zero
+      invocations in CloudWatch. NumberOfNotificationsDelivered is 0
+      for this subscription.
+
+      TopicArn: arn:aws:sns:us-east-1:111111111111:order-events
+      SubscriptionArn: arn:aws:sns:us-east-1:111111111111:order-events:def
+      Protocol: lambda
+      Endpoint: arn:aws:lambda:us-east-1:111111111111:function:fn-order-processor
+      ConfirmationStatus: Confirmed
+      FilterPolicy: (none)
+
+      Lambda context:
+        - Function fn-order-processor exists, State: Active,
+          LastUpdateStatus: Successful.
+        - Function resource-based policy (get-policy):
+            Statements allow API Gateway invoke and a CI/CD test
+            principal. NO statement grants sns.amazonaws.com
+            lambda:InvokeFunction.
+        - Subscription was created via Terraform (IaC), not the
+          console.
+
+      CloudWatch metrics (last hour):
+        - NumberOfNotificationsPublished: 5000 (for the topic)
+        - NumberOfNotificationsDelivered: 0 (for this subscription)
+        - Lambda Invocations: 0
+        - Lambda Errors: 0
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "lambda-subscription-no-invoke"
+        - "LAMBDA_ASYNC_INVOCATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: FILTER_POLICY_MISMATCH"
+
+  - id: sqs-message-size-envelope-exceeded
+    description: >-
+      SNS-to-SQS subscription with RawMessageDelivery: false. SNS
+      message body is 254 KB; the JSON envelope adds ~4 KB overhead,
+      exceeding the 256 KB SQS MaximumMessageSize. Messages are
+      rejected by SQS. Expected layer: SQS_MESSAGE_SIZE.
+    input: |
+      Symptom: SQS subscription queue order-queue is empty despite
+      the topic publishing large messages. CloudWatch
+      NumberOfNotificationsFailed > 0 for this subscription.
+      Smaller messages deliver fine.
+
+      TopicArn: arn:aws:sns:us-east-1:111111111111:batch-events
+      SubscriptionArn: arn:aws:sns:us-east-1:111111111111:batch-events:ghi
+      Protocol: sqs
+      Endpoint: arn:aws:sqs:us-east-1:111111111111:order-queue
+      ConfirmationStatus: Confirmed
+      FilterPolicy: (none)
+      RawMessageDelivery: false
+
+      SQS context:
+        - Queue order-queue:
+          - MaximumMessageSize: 262144 (256 KB, the default)
+          - ApproximateNumberOfMessagesVisible: 0
+          - Queue policy grants sns.amazonaws.com sqs:SendMessage
+            (policy is fine)
+
+      SNS message context:
+        - Publisher sends two message sizes:
+          - 80% of messages: body ~50 KB (deliver fine)
+          - 20% of messages: body ~254 KB (fail — envelope adds
+            ~4 KB, total ~258 KB > 256 KB SQS cap)
+
+      CloudWatch metrics (last hour):
+        - NumberOfNotificationsPublished: 10000
+        - NumberOfNotificationsDelivered: 8000 (the 50 KB messages)
+        - NumberOfNotificationsFailed: 2000 (the 254 KB messages)
+        - PublishSize p99: 260000 bytes
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "sqs-message-size"
+        - "SQS_MESSAGE_SIZE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SQS_REDRIVE"

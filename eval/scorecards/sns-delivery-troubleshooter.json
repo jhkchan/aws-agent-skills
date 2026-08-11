@@ -1,0 +1,70 @@
+{
+  "skill": "sns-delivery-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill contains many expert details (default HTTP retry schedule, 256\u202fKB size cap, RawMessageDelivery impact, FilterPolicyScope nuance, cross\u2011region Lambda grant) that a generic model may not know, but a large portion restates well\u2011known SNS behavior. The added knowledge is valuable yet not wholly novel, so 3 points are deducted."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes senior CloudOps thinking with a step\u2011wise diagnostic tree, pre\u2011flight gate, and AWS\u2011specific CLI procedures for each layer. Procedures are tightly tied to SNS (e.g., get\u2011subscription\u2011attributes, DeliveryPolicy inspection). Slightly generic wording in some probes (\"check endpoint logs\") prevents a full score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER list is extensive and explains why each pitfall is bad, yet it omits a few common anti\u2011patterns such as missing IAM role permissions for cross\u2011account subscriptions and the subtle failure mode when a subscription\u2019s RedrivePolicy points to a non\u2011existent DLQ. Two points are deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter, description, when\u2011to\u2011use, activation triggers, and invocation schema are all present and mostly clear. However, the activation_triggers list is overly verbose and could miss alternative phrasings (e.g., \u201cSNS fan\u2011out not working\u201d), so 1 point is deducted."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: quick navigation, then contract, then anti\u2011patterns, heuristics, dependency graph, triage table, pre\u2011flight, diagnostic tree, examples, remediation. However, the sheer volume of early sections can overload an agent before it reaches the actionable steps, so a small deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "All state\u2011changing commands are gated by an explicit CONFIRM prompt; read\u2011only probes are default. Calibration matches fragility of SNS operations perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable troubleshooting skill pattern (output contract \u2192 anti\u2011patterns \u2192 heuristics \u2192 dependency graph \u2192 triage \u2192 diagnostic steps \u2192 examples \u2192 remediation). Minor ad\u2011hoc ordering of sections prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working decision trees, concrete AWS CLI commands, remediation steps, and worked examples that an agent can execute. Lacks handling of pagination for list\u2011operations, cross\u2011account/region edge cases, and explicit error\u2011handling for missing credentials, leading to a modest deduction."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 45110,
+  "latency_ms": 12188,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

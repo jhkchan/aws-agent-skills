@@ -799,18 +799,15 @@ Terraform / CloudFormation alarms do NOT.
 
 ## Domain
 
-AWS CloudOps / CloudWatch Alarms, Metric Configuration, Alarm Action
-Delivery, Composite Alarms, Anomaly Detection, and Treat-Missing-Data
-Semantics.
+AWS CloudOps / CloudWatch Alarms, Metric Configuration, Alarm Action Delivery, Composite Alarms, Anomaly Detection, Treat-Missing-Data.
 
 ## AWS documentation
 
-- **CloudWatch User Guide — Creating alarms** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html
-- **Using Amazon CloudWatch alarms** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ConsoleAlarms.html
+- **Creating alarms** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html
 - **TreatMissingData** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html#console-alarm-missing-data
 - **High-resolution metrics** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html#high-resolution-metrics
 - **Composite alarms** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Create_Composite_Alarm.html
 - **Math expression alarms** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/using-metric-math.html
 - **Anomaly detection** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Anomaly_Detection.html
-- **SNS topic policies for CloudWatch alarms** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/US_SetupSNS.html
-- **Lambda function permissions for CloudWatch alarms** — https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchalerts.html
+- **SNS topic policies for alarms** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/US_SetupSNS.html
+- **Lambda permissions for alarms** — https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchalerts.html
