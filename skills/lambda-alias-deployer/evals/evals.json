@@ -1,0 +1,174 @@
+{
+  "skill": "lambda-alias-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Lambda Alias Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across alias configurations (basic alias on published version with API Gateway, canary traffic shift, provisioned concurrency on alias with Auto Scaling, SnapStart alias, missing published version). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "basic-alias-versioned",
+      "name": "Lambda alias on published version with API Gateway integration and CloudWatch alarm",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — alias points to published version 5, API Gateway stage uses alias qualifier, CloudWatch alarm scoped to alias",
+      "prompt": "Create a Lambda alias named prod for function my-function pointing to published version 5. Set up API Gateway integration so API abc123 stage prod invokes the alias. Create a CloudWatch alarm for errors scoped to the alias. Region us-east-1. Tags: Environment=production, Service=api. Account: 123456789012.",
+      "prompt_file": "prompts/basic-alias-versioned.md",
+      "baseline_file": "baselines/basic-alias-versioned.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_ALIAS: my-function:prod (version 5, weight 100%)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Function: my-function (exists in us-east-1)\n  [✓] Published version: 5 (immutable snapshot)\n  [✓] Alias: prod → version 5\n  [✓] API Gateway integration: abc123 stage prod → alias prod\n  [✓] CloudWatch alarm: my-function-prod-errors scoped to my-function:prod\n  [✓] Provisioned concurrency: disabled\n  [✓] SnapStart: disabled\n  [✓] Tags: Environment=production, Service=api\nVERIFICATION_COMMANDS:\n  aws lambda get-alias --function-name my-function --name prod\n  aws cloudwatch describe-alarms --alarm-names my-function-prod-errors",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "version 5"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "canary-traffic-shift",
+      "name": "Weighted traffic shifting for canary deployment (90% v5, 10% v6)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — canary traffic shift between two published versions using alias routing config",
+      "prompt": "I need to do a canary deployment for function my-function. The prod alias currently points to version 5. I published version 6 and want to shift 10% traffic to it. Keep 90% on version 5. Region us-east-1. Account: 123456789012.",
+      "prompt_file": "prompts/canary-traffic-shift.md",
+      "baseline_file": "baselines/canary-traffic-shift.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_ALIAS: my-function:prod (version 5, weight 90%; version 6, weight 10%)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Function: my-function (exists in us-east-1)\n  [✓] Published version: 5 (current), 6 (canary)\n  [✓] Alias: prod → version 5 (90%) + version 6 (10%)\n  [✓] Traffic shifting: canary (version 5 90% → version 6 10%)\nVERIFICATION_COMMANDS:\n  aws lambda get-alias --function-name my-function --name prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "canary",
+            "VERDICT",
+            "CHECKLIST",
+            "version 5",
+            "version 6"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "provisioned-concurrency-alias",
+      "name": "Provisioned concurrency on alias with Auto Scaling target tracking",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — provisioned concurrency on alias (not version), Auto Scaling at 70% target utilization",
+      "prompt": "Set up provisioned concurrency on the prod alias for my-function in us-east-1. 10 provisioned concurrent executions. Configure Auto Scaling with 70% target utilization, min 2, max 50. The alias points to version 5. Account: 123456789012.",
+      "prompt_file": "prompts/provisioned-concurrency-alias.md",
+      "baseline_file": "baselines/provisioned-concurrency-alias.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_ALIAS: my-function:prod (version 5, weight 100%)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Function: my-function (exists in us-east-1)\n  [✓] Published version: 5\n  [✓] Alias: prod → version 5\n  [✓] Provisioned concurrency: 10 executions on alias prod\n  [✓] Auto Scaling: target=70% utilization, min=2, max=50\nVERIFICATION_COMMANDS:\n  aws lambda get-alias --function-name my-function --name prod\n  aws lambda get-provisioned-concurrency-config --function-name my-function --qualifier prod\n  aws application-autoscaling describe-scalable-targets --service-namespace lambda --resource-ids function:my-function:prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "provisioned concurrency",
+            "VERDICT",
+            "CHECKLIST",
+            "prod"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "snapstart-alias",
+      "name": "SnapStart-enabled Lambda with staging alias",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SnapStart enabled on Java function, staging alias points to SnapStart-enabled version",
+      "prompt": "Enable SnapStart on function my-function (java17 runtime) and create a staging alias pointing to a new SnapStart-enabled version. The function is in us-east-1. I want the staging alias for pre-production testing. Account: 123456789012.",
+      "prompt_file": "prompts/snapstart-alias.md",
+      "baseline_file": "baselines/snapstart-alias.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_ALIAS: my-function:staging (version 1, weight 100%)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Function: my-function (exists in us-east-1, java17)\n  [✓] Published version: 1 (SnapStart snapshot created)\n  [✓] Alias: staging → version 1\n  [✓] SnapStart: enabled (version 1 has snapshot)\nVERIFICATION_COMMANDS:\n  aws lambda get-alias --function-name my-function --name staging\n  aws lambda get-function-configuration --function-name my-function --qualifier 1 --query SnapStart",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SnapStart",
+            "VERDICT",
+            "CHECKLIST",
+            "staging"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-published-version",
+      "name": "Alias requested but no published version exists (only $LATEST)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — function has no published versions; alias cannot point to $LATEST for production",
+      "prompt": "Create a prod alias for my-function. The function exists but I have not published any versions yet — it only has $LATEST. Region us-east-1. Account: 123456789012.",
+      "prompt_file": "prompts/missing-published-version.md",
+      "baseline_file": "baselines/missing-published-version.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "LAMBDA_ALIAS: my-function:prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Published version: NONE — function has only $LATEST. Publish a version with: aws lambda publish-version --function-name my-function\n  [✓] Function: my-function (exists in us-east-1)\nVERIFICATION_COMMANDS:\n  aws lambda list-versions-by-function --function-name my-function\n  aws lambda publish-version --function-name my-function",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "VERDICT",
+            "CHECKLIST",
+            "version"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

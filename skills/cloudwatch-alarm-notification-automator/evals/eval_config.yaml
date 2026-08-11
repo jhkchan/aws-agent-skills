@@ -1,0 +1,48 @@
+# Eval configuration for cloudwatch-alarm-notification-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudwatch-alarm-notification-automator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: sns-lambda-slack-pagerduty-automated
+    difficulty: easy
+    prompt_file: prompts/sns-lambda-slack-pagerduty-automated.md
+    baseline_file: baselines/sns-lambda-slack-pagerduty-automated.md
+    expected_verdict: AUTOMATED
+    expected_risk: LOW
+  - id: eventbridge-alarm-to-jira-ticket-automated
+    difficulty: medium
+    prompt_file: prompts/eventbridge-alarm-to-jira-ticket-automated.md
+    baseline_file: baselines/eventbridge-alarm-to-jira-ticket-automated.md
+    expected_verdict: AUTOMATED
+    expected_risk: LOW
+  - id: unconfirmed-subscription-manual-required
+    difficulty: hard
+    prompt_file: prompts/unconfirmed-subscription-manual-required.md
+    baseline_file: baselines/unconfirmed-subscription-manual-required.md
+    expected_verdict: MANUAL_STEP_REQUIRED
+    expected_risk: HIGH
+  - id: composite-correlation-tiered-escalation-automated
+    difficulty: medium
+    prompt_file: prompts/composite-correlation-tiered-escalation-automated.md
+    baseline_file: baselines/composite-correlation-tiered-escalation-automated.md
+    expected_verdict: AUTOMATED
+    expected_risk: MODERATE
+  - id: aws-user-notifications-amazon-q-automated
+    difficulty: medium
+    prompt_file: prompts/aws-user-notifications-amazon-q-automated.md
+    baseline_file: baselines/aws-user-notifications-amazon-q-automated.md
+    expected_verdict: AUTOMATED
+    expected_risk: LOW

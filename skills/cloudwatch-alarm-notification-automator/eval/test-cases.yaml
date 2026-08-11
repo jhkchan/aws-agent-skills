@@ -1,0 +1,270 @@
+# Eval test cases for cloudwatch-alarm-notification-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-alarm-notification-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: sns-lambda-slack-pagerduty-automated
+    description: >-
+      Design an SNS-to-Lambda fan-out workflow delivering CloudWatch alarm
+      notifications to both Slack (#ops-alerts) and PagerDuty (service
+      PXYZ). The composite alarm exists, subscriptions are confirmed,
+      webhooks are stored in Parameter Store, the kill-switch parameter
+      exists, and a test publish has been verified. All safety gates pass;
+      plan should produce AUTOMATED with the full workflow block.
+    input: |
+      Design intent: wire the prod-checkout-critical-rollup composite
+      alarm to Slack #ops-alerts AND PagerDuty service PXYZ. 1-tier
+      (no escalation). Region: us-east-1. Account: 111111111111.
+
+      Source composite alarm:
+        aws cloudwatch describe-alarms \
+          --alarm-names prod-checkout-critical-rollup:
+          OK (StateValue: OK, AlarmRule: ALARM(alb-error-ratio-prod)
+              OR ALARM(alb-latency-anomaly-prod)
+              OR ALARM(lambda-errors-high-prod-checkout))
+
+      Pre-flight checks (already performed by caller):
+        aws sns list-topics:
+          arn:aws:sns:us-east-1:111111111111:critical-notifications-checkout
+            (exists)
+        aws lambda list-functions:
+          alarm-slack-forwarder (Runtime python3.11, Timeout 10s)
+          alarm-pagerduty-forwarder (Runtime python3.11, Timeout 10s)
+        aws sns list-subscriptions-by-topic \
+          --topic-arn arn:aws:sns:us-east-1:111111111111:critical-notifications-checkout:
+          Lambda subscription to alarm-slack-forwarder: SubscriptionArn populated (confirmed)
+          Lambda subscription to alarm-pagerduty-forwarder: SubscriptionArn populated (confirmed)
+        aws lambda get-policy --function-name alarm-slack-forwarder:
+          AllowSNSInvoke statement present with source-arn matching
+        aws lambda get-policy --function-name alarm-pagerduty-forwarder:
+          AllowSNSInvoke statement present with source-arn matching
+        aws ssm get-parameter --name /notifications/kill-switch:
+          enabled
+        aws ssm get-parameter --name /slack/critical-webhook:
+          exists (SecureString)
+        aws ssm get-parameter --name /pagerduty/integration-key:
+          exists (SecureString)
+        Test publish result: delivered to Slack in 8s, PagerDuty incident
+          created in 11s
+
+      Emit the standard VERDICT block (NOTIFICATION_SOURCE, SCOPE,
+      VERDICT, WORKFLOW, SAFETY, FINDINGS, REMEDIATION).
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "prod-checkout-critical-rollup"
+        - "VERDICT"
+        - "SAFETY"
+        - "Slack"
+        - "PagerDuty"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: eventbridge-alarm-to-jira-ticket-automated
+    description: >-
+      Design an alarm-to-Jira ticket automation. EventBridge rule matches
+      ALARM state changes on the prod-checkout-critical-rollup composite
+      and invokes a Lambda that creates a Jira Incident ticket with
+      idempotency via DynamoDB dedup. All gates pass; AUTOMATED.
+    input: |
+      Design intent: auto-create a Jira Incident ticket in project OPS
+      when the prod-checkout-critical-rollup composite enters ALARM,
+      auto-resolve when it returns to OK. Region: us-east-1.
+      Account: 111111111111.
+
+      Pre-flight checks (performed by caller):
+        aws events describe-rule --name alarm-state-change-to-jira:
+          OK (state ENABLED, event-pattern matches
+              source=aws.cloudwatch, detail-type=CloudWatch Alarm State
+              Change, detail.stateName=[ALARM,OK])
+        aws events list-targets-by-rule \
+          --rule alarm-state-change-to-jira:
+          Target: arn:aws:lambda:us-east-1:111111111111:function:alarm-jira-creator
+        aws lambda get-policy --function-name alarm-jira-creator:
+          AllowEventBridgeInvoke statement present
+        aws ssm get-parameter --name /jira/api-token:
+          exists (SecureString)
+        aws ssm get-parameter --name /jira/email:
+          exists (String)
+        aws dynamodb describe-table --table-name alarm-ticket-map:
+          TableStatus: ACTIVE, KeySchema: alarmName (HASH)
+        Test alarm event (aws events put-events with synthetic ALARM):
+          Jira ticket OPS-123 created, recorded in DynamoDB
+        Second test event (same alarmName within 5 min):
+          DynamoDB dedup hit — no duplicate ticket created
+        Test OK transition event:
+          Jira ticket OPS-123 transitioned to Resolved (state=31)
+
+      Emit the standard VERDICT block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "Jira"
+        - "VERDICT"
+        - "idempotency"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: unconfirmed-subscription-manual-required
+    description: >-
+      An existing alarm-to-Slack workflow has a broken subscription: the
+      Lambda subscription was added but lambda:add-permission for SNS
+      invoke was never granted. SNS publishes but the Lambda is never
+      invoked — the silent-drop failure mode. The skill MUST surface this
+      as MANUAL_STEP_REQUIRED with the specific gap and remediation.
+    input: |
+      Validation mode: validate the existing alarm-to-Slack workflow
+      against the safety baseline. Region: us-east-1. Account: 111111111111.
+
+      Existing workflow:
+        EventBridge rule: alarm-state-change-to-sns (state ENABLED,
+          pattern matches source=aws.cloudwatch,
+          detail-type=CloudWatch Alarm State Change,
+          detail.stateName=[ALARM])
+        SNS topic: arn:aws:sns:us-east-1:111111111111:critical-notifications-api
+        Lambda forwarder: arn:aws:lambda:us-east-1:111111111111:function:alarm-slack-forwarder
+
+      Pre-flight checks (performed by caller):
+        aws sns list-subscriptions-by-topic \
+          --topic-arn arn:aws:sns:us-east-1:111111111111:critical-notifications-api:
+          Endpoint: arn:aws:lambda:...:function:alarm-slack-forwarder
+          SubscriptionArn: PendingConfirmation (Lambda added but...)
+        aws lambda get-policy --function-name alarm-slack-forwarder:
+          ERROR: ResourceNotFoundException (no policy exists —
+            lambda:add-permission was never run for this topic)
+        aws ssm get-parameter --name /notifications/kill-switch:
+          enabled
+        aws ssm get-parameter --name /slack/critical-webhook:
+          exists (SecureString)
+        Test publish (aws sns publish to the topic):
+          NumberOfNotificationsDelivered: 0
+          NumberOfNotificationsFailed: 1 (Lambda invoke failed)
+          CloudWatch Logs for alarm-slack-forwarder: no invocations
+            within the last 60s
+
+      Emit the standard VERDICT block.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "add-permission"
+        - "VERDICT"
+        - "SAFETY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: AUTOMATED"
+
+  - id: composite-correlation-tiered-escalation-automated
+    description: >-
+      Design a composite alarm correlation plus 2-tier Step Functions
+      escalation workflow. The composite OR rule deduplicates three noisy
+      child alarms; the Step Functions state machine pages primary
+      on-call, waits 5 min for ack, escalates to secondary if unacked.
+      All gates pass; AUTOMATED.
+    input: |
+      Design intent: build a composite alarm (prod-payment-critical-rollup)
+      that OR-correlates three child alarms (rds-connections-high,
+      api-latency-p99, api-5xx-rate). Wire the composite to a 2-tier
+      escalation (primary -> 5 min wait -> secondary if unacked) via
+      Step Functions. Region: us-east-1. Account: 111111111111.
+
+      Pre-flight checks (performed by caller):
+        aws cloudwatch describe-alarms for each child:
+          rds-connections-high: OK
+          api-latency-p99: OK
+          api-5xx-rate: OK
+        aws cloudwatch describe-alarms \
+          --alarm-names prod-payment-critical-rollup:
+          Not found (will be created by the workflow)
+        aws stepfunctions describe-state-machine \
+          --state-machine-arn arn:aws:states:us-east-1:111111111111:stateMachine:payment-escalation:
+          OK (status ACTIVE, definition includes PagePrimary -> WaitForAck
+              300s -> CheckAck Choice -> PageSecondary)
+        aws sns list-topics:
+          arn:aws:sns:us-east-1:111111111111:on-call-primary (exists, 3 subs)
+          arn:aws:sns:us-east-1:111111111111:on-call-secondary (exists, 2 subs)
+        aws dynamodb describe-table --table-name alarm-ack-state:
+          ACTIVE (key: incidentId)
+        aws ssm get-parameter --name /notifications/kill-switch:
+          enabled
+        Test: synthetic alarm event triggered Step Functions execution;
+          primary paged in 4s, ack recorded via API Gateway URL within
+          60s, state machine exited successfully without escalating
+
+      Emit the standard VERDICT block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "composite"
+        - "VERDICT"
+        - "escalation"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: aws-user-notifications-amazon-q-automated
+    description: >-
+      Design an alarm notification workflow using 2024-2026 native
+      surfaces: AWS User Notifications for chat-based delivery to Slack
+      via Chatbot (no Lambda), plus Amazon Q operational analysis for
+      natural-language triage. The notification hub exists, Chatbot
+      channel is configured, Q is enabled on the application. AUTOMATED.
+    input: |
+      Design intent: deliver CloudWatch alarm notifications for the
+      prod-checkout service to Slack #ops-alerts via AWS User
+      Notifications (Chatbot), and add Amazon Q operational analysis
+      for triage. No custom Lambda forwarder. Region: us-east-1.
+      Account: 111111111111.
+
+      Pre-flight checks (performed by caller):
+        aws notifications list-notification-hubs --region us-east-1:
+          arn:aws:notifications::111111111111:hub/prod (status ACTIVE)
+        aws chatbot describe-slack-channel-configurations:
+          ConfigurationName: prod-alarm-slack
+          SlackWorkspaceId: T0XXXXXXXX
+          SlackChannelId: C0XXXXXXXX (channel: #ops-alerts)
+          SnsTopicArns: [arn:aws:sns:us-east-1:111111111111:aws-chatbot]
+          IamRoleArn: arn:aws:iam::111111111111:role/aws-chatbot-role
+        aws cloudwatch describe-alarms \
+          --alarm-names prod-checkout-critical-rollup:
+          OK (AlarmActions includes
+              arn:aws:sns:us-east-1:111111111111:aws-chatbot)
+        aws application-signals get-application \
+          --application-identifier prod-checkout:
+          OperationalAnalysisConfig: {enabled: true}
+        Test: synthetic alarm event -> Slack message arrived in #ops-alerts
+          in 6s (Chatbot-formatted), Amazon Q analysis link in the
+          console populated with deployment correlation + log errors
+          within 45s
+        aws sns list-subscriptions-by-topic \
+          --topic-arn arn:aws:sns:us-east-1:111111111111:aws-chatbot:
+          1 subscription (Chatbot-managed, confirmed)
+        aws ssm get-parameter --name /notifications/kill-switch:
+          enabled
+
+      Emit the standard VERDICT block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "User Notifications"
+        - "VERDICT"
+        - "Amazon Q"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MANUAL_STEP_REQUIRED"

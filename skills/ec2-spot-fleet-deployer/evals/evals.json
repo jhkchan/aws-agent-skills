@@ -1,0 +1,174 @@
+{
+  "skill": "ec2-spot-fleet-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the EC2 Spot Fleet Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across fleet types (maintain priceCapacityOptimized with rebalance, request lowestPrice burst, capacityOptimized with rebalance, placement score with ODCR, missing IAM service role). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "maintain-price-capacity-optimized",
+      "name": "Maintain Spot Fleet with priceCapacityOptimized and capacity rebalance",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — maintain fleet, priceCapacityOptimized, 3 types x 3 AZs, capacity rebalance with launch, IAM role verified",
+      "prompt": "Create a maintain Spot Fleet in us-east-1 with priceCapacityOptimized allocation strategy. Target capacity 20 vcpu. Instance types: m5.large, m5a.large, c5.large across us-east-1a, us-east-1b, us-east-1c. Enable capacity rebalance with launch replacement strategy. InstanceInterruptionBehavior terminate. Launch template lt-0abc123 (version 1). IAM role AWSServiceRoleForEC2SpotFleet exists. Tags: Environment=production, Service=batch-processing. Account ID: 123456789012.",
+      "prompt_file": "prompts/maintain-price-capacity-optimized.md",
+      "baseline_file": "baselines/maintain-price-capacity-optimized.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SPOT_FLEET: sfr-1234567890abcdef0 (allocation strategy: priceCapacityOptimized)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Fleet type: maintain\n  [✓] Allocation strategy: priceCapacityOptimized\n  [✓] Launch template: lt-0abc123 (version 1)\n  [✓] Instance types: m5.large, m5a.large, c5.large (in 3 AZs = 9 pools)\n  [✓] Target capacity: 20 vcpu (spot: 20, on-demand: 0)\n  [✓] InstanceInterruptionBehavior: terminate\n  [✓] Capacity rebalance: enabled (launch strategy)\n  [✓] IAM service role: AWSServiceRoleForEC2SpotFleet\n  [✓] Tags: Environment=production, Service=batch-processing\nVERIFICATION_COMMANDS:\n  aws ec2 describe-spot-fleet-requests --spot-fleet-request-ids sfr-1234567890abcdef0\n  aws ec2 describe-spot-fleet-instances --spot-fleet-request-id sfr-1234567890abcdef0\n  aws ec2 describe-spot-fleet-request-history --spot-fleet-request-id sfr-1234567890abcdef0",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "priceCapacityOptimized",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "maintain",
+            "capacity rebalance"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "request-lowest-price-burst",
+      "name": "One-time request Spot Fleet with lowestPrice for HPC burst",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — request fleet, lowestPrice with InstancePoolsToUseCount 4, 4 types x 4 AZs, no replacement (request type)",
+      "prompt": "I need a one-time Spot Fleet request for a burst HPC job in us-east-1. Use lowestPrice with InstancePoolsToUseCount 4. Target capacity 50 instances. Instance types: c5.large, c5a.large, c5n.large, m5.large across us-east-1a, us-east-1b, us-east-1c, us-east-1d. Fleet type request. Launch template lt-hpc001 (version 1). IAM role AWSServiceRoleForEC2SpotFleet exists. Account: 123456789012.",
+      "prompt_file": "prompts/request-lowest-price-burst.md",
+      "baseline_file": "baselines/request-lowest-price-burst.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SPOT_FLEET: sfr-hpc001burst (allocation strategy: lowestPrice)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Fleet type: request (one-time, no replacement)\n  [✓] Allocation strategy: lowestPrice (InstancePoolsToUseCount: 4)\n  [✓] Launch template: lt-hpc001 (version 1)\n  [✓] Instance types: c5.large, c5a.large, c5n.large, m5.large (in 4 AZs = 16 pools)\n  [✓] Target capacity: 50 instances\n  [✓] Capacity rebalance: not applicable (request fleet)\n  [✓] IAM service role: AWSServiceRoleForEC2SpotFleet\nVERIFICATION_COMMANDS:\n  aws ec2 describe-spot-fleet-requests --spot-fleet-request-ids sfr-hpc001burst\n  aws ec2 describe-spot-fleet-instances --spot-fleet-request-id sfr-hpc001burst",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "request",
+            "lowestPrice",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "capacity-rebalance-enabled",
+      "name": "Maintain Spot Fleet with capacityOptimized and rebalance for ML training",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — maintain fleet, capacityOptimized, GPU instances, capacity rebalance with launch, 100 vcpu target",
+      "prompt": "Create a maintain Spot Fleet for ML training in us-east-1. Use capacityOptimized allocation strategy. Target capacity 100 vcpu. Instance types: g4dn.xlarge, g4dn.2xlarge across us-east-1a, us-east-1b, us-east-1c. Enable capacity rebalance with launch replacement. InstanceInterruptionBehavior terminate. Launch template lt-ml-training (version 2). IAM service role AWSServiceRoleForEC2SpotFleet verified. Tags: Workload=ml-training. Account: 123456789012.",
+      "prompt_file": "prompts/capacity-rebalance-enabled.md",
+      "baseline_file": "baselines/capacity-rebalance-enabled.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SPOT_FLEET: sfr-mltraining001 (allocation strategy: capacityOptimized)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Fleet type: maintain\n  [✓] Allocation strategy: capacityOptimized\n  [✓] Launch template: lt-ml-training (version 2)\n  [✓] Instance types: g4dn.xlarge, g4dn.2xlarge (in 3 AZs = 6 pools)\n  [✓] Target capacity: 100 vcpu\n  [✓] InstanceInterruptionBehavior: terminate\n  [✓] Capacity rebalance: enabled (launch strategy)\n  [✓] IAM service role: AWSServiceRoleForEC2SpotFleet\n  [✓] Tags: Workload=ml-training\nVERIFICATION_COMMANDS:\n  aws ec2 describe-spot-fleet-requests --spot-fleet-request-ids sfr-mltraining001\n  aws ec2 describe-spot-fleet-instances --spot-fleet-request-id sfr-mltraining001",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "capacityOptimized",
+            "capacity rebalance",
+            "VERDICT",
+            "CHECKLIST",
+            "maintain"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spot-placement-score",
+      "name": "Maintain Spot Fleet with placement score pre-check and ODCR integration",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — maintain fleet, priceCapacityOptimized, placement score pre-checked, ODCR used-first for 5 On-Demand units",
+      "prompt": "Create a maintain Spot Fleet in us-east-1 with priceCapacityOptimized. Target capacity 30 vcpu, with 5 On-Demand units from capacity reservations. Instance types: m5.large, m5a.large, c5.large across us-east-1a, us-east-1b, us-east-1c. Pre-check Spot placement scores before creating. Use capacity reservations first for the On-Demand portion. Launch template lt-web-v3 (version 1). IAM role AWSServiceRoleForEC2SpotFleet verified. Account: 123456789012.",
+      "prompt_file": "prompts/spot-placement-score.md",
+      "baseline_file": "baselines/spot-placement-score.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SPOT_FLEET: sfr-webv3-odcr (allocation strategy: priceCapacityOptimized)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Fleet type: maintain\n  [✓] Allocation strategy: priceCapacityOptimized\n  [✓] Launch template: lt-web-v3 (version 1)\n  [✓] Instance types: m5.large, m5a.large, c5.large (in 3 AZs = 9 pools)\n  [✓] Target capacity: 30 vcpu (spot: 25, on-demand: 5)\n  [✓] Spot placement score: checked (top pool score: 10)\n  [✓] Capacity reservations (ODCR): used-first (5 On-Demand units)\n  [✓] IAM service role: AWSServiceRoleForEC2SpotFleet\nVERIFICATION_COMMANDS:\n  aws ec2 describe-spot-fleet-requests --spot-fleet-request-ids sfr-webv3-odcr\n  aws ec2 describe-spot-fleet-instances --spot-fleet-request-id sfr-webv3-odcr",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "VERDICT",
+            "CHECKLIST",
+            "placement score"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-iam-role",
+      "name": "Spot Fleet request without IAM service-linked role",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — AWSServiceRoleForEC2SpotFleet does not exist; fleet request will fail with permission error",
+      "prompt": "Create a maintain Spot Fleet in us-east-1 for web servers. priceCapacityOptimized. Target capacity 10 vcpu. Instance types: m5.large, m5a.large. The IAM role AWSServiceRoleForEC2SpotFleet has NOT been created yet. Launch template lt-web-001 (version 1). Account: 123456789012.",
+      "prompt_file": "prompts/missing-iam-role.md",
+      "baseline_file": "baselines/missing-iam-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SPOT_FLEET: maintain-priceCapacityOptimized (us-east-1)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] IAM service role: AWSServiceRoleForEC2SpotFleet NOT found. Create with: aws iam create-service-linked-role --aws-service-name spotfleet.amazonaws.com\n  [✗] Diversification: only 2 instance types specified (recommend 3+)\n  [✓] Fleet type: maintain\n  [✓] Allocation strategy: priceCapacityOptimized\nVERIFICATION_COMMANDS:\n  aws iam get-role --role-name AWSServiceRoleForEC2SpotFleet\n  aws iam create-service-linked-role --aws-service-name spotfleet.amazonaws.com",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "VERDICT",
+            "CHECKLIST",
+            "AWSServiceRoleForEC2SpotFleet"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+# Eval test cases for managed-blockchain-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Managed Blockchain
+# product lines (Fabric Standard network, Fabric 2.x chaincode,
+# Ethereum mainnet node, Query API token balances, Starter edition
+# rejected).
+skill: managed-blockchain-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: fabric-standard-network
+    description: >-
+      Provision a Hyperledger Fabric Standard edition network with
+      founder member and peer node. Expects READY_TO_DEPLOY with all
+      checklist items verified including STANDARD edition, Fabric 2.2,
+      bc.m5.large peer node, CA enrollment, and CloudWatch log
+      publishing.
+    input: |
+      Create a Hyperledger Fabric network on AWS Managed Blockchain
+      for a supply chain consortium. Network name:
+      consortium-supply-chain. Use Standard edition and Fabric
+      framework version 2.2. Founder member name: founder-member,
+      admin user: admin. Create one peer node (bc.m5.large) in
+      us-east-1a with CloudWatch log publishing for chaincode, state
+      requests, and transactions. Region: us-east-1. Tags:
+      Environment=production, Consortium=supply-chain. Account ID:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "STANDARD"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Fabric"
+        - "bc.m5.large"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+        - "STARTER"
+
+  - id: fabric-chaincode-2x
+    description: >-
+      Deploy chaincode on a Fabric 2.x channel using the new
+      decentralized lifecycle (approve/commit). Expects READY_TO_DEPLOY
+      with the 2.x lifecycle (not 1.4 install/instantiate) cited.
+    input: |
+      I have an existing Fabric 2.2 Managed Blockchain network
+      n-ABCDEFGHIJ1234567 with member m-ABCDEFGHIJ1234567 and peer
+      node nd-XXXXXXXXXXXXX. I need to install and deploy chaincode
+      named supply-chain-cc version 1.0 on channel
+      supply-chain-channel. The chaincode is in Go at
+      github.com/example/supply-chain. Admin cert is enrolled at
+      ./admin-msp. Region: us-east-1. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "approve"
+        - "commit"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "supply-chain-cc"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ethereum-mainnet-node
+    description: >-
+      Provision a Managed Blockchain Ethereum node on mainnet.
+      Expects READY_TO_DEPLOY with the predefined network ID
+      n-ethereum-mainnet, JSON-RPC endpoint, and no create-network
+      call.
+    input: |
+      I need an AWS Managed Blockchain Ethereum node synced to
+      mainnet. Use bc.m5.large in us-east-1a. I need the JSON-RPC
+      HTTP endpoint for my dApp backend. Region: us-east-1. Tags:
+      Environment=production, UseCase=dapp-backend. Account ID:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ETHEREUM"
+        - "n-ethereum-mainnet"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "JSON-RPC"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+        - "create-network"
+
+  - id: query-token-balances
+    description: >-
+      Query ERC-20 token balances for a wallet address using the
+      Managed Blockchain Query API. Expects READY_TO_DEPLOY with the
+      serverless Query API cited (no node provisioning).
+    input: |
+      I need to read the ERC-20 token balances for wallet address
+      0x1234567890abcdef1234567890abcdef12345678 on Ethereum mainnet.
+      I also need the transaction history. I do NOT want to run a
+      full node. Region: us-east-1. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Query API"
+        - "ETH_MAINNET"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "managedblockchain-query"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+        - "create-node"
+
+  - id: starter-edition-rejected
+    description: >-
+      Operator requests Starter edition Fabric network. Starter is
+      retired for new networks. Expects PREREQUISITES_MISSING with
+      the Standard edition requirement cited.
+    input: |
+      Create a Hyperledger Fabric network using Starter edition to
+      save costs. It's just for a small POC. Network name: poc-net.
+      Framework version 1.4. One peer node bc.t3.small in us-east-1a.
+      Region: us-east-1. Account ID: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "STARTER"
+        - "STANDARD"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

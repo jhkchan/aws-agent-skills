@@ -1,0 +1,156 @@
+# Eval test cases for ec2-spot-fleet-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across fleet types (maintain
+# priceCapacityOptimized with rebalance, request lowestPrice burst,
+# capacityOptimized with placement score, ODCR integration, missing
+# IAM service role).
+skill: ec2-spot-fleet-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: maintain-price-capacity-optimized
+    description: >-
+      Provision a maintain Spot Fleet with priceCapacityOptimized
+      allocation strategy, 3 instance types across 3 AZs, capacity
+      rebalance enabled. Expects READY_TO_DEPLOY with all checklist
+      items verified including diversification, rebalance, and IAM
+      service role.
+    input: |
+      Create a maintain Spot Fleet in us-east-1 with
+      priceCapacityOptimized allocation strategy. Target capacity
+      20 vcpu. Instance types: m5.large, m5a.large, c5.large across
+      us-east-1a, us-east-1b, us-east-1c. Enable capacity rebalance
+      with launch replacement strategy. InstanceInterruptionBehavior
+      terminate. Launch template lt-0abc123 (version 1). IAM role
+      AWSServiceRoleForEC2SpotFleet exists. Tags:
+      Environment=production, Service=batch-processing. Account ID:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "priceCapacityOptimized"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "maintain"
+        - "capacity rebalance"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: request-lowest-price-burst
+    description: >-
+      Provision a one-time request Spot Fleet with lowestPrice
+      allocation for a burst HPC job. Expects READY_TO_DEPLOY with
+      request fleet type, noting no replacement and no rebalance.
+    input: |
+      I need a one-time Spot Fleet request for a burst HPC job in
+      us-east-1. Use lowestPrice with InstancePoolsToUseCount 4.
+      Target capacity 50 instances. Instance types: c5.large,
+      c5a.large, c5n.large, m5.large across us-east-1a, us-east-1b,
+      us-east-1c, us-east-1d. Fleet type request. Launch template
+      lt-hpc001 (version 1). IAM role
+      AWSServiceRoleForEC2SpotFleet exists. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "request"
+        - "lowestPrice"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: capacity-rebalance-enabled
+    description: >-
+      Provision a maintain Spot Fleet with capacityOptimized and
+      capacity rebalance for long-running ML training. Expects
+      READY_TO_DEPLOY with rebalance enabled and launch replacement
+      strategy.
+    input: |
+      Create a maintain Spot Fleet for ML training in us-east-1.
+      Use capacityOptimized allocation strategy. Target capacity
+      100 vcpu. Instance types: g4dn.xlarge, g4dn.2xlarge across
+      us-east-1a, us-east-1b, us-east-1c. Enable capacity rebalance
+      with launch replacement. InstanceInterruptionBehavior
+      terminate. Launch template lt-ml-training (version 2). IAM
+      service role AWSServiceRoleForEC2SpotFleet verified. Tags:
+      Workload=ml-training. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "capacityOptimized"
+        - "capacity rebalance"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "maintain"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: spot-placement-score
+    description: >-
+      Provision a maintain Spot Fleet with Spot placement score pre-
+      check and ODCR integration. Expects READY_TO_DEPLOY with
+      placement score checked and capacity reservations used-first.
+    input: |
+      Create a maintain Spot Fleet in us-east-1 with
+      priceCapacityOptimized. Target capacity 30 vcpu, with 5
+      On-Demand units from capacity reservations. Instance types:
+      m5.large, m5a.large, c5.large across us-east-1a, us-east-1b,
+      us-east-1c. Pre-check Spot placement scores before creating.
+      Use capacity reservations first for the On-Demand portion.
+      Launch template lt-web-v3 (version 1). IAM role
+      AWSServiceRoleForEC2SpotFleet verified. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "placement score"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-iam-role
+    description: >-
+      Operator requests a Spot Fleet but the IAM service-linked role
+      does not exist. Expects PREREQUISITES_MISSING with the IAM
+      role gap cited.
+    input: |
+      Create a maintain Spot Fleet in us-east-1 for web servers.
+      priceCapacityOptimized. Target capacity 10 vcpu. Instance
+      types: m5.large, m5a.large. The IAM role
+      AWSServiceRoleForEC2SpotFleet has NOT been created yet.
+      Launch template lt-web-001 (version 1). Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "AWSServiceRoleForEC2SpotFleet"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

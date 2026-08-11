@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-alarm-notification-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Alarm Notification Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "sns-lambda-slack-pagerduty-automated",
+      "name": "SNS-to-Lambda fan-out to Slack + PagerDuty (AUTOMATED, all safety gates pass)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/sns-lambda-slack-pagerduty-automated.md",
+      "baseline_file": "baselines/sns-lambda-slack-pagerduty-automated.md",
+      "expected_verdict": "AUTOMATED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "prod-checkout-critical-rollup", "VERDICT", "SAFETY", "Slack", "PagerDuty"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "eventbridge-alarm-to-jira-ticket-automated",
+      "name": "EventBridge-driven alarm-to-Jira ticket automation with idempotency (AUTOMATED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/eventbridge-alarm-to-jira-ticket-automated.md",
+      "baseline_file": "baselines/eventbridge-alarm-to-jira-ticket-automated.md",
+      "expected_verdict": "AUTOMATED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "Jira", "VERDICT", "idempotency"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "unconfirmed-subscription-manual-required",
+      "name": "Existing workflow validation — missing lambda:add-permission (MANUAL_STEP_REQUIRED, silent-drop failure)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/unconfirmed-subscription-manual-required.md",
+      "baseline_file": "baselines/unconfirmed-subscription-manual-required.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "add-permission", "VERDICT", "SAFETY"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "composite-correlation-tiered-escalation-automated",
+      "name": "Composite alarm correlation + 2-tier Step Functions escalation (AUTOMATED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/composite-correlation-tiered-escalation-automated.md",
+      "baseline_file": "baselines/composite-correlation-tiered-escalation-automated.md",
+      "expected_verdict": "AUTOMATED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "composite", "VERDICT", "escalation"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "aws-user-notifications-amazon-q-automated",
+      "name": "AWS User Notifications (Chatbot) + Amazon Q triage — 2024-2026 native surfaces (AUTOMATED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/aws-user-notifications-amazon-q-automated.md",
+      "baseline_file": "baselines/aws-user-notifications-amazon-q-automated.md",
+      "expected_verdict": "AUTOMATED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "User Notifications", "VERDICT", "Amazon Q"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

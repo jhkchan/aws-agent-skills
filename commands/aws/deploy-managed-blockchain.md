@@ -1,6 +1,6 @@
 ---
 allowed-tools: Read, Bash, Grep
-description: "Deploy Managed Blockchain"
+description: "Deploy Managed Blockchain (Fabric network/member/node, Ethereum node, Query API)"
 ---
 
-Read the skill at `skills/managed-blockchain-deployer/SKILL.md` (or troubleshooter/optimizer/operator) and follow its procedure.
+Read the skill at `skills/managed-blockchain-deployer/SKILL.md` and follow its procedure.

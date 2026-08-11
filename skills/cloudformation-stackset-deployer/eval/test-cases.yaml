@@ -1,0 +1,163 @@
+# Eval test cases for cloudformation-stackset-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across StackSet scenarios
+# (SERVICE_MANAGED OU deployment, SELF_MANAGED account list,
+#  drift detection + managed execution, operation preferences
+#  tuning, missing trusted access prerequisite).
+skill: cloudformation-stackset-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: service-managed-ou-deployment
+    description: >-
+      Provision a SERVICE_MANAGED StackSet targeting an OU across
+      multiple regions. Expects READY_TO_DEPLOY with all checklist
+      items verified including trusted access, OU IDs, operation
+      preferences, and managed execution.
+    input: |
+      Create a CloudFormation StackSet named baseline-iam-roles
+      using the SERVICE_MANAGED permission model. Target OU
+      ou-abc-12345678 (Security OU) across regions us-east-1,
+      us-west-2, and eu-west-1. Template is at
+      s3://my-bucket/templates/baseline-iam.yaml (18,432 bytes).
+      Capabilities: CAPABILITY_IAM. Parameters:
+      Environment=production,
+      AuditRoleArn=arn:aws:iam::111111111111:role/audit.
+      Organizations trusted access is already enabled. Enable
+      managed execution. Tags: Owner=platform, CostCenter=infra.
+      Account ID: 111111111111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SERVICE_MANAGED"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "ou-abc-12345678"
+        - "CAPABILITY_IAM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: self-managed-account-list
+    description: >-
+      Provision a SELF_MANAGED StackSet targeting an explicit
+      account list across two regions. Expects READY_TO_DEPLOY
+      with administration role and execution role cited.
+    input: |
+      Create a StackSet named config-baseline using SELF_MANAGED
+      permission model. Target accounts 111111111111,
+      222222222222, and 333333333333 in regions us-east-1 and
+      eu-west-1. Template at file://config-baseline.yaml (8,000
+      bytes). Administration role:
+      arn:aws:iam::111111111111:role/AWSCloudFormationStackSetAdministrationRole.
+      Execution role AWSCloudFormationStackSetExecutionRole is
+      pre-provisioned in all three target accounts. No IAM
+      capabilities needed. Parameters: LogLevel=INFO.
+      Account ID: 111111111111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SELF_MANAGED"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "AWSCloudFormationStackSetAdministrationRole"
+        - "AWSCloudFormationStackSetExecutionRole"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: drift-detection-managed-execution
+    description: >-
+      Enable drift detection and managed execution on a
+      SERVICE_MANAGED StackSet. Expects READY_TO_DEPLOY with
+      managed execution Active=true and drift detection cited.
+    input: |
+      I have a SERVICE_MANAGED StackSet named guardduty-baseline
+      targeting ou-xyz-87654321 across us-east-1, us-east-2, and
+      us-west-2. Template at
+      s3://templates/guardduty.yaml. Organizations trusted access
+      is enabled. I want managed execution enabled with auto-
+      deployment Enabled=true, RetainStacksOnAccountRemoval=false.
+      Enable continuous drift detection. Capabilities: none.
+      Account ID: 111111111111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SERVICE_MANAGED"
+        - "managed-execution"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: operation-preferences-tuning
+    description: >-
+      Deploy a StackSet with tuned operation preferences for a
+      large fan-out. Expects READY_TO_DEPLOY with
+      FailureTolerancePercentage and MaxConcurrentPercentage
+      cited and RegionOrder specified.
+    input: |
+      Create a SERVICE_MANAGED StackSet named ssm-patch-baseline
+      targeting ou-def-11223344 across us-east-1, us-east-2,
+      us-west-2, and eu-west-1. Template at
+      s3://templates/patch-baseline.yaml (24,000 bytes).
+      Trusted access enabled. Set operation preferences:
+      FailureTolerancePercentage=5, MaxConcurrentPercentage=20,
+      RegionConcurrencyType=SEQUENTIAL, RegionOrder starting with
+      us-east-1. Capabilities: CAPABILITY_AUTO_EXPAND.
+      Account ID: 111111111111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "FailureTolerancePercentage"
+        - "MaxConcurrentPercentage"
+        - "SEQUENTIAL"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-trusted-access
+    description: >-
+      Operator requests a SERVICE_MANAGED StackSet but
+      Organizations trusted access is not enabled. Expects
+      PREREQUISITES_MISSING with the trusted access gap cited.
+    input: |
+      Create a SERVICE_MANAGED StackSet for OU ou-fail-99887766
+      across us-east-1. Template at file://baseline.yaml. I
+      haven't enabled any Organizations trusted access for
+      CloudFormation. Just create the StackSet and deploy.
+      Account ID: 111111111111.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "trusted access"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

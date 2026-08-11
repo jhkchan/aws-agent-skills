@@ -1,0 +1,229 @@
+# Eval test cases for s3-intelligent-tiering-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-intelligent-tiering-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: mixed-access-enable-intelligent-tiering
+    description: >-
+      Bucket with mixed/unknown access patterns (18% daily, 60% monthly,
+      22% cold), average object size 1.8 MB, no Intelligent-Tiering
+      configuration. Classic opportunity to enable Intelligent-Tiering
+      with archive tiers. Monitoring fee passes the gate.
+    input: |
+      Bucket: app-data-mixed
+      Region: us-east-1
+      Versioning: Enabled
+      Object Lock: not configured
+      Current IntelligentTieringConfiguration: none
+      Current lifecycle configuration: none
+      S3 Storage Lens (last 30 days):
+        Total storage bytes: 56,000,000,000,000 (56 TB in 30M objects)
+        Average object size: 1.8 MB
+        ObjectSizeDistribution:
+          "< 128KB": 3%
+          "128KB-1MB": 27%
+          "1MB-128MB": 70%
+        Access pattern:
+          Daily access: 18% of bytes
+          Monthly access (1-3x): 40% of bytes
+          Quarterly access: 20% of bytes
+          Yearly or less: 22% of bytes
+        Average object age: 95 days
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "app-data-mixed"
+        - "VERDICT"
+        - "RECOMMENDATION"
+        - "SAVINGS"
+        - "ARCHIVE_ACCESS"
+        - "DEEP_ARCHIVE_ACCESS"
+        - "put-bucket-intelligent-tiering-configuration"
+        - "monitoring"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: OPTIMIZED"
+
+  - id: small-objects-rejected-monitoring-fee
+    description: >-
+      Bucket of 8 million small JSON config files (avg 4 KB) in Standard.
+      Proposed to move to Intelligent-Tiering. Verify the skill REJECTS
+      Intelligent-Tiering because the monitoring fee ($20.50/month)
+      exceeds the transition saving ($0 — objects below the 128 KB
+      minimum billable size cannot save on Infrequent tiering).
+    input: |
+      Bucket: app-config-state
+      Region: us-east-1
+      Versioning: Suspended
+      Object Lock: not configured
+      Current IntelligentTieringConfiguration: none
+      Workload: small JSON config state files
+      S3 Storage Lens (last 30 days):
+        Total objects: 8,200,000
+        Average object size: 4.2 KB
+        Total storage bytes: 34.4 GB
+        ObjectSizeDistribution:
+          "< 128KB": 100%
+        Access pattern: GET every ~10 days (uniform)
+      Proposed plan (operator asks): "should I move this to Intelligent-Tiering?"
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION). Address the proposed
+      Intelligent-Tiering plan explicitly.
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "app-config-state"
+        - "monitoring fee"
+        - "128"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: OPTIMIZED"
+
+  - id: archive-tiers-not-configured
+    description: >-
+      Bucket already has Intelligent-Tiering enabled but only with the
+      default Frequent/Infrequent tiers — no Archive Access or Deep
+      Archive Access configured. 40% of objects are older than 180 days
+      with no access. Verify the skill recommends adding the archive
+      tiers to capture the cold-data savings.
+    input: |
+      Bucket: data-lake-curated
+      Region: us-east-1
+      Versioning: Enabled
+      Current IntelligentTieringConfiguration:
+        Id: Config
+        Status: Enabled
+        Tierings: []  (no archive tiers configured; Frequent/Infrequent only)
+      S3 Storage Lens (last 30 days):
+        Total storage bytes: 100,000,000,000,000 (100 TB in 50M objects)
+        Average object size: 2.0 MB
+        ObjectSizeDistribution:
+          "< 128KB": 1%
+          "128KB-1MB": 19%
+          "1MB-128MB": 80%
+        Tier distribution:
+          Frequent Access: 25%
+          Infrequent Access: 35%
+          (no Archive tier — objects sitting in Infrequent indefinitely)
+        Access pattern:
+          Daily access: 15%
+          Monthly access: 25%
+          No access in 90+ days: 40%
+          No access in 180+ days: 20%
+        Average object age: 145 days
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "data-lake-curated"
+        - "ARCHIVE_ACCESS"
+        - "DEEP_ARCHIVE_ACCESS"
+        - "VERDICT"
+        - "monitoring"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: OPTIMIZED"
+
+  - id: predictable-access-lifecycle-cheaper
+    description: >-
+      Bucket with a predictable daily access pattern (all objects
+      accessed within 7 days). Verify the skill recommends AGAINST
+      Intelligent-Tiering because the monitoring fee is pure overhead
+      and Standard is cheaper for predictable daily access. Lifecycle
+      or Standard is the correct pick.
+    input: |
+      Bucket: media-thumbnails
+      Region: us-east-1
+      Versioning: Suspended
+      Current IntelligentTieringConfiguration: none
+      Workload: media thumbnail images served to a web app
+      S3 Storage Lens (last 30 days):
+        Total storage bytes: 12,000,000,000,000 (12 TB in 80M objects)
+        Average object size: 150 KB
+        ObjectSizeDistribution:
+          "< 128KB": 35%
+          "128KB-1MB": 65%
+        Access pattern:
+          Every object accessed within last 7 days: 100%
+          (CDN-backed; daily access is guaranteed)
+        Average object age: 30 days
+      Operator asks: "should I enable Intelligent-Tiering to save cost?"
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "media-thumbnails"
+        - "monitoring"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: OPTIMIZED"
+
+  - id: already-optimal-full-config
+    description: >-
+      Bucket already has Intelligent-Tiering with Archive Access at 90
+      days and Deep Archive Access at 180 days, scoped to the correct
+      prefix. Storage Lens tier distribution matches the access pattern.
+      Monitoring fee is well within the gate. All dimensions clean.
+    input: |
+      Bucket: analytics-warehouse
+      Region: us-east-1
+      Versioning: Enabled
+      Current IntelligentTieringConfiguration:
+        Id: Config
+        Status: Enabled
+        Filter: {Prefix: "warehouse/"}
+        Tierings:
+          - {AccessTier: ARCHIVE_ACCESS, Days: 90}
+          - {AccessTier: DEEP_ARCHIVE_ACCESS, Days: 180}
+      S3 Storage Lens (last 30 days):
+        Total storage bytes: 200,000,000,000,000 (200 TB in 60M objects)
+        Average object size: 3.3 MB
+        Tier distribution:
+          Frequent Access: 22%
+          Infrequent Access: 45%
+          Archive Access: 23%
+          Deep Archive Access: 10%
+        Access pattern:
+          Daily: 22%
+          Monthly: 45%
+          Quarterly: 23%
+          Yearly: 10%
+        Average object age: 120 days
+      Emit the standard VERDICT block (BUCKET, VERDICT, REASON,
+      RECOMMENDATION, SAVINGS, IMPLEMENTATION).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "analytics-warehouse"
+        - "VERDICT"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: OPTIMIZED"

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-intelligent-tiering-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Intelligent-Tiering Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "mixed-access-enable-intelligent-tiering",
+      "name": "Mixed/unknown access pattern, large objects, no Intelligent-Tiering — enable with archive tiers",
+      "difficulty": "hard",
+      "prompt_file": "prompts/mixed-access-enable-intelligent-tiering.md",
+      "baseline_file": "baselines/mixed-access-enable-intelligent-tiering.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "app-data-mixed", "VERDICT", "RECOMMENDATION", "SAVINGS", "ARCHIVE_ACCESS", "DEEP_ARCHIVE_ACCESS", "put-bucket-intelligent-tiering-configuration", "monitoring"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "small-objects-rejected-monitoring-fee",
+      "name": "8M small JSON config files — Intelligent-Tiering monitoring fee exceeds savings on sub-128KB objects",
+      "difficulty": "hard",
+      "prompt_file": "prompts/small-objects-rejected-monitoring-fee.md",
+      "baseline_file": "baselines/small-objects-rejected-monitoring-fee.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "app-config-state", "monitoring fee", "128", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "archive-tiers-not-configured",
+      "name": "Intelligent-Tiering enabled but no archive tiers — 40% of objects cold for 90+ days in Infrequent only",
+      "difficulty": "medium",
+      "prompt_file": "prompts/archive-tiers-not-configured.md",
+      "baseline_file": "baselines/archive-tiers-not-configured.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "data-lake-curated", "ARCHIVE_ACCESS", "DEEP_ARCHIVE_ACCESS", "VERDICT", "monitoring"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: ALREADY_OPTIMAL", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "predictable-access-lifecycle-cheaper",
+      "name": "Predictable daily access (CDN-backed thumbnails) — monitoring fee pure overhead, Standard cheaper",
+      "difficulty": "medium",
+      "prompt_file": "prompts/predictable-access-lifecycle-cheaper.md",
+      "baseline_file": "baselines/predictable-access-lifecycle-cheaper.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "media-thumbnails", "monitoring", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-full-config",
+      "name": "Intelligent-Tiering with Archive + Deep Archive tiers, correct prefix, healthy tier distribution — all dimensions clean",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-full-config.md",
+      "baseline_file": "baselines/already-optimal-full-config.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "analytics-warehouse", "VERDICT", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}

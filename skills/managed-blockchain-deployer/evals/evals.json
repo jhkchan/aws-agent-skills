@@ -1,0 +1,181 @@
+{
+  "skill": "managed-blockchain-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Managed Blockchain Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Managed Blockchain product lines (Fabric Standard network with founder member and peer node, Fabric 2.x chaincode lifecycle, Ethereum mainnet node, Query API token balances, Starter edition rejected as retired). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "fabric-standard-network",
+      "name": "Fabric Standard network with founder member and peer node",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Fabric Standard edition, framework 2.2, founder member, peer node bc.m5.large, CA enrollment, CloudWatch logs",
+      "prompt": "Create a Hyperledger Fabric network on AWS Managed Blockchain for a supply chain consortium. Network name: consortium-supply-chain. Use Standard edition and Fabric framework version 2.2. Founder member name: founder-member, admin user: admin. Create one peer node (bc.m5.large) in us-east-1a with CloudWatch log publishing for chaincode, state requests, and transactions. Region: us-east-1. Tags: Environment=production, Consortium=supply-chain. Account ID: 123456789012.",
+      "prompt_file": "prompts/fabric-standard-network.md",
+      "baseline_file": "baselines/fabric-standard-network.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MANAGED_BLOCKCHAIN: Fabric — consortium-supply-chain (n-ABCDEFGHIJ1234567)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Product line: Fabric\n  [✓] Network: n-ABCDEFGHIJ1234567 (edition: STANDARD, framework: 2.2)\n  [✓] Member: m-ABCDEFGHIJ1234567 (admin: admin)\n  [✓] Peer node: nd-XXXXXXXXXXXXX (instance: bc.m5.large, AZ: us-east-1a)\n  [✓] Certificate authority: enrolled (admin cert MSP at ./admin-msp)\n  [✓] Log publishing: ChaincodeLogs, StateRequests, Transactions → CloudWatch\n  [✓] Channel: N/A (created post-network via peer CLI)\n  [✓] Chaincode: N/A (installed post-channel)\n  [✓] Region: us-east-1\n  [✓] VPC/subnets: verified in AZ us-east-1a\n  [✓] Tags: Environment=production, Consortium=supply-chain\nVERIFICATION_COMMANDS:\n  aws managedblockchain get-network --network-id n-ABCDEFGHIJ1234567 --region us-east-1\n  aws managedblockchain get-member --network-id n-ABCDEFGHIJ1234567 --member-id m-ABCDEFGHIJ1234567 --region us-east-1\n  aws managedblockchain get-node --network-id n-ABCDEFGHIJ1234567 --node-id nd-XXXXXXXXXXXXX --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "STANDARD",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Fabric",
+            "bc.m5.large"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING",
+            "STARTER"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fabric-chaincode-2x",
+      "name": "Fabric 2.x chaincode lifecycle (approve/commit)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — chaincode deploy on Fabric 2.2 channel using new lifecycle (package/install/approve/commit), not 1.4 install/instantiate",
+      "prompt": "I have an existing Fabric 2.2 Managed Blockchain network n-ABCDEFGHIJ1234567 with member m-ABCDEFGHIJ1234567 and peer node nd-XXXXXXXXXXXXX. I need to install and deploy chaincode named supply-chain-cc version 1.0 on channel supply-chain-channel. The chaincode is in Go at github.com/example/supply-chain. Admin cert is enrolled at ./admin-msp. Region: us-east-1. Account ID: 123456789012.",
+      "prompt_file": "prompts/fabric-chaincode-2x.md",
+      "baseline_file": "baselines/fabric-chaincode-2x.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MANAGED_BLOCKCHAIN: Fabric — chaincode deploy (supply-chain-cc v1.0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Product line: Fabric\n  [✓] Network: n-ABCDEFGHIJ1234567 (framework: 2.2)\n  [✓] Member: m-ABCDEFGHIJ1234567 (admin cert enrolled at ./admin-msp)\n  [✓] Peer node: nd-XXXXXXXXXXXXX\n  [✓] Channel: supply-chain-channel\n  [✓] Chaincode: supply-chain-cc v1.0 (lifecycle: package → install → approveformyorg → commit)\n  [✓] Region: us-east-1\nVERIFICATION_COMMANDS:\n  peer lifecycle chaincode querycommitted -C supply-chain-channel --tls --cafile ./managed-blockchain-tls-chain.pem",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "approve",
+            "commit",
+            "VERDICT",
+            "CHECKLIST",
+            "supply-chain-cc"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ethereum-mainnet-node",
+      "name": "Managed Blockchain Ethereum node on mainnet",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Ethereum node using predefined network ID n-ethereum-mainnet, no create-network, JSON-RPC endpoint returned",
+      "prompt": "I need an AWS Managed Blockchain Ethereum node synced to mainnet. Use bc.m5.large in us-east-1a. I need the JSON-RPC HTTP endpoint for my dApp backend. Region: us-east-1. Tags: Environment=production, UseCase=dapp-backend. Account ID: 123456789012.",
+      "prompt_file": "prompts/ethereum-mainnet-node.md",
+      "baseline_file": "baselines/ethereum-mainnet-node.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MANAGED_BLOCKCHAIN: Ethereum node — mainnet (nd-YYYYYYYYYYYYY)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Product line: Ethereum node\n  [✓] Network: n-ethereum-mainnet (predefined — public chain, no create-network)\n  [✓] Member: N/A (Ethereum is account-based)\n  [✓] Peer node: N/A\n  [✓] Certificate authority: N/A\n  [✓] Log publishing: N/A\n  [✓] Ethereum node: nd-YYYYYYYYYYYYY (JSON-RPC endpoint: https://nd-xxxx.n-ethereum-mainnet.managedblockchain.us-east-1.amazonaws.com)\n  [✓] Query API: N/A\n  [✓] Region: us-east-1\n  [✓] VPC/subnets: verified in AZ us-east-1a\n  [✓] Tags: Environment=production, UseCase=dapp-backend\nVERIFICATION_COMMANDS:\n  aws managedblockchain get-node --network-id n-ethereum-mainnet --node-id nd-YYYYYYYYYYYYY --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ETHEREUM",
+            "n-ethereum-mainnet",
+            "VERDICT",
+            "CHECKLIST",
+            "JSON-RPC"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING",
+            "create-network"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "query-token-balances",
+      "name": "Query API token balances (serverless, no node)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — serverless Query API for ERC-20 token balances on ETH mainnet, no node provisioning, IAM policy attached",
+      "prompt": "I need to read the ERC-20 token balances for wallet address 0x1234567890abcdef1234567890abcdef12345678 on Ethereum mainnet. I also need the transaction history. I do NOT want to run a full node. Region: us-east-1. Account ID: 123456789012.",
+      "prompt_file": "prompts/query-token-balances.md",
+      "baseline_file": "baselines/query-token-balances.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MANAGED_BLOCKCHAIN: Query API — token balances (0x1234...)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Product line: Query API\n  [✓] Network: N/A (serverless — no node)\n  [✓] Member: N/A\n  [✓] Peer node: N/A\n  [✓] Certificate authority: N/A\n  [✓] Log publishing: N/A\n  [✓] Ethereum node: N/A\n  [✓] Query API: IAM policy AmazonManagedBlockchainQueryReadOnly attached\n  [✓] Chain: ETH_MAINNET\n  [✓] Region: us-east-1\n  [✓] VPC/subnets: N/A (serverless)\nVERIFICATION_COMMANDS:\n  aws managedblockchain-query list-token-balances --owner-identifier '{\"IdentifierType\":\"ADDRESS\",\"Identifier\":\"0x1234...\"}' --chain-id ETH_MAINNET --region us-east-1\n  aws managedblockchain-query list-transactions --address 0x1234... --chain-id ETH_MAINNET --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Query API",
+            "ETH_MAINNET",
+            "VERDICT",
+            "CHECKLIST",
+            "managedblockchain-query"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING",
+            "create-node"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "starter-edition-rejected",
+      "name": "Operator requests Starter edition Fabric network (retired)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Starter edition is retired; new networks must use Standard edition",
+      "prompt": "Create a Hyperledger Fabric network using Starter edition to save costs. It's just for a small POC. Network name: poc-net. Framework version 1.4. One peer node bc.t3.small in us-east-1a. Region: us-east-1. Account ID: 123456789012.",
+      "prompt_file": "prompts/starter-edition-rejected.md",
+      "baseline_file": "baselines/starter-edition-rejected.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "MANAGED_BLOCKCHAIN: Fabric — poc-net\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Edition: STARTER is NO LONGER AVAILABLE for new networks (announced retirement). Use STANDARD.\n  [✗] Framework version: 1.4 is legacy; 2.2 is recommended for new networks.\n  [✗] Instance type: bc.t3.small is Starter-only (deprecated with Starter retirement).\nVERIFICATION_COMMANDS:\n  aws managedblockchain list-networks --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "STARTER",
+            "STANDARD",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

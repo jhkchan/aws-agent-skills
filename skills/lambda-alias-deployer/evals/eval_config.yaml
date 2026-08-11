@@ -1,0 +1,49 @@
+# Eval configuration for lambda-alias-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: lambda-alias-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: basic-alias-versioned
+    difficulty: hard
+    prompt_file: prompts/basic-alias-versioned.md
+    baseline_file: baselines/basic-alias-versioned.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: canary-traffic-shift
+    difficulty: hard
+    prompt_file: prompts/canary-traffic-shift.md
+    baseline_file: baselines/canary-traffic-shift.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: provisioned-concurrency-alias
+    difficulty: hard
+    prompt_file: prompts/provisioned-concurrency-alias.md
+    baseline_file: baselines/provisioned-concurrency-alias.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: snapstart-alias
+    difficulty: hard
+    prompt_file: prompts/snapstart-alias.md
+    baseline_file: baselines/snapstart-alias.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-published-version
+    difficulty: easy
+    prompt_file: prompts/missing-published-version.md
+    baseline_file: baselines/missing-published-version.md
+    expected_verdict: PREREQUISITES_MISSING

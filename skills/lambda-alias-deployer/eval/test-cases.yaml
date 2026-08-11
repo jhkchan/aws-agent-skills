@@ -1,0 +1,143 @@
+# Eval test cases for lambda-alias-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across alias configurations
+# (basic alias on published version, canary traffic shift,
+# provisioned concurrency on alias, SnapStart alias, missing
+# published version).
+skill: lambda-alias-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: basic-alias-versioned
+    description: >-
+      Create a Lambda alias pointing to a published version with
+      API Gateway integration and CloudWatch alarm. Expects
+      READY_TO_DEPLOY with all checklist items verified including
+      version immutability and alias qualifier.
+    input: |
+      Create a Lambda alias named prod for function my-function
+      pointing to published version 5. Set up API Gateway
+      integration so API abc123 stage prod invokes the alias.
+      Create a CloudWatch alarm for errors scoped to the alias.
+      Region us-east-1. Tags: Environment=production, Service=api.
+      Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "version 5"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: canary-traffic-shift
+    description: >-
+      Configure weighted traffic shifting on an existing alias
+      for canary deployment (90% old version, 10% new version).
+      Expects READY_TO_DEPLOY with two published versions cited
+      and weighted routing config.
+    input: |
+      I need to do a canary deployment for function my-function.
+      The prod alias currently points to version 5. I published
+      version 6 and want to shift 10% traffic to it. Keep 90% on
+      version 5. Region us-east-1. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "canary"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "version 5"
+        - "version 6"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: provisioned-concurrency-alias
+    description: >-
+      Configure provisioned concurrency on a Lambda alias with
+      Auto Scaling. Expects READY_TO_DEPLOY with provisioned
+      concurrency on the alias (not the version) and auto scaling
+      target tracking.
+    input: |
+      Set up provisioned concurrency on the prod alias for
+      my-function in us-east-1. 10 provisioned concurrent
+      executions. Configure Auto Scaling with 70% target
+      utilization, min 2, max 50. The alias points to version 5.
+      Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "provisioned concurrency"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "prod"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: snapstart-alias
+    description: >-
+      Enable SnapStart on a Lambda function and create an alias
+      pointing to a SnapStart-enabled version. Expects
+      READY_TO_DEPLOY with SnapStart enabled and version snapshot
+      noted.
+    input: |
+      Enable SnapStart on function my-function (java17 runtime)
+      and create a staging alias pointing to a new SnapStart-
+      enabled version. The function is in us-east-1. I want the
+      staging alias for pre-production testing. Account:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SnapStart"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "staging"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-published-version
+    description: >-
+      Operator requests an alias but has not published a version.
+      The function exists but only has $LATEST. Expects
+      PREREQUISITES_MISSING with the version requirement cited.
+    input: |
+      Create a prod alias for my-function. The function exists
+      but I have not published any versions yet — it only has
+      $LATEST. Region us-east-1. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "version"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
