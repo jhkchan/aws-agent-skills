@@ -1,0 +1,235 @@
+# Eval test cases for kinesis-firehose-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: kinesis-firehose-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: delivery-to-s3-kms-gap
+    description: >-
+      DeliveryToS3.Success drops to 0 after a KMS key policy
+      change. CloudTrail shows AccessDenied on kms:GenerateDataKey.
+      Skill must identify the KMS key policy gap via the 5-layer
+      health check and produce ROOT_CAUSE_FOUND with the put-key-
+      policy fix.
+    input: |
+      Diagnosis reference: delivery-to-s3-kms-gap
+      Account: 111111111111
+      Region: us-east-1
+      Delivery-stream-name: prod-events-delivery
+      Destination: s3 (extended)
+      Symptom: DeliveryToS3Fails
+
+      Recent diagnostic output:
+      - CloudTrail PutObject events for the Firehose role show
+        errorMessage: "AccessDenied: kms:GenerateDataKey on
+        arn:aws:kms:us-east-1:111111111111:key/abc123"
+      - aws kms get-key-policy: Statement Principal =
+        {"AWS": "arn:aws:iam::111111111111:root"} only
+        (no firehose.amazonaws.com service principal)
+      - aws s3api head-bucket: returns 200 (bucket exists)
+      - aws s3api get-bucket-location: us-east-1 (matches
+        Firehose region)
+      - CloudWatch DeliveryToS3.Success: 0% for the last 30 min
+      - CloudWatch logging: Enabled on the destination
+
+      Emit the standard DIAGNOSIS block (SYMPTOM, ROOT_CAUSE,
+      EVIDENCE, LAYER_CHECK, FIX, VERIFICATION, VERDICT).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "delivery-to-s3-kms-gap"
+        - "VERDICT"
+        - "kms:GenerateDataKey"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: lambda-transform-6mb-cap
+    description: >-
+      Lambda transform produces response payloads exceeding the
+      6 MB cap due to JSON enrichment expansion. Full batches
+      are being dropped to S3 backup. Skill must identify the
+      6 MB response cap as the root cause and produce
+      ROOT_CAUSE_FOUND with the reduce-buffer-size fix.
+    input: |
+      Diagnosis reference: lambda-transform-6mb-cap
+      Account: 111111111111
+      Region: us-east-1
+      Delivery-stream-name: prod-events-enriched
+      Destination: s3 (extended, with Lambda transform)
+      Lambda function: prod-enrichment-fn
+      Symptom: LambdaFails (transformed batches dropped)
+
+      Recent diagnostic output:
+      - CloudWatch Lambda.Errors: 0 (no exceptions)
+      - Lambda Duration: 200-400ms (well under the 30s timeout)
+      - Firehose log: "Response payload exceeds 6 MB" repeatedly;
+        full batches routed to S3 error backup.
+      - Lambda Insights: output record size averages 8 KB after
+        enrichment (input ~1 KB; enrichment adds JSON expansion).
+      - describe-delivery-stream ProcessingConfiguration:
+        BufferingHints SizeInMBs=3, IntervalInSeconds=60
+      - CloudWatch LambdaInvocation.DroppedRecords > 0
+
+      Emit the standard DIAGNOSIS block. Identify the root cause
+      via the 5-layer health check (Step 1, Layer 2).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "lambda-transform-6mb-cap"
+        - "VERDICT"
+        - "6 MB"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: format-conversion-0-byte
+    description: >-
+      Parquet objects are landing in S3 but are 0 bytes. The Glue
+      table columns are CamelCase but the input JSON keys are
+      snake_case. Skill must identify the case-sensitivity
+      mismatch as the root cause and produce ROOT_CAUSE_FOUND
+      with the Glue schema fix.
+    input: |
+      Diagnosis reference: format-conversion-0-byte
+      Account: 111111111111
+      Region: us-east-1
+      Delivery-stream-name: prod-events-parquet
+      Destination: s3 (extended, with format conversion)
+      Glue database: prod_db, table: events
+      Symptom: FormatConversionFails
+
+      Recent diagnostic output:
+      - DeliveryToS3.Success: 100% (objects landing)
+      - aws s3api head-object on the latest 5 objects:
+        ContentLength: 0 for all 5
+      - Athena query on the table returns 0 rows
+      - aws glue get-table prod_db events: columns show
+        userId, eventType, requestTime (CamelCase)
+      - Sample input record (from S3 error backup):
+        {"user_id":"u123","event_type":"click","request_time":"2026-08-10T10:00:00Z"}
+        (snake_case keys)
+      - DataFormatConversionConfiguration: Enabled=true,
+        InputFormatConfiguration.Deserializer=OpenXJsonSerDe
+        (CaseInsensitive NOT set)
+
+      Emit the standard DIAGNOSIS block. Identify the root cause
+      via Step 5 (FormatConversionFails).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "format-conversion-0-byte"
+        - "VERDICT"
+        - "case"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: opensearch-circuit-breaker
+    description: >-
+      DeliveryToOpenSearch.Success is 0 for 45 minutes. The
+      OpenSearch domain is in RED cluster health due to disk
+      watermark breach. Firehose circuit breaker is engaged.
+      Skill must identify the OpenSearch cluster state as the
+      root cause and ESCALATE (requires OpenSearch admin to
+      restore cluster health).
+    input: |
+      Diagnosis reference: opensearch-circuit-breaker
+      Account: 111111111111
+      Region: us-east-1
+      Delivery-stream-name: prod-events-to-opensearch
+      Destination: opensearch
+      Domain: prod-events-search
+      Symptom: OpenSearchFails
+
+      Recent diagnostic output:
+      - DeliveryToOpenSearch.Success: 0% for the last 45 min
+      - Firehose log: circuit breaker engaged after 5 minutes of
+        sustained 429 responses
+      - aws opensearch describe-domain-health:
+        ClusterHealth=Red
+      - 2/5 data nodes show free_storage_below_watermark
+      - OpenSearch access policy includes the Firehose role with
+        es:ESHttpPost (auth OK)
+      - IAM and KMS layers pass
+
+      Emit the standard DIAGNOSIS block.
+    expected_verdict: ESCALATE
+    assertions:
+      must_contain:
+        - "ESCALATE"
+        - "opensearch-circuit-breaker"
+        - "VERDICT"
+        - "Red"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ROOT_CAUSE_FOUND"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: redshift-copy-column-mismatch
+    description: >-
+      Firehose to Redshift COPY fails consistently with a
+      column-count mismatch in stl_load_errors. The Firehose
+      CopyCommand.DataTableColumns lists 5 columns but the
+      Redshift table has 6. Skill must identify the column
+      mismatch as the root cause and produce ROOT_CAUSE_FOUND
+      with the update-destination fix.
+    input: |
+      Diagnosis reference: redshift-copy-column-mismatch
+      Account: 111111111111
+      Region: us-east-1
+      Delivery-stream-name: prod-events-to-redshift
+      Destination: redshift
+      Cluster: prod-redshift
+      Table: public.events
+      Symptom: RedshiftFails
+
+      Recent diagnostic output:
+      - DeliveryToRedshift.Success: 0% for the last 30 min
+      - Firehose log: COPY command failed
+      - Redshift stl_load_errors:
+        query=12345, err_reason="Extra column(s) specified",
+        colname="user_id, event_type, request_time, ip, ua"
+        (5 columns in COPY)
+      - Redshift table public.events has 6 columns: user_id,
+        event_type, request_time, ip, ua, processed_at
+        (processed_at has DEFAULT CURRENT_TIMESTAMP)
+      - describe-delivery-stream RedshiftDestinationDescription:
+        CopyCommand.DataTableColumns =
+        "user_id,event_type,request_time,ip,ua"
+      - Staging bucket head-bucket: 200 (exists, correct region)
+      - Redshift cluster role has s3:GetObject on staging bucket
+
+      Emit the standard DIAGNOSIS block. Identify the root cause
+      via Step 7 (RedshiftFails).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "redshift-copy-column-mismatch"
+        - "VERDICT"
+        - "column"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"

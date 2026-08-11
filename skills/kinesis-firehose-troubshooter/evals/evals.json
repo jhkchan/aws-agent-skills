@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "kinesis-firehose-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Kinesis Data Firehose Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "delivery-to-s3-kms-gap",
+      "name": "DeliveryToS3Fails: KMS key policy lacks Firehose service principal - ROOT_CAUSE_FOUND",
+      "difficulty": "easy",
+      "prompt_file": "prompts/delivery-to-s3-kms-gap.md",
+      "baseline_file": "baselines/delivery-to-s3-kms-gap.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "delivery-to-s3-kms-gap", "VERDICT", "kms:GenerateDataKey"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "lambda-transform-6mb-cap",
+      "name": "LambdaFails: transform response exceeds 6 MB cap due to JSON enrichment - ROOT_CAUSE_FOUND",
+      "difficulty": "medium",
+      "prompt_file": "prompts/lambda-transform-6mb-cap.md",
+      "baseline_file": "baselines/lambda-transform-6mb-cap.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "lambda-transform-6mb-cap", "VERDICT", "6 MB"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "format-conversion-0-byte",
+      "name": "FormatConversionFails: Glue columns CamelCase vs JSON keys snake_case produces 0-byte Parquet - ROOT_CAUSE_FOUND",
+      "difficulty": "medium",
+      "prompt_file": "prompts/format-conversion-0-byte.md",
+      "baseline_file": "baselines/format-conversion-0-byte.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "format-conversion-0-byte", "VERDICT", "case"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    },
+    {
+      "id": "opensearch-circuit-breaker",
+      "name": "OpenSearchFails: cluster RED health triggers Firehose circuit breaker - ESCALATE",
+      "difficulty": "hard",
+      "prompt_file": "prompts/opensearch-circuit-breaker.md",
+      "baseline_file": "baselines/opensearch-circuit-breaker.md",
+      "expected_verdict": "ESCALATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ESCALATE", "opensearch-circuit-breaker", "VERDICT", "Red"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ROOT_CAUSE_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "redshift-copy-column-mismatch",
+      "name": "RedshiftFails: COPY column count (5) vs table (6) mismatch - ROOT_CAUSE_FOUND via stl_load_errors",
+      "difficulty": "hard",
+      "prompt_file": "prompts/redshift-copy-column-mismatch.md",
+      "baseline_file": "baselines/redshift-copy-column-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "redshift-copy-column-mismatch", "VERDICT", "column"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+        }
+      ]
+    }
+  ]
+}
