@@ -1,0 +1,70 @@
+{
+  "skill": "eks-nodegroup-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill provides a detailed decision tree, specific AWS CLI commands, and concrete environment variable values, but most of this information is already documented in AWS docs and common troubleshooting guides. It adds limited novel quantitative thresholds or exclusive expert heuristics, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The procedure follows an expert mindset (read\u2011only first, confirmation gate, layered probing) and is AWS\u2011specific, yet the ordering of some probes (e.g., when to check ASG activity vs. node conditions) is not fully explicit, leaving a small ambiguity."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER section lists several concrete pitfalls with reasons, but it omits common anti\u2011patterns such as forgetting to restart kubelet after an AMI change or ignoring pod\u2011level resource limits. The missing items reduce the completeness of the anti\u2011pattern coverage."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, activation triggers, and invocation schema are all present and well\u2011formed. However, the activation triggers are a long flat list without explicit priority or mutually\u2011exclusive grouping, which could cause unreliable activation in edge cases."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill layers information (quick start, reference table, detailed steps), but the quick\u2011start section already contains many detailed commands and tables, creating cognitive overload. Critical rules (e.g., confirmation gate) are buried later, so the disclosure is not optimally progressive."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are gated behind an explicit CONFIRM prompt, and all diagnostic probes are read\u2011only. The calibration matches the fragility of the tasks perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (quick start, symptom table, NEVER, heuristic, dependency graph, mindset, pre\u2011flight, process steps, examples) that aids comprehension, though the ordering of sections is slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill supplies concrete decision trees, commands, and example outputs that an agent could execute. Nonetheless, some edge cases (partial data, multi\u2011AZ capacity nuances, handling of ambiguous symptom strings) are not fully addressed, and error handling for malformed input is limited to a generic INSUFFICIENT_DATA block."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 38009,
+  "latency_ms": 16198,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}
