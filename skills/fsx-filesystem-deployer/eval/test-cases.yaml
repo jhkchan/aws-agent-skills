@@ -1,0 +1,153 @@
+# Eval test cases for fsx-filesystem-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across FSx topologies
+# (FSx for Windows Multi-AZ with AD and dedup, FSx for Lustre
+# PERSISTENT with S3 export, FSx for ONTAP with SVM and tiering,
+# Single-AZ Windows with throughput stepping, missing AD
+# prerequisite failure).
+skill: fsx-filesystem-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: windows-multiaz-ad-dedup
+    description: >-
+      Provision an FSx for Windows Multi-AZ file system with AD
+      integration, dedup enabled, shadow copies, and DNS aliases.
+      Expects READY_TO_DEPLOY with Multi-AZ deployment noted, AD
+      directory joined, dedup savings estimated, and both subnets
+      cited.
+    input: |
+      Create an FSx for Windows file system in us-east-1. Multi-AZ
+      deployment, 1024 GB SSD storage, 32 MB/s throughput capacity.
+      Join to Managed AD directory d-aaa111222. VPC vpc-aaa11122,
+      subnets subnet-aaa111 (us-east-1a) and subnet-bbb222
+      (us-east-1b). Enable dedup (GeneralPurpose). Enable shadow
+      copies. DNS alias fileshare.example.com. KMS encryption with
+      AWS-managed key. Backup: daily automatic, 7-day retention.
+      Maintenance window: Tuesday 01:00. Tags: Environment=production,
+      ManagedBy=cloudops.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Windows"
+        - "Multi-AZ"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "dedup"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: lustre-persistent-s3-export
+    description: >-
+      Provision an FSx for Lustre PERSISTENT file system with S3
+      export, LZ4 compression, and S3-linked data repository.
+      Expects READY_TO_DEPLOY with S3 export configured, PERSISTENT
+      deployment noted, and compression enabled.
+    input: |
+      Create an FSx for Lustre file system in us-east-1. PERSISTENT_1
+      deployment, 2400 GB SSD storage, 1000 MB/s/TB throughput. S3
+      export from s3://my-hpc-bucket/data with auto-import policy
+      NEW_CHANGED. LZ4 compression. VPC vpc-ccc33344, subnet
+      subnet-ccc333 (us-east-1a). Tags: Environment=production,
+      Workload=hpc.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Lustre"
+        - "PERSISTENT"
+        - "s3://my-hpc-bucket"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ontap-multiaz-svm-tiering
+    description: >-
+      Provision an FSx for ONTAP Multi-AZ file system with SVM and
+      volume tiering. Expects READY_TO_DEPLOY with ONTAP deployment,
+      SVM creation, and auto-tiering configured.
+    input: |
+      Create an FSx for ONTAP file system in us-east-1. Multi-AZ
+      deployment, 1024 GB storage. VPC vpc-eee55566, subnets
+      subnet-eee555 (us-east-1a) and subnet-fff666 (us-east-1b).
+      Create SVM svm-prod and volume vol-prod (1 TB) with auto
+      tiering policy and storage efficiency enabled. Tags:
+      Environment=production, ManagedBy=cloudops.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ONTAP"
+        - "tier"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: windows-singleaz-throughput
+    description: >-
+      Provision an FSx for Windows Single-AZ file system with
+      specific throughput capacity stepping. Expects READY_TO_DEPLOY
+      with Single-AZ noted, correct throughput step selected, and
+      cost trade-off explained.
+    input: |
+      Create an FSx for Windows file system in us-east-1. Single-AZ
+      deployment, 512 GB HDD storage. Join to Managed AD directory
+      d-aaa111222. VPC vpc-aaa11122, subnet subnet-aaa111
+      (us-east-1a). The workload needs approximately 180 MB/s
+      throughput. Tags: Environment=dev, ManagedBy=cloudops.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Windows"
+        - "Single-AZ"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-ad-prerequisite
+    description: >-
+      Operator requests an FSx for Windows file system but no Active
+      Directory is available. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the AD integration gap
+      cited.
+    input: |
+      Create an FSx for Windows file system in us-east-1. Multi-AZ
+      deployment, 1024 GB SSD. VPC vpc-noad, subnets subnet-ggg777
+      (us-east-1a) and subnet-hhh888 (us-east-1b). There is no
+      Active Directory configured in this account.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Active Directory"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

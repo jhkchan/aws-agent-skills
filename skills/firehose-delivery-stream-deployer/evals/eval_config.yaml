@@ -1,0 +1,49 @@
+# Eval configuration for firehose-delivery-stream-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: firehose-delivery-stream-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: s3-parquet-lambda-transform
+    difficulty: hard
+    prompt_file: prompts/s3-parquet-lambda-transform.md
+    baseline_file: baselines/s3-parquet-lambda-transform.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: opensearch-destination-retry-backup
+    difficulty: hard
+    prompt_file: prompts/opensearch-destination-retry-backup.md
+    baseline_file: baselines/opensearch-destination-retry-backup.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: splunk-http-endpoint
+    difficulty: medium
+    prompt_file: prompts/splunk-http-endpoint.md
+    baseline_file: baselines/splunk-http-endpoint.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: buffering-hints-tradeoff
+    difficulty: medium
+    prompt_file: prompts/buffering-hints-tradeoff.md
+    baseline_file: baselines/buffering-hints-tradeoff.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-s3-bucket
+    difficulty: easy
+    prompt_file: prompts/missing-s3-bucket.md
+    baseline_file: baselines/missing-s3-bucket.md
+    expected_verdict: PREREQUISITES_MISSING

@@ -1,0 +1,155 @@
+# Eval test cases for directory-service-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Directory Service
+# topologies (Managed AD Enterprise with forest trust and LDAPS,
+# AD Connector with on-prem DNS, Simple AD basic deployment, cross-
+# account directory sharing, missing VPC DNS support prerequisite
+# failure).
+skill: directory-service-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: managed-ad-enterprise-trust-ldaps
+    description: >-
+      Provision a Managed Microsoft AD Enterprise directory with a
+      two-way forest trust to an on-prem domain, LDAPS enabled with
+      an AWS PCA certificate, and IAM Identity Center SSO connected.
+      Expects READY_TO_DEPLOY with conditional forwarders on both
+      sides, trust direction noted, and LDAPS certificate lifecycle
+      planned.
+    input: |
+      Create a Managed Microsoft AD Enterprise directory in us-east-1.
+      VPC vpc-aaa11122 with subnets subnet-aaa111 (us-east-1a) and
+      subnet-bbb222 (us-east-1b). DNS name corp.example.com, NetBIOS
+      name corp. Set up a two-way forest trust with onprem.example.com
+      (conditional forwarders on both sides, on-prem DNS at 10.0.1.53
+      and 10.0.2.53). Enable LDAPS with a certificate from AWS PCA
+      (expiring 2026-12-01). Connect IAM Identity Center SSO. Password
+      policy: min-length 12, complexity on, max-age 90. Tags:
+      Environment=production, ManagedBy=cloudops.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Managed Microsoft AD"
+        - "Enterprise"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Two-Way"
+        - "Forest"
+        - "LDAPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ad-connector-onprem-dns
+    description: >-
+      Provision an AD Connector directory that proxies authentication
+      to an on-premises AD. Expects READY_TO_DEPLOY with on-prem DNS
+      server IPs noted, VPN/DX connectivity prerequisite verified, and
+      AD Connector limitations (no trusts, no LDAPS) respected.
+    input: |
+      Create an AD Connector in us-east-1. VPC vpc-ccc33344 with
+      subnets subnet-ccc333 (us-east-1a) and subnet-ddd444 (us-east-1b).
+      On-prem AD DNS servers at 10.0.1.53 and 10.0.2.53 (reachable via
+      VPN). Connect IAM Identity Center SSO. Tags: Environment=staging,
+      ManagedBy=cloudops.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AD Connector"
+        - "10.0.1.53"
+        - "10.0.2.53"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: simple-ad-basic
+    description: >-
+      Provision a Simple AD Large directory for basic LDAP needs.
+      Expects READY_TO_DEPLOY with Simple AD limitations (no trusts,
+      no LDAPS, no schema extensions) noted.
+    input: |
+      Create a Simple AD Large directory in us-east-1. VPC
+      vpc-eee55566 with subnets subnet-eee555 (us-east-1a) and
+      subnet-fff666 (us-east-1b). DNS name internal.example.com,
+      NetBIOS name internal. Connect IAM Identity Center SSO. Tags:
+      Environment=dev, ManagedBy=cloudops.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Simple AD"
+        - "Large"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-directory-sharing
+    description: >-
+      Share an existing Managed Microsoft AD directory with a second
+      AWS account. Expects READY_TO_DEPLOY with directory sharing
+      configured, target account ID cited, and accepter-side
+      acceptance step noted.
+    input: |
+      Share Managed Microsoft AD directory d-aaa111222 with target
+      account 999999999999. The directory is in us-east-1, owner
+      account 123456789012. Use HANDSHAKE method. Tags:
+      Environment=production, SharedWith=dev-account.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "999999999999"
+        - "share"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-vpc-dns-support
+    description: >-
+      Operator requests a Managed Microsoft AD directory but the VPC
+      does not have DNS support enabled. This is a prerequisite
+      failure. Expects PREREQUISITES_MISSING with the VPC DNS gap
+      cited.
+    input: |
+      Create a Managed Microsoft AD Standard directory in us-east-1.
+      VPC vpc-nodns with subnets subnet-ggg777 (us-east-1a) and
+      subnet-hhh888 (us-east-1b). The VPC does NOT have
+      enableDnsSupport enabled. DNS name corp.example.com, NetBIOS
+      name corp.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "enableDnsSupport"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "vpc-nodns"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

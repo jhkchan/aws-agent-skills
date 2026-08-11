@@ -1,0 +1,178 @@
+{
+  "skill": "directory-service-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Directory Service Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across directory topologies (Managed AD Enterprise with forest trust and LDAPS, AD Connector with on-prem DNS, Simple AD basic deployment, cross-account directory sharing, missing VPC DNS support prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "managed-ad-enterprise-trust-ldaps",
+      "name": "Managed Microsoft AD Enterprise with forest trust, LDAPS, and SSO",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Managed AD Enterprise, two-way forest trust with conditional forwarders on both sides, LDAPS with AWS PCA certificate, IAM Identity Center SSO connected",
+      "prompt": "Create a Managed Microsoft AD Enterprise directory in us-east-1. VPC vpc-aaa11122 with subnets subnet-aaa111 (us-east-1a) and subnet-bbb222 (us-east-1b). DNS name corp.example.com, NetBIOS name corp. Set up a two-way forest trust with onprem.example.com (conditional forwarders on both sides, on-prem DNS at 10.0.1.53 and 10.0.2.53). Enable LDAPS with a certificate from AWS PCA (expiring 2026-12-01). Connect IAM Identity Center SSO. Password policy: min-length 12, complexity on, max-age 90. Tags: Environment=production, ManagedBy=cloudops.",
+      "prompt_file": "prompts/managed-ad-enterprise-trust-ldaps.md",
+      "baseline_file": "baselines/managed-ad-enterprise-trust-ldaps.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DIRECTORY_SERVICE: d-aaa111222 (ManagedMicrosoftAD, Enterprise)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Directory type: Managed Microsoft AD\n  [✓] Edition/Size: Enterprise\n  [✓] VPC: vpc-aaa11122 (enableDnsSupport=true, enableDnsHostnames=true)\n  [✓] Subnet AZ1: subnet-aaa111 (us-east-1a)\n  [✓] Subnet AZ2: subnet-bbb222 (us-east-1b)\n  [✓] DNS name: corp.example.com\n  [✓] DNS conditional forwarders: configured (both sides)\n  [✓] Trust relationship: Forest Two-Way to onprem.example.com\n  [✓] LDAPS: enabled (cert from AWS PCA, expires 2026-12-01)\n  [✓] IAM Identity Center SSO: connected\nVERIFICATION_COMMANDS:\n  aws ds describe-directories --directory-ids d-aaa111222 --region us-east-1\n  aws ds describe-trusts --directory-id d-aaa111222 --region us-east-1\n  aws ds list-certificates --directory-id d-aaa111222 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Managed Microsoft AD",
+            "Enterprise",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Two-Way",
+            "Forest",
+            "LDAPS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ad-connector-onprem-dns",
+      "name": "AD Connector proxying to on-premises AD with SSO",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — AD Connector with on-prem DNS server IPs, VPN connectivity verified, SSO connected, AD Connector limitations (no trust, no LDAPS) respected",
+      "prompt": "Create an AD Connector in us-east-1. VPC vpc-ccc33344 with subnets subnet-ccc333 (us-east-1a) and subnet-ddd444 (us-east-1b). On-prem AD DNS servers at 10.0.1.53 and 10.0.2.53 (reachable via VPN). Connect IAM Identity Center SSO. Tags: Environment=staging, ManagedBy=cloudops.",
+      "prompt_file": "prompts/ad-connector-onprem-dns.md",
+      "baseline_file": "baselines/ad-connector-onprem-dns.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DIRECTORY_SERVICE: d-ccc333444 (ADConnector)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Directory type: AD Connector\n  [✓] VPC: vpc-ccc33344 (enableDnsSupport=true)\n  [✓] Subnet AZ1: subnet-ccc333 (us-east-1a)\n  [✓] Subnet AZ2: subnet-ddd444 (us-east-1b)\n  [✓] On-prem DNS: 10.0.1.53, 10.0.2.53 (reachable via VPN)\n  [✓] IAM Identity Center SSO: connected\nVERIFICATION_COMMANDS:\n  aws ds describe-directories --directory-ids d-ccc333444 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AD Connector",
+            "10.0.1.53",
+            "10.0.2.53",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "simple-ad-basic",
+      "name": "Simple AD Large for basic LDAP needs with SSO",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Simple AD Large with SSO, Simple AD limitations (no trust, no LDAPS, no schema extensions) noted",
+      "prompt": "Create a Simple AD Large directory in us-east-1. VPC vpc-eee55566 with subnets subnet-eee555 (us-east-1a) and subnet-fff666 (us-east-1b). DNS name internal.example.com, NetBIOS name internal. Connect IAM Identity Center SSO. Tags: Environment=dev, ManagedBy=cloudops.",
+      "prompt_file": "prompts/simple-ad-basic.md",
+      "baseline_file": "baselines/simple-ad-basic.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DIRECTORY_SERVICE: d-eee555666 (SimpleAD, Large)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Directory type: Simple AD\n  [✓] Size: Large\n  [✓] VPC: vpc-eee55566 (enableDnsSupport=true)\n  [✓] Subnet AZ1: subnet-eee555 (us-east-1a)\n  [✓] Subnet AZ2: subnet-fff666 (us-east-1b)\n  [✓] DNS name: internal.example.com\n  [✓] IAM Identity Center SSO: connected\nVERIFICATION_COMMANDS:\n  aws ds describe-directories --directory-ids d-eee555666 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Simple AD",
+            "Large",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-directory-sharing",
+      "name": "Cross-account directory sharing with handshake",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — share Managed AD with target account 999999999999, accepter must accept, unsharing breaks accepter resources",
+      "prompt": "Share Managed Microsoft AD directory d-aaa111222 with target account 999999999999. The directory is in us-east-1, owner account 123456789012. Use HANDSHAKE method. Tags: Environment=production, SharedWith=dev-account.",
+      "prompt_file": "prompts/cross-account-directory-sharing.md",
+      "baseline_file": "baselines/cross-account-directory-sharing.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DIRECTORY_SERVICE: d-aaa111222 (Shared to 999999999999)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Directory type: Managed Microsoft AD\n  [✓] Directory sharing: shared with 999999999999 (HANDSHAKE)\nVERIFICATION_COMMANDS:\n  aws ds describe-shared-directories --owner-directory-id d-aaa111222 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "999999999999",
+            "share",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-vpc-dns-support",
+      "name": "VPC without DNS support (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — VPC vpc-nodns does not have enableDnsSupport enabled; directory creation would fail",
+      "prompt": "Create a Managed Microsoft AD Standard directory in us-east-1. VPC vpc-nodns with subnets subnet-ggg777 (us-east-1a) and subnet-hhh888 (us-east-1b). The VPC does NOT have enableDnsSupport enabled. DNS name corp.example.com, NetBIOS name corp.",
+      "prompt_file": "prompts/missing-vpc-dns-support.md",
+      "baseline_file": "baselines/missing-vpc-dns-support.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "DIRECTORY_SERVICE: d-xxx (ManagedMicrosoftAD, Standard)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] VPC: vpc-nodns — enableDnsSupport is NOT enabled; Directory Service requires DNS support",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "enableDnsSupport",
+            "VERDICT",
+            "CHECKLIST",
+            "vpc-nodns"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

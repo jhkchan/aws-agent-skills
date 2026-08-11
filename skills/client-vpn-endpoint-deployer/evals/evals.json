@@ -1,0 +1,179 @@
+{
+  "skill": "client-vpn-endpoint-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Client VPN Endpoint Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across auth modes (mutual TLS split-tunnel with custom DNS leak prevention, SAML federation with self-service portal, Active Directory full-tunnel, multi-rule authorization ordering verification, missing ACM server certificate prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "mutual-tls-split-tunnel",
+      "name": "Mutual TLS Client VPN with split-tunnel and custom DNS",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — mutual TLS auth, split-tunnel with custom DNS server (leak prevention), single subnet association, allow-all authorization rule",
+      "prompt": "Create a Client VPN endpoint in us-east-1, account 123456789012. Client CIDR 10.250.0.0/16. Mutual TLS auth using server certificate arn:aws:acm:us-east-1:123456789012:certificate/abc123. Split tunnel enabled. DNS server 10.0.0.2 (VPC resolver). Target VPC vpc-aaa11122 (10.0.0.0/16). Associate subnet subnet-aaa11122 in us-east-1a. Authorization rule: allow all groups to access 10.0.0.0/16. Connection logging to CloudWatch log group client-vpn-logs. Transport UDP on port 443. Tags: Environment=production, Access=corporate.",
+      "prompt_file": "prompts/mutual-tls-split-tunnel.md",
+      "baseline_file": "baselines/mutual-tls-split-tunnel.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLIENT_VPN: cvpn-aaa11122bbbb3333 (10.250.0.0/16 → vpc-aaa11122)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Client CIDR: 10.250.0.0/16 (non-overlapping with 10.0.0.0/16)\n  [✓] Authentication: mutual-TLS (ACM arn:aws:acm:us-east-1:123456789012:certificate/abc123)\n  [✓] Authorization rules: 1 rule — allow all groups to 10.0.0.0/16\n  [✓] Target subnet association: subnet-aaa11122 in us-east-1a — available\n  [✓] DNS servers: 10.0.0.2 (split-tunnel DNS leak prevented)\n  [✓] Tunnel mode: split-tunnel\n  [✓] Transport protocol: udp (port 443)\n  [✓] Connection logging: enabled (CloudWatch client-vpn-logs)\nVERIFICATION_COMMANDS:\n  aws ec2 describe-client-vpn-endpoints --client-vpn-endpoint-ids cvpn-aaa11122bbbb3333 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cvpn-",
+            "10.250.0.0/16",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "split-tunnel",
+            "10.0.0.2"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "saml-federation-self-service-portal",
+      "name": "SAML federated Client VPN with self-service portal",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SAML 2.0 federation auth, self-service portal enabled, full-tunnel mode",
+      "prompt": "Create a Client VPN endpoint in us-east-1, account 123456789012. Client CIDR 10.250.0.0/16. SAML federated authentication using provider arn:aws:iam::123456789012:saml-provider/CorporateIdP. Server certificate arn:aws:acm:us-east-1:123456789012:certificate/abc123 (required even for SAML). Enable self-service portal. Full-tunnel mode. DNS server 10.0.0.2. Target VPC vpc-aaa11122 (10.0.0.0/16). Associate subnet subnet-aaa11122. Authorization rule: allow all groups to access 10.0.0.0/16. Tags: Environment=production, Auth=federated.",
+      "prompt_file": "prompts/saml-federation-self-service-portal.md",
+      "baseline_file": "baselines/saml-federation-self-service-portal.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLIENT_VPN: cvpn-ccc22233dddd4444 (10.250.0.0/16 → vpc-aaa11122)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Authentication: SAML federation (arn:aws:iam::123456789012:saml-provider/CorporateIdP)\n  [✓] Self-service portal: enabled\n  [✓] Tunnel mode: full-tunnel\n  [✓] Target subnet association: subnet-aaa11122 in us-east-1a — available\n  [✓] Authorization rules: 1 rule — allow all groups to 10.0.0.0/16",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SAML",
+            "saml-provider",
+            "self-service",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "active-directory-full-tunnel",
+      "name": "Active Directory Client VPN with full-tunnel",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Active Directory auth (AWS Managed AD), full-tunnel mode, group-restricted authorization rule",
+      "prompt": "Create a Client VPN endpoint in us-east-1, account 123456789012. Client CIDR 10.251.0.0/16. Active Directory authentication using directory ID d-9067a4a4bd (AWS Managed Microsoft AD). Server certificate arn:aws:acm:us-east-1:123456789012:certificate/abc123. Full tunnel (no split-tunnel). DNS server 10.0.0.2. Target VPC vpc-bbb22233 (172.16.0.0/16). Associate subnet subnet-bbb22233 in us-east-1b. Authorization rule: allow group corp-users to access 172.16.0.0/16. Connection logging to CloudWatch log group client-vpn-ad-logs. Tags: Environment=production, Auth=active-directory.",
+      "prompt_file": "prompts/active-directory-full-tunnel.md",
+      "baseline_file": "baselines/active-directory-full-tunnel.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLIENT_VPN: cvpn-eee33344ffff5555 (10.251.0.0/16 → vpc-bbb22233)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Authentication: Active Directory (d-9067a4a4bd)\n  [✓] Tunnel mode: full-tunnel\n  [✓] Target subnet association: subnet-bbb22233 in us-east-1b — available\n  [✓] Authorization rules: 1 rule — group corp-users to 172.16.0.0/16\n  [✓] Connection logging: enabled (CloudWatch client-vpn-ad-logs)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Active Directory",
+            "d-9067a4a4bd",
+            "full-tunnel",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "authorization-rule-ordering",
+      "name": "Client VPN with multi-rule authorization ordering verification",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — multiple authorization rules ordered specific-first, broad-last (first-match wins)",
+      "prompt": "Create a Client VPN endpoint in us-east-1, account 123456789012. Client CIDR 10.250.0.0/16. Mutual TLS auth using server certificate arn:aws:acm:us-east-1:123456789012:certificate/abc123. Split tunnel enabled. DNS server 10.0.0.2. Target VPC vpc-aaa11122 (10.0.0.0/16). Associate subnet subnet-aaa11122. Create TWO authorization rules: (1) allow group data-team to access 10.0.0.0/16, (2) allow all groups to access 0.0.0.0/0. Rule 1 must be evaluated before rule 2. Tags: Environment=production, Access=multi-rule.",
+      "prompt_file": "prompts/authorization-rule-ordering.md",
+      "baseline_file": "baselines/authorization-rule-ordering.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLIENT_VPN: cvpn-ggg44455hhhh6666 (10.250.0.0/16 → vpc-aaa11122)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Authentication: mutual-TLS (ACM arn:aws:acm:us-east-1:123456789012:certificate/abc123)\n  [✓] Authorization rules: 2 rules — first-match ordering verified (10.0.0.0/16 data-team first; 0.0.0.0/0 all-staff last)\n  [✓] DNS servers: 10.0.0.2 (split-tunnel DNS leak prevented)\n  [✓] Tunnel mode: split-tunnel",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ordering",
+            "data-team",
+            "0.0.0.0/0",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-server-certificate",
+      "name": "Client VPN mutual TLS without ACM server certificate (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — mutual TLS requires a server certificate in ACM; none provided",
+      "prompt": "Create a Client VPN endpoint in us-east-1, account 123456789012. Client CIDR 10.250.0.0/16. Mutual TLS auth but no server certificate has been imported into ACM yet. Target VPC vpc-aaa11122 (10.0.0.0/16). Associate subnet subnet-aaa11122.",
+      "prompt_file": "prompts/missing-server-certificate.md",
+      "baseline_file": "baselines/missing-server-certificate.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "CLIENT_VPN: (pending — cvpn-id not provisionable)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Server certificate: MISSING — mutual TLS auth requires a server certificate in ACM; import one before creating the endpoint",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "server certificate",
+            "ACM",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

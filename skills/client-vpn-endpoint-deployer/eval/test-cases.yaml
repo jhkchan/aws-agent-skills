@@ -1,0 +1,172 @@
+# Eval test cases for client-vpn-endpoint-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Client VPN auth modes
+# (mutual TLS split-tunnel with custom DNS, SAML federation with
+# self-service portal, Active Directory full-tunnel, authorization rule
+# ordering verification, missing ACM server certificate prerequisite
+# failure).
+skill: client-vpn-endpoint-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: mutual-tls-split-tunnel
+    description: >-
+      Provision a Client VPN endpoint with mutual TLS authentication,
+      split-tunnel enabled, custom DNS servers set to the VPC resolver,
+      single subnet association, and a default allow-all authorization
+      rule. Expects READY_TO_DEPLOY with split-tunnel DNS leak
+      prevention noted.
+    input: |
+      Create a Client VPN endpoint in us-east-1, account
+      123456789012. Client CIDR 10.250.0.0/16. Mutual TLS auth using
+      server certificate
+      arn:aws:acm:us-east-1:123456789012:certificate/abc123. Split
+      tunnel enabled. DNS server 10.0.0.2 (VPC resolver). Target VPC
+      vpc-aaa11122 (10.0.0.0/16). Associate subnet subnet-aaa11122 in
+      us-east-1a. Authorization rule: allow all groups to access
+      10.0.0.0/16. Connection logging to CloudWatch log group
+      client-vpn-logs. Transport UDP on port 443. Tags:
+      Environment=production, Access=corporate.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cvpn-"
+        - "10.250.0.0/16"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "split-tunnel"
+        - "10.0.0.2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: saml-federation-self-service-portal
+    description: >-
+      Provision a Client VPN endpoint with SAML 2.0 federated
+      authentication and self-service portal enabled. Expects
+      READY_TO_DEPLOY with SAML provider ARN and portal URL noted.
+    input: |
+      Create a Client VPN endpoint in us-east-1, account
+      123456789012. Client CIDR 10.250.0.0/16. SAML federated
+      authentication using provider
+      arn:aws:iam::123456789012:saml-provider/CorporateIdP. Server
+      certificate arn:aws:acm:us-east-1:123456789012:certificate/abc123
+      (required even for SAML). Enable self-service portal. Full-tunnel
+      mode. DNS server 10.0.0.2. Target VPC vpc-aaa11122
+      (10.0.0.0/16). Associate subnet subnet-aaa11122. Authorization
+      rule: allow all groups to access 10.0.0.0/16. Tags:
+      Environment=production, Auth=federated.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SAML"
+        - "saml-provider"
+        - "self-service"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: active-directory-full-tunnel
+    description: >-
+      Provision a Client VPN endpoint with Active Directory
+      authentication and full-tunnel mode. Expects READY_TO_DEPLOY
+      with directory ID noted and full-tunnel (no split-tunnel flag)
+      confirmed.
+    input: |
+      Create a Client VPN endpoint in us-east-1, account
+      123456789012. Client CIDR 10.251.0.0/16. Active Directory
+      authentication using directory ID d-9067a4a4bd (AWS Managed
+      Microsoft AD). Server certificate
+      arn:aws:acm:us-east-1:123456789012:certificate/abc123. Full
+      tunnel (no split-tunnel). DNS server 10.0.0.2. Target VPC
+      vpc-bbb22233 (172.16.0.0/16). Associate subnet subnet-bbb22233
+      in us-east-1b. Authorization rule: allow group "corp-users" to
+      access 172.16.0.0/16. Connection logging to CloudWatch log
+      group client-vpn-ad-logs. Tags: Environment=production,
+      Auth=active-directory.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Active Directory"
+        - "d-9067a4a4bd"
+        - "full-tunnel"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: authorization-rule-ordering
+    description: >-
+      Provision a Client VPN endpoint with multiple authorization rules
+      that must be ordered from most-specific to most-broad. Expects
+      READY_TO_DEPLOY with rule ordering verified (specific CIDR +
+      group first, broad CIDR + all groups last).
+    input: |
+      Create a Client VPN endpoint in us-east-1, account
+      123456789012. Client CIDR 10.250.0.0/16. Mutual TLS auth using
+      server certificate
+      arn:aws:acm:us-east-1:123456789012:certificate/abc123. Split
+      tunnel enabled. DNS server 10.0.0.2. Target VPC vpc-aaa11122
+      (10.0.0.0/16). Associate subnet subnet-aaa11122. Create TWO
+      authorization rules: (1) allow group data-team to access
+      10.0.0.0/16, (2) allow all groups to access 0.0.0.0/0. Rule 1
+      must be evaluated before rule 2. Tags: Environment=production,
+      Access=multi-rule.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ordering"
+        - "data-team"
+        - "0.0.0.0/0"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-server-certificate
+    description: >-
+      Operator requests a Client VPN endpoint with mutual TLS auth but
+      no server certificate ARN provided. This is a prerequisite
+      failure. Expects PREREQUISITES_MISSING with the missing server
+      certificate cited.
+    input: |
+      Create a Client VPN endpoint in us-east-1, account
+      123456789012. Client CIDR 10.250.0.0/16. Mutual TLS auth but no
+      server certificate has been imported into ACM yet. Target VPC
+      vpc-aaa11122 (10.0.0.0/16). Associate subnet subnet-aaa11122.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "server certificate"
+        - "ACM"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

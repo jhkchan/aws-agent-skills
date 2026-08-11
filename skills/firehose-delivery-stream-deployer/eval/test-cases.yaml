@@ -1,0 +1,168 @@
+# Eval test cases for firehose-delivery-stream-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Firehose destinations
+# (S3 Parquet with Lambda transformation and Hive-style prefix,
+# OpenSearch with retry and backup, Splunk HTTP endpoint,
+# buffering hints trade-off for Parquet, missing S3 bucket
+# prerequisite failure).
+skill: firehose-delivery-stream-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: s3-parquet-lambda-transform
+    description: >-
+      Provision a Firehose delivery stream with Direct PUT source,
+      Lambda transformation, Parquet format conversion via Glue
+      schema, S3 destination with Hive-style partitioned prefix, and
+      buffering hints tuned for Parquet (128MB). Expects READY_TO_DEPLOY
+      with Hive-style prefix and Parquet-tuned buffering noted.
+    input: |
+      Create a Firehose delivery stream named events-to-s3-parquet in
+      us-east-1, account 123456789012. Source: Direct PUT. Lambda
+      transformation using function
+      arn:aws:lambda:us-east-1:123456789012:function:firehose-transform
+      with buffer 3MB. Format conversion to Parquet using Glue database
+      analytics, table events_table. S3 destination bucket
+      my-data-lake with Hive-style prefix
+      data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/.
+      Error prefix
+      errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/.
+      Buffering hints 128MB / 300s. KMS encryption with key
+      arn:aws:kms:us-east-1:123456789012:key/abc123. Backup to
+      firehose-backup bucket. Tags: Environment=production,
+      Pipeline=events.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "events-to-s3-parquet"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Parquet"
+        - "128"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: opensearch-destination-retry-backup
+    description: >-
+      Provision a Firehose delivery stream delivering to OpenSearch
+      with retry duration and failed-document backup. Expects
+      READY_TO_DEPLOY with OpenSearch domain, index rotation, retry
+      duration, and S3 backup for failed documents noted.
+    input: |
+      Create a Firehose delivery stream named logs-to-opensearch in
+      us-east-1, account 123456789012. Source: Direct PUT. No Lambda
+      transformation. Destination: OpenSearch domain
+      arn:aws:es:us-east-1:123456789012:domain/logs-domain. Index name
+      logs with daily rotation. Buffering hints 5MB / 60s. Retry
+      duration 300s. S3 backup mode FailedDocumentsOnly to bucket
+      firehose-os-backup. KMS encryption with key
+      arn:aws:kms:us-east-1:123456789012:key/abc123. Tags:
+      Environment=production, Pipeline=logs.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "OpenSearch"
+        - "logs-domain"
+        - "FailedDocumentsOnly"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: splunk-http-endpoint
+    description: >-
+      Provision a Firehose delivery stream delivering to a Splunk HTTP
+      Event Collector endpoint. Expects READY_TO_DEPLOY with HTTP
+      endpoint URL, buffering hints for low-latency SIEM, and S3
+      backup noted.
+    input: |
+      Create a Firehose delivery stream named security-to-splunk in
+      us-east-1, account 123456789012. Source: Direct PUT. Destination:
+      HTTP endpoint at https://splunk.example.com:8088/services/collector
+      with access key. Buffering hints 5MB / 60s for low-latency SIEM.
+      Retry duration 300s. S3 backup to bucket firehose-splunk-backup.
+      Tags: Environment=production, Pipeline=siem.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "HTTP"
+        - "splunk"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: buffering-hints-tradeoff
+    description: >-
+      Provision a Firehose delivery stream and verify the buffering
+      hints are tuned for the Parquet + Athena use case (larger
+      buffers for fewer, larger files). Expects READY_TO_DEPLOY with
+      buffering hints at 64+ MB for Parquet and Hive-style prefix
+      for partition pruning.
+    input: |
+      Create a Firehose delivery stream named analytics-parquet in
+      us-east-1, account 123456789012. Source: Direct PUT. Format
+      conversion to Parquet using Glue database analytics, table
+      events. S3 destination bucket analytics-lake with Hive-style
+      prefix data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/.
+      Buffering hints should be tuned for Parquet + Athena downstream
+      (larger files for better query performance). KMS encryption.
+      Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Parquet"
+        - "64"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-s3-bucket
+    description: >-
+      Operator requests a Firehose delivery stream with S3 destination
+      but the S3 bucket does not exist. This is a prerequisite
+      failure. Expects PREREQUISITES_MISSING with the missing S3
+      bucket cited.
+    input: |
+      Create a Firehose delivery stream named events-stream in
+      us-east-1, account 123456789012. Source: Direct PUT. S3
+      destination bucket my-nonexistent-bucket (this bucket has not
+      been created yet). No transformation. JSON format. Buffering
+      hints 5MB / 300s.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "S3"
+        - "bucket"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

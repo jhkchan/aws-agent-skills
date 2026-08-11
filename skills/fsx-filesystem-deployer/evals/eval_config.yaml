@@ -1,0 +1,49 @@
+# Eval configuration for fsx-filesystem-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: fsx-filesystem-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: windows-multiaz-ad-dedup
+    difficulty: hard
+    prompt_file: prompts/windows-multiaz-ad-dedup.md
+    baseline_file: baselines/windows-multiaz-ad-dedup.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: lustre-persistent-s3-export
+    difficulty: hard
+    prompt_file: prompts/lustre-persistent-s3-export.md
+    baseline_file: baselines/lustre-persistent-s3-export.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: ontap-multiaz-svm-tiering
+    difficulty: medium
+    prompt_file: prompts/ontap-multiaz-svm-tiering.md
+    baseline_file: baselines/ontap-multiaz-svm-tiering.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: windows-singleaz-throughput
+    difficulty: medium
+    prompt_file: prompts/windows-singleaz-throughput.md
+    baseline_file: baselines/windows-singleaz-throughput.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-ad-prerequisite
+    difficulty: easy
+    prompt_file: prompts/missing-ad-prerequisite.md
+    baseline_file: baselines/missing-ad-prerequisite.md
+    expected_verdict: PREREQUISITES_MISSING

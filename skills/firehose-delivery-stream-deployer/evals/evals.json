@@ -1,0 +1,176 @@
+{
+  "skill": "firehose-delivery-stream-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Firehose Delivery Stream Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across destinations (S3 Parquet with Lambda transformation and Hive-style prefix, OpenSearch with retry and backup, Splunk HTTP endpoint, buffering hints trade-off for Parquet + Athena, missing S3 bucket prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "s3-parquet-lambda-transform",
+      "name": "S3 Parquet Firehose with Lambda transformation and Hive-style prefix",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Direct PUT source, Lambda transformation, Parquet format conversion via Glue, S3 destination with Hive-style prefix, buffering hints tuned for Parquet (128MB)",
+      "prompt": "Create a Firehose delivery stream named events-to-s3-parquet in us-east-1, account 123456789012. Source: Direct PUT. Lambda transformation using function arn:aws:lambda:us-east-1:123456789012:function:firehose-transform with buffer 3MB. Format conversion to Parquet using Glue database analytics, table events_table. S3 destination bucket my-data-lake with Hive-style prefix data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/. Error prefix errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/. Buffering hints 128MB / 300s. KMS encryption with key arn:aws:kms:us-east-1:123456789012:key/abc123. Backup to firehose-backup bucket. Tags: Environment=production, Pipeline=events.",
+      "prompt_file": "prompts/s3-parquet-lambda-transform.md",
+      "baseline_file": "baselines/s3-parquet-lambda-transform.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FIREHOSE: events-to-s3-parquet (Direct PUT → S3)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source: Direct PUT\n  [✓] Lambda transformation: enabled (arn:aws:lambda:us-east-1:123456789012:function:firehose-transform, buffer 3MB)\n  [✓] Format conversion: Parquet (Glue analytics/events_table)\n  [✓] Destination: S3 (arn:aws:s3:::my-data-lake, prefix data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/)\n  [✓] Buffering hints: 128MB / 300s (tuned for Parquet)\n  [✓] S3 prefix: Hive-style partitioned\n  [✓] KMS encryption: enabled\nVERIFICATION_COMMANDS:\n  aws firehose describe-delivery-stream --delivery-stream-name events-to-s3-parquet --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "events-to-s3-parquet",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Parquet",
+            "128"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "opensearch-destination-retry-backup",
+      "name": "OpenSearch Firehose with retry and failed-document backup",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Direct PUT source, OpenSearch destination with daily index rotation, 5MB buffering for low-latency, FailedDocumentsOnly backup, KMS encryption",
+      "prompt": "Create a Firehose delivery stream named logs-to-opensearch in us-east-1, account 123456789012. Source: Direct PUT. No Lambda transformation. Destination: OpenSearch domain arn:aws:es:us-east-1:123456789012:domain/logs-domain. Index name logs with daily rotation. Buffering hints 5MB / 60s. Retry duration 300s. S3 backup mode FailedDocumentsOnly to bucket firehose-os-backup. KMS encryption with key arn:aws:kms:us-east-1:123456789012:key/abc123. Tags: Environment=production, Pipeline=logs.",
+      "prompt_file": "prompts/opensearch-destination-retry-backup.md",
+      "baseline_file": "baselines/opensearch-destination-retry-backup.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FIREHOSE: logs-to-opensearch (Direct PUT → OpenSearch)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source: Direct PUT\n  [✓] Destination: OpenSearch (arn:aws:es:us-east-1:123456789012:domain/logs-domain, index logs)\n  [✓] Buffering hints: 5MB / 60s (tuned for OpenSearch)\n  [✓] Retry: 300s\n  [✓] Backup: FailedDocumentsOnly → arn:aws:s3:::firehose-os-backup\n  [✓] KMS encryption: enabled",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "OpenSearch",
+            "logs-domain",
+            "FailedDocumentsOnly",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "splunk-http-endpoint",
+      "name": "Splunk HTTP endpoint Firehose with low-latency buffering",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Direct PUT source, HTTP endpoint destination (Splunk HEC), 5MB/60s buffering for SIEM, S3 backup",
+      "prompt": "Create a Firehose delivery stream named security-to-splunk in us-east-1, account 123456789012. Source: Direct PUT. Destination: HTTP endpoint at https://splunk.example.com:8088/services/collector with access key. Buffering hints 5MB / 60s for low-latency SIEM. Retry duration 300s. S3 backup to bucket firehose-splunk-backup. Tags: Environment=production, Pipeline=siem.",
+      "prompt_file": "prompts/splunk-http-endpoint.md",
+      "baseline_file": "baselines/splunk-http-endpoint.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FIREHOSE: security-to-splunk (Direct PUT → HTTP endpoint)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source: Direct PUT\n  [✓] Destination: HTTP endpoint (https://splunk.example.com:8088/services/collector)\n  [✓] Buffering hints: 5MB / 60s (tuned for SIEM low latency)\n  [✓] Retry: 300s\n  [✓] Backup: → arn:aws:s3:::firehose-splunk-backup",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "HTTP",
+            "splunk",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "buffering-hints-tradeoff",
+      "name": "Parquet Firehose with buffering hints tuned for Athena",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Parquet format conversion, buffering hints at 64+ MB for larger files (Athena performance), Hive-style prefix for partition pruning",
+      "prompt": "Create a Firehose delivery stream named analytics-parquet in us-east-1, account 123456789012. Source: Direct PUT. Format conversion to Parquet using Glue database analytics, table events. S3 destination bucket analytics-lake with Hive-style prefix data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/. Buffering hints should be tuned for Parquet + Athena downstream (larger files for better query performance). KMS encryption. Tags: Environment=production.",
+      "prompt_file": "prompts/buffering-hints-tradeoff.md",
+      "baseline_file": "baselines/buffering-hints-tradeoff.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FIREHOSE: analytics-parquet (Direct PUT → S3)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Format conversion: Parquet (Glue analytics/events)\n  [✓] Buffering hints: 64MB+ / 300s (tuned for Parquet + Athena — fewer larger files)\n  [✓] S3 prefix: Hive-style partitioned (year/month)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Parquet",
+            "64",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-s3-bucket",
+      "name": "Firehose S3 destination with missing bucket (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — S3 destination bucket does not exist; Firehose cannot deliver",
+      "prompt": "Create a Firehose delivery stream named events-stream in us-east-1, account 123456789012. Source: Direct PUT. S3 destination bucket my-nonexistent-bucket (this bucket has not been created yet). No transformation. JSON format. Buffering hints 5MB / 300s.",
+      "prompt_file": "prompts/missing-s3-bucket.md",
+      "baseline_file": "baselines/missing-s3-bucket.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "FIREHOSE: events-stream (Direct PUT → S3)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] S3 bucket: MISSING — bucket my-nonexistent-bucket does not exist; create it before configuring the delivery stream",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "S3",
+            "bucket",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

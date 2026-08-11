@@ -1,0 +1,175 @@
+{
+  "skill": "fsx-filesystem-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the FSx Filesystem Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across FSx topologies (FSx for Windows Multi-AZ with AD and dedup, FSx for Lustre PERSISTENT with S3 export and compression, FSx for ONTAP Multi-AZ with SVM and tiering, Single-AZ Windows with throughput stepping, missing AD prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "windows-multiaz-ad-dedup",
+      "name": "FSx for Windows Multi-AZ with AD integration and dedup",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Windows Multi-AZ, AD joined, dedup with estimated savings, shadow copies, DNS aliases, both subnets cited",
+      "prompt": "Create an FSx for Windows file system in us-east-1. Multi-AZ deployment, 1024 GB SSD storage, 32 MB/s throughput capacity. Join to Managed AD directory d-aaa111222. VPC vpc-aaa11122, subnets subnet-aaa111 (us-east-1a) and subnet-bbb222 (us-east-1b). Enable dedup (GeneralPurpose). Enable shadow copies. DNS alias fileshare.example.com. KMS encryption with AWS-managed key. Backup: daily automatic, 7-day retention. Maintenance window: Tuesday 01:00. Tags: Environment=production, ManagedBy=cloudops.",
+      "prompt_file": "prompts/windows-multiaz-ad-dedup.md",
+      "baseline_file": "baselines/windows-multiaz-ad-dedup.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FSX_FILESYSTEM: fs-aaa111222 (WINDOWS, MULTI_AZ_1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] File system type: Windows\n  [✓] Storage type: SSD\n  [✓] Storage capacity: 1024 GB\n  [✓] Deployment type: Multi-AZ\n  [✓] Throughput capacity: 32 MB/s\n  [✓] VPC: vpc-aaa11122\n  [✓] Subnet AZ1: subnet-aaa111 (us-east-1a)\n  [✓] Subnet AZ2: subnet-bbb222 (us-east-1b)\n  [✓] AD integration: d-aaa111222 — joined\n  [✓] DNS aliases: fileshare.example.com\n  [✓] Dedup: enabled (GeneralPurpose, est. savings 50-80%)\n  [✓] Shadow copies: enabled\n  [✓] KMS encryption: AWS-managed\n  [✓] Backup: automatic (daily, retention 7 days)\nVERIFICATION_COMMANDS:\n  aws fsx describe-file-systems --file-system-ids fs-aaa111222 --region us-east-1\n  aws fsx describe-backups --filters Name=file-system-id,Values=fs-aaa111222 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Windows",
+            "Multi-AZ",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "dedup"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lustre-persistent-s3-export",
+      "name": "FSx for Lustre PERSISTENT with S3 export and compression",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Lustre PERSISTENT_1, S3 data repository linked (import/export), LZ4 compression, auto-import policy configured",
+      "prompt": "Create an FSx for Lustre file system in us-east-1. PERSISTENT_1 deployment, 2400 GB SSD storage, 1000 MB/s/TB throughput. S3 export from s3://my-hpc-bucket/data with auto-import policy NEW_CHANGED. LZ4 compression. VPC vpc-ccc33344, subnet subnet-ccc333 (us-east-1a). Tags: Environment=production, Workload=hpc.",
+      "prompt_file": "prompts/lustre-persistent-s3-export.md",
+      "baseline_file": "baselines/lustre-persistent-s3-export.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FSX_FILESYSTEM: fs-ccc333444 (LUSTRE, PERSISTENT_1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] File system type: Lustre\n  [✓] Deployment type: PERSISTENT_1\n  [✓] Storage type: SSD\n  [✓] Storage capacity: 2400 GB\n  [✓] Throughput capacity: 1000 MB/s/TB\n  [✓] VPC: vpc-ccc33344\n  [✓] Subnet AZ1: subnet-ccc333 (us-east-1a)\n  [✓] S3 export: s3://my-hpc-bucket/data (import/export, auto-import NEW_CHANGED)\n  [✓] Data compression: LZ4\nVERIFICATION_COMMANDS:\n  aws fsx describe-file-systems --file-system-ids fs-ccc333444 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Lustre",
+            "PERSISTENT",
+            "s3://my-hpc-bucket",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ontap-multiaz-svm-tiering",
+      "name": "FSx for ONTAP Multi-AZ with SVM and volume tiering",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — ONTAP Multi-AZ, SVM created, volume with auto-tiering and storage efficiency enabled",
+      "prompt": "Create an FSx for ONTAP file system in us-east-1. Multi-AZ deployment, 1024 GB storage. VPC vpc-eee55566, subnets subnet-eee555 (us-east-1a) and subnet-fff666 (us-east-1b). Create SVM svm-prod and volume vol-prod (1 TB) with auto tiering policy and storage efficiency enabled. Tags: Environment=production, ManagedBy=cloudops.",
+      "prompt_file": "prompts/ontap-multiaz-svm-tiering.md",
+      "baseline_file": "baselines/ontap-multiaz-svm-tiering.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FSX_FILESYSTEM: fs-eee555666 (ONTAP, MULTI_AZ_1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] File system type: ONTAP\n  [✓] Deployment type: Multi-AZ\n  [✓] Storage capacity: 1024 GB\n  [✓] VPC: vpc-eee55566\n  [✓] Subnet AZ1: subnet-eee555 (us-east-1a)\n  [✓] Subnet AZ2: subnet-fff666 (us-east-1b)\n  [✓] ONTAP tiering: auto (storage efficiency enabled)\n  [✓] SVM: svm-prod\nVERIFICATION_COMMANDS:\n  aws fsx describe-file-systems --file-system-ids fs-eee555666 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ONTAP",
+            "tier",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "windows-singleaz-throughput",
+      "name": "FSx for Windows Single-AZ with throughput capacity stepping",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Windows Single-AZ, throughput stepped to 256 MB/s (nearest step above 180 MB/s with headroom), HDD storage",
+      "prompt": "Create an FSx for Windows file system in us-east-1. Single-AZ deployment, 512 GB HDD storage. Join to Managed AD directory d-aaa111222. VPC vpc-aaa11122, subnet subnet-aaa111 (us-east-1a). The workload needs approximately 180 MB/s throughput. Tags: Environment=dev, ManagedBy=cloudops.",
+      "prompt_file": "prompts/windows-singleaz-throughput.md",
+      "baseline_file": "baselines/windows-singleaz-throughput.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FSX_FILESYSTEM: fs-xxx (WINDOWS, SINGLE_AZ_1)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] File system type: Windows\n  [✓] Storage type: HDD\n  [✓] Storage capacity: 512 GB\n  [✓] Deployment type: Single-AZ\n  [✓] Throughput capacity: 256 MB/s (stepped above 180 MB/s requirement)\n  [✓] AD integration: d-aaa111222 — joined\nVERIFICATION_COMMANDS:\n  aws fsx describe-file-systems --file-system-ids fs-xxx --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Windows",
+            "Single-AZ",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-ad-prerequisite",
+      "name": "FSx for Windows without Active Directory (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no Active Directory available; FSx for Windows requires AD integration",
+      "prompt": "Create an FSx for Windows file system in us-east-1. Multi-AZ deployment, 1024 GB SSD. VPC vpc-noad, subnets subnet-ggg777 (us-east-1a) and subnet-hhh888 (us-east-1b). There is no Active Directory configured in this account.",
+      "prompt_file": "prompts/missing-ad-prerequisite.md",
+      "baseline_file": "baselines/missing-ad-prerequisite.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "FSX_FILESYSTEM: fs-xxx (WINDOWS, MULTI_AZ_1)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] AD integration: no Active Directory available — FSx for Windows requires AD for authentication",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "Active Directory",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}
