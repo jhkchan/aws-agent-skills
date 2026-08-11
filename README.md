@@ -295,6 +295,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | lambda-runtime-deprecation-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 15.4s | 45863 |
 | macie-data-classification-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 17.6s | 36862 |
 | macie-data-discovery-operator | amazon.nova-pro-v1:0 | 98/120 | B | 4/5 | 18.5s | 34932 |
+| memorydb-cluster-deployer | amazon.nova-pro-v1:0 | 100/120 | B | 3/5 | 16.9s | 47090 |
 | msk-cluster-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 12.2s | 36499 |
 | msk-cost-optimizer | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 7.3s | 48349 |
 | multi-account-governance-automator | amazon.nova-pro-v1:0 | 105/120 | B | 0/5 | 15.9s | 44683 |
