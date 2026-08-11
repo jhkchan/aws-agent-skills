@@ -4,23 +4,19 @@ description: >-
   Provisions AWS Service Catalog portfolios and products with
   production-safe defaults: portfolio creation (DisplayName,
   ProviderName, description), product creation from CloudFormation
-  templates (product type CLOUDFORMATION_TEMPLATE, versioning with
-  semantic version strings, provisioning artifact ARNs), constraints
-  (LAUNCH constraint with stack-based and template-based roles,
-  STACK_UPDATE constraint, TAG_UPDATE constraint, NOTIFICATION
-  constraint), launch paths (local account + shared via AWS
-  Organizations), portfolio sharing (organization-level, account-
-  level, organizational unit), TagOptions (key-value pairs applied
-  to launched products), and latest primitives (Service Catalog
-  Terraform Open Source support, Service App Registry integration,
-  Service Catalog with Terraform Cloud). Emits a READY_TO_DEPLOY /
-  PREREQUISITES_MISSING plan with verified portfolios, products,
-  constraints, and copy-pasteable servicecatalog + iam + sns
-  commands. Use when provisioning Service Catalog for self-service
-  launchpad, governance-gated product distribution, or cross-account
-  template distribution. Triggers: Service Catalog, portfolio,
-  product, launch constraint, TagOptions, organizational sharing,
-  self-service launchpad.
+  templates (CLOUDFORMATION_TEMPLATE, semantic versions, provisioning
+  artifacts), constraints (LAUNCH stack/template-based roles,
+  STACK_UPDATE, TAG_UPDATE, NOTIFICATION), launch paths (local +
+  shared via Organizations), portfolio sharing (org, account, OU),
+  TagOptions (key-value pairs applied to launched products), and
+  latest primitives (Terraform Open Source, Service App Registry,
+  Terraform Cloud). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING
+  with verified portfolios, products, constraints, and copy-pasteable
+  servicecatalog + iam + sns commands. Use when provisioning Service
+  Catalog for self-service launchpad, governance-gated distribution,
+  or cross-account template distribution. Triggers: Service Catalog,
+  portfolio, product, launch constraint, TagOptions, organizational
+  sharing, self-service launchpad.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

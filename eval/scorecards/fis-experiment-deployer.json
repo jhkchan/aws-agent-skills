@@ -1,0 +1,70 @@
+{
+  "skill": "fis-experiment-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides several expert\u2011level insights not in a baseline model (silent\u2011failure table, exact ordering constraints, tag\u2011condition IAM policy snippet, budgetDuration heuristic). Missing deeper delta such as cross\u2011account trust\u2011policy nuances and a concrete decision\u2011tree for choosing between stop\u2011instances vs terminate\u2011instances."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedural flow (target \u2192 action \u2192 stop\u2011condition \u2192 IAM \u2192 logging \u2192 budget) and includes concrete CLI steps. Lacks a dedicated rollback\u2011verification procedure, which would make the mindset fully complete."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons and a silent\u2011failure matrix. Does not explicitly flag the irreversible `terminate-instances` action as a separate WARN entry in the checklist, leaving a small gap in anti\u2011pattern coverage."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. The only minor issue is that the activation_triggers duplicate many keywords, which could cause ambiguous routing in some agents."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered from quick reference to deep heuristics, but the Quick Reference table packs many details (step, reversibility, risk) which may overload the initial read. Critical rules are still buried in later sections."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly gated by prerequisites and NEVER rules, while creative specification is left flexible. BudgetDuration rationale is qualitative (\u201c2x\u201d) rather than a precise formula, leaving a small calibration gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 8,
+      "max": 10,
+      "justification": "Follows a logical sectioned pattern (What, Quick nav, Procedure, Anti\u2011pattern, Output contract) but does not map to a recognized canonical framework (e.g., Mindset\u2011Navigation\u2011Philosophy\u2011Process\u2011Tool). Structure is coherent but somewhat ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides end\u2011to\u2011end CLI commands, verification steps, and example outputs that are syntactically correct. Lacks explicit error\u2011handling guidance for failed verification commands and does not show fallback actions when a prerequisite check fails."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 41774,
+  "latency_ms": 30174,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
