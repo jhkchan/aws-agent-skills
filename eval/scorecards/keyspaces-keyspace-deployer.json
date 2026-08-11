@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides several expert\u2011level specifics not usually known to a baseline model (partition\u2011key immutability, cardinality heuristic, exact on\u2011demand vs provisioned cost crossover at ~10\u201115% utilization, required private DNS on VPC endpoint, auto\u2011scaling cooldown values, recent feature timeline). However some of the information (e.g., basic API commands, general encryption at rest) is already common knowledge, so not a perfect 20."
+      "justification": "Adds concrete expert heuristics not usually in baseline models: partition\u2011key cardinality threshold, 10\u201115% sustained utilization crossover for on\u2011demand vs provisioned, immutable partition\u2011key warning, mandatory private\u2011DNS for VPC endpoint, and a recent\u2011features summary. However, much of the content restates official documentation without novel insight, preventing a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Offers a complete AWS\u2011specific step\u2011by\u2011step procedure for keyspace/table creation, capacity mode changes, PITR, encryption, connectivity, VPC endpoint, and auto\u2011scaling. Minor vagueness around TTL (stated as CQL only) could be clearer about how to integrate TTL commands into deployment scripts."
+      "justification": "Provides AWS\u2011specific, step\u2011by\u2011step CLI commands and JSON payloads for keyspace creation, table schema, capacity mode, PITR, encryption, client\u2011side encryption, VPC endpoint, and auto\u2011scaling. Missing an explicit IAM policy example that would complete the procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasoning (low\u2011cardinality partition keys, immutable schema, PITR default, SSL port, SigV4 auth, private DNS, encrypted\u2011column queries, frequent capacity switches, missing auto\u2011scaling, missing TTL). Could be stronger by adding IAM\u2011policy pitfalls and explicit cost\u2011surprise examples."
+      "justification": "Contains a detailed NEVER list with concrete reasons (low\u2011cardinality partition keys, assuming PITR is on, using port 9042, etc.). Lacks a never rule for relying on default TTL without assessing data growth, and the skill does not catch missing KMS key or VPC endpoint prerequisites, which the model output exposed."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description, when\u2011to\u2011use, keywords, and output contract are well defined. The activation trigger relies on a keyword list but lacks a precise pattern or confidence threshold, making automated triggering slightly ambiguous."
+      "justification": "Frontmatter, description, keywords, triggers, and output contract are well\u2011formed. The only shortfall is the absence of an explicit, machine\u2011readable activation predicate beyond keyword matching (e.g., a JSON schema for intent detection)."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick navigation \u2192 detailed steps \u2192 NEVER \u2192 output format \u2192 worked example \u2192 error handling). However error\u2011handling and recent\u2011features sections appear after the core checklist, which can overload the reader when they just need the checklist."
+      "justification": "Uses quick\u2011navigation table and layered sections (prerequisites, steps, NEVER, references) to avoid overload, yet the initial narrative and extensive tables front\u2011load a lot of detail, making the first read somewhat dense."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (create\u2011keyspace, create\u2011table) are gated by a prerequisite check and a strict output contract. Creative design decisions (partition\u2011key choice) are guided by heuristics, not forced. Guidance on capacity\u2011mode switching could quantify billing impact more precisely."
+      "justification": "Calibrates creation actions with prerequisite checks and optional features. However it does not enforce validation of required resources (e.g., existence of the referenced KMS key), leaving a destructive path loosely constrained."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset, navigation, step\u2011by\u2011step, NEVER, output format, example, error handling). The ordering of sections is slightly ad\u2011hoc (error handling after examples) which prevents a perfectly clean pattern."
+      "justification": "Follows a recognizable pattern (mindset, stepwise process, NEVER list, output format). The 'Recent features' section feels ad\u2011hoc and slightly breaks the otherwise consistent structure."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 10,
       "max": 15,
-      "justification": "Agent can execute the skill cold: commands, checklist, verification steps are concrete. Minor gaps: examples do not show verification of KMS key existence before use, and region handling is left to the user. No handling of edge case where VPC endpoint creation fails."
+      "justification": "Agent can generate the checklist and commands, but the model output example shows a case where a non\u2011existent KMS alias is accepted as READY_TO_DEPLOY, indicating missing validation logic. Also no guidance for handling already\u2011existing keyspaces/tables, leading to potential execution failures."
     }
   ],
-  "total_score": 107,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 51719,
-  "latency_ms": 18667,
+  "token_count": 50970,
+  "latency_ms": 12491,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Provides many expert heuristics (exact 2\u2011private\u2011subnet requirement, execution\u2011class sizing thresholds, exact version\u2011pinning rules), but a portion restates common AWS knowledge and omits a concrete decision tree for KMS key creation (e.g., when to use AWS\u2011managed vs customer\u2011managed keys)."
+      "justification": "Provides several expert\u2011level heuristics not commonly known to a baseline model: exact VPC requirement of 2 private subnets in different AZs, NAT\u2011gateway vs S3 VPC endpoint decision tree, precise execution\u2011class sizing thresholds (concurrent task counts), exact cost figures, mandatory exact\u2011pinning of requirements.txt, KMS encryption scope, and detailed security\u2011group rule set. However, some of this (e.g., need for two subnets) is documented in AWS docs, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Lists AWS\u2011specific CLI ordering, VPC readiness checks, IAM role trust policy, KMS permissions, and log\u2011group creation. Some steps remain generic (e.g., \"verify prerequisites\" without AWS\u2011specific checklists) and the overall procedure could be tighter in sequencing."
+      "justification": "Encodes an AWS\u2011specific provisioning workflow: verify VPC subnets \u2192 check NAT/VPC endpoint \u2192 create S3 bucket \u2192 upload DAGs/requirements/plugins \u2192 create scoped IAM role \u2192 create KMS key \u2192 run ordered `aws mwaa create\u2011environment` CLI with all flags. The procedure is concrete and ordered, but a few steps (e.g., bucket versioning, IAM policy attachment) are mentioned only briefly, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete pitfalls, yet a few warnings (e.g., \"NEVER use the same IAM role for other services\") lack detailed reasoning about security impact, reducing their anti\u2011pattern strength."
+      "justification": "Contains a detailed NEVER list (10 items) with concrete reasons (e.g., single subnet causes API failure, unpinned requirements break reproducibility, missing logs prevent troubleshooting). Only minor deduction for not covering every possible pitfall (e.g., forgetting to set DNS hostnames) and for occasional lack of explicit \"why\" depth."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, triggers, and a strict output contract are all present. The \"when to invoke\" section is verbose and could be more precise, but activation criteria are still clear enough for reliable use."
+      "justification": "Full frontmatter, clear description, trigger keywords, and an explicit output contract with required literal labels. The only shortfall is the absence of a concise \"when to invoke\" summary outside the metadata block, which could affect automated activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document front\u2011loads extensive tables, heuristics, and full command examples before the agent reaches the concise checklist, creating cognitive overload; critical rules are buried deep instead of being surfaced early."
+      "justification": "The document layers information (quick navigation, mindset, heuristics, step\u2011by\u2011step, never list, output format, worked example). However, the initial sections are dense and contain many details that could overload a first\u2011time reader, so the progressive disclosure is good but not optimal."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (aws mwaa create\u2011environment) are guarded by a prerequisite checklist, but the skill does not enforce an explicit confirmation step or tighter parameter constraints (e.g., max\u2011workers limits per class), leaving some freedom for unsafe inputs."
+      "justification": "For a destructive provisioning task the skill tightly constrains execution: it forces prerequisite verification, requires explicit checklist, and provides a \"NEVER\" list. The only shortfall is that region is hard\u2011coded in examples, leaving a small freedom gap for multi\u2011region deployments."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset, heuristics, step list, NEVER, output format) but mixes markdown tables, prose, and code blocks in an ad\u2011hoc way, slightly breaking a clean, repeatable structure."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Stepwise Procedure \u2192 NEVER list \u2192 Output format) that aids comprehension, though the structure mixes narrative and tables, making it marginally less clean than a strict template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides working CLI examples, decision trees, and error\u2011handling guidance. Missing handling for region mismatches between VPC and S3 bucket, bucket versioning requirements, and explicit fallback commands for CLI failures, which could cause execution gaps."
+      "justification": "Provides concrete CLI commands, checklist format, verification commands, and error\u2011handling guidance, enabling an agent to execute the skill end\u2011to\u2011end. Minor gaps: region is baked into examples, optional parameters (e.g., updating an existing environment) are not fully covered, and there is no explicit fallback for missing optional fields."
     }
   ],
-  "total_score": 104,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43181,
-  "latency_ms": 24726,
+  "token_count": 43862,
+  "latency_ms": 11171,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0
