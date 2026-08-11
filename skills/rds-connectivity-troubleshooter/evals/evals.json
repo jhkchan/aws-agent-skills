@@ -11,17 +11,17 @@
       "difficulty": "medium",
       "prompt_file": "prompts/timeout-sg-missing-rule.md",
       "baseline_file": "baselines/timeout-sg-missing-rule.md",
-      "expected_verdict": "ROOT_CAUSE_FOUND",
-      "expected_layer": "NETWORK_SG",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_root_cause": "NETWORK_SG_INBOUND",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["ROOT_CAUSE_FOUND", "timeout-sg-missing-rule", "NETWORK_SG", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "timeout-sg-missing-rule", "NETWORK_SG_INBOUND", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
         },
         {
           "type": "must_not_contain",
-          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE"]
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE_FOUND"]
         }
       ]
     },
@@ -31,17 +31,17 @@
       "difficulty": "hard",
       "prompt_file": "prompts/auth-failed-iam-token-expiry.md",
       "baseline_file": "baselines/auth-failed-iam-token-expiry.md",
-      "expected_verdict": "ROOT_CAUSE_FOUND",
-      "expected_layer": "AUTH_IAM",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_root_cause": "AUTH_EXPIRED",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["ROOT_CAUSE_FOUND", "auth-iam-token-expiry", "AUTH_IAM", "VERDICT", "REASON", "EVIDENCE"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "auth-iam-token-expiry", "AUTH_EXPIRED", "VERDICT", "REASON", "EVIDENCE"]
         },
         {
           "type": "must_not_contain",
-          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: AUTH_CREDENTIALS"]
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE_FOUND", "ROOT_CAUSE: AUTH_CREDENTIALS"]
         }
       ]
     },
@@ -51,37 +51,37 @@
       "difficulty": "hard",
       "prompt_file": "prompts/tls-cert-mismatch.md",
       "baseline_file": "baselines/tls-cert-mismatch.md",
-      "expected_verdict": "ROOT_CAUSE_FOUND",
-      "expected_layer": "TLS_CERT",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_root_cause": "TLS_CERT",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["ROOT_CAUSE_FOUND", "tls-cert-mismatch", "TLS_CERT", "VERDICT", "REASON", "EVIDENCE"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "tls-cert-mismatch", "TLS_CERT", "VERDICT", "REASON", "EVIDENCE"]
         },
         {
           "type": "must_not_contain",
-          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: TLS_CONFIG"]
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE_FOUND", "ROOT_CAUSE: TLS_CONFIG"]
         }
       ]
     },
     {
       "id": "connection-refused-failover",
-      "name": "Aurora PostgreSQL cluster mid Multi-AZ failover — connection refused, AWS-side incident",
+      "name": "Aurora PostgreSQL cluster mid Multi-AZ failover — connection refused",
       "difficulty": "medium",
       "prompt_file": "prompts/connection-refused-failover.md",
       "baseline_file": "baselines/connection-refused-failover.md",
-      "expected_verdict": "ESCALATE",
-      "expected_layer": "INSTANCE_FAILOVER",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_root_cause": "INSTANCE_FAILOVER",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["ESCALATE", "connection-refused-failover", "INSTANCE_FAILOVER", "VERDICT", "REASON", "EVIDENCE"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "connection-refused-failover", "INSTANCE_FAILOVER", "VERDICT", "REASON", "EVIDENCE"]
         },
         {
           "type": "must_not_contain",
-          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ROOT_CAUSE_FOUND", "LAYER: NETWORK_SG"]
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE_FOUND", "ROOT_CAUSE: NETWORK_SG_INBOUND"]
         }
       ]
     },
@@ -91,17 +91,17 @@
       "difficulty": "medium",
       "prompt_file": "prompts/too-many-connections-aurora-derived.md",
       "baseline_file": "baselines/too-many-connections-aurora-derived.md",
-      "expected_verdict": "ROOT_CAUSE_FOUND",
-      "expected_layer": "CAPACITY_MAX_CONNECTIONS",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_root_cause": "CAPACITY_DERIVED_LIMIT",
       "files": [],
       "assertions": [
         {
           "type": "must_contain",
-          "values": ["ROOT_CAUSE_FOUND", "too-many-connections-aurora", "CAPACITY_MAX_CONNECTIONS", "VERDICT", "REASON", "EVIDENCE"]
+          "values": ["ROOT_CAUSE_IDENTIFIED", "too-many-connections-aurora", "CAPACITY_DERIVED_LIMIT", "VERDICT", "REASON", "EVIDENCE"]
         },
         {
           "type": "must_not_contain",
-          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: INSTANCE_UNAVAILABLE"]
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE_FOUND", "ROOT_CAUSE: INSTANCE_UNAVAILABLE"]
         }
       ]
     }

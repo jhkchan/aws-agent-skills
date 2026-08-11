@@ -1,0 +1,70 @@
+{
+  "skill": "apigateway-throttle-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides concrete, up\u2011to\u2011date pricing (e.g., REST $3.50/M, HTTP $1.00/M, WAF $5/rule\u202f+\u202f$1/M, cache $0.02/hr\u202fGB) and a detailed decision matrix with numeric thresholds (>50% idempotent GETs, 4xx throttle >1%). Includes non\u2011obvious AWS\u2011specific behaviours (REST vs HTTP feature gaps, cache being REST\u2011only, VPC endpoint hourly cost). This information is beyond what a generic model would know, but some numbers (e.g., Lambda per\u2011request cost) are not fully sourced, so not a perfect 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific workflow: pre\u2011flight data gate \u2192 Step\u202f0 non\u2011obvious behaviours \u2192 ordered steps (API type, throttle, usage plans, caching, payload, WAF/VPC). Each step includes exact CLI commands and calculations. The only shortfall is occasional generic advice (\"check security\") that could be tighter."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a concrete \"NEVER\" list with specific reasons (e.g., never migrate without checking mapping templates, never enable caching on HTTP API). However, the list is limited to five items and omits other common pitfalls (e.g., forgetting to update stage variables after migration), and some anti\u2011patterns are only mentioned later in prose rather than a dedicated list."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Full frontmatter with name, description, version, author, license, compatibility, keywords, tags, metadata, when_to_use, when_not_to_use, activation_triggers, invocation_schema, and a valid example. The description clearly states WHAT the skill does, WHEN to invoke, and provides KEYWORDS for activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: quick start, mindset, decision matrix, pre\u2011flight gate, detailed step\u2011by\u2011step sections, and deep references. Some sections are dense, but critical rules are not buried."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by an explicit CONFIRM prompt and safety checks. Recommendations are tightly constrained (e.g., no caching on HTTP API, migration only after feature check). Creative tasks (e.g., cost estimation) have generous freedom."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Process steps \u2192 Anti\u2011Patterns \u2192 Output contract). Minor ad\u2011hoc headings (e.g., \"Step 0 non\u2011obvious behaviours\") prevent a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides decision trees, CLI snippets, and a strict output contract that an agent can follow. However, the supplied example outputs contain a critical violation: a usage\u2011plan recommendation emits VERDICT FURTHER_OPTIMIZATION_AVAILABLE with $0.00 monthly saving, breaking the zero\u2011savings rule. Some examples also show inconsistent cost breakdowns (e.g., backend Lambda cost introduced without prior definition). These gaps reduce practical reliability."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 46189,
+  "latency_ms": 12753,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

@@ -20,29 +20,29 @@ evals:
     difficulty: medium
     prompt_file: prompts/timeout-sg-missing-rule.md
     baseline_file: baselines/timeout-sg-missing-rule.md
-    expected_verdict: ROOT_CAUSE_FOUND
-    expected_layer: NETWORK_SG
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_root_cause: NETWORK_SG_INBOUND
   - id: auth-failed-iam-token-expiry
     difficulty: hard
     prompt_file: prompts/auth-failed-iam-token-expiry.md
     baseline_file: baselines/auth-failed-iam-token-expiry.md
-    expected_verdict: ROOT_CAUSE_FOUND
-    expected_layer: AUTH_IAM
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_root_cause: AUTH_EXPIRED
   - id: tls-cert-mismatch
     difficulty: hard
     prompt_file: prompts/tls-cert-mismatch.md
     baseline_file: baselines/tls-cert-mismatch.md
-    expected_verdict: ROOT_CAUSE_FOUND
-    expected_layer: TLS_CERT
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_root_cause: TLS_CERT
   - id: connection-refused-failover
     difficulty: medium
     prompt_file: prompts/connection-refused-failover.md
     baseline_file: baselines/connection-refused-failover.md
-    expected_verdict: ESCALATE
-    expected_layer: INSTANCE_FAILOVER
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_root_cause: INSTANCE_FAILOVER
   - id: too-many-connections-aurora-derived
     difficulty: medium
     prompt_file: prompts/too-many-connections-aurora-derived.md
     baseline_file: baselines/too-many-connections-aurora-derived.md
-    expected_verdict: ROOT_CAUSE_FOUND
-    expected_layer: CAPACITY_MAX_CONNECTIONS
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_root_cause: CAPACITY_DERIVED_LIMIT

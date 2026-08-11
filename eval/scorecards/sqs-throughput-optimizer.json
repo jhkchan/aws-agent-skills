@@ -1,0 +1,70 @@
+{
+  "skill": "sqs-throughput-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides several expert heuristics not commonly memorised (e.g., empty\u2011receive ratio >50% triggers long polling, visibility timeout <6\u00d7 p95 triggers change, retention >7\u202fdays with low depth triggers reduction, DLQ depth >1,000 triggers redrive, FIFO high\u2011throughput mode thresholds). However, most of the underlying concepts (batching saves 10\u00d7, long polling reduces empty receives) are already known to a capable model, so the delta is substantial but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines a clear, AWS\u2011specific step\u2011by\u2011step procedure (pre\u2011flight data gate, Step\u202f0\u20117, safety checks, confirmation gate). The order follows best\u2011practice reasoning for SQS. Minor deduction because some steps (e.g., \u201cmeasure consumer p95\u201d) are described generically without concrete AWS tooling guidance."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 12,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never enable long polling without empty\u2011receive ratio, never use per\u2011message DLQ redrive). However, it omits an anti\u2011pattern for emitting `FURTHER_OPTIMIZATION_AVAILABLE` when projected savings are $0.00, which led to a model output violation. Also missing a rule about verifying batch payload size limits before recommending batch APIs."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, invocation schema, and example are all present and well\u2011formed. The only shortfall is the absence of a formal output schema (e.g., JSON schema) that would make activation deterministic for an agent."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: quick start \u2192 mindset \u2192 decision matrix \u2192 detailed steps \u2192 edge cases \u2192 anti\u2011patterns \u2192 safety checks. However, the Quick navigation table and some deep sections (e.g., Step\u202f0) are dense, causing occasional cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive changes (queue attributes) are gated by CONFIRM, risky actions (reducing retention) are warned, and safe actions (enabling long polling) are allowed. Slight deduction for occasional over\u2011constrained wording (e.g., \u201calways pair recommendation with exact CLI commands\u201d may limit creative alternative solutions)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (overview \u2192 quick start \u2192 mindset \u2192 stepwise process \u2192 anti\u2011patterns \u2192 safety checks \u2192 references). Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 9,
+      "max": 15,
+      "justification": "Provides decision trees, CLI commands, and a strict output contract, enabling an agent to act. However the sample model outputs reveal inconsistencies: a FIFO high\u2011throughput recommendation emits VERDICT\u202fFURTHER_OPTIMIZATION_AVAILABLE with $0 savings (violating the zero\u2011savings rule) and the batch\u2011API example mis\u2011calculates projected cost ($4.08 vs $3.06). These contradictions indicate that following the skill can produce invalid results, so practical usability cannot be near\u2011max."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 47123,
+  "latency_ms": 10672,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

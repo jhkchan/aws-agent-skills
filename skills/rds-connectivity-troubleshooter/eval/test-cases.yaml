@@ -2,10 +2,11 @@
 # Co-located per the eval-backed contract (spec S-002, S-E04).
 # Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
 #
-# Five deterministic cases — one per root-cause layer family. Each case's
-# TARGET embeds the test-case id so the model naturally echoes it (avoids
-# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
-# exactly the expected verdicts below.
+# Five deterministic cases — one per root-cause category family. Each
+# case's TARGET embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The bidirectional-SG-first
+# diagnostic ordering in SKILL.md produces exactly the expected
+# verdicts below.
 skill: rds-connectivity-troubleshooter
 model_id: amazon.nova-pro-v1:0
 profile: default
@@ -17,7 +18,8 @@ test_cases:
     description: >-
       MySQL instance reachable from one CIDR but the caller's app-server
       lives in a different subnet not covered by the SG inbound rule.
-      Symptom: telnet hangs and times out. Expected layer: NETWORK_SG.
+      Symptom: telnet hangs and times out. Expected root cause:
+      NETWORK_SG_INBOUND.
     input: |
       Symptom: application on EC2 instance i-app-server (private IP
       10.42.5.10, subnet subnet-bbb, SG sg-app, AZ us-east-1a) cannot
@@ -34,15 +36,16 @@ test_cases:
         - tcp/3306 from 10.42.0.0/24
         - tcp/3306 from sg-app-old (a deleted security group)
       DBSubnetGroup: prod-db-subnet-group (subnets in us-east-1a, us-east-1b)
+      Client SG sg-app egress: 0.0.0.0/0 all ports (allow-all)
 
-      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
-      EVIDENCE, REMEDIATION).
-    expected_verdict: ROOT_CAUSE_FOUND
+      Emit the standard diagnostic block (TARGET, VERDICT, ROOT_CAUSE,
+      REASON, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
     assertions:
       must_contain:
-        - "ROOT_CAUSE_FOUND"
+        - "ROOT_CAUSE_IDENTIFIED"
         - "timeout-sg-missing-rule"
-        - "NETWORK_SG"
+        - "NETWORK_SG_INBOUND"
         - "VERDICT"
         - "REASON"
         - "EVIDENCE"
@@ -51,15 +54,16 @@ test_cases:
         - "Error:"
         - "I cannot"
         - "I'm unable"
-        - "VERDICT: NEED_MORE_INFO"
-        - "VERDICT: ESCALATE"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE_FOUND"
 
   - id: auth-failed-iam-token-expiry
     description: >-
       PostgreSQL instance with IAM database auth enabled. First ~50
       connections succeed each morning, then subsequent connections fail
       with "password authentication failed". Symptom pattern indicates
-      IAM auth token cached too long in the connection pool.
+      IAM auth token cached too long in the connection pool. Expected
+      root cause: AUTH_EXPIRED.
     input: |
       Symptom: application uses IAM database auth against
       db-auth-iam-token-expiry. First ~50 connections each morning
@@ -75,15 +79,16 @@ test_cases:
       Endpoint: db-auth-iam-token-expiry.cid.on.aws:5432
       VpcSecurityGroups: [{VpcSecurityGroupId: sg-rds-prod, Status: active}]
       Application context: Java/HikariCP connection pool, maxLifetime=30 minutes.
+      IAM token cached in pool; not regenerated per connection.
 
-      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
-      EVIDENCE, REMEDIATION).
-    expected_verdict: ROOT_CAUSE_FOUND
+      Emit the standard diagnostic block (TARGET, VERDICT, ROOT_CAUSE,
+      REASON, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
     assertions:
       must_contain:
-        - "ROOT_CAUSE_FOUND"
+        - "ROOT_CAUSE_IDENTIFIED"
         - "auth-iam-token-expiry"
-        - "AUTH_IAM"
+        - "AUTH_EXPIRED"
         - "VERDICT"
         - "REASON"
         - "EVIDENCE"
@@ -91,14 +96,16 @@ test_cases:
         - "Error:"
         - "I cannot"
         - "I'm unable"
-        - "VERDICT: NEED_MORE_INFO"
-        - "LAYER: AUTH_CREDENTIALS"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE_FOUND"
+        - "ROOT_CAUSE: AUTH_CREDENTIALS"
 
   - id: tls-cert-mismatch
     description: >-
       MySQL instance recently rotated to rds-ca-e2024. Java client
       truststore still has only rds-ca-2019. Connections fail with
-      "unable to get local issuer certificate".
+      "unable to get local issuer certificate". Expected root cause:
+      TLS_CERT.
     input: |
       Symptom: Java application cannot connect to db-tls-cert-mismatch
       after a recent maintenance window. Error:
@@ -114,12 +121,12 @@ test_cases:
       require_secure_transport: 1
       Client truststore: contains rds-ca-2019 only
 
-      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
-      EVIDENCE, REMEDIATION).
-    expected_verdict: ROOT_CAUSE_FOUND
+      Emit the standard diagnostic block (TARGET, VERDICT, ROOT_CAUSE,
+      REASON, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
     assertions:
       must_contain:
-        - "ROOT_CAUSE_FOUND"
+        - "ROOT_CAUSE_IDENTIFIED"
         - "tls-cert-mismatch"
         - "TLS_CERT"
         - "VERDICT"
@@ -129,14 +136,15 @@ test_cases:
         - "Error:"
         - "I cannot"
         - "I'm unable"
-        - "VERDICT: NEED_MORE_INFO"
-        - "LAYER: TLS_CONFIG"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE_FOUND"
+        - "ROOT_CAUSE: TLS_CONFIG"
 
   - id: connection-refused-failover
     description: >-
       Aurora PostgreSQL cluster mid-failover. Application sees "server
       closed the connection unexpectedly". Events show Multi-AZ failover
-      started 45 seconds ago. Expected verdict: ESCALATE.
+      started 45 seconds ago. Expected root cause: INSTANCE_FAILOVER.
     input: |
       Symptom: application cannot connect to Aurora PostgreSQL writer
       endpoint. Error: "server closed the connection unexpectedly".
@@ -152,12 +160,12 @@ test_cases:
         - "Multi-AZ failover started" (45 seconds ago)
       No SG/NACL/route changes in the last 24 hours.
 
-      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
-      EVIDENCE, REMEDIATION).
-    expected_verdict: ESCALATE
+      Emit the standard diagnostic block (TARGET, VERDICT, ROOT_CAUSE,
+      REASON, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
     assertions:
       must_contain:
-        - "ESCALATE"
+        - "ROOT_CAUSE_IDENTIFIED"
         - "connection-refused-failover"
         - "INSTANCE_FAILOVER"
         - "VERDICT"
@@ -167,14 +175,16 @@ test_cases:
         - "Error:"
         - "I cannot"
         - "I'm unable"
-        - "VERDICT: ROOT_CAUSE_FOUND"
-        - "LAYER: NETWORK_SG"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE_FOUND"
+        - "ROOT_CAUSE: NETWORK_SG_INBOUND"
 
   - id: too-many-connections-aurora-derived
     description: >-
       Aurora MySQL cluster hitting the derived max_connections cap on a
       db.r6i.large writer. Engine returns "Too many connections" on
       connect. Instance-class upsizing or RDS Proxy is required.
+      Expected root cause: CAPACITY_DERIVED_LIMIT.
     input: |
       Symptom: application cannot open new connections to Aurora MySQL
       writer. Error: "Too many connections". Engine reports
@@ -190,14 +200,14 @@ test_cases:
         override to 8000 was applied but ignored)
       Recent events: no maintenance, no failover.
 
-      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
-      EVIDENCE, REMEDIATION).
-    expected_verdict: ROOT_CAUSE_FOUND
+      Emit the standard diagnostic block (TARGET, VERDICT, ROOT_CAUSE,
+      REASON, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
     assertions:
       must_contain:
-        - "ROOT_CAUSE_FOUND"
+        - "ROOT_CAUSE_IDENTIFIED"
         - "too-many-connections-aurora"
-        - "CAPACITY_MAX_CONNECTIONS"
+        - "CAPACITY_DERIVED_LIMIT"
         - "VERDICT"
         - "REASON"
         - "EVIDENCE"
@@ -205,5 +215,6 @@ test_cases:
         - "Error:"
         - "I cannot"
         - "I'm unable"
-        - "VERDICT: NEED_MORE_INFO"
-        - "LAYER: INSTANCE_UNAVAILABLE"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE_FOUND"
+        - "ROOT_CAUSE: INSTANCE_UNAVAILABLE"

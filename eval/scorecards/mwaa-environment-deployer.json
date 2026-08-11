@@ -1,0 +1,70 @@
+{
+  "skill": "mwaa-environment-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds concrete expert heuristics not found in a baseline model: exact VPC requirement of 2 private subnets in different AZs, NAT gateway or S3 VPC endpoint check, precise security\u2011group rule set, exact\u2011pin version constraints for requirements.txt, execution\u2011class sizing thresholds (tasks \u2192 class), KMS encryption scope, and detailed IAM permission list. Minor omission: does not call out the 256\u202fMB max size for the requirements bundle."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific step\u2011by\u2011step procedure (verify VPC, S3 bucket, IAM role, then run aws mwaa create\u2011environment with full CLI flags). However it does not explicitly prescribe attaching the managed policy AmazonMWAAServiceRolePolicy (or custom S3 permissions) to the execution role before creation, leaving a gap in the required procedure."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never use a single subnet, never leave requirements.txt unpinned, never omit CloudWatch logs). Could be stronger by adding pitfalls such as exceeding the 256\u202fMB DAG bundle limit or using overly broad IAM policies, but overall the anti\u2011patterns are specific and well\u2011justified."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and output contract are all present and well\u2011formed. The \"when to invoke\" section is verbose and could be more concise; activation relies on a long keyword list rather than a crisp trigger condition, leading to a slight deduction."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "Information is layered (quick navigation, mindset, heuristics, step\u2011by\u2011step, NEVER, output format), but the document front\u2011loads a large amount of detail before the checklist, which can overload the agent. Critical NEVER rules appear near the end rather than early, reducing immediate discoverability."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 12,
+      "max": 15,
+      "justification": "Calibrates freedom for a provisioning task by requiring prerequisite checks before emitting a READY_TO_DEPLOY checklist. However, it does not tightly constrain destructive actions (e.g., environment deletion) and leaves some optional fields (plugins, startup script) loosely defined, so the calibration is not optimal for high\u2011fragility operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Heuristics \u2192 Step\u2011by\u2011step process \u2192 NEVER list \u2192 Output format. The structure is consistent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI examples, a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling guidance (e.g., handling FAILED status, missing prerequisites). The model output demonstrates correct verdict handling. Lacks automated validation of parameter ranges (e.g., workers per class), but overall an agent could execute the skill successfully."
+    }
+  ],
+  "total_score": 102,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 44066,
+  "latency_ms": 10361,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

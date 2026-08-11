@@ -1,9 +1,9 @@
 # Example usage: rds-connectivity-troubleshooter
 
 A walkthrough showing the skill diagnosing a connection timeout that
-mimics an engine-level outage, demonstrating the OSI-aligned probe order,
-the security-group cross-VPC reference gotcha, and the evidence-backed
-ROOT_CAUSE_FOUND verdict.
+mimics an engine-level outage, demonstrating the bidirectional-SG-first
+probe order, the security-group dead-reference gotcha, and the
+evidence-backed ROOT_CAUSE_IDENTIFIED verdict.
 
 ## Input (user prompt)
 
@@ -31,13 +31,13 @@ NACL: default VPC NACL. Route table: local route to RDS CIDR.
 
 ```text
 TARGET: db-payments-prod-mysql
-VERDICT: ROOT_CAUSE_FOUND
+VERDICT: ROOT_CAUSE_IDENTIFIED
+ROOT_CAUSE: NETWORK_SG_INBOUND
 REASON: The RDS security group sg-rds-prod has no inbound rule matching
   the caller's security group sg-app-payments-v2. The only inbound rule
   references sg-app-payments-old, which is a deleted security group —
   the rule is silently dead. The SYN is dropped at the instance's
-  security group (Step 2b).
-LAYER: NETWORK_SG
+  security group (Step 1a).
 EVIDENCE:
   - Symptom: application on i-app-payments-v2 (10.42.5.10) reports
     "Operation timed out" connecting to db-payments-prod-mysql:3306.

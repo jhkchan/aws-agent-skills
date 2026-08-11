@@ -1,22 +1,21 @@
 ---
 name: comprehend-classifier-deployer
 description: >-
-  Provisions Amazon Comprehend custom document classifiers with production
-  defaults: multi-class vs multi-label mode selection, training data
-  formats (CSV line-level + Augmented Manifest from Ground Truth),
-  classifier input mode (PLAIN_TEXT vs Native PDF multi-page), training
-  job (create-document-classifier), model evaluation metrics (precision,
-  recall, F1, macro/micro average), endpoint deployment for real-time
-  inference (create-endpoint, auto-scaling), batch inference jobs, KMS
-  encryption for model artifacts and volume, VPC endpoint for private
-  inference, IAM roles for training and deployment, model versioning,
-  cost per training hour and per inference hour. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when training a custom
-  classifier, deploying a Comprehend endpoint, running batch
-  classification, or choosing multi-class vs multi-label. Triggers:
-  Comprehend custom classifier, document classifier training, multi-class
-  multi-label, Comprehend endpoint, augmented manifest, native PDF
-  classifier, batch inference.
+  Provisions Amazon Comprehend custom document classifiers with
+  production defaults: multi-class vs multi-label mode, training data
+  formats (CSV + Augmented Manifest from Ground Truth), classifier
+  input mode (PLAIN_TEXT vs Native PDF), training job
+  (create-document-classifier), evaluation metrics (precision, recall,
+  F1), endpoint deployment for real-time inference with auto-scaling,
+  batch inference jobs, KMS encryption for model artifacts and volume,
+  VPC endpoint for private inference, IAM roles for training and
+  deployment, model versioning, cost per training and inference hour.
+  Emits a READY_TO_DEPLOY checklist with verification commands. Use
+  when training a custom classifier, deploying a Comprehend endpoint,
+  running batch classification, or choosing multi-class vs multi-label.
+  Triggers: Comprehend custom classifier, document classifier training,
+  multi-class multi-label, Comprehend endpoint, augmented manifest,
+  native PDF classifier, batch inference.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
