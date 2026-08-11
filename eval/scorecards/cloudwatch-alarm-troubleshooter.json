@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 15,
       "max": 20,
-      "justification": "The skill delivers a structured nine\u2011category diagnostic tree, concrete probes (e.g., list\u2011metrics vs get\u2011metric\u2011data comparisons), and nuanced AWS\u2011specific edge cases such as anomaly\u2011detector training windows, math\u2011expression divide\u2011by\u2011zero guards, and composite\u2011alarm INSUFFICIENT propagation. These details go beyond a generic model\u2019s baseline knowledge, but many of the facts (case\u2011sensitive dimensions, period\u2011resolution rules) are already widely known, so the delta is strong but not maximal."
+      "justification": "The skill compiles many known CloudWatch alarm quirks but adds little truly novel expert insight (e.g., no new decision thresholds, no unpublished AWS nuances). It restates information a capable model could already generate, so it falls short of the full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The skill embeds senior\u2011engineer mindset (quick\u2011checks, non\u2011obvious behaviours) and prescribes AWS\u2011specific procedural order (describe\u2011alarms \u2192 get\u2011metric\u2011data \u2192 list\u2011metrics \u2192 action\u2011policy checks). It lacks a brief note on when to prefer console UI over CLI, a minor omission preventing a perfect score."
+      "justification": "Procedures are AWS\u2011specific and well\u2011ordered (pre\u2011flight, symptom\u2011driven steps, confirmation gate), yet some steps remain generic \u2013 e.g., \"run get-metric-data\" without guidance on pagination, error handling, or retry logic, and no explicit ordering when multiple complex layers (composite vs math) coexist."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The NEVER section lists many concrete pitfalls with clear reasoning (dimension case\u2011sensitivity, period mis\u2011alignment, missing SNS/Lambda permissions, misuse of SEARCH in math expressions, etc.). It does not cover a few relevant anti\u2011patterns such as cross\u2011account alarm permission pitfalls or metric\u2011stream resolution nuances, so 2 points are deducted."
+      "justification": "The NEVER section lists many concrete pitfalls with clear reasoning, but a few entries (e.g., the SEARCH function warning) lack an explicit \"why it fails\" explanation, leaving a minor gap in depth."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, the description explains WHAT, WHEN, and KEYWORDS, and activation_triggers cover the relevant phrases. The invocation_schema is described in prose but not expressed as a strict JSON schema, which slightly reduces compliance."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present and mostly precise. However, activation triggers omit some synonym phrases (e.g., \"alarm stuck\" vs \"alarm hanging\"), and the when_to_use paragraph could be tighter, causing slight ambiguity for automated activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers information: quick navigation \u2192 mindset \u2192 triage table \u2192 pre\u2011flight \u2192 detailed tree \u2192 remediation. However, the initial sections are dense and some critical rules (e.g., confirmation gate) are repeated later, causing mild cognitive overload."
+      "justification": "The skill provides a quick\u2011navigation table and layered sections, but the initial bulk of detailed tables and command blocks can overwhelm the reader before the most critical rules are highlighted."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions (put\u2011metric\u2011alarm, add\u2011permission) are gated behind explicit CONFIRM prompts, and read\u2011only probes are prioritized. The calibration is well\u2011matched to task fragility, though bulk remediation guidance could be tighter to avoid accidental mass changes."
+      "justification": "Destructive operations are gated behind explicit CONFIRM prompts; the calibration between read\u2011only probes and state\u2011changing fixes is precise."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern: navigation table, mindset/philosophy, symptom triage, pre\u2011flight, decision tree, output contract, NEVER list, remediation, references. The structure is coherent and aids comprehension."
+      "justification": "The overall structure follows a recognizable troubleshooting pattern, but the ordering of sections (e.g., mixing mindset with quick navigation) is slightly ad\u2011hoc rather than a strict template, preventing a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision branches, worked examples, and a deterministic output contract, enabling an agent to act. Missing are explicit error\u2011handling paths for CLI failures and a few edge cases (e.g., cross\u2011account alarm permissions), which prevent a perfect score."
+      "justification": "The skill supplies concrete CLI commands, decision branches, and output contracts, enabling an agent to act. However, it lacks guidance for handling CLI errors, pagination, rate\u2011limiting, and malformed inputs beyond a generic INSUFFICIENT_DATA fallback, which could cause execution failures."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46954,
-  "latency_ms": 14168,
+  "token_count": 46910,
+  "latency_ms": 12069,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

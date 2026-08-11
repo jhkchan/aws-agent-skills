@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 14,
       "max": 20,
-      "justification": "The skill provides a detailed decision tree, specific AWS CLI commands, and concrete environment variable values, but most of this information is already documented in AWS docs and common troubleshooting guides. It adds limited novel quantitative thresholds or exclusive expert heuristics, so the delta is strong but not maximal."
+      "justification": "The skill adds concrete AWS\u2011specific thresholds (e.g., subnet AvailableIpAddressCount <10, warm pool env vars) and a detailed decision tree, but the majority of the content (node conditions, IAM policies, basic CLI commands) is already known to a capable model; the net expert delta is modest."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The procedure follows an expert mindset (read\u2011only first, confirmation gate, layered probing) and is AWS\u2011specific, yet the ordering of some probes (e.g., when to check ASG activity vs. node conditions) is not fully explicit, leaving a small ambiguity."
+      "justification": "Procedures follow an expert mindset (pre\u2011flight safety, read\u2011only first, confirmation gate) and are ordered for EKS node\u2011group troubleshooting, yet some steps remain generic (e.g., \"check kubelet logs\" without AWS\u2011specific log locations or SSM session details)."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER section lists several concrete pitfalls with reasons, but it omits common anti\u2011patterns such as forgetting to restart kubelet after an AMI change or ignoring pod\u2011level resource limits. The missing items reduce the completeness of the anti\u2011pattern coverage."
+      "justification": "Contains a solid NEVER list with concrete pitfalls (e.g., never declare ROOT_CAUSE without a failing probe, never confuse node IAM role with CNI IRSA role) and reasons. Missing a few common anti\u2011patterns such as \"never ignore node\u2011level events when pod\u2011level errors appear\" prevents a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, activation triggers, and invocation schema are all present and well\u2011formed. However, the activation triggers are a long flat list without explicit priority or mutually\u2011exclusive grouping, which could cause unreliable activation in edge cases."
+      "justification": "Frontmatter is complete and the description, activation triggers, and invocation schema are well\u2011defined, yet activation triggers are simple string matches rather than precise patterns or regexes, which could cause unreliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick start, reference table, detailed steps), but the quick\u2011start section already contains many detailed commands and tables, creating cognitive overload. Critical rules (e.g., confirmation gate) are buried later, so the disclosure is not optimally progressive."
+      "justification": "The skill is layered (quick start, reference table, detailed steps, worked examples), but the opening sections already contain a large amount of detail, risking cognitive overload before the agent knows which part to use."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 15,
       "max": 15,
-      "justification": "Destructive actions are gated behind an explicit CONFIRM prompt, and all diagnostic probes are read\u2011only. The calibration matches the fragility of the tasks perfectly."
+      "justification": "Destructive actions are gated behind an explicit CONFIRM prompt and the default path is read\u2011only, showing excellent calibration for fragile operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (quick start, symptom table, NEVER, heuristic, dependency graph, mindset, pre\u2011flight, process steps, examples) that aids comprehension, though the ordering of sections is slightly ad\u2011hoc."
+      "justification": "The skill follows a recognizable troubleshooting pattern (mindset \u2192 pre\u2011flight \u2192 decision tree \u2192 output contract), but it mixes several formatting styles (tables, bullet lists, code blocks) which slightly reduces structural consistency."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The skill supplies concrete decision trees, commands, and example outputs that an agent could execute. Nonetheless, some edge cases (partial data, multi\u2011AZ capacity nuances, handling of ambiguous symptom strings) are not fully addressed, and error handling for malformed input is limited to a generic INSUFFICIENT_DATA block."
+      "justification": "Provides actionable commands, output contract, and worked examples that an agent can follow. Deductions for missing guidance on pagination of AWS CLI results, handling of multi\u2011region or multi\u2011node\u2011group inputs, and occasional inconsistencies (e.g., max pods count mismatch) that could cause confusion."
     }
   ],
-  "total_score": 106,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 38009,
-  "latency_ms": 16198,
+  "token_count": 36973,
+  "latency_ms": 13678,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5
