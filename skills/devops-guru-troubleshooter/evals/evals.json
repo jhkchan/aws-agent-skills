@@ -1,0 +1,177 @@
+{
+  "skill": "devops-guru-troubleshooter",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the DevOps Guru Troubleshooter. Five-case proven set exercising the ROOT_CAUSE_FOUND / NEED_MORE_INFO / ESCALATE classification across insight types (Proactive performance from deployment, Reactive RDS failover from AZ event, Proactive false-positive suppression, missing CloudTrail coverage, Proactive SSE-KMS configuration insight). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "proactive-alb-latency-from-deployment",
+      "name": "Proactive HIGH ALB latency insight correlated with CodeDeploy deployment",
+      "difficulty": "hard",
+      "branch": "ROOT_CAUSE_FOUND — change-correlation identifies CodeDeploy deployment as the proximate root cause; rollback recommended",
+      "prompt": "Diagnose this DevOps Guru insight:\nInsight ID: x-1234abcd in us-east-1\ndescribe-insight: PROACTIVE, HIGH, OPEN, Name=\"Increased latency on ALB app/my-alb\", StartTime=2026-08-09T14:35Z.\nlist-anomalies-for-insight: Anomaly \"TargetResponseTime\" source AWS/ApplicationELB, p99 elevated from 200ms baseline to 1800ms starting 14:35Z. Secondary anomaly: AWS/RDS DatabaseConnections elevated from 50 to 380 (connection pool exhaustion), CPUUtilization 92%.\nlist-recommendations: AGGREGATE_OF_METRICS — \"Investigate the backend service for increased processing time.\"\nCloudTrail: CodeDeploy deployment event at 2026-08-09T14:32Z, application=my-app, revision=abc123.\nRegion: us-east-1.",
+      "prompt_file": "prompts/proactive-alb-latency-from-deployment.md",
+      "baseline_file": "baselines/proactive-alb-latency-from-deployment.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_output": "INSIGHT: x-1234abcd in us-east-1 — PROACTIVE / HIGH / Increased latency on ALB app/my-alb\nVERDICT: ROOT_CAUSE_FOUND\nROOT_CAUSE: PERFORMANCE — CodeDeploy deployment at 2026-08-09T14:32Z (revision abc123) introduced a regression causing ALB TargetResponseTime p99 to spike from 200ms to 1800ms; RDS connection pool exhaustion (50 -> 380) is the downstream effect\nEVIDENCE:\n  - describe-insight: PROACTIVE, HIGH, OPEN, StartTime 2026-08-09T14:35Z\n  - list-anomalies-for-insight: TargetResponseTime p99 200ms -> 1800ms; DatabaseConnections 50 -> 380; CPUUtilization 92%\n  - CloudTrail: CodeDeploy event at 14:32Z, 3 minutes before insight StartTime (strong correlation)\nRESOURCE_CATEGORY: ALB + RDS (downstream)\nANALYSIS_CATEGORY: PERFORMANCE\nREMEDIATION:\n  1. Roll back the CodeDeploy deployment to the previous revision\n  2. Verify ALB TargetResponseTime returns to baseline (<300ms) within 10 minutes\n  3. Fix the regression in revision abc123 before redeploying; add a CloudWatch alarm on p99 TargetResponseTime > 500ms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_FOUND",
+            "x-1234abcd",
+            "VERDICT",
+            "ROOT_CAUSE",
+            "EVIDENCE",
+            "PROACTIVE"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: NEED_MORE_INFO",
+            "VERDICT: ESCALATE"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reactive-rds-failover-investigation",
+      "name": "Reactive HIGH RDS Multi-AZ failover correlated with AWS Health Dashboard AZ event",
+      "difficulty": "hard",
+      "branch": "ROOT_CAUSE_FOUND — AWS-side AZ power event (not deployment) is the root cause; no rollback needed",
+      "prompt": "Diagnose this DevOps Guru insight:\nInsight ID: y-5678efgh in us-east-1\ndescribe-insight: REACTIVE, HIGH, OPEN, Name=\"RDS Multi-AZ failover detected for aurora-prod-cluster\", StartTime=2026-08-10T03:14Z.\nlist-anomalies-for-insight: CloudTrail event FailoverDBCluster at 2026-08-10T03:14:22Z; Aurora ConnectionAttempts dropped 90% during 03:14-03:18Z.\nlist-recommendations: DEPLOYMENT_FAILURE — \"Investigate recent deployments\" (recommendation is heuristic; no deployment occurred).\nCloudTrail: No UpdateStack / deployment events in 03:00-03:20Z.\nAWS Health Dashboard: AWS_AURORA_EVENT us-east-1a \"Power issue\" at 2026-08-10T03:11Z through 03:45Z.\nRegion: us-east-1.",
+      "prompt_file": "prompts/reactive-rds-failover-investigation.md",
+      "baseline_file": "baselines/reactive-rds-failover-investigation.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_output": "INSIGHT: y-5678efgh in us-east-1 — REACTIVE / HIGH / RDS Multi-AZ failover detected for aurora-prod-cluster\nVERDICT: ROOT_CAUSE_FOUND\nROOT_CAUSE: AVAILABILITY — AWS-side AZ power event in us-east-1a (2026-08-10T03:11Z-03:45Z per Health Dashboard) triggered automatic Multi-AZ failover; not application-caused (no deployments in window)\nEVIDENCE:\n  - describe-insight: REACTIVE, HIGH, OPEN, StartTime 2026-08-10T03:14Z\n  - list-anomalies-for-insight: FailoverDBCluster at 03:14:22Z; ConnectionAttempts dropped 90% during 03:14-03:18Z\n  - CloudTrail: no UpdateStack or deployment events in 03:00-03:20Z\n  - AWS Health Dashboard: us-east-1a power issue 03:11Z-03:45Z (3 min before failover)\nRESOURCE_CATEGORY: RDS\nANALYSIS_CATEGORY: AVAILABILITY\nREMEDIATION:\n  1. No application rollback needed — failover is automatic and the cluster is healthy on the secondary AZ\n  2. Verify all application connection pools re-established (DatabaseConnections back to baseline)\n  3. File an AWS Support case to track the AZ event; no code or config change required",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_FOUND",
+            "y-5678efgh",
+            "VERDICT",
+            "ROOT_CAUSE",
+            "REACTIVE"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: NEED_MORE_INFO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "false-positive-suppression-known-marketing-event",
+      "name": "Proactive HIGH traffic spike is a known marketing event — root cause + suppression recommendation",
+      "difficulty": "hard",
+      "branch": "ROOT_CAUSE_FOUND — pre-announced marketing campaign is the root cause; documented suppression recommended (not auto-dismiss)",
+      "prompt": "Diagnose this DevOps Guru insight:\nInsight ID: z-9012ijkl in us-east-1\ndescribe-insight: PROACTIVE, HIGH, OPEN, Name=\"Anomalous traffic pattern on ALB app/marketing-alb\", StartTime=2026-08-09T09:00Z.\nlist-anomalies-for-insight: RequestCount elevated 15x baseline (200 rps -> 3000 rps); HTTPCode_Target_2XX_Count elevated proportionally (no error rate increase); TargetResponseTime unchanged (no latency degradation).\nlist-recommendations: AGGREGATE_OF_METRICS — \"Investigate the traffic source.\"\nContext: Marketing team launched a pre-announced email + push campaign at 2026-08-09T08:55Z targeting 500k users. The spike is expected and the ALB is sized for it.\nRegion: us-east-1.",
+      "prompt_file": "prompts/false-positive-suppression-known-marketing-event.md",
+      "baseline_file": "baselines/false-positive-suppression-known-marketing-event.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_output": "INSIGHT: z-9012ijkl in us-east-1 — PROACTIVE / HIGH / Anomalous traffic pattern on ALB app/marketing-alb\nVERDICT: ROOT_CAUSE_FOUND\nROOT_CAUSE: PERFORMANCE — pre-announced marketing campaign (email + push, 500k users) launched at 2026-08-09T08:55Z caused expected 15x traffic spike; anomaly is benign (2XX scaling proportionally, no latency degradation, no errors)\nEVIDENCE:\n  - describe-insight: PROACTIVE, HIGH, OPEN, StartTime 09:00Z (5 min after campaign launch)\n  - list-anomalies-for-insight: RequestCount 200 -> 3000 rps; 2XX elevated proportionally; TargetResponseTime unchanged (no degradation)\nRESOURCE_CATEGORY: ALB\nANALYSIS_CATEGORY: PERFORMANCE\nREMEDIATION:\n  1. No action — traffic is expected and the ALB is sized for it\n  2. Suppress as a false positive: tag the ALB with DevOpsGuru:SuppressedReason=marketing-campaign-2026-08-09; add the campaign window to the runbook\n  3. Do NOT rely on console \"dismiss\" alone — the ML model will re-flag the anomaly when it retrains. Use ResourceCollection or tag-based suppression for durable suppression.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_FOUND",
+            "z-9012ijkl",
+            "VERDICT",
+            "ROOT_CAUSE",
+            "suppression"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: NEED_MORE_INFO",
+            "VERDICT: ESCALATE"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-cloudtrail-coverage-need-more-info",
+      "name": "Proactive MEDIUM Lambda duration insight with no CloudTrail data events and no application logs",
+      "difficulty": "medium",
+      "branch": "NEED_MORE_INFO — CloudTrail data events for Lambda NOT enabled; application logs NOT shipped; deployment history inaccessible",
+      "prompt": "Diagnose this DevOps Guru insight:\nInsight ID: w-3456mnop in us-east-1\ndescribe-insight: PROACTIVE, MEDIUM, OPEN, Name=\"Increased Lambda function duration for checkout-handler\", StartTime=2026-08-10T10:00Z.\nlist-anomalies-for-insight: AWS/Lambda Duration p99 elevated from 800ms baseline to 4500ms starting 10:00Z; Errors slightly elevated; Throttles=0.\nlist-recommendations: AGGREGATE_OF_METRICS — \"Investigate the Lambda function code.\"\nProblem: CloudTrail data events for Lambda are NOT enabled in this account. Application logs from the Lambda are NOT shipped to CloudWatch Logs. We have no deployment history accessible.\nRegion: us-east-1.",
+      "prompt_file": "prompts/missing-cloudtrail-coverage-need-more-info.md",
+      "baseline_file": "baselines/missing-cloudtrail-coverage-need-more-info.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "expected_output": "INSIGHT: w-3456mnop in us-east-1 — PROACTIVE / MEDIUM / Increased Lambda function duration for checkout-handler\nVERDICT: NEED_MORE_INFO\nROOT_CAUSE: PERFORMANCE (hypothesized — Lambda Duration p99 elevated 800ms -> 4500ms; root cause cannot be confirmed without CloudTrail data events or application logs)\nEVIDENCE:\n  - describe-insight: PROACTIVE, MEDIUM, OPEN, StartTime 2026-08-10T10:00Z\n  - list-anomalies-for-insight: AWS/Lambda Duration p99 800ms -> 4500ms; Errors slightly elevated; Throttles=0\n  - list-recommendations: AGGREGATE_OF_METRICS — \"Investigate the Lambda function code.\" (generic, addresses symptom)\nMISSING_INPUTS:\n  1. CloudTrail data events for Lambda (not enabled in this account) — required for change-correlation to identify the deployment that caused the regression\n  2. Application logs from checkout-handler (NOT shipped to CloudWatch Logs) — required to identify the specific code path with elevated duration\n  3. Deployment history (not accessible) — required to correlate the regression with a code change\nRESOURCE_CATEGORY: Lambda\nANALYSIS_CATEGORY: PERFORMANCE\nNEXT_STEPS:\n  1. Enable CloudTrail data events for Lambda (management event is not enough — data events cover Invoke)\n  2. Ship Lambda application logs to CloudWatch Logs (Lambda Insights or structured logging)\n  3. Re-investigate once logs are available; the anomaly will recur if the root cause persists",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "NEED_MORE_INFO",
+            "w-3456mnop",
+            "VERDICT",
+            "CloudTrail"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: ROOT_CAUSE_FOUND",
+            "VERDICT: ESCALATE"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sse-config-insight-suppress-or-implement",
+      "name": "Proactive MEDIUM SSE-KMS CONFIGURATION insight on S3 bucket — enable KMS",
+      "difficulty": "medium",
+      "branch": "ROOT_CAUSE_FOUND — bucket prod-data-lake lacks SSE-KMS; CONFIGURATION analysis category; enable SSE-KMS with customer CMK",
+      "prompt": "Diagnose this DevOps Guru insight:\nInsight ID: v-7890qrst in us-east-1\ndescribe-insight: PROACTIVE, MEDIUM, OPEN, Name=\"S3 bucket prod-data-lake lacks server-side encryption\", StartTime=2026-08-09T00:00Z. AnalysisCategory=CONFIGURATION.\nlist-anomalies-for-insight: Configuration check detected SSE-S3 not enabled, SSE-KMS not enabled on bucket prod-data-lake (account 111111111111).\nlist-recommendations: CONFIGURATION — \"Enable server-side encryption on the S3 bucket using a customer-managed KMS key for compliance workloads.\"\nKMS alias/prod-s3-cmk exists and is enabled in us-east-1.\nRegion: us-east-1.",
+      "prompt_file": "prompts/sse-config-insight-suppress-or-implement.md",
+      "baseline_file": "baselines/sse-config-insight-suppress-or-implement.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_output": "INSIGHT: v-7890qrst in us-east-1 — PROACTIVE / MEDIUM / S3 bucket prod-data-lake lacks server-side encryption\nVERDICT: ROOT_CAUSE_FOUND\nROOT_CAUSE: CONFIGURATION — S3 bucket prod-data-lake has neither SSE-S3 nor SSE-KMS enabled; DevOps Guru server-side encryption analysis (2024-2025 feature) flagged this as a compliance gap\nEVIDENCE:\n  - describe-insight: PROACTIVE, MEDIUM, OPEN, AnalysisCategory=CONFIGURATION\n  - list-anomalies-for-insight: Configuration check — SSE-S3 not enabled, SSE-KMS not enabled\n  - list-recommendations: CONFIGURATION — enable SSE-KMS with customer-managed CMK\n  - KMS verification: alias/prod-s3-cmk exists and is enabled in us-east-1\nRESOURCE_CATEGORY: S3\nANALYSIS_CATEGORY: CONFIGURATION\nREMEDIATION:\n  1. Enable SSE-KMS with customer CMK: aws s3api put-bucket-encryption --bucket prod-data-lake --server-side-encryption-configuration '{\"Rules\":[{\"ApplyServerSideEncryptionByDefault\":{\"SSEAlgorithm\":\"aws:kms\",\"KMSMasterKeyID\":\"arn:aws:kms:us-east-1:111111111111:alias/prod-s3-cmk\"}}]}'\n  2. Verify: aws s3api get-bucket-encryption --bucket prod-data-lake\n  3. Note: existing objects are NOT auto-encrypted; use an S3 Batch Operations job to encrypt existing objects if compliance requires retroactive encryption",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_FOUND",
+            "v-7890qrst",
+            "VERDICT",
+            "ROOT_CAUSE",
+            "SSE-KMS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: NEED_MORE_INFO",
+            "VERDICT: ESCALATE"
+          ]
+        }
+      ]
+    }
+  ]
+}

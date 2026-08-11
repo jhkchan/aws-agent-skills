@@ -1,0 +1,199 @@
+# Eval test cases for devops-guru-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the ROOT_CAUSE_FOUND / NEED_MORE_INFO
+# / ESCALATE classification across insight types (Proactive performance,
+# Reactive availability, false positive suppression, SSE config,
+# cross-account escalation).
+skill: devops-guru-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: proactive-alb-latency-from-deployment
+    description: >-
+      A Proactive/HIGH insight reports increased latency on an ALB at
+      14:35Z. Operator supplies describe-insight, anomaly time series
+      (TargetResponseTime elevated from 200ms to 1800ms), and
+      CodeDeploy history showing a deployment at 14:32Z. Expects
+      ROOT_CAUSE_FOUND with the deployment as the root cause and
+      rollback as the remediation.
+    input: |
+      Diagnose this DevOps Guru insight:
+      Insight ID: x-1234abcd in us-east-1
+      describe-insight: PROACTIVE, HIGH, OPEN, Name="Increased latency
+      on ALB app/my-alb", StartTime=2026-08-09T14:35Z.
+      list-anomalies-for-insight: Anomaly "TargetResponseTime"
+      source AWS/ApplicationELB, p99 elevated from 200ms baseline to
+      1800ms starting 14:35Z. Secondary anomaly: AWS/RDS
+      DatabaseConnections elevated from 50 to 380 (connection pool
+      exhaustion), CPUUtilization 92%.
+      list-recommendations: AGGREGATE_OF_METRICS — "Investigate the
+      backend service for increased processing time."
+      CloudTrail: CodeDeploy deployment event at 2026-08-09T14:32Z,
+      application=my-app, revision=abc123.
+      Region: us-east-1.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "x-1234abcd"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "EVIDENCE"
+        - "PROACTIVE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: reactive-rds-failover-investigation
+    description: >-
+      A Reactive/HIGH insight reports RDS Multi-AZ failover. Operator
+      supplies describe-insight showing FailoverDBCluster at 03:14Z
+      with no deployment correlation. AWS Health Dashboard shows an
+      AZ-wide event. Expects ROOT_CAUSE_FOUND citing the AZ event
+      (the root cause is infrastructure-side, not application-side).
+    input: |
+      Diagnose this DevOps Guru insight:
+      Insight ID: y-5678efgh in us-east-1
+      describe-insight: REACTIVE, HIGH, OPEN, Name="RDS Multi-AZ
+      failover detected for aurora-prod-cluster", StartTime=
+      2026-08-10T03:14Z.
+      list-anomalies-for-insight: CloudTrail event
+      FailoverDBCluster at 2026-08-10T03:14:22Z; Aurora
+      ConnectionAttempts dropped 90% during 03:14-03:18Z.
+      list-recommendations: DEPLOYMENT_FAILURE — "Investigate
+      recent deployments" (recommendation is heuristic; no
+      deployment occurred).
+      CloudTrail: No UpdateStack / deployment events in 03:00-03:20Z.
+      AWS Health Dashboard: AWS_AURORA_EVENT us-east-1a
+      "Power issue" at 2026-08-10T03:11Z through 03:45Z.
+      Region: us-east-1.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "y-5678efgh"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "REACTIVE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: false-positive-suppression-known-marketing-event
+    description: >-
+      A Proactive/HIGH insight reports a traffic spike on an ALB at
+      09:00Z. The operator documents that a marketing campaign launched
+      at 08:55Z (pre-announced). The anomaly is expected. Expects
+      ROOT_CAUSE_FOUND with the marketing event as root cause and a
+      documented suppression recommendation (not an auto-dismiss).
+    input: |
+      Diagnose this DevOps Guru insight:
+      Insight ID: z-9012ijkl in us-east-1
+      describe-insight: PROACTIVE, HIGH, OPEN, Name="Anomalous traffic
+      pattern on ALB app/marketing-alb", StartTime=2026-08-09T09:00Z.
+      list-anomalies-for-insight: RequestCount elevated 15x baseline
+      (200 rps -> 3000 rps); HTTPCode_Target_2XX_Count elevated
+      proportionally (no error rate increase); TargetResponseTime
+      unchanged (no latency degradation).
+      list-recommendations: AGGREGATE_OF_METRICS — "Investigate the
+      traffic source."
+      Context: Marketing team launched a pre-announced email + push
+      campaign at 2026-08-09T08:55Z targeting 500k users. The spike
+      is expected and the ALB is sized for it.
+      Region: us-east-1.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "z-9012ijkl"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "suppression"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
+
+  - id: missing-cloudtrail-coverage-need-more-info
+    description: >-
+      A Proactive/MEDIUM insight reports anomalous Lambda duration.
+      Operator has not enabled CloudTrail data events for Lambda, and
+      application logs are not shipped to CloudWatch. Expects
+      NEED_MORE_INFO with the specific missing inputs cited.
+    input: |
+      Diagnose this DevOps Guru insight:
+      Insight ID: w-3456mnop in us-east-1
+      describe-insight: PROACTIVE, MEDIUM, OPEN, Name="Increased
+      Lambda function duration for checkout-handler", StartTime=
+      2026-08-10T10:00Z.
+      list-anomalies-for-insight: AWS/Lambda Duration p99 elevated
+      from 800ms baseline to 4500ms starting 10:00Z; Errors slightly
+      elevated; Throttles=0.
+      list-recommendations: AGGREGATE_OF_METRICS — "Investigate the
+      Lambda function code."
+      Problem: CloudTrail data events for Lambda are NOT enabled in
+      this account. Application logs from the Lambda are NOT shipped
+      to CloudWatch Logs. We have no deployment history accessible.
+      Region: us-east-1.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "w-3456mnop"
+        - "VERDICT"
+        - "CloudTrail"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ROOT_CAUSE_FOUND"
+        - "VERDICT: ESCALATE"
+
+  - id: sse-config-insight-suppress-or-implement
+    description: >-
+      A Proactive/MEDIUM CONFIGURATION insight reports an S3 bucket
+      without server-side encryption (latest SSE analysis feature,
+      2024-2025). Operator supplies describe-insight and the
+      recommendation to enable SSE-KMS with a customer CMK. Expects
+      ROOT_CAUSE_FOUND citing the missing SSE-KMS and enable-KMS as
+      the remediation.
+    input: |
+      Diagnose this DevOps Guru insight:
+      Insight ID: v-7890qrst in us-east-1
+      describe-insight: PROACTIVE, MEDIUM, OPEN, Name="S3 bucket
+      prod-data-lake lacks server-side encryption", StartTime=
+      2026-08-09T00:00Z. AnalysisCategory=CONFIGURATION.
+      list-anomalies-for-insight: Configuration check detected
+      SSE-S3 not enabled, SSE-KMS not enabled on bucket
+      prod-data-lake (account 111111111111).
+      list-recommendations: CONFIGURATION — "Enable server-side
+      encryption on the S3 bucket using a customer-managed KMS key
+      for compliance workloads."
+      KMS alias/prod-s3-cmk exists and is enabled in us-east-1.
+      Region: us-east-1.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "v-7890qrst"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "SSE-KMS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+        - "VERDICT: ESCALATE"
