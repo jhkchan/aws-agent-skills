@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 16,
       "max": 20,
-      "justification": "Provides specific expert heuristics (cert\u2011policy\u2011thing triple binding, topic\u2011rule SQL on payload, shadow delta state) that go beyond generic documentation, but much of the content restates known AWS docs without deeper novel insight."
+      "justification": "Provides specific expert heuristics (cert\u2011policy\u2011thing triple binding, dependency graph, SQL payload semantics, shadow delta mechanics) that go beyond generic knowledge, but much of the content restates standard AWS docs."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Lists the correct AWS\u2011specific order (thing \u2192 cert \u2192 policy \u2192 attach\u2011thing\u2011principal \u2192 attach\u2011policy) and includes detailed CLI steps, but some steps (e.g., \"verify prerequisites\") are generic and not tied to a concrete AWS check."
+      "justification": "Provides an AWS\u2011specific step\u2011by\u2011step procedure (thing \u2192 cert \u2192 policy \u2192 attach\u2011policy \u2192 attach\u2011thing\u2011principal \u2192 verify) and detailed sub\u2011procedures for topic rules, jobs, indexing, authorizers, Greengrass. Some steps are generic (\"verify\", \"store securely\") and could be tighter, hence deduction."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete pitfalls (e.g., never attach policy to a thing, never store private key insecurely) and reasons, yet a few items lack deeper explanation of failure modes (e.g., why attaching policy to thing silently fails)."
+      "justification": "Contains a detailed NEVER list with concrete pitfalls and reasons (e.g., attaching policy to thing, storing private key), but the list could include more edge\u2011case warnings (IAM role least\u2011privilege, versioning of policies)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description and when\u2011to\u2011use are clear, and output contract is defined. However, activation triggers rely only on keyword lists; no explicit schema or example of the literal block that guarantees reliable skill invocation."
+      "justification": "Frontmatter includes description, version, keywords, triggers, when_to_use, and output format. Missing a concise one\u2011sentence \"WHAT it does\" in the top\u2011level description; activation keywords are present but could be more formally enumerated. Hence slight deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "Information is layered (mindset, graph, heuristics, step\u2011by\u2011step), but the document front\u2011loads a large amount of detail before the concise checklist, creating cognitive overload for quick reference."
+      "justification": "Uses sections (Mindset, Dependency graph, Steps, NEVER, Output format) to layer information. However the skill front\u2011loads a large amount of detail (full CLI commands) before the checklist, which can overload the agent; deeper references are at the end, but overall layering is acceptable with minor penalty."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Destructive actions are guarded by prerequisite checks and NEVER rules, yet optional components (Greengrass, custom authorizer) are left loosely constrained, allowing unnecessary freedom in some scenarios."
+      "justification": "Appropriately constrains destructive actions by requiring prerequisite checks and NEVER rules, yet it does not explicitly lock down mutable resources (e.g., re\u2011creating an existing thing) for fragile operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (mindset \u2192 dependency graph \u2192 heuristics \u2192 steps \u2192 NEVER \u2192 output format) but does not explicitly label the pattern (e.g., Mindset\u2011Process\u2011Checklist) and mixes tables with free text."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Dependency graph \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). Structure is coherent and aids comprehension; only minor inconsistency in ordering of sections (e.g., QUICK NAVIGATION appears before Mindset) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 8,
+      "score": 6,
       "max": 15,
-      "justification": "Model output shows mismatches: verification commands use get\u2011policy instead of get\u2011topic\u2011rule, checklist omits required items (topic rule, shadow) yet still returns READY_TO_DEPLOY, and optional fields are inconsistently handled, indicating the skill cannot be executed reliably without errors."
+      "justification": "Model output violates the strict contract: it emits multiple checklist blocks in one response, includes extra prose and command logs after the required block, and misuses CLI commands (e.g., using add\u2011thing\u2011principal for tags, duplicate add\u2011thing\u2011principal). These execution errors demonstrate that an agent could not rely on the skill to produce a clean, automatable output."
     }
   ],
-  "total_score": 95,
+  "total_score": 94,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40362,
-  "latency_ms": 11962,
+  "token_count": 41430,
+  "latency_ms": 11128,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

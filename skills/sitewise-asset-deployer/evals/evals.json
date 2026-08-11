@@ -1,0 +1,187 @@
+{
+  "skill": "sitewise-asset-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the AWS IoT SiteWise Asset Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across SiteWise modeling scenarios (asset model with measurement/transform/metric/attribute + OPC-UA gateway, parent-child hierarchy with metric aggregation, cloud-direct ingestion via alias, dashboard and portal with Identity Center SSO + threshold alarms, missing Greengrass core device prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "opcua-gateway-asset-model",
+      "name": "SiteWise asset model with all four property types and OPC-UA gateway",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — measurement/transform/metric/attribute model, OPC-UA gateway with node-to-alias mappings, alias-based ingestion path",
+      "prompt": "Create a SiteWise asset model named \"Pump Station\" in us-east-1. Measurement properties: FlowRate (DOUBLE, m3/s), Pressure (DOUBLE, kPa), Temperature (DOUBLE, C), Vibration (DOUBLE, mm/s). Transform property: TemperatureF = Temperature * 9/5 + 32. Metric property: HourlyAvgFlow = AVG(FlowRate, 3600s). Attribute property: Manufacturer (STRING), SerialNumber (STRING). Gateway \"Plant Gateway\" on Greengrass core device GreengrassCore-001. OPC-UA source from opc.tcp://10.0.1.50:4840 with 4 node mappings to aliases /plant/area1/pump1/*. Account 123456789012. Tags: Environment=production, Site=PlantA.",
+      "prompt_file": "prompts/opcua-gateway-asset-model.md",
+      "baseline_file": "baselines/opcua-gateway-asset-model.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SITEWISE: Pump Station (model-xxx) → asset-id\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Property types: measurement(4), transform(1), metric(1), attribute(2)\n  [✓] Transform expressions: validated (TemperatureF)\n  [✓] Metric processing configs: validated (HourlyAvgFlow=3600s)\n  [✓] Gateway: Plant Gateway — RUNNING\n  [✓] OPC-UA source: opc.tcp://10.0.1.50:4840, 4 node mappings\n  [✓] Asset property aliases: /plant/area1/pump1/*\n  [✓] Data ingestion path: OPC-UA → gateway → measurement properties\nVERIFICATION_COMMANDS:\n  aws iotsitewise describe-asset-model --asset-model-id <model-id>\n  aws iotsitewise describe-gateway --gateway-id <gateway-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "measurement",
+            "transform",
+            "metric",
+            "attribute",
+            "TemperatureF",
+            "HourlyAvgFlow",
+            "opc.tcp://10.0.1.50:4840",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hierarchy-metric-aggregation",
+      "name": "Parent-child asset hierarchy with parent-level metric aggregation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — hierarchy defined in parent model, child assets associated, parent metric aggregates child measurements",
+      "prompt": "Create a SiteWise asset hierarchy in us-east-1. Parent model \"Production Line\" with metric property TotalOutput = SUM(PowerOutput, 300s) aggregated across child assets. Child model \"Machine\" with measurement properties: PowerOutput (DOUBLE, kW), Temperature (DOUBLE, C), Status (STRING). Hierarchy name \"Contains Machines\". Parent asset \"Line-A\" with child assets \"Machine-01\" and \"Machine-02\". Account 123456789012. Tags: Facility=Factory1.",
+      "prompt_file": "prompts/hierarchy-metric-aggregation.md",
+      "baseline_file": "baselines/hierarchy-metric-aggregation.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SITEWISE: Production Line → Line-A\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Asset hierarchy: Production Line → Machine via Contains Machines\n  [✓] Metric processing configs: validated (TotalOutput=300s)\n  [✓] Asset(s): Line-A (parent), Machine-01, Machine-02 (children)\n  [✓] Hierarchy associations: Line-A → Machine-01, Machine-02",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "hierarchy",
+            "Production Line",
+            "Machine",
+            "TotalOutput",
+            "Contains Machines",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cloud-ingestion-alias",
+      "name": "Cloud-direct ingestion via BatchPutAssetPropertyValue with property aliases",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — measurement model with alias, storage config, cloud-direct ingestion (no gateway)",
+      "prompt": "Create a SiteWise asset model \"Temperature Sensor\" in us-east-1 with measurement property Reading (DOUBLE, Celsius). Set alias /buildings/hq/sensor1/reading on the property. Cloud-direct ingestion via BatchPutAssetPropertyValue (no gateway). Storage warm tier 180 days. Account 123456789012. Tags: Environment=production, Building=HQ.",
+      "prompt_file": "prompts/cloud-ingestion-alias.md",
+      "baseline_file": "baselines/cloud-ingestion-alias.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SITEWISE: Temperature Sensor\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Property types: measurement(1)\n  [✓] Asset property aliases: /buildings/hq/sensor1/reading\n  [✓] Data ingestion path: BatchPutAssetPropertyValue → alias\n  [✓] Storage configuration: warm tier (180 days)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "BatchPutAssetPropertyValue",
+            "/buildings/hq/sensor1/reading",
+            "warm tier",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dashboard-portal-sso",
+      "name": "SiteWise dashboard and SSO portal with Identity Center and threshold alarms",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — SSO portal with Identity Center, project, dashboard, threshold alarm with duration, access policy",
+      "prompt": "Create a SiteWise project \"Plant Monitoring\" and portal \"Acme Plant Portal\" with SSO auth mode (Identity Center instance ssoins-12345). Role arn:aws:iam::123456789012:role/SiteWisePortal. Asset model \"Compressor\" with measurement Pressure (DOUBLE, kPa) and alarm HighPressure (Pressure GT 800 for 10 minutes). Dashboard \"Compressor Overview\" in the project. Assign group arn:aws:iam::123456789012:group/Operators as VIEWER on the project. Account 123456789012. Tags: Environment=production.",
+      "prompt_file": "prompts/dashboard-portal-sso.md",
+      "baseline_file": "baselines/dashboard-portal-sso.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SITEWISE: Compressor\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Portal: Acme Plant Portal — auth mode SSO, alarms ENABLED\n  [✓] Identity Center: configured (ssoins-12345)\n  [✓] Access policies: Operators → Plant Monitoring (VIEWER)\n  [✓] Alarms: HighPressure (Pressure > 800 kPa, 10 min duration)\n  [✓] Dashboard: Compressor Overview in Plant Monitoring",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SSO",
+            "Identity Center",
+            "HighPressure",
+            "durationInMinutes",
+            "VIEWER",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-greengrass-core-device",
+      "name": "SiteWise Edge gateway with unregistered Greengrass core device (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Greengrass core device 'MyCoreDevice' is not registered in Greengrass V2",
+      "prompt": "Create a SiteWise gateway \"Factory Gateway\" on Greengrass core device \"MyCoreDevice\" that is NOT yet registered in Greengrass V2. OPC-UA source from opc.tcp://10.0.2.30:4840. Asset model \"Pump\" with measurement FlowRate. Account 123456789012. Tags: Environment=production.",
+      "prompt_file": "prompts/missing-greengrass-core-device.md",
+      "baseline_file": "baselines/missing-greengrass-core-device.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SITEWISE: Pump\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Gateway: Greengrass core device 'MyCoreDevice' is NOT registered in Greengrass V2",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "Greengrass",
+            "core device",
+            "MyCoreDevice",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

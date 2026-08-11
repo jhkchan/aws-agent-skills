@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds several expert\u2011level insights (encryption must be set at creation, AUTH token requires TLS, snapshot\u2011vs\u2011maintenance window overlap, promotion\u2011priority rules, online\u2011resharding limits). However ~3 points are deducted because many sections simply restate AWS documentation without new heuristics, and the node\u2011type sizing table is generic."
+      "justification": "Adds several expert\u2011level insights not in a baseline model (e.g., encryption must be set at creation, AUTH token requires TLS, detailed dependency graph, snapshot\u2011vs\u2011maintenance window gotcha, replica promotion priority). Misses a few niche edge\u2011cases such as KMS key replication for Global Datastore, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides a clear AWS\u2011specific step\u2011by\u2011step CLI workflow, dependency graph, and checklist. Deducted 2 points for missing explicit Terraform/CloudFormation procedural guidance and for a few generic \u201cverify\u201d steps that are not tied to a concrete AWS\u2011specific checklist."
+      "justification": "Provides AWS\u2011specific step\u2011by\u2011step CLI procedures and ordering (subnet group \u2192 security group \u2192 replication group \u2192 encryption \u2192 auth token). Lacks explicit Terraform/CloudFormation procedural guidance despite listing them in compatibility, which leaves a gap for non\u2011CLI workflows."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (encryption after creation, AUTH without TLS, multi\u2011AZ without replica, etc.). One point deducted because it omits a common pitfall: forgetting IAM permissions for KMS key access."
+      "justification": "Contains a concrete NEVER list with specific reasons (e.g., never enable encryption after creation, never set AUTH without TLS). One minor omission: no explicit warning about using default parameter groups that may disable desired security settings."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, triggers, and a precise output contract are present. The \"when to invoke\" section is verbose and could be tighter, and the trigger list is long but not formally scoped, costing two points."
+      "justification": "Frontmatter, description, triggers, and when_to_use are present and clear. The activation description could be tighter\u2014keywords are many and some overlap, making exact trigger matching slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers high\u2011level overview, quick\u2011nav table, then deep sections, which is good. However the initial sections (mindset, dependency graph, full CLI examples) are dense and may overload the agent before it knows which parts are needed, costing 2 points."
+      "justification": "The skill layers information (quick navigation, mindset, detailed steps) but a large amount of critical rules (e.g., encryption immutability, NEVER list) appears early, creating some cognitive load before the checklist is reached."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom well for creation tasks: requires prerequisite verification and emits PREREQUISITES_MISSING. Deduct 1 point because destructive actions like cluster deletion or parameter\u2011group removal are not covered, leaving a gap for high\u2011risk operations."
+      "justification": "Destructive actions (cluster creation) are tightly gated by a prerequisite checklist and explicit output contract. The online\u2011resharding command lacks safety guards (e.g., confirming shard count limits), leaving a small freedom gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 stepwise process \u2192 output format \u2192 anti\u2011patterns). One point off because the pattern is not explicitly labeled as a standard framework, making it slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Checklist \u2192 NEVER \u2192 Output format). Slight deviation: the \u201cExpert heuristic\u201d section mixes narrative with code, breaking the otherwise clean section hierarchy."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 5,
+      "score": 6,
       "max": 15,
-      "justification": "The model output provided is empty, meaning the skill\u2019s contract was not fulfilled. This indicates the skill cannot be executed reliably as\u2011is. Additionally, decision branches for handling missing prerequisites are described but not demonstrated, leading to a large deduction."
+      "justification": "The skill defines a strict output contract, but the provided model output is empty, indicating the agent failed to produce the required checklist. This demonstrates a critical usability gap; also some edge\u2011cases (e.g., handling API throttling) are not covered."
     }
   ],
-  "total_score": 98,
+  "total_score": 99,
   "max_score": 120,
   "grade": "B",
-  "token_count": 33740,
-  "latency_ms": 9961,
+  "token_count": 33447,
+  "latency_ms": 7528,
   "assertions_passed": true,
   "assertions_passed_count": 0,
   "assertions_failed_count": 0

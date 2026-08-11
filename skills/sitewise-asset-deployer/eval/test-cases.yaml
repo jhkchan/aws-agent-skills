@@ -1,0 +1,173 @@
+# Eval test cases for sitewise-asset-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across SiteWise modeling
+# scenarios (measurement/transform/metric/attribute property model with
+# OPC-UA gateway, parent-child hierarchy with metric aggregation, cloud-
+# direct ingestion via alias, dashboard and portal with Identity Center,
+# missing Greengrass core device prerequisite failure).
+skill: sitewise-asset-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: opcua-gateway-asset-model
+    description: >-
+      Deploy a SiteWise asset model with all four property types
+      (measurement, transform, metric, attribute) and an OPC-UA gateway
+      source with node-to-alias mappings. Expects READY_TO_DEPLOY with
+      all property types validated, OPC-UA node mappings cited, and
+      alias-based ingestion path.
+    input: |
+      Create a SiteWise asset model named "Pump Station" in us-east-1.
+      Measurement properties: FlowRate (DOUBLE, m3/s), Pressure (DOUBLE,
+      kPa), Temperature (DOUBLE, C), Vibration (DOUBLE, mm/s).
+      Transform property: TemperatureF = Temperature * 9/5 + 32.
+      Metric property: HourlyAvgFlow = AVG(FlowRate, 3600s).
+      Attribute property: Manufacturer (STRING), SerialNumber (STRING).
+      Gateway "Plant Gateway" on Greengrass core device
+      GreengrassCore-001. OPC-UA source from opc.tcp://10.0.1.50:4840
+      with 4 node mappings to aliases /plant/area1/pump1/*. Account
+      123456789012. Tags: Environment=production, Site=PlantA.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "measurement"
+        - "transform"
+        - "metric"
+        - "attribute"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "opc.tcp://10.0.1.50:4840"
+        - "TemperatureF"
+        - "HourlyAvgFlow"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: hierarchy-metric-aggregation
+    description: >-
+      Deploy a parent-child asset hierarchy with metric aggregation at
+      the hierarchy level. Expects READY_TO_DEPLOY with hierarchy
+      definition in parent model, child assets associated, and
+      parent-level metric aggregating child measurements.
+    input: |
+      Create a SiteWise asset hierarchy in us-east-1. Parent model
+      "Production Line" with metric property TotalOutput = SUM(
+      PowerOutput, 300s) aggregated across child assets. Child model
+      "Machine" with measurement properties: PowerOutput (DOUBLE, kW),
+      Temperature (DOUBLE, C), Status (STRING). Hierarchy name
+      "Contains Machines". Parent asset "Line-A" with child assets
+      "Machine-01" and "Machine-02". Account 123456789012. Tags:
+      Facility=Factory1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "hierarchy"
+        - "Production Line"
+        - "Machine"
+        - "TotalOutput"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Contains Machines"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cloud-ingestion-alias
+    description: >-
+      Deploy a SiteWise asset model with cloud-direct ingestion via
+      BatchPutAssetPropertyValue using property aliases (no gateway).
+      Expects READY_TO_DEPLOY with aliases configured, storage
+      configuration set, and ingestion path via BatchPutAssetPropertyValue.
+    input: |
+      Create a SiteWise asset model "Temperature Sensor" in us-east-1
+      with measurement property Reading (DOUBLE, Celsius). Set alias
+      /buildings/hq/sensor1/reading on the property. Cloud-direct
+      ingestion via BatchPutAssetPropertyValue (no gateway). Storage
+      warm tier 180 days. Account 123456789012. Tags:
+      Environment=production, Building=HQ.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "BatchPutAssetPropertyValue"
+        - "/buildings/hq/sensor1/reading"
+        - "warm tier"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: dashboard-portal-sso
+    description: >-
+      Deploy a SiteWise dashboard in a project and an SSO portal with
+      Identity Center integration and threshold alarms. Expects
+      READY_TO_DEPLOY with portal auth mode SSO, Identity Center
+      configured, alarm with duration, and access policy.
+    input: |
+      Create a SiteWise project "Plant Monitoring" and portal "Acme
+      Plant Portal" with SSO auth mode (Identity Center instance
+      ssoins-12345). Role arn:aws:iam::123456789012:role/SiteWisePortal.
+      Asset model "Compressor" with measurement Pressure (DOUBLE, kPa)
+      and alarm HighPressure (Pressure GT 800 for 10 minutes). Dashboard
+      "Compressor Overview" in the project. Assign group
+      arn:aws:iam::123456789012:group/Operators as VIEWER on the
+      project. Account 123456789012. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SSO"
+        - "Identity Center"
+        - "HighPressure"
+        - "durationInMinutes"
+        - "VIEWER"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-greengrass-core-device
+    description: >-
+      Operator requests a SiteWise Edge gateway but the Greengrass core
+      device is not registered. This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING with the missing Greengrass core device
+      cited.
+    input: |
+      Create a SiteWise gateway "Factory Gateway" on Greengrass core
+      device "MyCoreDevice" that is NOT yet registered in Greengrass V2.
+      OPC-UA source from opc.tcp://10.0.2.30:4840. Asset model "Pump"
+      with measurement FlowRate. Account 123456789012. Tags:
+      Environment=production.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Greengrass"
+        - "core device"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "MyCoreDevice"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

@@ -1,4 +1,4 @@
-# Eval configuration for cloudhsm-cluster-deployer.
+# Eval configuration for license-manager-deployer.
 #
 # Maps each eval case to its external prompt and baseline files so the same
 # case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
@@ -7,7 +7,7 @@
 # The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
 # discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
 # not replace it — it adds the structured with-skill-vs-baseline dimension.
-skill_name: cloudhsm-cluster-deployer
+skill_name: license-manager-deployer
 snapshot_date: "2026-08-11"
 baseline_model: amazon.nova-pro-v1:0
 judge_model_id: openai.gpt-oss-120b-1:0
@@ -18,32 +18,32 @@ temperature: 0.0
 legacy_spec: ../eval/test-cases.yaml
 
 evals:
-  - id: three-az-cluster-with-activation
+  - id: oracle-vcpu-tracking
     difficulty: hard
-    prompt_file: prompts/three-az-cluster-with-activation.md
-    baseline_file: baselines/three-az-cluster-with-activation.md
+    prompt_file: prompts/oracle-vcpu-tracking.md
+    baseline_file: baselines/oracle-vcpu-tracking.md
     expected_verdict: READY_TO_DEPLOY
 
-  - id: single-az-prerequisite-failure
+  - id: sql-server-core-tracking
+    difficulty: hard
+    prompt_file: prompts/sql-server-core-tracking.md
+    baseline_file: baselines/sql-server-core-tracking.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: instance-based-ssm-discovery
+    difficulty: medium
+    prompt_file: prompts/instance-based-ssm-discovery.md
+    baseline_file: baselines/instance-based-ssm-discovery.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: cross-account-org-sharing
+    difficulty: medium
+    prompt_file: prompts/cross-account-org-sharing.md
+    baseline_file: baselines/cross-account-org-sharing.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-license-rules
     difficulty: easy
-    prompt_file: prompts/single-az-prerequisite-failure.md
-    baseline_file: baselines/single-az-prerequisite-failure.md
+    prompt_file: prompts/missing-license-rules.md
+    baseline_file: baselines/missing-license-rules.md
     expected_verdict: PREREQUISITES_MISSING
-
-  - id: co-password-and-quorum
-    difficulty: hard
-    prompt_file: prompts/co-password-and-quorum.md
-    baseline_file: baselines/co-password-and-quorum.md
-    expected_verdict: READY_TO_DEPLOY
-
-  - id: cross-region-backup-copy
-    difficulty: medium
-    prompt_file: prompts/cross-region-backup-copy.md
-    baseline_file: baselines/cross-region-backup-copy.md
-    expected_verdict: READY_TO_DEPLOY
-
-  - id: hsm-degradation-recovery
-    difficulty: medium
-    prompt_file: prompts/hsm-degradation-recovery.md
-    baseline_file: baselines/hsm-degradation-recovery.md
-    expected_verdict: READY_TO_DEPLOY

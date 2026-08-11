@@ -1,28 +1,157 @@
+# Eval test cases for cloudhsm-cluster-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across AWS CloudHSM
+# scenarios (3-AZ cluster with activation and HA, single-AZ
+# cluster prerequisite failure, CO password storage + quorum,
+# cross-region backup copy for DR, HSM degradation recovery).
 skill: cloudhsm-cluster-deployer
 model_id: amazon.nova-pro-v1:0
-cases:
-- id: ha-cluster-two-az
-  must_contain:
-  - READY_TO_DEPLOY
-  must_not_contain:
-  - PREREQUISITES_MISSING
-- id: crypto-officer-setup
-  must_contain:
-  - READY_TO_DEPLOY
-  must_not_contain:
-  - PREREQUISITES_MISSING
-- id: backup-and-restore
-  must_contain:
-  - READY_TO_DEPLOY
-  must_not_contain:
-  - PREREQUISITES_MISSING
-- id: single-az-no-ha
-  must_contain:
-  - PREREQUISITES_MISSING
-  must_not_contain:
-  - READY_TO_DEPLOY
-- id: missing-subnet-creation
-  must_contain:
-  - PREREQUISITES_MISSING
-  must_not_contain:
-  - READY_TO_DEPLOY
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: three-az-cluster-with-activation
+    description: >-
+      Provision a 3-AZ CloudHSM cluster with one-time activation
+      (CSR → self-signed cert), 2+ CO users, daily automatic backups,
+      PKCS#11 client config, and FIPS 140-2 Level 3 posture. Expects
+      READY_TO_DEPLOY with activation called out as one-time, HA
+      across 3 AZs, and CO password stored in Secrets Manager.
+    input: |
+      Create a CloudHSM cluster "cloudhsm-prod" in us-east-1 across
+      3 AZs (us-east-1a subnet-aaa, us-east-1b subnet-bbb, us-east-1c
+      subnet-ccc), VPC vpc-aaa11122, security group sg-cloudhsm-prod,
+      hsm1.medium. Perform one-time activation with our in-house
+      customerCA. Create 2 CO users (admin, officer2) with CO
+      password stored in Secrets Manager. Enable daily automatic
+      backups. Configure the PKCS#11 client. Workload:
+      nginx SSL/TLS offload. Tags: Environment=production,
+      Workload=tls-offload, Owner=platform-team.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cloudhsm-prod"
+        - "us-east-1a"
+        - "us-east-1b"
+        - "us-east-1c"
+        - "activation"
+        - "CO"
+        - "Secrets Manager"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: single-az-prerequisite-failure
+    description: >-
+      Operator requests a CloudHSM cluster with subnets in only one
+      AZ. Production clusters require ≥2 AZs for HA. This is a
+      prerequisite failure.
+      Expects PREREQUISITES_MISSING with the single-AZ gap cited.
+    input: |
+      Create a CloudHSM cluster "cloudhsm-dev" in us-east-1 in a
+      single AZ (us-east-1a subnet-aaa only), VPC vpc-aaa11122.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "single"
+        - "AZ"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: co-password-and-quorum
+    description: >-
+      Operator requests crypto officer management with documented
+      quorum policy. Expects READY_TO_DEPLOY with CO password stored
+      in Secrets Manager (KMS-encrypted), ≥2 CO users, and a
+      quorum policy for destructive operations.
+    input: |
+      Configure crypto officer management for CloudHSM cluster
+      cluster-abc123def. Create admin and officer2 as CO users. CO
+      password must be stored in Secrets Manager (encrypted with
+      customer-managed KMS key). Document a quorum policy of 2-of-2
+      COs for destructive operations. CU users: app-tls-user,
+      app-code-sign-user. Password policy: min 14 chars, mixed,
+      90-day rotation.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Secrets Manager"
+        - "quorum"
+        - "admin"
+        - "officer2"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-region-backup-copy
+    description: >-
+      Operator requests cross-region backup copy for DR. Expects
+      READY_TO_DEPLOY with the destination region cited and the
+      one-way copy semantics noted (restore creates a new cluster,
+      not a hot replica).
+    input: |
+      Configure cross-region backup copy for CloudHSM cluster
+      cluster-abc123def from us-east-1 to us-west-2. Destination
+      region is enabled for CloudHSM. Restore in us-west-2 should
+      create a new cluster from the copied backup.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "us-west-2"
+        - "us-east-1"
+        - "CopyBackupToRegion"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: hsm-degradation-recovery
+    description: >-
+      Operator reports a degraded HSM and asks for the recovery
+      procedure. Expects READY_TO_DEPLOY with the create-replacement
+      / sync / delete sequence, and the constraint that dropping
+      below 1 ACTIVE HSM loses HA.
+    input: |
+      HSM hsm-degraded111 in CloudHSM cluster cluster-abc123def
+      (us-east-1a) is degraded. Walk me through the recovery
+      procedure: create a replacement, sync, then delete the
+      degraded HSM. Maintain ≥2 ACTIVE HSMs in different AZs.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "hsm-degraded111"
+        - "delete-hsm"
+        - "create-hsm"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

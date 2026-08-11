@@ -1,0 +1,177 @@
+{
+  "skill": "keyspaces-keyspace-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Amazon Keyspaces Keyspace Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Keyspaces topologies (on-demand keyspace+table with PITR and CMK encryption, provisioned mode with auto-scaling, composite partition+clustering key for sort order, client-side KMS envelope encryption, missing KMS key prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "on-demand-keyspace-table-pitr",
+      "name": "On-demand Keyspaces keyspace and table with PITR and CMK encryption",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — on-demand keyspace+table, PITR explicitly enabled, CMK encryption, VPC endpoint with private DNS, composite partition key (user_id + event_date)",
+      "prompt": "Create an Amazon Keyspaces keyspace called event_store in us-east-1. Create a table user_events with columns: user_id (uuid), event_date (date), event_time (timestamp), event_type (text), payload (blob). Partition key: (user_id, event_date). Clustering key: event_time DESC. Use on-demand capacity. Enable point-in-time recovery. Use KMS CMK alias/keyspaces-cmk for encryption at rest. Create a VPC endpoint in VPC vpc-aaa11122, subnets subnet-aaa111 and subnet-bbb222, security group sg-keyspaces-client. Tags: Environment=production, Team=data-platform.",
+      "prompt_file": "prompts/on-demand-keyspace-table-pitr.md",
+      "baseline_file": "baselines/on-demand-keyspace-table-pitr.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KEYSPACES: event_store.user_events\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Keyspace: event_store — ACTIVE\n  [✓] Table: user_events — partition key: (user_id, event_date), clustering key: event_time DESC\n  [✓] Partition key cardinality: HIGH (user_id UUID + date)\n  [✓] Capacity mode: On-demand (PAY_PER_REQUEST)\n  [✓] Point-in-time recovery: ENABLED\n  [✓] Encryption at rest: Customer-managed key (alias/keyspaces-cmk)\n  [✓] VPC endpoint: private DNS enabled",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "event_store",
+            "user_events",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "PAY_PER_REQUEST",
+            "point-in-time recovery",
+            "Customer-managed key"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "provisioned-autoscaling",
+      "name": "Provisioned-mode Keyspaces table with target tracking auto-scaling",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — provisioned capacity with auto-scaling on read and write, target 70%, min 100 max 5000",
+      "prompt": "Create a table sensor_readings in keyspace telemetry_keyspace. Columns: sensor_id (text), reading_time (timestamp), value (double), unit (text). Partition key: sensor_id. Clustering key: reading_time DESC. Use provisioned capacity with 500 read capacity units and 1000 write capacity units. Enable auto-scaling with target 70%, min 100, max 5000 on both read and write. Region us-east-1. Tags: Environment=production, Workload=iot-telemetry.",
+      "prompt_file": "prompts/provisioned-autoscaling.md",
+      "baseline_file": "baselines/provisioned-autoscaling.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KEYSPACES: telemetry_keyspace.sensor_readings\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Keyspace: telemetry_keyspace — ACTIVE\n  [✓] Table: sensor_readings — partition key: sensor_id, clustering key: reading_time DESC\n  [✓] Capacity mode: Provisioned (read: 500, write: 1000) with auto-scaling\n  [✓] Auto-scaling: target 70%, min 100, max 5000 (read and write)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PROVISIONED",
+            "auto-scaling",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clustering-key-sort-order",
+      "name": "Composite partition key and multi-column clustering key for sort order",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — composite partition key (customer_id + order_date), multi-column clustering key (order_type ASC, order_ts DESC) for range queries",
+      "prompt": "Create a table order_history in keyspace commerce_keyspace. Columns: customer_id (uuid), order_date (date), order_ts (timestamp), order_type (text), amount (decimal), status (text). Partition key: (customer_id, order_date). Clustering key: (order_type ASC, order_ts DESC). This supports queries like get all returns for customer X on date Y, newest first. On-demand capacity. PITR enabled. Region us-east-1. Tags: Environment=production, Domain=orders.",
+      "prompt_file": "prompts/clustering-key-sort-order.md",
+      "baseline_file": "baselines/clustering-key-sort-order.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KEYSPACES: commerce_keyspace.order_history\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Table: order_history — partition key: (customer_id, order_date), clustering key: (order_type ASC, order_ts DESC)\n  [✓] Partition key cardinality: HIGH (customer_id UUID + date)\n  [✓] Capacity mode: On-demand (PAY_PER_REQUEST)\n  [✓] Point-in-time recovery: ENABLED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "order_history",
+            "clustering key",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "client-side-encryption-kms",
+      "name": "Client-side envelope encryption via KMS for PII data",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — client-side KMS envelope encryption on pii_data column, server-side CMK for encryption at rest, WHERE-clause warning on encrypted columns",
+      "prompt": "Create a table pii_records in keyspace compliance_keyspace. Columns: record_id (uuid), customer_id (uuid), pii_data (blob), region (text), created_at (timestamp). Partition key: (customer_id, region). Clustering key: created_at DESC. The pii_data column must be encrypted client-side using KMS envelope encryption with alias/keyspaces-client-encryption. Also use server-side CMK alias/keyspaces-cmk for encryption at rest. On-demand capacity. PITR enabled. Region us-east-1. Tags: Environment=production, Compliance=pii.",
+      "prompt_file": "prompts/client-side-encryption-kms.md",
+      "baseline_file": "baselines/client-side-encryption-kms.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "KEYSPACES: compliance_keyspace.pii_records\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Table: pii_records — partition key: (customer_id, region), clustering key: created_at DESC\n  [✓] Client-side encryption: KMS envelope (alias/keyspaces-client-encryption) on pii_data\n  [✓] Encryption at rest: Customer-managed key (alias/keyspaces-cmk)\n  [✓] Point-in-time recovery: ENABLED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Client-side encryption",
+            "KMS envelope",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-kms-key",
+      "name": "Keyspaces table with nonexistent KMS CMK (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — KMS key alias/nonexistent-key does not exist; cannot reference a nonexistent CMK for encryption at rest",
+      "prompt": "Create a table sensitive_data in keyspace app_keyspace. Columns: id (uuid), data (blob). Partition key: id. On-demand capacity. PITR enabled. Use KMS CMK alias/nonexistent-key for encryption at rest. Region us-east-1.",
+      "prompt_file": "prompts/missing-kms-key.md",
+      "baseline_file": "baselines/missing-kms-key.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "KEYSPACES: app_keyspace.sensitive_data\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Encryption at rest: KMS CMK alias/nonexistent-key NOT FOUND — create the key before referencing it",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "KMS",
+            "VERDICT",
+            "CHECKLIST",
+            "nonexistent-key"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

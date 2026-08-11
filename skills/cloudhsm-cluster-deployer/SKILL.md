@@ -492,25 +492,21 @@ cluster. Key material auto-syncs.
 ```text
 Recommended HA topologies:
   2 AZs: tolerates 1 AZ failure (minimum production posture)
-  3 AZs: tolerates 1 AZ failure during a replace operation
-         (recommended for strict HA)
+  3 AZs: tolerates 1 AZ failure during a replace (recommended)
 ```
 
 ```bash
 # Add a third HSM for stricter HA
 aws cloudhsmv2 create-hsm --cluster-id "$CLUSTER_ID" \
-  --availability-zone us-east-1c --ip-address 10.0.3.10 \
-  --region us-east-1
+  --availability-zone us-east-1c --ip-address 10.0.3.10 --region us-east-1
 
 # Verify all HSMs ACTIVE and in sync
-aws cloudhsmv2 describe-clusters \
-  --filters clusterIds=$CLUSTER_ID \
+aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID \
   --query 'Clusters[0].Hsms[*].{AZ:AvailabilityZone, State:State, ENI:EniIp}' \
   --output table --region us-east-1
 ```
 
-Two separate clusters in two AZs do NOT sync and do NOT count as
-HA. HA is intra-cluster.
+Two separate clusters in two AZs do NOT sync. HA is intra-cluster.
 
 ## Step 8 — PKCS#11/JCE/PCSC library integration
 
@@ -586,11 +582,10 @@ Inbound rules should be the narrowest possible.
 | 2223 | TCP | workload subnet | Client (PKCS#11/JCE/PCSC) |
 
 ```bash
-# Tighten the security group to workload subnet CIDR only
+# Tighten the SG to workload subnet CIDR only
 aws ec2 authorize-security-group-ingress \
   --group-id sg-cloudhsm-prod \
-  --ip-permissions \
-    IpProtocol=tcp,FromPort=2223,ToPort=2223,IpRanges=[{CidrIp=10.0.10.0/24}] \
+  --ip-permissions IpProtocol=tcp,FromPort=2223,ToPort=2223,IpRanges=[{CidrIp=10.0.10.0/24}] \
   --region us-east-1
 ```
 
@@ -605,9 +600,7 @@ client config (`configure -a <eni-ip>` or DNS CNAME).
 ```bash
 # Point the client at the cluster's primary ENI
 sudo /opt/cloudhsm/bin/configure -a 10.0.1.10
-
-# Or use DNS CNAME: cloudhsm.internal.example.com → 10.0.1.10
-# The client uses the CN from the cluster cert to verify identity
+# Or DNS CNAME: cloudhsm.internal.example.com → 10.0.1.10
 ```
 
 If the mapping is wrong, the client fails the TLS handshake. Verify
