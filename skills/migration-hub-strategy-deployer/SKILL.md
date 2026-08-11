@@ -630,42 +630,38 @@ TEMPLATE: (partial — install agents, then re-run)
 
 ## Configuration dependency graph
 
-The Migration Hub Strategy assessment has strict ordering dependencies.
-Deploy out of order and components fail silently or produce unreliable
-output.
+The assessment has strict ordering dependencies — deploy out of order and
+components fail silently or produce unreliable output.
 
 ```
-[Confirm home region with stakeholders]
+[Confirm home region] → [Deploy Collector VM on vCenter]
+        |
+        +-----------------------------+
+        |                             |
+        v                             v
+[Install agents on critical hosts]   [Verify vCenter + AWS 443 paths]
+        |                             |
+        +-----------------------------+
         |
         v
-[Deploy Collector VM on vCenter (agentless inventory)]
-        |
-        +-----------------------------+
-        |                             |
-        v                             v
-[Install Discovery agents on critical hosts]   [Verify vCenter + AWS network paths]
-        |                             |
-        v                             v
-[Wait 7-14 days for utilization + dependency data]   [Discovery data merging in console]
-        |                             |
-        +-----------------------------+
+[Wait 7-14 days for utilization + dependency data]
         |
         v
 [Start Strategy Recommendations assessment]
         |
         v
-[Review 6R strategy + anti-patterns + TCO + right-sizing]
+[Review 6R + anti-patterns + TCO + right-sizing]
         |
         +-----------------------------+
         |                             |
         v                             v
-[Wave planning from dependency graph]   [MGN setup for rehost targets]
+[Wave planning from dependency graph]   [MGN setup for rehost]
         |                             |
         v                             v
-[Wave 0 pilot cutover]                [DMS + SCT setup for replatform targets]
+[Wave 0 pilot cutover]            [DMS + SCT setup for replatform]
         |                             |
         v                             v
-[Wave 1+ production cutover sequence]  [Database replatform cutover]
+[Wave 1+ production cutover]      [Database replatform cutover]
 ```
 
 **Hard ordering constraints:**
