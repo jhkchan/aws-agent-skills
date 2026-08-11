@@ -1,0 +1,172 @@
+# Eval test cases for apprunner-service-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across source types (ECR image, source code repository),
+# auto-scaling, VPC connector, custom domain, observability, and
+# prerequisite failure branches (missing VPC connector, invalid access role).
+skill: apprunner-service-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ecr-source-autoscale
+    description: >-
+      Deploy a production App Runner service from an ECR image with
+      VPC connector for RDS access, custom auto-scaling (min 2 / max 10,
+      concurrency 100), health check, X-Ray tracing, Secrets Manager
+      secret injection, separate access role and instance role, and
+      managed custom domain. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a production App Runner service named "checkout-api-prod"
+      in us-east-1. Source: ECR image
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/checkout-api:2.1.0
+      on port 8080 with health check GET /healthz. Instance: 2 vCPU /
+      4096 MB. Access role AppRunnerECRAccess (managed ECR policy).
+      Instance role checkout-instance with DynamoDB + S3 scoped. Secret
+      DB_PASSWORD from secretsmanager:checkout/db. Environment vars
+      LOG_LEVEL=info, ENV=production. VPC connector checkout-vpc
+      (subnets subnet-priv-a, subnet-priv-b, subnet-priv-c; security
+      group sg-priv-app). Auto-scaling min 2 / max 10, concurrency 100.
+      Deployment trigger automatic. Observability: CloudWatch Logs
+      /aws/apprunner/checkout-api-prod with 30-day retention, X-Ray
+      tracing enabled. Custom domain checkout.example.com. Account:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "checkout-api-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "VPC connector"
+        - "concurrency"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: code-repository-source
+    description: >-
+      Deploy an App Runner service from a GitHub source code repository
+      with Node.js runtime, CodeConnection ARN, build command, and
+      health check. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy an App Runner service named "user-feedback-staging" in
+      us-east-1. Source: GitHub repository
+      https://github.com/acme/user-feedback, branch main, Node.js 20
+      runtime. Build command: npm install. Start command: node
+      server.js. Port 3000 with health check GET /healthz. Instance:
+      1 vCPU / 2048 MB. CodeConnection ARN
+      arn:aws:codeconnections:us-east-1:123456789012:connection/feedback-conn.
+      Instance role feedback-instance with DynamoDB scoped. Environment
+      vars ENV=staging. Auto-scaling default. Deployment trigger
+      automatic. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "user-feedback-staging"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "GitHub"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-vpc-connector
+    description: >-
+      Deploy an App Runner service that connects to a private RDS
+      database but no VPC connector is provided. Expects
+      PREREQUISITES_MISSING — VPC connector required for private VPC
+      resources.
+    input: |
+      Deploy an App Runner service named "internal-api-prod" in
+      us-east-1. Source: ECR image
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/internal-api:1.0.0
+      on port 8080. Instance: 2 vCPU / 4096 MB. Access role
+      AppRunnerECRAccess. Instance role internal-instance. The
+      application connects to an Aurora PostgreSQL cluster at
+      db.cluster-xxx.us-east-1.rds.amazonaws.com in private subnets
+      subnet-priv-a, subnet-priv-b. No VPC connector is configured.
+      Secret DB_PASSWORD from secretsmanager:internal/db. Auto-scaling
+      min 2 / max 8. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "internal-api-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VPC connector"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: manual-deployment-observability
+    description: >-
+      Deploy a production App Runner service with manual deployment
+      trigger (AutoDeploymentsEnabled=false), full observability
+      (CloudWatch Logs + X-Ray tracing), health check, and ARM64
+      architecture. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a production App Runner service named "ml-tagger-prod" in
+      us-east-1. Source: ECR image
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/ml-tagger:3.0-arm64
+      on port 8500 with health check GET /healthz. Architecture ARM64
+      (Graviton). Instance: 4 vCPU / 16384 MB. Access role
+      AppRunnerECRAccess. Instance role tagger-instance with S3
+      GetObject on models bucket. No VPC connector needed (no private
+      resources). Auto-scaling min 2 / max 6, concurrency 50.
+      Deployment trigger MANUAL (AutoDeploymentsEnabled=false).
+      Observability: CloudWatch Logs /aws/apprunner/ml-tagger-prod
+      with 90-day retention, X-Ray tracing enabled. Custom domain
+      tagger.example.com. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ml-tagger-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "manual"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: invalid-access-role
+    description: >-
+      Deploy an App Runner service from an ECR image but the access
+      role does not exist (or does not trust tasks.apprunner.amazonaws.com).
+      Expects PREREQUISITES_MISSING — access role required for ECR source.
+    input: |
+      Deploy an App Runner service named "report-api-prod" in us-east-1.
+      Source: ECR image
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/report-api:1.2.0 on
+      port 8080. Instance: 1 vCPU / 2048 MB. Access role: NONE PROVIDED
+      (the operator forgot to create an ECR access role). Instance role
+      report-instance with DynamoDB scoped. Auto-scaling min 1 / max 4.
+      No VPC connector. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "report-api-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "access role"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"

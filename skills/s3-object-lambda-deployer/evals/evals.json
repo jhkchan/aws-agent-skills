@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-object-lambda-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Object Lambda Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "pii-redaction-getobject-ready",
+      "name": "PII redaction Object Lambda AP with supporting AP, IAM role, transform Lambda, reserved concurrency — all dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/pii-redaction-getobject-ready.md",
+      "baseline_file": "baselines/pii-redaction-getobject-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "pii-redaction-getobject-ready", "VERDICT", "CHECKLIST", "VERIFICATION_COMMANDS", "WriteGetObjectResponse", "s3-object-lambda"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "missing-reserved-concurrency-missing",
+      "name": "Object Lambda without reserved concurrency — throttle-as-AccessDenied trap (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/missing-reserved-concurrency-missing.md",
+      "baseline_file": "baselines/missing-reserved-concurrency-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-reserved-concurrency-missing", "VERDICT", "concurrency"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "missing-write-get-object-response-missing",
+      "name": "IAM role lacking s3-object-lambda:WriteGetObjectResponse — Lambda exits cleanly, client gets empty object (PREREQUISITES_MISSING)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/missing-write-get-object-response-missing.md",
+      "baseline_file": "baselines/missing-write-get-object-response-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-write-get-object-response-missing", "VERDICT", "WriteGetObjectResponse"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "multi-region-olap-ready",
+      "name": "Multi-region Object Lambda across 3 regions with per-region Lambdas and source buckets — all pass",
+      "difficulty": "medium",
+      "prompt_file": "prompts/multi-region-olap-ready.md",
+      "baseline_file": "baselines/multi-region-olap-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "multi-region-olap-ready", "VERDICT", "CHECKLIST", "VERIFICATION_COMMANDS", "eu-west-1", "ap-southeast-2"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "olap-before-standard-ap-missing",
+      "name": "OLAP created BEFORE supporting standard AP exists — routing breaks (PREREQUISITES_MISSING)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/olap-before-standard-ap-missing.md",
+      "baseline_file": "baselines/olap-before-standard-ap-missing.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "olap-before-standard-ap-missing", "VERDICT", "standard"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

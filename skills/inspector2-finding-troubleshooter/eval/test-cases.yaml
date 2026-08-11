@@ -1,0 +1,148 @@
+# Eval test cases for inspector2-finding-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the ROOT_CAUSE_FOUND /
+# NEED_MORE_INFO / ESCALATE classification across finding types
+# (package CVE on EC2, package CVE on ECR, Lambda code vulnerability,
+# network reachability, missing-prerequisite / stale finding).
+skill: inspector2-finding-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: critical-package-cve-ec2
+    description: >-
+      Diagnose a Critical PACKAGE_VULNERABILITY finding on an EC2
+      instance. The CVE has a fixed-in version available via SSM
+      Patch Manager. Expects ROOT_CAUSE_FOUND with LAYER
+      EC2_OS_PACKAGE and SSM-based remediation.
+    input: |
+      Inspector v2 fired a CRITICAL finding on EC2 instance
+      i-0abc123def456 in us-east-1. Finding ARN:
+      arn:aws:inspector2:us-east-1:111:finding/abc123. It is a
+      PACKAGE_VULNERABILITY — CVE-2024-5555 affecting openssl at
+      version 3.0.7-1.amzn2023.1 (vulnerable range < 3.0.8). Fixed-in
+      version is 3.0.8-1.amzn2023.1. The instance is Amazon Linux 2023,
+      SSM-managed, online. lastObservedAt is 2026-08-09T18:00Z. Help me
+      diagnose and remediate. Account ID: 123456789012.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "PACKAGE_VULNERABILITY"
+        - "VERDICT"
+        - "CRITICAL"
+        - "EC2_OS_PACKAGE"
+        - "openssl"
+        - "SSM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: lambda-code-vulnerability-hardcoded-secret
+    description: >-
+      Diagnose a CODE_VULNERABILITY finding on a Lambda function where
+      Inspector code scanning flagged a hardcoded AWS access key. The
+      snippet is REDACTED. Expects ROOT_CAUSE_FOUND with LAYER
+      LAMBDA_SOURCE_DEFECT and a code-fix + key-rotation remediation.
+    input: |
+      Inspector fired a HIGH finding on Lambda function
+      checkout-handler (arn:aws:lambda:us-east-1:111:function:checkout-handler).
+      Type is CODE_VULNERABILITY, rule JS-HARDCODED-SECRET, file
+      handler.js line 42. The CodeSnippet text comes back REDACTED.
+      lastObservedAt 2026-08-09T20:00Z. Runtime nodejs20.x, no package
+      CVEs on its layers. Account ID: 123456789012.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "CODE_VULNERABILITY"
+        - "VERDICT"
+        - "LAMBDA_SOURCE_DEFECT"
+        - "rotate"
+        - "Secrets Manager"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "patch the runtime"
+
+  - id: network-reachability-sg-overly-permissive
+    description: >-
+      Diagnose a NETWORK_REACHABILITY finding flagging port 3306 (MySQL)
+      open to 0.0.0.0/0 on an EC2 instance with a public IP. Expects
+      ROOT_CAUSE_FOUND with LAYER SG_OVERLY_PERMISSIVE and a
+      restrict-SG remediation (not a package patch).
+    input: |
+      Inspector fired a CRITICAL NETWORK_REACHABILITY finding on EC2
+      instance i-db99 (us-east-1, account 123456789012). Port 3306 TCP
+      is reachable from CIDR 0.0.0.0/0, scope INTERNET. Security group
+      sg-db1 has an inbound rule 0.0.0.0/0 on tcp/3306. The instance
+      has a public IP (203.0.113.10). lastObservedAt 2026-08-09T22:00Z.
+      No package CVEs on the instance. How do I remediate?
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "NETWORK_REACHABILITY"
+        - "VERDICT"
+        - "SG_OVERLY_PERMISSIVE"
+        - "revoke-security-group-ingress"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "patch"
+        - "SSM Run Command"
+
+  - id: missing-finding-context
+    description: >-
+      Operator mentions an Inspector finding but does not provide the
+      finding ARN, finding JSON, or resource ARN. Expects NEED_MORE_INFO
+      with specific gaps cited.
+    input: |
+      Inspector flagged something on one of my EC2 instances. I think
+      it is a CVE. What do I do? Region us-east-1, account
+      123456789012.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "finding ARN"
+        - "batch-get-finding-details"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: ROOT_CAUSE_FOUND"
+        - "VERDICT: ESCALATE"
+
+  - id: stale-finding-already-patched
+    description: >-
+      Diagnose a PACKAGE_VULNERABILITY finding where the package
+      version is already >= fixedInVersion. lastObservedAt is more than
+      24h ago. Expects ROOT_CAUSE_FOUND with LAYER STALE_FINDING and a
+      rescan / no-action remediation (not a patch operation).
+    input: |
+      Inspector shows an OPEN PACKAGE_VULNERABILITY finding on EC2
+      instance i-789xyz for CVE-2024-7777 on the curl package. The
+      finding says vulnerable range < 8.4.0, fixed-in 8.4.0. But
+      lastObservedAt is 2026-08-05T10:00Z (5 days ago), and when I
+      query SSM inventory I see curl at version 8.4.0-1.amzn2023.1.
+      Is this still actionable? Account ID: 123456789012.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "STALE_FINDING"
+        - "VERDICT"
+        - "rescan"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "AWS-RunPatchBaseline"
+        - "send-command"

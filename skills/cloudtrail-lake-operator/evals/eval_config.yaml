@@ -1,0 +1,47 @@
+# Eval configuration for cloudtrail-lake-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: cloudtrail-lake-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: create-eds-mgmt-events-sse-kms-ready
+    difficulty: medium
+    prompt_file: prompts/create-eds-mgmt-events-sse-kms-ready.md
+    baseline_file: baselines/create-eds-mgmt-events-sse-kms-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: diagnose-empty-query-event-category-mismatch-blocked
+    difficulty: hard
+    prompt_file: prompts/diagnose-empty-query-event-category-mismatch-blocked.md
+    baseline_file: baselines/diagnose-empty-query-event-category-mismatch-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: run-partiql-aggregation-ready
+    difficulty: medium
+    prompt_file: prompts/run-partiql-aggregation-ready.md
+    baseline_file: baselines/run-partiql-aggregation-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: diagnose-slow-query-missing-time-filter-blocked
+    difficulty: hard
+    prompt_file: prompts/diagnose-slow-query-missing-time-filter-blocked.md
+    baseline_file: baselines/diagnose-slow-query-missing-time-filter-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: athena-federated-cross-region-completed
+    difficulty: hard
+    prompt_file: prompts/athena-federated-cross-region-completed.md
+    baseline_file: baselines/athena-federated-cross-region-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: MODERATE

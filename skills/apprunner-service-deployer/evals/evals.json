@@ -1,0 +1,174 @@
+{
+  "skill": "apprunner-service-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the App Runner Service Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across source types (ECR image, GitHub source code repository), auto-scaling, VPC connector, ARM64/Graviton, manual deployment, and prerequisite failure branches (missing VPC connector for private RDS, missing ECR access role). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "ecr-source-autoscale",
+      "name": "Production ECR-sourced service with VPC connector, auto-scaling, custom domain",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — full checklist with VPC connector, auto-scaling, observability",
+      "prompt": "Deploy a production App Runner service named \"checkout-api-prod\" in us-east-1. Source: ECR image 123456789012.dkr.ecr.us-east-1.amazonaws.com/checkout-api:2.1.0 on port 8080 with health check GET /healthz. Instance: 2 vCPU / 4096 MB. Access role AppRunnerECRAccess (managed ECR policy). Instance role checkout-instance with DynamoDB + S3 scoped. Secret DB_PASSWORD from secretsmanager:checkout/db. Environment vars LOG_LEVEL=info, ENV=production. VPC connector checkout-vpc (subnets subnet-priv-a, subnet-priv-b, subnet-priv-c; security group sg-priv-app). Auto-scaling min 2 / max 10, concurrency 100. Deployment trigger automatic. Observability: CloudWatch Logs /aws/apprunner/checkout-api-prod with 30-day retention, X-Ray tracing enabled. Custom domain checkout.example.com. Account: 123456789012.",
+      "prompt_file": "prompts/ecr-source-autoscale.md",
+      "baseline_file": "baselines/ecr-source-autoscale.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: checkout-api-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Source — ECR image 123456789012.dkr.ecr.us-east-1.amazonaws.com/checkout-api:2.1.0\n  [✓]      Source type — ECR (image), access role AppRunnerECRAccess\n  [✓]      Instance configuration — 2 vCPU / 4096 MB, port 8080\n  [✓]      Environment variables — LOG_LEVEL=info, ENV=production\n  [✓]      Secrets — DB_PASSWORD from secretsmanager:checkout/db\n  [✓]      Instance role — checkout-instance (DynamoDB + S3 scoped)\n  [✓]      Auto-scaling — min 2 / max 10, concurrency 100\n  [✓]      VPC connector — checkout-vpc (3 subnets, 1 SG)\n  [✓]      Health check — GET /healthz (HTTP 200), healthy threshold 3, interval 10s\n  [✓]      Deployment trigger — automatic\n  [✓]      Observability — CloudWatch Logs /aws/apprunner/checkout-api-prod, retention 30 days, X-Ray tracing enabled\n  [OPTIONAL] Custom domain — checkout.example.com (managed TLS)\nVERIFICATION_COMMANDS:\n  aws apprunner describe-service --service-arn arn:aws:apprunner:us-east-1:123456789012:service/checkout-api-prod/abc\n  aws apprunner describe-vpc-connector --vpc-connector-arn arn:aws:apprunner:us-east-1:123456789012:vpcconnector/checkout-vpc/abc\n  aws iam get-role --role-name AppRunnerECRAccess\n  aws logs describe-log-groups --log-group-name-prefix /aws/apprunner/checkout-api-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "checkout-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "VPC connector",
+            "concurrency"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "code-repository-source",
+      "name": "Staging service from GitHub source code repository with CodeConnection",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — source code repository, Node.js runtime, CodeConnection",
+      "prompt": "Deploy an App Runner service named \"user-feedback-staging\" in us-east-1. Source: GitHub repository https://github.com/acme/user-feedback, branch main, Node.js 20 runtime. Build command: npm install. Start command: node server.js. Port 3000 with health check GET /healthz. Instance: 1 vCPU / 2048 MB. CodeConnection ARN arn:aws:codeconnections:us-east-1:123456789012:connection/feedback-conn. Instance role feedback-instance with DynamoDB scoped. Environment vars ENV=staging. Auto-scaling default. Deployment trigger automatic. Account: 123456789012.",
+      "prompt_file": "prompts/code-repository-source.md",
+      "baseline_file": "baselines/code-repository-source.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: user-feedback-staging\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Source — GitHub repository https://github.com/acme/user-feedback (branch main)\n  [✓]      Source type — CODE (source repo), CodeConnection arn:aws:codeconnections:us-east-1:123456789012:connection/feedback-conn\n  [✓]      Instance configuration — 1 vCPU / 2048 MB, port 3000\n  [✓]      Environment variables — ENV=staging\n  [✓]      Instance role — feedback-instance (DynamoDB scoped)\n  [✓]      Build runtime — nodejs20, build: npm install, start: node server.js\n  [✓]      Health check — GET /healthz (HTTP 200), healthy threshold 3, interval 10s\n  [✓]      Deployment trigger — automatic\n  [✓]      Observability — CloudWatch Logs /aws/apprunner/user-feedback-staging, retention (default)\nVERIFICATION_COMMANDS:\n  aws apprunner describe-service --service-arn arn:aws:apprunner:us-east-1:123456789012:service/user-feedback-staging/abc\n  aws iam get-role --role-name feedback-instance\n  aws logs describe-log-groups --log-group-name-prefix /aws/apprunner/user-feedback-staging",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "user-feedback-staging",
+            "VERDICT",
+            "CHECKLIST",
+            "GitHub"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-vpc-connector",
+      "name": "ECR service connecting to private RDS without VPC connector",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — VPC connector required for private VPC resources",
+      "prompt": "Deploy an App Runner service named \"internal-api-prod\" in us-east-1. Source: ECR image 123456789012.dkr.ecr.us-east-1.amazonaws.com/internal-api:1.0.0 on port 8080. Instance: 2 vCPU / 4096 MB. Access role AppRunnerECRAccess. Instance role internal-instance. The application connects to an Aurora PostgreSQL cluster at db.cluster-xxx.us-east-1.rds.amazonaws.com in private subnets subnet-priv-a, subnet-priv-b. No VPC connector is configured. Secret DB_PASSWORD from secretsmanager:internal/db. Auto-scaling min 2 / max 8. Account: 123456789012.",
+      "prompt_file": "prompts/missing-vpc-connector.md",
+      "baseline_file": "baselines/missing-vpc-connector.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SERVICE: internal-api-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Source — ECR image 123456789012.dkr.ecr.us-east-1.amazonaws.com/internal-api:1.0.0\n  [✓]      Source type — ECR (image), access role AppRunnerECRAccess\n  [✓]      Instance configuration — 2 vCPU / 4096 MB, port 8080\n  [✗]      VPC connector — REQUIRED for Aurora PostgreSQL at db.cluster-xxx.us-east-1.rds.amazonaws.com in private subnets. Without a VPC connector, DNS resolves but TCP connections hang silently until timeout. Create a VPC connector with subnets subnet-priv-a, subnet-priv-b and a security group allowing outbound 5432.\nVERIFICATION_COMMANDS:\n  aws apprunner list-vpc-connectors --query 'VpcConnectors[*].VpcConnectorName'\n  aws ec2 describe-subnets --subnet-ids subnet-priv-a subnet-priv-b",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "internal-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VPC connector"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "manual-deployment-observability",
+      "name": "Production ARM64/Graviton ML service with manual deployment and X-Ray",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — manual deployment, ARM64, full observability, custom domain",
+      "prompt": "Deploy a production App Runner service named \"ml-tagger-prod\" in us-east-1. Source: ECR image 123456789012.dkr.ecr.us-east-1.amazonaws.com/ml-tagger:3.0-arm64 on port 8500 with health check GET /healthz. Architecture ARM64 (Graviton). Instance: 4 vCPU / 16384 MB. Access role AppRunnerECRAccess. Instance role tagger-instance with S3 GetObject on models bucket. No VPC connector needed (no private resources). Auto-scaling min 2 / max 6, concurrency 50. Deployment trigger MANUAL (AutoDeploymentsEnabled=false). Observability: CloudWatch Logs /aws/apprunner/ml-tagger-prod with 90-day retention, X-Ray tracing enabled. Custom domain tagger.example.com. Account: 123456789012.",
+      "prompt_file": "prompts/manual-deployment-observability.md",
+      "baseline_file": "baselines/manual-deployment-observability.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: ml-tagger-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Source — ECR image 123456789012.dkr.ecr.us-east-1.amazonaws.com/ml-tagger:3.0-arm64\n  [✓]      Source type — ECR (image), access role AppRunnerECRAccess\n  [✓]      Instance configuration — 4 vCPU / 16384 MB, port 8500, ARM64\n  [✓]      Instance role — tagger-instance (S3 GetObject on models bucket)\n  [✓]      Auto-scaling — min 2 / max 6, concurrency 50\n  [✓]      Health check — GET /healthz (HTTP 200), healthy threshold 3, interval 10s\n  [✓]      Deployment trigger — manual (AutoDeploymentsEnabled=false)\n  [✓]      Observability — CloudWatch Logs /aws/apprunner/ml-tagger-prod, retention 90 days, X-Ray tracing enabled\n  [OPTIONAL] Custom domain — tagger.example.com (managed TLS)\nVERIFICATION_COMMANDS:\n  aws apprunner describe-service --service-arn arn:aws:apprunner:us-east-1:123456789012:service/ml-tagger-prod/abc\n  aws iam get-role --role-name AppRunnerECRAccess\n  aws logs describe-log-groups --log-group-name-prefix /aws/apprunner/ml-tagger-prod\n  aws apprunner list-operations --service-arn arn:aws:apprunner:us-east-1:123456789012:service/ml-tagger-prod/abc",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ml-tagger-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "manual"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "invalid-access-role",
+      "name": "ECR-sourced service with no access role provided",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — access role required for ECR source",
+      "prompt": "Deploy an App Runner service named \"report-api-prod\" in us-east-1. Source: ECR image 123456789012.dkr.ecr.us-east-1.amazonaws.com/report-api:1.2.0 on port 8080. Instance: 1 vCPU / 2048 MB. Access role: NONE PROVIDED (the operator forgot to create an ECR access role). Instance role report-instance with DynamoDB scoped. Auto-scaling min 1 / max 4. No VPC connector. Account: 123456789012.",
+      "prompt_file": "prompts/invalid-access-role.md",
+      "baseline_file": "baselines/invalid-access-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SERVICE: report-api-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Source — ECR image 123456789012.dkr.ecr.us-east-1.amazonaws.com/report-api:1.2.0\n  [✗]      Source type — ECR (image), access role MISSING. The ECR access role is REQUIRED for ECR-sourced services. It must trust tasks.apprunner.amazonaws.com and have the AWSAppRunnerServicePolicyForECRAccess managed policy attached. Create it before deploying.\n  [✓]      Instance configuration — 1 vCPU / 2048 MB, port 8080\n  [✓]      Instance role — report-instance (DynamoDB scoped)\nVERIFICATION_COMMANDS:\n  aws iam get-role --query 'Role.AssumeRolePolicyDocument' --role-name AppRunnerECRAccess\n  aws iam list-attached-role-policies --role-name AppRunnerECRAccess",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "report-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "access role"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    }
+  ]
+}

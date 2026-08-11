@@ -1,0 +1,43 @@
+# Eval configuration for backup-compliance-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: backup-compliance-automator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: soc2-cross-account-legal-hold
+    difficulty: hard
+    prompt_file: prompts/soc2-cross-account-legal-hold.md
+    baseline_file: baselines/soc2-cross-account-legal-hold.md
+    expected_verdict: AUTOMATED
+  - id: hipaa-vault-lock-test
+    difficulty: hard
+    prompt_file: prompts/hipaa-vault-lock-test.md
+    baseline_file: baselines/hipaa-vault-lock-test.md
+    expected_verdict: AUTOMATED
+  - id: cross-region-pitr-search
+    difficulty: hard
+    prompt_file: prompts/cross-region-pitr-search.md
+    baseline_file: baselines/cross-region-pitr-search.md
+    expected_verdict: AUTOMATED
+  - id: governance-mode-no-test
+    difficulty: hard
+    prompt_file: prompts/governance-mode-no-test.md
+    baseline_file: baselines/governance-mode-no-test.md
+    expected_verdict: MANUAL_STEP_REQUIRED
+  - id: no-org-vault-drift
+    difficulty: hard
+    prompt_file: prompts/no-org-vault-drift.md
+    baseline_file: baselines/no-org-vault-drift.md
+    expected_verdict: MANUAL_STEP_REQUIRED

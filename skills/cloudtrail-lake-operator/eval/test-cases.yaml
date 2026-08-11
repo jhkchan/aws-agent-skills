@@ -1,0 +1,271 @@
+# Eval test cases for cloudtrail-lake-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudtrail-lake-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-eds-mgmt-events-sse-kms-ready
+    description: >-
+      Operator wants to create a new organization-scoped Event Data
+      Store in us-east-1 ingesting CloudTrail management events from
+      all accounts in org o-abc123def. All pre-checks pass: caller
+      is the management account, retention 365 days within bounds,
+      KMS key policy grants cloudtrail.amazonaws.com, AWS
+      Organizations access for CloudTrail is enabled. Plan should
+      produce READY with the create-event-data-store CLI and a
+      CONFIRM gate.
+    input: |
+      Operation: create-eds
+      Name: org-governance-edS
+      Region: us-east-1
+      Organization scope: true (org o-abc123def)
+      Ingestion: CloudTrail management events
+      Retention: 365 days
+      KMS: SSE-KMS with key
+        arn:aws:kms:us-east-1:111111111111:key/edS-cmk
+
+      Caller identity (aws sts get-caller-identity):
+        Account: 111111111111 (management account for o-abc123def)
+
+      Organizations access for CloudTrail (aws organizations
+        describe-organization):
+        Enabled, management account 111111111111
+
+      Destination KMS key policy (aws kms get-key-policy):
+        Grants cloudtrail.amazonaws.com kms:GenerateDataKey +
+        kms:Decrypt (verified)
+
+      Advanced event selectors (proposed):
+        - Name: management-events
+          FieldSelectors:
+            - Field: eventCategory
+              Equals: [Management]
+
+      TerminationProtectionEnabled: true (default)
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-event-data-store"
+        - "Management"
+        - "kms:GenerateDataKey"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: diagnose-empty-query-event-category-mismatch-blocked
+    description: >-
+      A Lake query for S3 object-level events (GetObject, PutObject)
+      returns zero rows. Investigation reveals the EDS was created
+      with EventCategory: Management only. S3 data events require
+      EventCategory: Data. Diagnose and emit BLOCKED with the
+      update-event-data-store fix.
+    input: |
+      Operation: diagnose-empty-query
+      EDS: arn:aws:cloudtrail:us-east-1:111111111111:event-data-store/eds-001
+        (name: org-governance-edS)
+      Region: us-east-1
+
+      EDS configuration (aws cloudtrail get-event-data-store):
+        Status: ENABLED
+        EventCategory: [Management]  # only Management
+        RetentionPeriod: 365
+        TerminationProtectionEnabled: true
+
+      Query (aws cloudtrail start-query):
+        SQL: SELECT userIdentity.accountId, eventName, COUNT(*)
+             FROM eds-001
+             WHERE eventTime >= '2026-08-01'
+               AND eventSource = 's3.amazonaws.com'
+             GROUP BY userIdentity.accountId, eventName
+
+      Query result (describe-query):
+        QueryStatus: FINISHED
+        QueryRunTimeInSeconds: 14
+        BytesScanned: 4,200,000,000
+        ResultsCount: 0
+
+      Operator's intent: count S3 GetObject/PutObject/DeleteObject
+        events per account.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "EventCategory"
+        - "Data"
+        - "update-event-data-store"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: run-partiql-aggregation-ready
+    description: >-
+      Operator wants to run a PartiQL aggregation query against an
+      existing EDS. All pre-checks pass: EDS ENABLED, SQL includes
+      eventTime filter, references Lake-supported columns, EDS
+      EventCategory matches the filter. Plan should produce READY
+      with the start-query CLI and a CONFIRM gate.
+    input: |
+      Operation: run-query
+      EDS: arn:aws:cloudtrail:us-east-1:111111111111:event-data-store/eds-001
+      Region: us-east-1
+
+      EDS configuration:
+        Status: ENABLED
+        EventCategory: [Management]
+        RetentionPeriod: 365
+        Bytes stored: ~120 GB over 90 days
+
+      SQL (proposed):
+        SELECT userIdentity.arn, COUNT(*) AS event_count
+        FROM eds-001
+        WHERE eventTime >= date_add('day', -7, now())
+        GROUP BY userIdentity.arn
+        ORDER BY event_count DESC
+        LIMIT 20
+
+      Operator intent: top 20 callers by event count in last 7 days.
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "start-query"
+        - "eventTime"
+        - "VERDICT"
+        - "CONFIRM"
+        - "PARTITION_PRUNING"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: diagnose-slow-query-missing-time-filter-blocked
+    description: >-
+      A Lake aggregation query took 11 minutes to run with
+      BytesScanned: 100 GB (the full EDS). The SQL is missing a
+      WHERE eventTime BETWEEN ... filter, triggering a full-table
+      scan. Diagnose and emit BLOCKED with the time-filter fix.
+    input: |
+      Operation: diagnose-slow-query
+      EDS: arn:aws:cloudtrail:us-east-1:111111111111:event-data-store/eds-001
+      Region: us-east-1
+
+      EDS size: ~100 GB over 90 days
+
+      Query (aws cloudtrail start-query):
+        SQL: SELECT userIdentity.arn, COUNT(*) AS cnt
+             FROM eds-001
+             GROUP BY userIdentity.arn
+             ORDER BY cnt DESC
+             LIMIT 20
+
+      describe-query result:
+        QueryStatus: FINISHED
+        QueryRunTimeInSeconds: 660
+        BytesScanned: 100,000,000,000 (100 GB - full table)
+        ResultsCount: 4,231
+
+      Operator intent: top 20 callers by event count, was hoping
+        for under 60 second latency.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "eventTime"
+        - "partition"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: athena-federated-cross-region-completed
+    description: >-
+      Operator ran a federated Athena query joining CloudTrail Lake
+      EDS in us-east-1 with another EDS in eu-west-1 via two
+      CloudTrailLake connector instances. The query succeeded with
+      results matching expected row count and BytesScanned within
+      bound. Produce the COMPLETED post-verification form.
+    input: |
+      Operation: federate-via-athena
+      EDS us-east-1: arn:aws:cloudtrail:us-east-1:111111111111:event-data-store/eds-us-east-1
+      EDS eu-west-1: arn:aws:cloudtrail:eu-west-1:111111111111:event-data-store/eds-eu-west-1
+      Athena workgroup: gov-analytics
+
+      Pre-checks all passed:
+        - CloudTrailLake connector deployed in us-east-1 and eu-west-1
+        - Lake Formation grants on connector Lambda roles for both EDS
+        - Athena workgroup role has cloudtrail:StartQuery, GetQuery,
+          GetQueryResults on both EDS
+        - Athena workgroup role has kms:Decrypt on both KMS keys
+
+      Execution (aws athena start-query-execution):
+        SQL: SELECT us.userIdentity.accountId,
+                    us.eventName, us.eventTime AS us_time,
+                    eu.eventTime AS eu_time
+             FROM
+              lambda:cloudtraillake_us_east_1.eds-us-east-1 us
+             JOIN
+              lambda:cloudtraillake_eu_west_1.eds-eu-west-1 eu
+             ON us.userIdentity.sessionId = eu.userIdentity.sessionId
+             WHERE us.eventTime >= date_add('day', -1, now())
+               AND eu.eventTime >= date_add('day', -1, now())
+               AND us.eventName = 'AssumeRole'
+             ORDER BY us.eventTime DESC
+             LIMIT 1000
+        Result: QueryExecutionId athena-exec-001, State SUCCEEDED
+
+      Athena query execution result:
+        State: SUCCEEDED
+        DataScannedInBytes: 4,200,000,000 (4.2 GB)
+        Result rows: 842 (within expected 500-1500 band)
+        Output location: s3://athena-results-111111111111/gov/athena-exec-001.csv
+
+      Lake describe-query (underlying EDS query in us-east-1):
+        QueryStatus: FINISHED
+        BytesScanned: 3,900,000,000 (3.9 GB - within Athena band)
+
+      Spot-check (operator-confirmed):
+        Three rows manually inspected: accountId, eventName,
+        eventTime match raw Lake query in us-east-1.
+
+      Task: emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "Athena"
+        - "POST_VERIFY"
+        - "SUCCEEDED"
+        - "VERDICT"
+        - "federated"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

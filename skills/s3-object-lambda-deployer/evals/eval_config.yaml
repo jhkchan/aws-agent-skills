@@ -1,0 +1,43 @@
+# Eval configuration for s3-object-lambda-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: s3-object-lambda-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: pii-redaction-getobject-ready
+    difficulty: easy
+    prompt_file: prompts/pii-redaction-getobject-ready.md
+    baseline_file: baselines/pii-redaction-getobject-ready.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: missing-reserved-concurrency-missing
+    difficulty: hard
+    prompt_file: prompts/missing-reserved-concurrency-missing.md
+    baseline_file: baselines/missing-reserved-concurrency-missing.md
+    expected_verdict: PREREQUISITES_MISSING
+  - id: missing-write-get-object-response-missing
+    difficulty: hard
+    prompt_file: prompts/missing-write-get-object-response-missing.md
+    baseline_file: baselines/missing-write-get-object-response-missing.md
+    expected_verdict: PREREQUISITES_MISSING
+  - id: multi-region-olap-ready
+    difficulty: medium
+    prompt_file: prompts/multi-region-olap-ready.md
+    baseline_file: baselines/multi-region-olap-ready.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: olap-before-standard-ap-missing
+    difficulty: medium
+    prompt_file: prompts/olap-before-standard-ap-missing.md
+    baseline_file: baselines/olap-before-standard-ap-missing.md
+    expected_verdict: PREREQUISITES_MISSING

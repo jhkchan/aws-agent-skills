@@ -1,0 +1,48 @@
+# Eval configuration for apprunner-service-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: apprunner-service-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: ecr-source-autoscale
+    difficulty: hard
+    prompt_file: prompts/ecr-source-autoscale.md
+    baseline_file: baselines/ecr-source-autoscale.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: code-repository-source
+    difficulty: hard
+    prompt_file: prompts/code-repository-source.md
+    baseline_file: baselines/code-repository-source.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-vpc-connector
+    difficulty: hard
+    prompt_file: prompts/missing-vpc-connector.md
+    baseline_file: baselines/missing-vpc-connector.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: manual-deployment-observability
+    difficulty: hard
+    prompt_file: prompts/manual-deployment-observability.md
+    baseline_file: baselines/manual-deployment-observability.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: invalid-access-role
+    difficulty: medium
+    prompt_file: prompts/invalid-access-role.md
+    baseline_file: baselines/invalid-access-role.md
+    expected_verdict: PREREQUISITES_MISSING

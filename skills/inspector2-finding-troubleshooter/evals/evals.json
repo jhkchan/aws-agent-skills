@@ -1,0 +1,174 @@
+{
+  "skill": "inspector2-finding-troubleshooter",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Inspector v2 Finding Troubleshooter. Five-case proven set exercising the ROOT_CAUSE_FOUND / NEED_MORE_INFO / ESCALATE classification across finding types (package CVE on EC2 with SSM remediation, Lambda code vulnerability hardcoded secret, network reachability SG overly permissive, missing finding context, stale finding already patched) and missing-context branches. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "critical-package-cve-ec2",
+      "name": "Critical PACKAGE_VULNERABILITY on EC2 with SSM Patch Manager fix available",
+      "difficulty": "hard",
+      "branch": "ROOT_CAUSE_FOUND — openssl CVE on EC2, fixed-in version available via SSM Patch Baseline, AWS-RunPatchBaseline remediation",
+      "prompt": "Inspector v2 fired a CRITICAL finding on EC2 instance i-0abc123def456 in us-east-1. Finding ARN: arn:aws:inspector2:us-east-1:111:finding/abc123. It is a PACKAGE_VULNERABILITY — CVE-2024-5555 affecting openssl at version 3.0.7-1.amzn2023.1 (vulnerable range < 3.0.8). Fixed-in version is 3.0.8-1.amzn2023.1. The instance is Amazon Linux 2023, SSM-managed, online. lastObservedAt is 2026-08-09T18:00Z. Help me diagnose and remediate. Account ID: 123456789012.",
+      "prompt_file": "prompts/critical-package-cve-ec2.md",
+      "baseline_file": "baselines/critical-package-cve-ec2.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_output": "TARGET: arn:aws:ec2:us-east-1:111:instance/i-0abc123def456\nVERDICT: ROOT_CAUSE_FOUND\nREASON: Instance has openssl at 3.0.7-1.amzn2023.1 which is within CVE-2024-5555 vulnerable range; fixed version 3.0.8-1.amzn2023.1 is available in SSM Patch Baseline.\nFINDING_TYPE: PACKAGE_VULNERABILITY\nSEVERITY: CRITICAL\nLAYER: EC2_OS_PACKAGE\nEVIDENCE:\n  - Finding: CVE-2024-5555 on openssl, lastObservedAt 2026-08-09T18:00Z\n  - Probe: SSM list-inventory-entries confirms openssl 3.0.7-1.amzn2023.1\n  - Probe: SSM describe-patches shows 3.0.8-1.amzn2023.1 available\nREMEDIATION:\n  1. aws ssm send-command --instance-ids i-0abc123def456 --document-name AWS-RunPatchBaseline\n  2. Wait for next Inspector rescan; finding auto-closes\n  3. Verify via list-inventory-entries that openssl is at 3.0.8",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_FOUND",
+            "PACKAGE_VULNERABILITY",
+            "VERDICT",
+            "CRITICAL",
+            "EC2_OS_PACKAGE",
+            "openssl",
+            "SSM"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: NEED_MORE_INFO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lambda-code-vulnerability-hardcoded-secret",
+      "name": "Lambda CODE_VULNERABILITY (hardcoded AWS access key) with redacted snippet",
+      "difficulty": "hard",
+      "branch": "ROOT_CAUSE_FOUND — Inspector code scanning for Lambda flags JS-HARDCODED-SECRET in handler.js:42, snippet REDACTED, fix is code change + key rotation",
+      "prompt": "Inspector fired a HIGH finding on Lambda function checkout-handler (arn:aws:lambda:us-east-1:111:function:checkout-handler). Type is CODE_VULNERABILITY, rule JS-HARDCODED-SECRET, file handler.js line 42. The CodeSnippet text comes back REDACTED. lastObservedAt 2026-08-09T20:00Z. Runtime nodejs20.x, no package CVEs on its layers. Account ID: 123456789012.",
+      "prompt_file": "prompts/lambda-code-vulnerability-hardcoded-secret.md",
+      "baseline_file": "baselines/lambda-code-vulnerability-hardcoded-secret.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_output": "TARGET: arn:aws:lambda:us-east-1:111:function:checkout-handler\nVERDICT: ROOT_CAUSE_FOUND\nREASON: Function has hardcoded AWS access key in handler.js line 42 (rule JS-HARDCODED-SECRET).\nFINDING_TYPE: CODE_VULNERABILITY\nSEVERITY: HIGH\nLAYER: LAMBDA_SOURCE_DEFECT\nEVIDENCE:\n  - Finding: CODE_VULNERABILITY, rule JS-HARDCODED-SECRET\n  - Probe: batch-get-code-snippets returns filePath handler.js, lineNumber 42, text REDACTED\nREMEDIATION:\n  1. Remove hardcoded key from handler.js:42, load from Secrets Manager\n  2. Rotate the exposed key in IAM\n  3. Redeploy via update-function-code\n  4. Verify finding closes on rescan",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_FOUND",
+            "CODE_VULNERABILITY",
+            "VERDICT",
+            "LAMBDA_SOURCE_DEFECT",
+            "rotate",
+            "Secrets Manager"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "VERDICT: NEED_MORE_INFO",
+            "patch the runtime"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network-reachability-sg-overly-permissive",
+      "name": "NETWORK_REACHABILITY finding on port 3306 with SG 0.0.0.0/0 inbound",
+      "difficulty": "medium",
+      "branch": "ROOT_CAUSE_FOUND — SG_OVERLY_PERMISSIVE layer, remediation is SG restrict (not package patch)",
+      "prompt": "Inspector fired a CRITICAL NETWORK_REACHABILITY finding on EC2 instance i-db99 (us-east-1, account 123456789012). Port 3306 TCP is reachable from CIDR 0.0.0.0/0, scope INTERNET. Security group sg-db1 has an inbound rule 0.0.0.0/0 on tcp/3306. The instance has a public IP (203.0.113.10). lastObservedAt 2026-08-09T22:00Z. No package CVEs on the instance. How do I remediate?",
+      "prompt_file": "prompts/network-reachability-sg-overly-permissive.md",
+      "baseline_file": "baselines/network-reachability-sg-overly-permissive.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_output": "TARGET: arn:aws:ec2:us-east-1:111:instance/i-db99\nVERDICT: ROOT_CAUSE_FOUND\nREASON: SG sg-db1 has inbound 0.0.0.0/0 on tcp/3306; Inspector flagged port 3306 reachable from INTERNET.\nFINDING_TYPE: NETWORK_REACHABILITY\nSEVERITY: CRITICAL\nLAYER: SG_OVERLY_PERMISSIVE\nEVIDENCE:\n  - Finding: port 3306, CIDR 0.0.0.0/0, scope INTERNET\n  - Probe: describe-security-groups returns IpPermissions FromPort 3306, CidrIp 0.0.0.0/0\nREMEDIATION:\n  1. aws ec2 revoke-security-group-ingress --group-id sg-db1 --protocol tcp --port 3306 --cidr 0.0.0.0/0\n  2. Add scoped rule from sg-app\n  3. Finding closes on next rescan",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_FOUND",
+            "NETWORK_REACHABILITY",
+            "VERDICT",
+            "SG_OVERLY_PERMISSIVE",
+            "revoke-security-group-ingress"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "patch",
+            "SSM Run Command"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-finding-context",
+      "name": "Operator reports an Inspector finding without ARN, JSON, or resource ARN",
+      "difficulty": "easy",
+      "branch": "NEED_MORE_INFO — finding ARN, finding JSON, resource ARN all unspecified",
+      "prompt": "Inspector flagged something on one of my EC2 instances. I think it is a CVE. What do I do? Region us-east-1, account 123456789012.",
+      "prompt_file": "prompts/missing-finding-context.md",
+      "baseline_file": "baselines/missing-finding-context.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "expected_output": "TARGET: unknown\nVERDICT: NEED_MORE_INFO\nREASON: Input is missing required context — at minimum the finding ARN or full finding JSON.\nFINDING_TYPE: UNKNOWN\nSEVERITY: UNKNOWN\nEVIDENCE:\n  - Missing: finding ARN, finding JSON (Type, Severity, Title, Resources), resource ARN\nREMEDIATION: Re-prompt for finding ARN from batch-get-finding-details, resource ARN, and lastObservedAt window.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "NEED_MORE_INFO",
+            "VERDICT",
+            "finding ARN",
+            "batch-get-finding-details"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "VERDICT: ROOT_CAUSE_FOUND",
+            "VERDICT: ESCALATE"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stale-finding-already-patched",
+      "name": "Open PACKAGE_VULNERABILITY finding where package is already at fixed-in version",
+      "difficulty": "medium",
+      "branch": "ROOT_CAUSE_FOUND — STALE_FINDING layer, remediation is rescan (not patch)",
+      "prompt": "Inspector shows an OPEN PACKAGE_VULNERABILITY finding on EC2 instance i-789xyz for CVE-2024-7777 on the curl package. The finding says vulnerable range < 8.4.0, fixed-in 8.4.0. But lastObservedAt is 2026-08-05T10:00Z (5 days ago), and when I query SSM inventory I see curl at version 8.4.0-1.amzn2023.1. Is this still actionable? Account ID: 123456789012.",
+      "prompt_file": "prompts/stale-finding-already-patched.md",
+      "baseline_file": "baselines/stale-finding-already-patched.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_output": "TARGET: arn:aws:ec2:us-east-1:111:instance/i-789xyz\nVERDICT: ROOT_CAUSE_FOUND\nREASON: Finding is stale — curl is already at 8.4.0-1.amzn2023.1 (>= fixed-in version 8.4.0); finding will auto-close on next rescan.\nFINDING_TYPE: PACKAGE_VULNERABILITY\nSEVERITY: <from finding>\nLAYER: STALE_FINDING\nEVIDENCE:\n  - Finding lastObservedAt 2026-08-05T10:00Z (>24h ago)\n  - Probe: SSM list-inventory-entries shows curl 8.4.0-1.amzn2023.1\nREMEDIATION:\n  1. Trigger Inspector rescan or wait for next cycle\n  2. Finding auto-closes when patched version detected\n  3. No patch action needed",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_FOUND",
+            "STALE_FINDING",
+            "VERDICT",
+            "rescan"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "AWS-RunPatchBaseline",
+            "send-command"
+          ]
+        }
+      ]
+    }
+  ]
+}

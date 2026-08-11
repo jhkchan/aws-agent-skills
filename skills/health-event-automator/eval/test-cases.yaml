@@ -1,0 +1,204 @@
+# Eval test cases for health-event-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: health-event-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: org-view-issue-scheduledchange
+    description: >-
+      Design Health event automation for a 25-account org routing issue
+      events for EC2 and RDS to Slack + Jira, DR failover gated behind
+      ImpactChoice, scheduledChange lead-time actions for instance
+      retirement, and accountNotification for exposed credentials. All
+      gates pass. Verdict: AUTOMATED.
+    input: |
+      Design AWS Health event automation for our org (25 member accounts,
+      delegated admin in audit account 222222222222). Emit the standard
+      Health block (EVENT_TYPES, AFFECTED_ENTITIES, RESPONDERS, ORG_VIEW,
+      SCHEDULED_CHANGES, VERIFICATION, VERDICT, FINDINGS, REMEDIATION).
+
+      Requirements:
+      - Event categories: issue, accountNotification, scheduledChange
+      - Services: EC2, RDS
+      - Regions: all active (us-east-1, us-west-2, eu-west-1)
+      - Accounts scope: organizational (25 member accounts)
+      - Responders: Slack notify, Jira create, DR failover trigger (region
+        outage only), Auto Scaling scale-out (EC2 host degradation), access
+        key rotation (credential exposed)
+      - Org view: enable-health-service-access-for-organization, delegated
+        admin in audit account
+      - Lead time: 7 days before scheduledEndTime for scheduledChange
+      - DLQ on every EventBridge target
+      - Synthetic event replay: 2026-08-01, end-to-end 12s
+      - Poller fallback: 60s describe-events cadence
+      - Idempotency: Jira dedup on eventArn label
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "org-view-issue-scheduledchange"
+        - "VERDICT"
+        - "describe-affected-entities"
+        - "enable-health-service-access-for-organization"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: scheduled-change-leadtime
+    description: >-
+      Design scheduledChange automation with EventBridge Scheduler lead-time
+      actions for instance retirement and RDS maintenance. Includes
+      scheduledEndTime re-fetch. All gates pass. Verdict: AUTOMATED.
+    input: |
+      Design AWS Health scheduledChange automation for our org (10 member
+      accounts). Emit the standard Health block.
+
+      Requirements:
+      - Event categories: scheduledChange only
+      - Services: EC2, RDS
+      - Regions: us-east-1, us-west-2
+      - Accounts scope: organizational
+      - Lead time: 7 days before scheduledEndTime for EC2 retirement;
+        1 day before for RDS maintenance
+      - Action: replace retired instance via launch template (EC2); verify
+        standby is current and plan failover window (RDS)
+      - ScheduledEndTime re-fetch: yes, before firing the lead-time action
+      - DLQ on every target
+      - Event replay: 2026-07-20, validated
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "scheduled-change-leadtime"
+        - "VERDICT"
+        - "scheduledEndTime"
+        - "EventBridge Scheduler"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: user-notifications-chat
+    description: >-
+      Design Health automation using AWS User Notifications for Slack
+      delivery of issue events, paired with EventBridge + Lambda for DR
+      failover gating. All gates pass. Verdict: AUTOMATED.
+    input: |
+      Design Health automation using AWS User Notifications for managed
+      chat delivery. Emit the standard Health block.
+
+      Requirements:
+      - Event categories: issue
+      - Services: EC2, RDS, S3
+      - Regions: us-east-1, us-west-2
+      - Accounts scope: single
+      - Chat delivery: AWS User Notifications (Slack channel) for
+        immediate notify
+      - Action responder: EventBridge + Lambda for DR failover trigger
+        gated behind ImpactChoice (region_outage only)
+      - DLQ on Lambda target
+      - Affected-entity enrichment before DR trigger
+      - Synthetic event replay: 2026-08-05
+      - Idempotency: dedup on eventArn
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "user-notifications-chat"
+        - "VERDICT"
+        - "User Notifications"
+        - "ImpactChoice"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: no-dlq-no-impact-gate
+    description: >-
+      Validate an existing Health responder workflow with no DLQ on targets,
+      DR trigger wired directly from issue events (no ImpactChoice), and
+      no affected-entity enrichment. Multiple CRITICAL gates fail. Verdict:
+      MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing Health responder workflow. Emit the standard
+      Health block.
+
+      Current state:
+      - Event categories: issue (only)
+      - Services: EC2
+      - Accounts scope: single
+      - Existing workflow:
+        - EventBridge rule: aws.health / issue / EC2
+        - Lambda target: directly invokes DR failover Step Functions on
+          any issue event (no impact evaluation)
+        - No DLQ on any EventBridge target
+        - No describe-affected-entities enrichment step
+        - Slack message says only "EC2 issue" — no instance IDs
+      - No synthetic event replay test
+      - No poller fallback
+      - No idempotency (same eventArn creates duplicate Jira tickets)
+
+      Expected: MANUAL_STEP_REQUIRED. The skill must flag multiple
+      CRITICAL gaps:
+      1. No DLQ — silently dropped Health events (missed outage risk).
+      2. DR trigger ungated — any single-host issue triggers full regional
+         failover.
+      3. No enrichment — Slack messages lack specific resource IDs.
+      4. No idempotency — duplicate tickets on event updates.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "no-dlq-no-impact-gate"
+        - "VERDICT"
+        - "ImpactChoice"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: org-view-missing
+    description: >-
+      Validate Health automation for a 50-account org that has not enabled
+      organizational view and has per-account rules in only 5 of 50
+      accounts. 45 accounts have no Health coverage. Verdict:
+      MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing Health automation posture for our 50-account
+      org. Emit the standard Health block.
+
+      Current state:
+      - 50 member accounts in AWS Organizations
+      - Management account has NOT run enable-health-service-access-for-organization
+      - No delegated administrator for health.amazonaws.com
+      - Per-account EventBridge rules deployed in only 5 of 50 accounts
+      - The 5 covered accounts have rules for issue / EC2 / us-east-1
+      - 45 accounts have no Health event coverage at all
+      - DLQ configured in the 5 covered accounts
+      - Affected-entity enrichment Lambda deployed in the 5 covered accounts
+
+      Expected: MANUAL_STEP_REQUIRED. The skill must flag:
+      1. Org view not enabled — 45 accounts have zero Health coverage.
+      2. No delegated administrator — central visibility is impossible.
+      3. Recommend enabling org view + delegating admin to centralize.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "org-view-missing"
+        - "VERDICT"
+        - "enable-health-service-access-for-organization"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"

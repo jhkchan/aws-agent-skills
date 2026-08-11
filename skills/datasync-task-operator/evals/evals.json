@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "datasync-task-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DataSync Task Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-task-nfs-to-s3-verify-ready",
+      "name": "Create DataSync task NFS -> S3 with VERIFY + daily schedule (all pre-checks pass, READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/create-task-nfs-to-s3-verify-ready.md",
+      "baseline_file": "baselines/create-task-nfs-to-s3-verify-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-task", "nfs://10.0.10.20/vol/data", "prod-migration-archive-2026", "VERDICT", "PRE_CHECKS", "POINT_IN_TIME_CONSISTENT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "deploy-agent-onprem-activation-expired-blocked",
+      "name": "Diagnose on-prem agent deployment with expired activation key (BLOCKED with re-fetch fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/deploy-agent-onprem-activation-expired-blocked.md",
+      "baseline_file": "baselines/deploy-agent-onprem-activation-expired-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "activation", "24", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "schedule-bandwidth-throttle-ready",
+      "name": "Add daily schedule with bandwidth throttle to existing task (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/schedule-bandwidth-throttle-ready.md",
+      "baseline_file": "baselines/schedule-bandwidth-throttle-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "update-task-schedule", "rate(1 day)", "BandwidthLimitInMb", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "diagnose-failing-execution-access-denied-blocked",
+      "name": "Diagnose DataSync task execution AccessDenied on s3:PutObject (BLOCKED with IAM fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/diagnose-failing-execution-access-denied-blocked.md",
+      "baseline_file": "baselines/diagnose-failing-execution-access-denied-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "AccessDenied", "s3:PutObject", "iam", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "fsx-ontap-verify-completed",
+      "name": "SMB-to-FSx for NetApp ONTAP transfer with verify passed (COMPLETED with round-trip)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/fsx-ontap-verify-completed.md",
+      "baseline_file": "baselines/fsx-ontap-verify-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "FSx for NetApp ONTAP", "POST_VERIFY", "VerificationFilesFailed", "VERDICT", "OWNER_DACL"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

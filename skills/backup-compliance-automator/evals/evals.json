@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "backup-compliance-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Backup Compliance Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "soc2-cross-account-legal-hold",
+      "name": "SOC2-aligned backup compliance for a 30-account org with Audit Manager, LOCK_MODE Vault Lock, legal hold automation, cross-account vault, Backup Search, cost tags — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/soc2-cross-account-legal-hold.md",
+      "baseline_file": "baselines/soc2-cross-account-legal-hold.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "soc2-cross-account-legal-hold", "VERDICT", "LOCK_MODE", "create-legal-hold"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "hipaa-vault-lock-test",
+      "name": "HIPAA-aligned backup compliance for a single account with LOCK_MODE Vault Lock, encryption control, restore drill control, legal hold test cycle — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/hipaa-vault-lock-test.md",
+      "baseline_file": "baselines/hipaa-vault-lock-test.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "hipaa-vault-lock-test", "VERDICT", "LOCK_MODE", "BACKUP_RECOVERY_POINT_ENCRYPTED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "cross-region-pitr-search",
+      "name": "eDiscovery backup compliance with DynamoDB PITR, cross-region copy, scoped Backup Search, search-driven legal hold automation — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-region-pitr-search.md",
+      "baseline_file": "baselines/cross-region-pitr-search.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "cross-region-pitr-search", "VERDICT", "Backup Search", "PITR"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "governance-mode-no-test",
+      "name": "Validate HIPAA-aligned posture with GOVERNANCE mode Vault Lock, missing encryption control, legal hold never tested, 14-month-old restore drill (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/governance-mode-no-test.md",
+      "baseline_file": "baselines/governance-mode-no-test.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "governance-mode-no-test", "VERDICT", "LOCK_MODE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "no-org-vault-drift",
+      "name": "Validate 50-account org backup posture with no delegated admin, no org-wide vault, 12 accounts with zero coverage, 6 accounts with stale recovery points (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-org-vault-drift.md",
+      "baseline_file": "baselines/no-org-vault-drift.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "no-org-vault-drift", "VERDICT", "delegated admin"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    }
+  ]
+}

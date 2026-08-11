@@ -1,0 +1,283 @@
+# Eval test cases for datasync-task-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: datasync-task-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-task-nfs-to-s3-verify-ready
+    description: >-
+      Operator wants to create a new DataSync task to migrate an NFS
+      share (10.0.10.20:/vol/data) to an S3 bucket
+      (prod-migration-archive-2026, SSE-KMS) with daily schedule and
+      bandwidth throttle. All pre-checks pass: agent ONLINE, source
+      reachable, IAM role has the full read-on-source + write-on-
+      destination chain, KMS key policy grants the role, Options
+      (POINT_IN_TIME_CONSISTENT verify, PosixPermissions PRESERVE)
+      are consistent with an S3 destination. Plan should produce
+      READY with the create-task CLI and a CONFIRM gate.
+    input: |
+      Operation: create-task
+      Source: nfs://10.0.10.20/vol/data (NFS share, on-prem)
+      Destination: s3://prod-migration-archive-2026 (us-east-1, SSE-KMS
+        with key arn:aws:kms:us-east-1:111111111111:key/dest-cmk)
+      Schedule: rate(1 day)
+      Bandwidth throttle: 1000 Mb/s
+      VerifyMode: POINT_IN_TIME_CONSISTENT
+      PosixPermissions: PRESERVE
+
+      Agent (aws datasync describe-agent):
+        AgentArn: arn:aws:datasync:us-east-1:111111111111:agent/agent-001
+        Status: ONLINE
+        LastConnectionTime: 2026-08-10T22:00:00Z
+
+      Source location (aws datasync list-locations):
+        LocationType: NFS
+        LocationUri: nfs://10.0.10.20/vol/data
+        AgentArns: [arn:aws:datasync:us-east-1:111111111111:agent/agent-001]
+
+      Destination location:
+        LocationType: S3
+        LocationUri: s3://prod-migration-archive-2026
+        S3StorageClass: STANDARD
+
+      IAM role (datasync-task-role):
+        Trust: datasync.amazonaws.com
+        Permissions:
+          - s3:GetObject on arn:aws:s3:::prod-migration-archive-2026/*
+          - s3:PutObject on arn:aws:s3:::prod-migration-archive-2026/*
+          - s3:AbortMultipartUpload on arn:aws:s3:::prod-migration-archive-2026/*
+          - s3:ListBucket on arn:aws:s3:::prod-migration-archive-2026
+          - kms:Encrypt on arn:aws:kms:us-east-1:111111111111:key/dest-cmk
+          - kms:GenerateDataKey on arn:aws:kms:us-east-1:111111111111:key/dest-cmk
+
+      Destination KMS key policy:
+        Grants arn:aws:iam::111111111111:role/datasync-task-role
+        kms:Encrypt + kms:GenerateDataKey (verified)
+
+      Destination ObjectOwnership: BucketOwnerEnforced
+
+      Estimated scope: ~12 TB, ~5 million files
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-task"
+        - "nfs://10.0.10.20/vol/data"
+        - "prod-migration-archive-2026"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "POINT_IN_TIME_CONSISTENT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: deploy-agent-onprem-activation-expired-blocked
+    description: >-
+      Operator is trying to deploy an on-prem DataSync agent for an
+      NFS-to-S3 migration. The activation key was fetched 48 hours
+      ago (expired; keys are valid for 24 hours). Plan must BLOCK
+      with the re-fetch-from-local-console fix.
+    input: |
+      Operation: deploy-agent
+      Deployment: on-prem VM (.ova on ESXi 7.0)
+      Source: nfs://10.0.10.20/vol/data
+      Destination: s3://prod-migration-archive-2026 (us-east-1)
+
+      Activation key fetched: 2026-08-08T10:00:00Z (48 hours ago)
+      Agent VM local console reachable at http://10.0.30.40 (HTTP port 80)
+      Agent VM outbound HTTPS (443) to datasync.us-east-1.amazonaws.com:
+        verified reachable
+
+      VPC subnet for source reachability: subnet-0abc (10.0.10.0/24)
+      Security group sg-001 allows outbound TCP 2049 to 10.0.10.20
+
+      Intended create-agent CLI:
+        aws datasync create-agent --activation-key AAAAAAAAAA
+        --agent-name onprem-agent-nfs
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "activation"
+        - "24"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: schedule-bandwidth-throttle-ready
+    description: >-
+      Operator wants to add a daily schedule with bandwidth throttle
+      to an existing DataSync task (already AVAILABLE). All pre-checks
+      pass: schedule expression within 1-year horizon, throttle value
+      (1000 Mb) <= agent uplink (10 Gbps), task is not RUNNING.
+      Plan should produce READY with the update-task-schedule CLI.
+    input: |
+      Operation: create-schedule
+      Task: arn:aws:datasync:us-east-1:111111111111:task/task-001
+        (name: nfs-to-s3-archive, Status: AVAILABLE)
+      Schedule: rate(1 day)
+      Bandwidth throttle: 1000 Mb/s
+
+      Agent uplink capacity: 10 Gbps (10,000 Mb)
+
+      Current task state (describe-task):
+        Status: AVAILABLE
+        CurrentTaskExecutionArn: (none)
+        Schedule: (not set)
+
+      IAM role (datasync-task-role) verified for source-read +
+      destination-write
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "update-task-schedule"
+        - "rate(1 day)"
+        - "BandwidthLimitInMb"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: diagnose-failing-execution-access-denied-blocked
+    description: >-
+      A DataSync task from NFS to S3 ran a 12 TB migration. Latest
+      execution failed partway (2.1 TB of 12 TB) with AccessDenied on
+      s3:PutObject for a specific object key. The task role is missing
+      s3:PutObject on the destination bucket. Diagnose and emit
+      BLOCKED with the iam attach-role-policy fix.
+    input: |
+      Operation: diagnose-failing-execution
+      Task: arn:aws:datasync:us-east-1:111111111111:task/task-001
+        (name: nfs-to-s3-archive)
+      Source: nfs://10.0.10.20/vol/data
+      Destination: s3://prod-migration-archive-2026
+
+      Latest execution (describe-task-execution):
+        TaskExecutionArn: arn:aws:datasync:us-east-1:111111111111:task/task-001/execution/exec-009
+        Status: ERROR
+        StartTime: 2026-08-09T22:00:00Z
+        BytesTransferred: 2,310,000,000,000 (2.1 TB)
+        BytesWritten: 2,290,000,000,000 (2.29 TB)
+        EstimatedFilesToTransfer: 5,000,000
+        FilesTransferred: 870,000
+        VerificationFilesFailed: 0
+        ErrorCode: AccessDenied
+        ErrorDetail: "AccessDenied (403) for s3:PutObject on
+          arn:aws:s3:::prod-migration-archive-2026/logs/app.log"
+
+      Task (describe-task):
+        Status: AVAILABLE
+        Options: { VerifyMode: POINT_IN_TIME_CONSISTENT,
+                   PosixPermissions: PRESERVE }
+
+      Agent: Status: ONLINE, LastConnectionTime: recent
+
+      IAM role (datasync-task-role) attached policies:
+        - s3:GetObject on arn:aws:s3:::prod-migration-archive-2026/*
+        - s3:ListBucket on arn:aws:s3:::prod-migration-archive-2026
+        - kms:Encrypt, kms:GenerateDataKey on dest-cmk
+        MISSING: s3:PutObject on the destination bucket
+
+      Destination KMS key policy: verified, grants the role
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "AccessDenied"
+        - "s3:PutObject"
+        - "iam"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: fsx-ontap-verify-completed
+    description: >-
+      An SMB-to-FSx for NetApp ONTAP task has been created and
+      executed. Latest execution reached Status: SUCCESS with
+      FilesTransferred == EstimatedFilesToTransfer and zero
+      VerificationFilesFailed. Spot-check confirms the destination
+      file matches source size and mtime, and the ACL is preserved
+      per SecurityDescriptorCopyFlags. Produce the COMPLETED post-
+      verification form.
+    input: |
+      Operation: transfer-to-fsx-ontap
+      Task: arn:aws:datasync:us-east-1:111111111111:task/task-042
+        (name: smb-to-fsxn-finance)
+      Source: smb://10.0.20.30/share/finance
+      Destination: fsxn://fs-0abc123/vol1/finance (FSx for NetApp ONTAP)
+
+      FSx ONTAP file system (aws fsx describe-file-systems):
+        Lifecycle: AVAILABLE
+        SVM svm-0456 inter-cluster endpoint reachable from agent
+          subnet 10.0.30.0/24
+
+      Latest execution (describe-task-execution):
+        Status: SUCCESS
+        StartTime: 2026-08-10T01:00:00Z
+        BytesTransferred: 1,840,000,000,000
+        BytesWritten: 1,820,000,000,000
+        EstimatedFilesToTransfer: 48,231
+        FilesTransferred: 48,231
+        VerificationFilesTransferred: 48,231
+        VerificationFilesFailed: 0
+
+      Options used:
+        SecurityDescriptorCopyFlags: OWNER_DACL
+        VerifyMode: POINT_IN_TIME_CONSISTENT
+        Acl: PRESERVE
+
+      Spot-check (operator-confirmed):
+        File: \\fsx\vol1\finance\2026\Q3.xlsx
+        Source size: 4,404,019 bytes (4.2 MB)
+        Destination size: 4,404,019 bytes (matches)
+        Source mtime: 2026-07-15T10:30:00Z
+        Destination mtime: 2026-07-15T10:30:00Z (within 1 second)
+        Destination ACL: preserves OWNER_DACL per
+          SecurityDescriptorCopyFlags
+
+      Task Reports: configured, report object present at
+        s3://datasync-reports-111111111111/task-042/exec-001/reports/SUCCESSES_AND_ERRORS/
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "FSx for NetApp ONTAP"
+        - "POST_VERIFY"
+        - "VerificationFilesFailed"
+        - "VERDICT"
+        - "OWNER_DACL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

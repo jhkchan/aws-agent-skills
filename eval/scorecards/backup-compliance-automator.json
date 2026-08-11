@@ -1,0 +1,13 @@
+{
+  "skill": "backup-compliance-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [],
+  "total_score": 0,
+  "max_score": 120,
+  "grade": "F",
+  "token_count": 0,
+  "latency_ms": 0,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

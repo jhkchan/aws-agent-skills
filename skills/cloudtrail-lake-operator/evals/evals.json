@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudtrail-lake-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudTrail Lake Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-eds-mgmt-events-sse-kms-ready",
+      "name": "Create organization-scoped EDS for Management events with SSE-KMS (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/create-eds-mgmt-events-sse-kms-ready.md",
+      "baseline_file": "baselines/create-eds-mgmt-events-sse-kms-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-event-data-store", "Management", "kms:GenerateDataKey", "VERDICT", "PRE_CHECKS", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "diagnose-empty-query-event-category-mismatch-blocked",
+      "name": "Diagnose empty query results — EDS EventCategory mismatch (BLOCKED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/diagnose-empty-query-event-category-mismatch-blocked.md",
+      "baseline_file": "baselines/diagnose-empty-query-event-category-mismatch-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "EventCategory", "Data", "update-event-data-store", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "run-partiql-aggregation-ready",
+      "name": "Plan PartiQL aggregation query with partition pruning (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/run-partiql-aggregation-ready.md",
+      "baseline_file": "baselines/run-partiql-aggregation-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "start-query", "eventTime", "VERDICT", "CONFIRM", "PARTITION_PRUNING"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "diagnose-slow-query-missing-time-filter-blocked",
+      "name": "Diagnose slow query missing eventTime WHERE filter (BLOCKED with partition fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/diagnose-slow-query-missing-time-filter-blocked.md",
+      "baseline_file": "baselines/diagnose-slow-query-missing-time-filter-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "eventTime", "partition", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "athena-federated-cross-region-completed",
+      "name": "Athena-federated cross-Region CloudTrail Lake JOIN with results (COMPLETED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/athena-federated-cross-region-completed.md",
+      "baseline_file": "baselines/athena-federated-cross-region-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "Athena", "POST_VERIFY", "SUCCEEDED", "VERDICT", "federated"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

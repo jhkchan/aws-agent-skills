@@ -1,0 +1,49 @@
+# Eval configuration for inspector2-finding-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: inspector2-finding-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: critical-package-cve-ec2
+    difficulty: hard
+    prompt_file: prompts/critical-package-cve-ec2.md
+    baseline_file: baselines/critical-package-cve-ec2.md
+    expected_verdict: ROOT_CAUSE_FOUND
+
+  - id: lambda-code-vulnerability-hardcoded-secret
+    difficulty: hard
+    prompt_file: prompts/lambda-code-vulnerability-hardcoded-secret.md
+    baseline_file: baselines/lambda-code-vulnerability-hardcoded-secret.md
+    expected_verdict: ROOT_CAUSE_FOUND
+
+  - id: network-reachability-sg-overly-permissive
+    difficulty: medium
+    prompt_file: prompts/network-reachability-sg-overly-permissive.md
+    baseline_file: baselines/network-reachability-sg-overly-permissive.md
+    expected_verdict: ROOT_CAUSE_FOUND
+
+  - id: missing-finding-context
+    difficulty: easy
+    prompt_file: prompts/missing-finding-context.md
+    baseline_file: baselines/missing-finding-context.md
+    expected_verdict: NEED_MORE_INFO
+
+  - id: stale-finding-already-patched
+    difficulty: medium
+    prompt_file: prompts/stale-finding-already-patched.md
+    baseline_file: baselines/stale-finding-already-patched.md
+    expected_verdict: ROOT_CAUSE_FOUND

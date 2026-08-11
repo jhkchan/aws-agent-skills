@@ -1,0 +1,175 @@
+{
+  "skill": "xray-tracing-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the X-Ray Tracing Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across platforms (EC2 systemd, ECS Fargate sidecar, EKS DaemonSet, Lambda Powertools), SDK languages (Java, Python, Node.js), sampling rules (default vs custom), observability (CloudWatch ServiceLens, X-Ray groups), OpenTelemetry / ADOT migration, and prerequisite failure branches (missing IAM GetSamplingRules permission, oversampled Default rule at 100% on high-traffic service). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "ec2-java-default-sampling",
+      "name": "Java Spring Boot on EC2 with systemd daemon and default sampling",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — EC2 systemd, Java SDK v2, default sampling, annotations",
+      "prompt": "Enable X-Ray distributed tracing on a Java Spring Boot application named \"orders-api\" running on EC2 instances in us-east-1. The app uses AWS SDK v2 (DynamoDB, S3, SQS). Instance profile role ec2-orders-role. Deploy the X-Ray daemon 4.x via systemd. Use the aws-xray-recorder-sdk-core and aws-xray-recorder-sdk-aws-sdk-v2 Maven packages. Default sampling rule (reservoir 1/s, rate 5%). Annotations: order_id, environment=production, region=us-east-1. Metadata: request_body_size. Enable CloudWatch ServiceLens. Account: 123456789012.",
+      "prompt_file": "prompts/ec2-java-default-sampling.md",
+      "baseline_file": "baselines/ec2-java-default-sampling.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: orders-api\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Platform — EC2, systemd daemon\n  [✓]      Daemon — aws-xray-daemon:4.x via systemd (UDP 2000)\n  [✓]      SDK instrumentation — Java, aws-xray-recorder-sdk-core + aws-sdk-v2, XRayServletFilter\n  [✓]      AWS SDK patched — TracingHandler on DynamoDB, S3, SQS clients\n  [✓]      Sampling rule — Default (reservoir 1/s, rate 5%)\n  [✓]      IAM role — ec2-orders-role has xray:PutTraceSegments + PutTelemetryRecords + GetSamplingRules + GetSamplingTargets\n  [✓]      Annotations — order_id, environment=production, region=us-east-1\n  [✓]      Metadata — request_body_size\n  [✓]      Service map — generated from traces\n  [✓]      CloudWatch ServiceLens — integrated\nVERIFICATION_COMMANDS:\n  aws xray get-sampling-rules\n  aws iam list-attached-role-policies --role-name ec2-orders-role\n  aws xray get-service-graph --start-time 2026-08-10T00:00:00Z --end-time 2026-08-10T23:59:59Z",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "orders-api",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "daemon",
+            "sampling"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ecs-fargate-otel-python",
+      "name": "ECS Fargate Python Flask with ADOT Collector and custom sampling",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — ADOT Collector sidecar, OTel SDK, custom sampling on checkout",
+      "prompt": "Enable distributed tracing on a Python Flask service named \"payments-api-prod\" running on ECS Fargate (cluster payments-prod) in us-east-1. Use the ADOT Collector (OpenTelemetry) as a sidecar container instead of the X-Ray daemon. Python 3.11 with opentelemetry-instrumentation-flask and opentelemetry-instrumentation-botocore. Task role payments-task with X-Ray write permissions. Custom sampling rule payments-checkout (100% on POST /checkout, reservoir 10/s). Default rule at 5% for all other endpoints. Annotations: customer_id, environment=production. Metadata: response_status. Enable CloudWatch ServiceLens. Account: 123456789012.",
+      "prompt_file": "prompts/ecs-fargate-otel-python.md",
+      "baseline_file": "baselines/ecs-fargate-otel-python.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: payments-api-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Platform — ECS Fargate, cluster payments-prod\n  [✓]      Daemon — ADOT Collector (aws-otel-collector) sidecar, gRPC 4317\n  [✓]      SDK instrumentation — Python 3.11, opentelemetry-instrumentation-flask + opentelemetry-instrumentation-botocore\n  [✓]      AWS SDK patched — BotocoreInstrumentor for DynamoDB, S3, SQS\n  [✓]      Sampling rule — Default (reservoir 1/s, rate 5%), custom payments-checkout (reservoir 10/s, rate 100% on POST /checkout)\n  [✓]      IAM role — payments-task has xray:PutTraceSegments + PutTelemetryRecords + GetSamplingRules + GetSamplingTargets\n  [✓]      Annotations — customer_id, environment=production\n  [✓]      Metadata — response_status\n  [✓]      Service map — generated from traces\n  [✓]      CloudWatch ServiceLens — integrated\nVERIFICATION_COMMANDS:\n  aws xray get-sampling-rules\n  aws ecs describe-task-definition --task-definition payments-api-prod\n  aws xray get-service-graph --start-time 2026-08-10T00:00:00Z --end-time 2026-08-10T23:59:59Z",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "payments-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "OpenTelemetry"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-iam-permissions",
+      "name": "Node.js Express on ECS Fargate without GetSamplingRules permission",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — GetSamplingRules + GetSamplingTargets required",
+      "prompt": "Enable X-Ray tracing on a Node.js Express service named \"search-api-prod\" on ECS Fargate in us-east-1. Use the X-Ray SDK (aws-xray-sdk-core) with the xray-daemon:4.1 sidecar. The task role search-task currently has xray:PutTraceSegments and xray:PutTelemetryRecords but does NOT have xray:GetSamplingRules or xray:GetSamplingTargets. The operator has not added these permissions. Default sampling rule at 5%. Account: 123456789012.",
+      "prompt_file": "prompts/missing-iam-permissions.md",
+      "baseline_file": "baselines/missing-iam-permissions.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SERVICE: search-api-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Platform — ECS Fargate\n  [✓]      Daemon — aws-xray-daemon:4.1 sidecar (UDP 2000)\n  [✓]      SDK instrumentation — Node.js, aws-xray-sdk-core, Express middleware\n  [✗]      IAM role — search-task is MISSING xray:GetSamplingRules and xray:GetSamplingTargets. Without these, the SDK cannot fetch central sampling rules and falls back to local default (1/s, fixed). The rules you configure in the X-Ray console are NEVER applied. Attach the AWSXRayDaemonWriteAccess managed policy or add both actions to the inline policy.\nVERIFICATION_COMMANDS:\n  aws iam list-attached-role-policies --role-name search-task\n  aws iam list-role-policies --role-name search-task\n  aws iam get-role-policy --role-name search-task --policy-name <policy>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "search-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "GetSamplingRules"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lambda-powertools-annotations",
+      "name": "Lambda Python with Powertools tracing and custom sampling rule",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Powertools decorators, custom high-value sampling, annotations",
+      "prompt": "Enable X-Ray tracing on a Lambda function named \"checkout-handler-prod\" in us-east-1. Runtime Python 3.11. Use AWS Lambda Powertools for tracing (capture_lambda_handler and capture_method decorators). The function calls DynamoDB and SQS via boto3. Lambda execution role checkout-exec-role (needs X-Ray write permissions). Custom sampling rule checkout-high-value (100% sampling, reservoir 5/s) matching the Lambda service name. Annotations: order_id, customer_id, environment=production. Metadata: processing_time_ms. Enable CloudWatch ServiceLens. Account: 123456789012.",
+      "prompt_file": "prompts/lambda-powertools-annotations.md",
+      "baseline_file": "baselines/lambda-powertools-annotations.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SERVICE: checkout-handler-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Platform — Lambda, Python 3.11, built-in daemon (no sidecar)\n  [✓]      Daemon — Lambda built-in (TracingConfig Mode=Active)\n  [✓]      SDK instrumentation — AWS Lambda Powertools v2, @tracer.capture_lambda_handler + @tracer.capture_method\n  [✓]      AWS SDK patched — Powertools auto-patches boto3\n  [✓]      Sampling rule — Default (reservoir 1/s, rate 5%), custom checkout-high-value (reservoir 5/s, rate 100%)\n  [✓]      IAM role — checkout-exec-role has xray:PutTraceSegments + PutTelemetryRecords + GetSamplingRules + GetSamplingTargets\n  [✓]      Annotations — order_id, customer_id, environment=production\n  [✓]      Metadata — processing_time_ms\n  [✓]      Service map — generated from traces (Lambda, DynamoDB, SQS)\n  [✓]      CloudWatch ServiceLens — integrated\nVERIFICATION_COMMANDS:\n  aws lambda get-function-configuration --function-name checkout-handler-prod --query 'TracingConfig'\n  aws xray get-sampling-rules\n  aws iam list-attached-role-policies --role-name checkout-exec-role",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "checkout-handler-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Powertools"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "oversampled-default-rule",
+      "name": "EKS high-traffic API with Default sampling rule set to 100%",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — Default rule at 100% generates massive trace volume and cost",
+      "prompt": "Enable X-Ray tracing on a high-traffic Node.js API named \"media-api-prod\" on EKS in us-east-1. The service handles 5000 requests/second. The operator wants the Default sampling rule set to FixedRate=1.0 (100%) so that \"every request is traced.\" Use the aws-xray-sdk-core with the X-Ray daemon DaemonSet. Node.js 20 with Express. Pod IRSA role media-api-xray-role. Annotations: user_id, content_type. The EKS cluster is media-prod. Account: 123456789012.",
+      "prompt_file": "prompts/oversampled-default-rule.md",
+      "baseline_file": "baselines/oversampled-default-rule.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SERVICE: media-api-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Platform — EKS, cluster media-prod\n  [✓]      Daemon — aws-xray-daemon DaemonSet (UDP 2000)\n  [✓]      SDK instrumentation — Node.js 20, aws-xray-sdk-core, Express middleware\n  [✗]      Sampling rule — Default rule at FixedRate=1.0 (100%) for a 5000 req/s service would generate ~432M traces/day. At $5 per 1M traces, this is ~$2,160/day in X-Ray ingestion costs. Keep the Default rule at 5% and create custom rules scoped to critical endpoints. NEVER set FixedRate=1.0 on the Default rule for high-traffic services.\nVERIFICATION_COMMANDS:\n  aws xray get-sampling-rules --query 'SamplingRuleRecords[?SamplingRule.RuleName==`Default`].SamplingRule.FixedRate'\n  aws cloudwatch get-metric-statistics --namespace AWS/XRay --metric-name TotalTraceCount --statistics Sum --period 3600 --start-time 2026-08-09T00:00:00Z --end-time 2026-08-10T00:00:00Z",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "media-api-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "100%"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "health-event-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Health Event Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "org-view-issue-scheduledchange",
+      "name": "Org-view Health automation for issue + scheduledChange + accountNotification across 25 member accounts — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/org-view-issue-scheduledchange.md",
+      "baseline_file": "baselines/org-view-issue-scheduledchange.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "org-view-issue-scheduledchange", "VERDICT", "describe-affected-entities", "enable-health-service-access-for-organization"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "scheduled-change-leadtime",
+      "name": "scheduledChange lead-time automation with EventBridge Scheduler for EC2 retirement and RDS maintenance — all gates pass",
+      "difficulty": "hard",
+      "prompt_file": "prompts/scheduled-change-leadtime.md",
+      "baseline_file": "baselines/scheduled-change-leadtime.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "scheduled-change-leadtime", "VERDICT", "scheduledEndTime", "EventBridge Scheduler"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "user-notifications-chat",
+      "name": "AWS User Notifications for Slack delivery of issue events paired with EventBridge + Lambda DR trigger — all gates pass",
+      "difficulty": "medium",
+      "prompt_file": "prompts/user-notifications-chat.md",
+      "baseline_file": "baselines/user-notifications-chat.md",
+      "expected_verdict": "AUTOMATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "user-notifications-chat", "VERDICT", "User Notifications", "ImpactChoice"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "no-dlq-no-impact-gate",
+      "name": "Validate existing responder workflow with no DLQ, ungated DR trigger, no enrichment, no idempotency (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/no-dlq-no-impact-gate.md",
+      "baseline_file": "baselines/no-dlq-no-impact-gate.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "no-dlq-no-impact-gate", "VERDICT", "ImpactChoice"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "org-view-missing",
+      "name": "Validate 50-account org where organizational view is not enabled and per-account rules cover only 5 of 50 accounts (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/org-view-missing.md",
+      "baseline_file": "baselines/org-view-missing.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "org-view-missing", "VERDICT", "enable-health-service-access-for-organization"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATED"]
+        }
+      ]
+    }
+  ]
+}

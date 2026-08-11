@@ -1,0 +1,240 @@
+# Eval test cases for backup-compliance-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: backup-compliance-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: soc2-cross-account-legal-hold
+    description: >-
+      Design SOC2-aligned backup compliance automation for a 30-account
+      org. Audit Manager framework with 4 controls (encryption, retention,
+      recency, region isolation), LOCK_MODE Vault Lock, scheduled reports,
+      EventBridge-triggered legal hold automation, cross-account
+      centralization via delegated admin + org vault, Backup Search for
+      eDiscovery, cost allocation tags. All gates pass. Verdict: AUTOMATED.
+    input: |
+      Design AWS Backup compliance automation for our 30-account org
+      aligned to SOC2. Emit the standard Backup block (FRAMEWORK,
+      REPORTING, LEGAL_HOLD, CROSS_ACCOUNT, SEARCH, VERIFICATION,
+      VERDICT, FINDINGS, REMEDIATION).
+
+      Requirements:
+      - Compliance framework: SOC2
+      - Resources in scope: EC2, RDS, DynamoDB, S3
+      - Accounts scope: organizational (30 member accounts)
+      - Retention policy: 35d daily, 12m monthly, immutability required
+      - Legal hold required: yes (litigation hold on demand)
+      - Audit Manager framework: 4 controls (PLAN_EXISTENCE,
+        RESOURCES_PROTECTED, MANUAL_DELETION_DISABLED, LAST_BACKUP_AGE 1d)
+        plus ENCRYPTED
+      - Reports: monthly compliance, weekly job summary, weekly coverage
+        -> versioned S3 bucket
+      - Vault Lock: LOCK_MODE (compliance mode), 7-365d
+      - Legal hold automation: EventBridge custom.legal -> Lambda
+        create-legal-hold; quarterly test cycle
+      - Cross-account: delegated admin in audit account 222222222222,
+        org-compliance-vault with member access policy, COPY_ACTION in
+        all 30 member plans
+      - Backup Search: scoped to production + org-compliance vaults
+      - Cost allocation tags: Project, Environment, Compliance active in
+        Billing
+      - Restore drill: 2026-07-20, RTO 35min EBS 1TB
+      - EventBridge Scheduler: daily audit run at 02:00 UTC
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "soc2-cross-account-legal-hold"
+        - "VERDICT"
+        - "LOCK_MODE"
+        - "create-legal-hold"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: hipaa-vault-lock-test
+    description: >-
+      Design HIPAA-aligned backup compliance for a single account with
+      Vault Lock in LOCK_MODE, encryption control, restore drill control,
+      and legal hold test cycle. All gates pass. Verdict: AUTOMATED.
+    input: |
+      Design AWS Backup compliance automation for a single account aligned
+      to HIPAA. Emit the standard Backup block.
+
+      Requirements:
+      - Compliance framework: HIPAA
+      - Resources in scope: EC2, RDS, S3 (PHI workloads)
+      - Accounts scope: single
+      - Retention policy: 365d daily, immutability required (CMK encryption)
+      - Audit Manager framework: BACKUP_RECOVERY_POINT_ENCRYPTED,
+        BACKUP_RECOVERY_POINT_MANUAL_DELETION_DISABLED,
+        BACKUP_RECOVERY_POINT_MINIMUM_RETENTION 365d,
+        BACKUP_REPORT_LAST_BACKUP_AGE 1d,
+        BACKUP_REPORT_LAST_RESTORE_AGE 90d
+      - Vault Lock: LOCK_MODE (compliance mode), 7-3650d
+      - Legal hold test: 2026-07-15, create + release cycle on non-prod
+        recovery point
+      - Reports: monthly compliance, weekly job summary
+      - Restore drill: 2026-07-20, RDS PITR test, RTO 25min
+      - Cost tags: PHI, Workload active in Billing
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "hipaa-vault-lock-test"
+        - "VERDICT"
+        - "LOCK_MODE"
+        - "BACKUP_RECOVERY_POINT_ENCRYPTED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: cross-region-pitr-search
+    description: >-
+      Design backup compliance for an eDiscovery workload with continuous
+      backup (PITR), cross-region copy, Backup Search scoped to two
+      regions, and legal hold automation tied to search results. All
+      gates pass. Verdict: AUTOMATED.
+    input: |
+      Design AWS Backup compliance automation for an eDiscovery workload.
+      Emit the standard Backup block.
+
+      Requirements:
+      - Compliance framework: custom:ediscovery
+      - Resources in scope: DynamoDB (continuous backup / PITR), S3
+      - Accounts scope: single
+      - Retention policy: 35d daily + 35d PITR continuous, immutable
+      - Audit Manager framework: BACKUP_PLAN_EXISTENCE,
+        BACKUP_RECOVERY_POINT_ENCRYPTED, BACKUP_VARIANT_WITH_REGION_ISOLATION
+      - Cross-region copy: us-east-1 -> us-west-2 (org vault in us-west-2)
+      - Backup Search: scoped to DynamoDB tables, search term matches
+        case keywords, results exported to S3
+      - Legal hold automation: search results -> Lambda batch-create
+        BackupLegalHold on matching recovery points
+      - Vault Lock: LOCK_MODE, 35-2555d
+      - Reports: monthly compliance, weekly job summary
+      - Restore drill: 2026-07-25, DynamoDB PITR restore test
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "cross-region-pitr-search"
+        - "VERDICT"
+        - "Backup Search"
+        - "PITR"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: governance-mode-no-test
+    description: >-
+      Validate an existing HIPAA-aligned backup posture with Vault Lock
+      in GOVERNANCE mode (root can override), missing encryption control,
+      legal hold never tested, and no restore drill in 14 months.
+      Multiple CRITICAL gates fail. Verdict: MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing AWS Backup compliance posture aligned to
+      HIPAA. Emit the standard Backup block.
+
+      Current state:
+      - Compliance framework: HIPAA (claimed)
+      - Resources in scope: EC2, RDS, S3 (PHI workloads)
+      - Accounts scope: single
+      - Existing posture:
+        - Audit Manager framework: 3 controls (PLAN_EXISTENCE,
+          RESOURCES_PROTECTED, LAST_BACKUP_AGE 1d)
+          - MISSING: BACKUP_RECOVERY_POINT_ENCRYPTED control
+        - Vault Lock: GOVERNANCE mode (root can override retention) on
+          production-vault
+        - Legal hold: BackupLegalHold mechanism configured but never
+          tested (no create + release cycle run)
+        - Reports: monthly compliance only; no coverage report
+          (unprotected resources invisible)
+        - Last restore drill: 14 months ago (HIPAA requires annual)
+        - Latest compliance report: 2026-07-10 (31 days stale)
+        - Cost allocation tags: partially active (Project only,
+          Environment missing)
+        - No EventBridge Scheduler for periodic audits (manual only)
+
+      Expected: MANUAL_STEP_REQUIRED. The skill must flag multiple
+      CRITICAL gaps:
+      1. GOVERNANCE mode Vault Lock is not compliance-grade for HIPAA —
+         root can override. Must switch to LOCK_MODE.
+      2. Missing ENCRYPTED control — HIPAA requires at-rest encryption
+         on all recovery points.
+      3. Legal hold never tested — under court deadline pressure, the
+         team will not know how to create or release holds.
+      4. No restore drill in 14 months — recovery capability unverified.
+      5. Stale compliance report — manual cadence is unreliable.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "governance-mode-no-test"
+        - "VERDICT"
+        - "LOCK_MODE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"
+
+  - id: no-org-vault-drift
+    description: >-
+      Validate a 50-account org backup posture where no org-wide vault
+      exists, per-account backup plans have no central view, and 12 of 50
+      accounts have stale recovery points. Verdict: MANUAL_STEP_REQUIRED.
+    input: |
+      Validate this existing AWS Backup compliance posture for our
+      50-account org aligned to SOC2. Emit the standard Backup block.
+
+      Current state:
+      - 50 member accounts in AWS Organizations
+      - Compliance framework: SOC2 (claimed)
+      - Resources in scope: EC2, RDS
+      - Existing posture:
+        - No delegated administrator for backup.amazonaws.com
+        - No org-wide backup vault
+        - Per-account backup plans deployed in 38 of 50 accounts via
+          CloudFormation StackSets
+        - 12 of 50 accounts have NO backup plan at all
+        - Of the 38 covered accounts, the latest recovery point in 6
+          accounts is older than 7 days (stale)
+        - Audit Manager: framework exists in only 5 accounts (no
+          centralized view)
+        - Vault Lock: configured per-account in GOVERNANCE mode
+          (variable retention days across accounts)
+        - Legal hold: never tested
+        - Reports: per-account monthly, no aggregation
+        - Restore drill: only 2 of 50 accounts have tested restores
+          within 90 days
+
+      Expected: MANUAL_STEP_REQUIRED. The skill must flag:
+      1. No delegated admin or org-wide vault — no central audit view.
+      2. 12 accounts have zero backup coverage — major SOC2 finding.
+      3. 6 accounts have stale recovery points (no central detection).
+      4. Vault Lock in GOVERNANCE mode (not SOC2-grade).
+      5. Legal hold never tested.
+      6. Restore drill coverage is 2/50.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "no-org-vault-drift"
+        - "VERDICT"
+        - "delegated admin"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATED"

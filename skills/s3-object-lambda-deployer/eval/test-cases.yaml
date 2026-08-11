@@ -1,0 +1,179 @@
+# Eval test cases for s3-object-lambda-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-object-lambda-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: pii-redaction-getobject-ready
+    description: >-
+      Standard PII redaction Object Lambda AP: supporting standard AP
+      exists with Lambda-read policy, IAM role with s3-object-lambda
+      trust + WriteGetObjectResponse permission, transform Lambda that
+      calls WriteGetObjectResponse, reserved concurrency set, single
+      GetObject operation. All checklist dimensions pass.
+    input: |
+      Design a deployment plan for an S3 Object Lambda Access Point.
+      Emit the standard VERDICT block (OBJECT_LAMBDA_SPEC, VERDICT,
+      CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - OLAP name: pii-redact-olap
+      - Bucket: prod-data-lake (BPA all 4 True, SSE-KMS, versioning)
+      - Supporting standard AP: dlake-team-a-ap (already exists with Lambda-read policy)
+      - IAM role: olap-exec (trust=s3-object-lambda.amazonaws.com, perms include WriteGetObjectResponse)
+      - Transform Lambda: pii-redact-fn (python3.12, uses WriteGetObjectResponse)
+      - Reserved concurrency: 50
+      - Operations: GetObject only
+      - Region: us-east-1, Account: 111111111111
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "pii-redaction-getobject-ready"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "WriteGetObjectResponse"
+        - "s3-object-lambda"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-reserved-concurrency-missing
+    description: >-
+      Object Lambda without reserved concurrency on the transform
+      function. Must emit PREREQUISITES_MISSING because Lambda throttle
+      surface as S3 AccessDenied to clients.
+    input: |
+      Design a deployment plan for an S3 Object Lambda Access Point.
+      Emit the standard VERDICT block (OBJECT_LAMBDA_SPEC, VERDICT,
+      CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - OLAP name: enrichment-olap
+      - Bucket: prod-data-lake (baseline healthy)
+      - Supporting standard AP: dlake-team-b-ap (exists, Lambda-read policy attached)
+      - IAM role: olap-enrich-role (trust=s3-object-lambda.amazonaws.com, WriteGetObjectResponse in policy)
+      - Transform Lambda: enrich-fn (python3.12, uses WriteGetObjectResponse)
+      - Reserved concurrency: NOT SET (rely on account-level unreserved)
+      - Operations: GetObject
+      - Expected peak traffic: ~100 GETs/sec
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-reserved-concurrency-missing"
+        - "VERDICT"
+        - "concurrency"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-write-get-object-response-missing
+    description: >-
+      Object Lambda where the IAM role lacks the
+      s3-object-lambda:WriteGetObjectResponse permission. Must emit
+      PREREQUISITES_MISSING because the Lambda will exit cleanly and
+      the client receives an empty object.
+    input: |
+      Design a deployment plan for an S3 Object Lambda Access Point.
+      Emit the standard VERDICT block (OBJECT_LAMBDA_SPEC, VERDICT,
+      CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - OLAP name: format-convert-olap
+      - Bucket: data-exports (baseline healthy)
+      - Supporting standard AP: exports-ap (exists, Lambda-read policy attached)
+      - IAM role: olap-convert-role (trust=s3-object-lambda.amazonaws.com, but only has logs:* and s3:GetObject — NO s3-object-lambda:WriteGetObjectResponse)
+      - Transform Lambda: csv-to-json-fn (python3.12, uses WriteGetObjectResponse)
+      - Reserved concurrency: 30
+      - Operations: GetObject
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-write-get-object-response-missing"
+        - "VERDICT"
+        - "WriteGetObjectResponse"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: multi-region-olap-ready
+    description: >-
+      Multi-region Object Lambda deployment across us-east-1,
+      eu-west-1, and ap-southeast-2 with per-region transform Lambdas
+      and per-region source buckets. All dimensions pass.
+    input: |
+      Design a deployment plan for a multi-region S3 Object Lambda
+      Access Point. Emit the standard VERDICT block (OBJECT_LAMBDA_SPEC,
+      VERDICT, CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - OLAP name: global-pii-olap (one per region)
+      - Regions: us-east-1, eu-west-1, ap-southeast-2
+      - Per-region source buckets: prod-data-us, prod-data-eu, prod-data-ap (all baseline healthy)
+      - Per-region standard APs: dlake-ap-us, dlake-ap-eu, dlake-ap-ap (exist with Lambda-read policies)
+      - Per-region IAM roles: olap-exec-us, olap-exec-eu, olap-exec-ap (all with s3-object-lambda trust + WriteGetObjectResponse)
+      - Per-region transform Lambdas: pii-redact-us, pii-redact-eu, pii-redact-ap (all use WriteGetObjectResponse)
+      - Reserved concurrency: 50 per region
+      - Operations: GetObject + HeadObject
+      - Client routing: Route 53 latency-based routing across the 3 OLAP ARNs
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "multi-region-olap-ready"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "eu-west-1"
+        - "ap-southeast-2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: olap-before-standard-ap-missing
+    description: >-
+      Object Lambda AP created BEFORE the supporting standard Access
+      Point exists. Must emit PREREQUISITES_MISSING because the OLAP
+      references the standard AP ARN and routing breaks without it.
+    input: |
+      Design a deployment plan for an S3 Object Lambda Access Point.
+      Emit the standard VERDICT block (OBJECT_LAMBDA_SPEC, VERDICT,
+      CHECKLIST, VERIFICATION_COMMANDS).
+
+      Requirements:
+      - OLAP name: new-olap
+      - Bucket: shared-reports (baseline healthy)
+      - Supporting standard AP: reports-ap — DOES NOT EXIST YET
+      - IAM role: olap-reports-role (trust=s3-object-lambda.amazonaws.com, perms correct)
+      - Transform Lambda: reports-redact-fn (python3.12, uses WriteGetObjectResponse)
+      - Reserved concurrency: 20
+      - Operations: GetObject
+      - Operator wants to create the OLAP first, then create the
+        standard AP after the OLAP is up
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "olap-before-standard-ap-missing"
+        - "VERDICT"
+        - "standard"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

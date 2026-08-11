@@ -1,0 +1,48 @@
+# Eval configuration for xray-tracing-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: xray-tracing-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: ec2-java-default-sampling
+    difficulty: hard
+    prompt_file: prompts/ec2-java-default-sampling.md
+    baseline_file: baselines/ec2-java-default-sampling.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: ecs-fargate-otel-python
+    difficulty: hard
+    prompt_file: prompts/ecs-fargate-otel-python.md
+    baseline_file: baselines/ecs-fargate-otel-python.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-iam-permissions
+    difficulty: hard
+    prompt_file: prompts/missing-iam-permissions.md
+    baseline_file: baselines/missing-iam-permissions.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: lambda-powertools-annotations
+    difficulty: hard
+    prompt_file: prompts/lambda-powertools-annotations.md
+    baseline_file: baselines/lambda-powertools-annotations.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: oversampled-default-rule
+    difficulty: hard
+    prompt_file: prompts/oversampled-default-rule.md
+    baseline_file: baselines/oversampled-default-rule.md
+    expected_verdict: PREREQUISITES_MISSING
