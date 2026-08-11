@@ -1,0 +1,70 @@
+{
+  "skill": "ec2-reserved-capacity-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many concrete numbers (discount percentages, marketplace fee, breakeven tables) and a detailed decision matrix that a senior engineer would find useful, but a large portion (e.g., discount ranges, 80/60% thresholds) is already common knowledge, so the true delta is limited."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific workflow: exact order of data collection, precise AWS CLI commands, and a step\u2011by\u2011step decision tree (Step\u202f0\u20119). The procedure is largely AWS\u2011centric, but some steps are generic (e.g., \"monitor utilization\") and it lacks explicit guidance for multi\u2011account or cross\u2011region aggregation, leaving a small gap."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., 3\u2011yr Standard RI lock\u2011in, marketplace fee, upfront breakeven). Missing several common pitfalls such as double\u2011counting RI and Savings Plans, ignoring cross\u2011account cost allocation, and failing to warn about committing on spiky workloads, so two points are deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use/when_not_to_use, activation_triggers, and invocation_schema are present. One point deducted because the schema lacks a concrete JSON example of the expected input, which could hinder reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (activation \u2192 mindset \u2192 quick reference \u2192 process), but the skill front\u2011loads a large amount of detail (tables, heuristics, full command set) before the agent knows it should invoke the skill, creating cognitive overload. Two points deducted for this over\u2011exposure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (purchasing RIs, selling on Marketplace) are gated by a NEED_MORE_INFO response and verification steps, showing good calibration. One point deducted because the skill does not explicitly require a budget approval check before recommending All\u2011Upfront purchases, leaving a small freedom gap for high\u2011impact financial decisions."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset, Quick Reference, Process, NEVER, Decision Tree) that aids comprehension. Slight deduction because the step numbering (Step\u202f0\u20119) and some headings are ad\u2011hoc rather than adhering to a standard framework like the MIT\u2011licensed pattern template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, output contract, and verification steps, enabling an agent to act. Deducted two points for lacking explicit error\u2011handling guidance (e.g., CLI failures, partial data merges) and for not covering multi\u2011account aggregation scenarios, which are common in real\u2011world FinOps use cases."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 43278,
+  "latency_ms": 17252,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

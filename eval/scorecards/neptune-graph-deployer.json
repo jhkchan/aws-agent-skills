@@ -1,0 +1,70 @@
+{
+  "skill": "neptune-graph-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds several expert nuggets (encryption\u2011at\u2011creation, IAM auth must be set at cluster creation, static parameters needing reboot, concrete IOPS budgeting formula, read\u2011replica scaling math, Streams filter patterns). However a portion restates documented facts without novel insight, so not a full 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Lists AWS\u2011specific CLI steps in the correct order (subnet group \u2192 parameter group \u2192 cluster \u2192 primary \u2192 replicas, enable IAM auth, encryption, Streams). Missing explicit wait/poll for cluster availability before creating instances and no guidance for handling command failures, which are essential AWS\u2011specific procedural details."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a detailed \"NEVER\" list with concrete reasons (encryption cannot be enabled later, read replicas don't boost writes, Streams only capture post\u2011enable changes, etc.). Missing a few common cost\u2011related pitfalls (e.g., forgetting to set backup retention limits), so one point is deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, triggers, keywords, and when_to_use are present, and output format is strictly defined. Activation relies on a keyword list that is not exhaustive and lacks explicit matching rules (e.g., regex, priority), which could cause unreliable invocation in edge cases."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses top\u2011level overview, quick\u2011navigation table, and deep sections, keeping the initial cognitive load low. The full checklist and command examples are buried deep, requiring scrolling, and some critical constraints (e.g., min/max replica count) are only in tables, not highlighted early."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (cluster creation) are constrained by many required parameters, while creative choices (query language, replica count) remain flexible. Could tighten constraints around mandatory encryption and IAM auth flags, but calibration is generally appropriate."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Step\u2011by\u2011step procedure \u2192 NEVER list \u2192 Output format \u2192 Worked example. The structure is consistent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 4,
+      "max": 15,
+      "justification": "The model produced no output, showing that the skill\u2019s instructions are not actionable enough. There is no clear mapping from user intent to checklist fields, no step\u2011by\u2011step template\u2011filling guide, and no handling of missing inputs, leading to execution failure."
+    }
+  ],
+  "total_score": 96,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 38266,
+  "latency_ms": 9326,
+  "assertions_passed": true,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 0
+}

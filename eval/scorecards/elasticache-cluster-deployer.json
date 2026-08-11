@@ -1,0 +1,70 @@
+{
+  "skill": "elasticache-cluster-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete expert knowledge not usually in baseline models: encryption must be set at creation, detailed configuration dependency graph, snapshot\u2011vs\u2011maintenance window overlap rule, replica promotion priority details, and online\u2011resharding constraints."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers a clear AWS\u2011specific procedural flow (dependency graph, exact CLI commands, ordering of subnet\u2011group \u2192 security\u2011group \u2192 replication\u2011group, etc.). One minor generic statement (\u201ccheck security\u201d) prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a detailed \"NEVER\" list with concrete pitfalls (e.g., enabling encryption post\u2011creation, setting AUTH without TLS, multi\u2011AZ without replicas) and explains why each is dangerous, reflecting experience\u2011driven warnings."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete (name, description, version, author, license, keywords, tags, dependencies, metadata). Description clearly states WHAT the skill does, WHEN to invoke, and provides activation keywords. No missing fields."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered with quick\u2011navigation and detailed sections, but the sheer length of some sections (e.g., full command tables) adds cognitive load, preventing a perfect score."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by a prerequisite checklist, matching the fragility of provisioning resources. Slight over\u2011specification in some optional flags keeps it from full marks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (mindset, steps, NEVER, output format). Minor inconsistency in section naming prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 5,
+      "max": 15,
+      "justification": "The model output provided no checklist or verdict, violating the strict output contract. An agent could not act on the skill as written, indicating major usability failure."
+    }
+  ],
+  "total_score": 99,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 33597,
+  "latency_ms": 9619,
+  "assertions_passed": true,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 0
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "elb-cost-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete expert knowledge not usually known by a generic model: precise LCU dimension formulas, idle\u2011LB thresholds (e.g., RequestCount <100/day for 7\u202fdays), up\u2011to\u2011date 2024\u20112026 AWS feature list (ALB zonal DNS exclusion, NLB cross\u2011zone visibility, ALB access\u2011log partitioning), detailed cost tables per region, and a full decision\u2011tree with ordered categories. Restates basics but extends with actionable numbers and recent changes."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: exact CLI commands for inventory, metric collection, rule creation, and migration steps; ordered mindset (idle \u2192 LCU \u2192 consolidation \u2192 CLB migration \u2192 data\u2011transfer); verification steps for each. Lacks a few procedural nuances (e.g., how to calculate PrivateLink cost savings) but overall domain\u2011specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a solid NEVER list with concrete pitfalls (deleting without 7\u2011day zero\u2011traffic check, TLS cert coverage, cross\u2011zone cost assumptions, CLB\u2192NLB misuse, disabling ALB cross\u2011zone, ignoring access\u2011log costs) and clear reasons. Could include additional anti\u2011patterns (e.g., forgetting health\u2011check adjustments after consolidation)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Full frontmatter, detailed description, when_to_use/when_not_to_use, activation_triggers, and a precise invocation_schema. Missing a concrete example invocation payload, which would make activation 100\u202f% reliable."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "Top\u2011level summary, quick reference, and detailed sections are layered, but critical safety rules (NEVER) appear after many pages of content, causing some cognitive overload for quick use."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (deleting LB) are tightly constrained with tagging and verification steps; cost\u2011estimation steps are guided but sometimes lack explicit assumption statements. Overall calibration matches task fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Process \u2192 NEVER \u2192 Decision tree \u2192 Verification \u2192 Verdict). Structure is consistent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 10,
+      "max": 15,
+      "justification": "Model output shows deviations from the strict output contract: combined multiple targets in one block, omitted some required recommendation lines, and occasional mismatched estimated savings (e.g., $22.15 for an idle ALB). These gaps reduce the ability of an agent to execute the skill reliably."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 41685,
+  "latency_ms": 14934,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

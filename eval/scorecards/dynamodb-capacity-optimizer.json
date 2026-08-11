@@ -1,0 +1,70 @@
+{
+  "skill": "dynamodb-capacity-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 14,
+      "max": 20,
+      "justification": "The skill mostly restates well\u2011known DynamoDB cost rules (30% crossover, 70% target, pricing numbers). It adds some useful thresholds but no truly novel decision tree or exception that a senior CloudOps engineer could not already infer."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific and detailed (CLI sequences, gating order). However a few steps are generic (e.g., \u201cverify no consumers depend on Streams\u201d without a concrete AWS\u2011CLI check) and the overall flow could be tighter."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 12,
+      "max": 15,
+      "justification": "The NEVER list covers major pitfalls and gives reasons, but it omits a concrete warning about disabling Streams without confirming Lambda event\u2011source mappings and about changing table class without checking write\u2011capacity impact."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter, description, activation triggers, and invocation schema are present and clear. Minor omission: the skill does not explicitly version its output schema (e.g., a JSON schema), which would aid strict validation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document layers high\u2011level overview, quick start, then deep steps, but the Quick Reference matrix and Step\u202f0 non\u2011obvious behaviours are dense and could overwhelm a first\u2011time agent."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (capacity\u2011mode switch, GSI recreation) are gated by a CONFIRM prompt and safety checks. Calibration is slightly loose for batch processing (no explicit limit on tables per run)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (front\u2011matter \u2192 mindset \u2192 stepwise process \u2192 anti\u2011patterns \u2192 safety). A few sections (e.g., \u201cStep\u202f0 non\u2011obvious behaviours\u201d) feel ad\u2011hoc rather than part of the core pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 5,
+      "max": 15,
+      "justification": "Model outputs expose critical usability gaps: math errors in cost calculations, inconsistent savings (e.g., $0.00 saving yet FURTHER_OPTIMIZATION_AVAILABLE), and malformed capacity formulas. These violations break the zero\u2011savings rule and make the skill unreliable for an agent."
+    }
+  ],
+  "total_score": 94,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 51461,
+  "latency_ms": 12875,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

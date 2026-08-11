@@ -1,0 +1,70 @@
+{
+  "skill": "batch-compute-environment-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides several expert\u2011level heuristics not found in generic docs (e.g., compute environment must be ENABLED, BEST_FIT_PROGRESSIVE as default for heterogeneous pools, detailed launch\u2011template constraints, spot\u2011fleet role requirements). However, ~10% of the content merely restates standard AWS Batch concepts, so full 20 is not awarded."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers a concrete AWS\u2011specific procedure order (type selection \u2192 allocation strategy \u2192 launch template \u2192 instance role \u2192 subnets \u2192 job queue \u2192 job definition \u2192 dependencies \u2192 spot integration \u2192 verification). One point deducted because the early \u201cverify prerequisites\u201d step is generic and not tied to a precise AWS\u2011specific checklist."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never leave CE DISABLED, never request more vCPUs than any instance type). One point deducted for omitting a common cost\u2011overrun anti\u2011pattern such as over\u2011provisioning maxvCpus without budgeting."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, triggers, and output contract are present. The trigger list is extensive but some activation keywords are embedded in prose rather than a strict list, making reliable activation slightly ambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick navigation, mindset, detailed steps) but introduces large tables and heuristics early, which can overload the agent before it knows whether it needs that depth."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (environment creation) are tightly constrained by prerequisite checks and ENABLED verification. Creative tasks (array job design) are given moderate freedom, but the skill does not explicitly limit overly complex dependency graphs, leaving a small gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Heuristics \u2192 NEVER \u2192 Output format). Slight ad\u2011hoc ordering of sections (e.g., quick navigation before mindset) prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides decision trees, a ready\u2011to\u2011use checklist, verification commands, and error\u2011handling guidance. Missing are explicit instructions for EKS\u2011specific IAM permissions and for updating an existing compute environment, which could cause execution gaps."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 39526,
+  "latency_ms": 8483,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

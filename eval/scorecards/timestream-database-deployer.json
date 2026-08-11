@@ -1,0 +1,70 @@
+{
+  "skill": "timestream-database-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides expert\u2011level heuristics (memory\u2011store TTL tuning, magnetic\u2011store write trade\u2011offs), a concrete dependency graph, exact bucket\u2011policy JSON, detailed IAM role statements, and schedule\u2011expression syntax that go beyond a baseline model's knowledge. However, much of the content restates official documentation without novel insight, preventing a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines a precise AWS\u2011specific provisioning workflow (create DB \u2192 create table \u2192 bucket policy \u2192 enable magnetic\u2011store writes \u2192 scheduled query \u2192 tagging) with exact CLI commands and required IAM permissions. Procedures are concrete and AWS\u2011centric, only missing a brief note on idempotent handling."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with specific reasons (e.g., high memory\u2011store TTL cost, missing bucket policy, creating scheduled query before target table). Lacks a few additional pitfalls such as forgetting region support checks or KMS key immutability, so it falls short of full marks."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Full front\u2011matter, clear description, explicit \"when_to_use\" section, comprehensive keyword list, and a strict output contract with required literal labels."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document layers information (quick navigation, mindset, step\u2011by\u2011step, heuristics, anti\u2011patterns) but presents a large amount of detail early, which can overload the agent. Critical rules are not buried, yet the hierarchy could be more compact."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by a prerequisite checklist and explicit VERDICT handling, matching the fragility of provisioning resources. Some flexibility remains for partial configurations, but overall calibration is appropriate."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Navigation \u2192 Heuristics \u2192 Step\u2011by\u2011step procedure \u2192 Anti\u2011pattern \u2192 Output format."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling guidance. Missing coverage of idempotent behavior, handling of existing resources, and region\u2011mismatch edge cases prevents a perfect score."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 50793,
+  "latency_ms": 15962,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

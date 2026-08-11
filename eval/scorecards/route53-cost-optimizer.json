@@ -1,0 +1,70 @@
+{
+  "skill": "route53-cost-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 15,
+      "max": 20,
+      "justification": "Adds many expert details (zone\u2011count pricing tiers, calculated\u2011health\u2011check nesting limit, exact CLI sequences, decision matrix, anti\u2011pattern list) that a generic model would not know. However the pricing units are wrong (uses $/Billion instead of $/Million) and omits regional price variations, which limits the true expert delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (e.g., ACM CNAME check, VPC association audit, CLI sequences). However several steps are generic safety checks (\u201cverify no dependent services\u201d) and the ordering for private\u2011zone consolidation is not fully detailed, leaving a small procedural gap."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill lists concrete NEVER rules with clear rationales (e.g., never delete a zone without ACM validation check). It omits a few important pitfalls such as the cost of KMS API calls for DNSSEC and the nuance that a traffic\u2011policy cost is per policy, not per attached record, which could lead to over\u2011optimistic savings."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and a full invocation schema are present and well\u2011structured. The \u2018when_to_use\u2019 narrative is slightly vague about the exact metric windows required, but overall the spec is sufficient for reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document layers high\u2011level Quick\u2011Start, Mindset, and detailed Step\u2011by\u2011Step sections, which aids incremental consumption. Nonetheless the Quick\u2011Start already contains four headline rules and a cost formula, which may overload a first\u2011time reader before they know the context."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (zone deletion) are gated by extensive pre\u2011flight checks and a mandatory CONFIRM prompt, showing good calibration. The only shortfall is the lack of an explicit batch\u2011size limit for bulk deletions, which could permit overly aggressive operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Stepwise process \u2192 Anti\u2011Patterns \u2192 Output contract). Section titles are slightly inconsistent (e.g., \u201cStep 0 non\u2011obvious behaviours\u201d vs \u201cStep 1 Hosted zone inventory\u201d), but the overall structure is coherent."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 10,
+      "max": 15,
+      "justification": "Provides decision matrices, CLI commands, and a strict output contract, enabling an agent to act. However the example outputs contain arithmetic errors (e.g., treating $0.20 per\u202fB as $0.20 per\u202fquery) and omit tiered query pricing, which would cause mis\u2011calculations in real use. Missing handling of shared KMS keys and edge\u2011case validation further reduces reliability."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 45509,
+  "latency_ms": 17728,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

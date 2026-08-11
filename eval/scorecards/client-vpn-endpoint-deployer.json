@@ -1,0 +1,70 @@
+{
+  "skill": "client-vpn-endpoint-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Introduces several expert\u2011level nuances not usually restated by a generic model: first\u2011match rule ordering, split\u2011tunnel DNS leak mitigation, mutual\u2011TLS revocation via CRL upload, AWS\u2011specific concurrency limits for subnet association, soft limit of 12 associations, requirement to create CloudWatch log group before enabling logging, and the need for at least one authorization rule. These concrete thresholds and gotchas constitute genuine delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedural flow with exact CLI commands, ordering (endpoint \u2192 auth \u2192 subnet \u2192 routes \u2192 logging), and special handling such as deleting/recreating rules to change order and waiting for association status. The mindset is clearly tied to AWS Client VPN provisioning rather than generic security checks."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed \"NEVER\" list (10 items) each with concrete reasoning (e.g., silent failure without auth rules, DNS leak risk, overlapping CIDR, concurrency of subnet associations). The anti\u2011patterns are specific to Client VPN and explain why they are harmful."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, triggers, and a strict output contract with literal labels. The \"when_to_use\" section is present but somewhat verbose; activation triggers rely on keyword matching which may be imprecise, leaving a small gap in reliable invocation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "Uses a navigation table and layered sections (mindset, dependency graph, heuristics, steps, NEVER, output format). However, a large amount of detailed CLI syntax appears early, which could overload the agent before it knows which path to follow."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive actions (e.g., rule reordering) are warned as delete\u2011recreate, prerequisite checks are enforced, limits (12 subnets) and concurrency constraints are highlighted. Creative tasks (choosing auth type) are left open, matching task fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (mindset \u2192 dependency graph \u2192 heuristics \u2192 step\u2011by\u2011step \u2192 NEVER \u2192 output contract). The structure is consistent with other CloudOps skills."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling guidance. Missing a clear decision tree for selecting authentication method based on input parameters and no automated validation of overlapping CIDR or subnet\u2011association limits, which could cause agents to produce incomplete or incorrect output."
+    }
+  ],
+  "total_score": 102,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 42143,
+  "latency_ms": 12918,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

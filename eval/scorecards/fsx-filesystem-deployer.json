@@ -1,0 +1,70 @@
+{
+  "skill": "fsx-filesystem-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 15,
+      "max": 20,
+      "justification": "Adds concrete expert heuristics not usually restated: stepped throughput capacity selection, Multi\u2011AZ vs Single\u2011AZ decision tree, S3\u2011export nuance, dedup savings estimation, and a configuration dependency graph. These provide actionable guidance beyond generic AWS docs."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides AWS\u2011specific CLI command sequences and ordering (e.g., create\u2011file\u2011system \u2192 associate\u2011aliases \u2192 backup). However some steps are generic (e.g., \"verify SG rules\") and lack full AWS\u2011specific checklist details."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never pick Single\u2011AZ for production, never use arbitrary throughput). Missing a few common pitfalls such as IAM role mis\u2011configuration and cost\u2011monitoring omissions."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, activation keywords, and strict output contract are present, enabling reliable invocation. The verdict shape is limited to two values and the PREREQUISITES_MISSING checklist example is less explicit, leaving a small ambiguity."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "Uses navigation table and layered sections (Mindset, Heuristics, Steps, NEVER, Output). Nonetheless the skill front\u2011loads a large amount of detail, which can cause cognitive overload before the core checklist is needed."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately for provisioning: strict prerequisite checks, explicit output format, and limited destructive actions. Slight gap: no constraints for delete or modify operations, though the primary task is creation."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Expert heuristics \u2192 Step\u2011by\u2011step workflow \u2192 NEVER list \u2192 Output format). Structure aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides decision trees, ready\u2011to\u2011copy CLI commands, error\u2011handling guidance, and worked examples. Lacks handling for some edge cases (region mismatch, IAM permission errors, cross\u2011region backup copy) which could impede flawless execution."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 41043,
+  "latency_ms": 6848,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

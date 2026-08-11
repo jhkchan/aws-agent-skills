@@ -1,0 +1,70 @@
+{
+  "skill": "s3-storage-class-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many concrete numbers (pricing, min\u2011days matrix, transition cost formula) and a detailed decision matrix that a generic model would not know, but it still largely restates publicly documented S3 pricing and lifecycle rules without introducing a novel decision tree or unique thresholds beyond the docs."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines a clear AWS\u2011specific step order, dependency graph, and CLI procedures, yet omits a concrete procedure for handling MFA Delete when lifecycle expiration is required, leaving a gap in the expert workflow."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with specific reasons (e.g., minimum\u2011days violations, retrieval\u2011cost surprises), but misses common pitfalls such as cross\u2011region replication cost impact and the risk of using One\u2011Zone\u2011IA for compliance data."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete and includes description, when_to_use, activation_triggers, and invocation_schema. However, the skill does not explicitly define a machine\u2011readable output schema beyond the free\u2011form verdict_shape, which weakens reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Uses layered navigation: quick start, mindset, decision matrix, then deep step\u2011wise sections. Critical rules (minimum\u2011days, transition costs) are placed in Step\u202f0, which could be missed on a rapid read, hence a small deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom precisely: destructive actions (lifecycle changes, batch ops) require pre\u2011flight checks and explicit CONFIRM prompts; analysis tasks are left open. No over\u2011constraining of creative steps."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent pattern (overview \u2192 mindset \u2192 quick reference \u2192 stepwise process \u2192 anti\u2011patterns \u2192 output contract), making the skill easy to recognize and follow."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides actionable CLI commands, decision matrix, and a strict output contract that an agent can implement. Some calculations (e.g., transition request cost) are only sketched, and error handling for missing data sources (Storage Lens absent) is not fully detailed, leading to a modest deduction."
+    }
+  ],
+  "total_score": 110,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 48754,
+  "latency_ms": 7973,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
