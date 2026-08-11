@@ -1,0 +1,70 @@
+{
+  "skill": "cloudfront-502-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill largely restates documented AWS troubleshooting steps; the added value is the specific ordering of probes and a few heuristics (e.g., TLS mismatch is the most common post\u2011config change, OAC failures are silent). It omits newer edge cases such as WAF\u2011related 502s or HTTP/2 nuances, so the genuine expert knowledge gain is modest."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides AWS\u2011specific procedures (CLI calls, OpenSSL checks, OriginShield probing) and a clear mindset, but intermixes generic actions (curl, grep) and lacks a strict ordering for complex scenarios like multi\u2011origin failover verification, reducing procedural precision."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER list is thorough and explains why each pitfall is dangerous, yet it misses common traps such as ignoring CloudWatch metrics for latency spikes or over\u2011relying on x\u2011edge-result-type when logs are incomplete."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, keywords, activation triggers, and invocation schema are present, but the triggers are overly broad and the schema lacks explicit validation constraints (e.g., required fields). The \"when to use\" description could be tighter to avoid ambiguous activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The quick\u2011start section packs many details, and many rules (e.g., confirmation gate) are buried deeper, causing cognitive overload. While deeper sections exist, the layering is not optimal; critical safety rules are not front\u2011loaded."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (distribution update, invalidation) are gated behind explicit CONFIRM prompts. Read\u2011only probes are prioritized. The only gap is the lack of a configurable \u2018dry\u2011run\u2019 mode for bulk validation."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows a coherent, recognizable pattern (quick start, mindset, philosophy, pre\u2011flight, process, anti\u2011patterns, output format), aiding comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "The decision tree, commands, and output format are usable, but ambiguous handling when multiple layers could match and missing edge cases (e.g., mixed 502/504 symptoms) may lead to incorrect root\u2011cause identification in practice."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 39519,
+  "latency_ms": 12731,
+  "assertions_passed": false,
+  "assertions_passed_count": 1,
+  "assertions_failed_count": 4
+}

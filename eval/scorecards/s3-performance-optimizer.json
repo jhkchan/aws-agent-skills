@@ -1,0 +1,70 @@
+{
+  "skill": "s3-performance-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 13,
+      "max": 20,
+      "justification": "The skill compiles several specific, up\u2011to\u2011date thresholds (e.g., 10,000\u202fRPS per prefix, July\u202f2023 removal of the 3,500/5,500 cap) and concrete part\u2011size tables that a generic model would not enumerate, but most of the content restates publicly documented best\u2011practices rather than novel expert heuristics."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Offers a clear AWS\u2011specific workflow (pre\u2011flight probes, decision tree, CLI steps). Deductions for a few generic statements (\"measure before optimizing\") and missing explicit ordering for enabling metrics before probing, plus no rollback procedure for destructive changes."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list with reasoning (e.g., avoid prefix sharding <10k\u202fRPS, never use copy\u2011object >5\u202fGB). One point deducted because some anti\u2011patterns lack deeper explanation (e.g., why S3 Select fails on encrypted Parquet) and omission of a warning about exceeding the 10,000\u2011part limit in multipart uploads."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. Deducted one point for minor gaps: no explicit output schema definition and the \"entry_point: false\" flag is ambiguous for runtime activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections (quick start, mindset, triage table, detailed steps). However, critical anti\u2011pattern rules are buried later, and the quick\u2011start already contains many details, creating some cognitive overload. Hence a modest deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions require explicit CONFIRM prompts and safety checks, matching fragility. One point deducted because cost\u2011impact warnings (e.g., enabling Transfer Acceleration) are not emphasized, and there is no hard limit guidance for multipart part count to avoid the 10,000\u2011part ceiling."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (quick start \u2192 mindset \u2192 philosophy \u2192 triage \u2192 process \u2192 anti\u2011patterns \u2192 safety). Slight deduction because the pattern is not explicitly labeled, making it feel a bit ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, decision tree, output format, and examples, enabling an agent to act. Deductions for missing fallback when CloudWatch metrics are disabled, and lack of error\u2011handling guidance for CLI failures (permissions, rate\u2011limit errors)."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 40383,
+  "latency_ms": 6168,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
