@@ -343,3 +343,88 @@ compliance status. They are separate systems.
 Cost optimization: use resource scope to limit which resource types
 are evaluated. Scoping a rule to `AWS::S3::Bucket` instead of
 `allSupported` reduces evaluation count by ~80% in typical accounts.
+
+## Full anti-patterns NEVER list
+
+- NEVER deploy a Config rule without first verifying the configuration
+  recorder is running. A stopped recorder means ALL rules report stale
+  compliance.
+- NEVER assume `put-config-rule` triggers immediate evaluation. The rule
+  evaluates on the next resource change or at the next
+  MaximumExecutionFrequency interval. Always run
+  `start-config-rules-evaluation` after creating a rule.
+- NEVER assume remediation is automatic. Adding an SSM Automation document
+  does NOT auto-remediate unless `Automatic: true` is explicitly set.
+- NEVER deploy a custom Lambda rule without verifying the Lambda resource-
+  based permission for `config.amazonaws.com`.
+- NEVER deploy a custom Lambda rule where the function timeout exceeds 60
+  seconds. Config's invocation has a hard 60s timeout.
+- NEVER use a Config rule scope that includes unsupported resource types.
+  The rule accepts the config but evaluates nothing.
+- NEVER exceed 150 Config rules per region without requesting a limit
+  increase. The 151st rule is silently rejected.
+- NEVER deploy a conformance pack with an invalid template body. The
+  CloudFormation stack creation fails silently.
+- NEVER assume Security Hub integration is bi-directional. Config forwards
+  TO Security Hub; remediating in Security Hub does NOT change Config
+  compliance status.
+- NEVER delete a Config rule to "stop noise" without understanding why
+  resources are non-compliant. Set `ConfigRuleState: INACTIVE` instead.
+- NEVER forget the SSM Automation document must be in the SAME region as
+  the Config rule. Cross-region remediation is not supported.
+- NEVER auto-execute a state-changing Config CLI without the CONFIRM gate.
+  `put-config-rule` overwrites with no version history.
+- NEVER deploy an organization config rule from a member account. Org rules
+  must be deployed from the management account or delegated administrator.
+- NEVER use periodic evaluation for security-critical rules when
+  configuration-change evaluation is available. Periodic can take up to 24h.
+- NEVER deploy proactive rules without testing the CloudFormation hook in a
+  non-production account. A misconfigured hook can block ALL CFN deployments.
+
+## Expert heuristic: stale compliance diagnostic decision tree
+
+```
+Rule shows "Compliant" for all resources
+   ├─ Is the configuration recorder running?
+   │    ├─ NO → Stale compliance — restart recorder, force evaluation
+   │    └─ YES → Check last evaluation time
+   │              ├─ LastSuccessfulInvocationTime is old (> MaximumExecutionFrequency)?
+   │              │    ├─ YES → Stale — force start-config-rules-evaluation
+   │              │    └─ NO → Likely real compliance
+   │              └─ For custom rules: Lambda had errors?
+   │                   ├─ Check describe-config-rule-evaluation-status
+   │                   └─ Check CloudWatch Logs for the Lambda function
+   │
+   └─ Confirm via get-compliance-details-by-config-rule:
+        aws configservice get-compliance-details-by-config-rule \
+          --config-rule-name <name>
+        If empty result → no evaluations performed (stale or broken)
+```
+
+**Per-rule-type staleness indicators:**
+
+| Rule type | What to check when compliance looks stale |
+|---|---|
+| Managed rule | Recorder running? `describe-configuration-recorder-status`. Rule ACTIVE? |
+| Custom Lambda rule | Lambda exists? Permission for Config? Last invocation had errors? Check CW Logs. |
+| Periodic rule | MaximumExecutionFrequency elapsed since last evaluation? Force evaluation. |
+| Conformance pack | CloudFormation stack status = CREATE_COMPLETE? Any drift? |
+| Org rule | Management account permissions intact? Aggregator authorized? |
+
+## Pre-flight safety checks (full detail)
+
+- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation, the
+  operator MUST emit CONFIRM and await approval.
+- **PutConfigRule overwrites the entire rule configuration.** Always
+  snapshot before modification.
+- For custom Lambda rules, verify the function's resource-based policy
+  includes a permission statement for `config.amazonaws.com`. #1 cause of
+  custom rule evaluation errors.
+- For remediation configurations, verify the SSM Automation document exists
+  AND the Config service-linked role has `ssm:StartAutomationExecution`.
+- For conformance packs, validate the template YAML before deployment.
+  Errors surface as CloudFormation stack events, not Config API errors.
+- For organization config rules, verify the management account has
+  authorized the Config service as a delegated administrator.
+- Prefer configuration-change rules over periodic for security-critical
+  checks. Configuration-change detects within minutes; periodic can take 24h.

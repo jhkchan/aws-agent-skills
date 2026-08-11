@@ -434,3 +434,132 @@ on the CMK. Account A's key policy must allow account B
 For high-throughput workloads (millions of GenerateDataKey calls per
 second), use envelope encryption with data key caching (the AWS
 Encryption SDK does this automatically).
+
+## Full NEVER list (anti-patterns)
+
+- NEVER create a CMK without the account root as break-glass. Without root
+  fallback, an accidental policy misconfiguration permanently locks everyone
+  out — AWS support cannot recover.
+- NEVER grant `kms:*` to any non-root principal. Use scoped statements for
+  users vs administrators.
+- NEVER combine key administrator and key user into one role. Separation of
+  duties: admins manage lifecycle, users access data — never both.
+- NEVER rely on IAM alone for CMK access. IAM grants cannot override a key
+  policy denial. The key policy MUST explicitly list principals.
+- NEVER skip automatic rotation on a `SYMMETRIC_DEFAULT` CMK. Annual rotation
+  is free, invisible to callers, limits blast radius of compromise.
+- NEVER use a CMK with no deletion window (API enforces 7-30 day). For
+  production, set 30 days.
+- NEVER assume cross-account access works because account B's IAM is correct.
+  KMS requires BOTH key policy AND caller IAM to allow.
+- NEVER delete a CMK without confirming no ciphertext is encrypted under it.
+  Audit CloudTrail for recent Encrypt / GenerateDataKey usage.
+- NEVER use AWS-managed keys when you need cross-account access, rotation
+  control, or CloudTrail audit trail of key usage.
+- NEVER rotate a multi-Region primary without rotating all replicas.
+- NEVER use the CMK directly to encrypt data > 4 KB. Use envelope encryption.
+- NEVER omit the encryption context on Encrypt/Decrypt. It is authenticated
+  AAD and must match on both operations.
+- NEVER deviate from the checklist output format. Substituting `Verdict` for
+  literal `VERDICT:` breaks downstream automation.
+
+## Edge-case handling (full detail)
+
+- **Accidental lockout.** If a key policy excludes the root, recovery is
+  impossible — AWS support cannot restore access. Always include
+  `{"AWS": "arn:aws:iam::<account>:root"}` with `kms:*` as the first
+  statement. Validate with IAM policy simulator before applying.
+
+- **Cross-account service-linked role.** When an AWS service in account B
+  needs a CMK in account A, the service creates a grant on the CMK. The key
+  policy must allow account B `kms:CreateGrant` with
+  `kms:GrantIsForAWSResource=true`. Caller IAM in account B must also allow.
+
+- **CMK in PendingDeletion.** Cannot Encrypt or GenerateDataKey, but CAN
+  Decrypt (intentional — allows data migration off the doomed key). Cancel
+  with `CancelKeyDeletion` if the window has not elapsed.
+
+- **Asymmetric key rotation.** Asymmetric and HMAC CMKs cannot auto-rotate.
+  Manual rotation = create new key, update alias, re-encrypt on next access.
+  Old key must remain accessible for decrypt of historical ciphertext.
+
+- **Multi-Region replica policy drift.** Each replica has an independent key
+  policy. Automate replica policy sync via CloudFormation StackSets or
+  Terraform `for_each`.
+
+- **Custom key store disconnect.** If the CloudHSM cluster goes unhealthy or
+  `kmsuser` password rotates, the custom key store disconnects and all
+  Encrypt/Decrypt on its keys fails. Monitor health, set CloudWatch alarm.
+
+- **CloudTrail `Decrypt` calls.** KMS logs `Decrypt` events with encryption
+  context. Use for audit. High-volume `GenerateDataKey` calls are
+  rate-limited in CloudTrail by default.
+
+- **Quota limits.** Each CMK supports 50,000 RPS for `GenerateDataKey`
+  (Region-wide). For higher throughput, use envelope encryption with data
+  key caching (AWS Encryption SDK does this automatically).
+
+## Envelope encryption pattern (full reference)
+
+KMS keys are not used to bulk-encrypt data. Use envelope encryption:
+
+1. **GenerateDataKey** — KMS returns a plaintext data key AND the same key
+   encrypted under the CMK.
+2. **Encrypt the data** — use a client-side cipher (AES-GCM via AWS
+   Encryption SDK) with the plaintext data key.
+3. **Store** — discard the plaintext data key. Store ciphertext + encrypted
+   data key.
+4. **Decrypt** — call `Decrypt` on the encrypted data key. KMS returns
+   plaintext data key. Use it to decrypt.
+
+```bash
+aws kms generate-data-key \
+  --key-id alias/payments-cmk \
+  --key-spec AES_256 \
+  --encryption-context '{"department":"finance","app":"payments"}'
+
+aws kms decrypt \
+  --ciphertext-blob fileb://encrypted-data-key.bin \
+  --encryption-context '{"department":"finance","app":"payments"}'
+```
+
+Why envelope encryption:
+- KMS has a 4 KB limit on `Encrypt` / `Decrypt`.
+- KMS request quotas (5,500-50,000 RPS) limit direct encryption. Envelope
+  encryption caches the data key.
+- The Encryption SDK implements this automatically with key caching and key
+  commitment.
+
+Encryption context is authenticated AAD — MUST be identical on Encrypt and
+Decrypt. Use it to scope access (grants can require specific context).
+
+## Cross-account access (full reference)
+
+For a principal in account B to use a CMK in account A:
+
+1. **Account A (key owner)** — key policy grants account B's role the KMS
+   actions AND `kms:CreateGrant` with `kms:GrantIsForAWSResource=true`.
+2. **Account B (caller)** — IAM policy on the caller role must ALSO grant
+   KMS actions on the cross-account CMK ARN.
+
+Both policies must allow — KMS is a "both-must-allow" service.
+
+```json
+// Account A key policy
+{
+  "Sid": "Allow cross-account use",
+  "Effect": "Allow",
+  "Principal": { "AWS": "arn:aws:iam::<account-b-id>:root" },
+  "Action": ["kms:Decrypt", "kms:DescribeKey", "kms:GenerateDataKey*"],
+  "Resource": "*"
+}
+```
+
+```json
+// Account B caller IAM policy
+{
+  "Effect": "Allow",
+  "Action": ["kms:Decrypt", "kms:GenerateDataKey*"],
+  "Resource": "arn:aws:kms:us-east-1:<account-a-id>:key/<key-id>"
+}
+```

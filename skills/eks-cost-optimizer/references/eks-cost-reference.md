@@ -248,3 +248,223 @@ savings = committed_hourly_spend * discount_rate * 730
 
 Prices are approximate us-east-1 rates as of 2026. Always verify with
 `aws ec2 describe-spot-price-history` for current Spot prices.
+
+## Pre-flight data-gathering CLI commands
+
+```bash
+# 1. Confirm Container Insights is enabled
+aws eks describe-cluster --name <cluster> --query 'cluster.logging' --output json
+aws logs describe-metric-filters \
+  --log-group-name /aws/containerinsights/<cluster>/performance --output json
+
+# 2. Pull 14-30 day node utilization
+START=$(date -d '-30 days' +%FT%TZ)
+END=$(date +%FT%TZ)
+aws cloudwatch get-metric-statistics \
+  --namespace ContainerInsights --metric-name node_cpu_utilization \
+  --dimensions Name=ClusterName,Value=<cluster> Name=NodeGroupName,Value=<ng> \
+  --start-time $START --end-time $END --period 3600 --statistics Average,Maximum \
+  --output json > node-cpu.json
+aws cloudwatch get-metric-statistics \
+  --namespace ContainerInsights --metric-name node_memory_utilization \
+  --dimensions Name=ClusterName,Value=<cluster> Name=NodeGroupName,Value=<ng> \
+  --start-time $START --end-time $END --period 3600 --statistics Average,Maximum \
+  --output json > node-mem.json
+
+# 3. Pod-level utilization (bin-packing signal)
+aws cloudwatch get-metric-statistics \
+  --namespace ContainerInsights --metric-name pod_cpu_utilization \
+  --dimensions Name=ClusterName,Value=<cluster> \
+  --start-time $START --end-time $END --period 3600 --statistics Average,Maximum \
+  --output json > pod-cpu.json
+
+# 4. In-cluster signals
+kubectl top nodes --heapster-scheduler --sort-by=cpu
+kubectl describe node <node> | grep -A 5 "Allocated resources"
+
+# 5. Node group config
+aws eks describe-nodegroup --cluster-name <cluster> --nodegroup-name <ng> --output json
+
+# 6. Per-pod requests vs usage
+kubectl get pods --all-namespaces -o json | jq '.items[] | {
+  pod: .metadata.name, ns: .metadata.namespace,
+  cpu_request: .spec.containers[].resources.requests.cpu,
+  mem_request: .spec.containers[].resources.requests.memory}'
+kubectl top pods --all-namespaces
+
+# 7. VPA recommendations
+kubectl apply -f vpa-recommender.yaml
+kubectl get vpa <vpa-name> -o json | jq '.status.recommendation'
+
+# 8. Capture pre-state before changes
+aws eks describe-nodegroup --cluster-name <c> --nodegroup-name <ng> \
+  --output json > /tmp/<ng>-pre-$(date +%s).json
+```
+
+## Detailed expert heuristics (non-obvious EKS cost behaviours)
+
+- **Pod `requests` is the scheduling currency, not `limits`.** The scheduler
+  places pods based on `requests`, not `limits` and not actual usage. A node at
+  10% actual CPU can still be "full" if pods have inflated requests.
+- **Fargate does not support DaemonSets, privileged pods, or hostNetwork.**
+  Verify no DaemonSet dependencies before recommending Fargate.
+- **Fargate pricing is per-pod-per-second with a 1-minute minimum.** A pod
+  requesting 2 vCPU + 4 GB costs the same at 5% or 95% usage.
+- **Spot gives a 2-minute warning.** NTH or Karpenter intercepts and
+  cordon-drains. Without them, pods get 30s default grace period.
+- **Karpenter consolidation: delete + replace.** Delete removes empty nodes;
+  replace swaps underutilized nodes for cheaper alternatives. Runs every ~10s.
+- **EKS Auto Mode (2024-2025) bundles Karpenter-like provisioning.** New
+  clusters: Auto Mode eliminates separate Karpenter install.
+- **Graviton requires multi-arch images.** Single-arch x86 images fail with
+  `ImagePullBackOff` on arm64 nodes. Verify via `docker manifest inspect`.
+- **Managed node group updates respect PDB.** A PDB that blocks drainage
+  stalls the update.
+- **Compute Savings Plans cover EC2 nodes, NOT Fargate.** Never claim Savings
+  Plan savings on Fargate spend.
+- **Cluster Autoscaler never consolidates partially-used nodes.** Karpenter
+  does — this is the 20-40% savings source.
+- **Cross-AZ pod-to-pod traffic within a cluster is free.** Cross-AZ to
+  RDS/ElastiCache/ALB is $0.01/GB each way.
+
+## Additional worked examples
+
+### Worked example — Fargate migration for a low-density dev workload
+
+```text
+TARGET: dev-cluster/dev-nodegroup
+VERDICT: OPPORTUNITY_FOUND
+REASON: 3 On-Demand m5.large nodes ($210/month) running 6 dev pods that
+  each need 0.5 vCPU + 1 GB. Pod density is 2 pods/node — well below the
+  Fargate breakeven. No DaemonSets or privileged pods. Migrating to
+  Fargate saves 55% and eliminates node management.
+RECOMMENDATION:
+  Current: m5.large x 3 nodes at On-Demand ($0.096/h each)
+  Proposed: Fargate profile, 6 pods at 0.5 vCPU + 1 GB each
+  Compute model: EC2 On-Demand → Fargate
+  Autoscaler: N/A (Fargate auto-scales per pod)
+  Bin-packing action: none (Fargate charges per pod request)
+  Graviton: consider Fargate arm64 (20% cheaper per vCPU)
+  Confidence: HIGH — no DaemonSets, no privileged pods, pod density 2/node.
+ESTIMATED_SAVINGS:
+  Monthly (right-size + bin-pack): $0
+  Monthly (compute model): $116.12  (EC2: $0.096 x 3 x 730 = $210.24;
+    Fargate: 6 pods x (0.5 x $0.04048 + 1 x $0.004445) x 730 = $94.12;
+    savings: $210.24 - $94.12 = $116.12)
+  Monthly (pricing model): $0 (Fargate not covered by Savings Plans)
+  Annual total: $1,393.44
+MIGRATION_STEPS:
+  1. Create a Fargate profile for the dev namespace:
+     aws eks create-fargate-profile --cluster-name dev-cluster \
+       --fargate-profile-name dev-profile \
+       --pod-execution-role-arn arn:aws:iam::<acct>:role/eks-fargate-pod-execution-role \
+       --selectors namespaceName=dev \
+       --subnets <subnet-ids> --security-groups <sg-ids>
+  2. Verify no pods in the dev namespace use DaemonSets or privileged
+     security context:
+     kubectl get pods -n dev -o json | jq '.items[].spec.containers[].securityContext.privileged'
+  3. Delete existing pods to trigger Fargate scheduling:
+     kubectl delete pods -n dev --all
+  4. Verify pods reschedule on Fargate:
+     kubectl get pods -n dev -o wide | grep Fargate
+  5. Scale the EC2 node group to 0 and delete after verification:
+     aws eks update-nodegroup-config --cluster-name dev-cluster \
+       --nodegroup-name dev-nodegroup --scaling-config desiredSize=0,minSize=0,maxSize=0
+CONFIRM: Before creating the Fargate profile, emit and await operator approval.
+```
+
+### Worked example — already optimal
+
+```text
+TARGET: prod-cluster/prod-karpenter-spot
+VERDICT: ALREADY_OPTIMAL
+REASON: Karpenter-managed cluster with consolidation enabled, Spot capacity
+  for fault-tolerant workloads, On-Demand baseline covered by a 3-year
+  Compute Savings Plan. Pod requests tuned via VPA (ratio 1.3x). Node
+  utilization 55% CPU / 62% Memory — healthy with headroom.
+RECOMMENDATION:
+  Current: Karpenter with m7i.xlarge Spot + On-Demand mix, 3-yr Savings Plan
+  Proposed: no change
+  Confidence: HIGH — all dimensions optimized.
+ESTIMATED_SAVINGS:
+  Monthly: $0 (all layers)
+  Annual total: $0
+MIGRATION_STEPS:
+  - None required. Re-evaluate quarterly.
+  - Monitor Spot interruption rate via CloudWatch.
+```
+
+### Worked example — NEED_MORE_INFO (Container Insights absent)
+
+```text
+TARGET: staging-cluster/staging-ng
+VERDICT: NEED_MORE_INFO
+REASON: Container Insights is not enabled on staging-cluster.
+RECOMMENDATION:
+  Current: m5.xlarge x 3 nodes at On-Demand
+  Proposed: pending data
+  Confidence: LOW — no utilization data available.
+ESTIMATED_SAVINGS: $0 (cannot quantify)
+MIGRATION_STEPS:
+  1. Enable Container Insights:
+     aws eks update-cluster-config --name staging-cluster \
+       --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
+  2. Wait 14-30 days.
+  3. Re-evaluate.
+```
+
+## Full NEVER list (anti-patterns)
+
+- NEVER recommend a node group downsize without first checking the pod
+  requests-to-usage ratio. Inflated requests make nodes appear "full" while
+  actual usage is low.
+- NEVER recommend Fargate without verifying no DaemonSets, privileged pods,
+  or hostNetwork are in use.
+- NEVER recommend a Spot node group without verifying PodDisruptionBudget
+  (PDB) and a graceful drain mechanism (NTH or Karpenter native).
+- NEVER recommend Spot for stateful workloads (databases, message queues,
+  singleton services, or any pod with local state).
+- NEVER claim Compute Savings Plan savings on Fargate spend. CSPs apply to
+  EC2 instance spend only.
+- NEVER recommend Graviton node groups without verifying every pod's
+  container image has an arm64 manifest entry.
+- NEVER recommend a single instance type for a Spot node group or Karpenter
+  NodePool. Always provide 3+ alternative instance types.
+- NEVER assume Cluster Autoscaler consolidates partially-utilized nodes.
+  Only Karpenter does this.
+- NEVER recommend Fargate for a high-density steady-state workload (> 6
+  pods per equivalent EC2 node). Always compute the breakeven.
+- NEVER set memory `limit` below `request`. Memory limit < request causes
+  OOMKill.
+- NEVER trigger a managed node group update during peak traffic. Schedule
+  for off-peak hours.
+- NEVER recommend Karpenter without configuring disruption budgets for
+  production. Use `disruption.budgets` to control the pace.
+- NEVER assume EKS Fargate pods have access to the same security group as
+  EC2 nodes. Fargate pods use the Fargate profile's pod execution role.
+- NEVER ignore the EKS control plane cost ($73/month) in fleet-wide
+  analysis. A fleet of 10 small clusters pays $730/month in control planes.
+- NEVER recommend removing `requests` entirely. Without requests, the
+  scheduler cannot make placement decisions.
+- NEVER assume Container Insights CPU and `kubectl top nodes` will always
+  agree. Trust `kubectl top` for fresher data, Container Insights for
+  historical trends.
+
+## Pre-flight safety checks (full detail)
+
+- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
+  emit and await operator approval.
+- **Verify PDB before Spot migration:**
+  `kubectl get pdb --all-namespaces` — confirm every deployment has a PDB.
+- **Verify multi-arch images before Graviton migration:**
+  `docker manifest inspect <image>` — confirm arm64 entry exists.
+- **Verify no DaemonSet dependencies before Fargate migration:**
+  `kubectl get ds --all-namespaces` — check target pods.
+- **Drain nodes one at a time during cutover.** Cordoning all nodes at
+  once causes mass pod rescheduling.
+- **Batch limit for fleet-wide remediation.** Sort by savings, batch of
+  at most 3 node groups, single CONFIRM per batch, verify before next batch.
+- **Capture pre-state before changes:**
+  `aws eks describe-nodegroup --cluster-name <c> --nodegroup-name <ng> --output json > /tmp/<ng>-pre-$(date +%s).json`
+- **Verify Savings Plan coverage post-commitment.** Takes up to 1 hour to
+  propagate. Verify with `aws ce get-savings-plans-coverage`.
