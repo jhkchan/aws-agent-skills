@@ -276,3 +276,121 @@ aws ecs execute-command \
 NEVER enable in production without a change ticket — `execute-command`
 bypasses bastion auditing. CloudTrail logs the session, but session
 contents are not recorded by default.
+
+## Full NEVER list (anti-patterns)
+
+- NEVER use `:latest` image tag in production. It is mutable — a new push
+  silently changes what runs. Pin to a version tag or SHA digest. #1
+  rollback-breaker.
+- NEVER combine the execution role and task role into one. The execution
+  role pulls images and writes logs; the task role is the application's
+  identity. Combining produces pull failures or least-privilege violations.
+- NEVER use a target group with `target_type=instance` for a Fargate
+  service. Fargate tasks register by ENI private IP — only `target_type=ip`
+  works. Silently fails registration.
+- NEVER deploy Fargate tasks to a public subnet with
+  `assignPublicIp=ENABLED` in production. Exposes the task directly to
+  the internet. Use private subnets + NAT Gateway or VPC endpoints.
+- NEVER deploy without the deployment circuit breaker when using a rolling
+  deployment. Without `enable=true, rollback=true`, a bad task definition
+  leaves the service degraded indefinitely.
+- NEVER rely on the ALB health check alone. Always define a container
+  health check for the circuit breaker and task lifecycle signal.
+- NEVER set `minimumHealthyPercent=0` for a production service. Stops all
+  old tasks before new ones start — downtime window every deployment.
+- NEVER use `awslogs` log driver without pre-creating the log group. ECS
+  does NOT auto-create log groups; first task fails with
+  `ResourceNotFoundException`.
+- NEVER reference Secrets Manager secrets in plaintext environment
+  variables. Use the `secrets` array so they are injected at runtime.
+- NEVER set `scaleInCooldown` below 300 seconds. Sub-300s causes flapping.
+- NEVER use `DAEMON` scheduling strategy on Fargate. Only valid for EC2.
+- NEVER use the legacy `launch-type` API with FARGATE_SPOT. Spot is a
+  capacity provider, not a launch type.
+- NEVER omit the `startPeriod` on slow-start containers (Java, .NET).
+  Health check fires before app is ready → circuit breaker false rollback.
+- NEVER deviate from the checklist output format. Substituting labels
+  silently breaks downstream pipelines and evals.
+
+## Edge-case handling (full detail)
+
+- **Cross-account ECR pull.** Execution role in account A pulling from
+  account B's ECR needs `ecr:BatchGetImage` on the cross-account repo AND
+  the repository policy in B must grant A's root. `ecr:GetAuthorizationToken`
+  is always against the calling account.
+
+- **ECS Exec in production.** `enableExecuteCommand=true` allows shell
+  access via `aws ecs execute-command`. Bypasses bastion auditing. Enable
+  only for break-glass; require change ticket and CloudTrail alert.
+
+- **ALB health check vs. container health check divergence.** If ALB
+  passes but container check fails, ECS marks task unhealthy while ALB
+  keeps sending traffic. Align path, interval, timeout of both checks.
+
+- **Slow-start JVM tasks.** Java/Spring Boot can take 60-120s to start.
+  Set `healthCheck.startPeriod=60` (or higher) and
+  `unhealthyThresholdCount=3` to avoid spurious rollback.
+
+- **Spot interruption drain.** Fargate Spot receives 2-minute warning, ECS
+  sends `SIGTERM`. Set `stopTimeout=30` (max) for graceful shutdown.
+
+- **Capacity provider vs. launch type.** Once a service uses a
+  capacity-provider strategy, you cannot switch back to launch type
+  without recreating the service.
+
+- **Service Connect / Cloud Map.** For service-to-service discovery,
+  enable Service Connect (built-in) or Cloud Map (external). Both require
+  the namespace to exist before service creation.
+
+- **Task placement constraints.** Fargate ignores most placement
+  constraints (EC2-only). Use `spread=attribute:ecs.availability-zone`
+  to balance across AZs.
+
+## Expert heuristic (full detail)
+
+**The 60/70 rule:** set CPU target tracking at 60% for latency-sensitive
+services, 70% for batch. Leaves headroom before auto-scaling kicks in
+(scale-out takes ~60-90s on Fargate — task startup + ALB health check).
+
+**Memory: 2x the working set.** A JVM app with 2 GB heap needs at least
+4 GB task memory. Set JVM heap via `-XX:MaxRAMPercentage=75`.
+
+**AZ spread:** minimum 2 AZs for HA, 3 AZs for user-facing services. Pair
+with `desiredCount >= AZ count` so a single AZ failure does not drop
+capacity below 1.
+
+**Fargate Spot blend:** `base=2` on FARGATE (HA floor) plus FARGATE_SPOT
+weight 1-3 for burst. NEVER put stateful workloads on Spot.
+
+**ALB vs. NLB:** ALB for HTTP/HTTPS (path routing, OIDC, WAF). NLB for
+TCP/TLS (low latency, static IPs, preserved source IP). Target type must
+be `ip` either way.
+
+## Pre-flight safety checks (full detail with CLI)
+
+```bash
+# Confirm the cluster exists with the right capacity provider
+aws ecs describe-clusters --clusters <cluster> --include ATTACHMENTS
+
+# Confirm the ECR image exists
+aws ecr describe-images --repository-name <repo> --image-ids imageTag=<tag>
+
+# Confirm both roles exist and have the right trust policy
+aws iam get-role --role-name <exec-role> --query 'Role.AssumeRolePolicyDocument'
+aws iam get-role --role-name <task-role> --query 'Role.AssumeRolePolicyDocument'
+
+# Confirm the target group is target_type=ip
+aws elbv2 describe-target-groups --target-group-arns <arn> --query 'targetGroups[0].TargetType'
+
+# Confirm subnets are private and span >= 2 AZs
+aws ec2 describe-subnets --subnet-ids subnet-aaa subnet-bbb \
+  --query 'Subnets[].{AZ:AvailabilityZone,Public:MapPublicIpOnLaunch}'
+
+# Pre-create the CloudWatch log group with retention
+aws logs create-log-group --log-group-name /ecs/<service>
+aws logs put-retention-policy --log-group-name /ecs/<service> --retention-in-days 30
+
+# For existing services, capture current config for rollback
+aws ecs describe-services --cluster <cluster> --services <service> \
+  --output json > /tmp/<service>-backup.json
+```

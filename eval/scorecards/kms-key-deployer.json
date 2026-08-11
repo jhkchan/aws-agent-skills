@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides many expert details not in a generic model: decision tree for key spec vs workload, on\u2011demand rotation flag, multi\u2011Region replica policy sync, CloudHSM custom key store steps, recent 2024\u20112026 feature changes, and explicit separation\u2011of\u2011duties heuristics. However a large portion restates AWS documentation verbatim, so not a full 20."
+      "justification": "Provides specific, up\u2011to\u2011date AWS\u2011specific knowledge not usually known by a generic model: exact ordering of KMS provisioning steps, on\u2011demand rotation flag (2024\u20112025), HMAC_256 spec details, multi\u2011Region replication commands, custom key store (CloudHSM) lifecycle, and recent feature changes. This adds genuine expert delta beyond baseline KMS concepts."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Lists a concrete 10\u2011step AWS\u2011specific provisioning workflow (spec selection, policy creation, alias, rotation, multi\u2011region, CloudHSM, deletion, tagging). One point deducted because the early \u201cverify prerequisites\u201d step is generic and not uniquely AWS\u2011specific."
+      "justification": "Provides an AWS\u2011specific, ordered provisioning workflow (spec \u2192 policy \u2192 admin/user separation \u2192 grants \u2192 alias \u2192 rotation \u2192 multi\u2011region \u2192 custom key store \u2192 deletion window) with exact CLI commands and JSON snippets. Lacks a concise decision\u2011tree diagram or flowchart that would make the procedure fully self\u2011contained."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with specific reasons (root break\u2011glass, never grant kms:* to non\u2011root, never combine admin/user, never rely on IAM alone, etc.). Missing a targeted warning about using ENCRYPT/DECRYPT actions with HMAC keys and about forgetting to sync replica policies, which reduces completeness."
+      "justification": "Contains a concrete NEVER list with five high\u2011impact anti\u2011patterns and clear reasoning (e.g., never omit root, never grant kms:* broadly). However the list is not exhaustive (missing pitfalls such as never rely on default key policy, never grant kms:* to non\u2011root, never use IAM alone for access) and therefore falls short of a full expert anti\u2011pattern catalogue."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, when\u2011to\u2011use, activation keywords, strict output contract, and exhaustive section taxonomy are all present and well\u2011structured. The only shortfall is that the 'Output format' example does not explicitly list the allowed values for the optional fields, leaving a tiny ambiguity."
+      "justification": "Frontmatter is complete, description, when_to_use, triggers, keywords, and a strict output contract with exact label syntax are all present. Activation criteria are unambiguous, enabling reliable skill invocation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level navigation and concise high\u2011level sections precede deep technical references, preventing overload. However the 'STRICT output contract' block is large and repeats many rules that could be summarized, causing slight cognitive bloat."
+      "justification": "Information is layered: quick navigation, strict contract, reasoning framework, prerequisites, step\u2011by\u2011step deployment, edge\u2011case handling, workload matrix, recent features, anti\u2011pattern list, heuristics, and pre\u2011flight checks. Critical rules are not buried, but the sheer volume may still cause some cognitive load."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (deletion window) are calibrated with a recommended 30\u2011day default and explicit warnings for 7\u2011day windows. Creative tasks (policy design) are given flexibility. The skill still permits a 7\u2011day window without a hard block, which is a minor over\u2011freedom for production."
+      "justification": "Destructive actions (deletion window, schedule\u2011key\u2011deletion) are tightly constrained with mandatory 7\u201130 day window and explicit confirmation steps. Creative tasks (policy drafting, alias naming) are left flexible. Calibration matches task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (frontmatter \u2192 navigation \u2192 contract \u2192 reasoning \u2192 prerequisites \u2192 procedure \u2192 heuristics \u2192 edge cases). Structure is consistent, but the inclusion of a large markdown table of keywords and references makes the pattern slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern: navigation table, strict output contract, reasoning framework, ordered deployment steps, anti\u2011pattern list, heuristics, and references. Structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 8,
+      "score": 6,
       "max": 15,
-      "justification": "Model output mostly follows the contract, but several concrete errors appear: (1) marks a correct SYMMETRIC_DEFAULT spec as [\u2717]; (2) combines admin and user roles in the audit example, violating the separation\u2011of\u2011duties anti\u2011pattern; (3) lists encrypt/decrypt actions for an HMAC key where only MAC actions apply; (4) uses a non\u2011existent IAM policy name in verification commands. These mistakes show the skill does not guarantee correct execution without further guidance."
+      "justification": "Model output examples exhibit factual errors: RSA key users list includes Encrypt/Decrypt (incorrect for SIGN_VERIFY), HMAC key users list includes Encrypt/Decrypt and GenerateDataKey (wrong actions), and some check items are marked incorrectly. These mistakes show the skill does not guarantee a correct, executable checklist, reducing practical usability."
     }
   ],
-  "total_score": 100,
+  "total_score": 96,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49572,
-  "latency_ms": 12698,
+  "token_count": 37848,
+  "latency_ms": 8310,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

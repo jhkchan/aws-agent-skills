@@ -233,7 +233,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | ecs-task-troubleshooter | amazon.nova-pro-v1:0 | 109/120 | A | 2/5 | 12.3s | 55277 |
 | efs-filesystem-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 11.6s | 38429 |
 | eks-cluster-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.7s | 34838 |
-| eks-cost-optimizer | amazon.nova-pro-v1:0 | 107/120 | B | 3/5 | 32.1s | 56960 |
+| eks-cost-optimizer | amazon.nova-pro-v1:0 | 107/120 | B | 3/5 | 19.3s | 41916 |
 | eks-pod-troubleshooter | amazon.nova-pro-v1:0 | 110/120 | A | 4/5 | 16.1s | 55994 |
 | eks-upgrade-operator | amazon.nova-pro-v1:0 | 107/120 | B | 4/5 | 14.3s | 43850 |
 | elasticache-cache-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 4/5 | 10.9s | 68137 |
@@ -255,7 +255,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | incident-response-automator | amazon.nova-pro-v1:0 | 109/120 | A | 0/5 | 4.9s | 55975 |
 | inspector2-coverage-finding-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.3s | 52550 |
 | kinesis-stream-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 27.1s | 42232 |
-| kms-key-deployer | amazon.nova-pro-v1:0 | 100/120 | B | 3/5 | 12.7s | 49572 |
+| kms-key-deployer | amazon.nova-pro-v1:0 | 96/120 | B | 3/5 | 8.3s | 37848 |
 | kms-key-policy-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.2s | 49516 |
 | kms-key-rotation-operator | amazon.nova-pro-v1:0 | 109/120 | A | 4/5 | 4.6s | 45796 |
 | lakeformation-data-lake-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 13.1s | 43103 |
