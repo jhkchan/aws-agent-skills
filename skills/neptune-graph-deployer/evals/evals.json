@@ -1,0 +1,39 @@
+{
+  "evals": [
+    {
+      "id": "neptune-cluster-gremlin",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/neptune-cluster-gremlin.md",
+      "baseline_file": "baselines/neptune-cluster-gremlin.md"
+    },
+    {
+      "id": "neptune-sparql",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/neptune-sparql.md",
+      "baseline_file": "baselines/neptune-sparql.md"
+    },
+    {
+      "id": "neptune-ml-integration",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/neptune-ml-integration.md",
+      "baseline_file": "baselines/neptune-ml-integration.md"
+    },
+    {
+      "id": "missing-subnet-group",
+      "verdict": "PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-subnet-group.md",
+      "baseline_file": "baselines/missing-subnet-group.md"
+    },
+    {
+      "id": "neptune-without-ssl",
+      "verdict": "PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/neptune-without-ssl.md",
+      "baseline_file": "baselines/neptune-without-ssl.md"
+    }
+  ]
+}

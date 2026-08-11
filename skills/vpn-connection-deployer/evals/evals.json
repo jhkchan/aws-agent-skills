@@ -1,0 +1,39 @@
+{
+  "evals": [
+    {
+      "id": "site-to-site-vpn-dual-tunnel",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/site-to-site-vpn-dual-tunnel.md",
+      "baseline_file": "baselines/site-to-site-vpn-dual-tunnel.md"
+    },
+    {
+      "id": "transit-gateway-vpn",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/transit-gateway-vpn.md",
+      "baseline_file": "baselines/transit-gateway-vpn.md"
+    },
+    {
+      "id": "vpn-static-routing",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpn-static-routing.md",
+      "baseline_file": "baselines/vpn-static-routing.md"
+    },
+    {
+      "id": "missing-customer-gateway",
+      "verdict": "PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-customer-gateway.md",
+      "baseline_file": "baselines/missing-customer-gateway.md"
+    },
+    {
+      "id": "ikev1-deprecated",
+      "verdict": "PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ikev1-deprecated.md",
+      "baseline_file": "baselines/ikev1-deprecated.md"
+    }
+  ]
+}

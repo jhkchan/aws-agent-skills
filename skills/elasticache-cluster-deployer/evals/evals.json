@@ -1,0 +1,39 @@
+{
+  "evals": [
+    {
+      "id": "redis-replication-group-multiaz",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/redis-replication-group-multiaz.md",
+      "baseline_file": "baselines/redis-replication-group-multiaz.md"
+    },
+    {
+      "id": "memcached-cluster-basic",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/memcached-cluster-basic.md",
+      "baseline_file": "baselines/memcached-cluster-basic.md"
+    },
+    {
+      "id": "redis-global-datastore",
+      "verdict": "READY_TO_DEPLOY",
+      "difficulty": "hard",
+      "prompt_file": "prompts/redis-global-datastore.md",
+      "baseline_file": "baselines/redis-global-datastore.md"
+    },
+    {
+      "id": "missing-subnet-group",
+      "verdict": "PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-subnet-group.md",
+      "baseline_file": "baselines/missing-subnet-group.md"
+    },
+    {
+      "id": "memcached-with-encryption",
+      "verdict": "PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/memcached-with-encryption.md",
+      "baseline_file": "baselines/memcached-with-encryption.md"
+    }
+  ]
+}
