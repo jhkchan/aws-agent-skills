@@ -142,31 +142,13 @@ message configs) and `HoldoutPercent` (control group).
 | `HoldoutPercent` | Control group | 0-100; SizePercent for control |
 
 **Sum rule:** DefaultTreatment SizePercent (implicit) +
-AdditionalTreatments SizePercents + HoldoutPercent = 100.
+AdditionalTreatments SizePercents + HoldoutPercent = 100. The
+default treatment's share is the remainder: `100 - HoldoutPercent -
+sum(AdditionalTreatments.SizePercent)`. Each `AdditionalTreatments`
+entry must declare its own `SizePercent`; the default treatment
+does not (it is computed).
 
-```json
-{
-  "Name": "subject-line-ab",
-  "HoldoutPercent": 20,
-  "MessageConfiguration": {"EmailConfig": {"TemplateInformation": {"Name": "subject-a"}}},
-  "AdditionalTreatments": [
-    {"Id": "treatment-b", "SizePercent": 40, "MessageConfiguration": {"EmailConfig": {"TemplateInformation": {"Name": "subject-b"}}}},
-    {"Id": "treatment-c", "SizePercent": 20, "MessageConfiguration": {"EmailConfig": {"TemplateInformation": {"Name": "subject-c"}}}},
-    {"Id": "treatment-d", "SizePercent": 20, "MessageConfiguration": {"EmailConfig": {"TemplateInformation": {"Name": "subject-d"}}}}
-  ]
-}
-```
-
-Default 20 + treatment-b 40 + treatment-c 20 + treatment-d 20 +
-holdout 20 = 100. (Wait, that's 120 — incorrect. Let me recalculate:
-default is implicit; with holdout 20, additional treatments
-40+20+20 = 80, plus default = 100, so default = 0... that doesn't
-work either. Let me clarify: the default SizePercent is the
-remainder: 100 - holdout - sum(AdditionalTreatments). So with
-holdout 20 + additional 40+20+20 = 100, default = -20, which is
-invalid. Correct example below.)
-
-**Correct example:**
+**Worked example (3 treatments + 20% holdout):**
 
 ```json
 {
@@ -180,8 +162,20 @@ invalid. Correct example below.)
 }
 ```
 
-Default 20 (implicit: 100 - 20 - 60) + treatment-b 40 + treatment-c
-20 + holdout 20 = 100. Valid.
+Math: holdout 20 + treatment-b 40 + treatment-c 20 = 80. The
+default treatment (subject-a) receives the remainder: 100 - 80 =
+20. So the implicit split is 20/40/20/20 (default-b-c-holdout),
+summing to 100. Valid.
+
+**Validation:**
+- If `HoldoutPercent + sum(AdditionalTreatments.SizePercent) > 100`,
+  the default treatment share goes negative — `create-campaign`
+  rejects it.
+- If the sum is exactly 100, the default treatment gets 0% — also
+  rejected (no message sent for the default).
+- Each `AdditionalTreatments` entry must reference a distinct
+  template; identical templates across treatments produce
+  identical results and the test measures noise.
 
 ## Sample-size heuristic for MDE
 

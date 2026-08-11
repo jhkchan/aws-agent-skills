@@ -1,0 +1,70 @@
+{
+  "skill": "license-manager-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill compiles concrete vendor\u2011specific rule strings, a cross\u2011account sharing flow, SSM discovery steps, and counting\u2011type heuristics that are not obvious from a generic model. However much of the content mirrors official AWS documentation, so it does not constitute a full expert\u2011only insight."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedural order (e.g., enable Organizations, register delegated admin, then share license config) and exact CLI commands. A few steps are phrased generically (\u201cverify prerequisites\u201d) rather than prescribing the exact AWS call, costing one point."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., confusing license count with vCPU count). Missing some common pitfalls such as tag\u2011policy conflicts or IAM permission edge cases, so it falls short of a perfect list."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, activation keywords, and output contract are present, enabling reliable invocation. The trigger list mixes free\u2011form phrases and could be tighter; also the \u2018when_to_use\u2019 paragraph is embedded in metadata rather than a separate, clearly\u2011marked section, leading to a small deduction."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick navigation, mindset, step\u2011by\u2011step, NEVER, output format) but introduces many detailed CLI snippets early, which can overload the agent before it knows whether the scenario applies."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (creating license configs, sharing) are gated by a prerequisite checklist, but enforcement relies on the agent to perform the checks; the skill itself does not automatically block execution when prerequisites are missing, so some freedom remains for fragile operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). The structure is coherent and aids comprehension, earning near\u2011max."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides a usable checklist, concrete CLI commands, and error\u2011handling guidance. Missing handling for API throttling, pagination, and IAM permission errors, and the examples assume ideal conditions, reducing practical robustness."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 39964,
+  "latency_ms": 9529,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

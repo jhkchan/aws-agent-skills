@@ -173,7 +173,6 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 | Step 12 — MongoDB compatibility and connecting | Client access |
 | Step 13 — TLS configuration | Security |
 | Step 14 — CloudWatch metrics | Observability |
-| Step 15 — Recent features | Latest |
 | NEVER do these things | Review before signing off |
 | Output format | The literal checklist template |
 | references/storage-and-changestreams.md | Storage autoscaling + CDC detail |
@@ -220,7 +219,7 @@ sequence provisioning.
 |---|---|---|---|
 | Subnet group | at least 2 subnets across 2 AZs | subnets must be private; no public DocumentDB | cluster creation |
 | Security group | VPC exists | SG must allow port 27017 (or custom) from app tier | cluster network access |
-| Parameter group | none (uses default initially) | change streams parameter (change_streams_log_retention_duration) requires cluster modification + reboot | change streams, TTL, profiling |
+| Parameter group | none (uses default initially) | change streams parameter requires cluster modification + reboot | change streams, TTL, profiling |
 | KMS key | KMS key exists (if customer-managed) | KMS key cannot be changed after cluster creation without snapshot/restore | encryption at rest |
 | Cluster (create-db-cluster) | subnet group, security group, KMS key, parameter group | cluster endpoint is immutable once created; storage volume auto-grows | instances, endpoints |
 | Instances (create-db-instance) | cluster exists; instance class chosen | instances are created one at a time; failover priority is set per instance | compute capacity |
@@ -254,61 +253,23 @@ recognizes that autoscaling has a ceiling, and hitting it stops writes.
 
 ```text
 DocumentDB storage autoscaling:
-  Cluster volume starts at 10 GB (minimum).
-  Auto-grows automatically as data increases.
-  Growth is in 10 GB increments.
-
-  BUT: there is a ceiling (max storage allocated).
-  Default ceiling: varies by instance class.
-  Configurable up to 64 TB.
+  Cluster volume starts at 10 GB (minimum), auto-grows in 10 GB increments.
+  Ceiling: configurable up to 64 TB.
 
   When storage hits the ceiling:
     → Cluster enters STORAGE_FULL state
     → ALL writes are rejected (inserts, updates, deletes fail)
-    → Reads may continue but writes are blocked
     → Resolution: increase the ceiling (modify-db-cluster) or delete data
 
   Expert rule:
     Set ceiling = projected_growth_12_months × 1.5 (50% headroom)
-    Monitor DatabaseCpuUtilization + DatabaseFreeStorageSpace
     Alert when free storage < 20% of ceiling
 ```
 
-**Key implication:** the #1 cause of DocumentDB write outages is hitting
-the storage ceiling. Always set the ceiling with headroom and monitor
-free storage against it.
-
 ## Expert heuristic: index before query (no query optimizer)
 
-DocumentDB does NOT have a query optimizer. Unlike MongoDB, which can
-choose among available indexes, DocumentDB requires the application to
-create explicit indexes. A query without a matching index is a full
-collection scan.
-
-```text
-Query planning comparison:
-
-  MongoDB:
-    db.collection.find({status: "active", category: "books"})
-    → Query optimizer evaluates available indexes
-    → Picks the best index (or compound index)
-    → Fast if any usable index exists
-
-  DocumentDB:
-    db.collection.find({status: "active", category: "books"})
-    → No query optimizer
-    → If no index on {status: 1} or {status: 1, category: 1} → FULL SCAN
-    → Full scan on 10M docs = seconds of latency, high CPU
-
-    Expert rule:
-      1. Create indexes BEFORE deploying queries that need them
-      2. Use compound indexes for multi-field equality + range queries
-      3. Use single-field indexes for simple lookups
-      4. Create text indexes for search (supports $text queries)
-      5. Monitor DatabaseCpuUtilization — spikes indicate scan-heavy queries
-```
-
-**Indexing strategy:**
+DocumentDB does NOT have a query optimizer. A query without a matching
+index is a full collection scan.
 
 | Index type | When to use | Example |
 |---|---|---|
@@ -318,10 +279,14 @@ Query planning comparison:
 | TTL | Auto-expire documents after a duration | `{createdAt: 1}` with expireAfterSeconds |
 | Unique | Enforce uniqueness | `{orderId: 1}` with unique: true |
 
+**Expert rule:** create indexes BEFORE deploying queries that need them.
+A query without a matching index is a full collection scan — on a 10M
+document collection, that is seconds of latency and high CPU.
+
 ## Expert heuristic: change streams for CDC
 
-Change streams provide ordered, resumable change events from DocumentDB.
-They are the recommended CDC mechanism for real-time data pipelines.
+Change streams provide ordered, resumable change events. They are the
+recommended CDC mechanism for real-time data pipelines.
 
 ```text
 Change stream flow:
@@ -331,10 +296,6 @@ Change stream flow:
   3. DocumentDB emits events: insert, update, delete, replace
   4. Application processes events and checkpoints resume token
   5. On restart, application resumes from last checkpoint token
-
-  Without change streams:
-    Polling = full collection scans, expensive, imprecise, latency-gapped
-    DMS = works but adds infrastructure and latency
 
   Expert rule:
     Enable change streams at CLUSTER CREATION (parameter group).
@@ -374,7 +335,6 @@ instance, and 0-15 replica instances. Storage is a shared cluster volume
 | Replica instances | Read-only (up to 15) | `create-db-instance` |
 | Cluster endpoint | Writer endpoint (always points to primary) | automatic |
 | Reader endpoint | Round-robin across replicas | automatic |
-| Instance endpoint | Per-instance endpoint | automatic |
 
 **The cluster is the storage and management boundary. Instances are
 compute.** Adding instances adds read capacity; storage is shared.
@@ -388,24 +348,19 @@ compute.** Adding instances adds read capacity; storage is shared.
 | db.r5.2xlarge | 8 | 64 | Large production |
 | db.r5.4xlarge | 16 | 128 | X-large production |
 | db.r5.8xlarge | 32 | 256 | XX-large production |
-| db.r5.12xlarge | 48 | 384 | Max read replica |
 | db.r5.16xlarge | 64 | 512 | Max primary |
 | db.r5.24xlarge | 96 | 768 | Largest primary |
 | db.t3.medium | 2 | 4 | Development/test |
 
-**r5 instances** are memory-optimized — recommended for production
-MongoDB-compatible workloads where the working set fits in memory.
-
-**t3.medium** is burstable — suitable for development, testing, and
-small non-production workloads. NOT recommended for production because
-CPU credits can be exhausted under sustained load.
+**r5 instances** are memory-optimized — recommended for production.
+**t3.medium** is burstable — suitable for development only. NOT
+recommended for production because CPU credits deplete under sustained
+load.
 
 ## Step 3 — Storage autoscaling
 
 DocumentDB storage auto-grows from 10 GB. Set an explicit ceiling to
 prevent STORAGE_FULL write outages.
-
-**Create cluster with storage autoscaling:**
 
 ```bash
 aws docdb create-db-cluster \
@@ -416,37 +371,16 @@ aws docdb create-db-cluster \
   --db-subnet-group-name my-subnet-group \
   --vpc-security-group-ids sg-abc123 \
   --backup-retention-period 7 \
-  --storage-type storage_type_per_iops \
   --deletion-protection \
   --region us-east-1
-```
 
-**Modify storage ceiling:**
-
-```bash
-# Increase the storage ceiling
-aws docdb modify-db-cluster \
-  --db-cluster-identifier my-docdb-cluster \
-  --storage-type storage_type_per_iops \
-  --apply-immediately \
-  --region us-east-1
-```
-
-**Monitor storage:**
-
-```bash
-# Check current storage allocation
-aws docdb describe-db-clusters \
-  --db-cluster-identifier my-docdb-cluster \
-  --query 'DBClusters[0].StorageAllocated' --region us-east-1
-
-# CloudWatch: free storage space
+# Monitor free storage
 aws cloudwatch get-metric-statistics \
   --namespace AWS/DocDB \
   --metric-name FreeStorageSpace \
   --dimensions Name=DBClusterIdentifier,Value=my-docdb-cluster \
   --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%T%H:%M:%S) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
   --period 300 --statistics Average \
   --region us-east-1
 ```
@@ -469,47 +403,35 @@ aws docdb create-db-instance \
   --db-cluster-identifier my-docdb-cluster \
   --region us-east-1
 
-# Create a replica in a different AZ
+# Create a replica in a different AZ with failover priority
 aws docdb create-db-instance \
   --db-instance-identifier my-docdb-replica-1 \
   --db-instance-class db.r5.large \
   --engine docdb \
   --db-cluster-identifier my-docdb-cluster \
   --preferred-availability-zone us-east-1b \
+  --promotion-tier 0 \
   --region us-east-1
 ```
 
 **Failover priority:** each instance has a priority (0 = highest). The
-highest-priority replica is promoted during failover. Set priority
-explicitly for controlled failover:
-
-```bash
-aws docdb modify-db-instance \
-  --db-instance-identifier my-docdb-replica-1 \
-  --promotion-tier 0 \
-  --apply-immediately \
-  --region us-east-1
-```
+highest-priority replica is promoted during failover.
 
 ## Step 5 — Subnet groups and security groups
 
-**Subnet group (requires at least 2 AZs):**
-
 ```bash
+# Subnet group (requires at least 2 AZs)
 aws docdb create-db-subnet-group \
   --db-subnet-group-name my-subnet-group \
   --db-subnet-group-description "DocumentDB subnet group" \
   --subnet-ids subnet-aaa111 subnet-bbb222 subnet-ccc333 \
   --region us-east-1
-```
 
-**Security group (port 27017 from app tier):**
-
-```bash
+# Security group (port 27017 from app tier)
 aws ec2 authorize-security-group-ingress \
   --group-id sg-docdb-cluster \
   --ip-permissions \
-    "IpProtocol=tcp,FromPort=27017,ToPort=27017,IpRanges=[{CidrIp=10.0.0.0/16,Description='App tier CIDR'}]" \
+    "IpProtocol=tcp,FromPort=27017,ToPort=27017,IpRanges=[{CidrIp=10.0.0.0/16}]" \
   --region us-east-1
 ```
 
@@ -519,7 +441,6 @@ Parameter groups control cluster-level settings including change streams,
 profiling, and TLS.
 
 ```bash
-# Create a custom parameter group
 aws docdb create-db-cluster-parameter-group \
   --db-cluster-parameter-group-name my-param-group \
   --db-parameter-group-family docdb4.0 \
@@ -542,12 +463,10 @@ aws docdb modify-db-cluster-parameter-group \
 | change_streams_log_retention_duration | 0 (disabled) | 172800 (2 days) | Enables CDC with 48h recovery buffer |
 | audit_logs | disabled | enabled | Compliance and security auditing |
 | tls | enabled | enabled | Always keep TLS enabled in production |
-| ttl_monitor | enabled | enabled | TTL index processing |
 
 ## Step 7 — KMS encryption
 
 ```bash
-# Create cluster with customer-managed KMS key
 aws docdb create-db-cluster \
   --db-cluster-identifier my-docdb-cluster \
   --engine docdb \
@@ -562,8 +481,7 @@ aws docdb create-db-cluster \
 
 **Critical:** KMS key cannot be changed after cluster creation without
 snapshot-restore. Choose customer-managed key at creation for maximum
-control (rotation, policy). The default AWS-managed key is used if
-`--kms-key-id` is omitted.
+control.
 
 ## Step 8 — Backup retention and point-in-time recovery
 
@@ -581,12 +499,7 @@ aws docdb modify-db-cluster \
   --backup-retention-period 14 \
   --apply-immediately \
   --region us-east-1
-```
 
-Point-in-time recovery is automatically enabled when backup retention is
-> 0. You can restore to any second within the retention window.
-
-```bash
 # Restore to a point in time
 aws docdb restore-db-cluster-to-point-in-time \
   --source-db-cluster-identifier my-docdb-cluster \
@@ -595,37 +508,35 @@ aws docdb restore-db-cluster-to-point-in-time \
   --region us-east-1
 ```
 
+Point-in-time recovery is automatically enabled when backup retention is
+> 0.
+
 ## Step 9 — Change streams for CDC
 
 Change streams must be enabled in the parameter group (see Step 6). Once
-enabled, applications can subscribe via the MongoDB driver.
-
-**Enable change streams (parameter group):**
+enabled, applications subscribe via the MongoDB driver.
 
 ```bash
+# Enable change streams + reboot for parameter to take effect
 aws docdb modify-db-cluster-parameter-group \
   --db-cluster-parameter-group-name my-param-group \
   --parameters \
     ParameterName=change_streams_log_retention_duration,ParameterValue=172800,ApplyMethod=immediate \
   --region us-east-1
 
-# Reboot the cluster for parameter to take effect
 aws docdb reboot-db-instance \
   --db-instance-identifier my-docdb-primary \
   --region us-east-1
 ```
 
-**Consume change streams (Node.js example):**
-
 ```javascript
+// Consume change streams (Node.js)
 const { MongoClient } = require('mongodb');
 const client = await MongoClient.connect(
-  'mongodb://admin:password@my-docdb-cluster.cluster-abc.us-east-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false',
+  'mongodb://admin:password@cluster-endpoint:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false',
   { tlsCAFile: 'rds-combined-ca-bundle.pem' }
 );
-const db = client.db('mydb');
-const stream = db.collection('orders').watch();
-
+const stream = client.db('mydb').collection('orders').watch();
 stream.on('change', (next) => {
   console.log('Change event:', JSON.stringify(next));
   // Process and checkpoint resume token
@@ -637,43 +548,32 @@ stream.on('change', (next) => {
 DocumentDB has NO query optimizer. Indexes MUST be created BEFORE
 queries that need them.
 
-**Connect via mongo shell and create indexes:**
-
 ```bash
 # Connect to the cluster
-mongo "mongodb://admin:password@my-docdb-cluster.cluster-abc.us-east-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false" \
+mongo "mongodb://admin:password@cluster-endpoint:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false" \
   --tlsCAFile rds-combined-ca-bundle.pem
 ```
 
 ```javascript
 // Single-field index
 db.users.createIndex({ email: 1 })
-
 // Compound index (ESR rule: Equality, Sort, Range)
 db.orders.createIndex({ status: 1, created_at: -1 })
-
 // Text index for search
 db.products.createIndex({ name: "text", description: "text" })
-
 // Unique index
 db.accounts.createIndex({ accountId: 1 }, { unique: true })
-
 // TTL index (auto-expire after 3600 seconds)
 db.sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 3600 })
-
 // List indexes
 db.users.getIndexes()
 ```
 
-**Expert rule:** create indexes BEFORE deploying the application queries.
-A query without a matching index is a full collection scan — on a 10M
-document collection, that is seconds of latency and high CPU.
-
 ## Step 11 — Global clusters
 
 DocumentDB global clusters provide cross-region replication with
-typically under 1 second latency. A global cluster has one primary
-region (read-write) and up to 5 secondary regions (read-only).
+typically under 1 second latency. One primary region (read-write) and
+up to 5 secondary regions (read-only).
 
 ```bash
 # Create the global cluster
@@ -693,88 +593,46 @@ aws docdb create-db-cluster \
   --region eu-west-1
 ```
 
-**Failover (managed promotion):**
-
-```bash
-# Promote a secondary to primary (requires deleting old primary from global cluster)
-aws docdb delete-db-cluster \
-  --db-cluster-identifier my-docdb-cluster \
-  --region us-east-1
-
-# The secondary is now detached; promote it
-aws docdb modify-db-cluster \
-  --db-cluster-identifier my-docdb-cluster-eu \
-  --region eu-west-1 \
-  --apply-immediately
-```
-
 **Key limitation:** global cluster failover is NOT automatic. You must
 script it (typically with Lambda + EventBridge). Secondary clusters are
 read-only until promoted.
 
 ## Step 12 — MongoDB compatibility and connecting
 
-DocumentDB supports MongoDB wire protocol versions 3.6, 4.0, and 5.0.
-The compatibility version is set at cluster creation via the `--engine-version`
-parameter.
-
 | Engine version | MongoDB wire compatibility | Key features |
 |---|---|---|
-| 5.0.0 | MongoDB 5.0 | Latest — time series collections, stable API |
+| 5.0.0 | MongoDB 5.0 | Time series collections, stable API |
 | 4.0.0 | MongoDB 4.0 | Transactions, change streams improvements |
 | 3.6.0 | MongoDB 3.6 | Baseline — change streams, retries |
 
-**Connect via mongo shell (with TLS):**
-
 ```bash
-mongo "mongodb://admin:password@my-docdb-cluster.cluster-abc.us-east-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false" \
+# Connect via mongo shell (with TLS)
+mongo "mongodb://admin:password@cluster-endpoint:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false" \
   --tlsCAFile rds-combined-ca-bundle.pem
-```
 
-**Download the CA bundle:**
-
-```bash
+# Download the CA bundle
 wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
 ```
 
-**Connection string components:**
-- `tls=true` — enables TLS (required for DocumentDB)
-- `replicaSet=rs0` — DocumentDB uses replica set `rs0`
-- `readPreference=secondaryPreferred` — route reads to replicas
-- `retryWrites=false` — DocumentDB does not support retryable writes
+**Connection string:** `tls=true` (required), `replicaSet=rs0`,
+`readPreference=secondaryPreferred`, `retryWrites=false` (DocumentDB
+does not support retryable writes).
 
 ## Step 13 — TLS configuration
 
-TLS is enabled by default on DocumentDB clusters. Disabling TLS is
-possible but NOT recommended for production.
-
-**Check TLS status (parameter group):**
+TLS is enabled by default on DocumentDB clusters. Disabling TLS is NOT
+recommended for production.
 
 ```bash
+# Check TLS status (parameter group)
 aws docdb describe-db-cluster-parameters \
   --db-cluster-parameter-group-name my-param-group \
   --query 'Parameters[?ParameterName==`tls`]' \
   --region us-east-1
 ```
 
-**Disable TLS (NOT recommended — development only):**
-
-```bash
-aws docdb modify-db-cluster-parameter-group \
-  --db-cluster-parameter-group-name my-param-group \
-  --parameters \
-    ParameterName=tls,ParameterValue=disabled,ApplyMethod=pending-reboot \
-  --region us-east-1
-
-# Reboot required
-aws docdb reboot-db-instance \
-  --db-instance-identifier my-docdb-primary \
-  --region us-east-1
-```
-
 **Expert rule:** always keep TLS enabled. Disabling TLS exposes database
-traffic in plaintext. The only valid reason to disable TLS is local
-development testing, never production.
+traffic in plaintext. Only disable for local development testing.
 
 ## Step 14 — CloudWatch metrics
 
@@ -782,96 +640,42 @@ development testing, never production.
 |---|---|---|
 | DatabaseCpuUtilization | CPU across instances | > 80% sustained 5 min |
 | DatabaseFreeStorageSpace | Free storage (bytes) | < 20% of ceiling |
-| DatabaseConnections | Active connections | Approaching max (varies by instance) |
+| DatabaseConnections | Active connections | Approaching max |
 | DatabaseMemoryUsagePercentage | RAM utilization | > 90% sustained |
 | DatabaseReplicaLag | Replica lag (seconds) | > 30 seconds |
-| DatabaseBytesReceivedFromReplica | Replication throughput | Monitor for anomalies |
-| FreeableMemory | Available RAM | Trending down = investigate |
-
-```bash
-# Monitor CPU utilization
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/DocDB \
-  --metric-name DatabaseCpuUtilization \
-  --dimensions Name=DBClusterIdentifier,Value=my-docdb-cluster \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-  --period 300 --statistics Average,Maximum \
-  --region us-east-1
-```
-
-## Step 15 — Recent features
-
-**Recent AWS features (2023-2026):**
-
-- **DocumentDB Elastic Clusters (2023-2024):** Horizontally scalable
-  clusters that distribute data across shards, supporting virtually
-  unlimited read/write capacity. Separate from the standard cluster
-  architecture covered by this skill.
-
-- **DocumentDB 5.0 compatibility (2023-2024):** Full MongoDB 5.0 wire
-  protocol support including time series collections and the stable API.
-  Enables migration from self-managed MongoDB 5.0.
-
-- **Storage autoscaling improvements (2023-2024):** Enhanced storage
-  autoscaling with configurable ceilings up to 64 TB per cluster volume.
-  The autoscaling algorithm was improved to grow more aggressively when
-  utilization exceeds 90%.
-
-- **Change streams performance (2023-2024):** Reduced change stream event
-  delivery latency and improved retention management. Change stream
-  retention now supports up to 3 days (259200 seconds).
-
-- **IAM authentication (2024-2025):** AWS IAM database authentication for
-  DocumentDB, enabling token-based authentication without static
-  passwords. Reduces credential management overhead.
-
-- **Global cluster multi-region write (2025-2026):** Enhanced global
-  cluster capabilities with lower replication latency and improved
-  failover automation via managed promotion APIs.
 
 ## NEVER do these things
 
 1. **NEVER deploy queries without creating indexes first.** DocumentDB
    has NO query optimizer. A query without a matching index is a full
-   collection scan. Create single-field, compound, or text indexes BEFORE
-   deploying application queries.
+   collection scan.
 
 2. **NEVER leave the storage autoscaling ceiling at default without
    assessment.** Hitting the ceiling causes STORAGE_FULL and ALL writes
-   are rejected. Set the ceiling with 50% headroom above projected
-   12-month growth.
+   are rejected. Set the ceiling with 50% headroom.
 
 3. **NEVER disable TLS in production.** TLS is enabled by default for a
-   reason. Disabling it exposes database traffic in plaintext. Only
-   disable for local development testing.
+   reason. Only disable for local development testing.
 
 4. **NEVER use t3.medium instances for production.** T3 instances are
-   burstable — CPU credits deplete under sustained load, causing
-   throttling. Use r5 instances for any production workload.
+   burstable — CPU credits deplete under sustained load. Use r5.
 
-5. **NEVER create a single-instance cluster for production.** A single
-   instance has no failover target. Always deploy at least 1 primary +
-   1 replica in different AZs for high availability.
+5. **NEVER create a single-instance cluster for production.** Always
+   deploy at least 1 primary + 1 replica in different AZs.
 
 6. **NEVER forget to enable change streams at creation.** Enabling
-   change streams later requires a parameter group change and cluster
-   reboot. If any downstream system needs CDC, enable it from the start.
+   later requires a parameter group change and cluster reboot.
 
 7. **NEVER use retryWrites=true in the connection string.** DocumentDB
    does not support retryable writes. Always set `retryWrites=false`.
 
-8. **NEVER assume global cluster failover is automatic.** Global cluster
-   secondary promotion requires scripting (Lambda + EventBridge). Plan
-   the failover procedure before you need it.
+8. **NEVER assume global cluster failover is automatic.** Secondary
+   promotion requires scripting (Lambda + EventBridge).
 
 9. **NEVER change the KMS key after cluster creation without planning
    downtime.** Changing encryption requires a snapshot-restore cycle.
-   Choose the KMS key carefully at creation time.
 
-10. **NEVER use ALLOW_ALL or skip deletion protection for production
-    clusters.** Deletion protection prevents accidental cluster
-    deletion. Always enable it for production.
+10. **NEVER skip deletion protection for production clusters.**
 
 ## Output format
 
@@ -943,22 +747,15 @@ VERIFICATION_COMMANDS:
 
 ### Change stream not emitting events
 - `change_streams_log_retention_duration` is 0 in the parameter group.
-  Set it to 172800 (2 days) and reboot the cluster. Events from before
-  enabling change streams are not available.
+  Set it to 172800 (2 days) and reboot the cluster.
 
 ### Connection failures (TLS handshake error)
 - TLS is enabled but the client is not using the CA bundle. Download
   `rds-combined-ca-bundle.pem` and pass it via `--tlsCAFile`.
 
 ### Replica lag is high
-- `DatabaseReplicaLag` > 30 seconds. Check if the primary is overloaded
-  (CPU, memory). Consider scaling up the instance class or adding
-  replicas. Heavy write workloads can cause replication lag.
-
-### Global cluster secondary not receiving updates
-- Verify the global cluster is healthy. Check that the secondary cluster
-  is in `available` status. Network issues between regions can cause
-  replication lag.
+- Check if the primary is overloaded (CPU, memory). Consider scaling up
+  the instance class or adding replicas.
 
 ## Domain
 
@@ -969,13 +766,9 @@ Database Management.
 
 - **DocumentDB Guide** — https://docs.aws.amazon.com/documentdb/latest/developerguide/what-is.html
 - **Create a cluster** — https://docs.aws.amazon.com/documentdb/latest/developerguide/db-cluster-create.html
-- **Instance types** — https://docs.aws.amazon.com/documentdb/latest/developerguide/db-instance-classes.html
 - **Change streams** — https://docs.aws.amazon.com/documentdb/latest/developerguide/change_streams.html
 - **Storage autoscaling** — https://docs.aws.amazon.com/documentdb/latest/developerguide/limits.html#limits-storage
 - **Global clusters** — https://docs.aws.amazon.com/documentdb/latest/developerguide/global-clusters.html
 - **Indexing** — https://docs.aws.amazon.com/documentdb/latest/developerguide/best_practices.html
 - **Connecting with mongo shell** — https://docs.aws.amazon.com/documentdb/latest/developerguide/connect_programmatically.html
-- **TLS** — https://docs.aws.amazon.com/documentdb/latest/developerguide/security.encryption.ssl.html
 - **CloudWatch metrics** — https://docs.aws.amazon.com/documentdb/latest/developerguide/cloud_watch.html
-- **Parameter groups** — https://docs.aws.amazon.com/documentdb/latest/developerguide/cluster_parameter_groups.html
-- **Backup and restore** — https://docs.aws.amazon.com/documentdb/latest/developerguide/backup_restore.html
