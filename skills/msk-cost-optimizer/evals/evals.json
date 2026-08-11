@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "msk-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the MSK Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "graviton-broker-migration",
+      "name": "kafka.m5.large cluster (3 brokers, Kafka 3.5.1) — Graviton migration to m7g yields ~20% compute savings",
+      "difficulty": "medium",
+      "prompt_file": "prompts/graviton-broker-migration.md",
+      "baseline_file": "baselines/graviton-broker-migration.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "graviton-broker-migration", "m7g", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "broker-count-overprovisioned",
+      "name": "6 brokers on kafka.m5.large with total ingress 15 MB/s (2.5/broker) — reduce to 3 brokers via blue/green",
+      "difficulty": "medium",
+      "prompt_file": "prompts/broker-count-overprovisioned.md",
+      "baseline_file": "baselines/broker-count-overprovisioned.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "broker-count-overprovisioned", "3", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "ebs-storage-overprovisioned",
+      "name": "3 brokers with 2 TB EBS each but KafkaDataLogsDiskUsed avg 20% (410 GB used) — EBS 5x over-allocated",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ebs-storage-overprovisioned.md",
+      "baseline_file": "baselines/ebs-storage-overprovisioned.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "ebs-storage-overprovisioned", "500", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "msk-serverless-break-even",
+      "name": "3 x kafka.m5.large with ingress 10 MB/s, 20 partitions, 5 GB data — well below 50 MB/s Serverless break-even",
+      "difficulty": "hard",
+      "prompt_file": "prompts/msk-serverless-break-even.md",
+      "baseline_file": "baselines/msk-serverless-break-even.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "msk-serverless-break-even", "Serverless", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-graviton-compact-retention",
+      "name": "kafka.m7g.large (Graviton, KRaft), 3 brokers, BytesInPerSec 18 MB/s, disk 55%, compacted changelog topics — already optimal",
+      "difficulty": "hard",
+      "prompt_file": "prompts/already-optimal-graviton-compact-retention.md",
+      "baseline_file": "baselines/already-optimal-graviton-compact-retention.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-graviton-compact-retention", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

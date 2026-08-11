@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "elasticache-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ElastiCache Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "graviton-node-migration",
+      "name": "cache.m5.2xlarge cluster (3 shards x 2 nodes) — Graviton migration to r6g yields ~26% compute savings",
+      "difficulty": "medium",
+      "prompt_file": "prompts/graviton-node-migration.md",
+      "baseline_file": "baselines/graviton-node-migration.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "graviton-node-migration", "r6g", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "ondemand-steady-state-rn-candidate",
+      "name": "12-month steady On-Demand cluster on cache.r6g.2xlarge, no Reserved Node, no migration plan — RN candidate",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ondemand-steady-state-rn-candidate.md",
+      "baseline_file": "baselines/ondemand-steady-state-rn-candidate.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "ondemand-steady-state-rn-candidate", "Reserved Node", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "node-rightsizing-low-engine-cpu",
+      "name": "cache.r6g.2xlarge with EngineCPUUtilization avg 8%, dataset 6 GB — downsize to r6g.xlarge",
+      "difficulty": "medium",
+      "prompt_file": "prompts/node-rightsizing-low-engine-cpu.md",
+      "baseline_file": "baselines/node-rightsizing-low-engine-cpu.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "node-rightsizing-low-engine-cpu", "r6g.xlarge", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "serverless-candidate-variable-load",
+      "name": "cache.r6g.large with overnight idle 8h/day, dataset 3 GB, EngineCPU avg 8% — ElastiCache Serverless candidate",
+      "difficulty": "hard",
+      "prompt_file": "prompts/serverless-candidate-variable-load.md",
+      "baseline_file": "baselines/serverless-candidate-variable-load.md",
+      "expected_verdict": "OPPORTUNITY_FOUND",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPPORTUNITY_FOUND", "serverless-candidate-variable-load", "Serverless", "RECOMMENDATION", "ESTIMATED_SAVINGS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ALREADY_OPTIMAL", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-graviton-rn-rightsized",
+      "name": "cache.r7g.large (latest Graviton), RN on all nodes, EngineCPU avg 35%, 1 replica/shard, no AOF — already optimal",
+      "difficulty": "hard",
+      "prompt_file": "prompts/already-optimal-graviton-rn-rightsized.md",
+      "baseline_file": "baselines/already-optimal-graviton-rn-rightsized.md",
+      "expected_verdict": "ALREADY_OPTIMAL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ALREADY_OPTIMAL", "already-optimal-graviton-rn-rightsized", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPPORTUNITY_FOUND", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

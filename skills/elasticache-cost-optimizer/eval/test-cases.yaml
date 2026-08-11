@@ -1,0 +1,213 @@
+# Eval test cases for elasticache-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per ElastiCache optimisation pattern.
+# Each case's cluster embeds the test-case id so the model naturally
+# echoes it (avoids assertion-token mismatch). The decision matrix in
+# SKILL.md produces exactly the expected verdicts below.
+skill: elasticache-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: graviton-node-migration
+    description: >-
+      ElastiCache for Redis cluster running on cache.m5.2xlarge (pre-
+      Graviton) with 3 shards x 2 nodes. Graviton migration to
+      cache.r6g.2xlarge yields ~26% compute savings. Expected verdict:
+      OPPORTUNITY_FOUND with Graviton migration recommendation.
+    input: |
+      Replication Group: orders-cache-rg
+        (case graviton-node-migration)
+      Engine: redis (7.0)
+      Region: us-east-1
+      NodeType: cache.m5.2xlarge (8 vCPU, 26.36 GB) — $0.904/h
+      Shards: 3 (cluster mode enabled)
+      ReplicasPerShard: 1 (total 6 nodes)
+      Persistence: RDB snapshots (daily)
+      Pricing: On-Demand (no Reserved Node)
+      CloudWatch (last 30 days):
+        - CPUUtilization: avg=35%, max=55%
+        - EngineCPUUtilization: avg=28%, max=45%
+        - CurrConnections: avg=500, max=800
+      Cost Explorer (last 30 days):
+        - ElastiCache:NodeUsage: cache.m5.2xlarge x 6 nodes
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "graviton-node-migration"
+        - "r6g"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: ondemand-steady-state-rn-candidate
+    description: >-
+      ElastiCache for Redis cluster running On-Demand for 12 months
+      steady on cache.r6g.2xlarge, no Reserved Node in place,
+      mission-critical and stable. Expected verdict: OPPORTUNITY_FOUND
+      with 1-yr No Upfront Reserved Node recommendation.
+    input: |
+      Replication Group: billing-cache-rg
+        (case ondemand-steady-state-rn-candidate)
+      Engine: redis (7.0)
+      Region: us-east-1
+      NodeType: cache.r6g.2xlarge (8 vCPU, 26.36 GB)
+      Shards: 2 (cluster mode enabled)
+      ReplicasPerShard: 1 (total 4 nodes)
+      Persistence: RDB snapshots (daily)
+      Pricing: On-Demand (no Reserved Node)
+      Cluster uptime: 12 months steady
+      CloudWatch (last 30 days):
+        - CPUUtilization: avg=40%, max=60%
+        - EngineCPUUtilization: avg=32%, max=50%
+        - CurrConnections: avg=300, max=450
+      describe-reserved-cache-nodes: empty (no RN held)
+      Migration plans: none (mission-critical, long-term)
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "ondemand-steady-state-rn-candidate"
+        - "Reserved Node"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: node-rightsizing-low-engine-cpu
+    description: >-
+      ElastiCache for Redis cluster on cache.r6g.2xlarge with
+      EngineCPUUtilization avg 8% and CurrConnections avg 80. Node can
+      downsize to cache.r6g.xlarge. Expected verdict: OPPORTUNITY_FOUND
+      with right-size recommendation.
+    input: |
+      Replication Group: sessions-cache-rg
+        (case node-rightsizing-low-engine-cpu)
+      Engine: redis (7.0)
+      Region: us-east-1
+      NodeType: cache.r6g.2xlarge (8 vCPU, 26.36 GB) — $0.664/h
+      Shards: 2 (cluster mode enabled)
+      ReplicasPerShard: 1 (total 4 nodes)
+      Persistence: RDB snapshots (daily)
+      Pricing: On-Demand
+      CloudWatch (last 30 days):
+        - CPUUtilization: avg=10%, max=20%
+        - EngineCPUUtilization: avg=8%, max=15%
+        - CurrConnections: avg=80, max=150
+        - FreeableMemory: avg=18 GB (of 26.36 GB)
+      Dataset size: ~6 GB total (3 GB per shard, fits in xlarge)
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "node-rightsizing-low-engine-cpu"
+        - "r6g.xlarge"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: serverless-candidate-variable-load
+    description: >-
+      ElastiCache for Redis cluster on cache.r6g.large with spiky daytime
+      load and overnight idle (8h/day at near-zero). Dataset is 3 GB,
+      EngineCPU avg 8%. ElastiCache Serverless is a strong candidate.
+      Expected verdict: OPPORTUNITY_FOUND with Serverless migration.
+    input: |
+      Replication Group: feature-flags-cache
+        (case serverless-candidate-variable-load)
+      Engine: redis (7.0)
+      Region: us-east-1
+      NodeType: cache.r6g.large (2 vCPU, 6.05 GB) — $0.167/h
+      Shards: 1 (non-cluster mode)
+      ReplicasPerShard: 1 (total 2 nodes)
+      Persistence: none (ephemeral)
+      Pricing: On-Demand
+      Dataset size: 3 GB
+      CloudWatch (last 30 days):
+        - CPUUtilization: avg=8%, max=35% (daytime spikes only)
+        - EngineCPUUtilization: avg=5%, max=25%
+        - CurrConnections: avg=20, max=100 (overnight drops to <5)
+        - Overnight idle: 8 hours/day at near-zero load
+      Cost Explorer:
+        - ElastiCache:NodeUsage: cache.r6g.large x 2 nodes = ~$244/month
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "serverless-candidate-variable-load"
+        - "Serverless"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-graviton-rn-rightsized
+    description: >-
+      ElastiCache for Redis cluster already on cache.r7g.large (latest
+      Graviton), EngineCPU avg 35% (healthy), 1 replica per shard for
+      failover, RDB snapshots (1-day retention), 1-yr RN on all nodes,
+      no AOF, dataset at 40% of memory. Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      Replication Group: prod-cache-rg
+        (case already-optimal-graviton-rn-rightsized)
+      Engine: redis (7.2)
+      Region: us-east-1
+      NodeType: cache.r7g.large (2 vCPU, 6.67 GB) — $0.153/h
+      Shards: 3 (cluster mode enabled)
+      ReplicasPerShard: 1 (total 6 nodes)
+      Persistence: RDB snapshots (1-day retention)
+      Pricing: 1-yr No Upfront Reserved Node (all 6 nodes covered)
+      Dataset size: 8 GB total (~2.7 GB per shard, 40% of node memory)
+      CloudWatch (last 30 days):
+        - CPUUtilization: avg=38%, max=55%
+        - EngineCPUUtilization: avg=35%, max=50%
+        - CurrConnections: avg=400, max=600
+      Reserved Nodes held:
+        - cache.r7g.large redis 1-yr No Upfront x 6
+      AOF: disabled
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-graviton-rn-rightsized"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"

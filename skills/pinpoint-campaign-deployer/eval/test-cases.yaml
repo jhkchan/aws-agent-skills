@@ -1,0 +1,178 @@
+# Eval test cases for pinpoint-campaign-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: pinpoint-campaign-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: email-campaign-full-security
+    description: >-
+      Standard email campaign with all dimensions: SES verified identity
+      for email channel, demographic segment resolving to 45230 endpoints,
+      email template with Liquid personalization, weekly schedule with
+      quiet time, frequency cap 5/day, A/B test with 10% holdout and two
+      treatments. All checklist dimensions pass.
+    input: |
+      Design a deployment plan for a production Pinpoint email campaign.
+      Emit the standard VERDICT block (CAMPAIGN, VERDICT, PRE_CHECKS,
+      STEPS, POST_VERIFY, CHANNEL, SEGMENT, SCHEDULE).
+
+      Requirements:
+      - Project: app-abc123 (prod-engagement)
+      - Channel: email (SES identity example.com verified in us-east-1)
+      - Segment: seg-premium (demographic, 45230 endpoints — DeviceType=ios, tier=premium)
+      - Templates: subject-a, subject-b (email, Liquid personalization)
+      - Schedule: immediate
+      - Quiet time: 22:00-08:00 America/New_York
+      - Frequency cap: 5/day
+      - A/B test: 10% holdout, 45% treatment-a, 45% treatment-b
+      - Event stream: arn:aws:kinesis:us-east-1:111111111111:stream/pinpoint-events
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "email-campaign-full-security"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "STEPS"
+        - "email"
+        - "holdout"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: journey-multistep-deploy
+    description: >-
+      Multi-step onboarding journey with ENTRY, SEND welcome email, WAIT
+      24 hours, CONDITIONAL_SPLIT on app_open event (yes-no), SEND nudge
+      on no-match, END. Email channel verified, segment resolves to 12000
+      endpoints.
+    input: |
+      Design a deployment plan for a Pinpoint multi-step onboarding
+      journey. Emit the standard VERDICT block.
+
+      Requirements:
+      - Project: app-abc123
+      - Channel: email (SES identity example.com verified)
+      - Entry: segment-based (seg-new-users, 12000 endpoints)
+      - Activities:
+        1. ENTRY -> send-welcome
+        2. SEND welcome email (template: welcome-email)
+        3. WAIT 24 hours (PT24H)
+        4. CONDITIONAL_SPLIT on app_open event in last 1 day
+           - True -> END (user engaged)
+           - False -> send-nudge
+        5. SEND nudge email (template: nudge-email)
+        6. END
+      - Quiet time: 22:00-08:00 America/New_York
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "journey-multistep-deploy"
+        - "VERDICT"
+        - "CONDITIONAL_SPLIT"
+        - "journey"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ses-identity-not-verified
+    description: >-
+      Email channel references an SES identity that is not verified.
+      Pinpoint would silently accept the campaign and produce zero sends.
+      Must emit PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a Pinpoint email campaign. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Project: app-abc123
+      - Channel: email (SES identity marketing.example.com)
+      - Segment: seg-all (demographic, 50000 endpoints)
+      - Template: promo-email
+      - Schedule: immediate
+
+      Existing-account context: the SES identity marketing.example.com
+      was created 10 minutes ago and DNS verification records (TXT and
+      DKIM CNAME) have not propagated yet. The identity status is
+      PENDING.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "ses-identity-not-verified"
+        - "VERDICT"
+        - "verified"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: segment-zero-endpoints
+    description: >-
+      Segment dimensions are too restrictive and resolve to 0 endpoints.
+      The campaign would send nothing silently. Must emit
+      PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a Pinpoint SMS campaign. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Project: app-abc123
+      - Channel: SMS (origination number +12025550100 provisioned)
+      - Segment: seg-vip-android-users (demographic: DeviceType=android,
+        tier=vip, lifecycle=active, region=ap-southeast-2)
+      - Template: vip-promo-sms
+      - Schedule: immediate
+
+      Existing-account context: get-segment-estimate for
+      seg-vip-android-users returns 0 endpoints. The combination of
+      android + vip + active + ap-southeast-2 is too restrictive —
+      no endpoints match all four dimensions.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "segment-zero-endpoints"
+        - "VERDICT"
+        - "0 endpoints"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-required-fields
+    description: >-
+      Incomplete deployment specification — missing project id, channel,
+      and segment. Cannot produce a deployment plan without required
+      fields.
+    input: |
+      Design a deployment plan for a Pinpoint campaign. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Campaign name: promo-blast
+      - The user did not specify: project id, channel, segment,
+        or message template.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-required-fields"
+        - "VERDICT"
+        - "REQUIRED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

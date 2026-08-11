@@ -1,0 +1,222 @@
+# Eval test cases for msk-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per MSK optimisation pattern. Each
+# case's cluster embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The decision matrix in
+# SKILL.md produces exactly the expected verdicts below.
+skill: msk-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: graviton-broker-migration
+    description: >-
+      MSK cluster running on kafka.m5.large (pre-Graviton) with 3 brokers
+      and Kafka 3.5.1. Graviton migration to kafka.m7g.large yields ~20%
+      compute savings. Expected verdict: OPPORTUNITY_FOUND with Graviton
+      migration recommendation.
+    input: |
+      Cluster: events-prod-msk
+        (case graviton-broker-migration)
+      Kafka Version: 3.5.1
+      Region: us-east-1
+      Broker Type: kafka.m5.large (2 vCPU, 8 GB) — $0.276/h
+      Broker Count: 3
+      EBS Volume: 1 TB gp3 per broker
+      Partitions: 60 across 10 topics
+      Log Retention: 72 hours (3 days)
+      Compacted Topics: none
+      Pricing: On-Demand
+      CloudWatch (last 30 days):
+        - BytesInPerSec per broker: avg=12, max=20
+        - BytesOutPerSec per broker: avg=25, max=40
+        - KafkaDataLogsDiskUsed: avg=45%, max=55%
+        - CpuUser: avg=30%, max=45%
+        - MaxOffsetLag: avg=500 (low consumer lag)
+      Cost Explorer (last 30 days):
+        - MSK:BrokerUsage: kafka.m5.large x 3 brokers
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "graviton-broker-migration"
+        - "m7g"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: broker-count-overprovisioned
+    description: >-
+      MSK cluster with 6 brokers on kafka.m5.large but total ingress only
+      15 MB/s (2.5 MB/s per broker). Can reduce to 3 brokers via blue/
+      green migration. Expected verdict: OPPORTUNITY_FOUND with broker
+      count reduction.
+    input: |
+      Cluster: analytics-msk-dev
+        (case broker-count-overprovisioned)
+      Kafka Version: 3.5.1
+      Region: us-east-1
+      Broker Type: kafka.m5.large (2 vCPU, 8 GB) — $0.276/h
+      Broker Count: 6
+      EBS Volume: 500 GB gp3 per broker
+      Partitions: 120 total (20 per broker)
+      Log Retention: 24 hours
+      Compacted Topics: none
+      Pricing: On-Demand
+      CloudWatch (last 30 days):
+        - BytesInPerSec per broker: avg=2.5, max=5
+        - Total BytesInPerSec: avg=15 MB/s
+        - KafkaDataLogsDiskUsed: avg=30%, max=40%
+        - CpuUser: avg=10%, max=20%
+        - MaxOffsetLag: avg=200 (low consumer lag)
+      Partition-to-broker ratio: 20/broker (well under 400 ceiling)
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "broker-count-overprovisioned"
+        - "3"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: ebs-storage-overprovisioned
+    description: >-
+      MSK cluster with 3 brokers each having 2 TB EBS but
+      KafkaDataLogsDiskUsed avg only 20%. EBS is 5x over-allocated.
+      Expected verdict: OPPORTUNITY_FOUND with EBS right-sizing on next
+      blue/green migration.
+    input: |
+      Cluster: logs-msk-prod
+        (case ebs-storage-overprovisioned)
+      Kafka Version: 3.5.1
+      Region: us-east-1
+      Broker Type: kafka.m7g.large (2 vCPU, 8 GB) — $0.220/h
+      Broker Count: 3
+      EBS Volume: 2 TB gp3 per broker ($0.08/GB-month)
+      Partitions: 45 across 8 topics
+      Log Retention: 24 hours
+      Compacted Topics: none
+      Pricing: On-Demand
+      CloudWatch (last 30 days):
+        - BytesInPerSec per broker: avg=8, max=15
+        - KafkaDataLogsDiskUsed: avg=20%, max=25%
+        - CpuUser: avg=25%, max=35%
+      Disk usage per broker: ~410 GB used of 2,000 GB allocated
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "ebs-storage-overprovisioned"
+        - "500"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: msk-serverless-break-even
+    description: >-
+      MSK provisioned cluster with 3 kafka.m5.large brokers, total ingress
+      only 10 MB/s, 20 partitions, 5 GB data stored, idle overnight. Well
+      below the ~50 MB/s Serverless break-even. Expected verdict:
+      OPPORTUNITY_FOUND with Serverless migration recommendation.
+    input: |
+      Cluster: notifications-msk-dev
+        (case msk-serverless-break-even)
+      Kafka Version: 3.5.1
+      Region: us-east-1
+      Broker Type: kafka.m5.large (2 vCPU, 8 GB) — $0.276/h
+      Broker Count: 3
+      EBS Volume: 100 GB gp3 per broker
+      Partitions: 20 across 5 topics
+      Log Retention: 24 hours
+      Compacted Topics: none
+      Pricing: On-Demand
+      Total BytesInPerSec: avg=10 MB/s, max=15 (overnight drops to <1)
+      Data stored: ~5 GB total
+      Consumer lag: low (MaxOffsetLag avg <100)
+      Cost Explorer:
+        - MSK:BrokerUsage: kafka.m5.large x 3 brokers = ~$604/month
+        - MSK:EBSUsage: 300 GB x $0.08 = ~$24/month
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPPORTUNITY_FOUND
+    assertions:
+      must_contain:
+        - "OPPORTUNITY_FOUND"
+        - "msk-serverless-break-even"
+        - "Serverless"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: ALREADY_OPTIMAL"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-graviton-compact-retention
+    description: >-
+      MSK cluster already on kafka.m7g.large (Graviton, Kafka 3.5.1 with
+      KRaft), 3 brokers (minimum HA), BytesInPerSec/broker avg 18 MB/s
+      (healthy), KafkaDataLogsDiskUsed avg 55%, compacted topics for
+      changelog workloads, 72h retention, partition count 90 total.
+      Expected verdict: ALREADY_OPTIMAL.
+    input: |
+      Cluster: analytics-msk-prod
+        (case already-optimal-graviton-compact-retention)
+      Kafka Version: 3.5.1 (KRaft mode enabled)
+      Region: us-east-1
+      Broker Type: kafka.m7g.large (2 vCPU, 8 GB) — $0.220/h
+      Broker Count: 3
+      EBS Volume: 1 TB gp3 per broker
+      Partitions: 90 total (30 per broker)
+      Log Retention: 72 hours (3 days)
+      Compacted Topics: 3 changelog topics (cleanup.policy=compact)
+      Pricing: On-Demand
+      CloudWatch (last 30 days):
+        - BytesInPerSec per broker: avg=18, max=28
+        - BytesOutPerSec per broker: avg=35, max=50
+        - KafkaDataLogsDiskUsed: avg=55%, max=65%
+        - CpuUser: avg=40%, max=55%
+        - MaxOffsetLag: avg=800 (healthy)
+      Partition-to-broker ratio: 30/broker (under 400 ceiling)
+      Emit the standard optimisation block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: ALREADY_OPTIMAL
+    assertions:
+      must_contain:
+        - "ALREADY_OPTIMAL"
+        - "already-optimal-graviton-compact-retention"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPPORTUNITY_FOUND"
+        - "VERDICT: NEED_MORE_INFO"

@@ -1,0 +1,48 @@
+# Eval configuration for cloudfront-response-headers-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudfront-response-headers-deployer
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: custom-security-headers-ready
+    difficulty: easy
+    prompt_file: prompts/custom-security-headers-ready.md
+    baseline_file: baselines/custom-security-headers-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: LOW
+  - id: cors-wildcard-with-credentials-missing
+    difficulty: hard
+    prompt_file: prompts/cors-wildcard-with-credentials-missing.md
+    baseline_file: baselines/cors-wildcard-with-credentials-missing.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: HIGH
+  - id: managed-securityheaders-policy-ready
+    difficulty: medium
+    prompt_file: prompts/managed-securityheaders-policy-ready.md
+    baseline_file: baselines/managed-securityheaders-policy-ready.md
+    expected_verdict: READY_TO_DEPLOY
+    expected_risk: LOW
+  - id: hsts-include-subdomains-http-only-gap-missing
+    difficulty: hard
+    prompt_file: prompts/hsts-include-subdomains-http-only-gap-missing.md
+    baseline_file: baselines/hsts-include-subdomains-http-only-gap-missing.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: HIGH
+  - id: distribution-in-progress-missing
+    difficulty: medium
+    prompt_file: prompts/distribution-in-progress-missing.md
+    baseline_file: baselines/distribution-in-progress-missing.md
+    expected_verdict: PREREQUISITES_MISSING
+    expected_risk: MODERATE

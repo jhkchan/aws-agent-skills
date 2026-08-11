@@ -1,0 +1,45 @@
+# Eval configuration for msk-cost-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the
+# same case can run with-skill (SKILL.md loaded) vs without-skill
+# (baseline only) for delta comparison. This is the canonical
+# structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer
+# shim discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This
+# file does not replace it — it adds the structured with-skill-vs-
+# baseline dimension.
+skill_name: msk-cost-optimizer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: graviton-broker-migration
+    difficulty: medium
+    prompt_file: prompts/graviton-broker-migration.md
+    baseline_file: baselines/graviton-broker-migration.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: broker-count-overprovisioned
+    difficulty: medium
+    prompt_file: prompts/broker-count-overprovisioned.md
+    baseline_file: baselines/broker-count-overprovisioned.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: ebs-storage-overprovisioned
+    difficulty: medium
+    prompt_file: prompts/ebs-storage-overprovisioned.md
+    baseline_file: baselines/ebs-storage-overprovisioned.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: msk-serverless-break-even
+    difficulty: hard
+    prompt_file: prompts/msk-serverless-break-even.md
+    baseline_file: baselines/msk-serverless-break-even.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: already-optimal-graviton-compact-retention
+    difficulty: hard
+    prompt_file: prompts/already-optimal-graviton-compact-retention.md
+    baseline_file: baselines/already-optimal-graviton-compact-retention.md
+    expected_verdict: ALREADY_OPTIMAL

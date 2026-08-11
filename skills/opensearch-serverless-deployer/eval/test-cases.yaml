@@ -1,0 +1,173 @@
+# Eval test cases for opensearch-serverless-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: opensearch-serverless-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: vectorsearch-full-security
+    description: >-
+      Standard VECTORSEARCH collection with full security: customer-managed
+      KMS encryption policy (created before collection), VPC network policy,
+      standby replicas ENABLED, OCU floor 4, data access policy with 3 IAM
+      principals, SAML via IAM Identity Center, faiss HNSW k-NN index with
+      dimension 1536. All checklist dimensions pass.
+    input: |
+      Design a deployment plan for a production OpenSearch Serverless
+      VECTORSEARCH collection. Emit the standard VERDICT block (COLLECTION,
+      VERDICT, PRE_CHECKS, STEPS, POST_VERIFY, TYPE, ENCRYPTION, NETWORK).
+
+      Requirements:
+      - Collection name: prod-vectors
+      - Type: VECTORSEARCH
+      - Encryption: customer-managed KMS key arn:aws:kms:us-east-1:111111111111:key/abc-123
+      - Network: VPC-only (vpce-xyz123 in vpc-abc123, subnets subnet-aaa subnet-bbb, sg sg-abc123)
+      - Standby replicas: ENABLED
+      - OCU floor: 2 indexing + 2 search
+      - Data access: 3 IAM principals (AppRole admin, SearchRole read, IngestRole write)
+      - Auth: SAML via IAM Identity Center (metadata URL https://identity-center.amazonaws.com/saml/metadata/abc, group attribute department)
+      - Vector: faiss HNSW, dimension 1536, cosinesimil
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "vectorsearch-full-security"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "STEPS"
+        - "VECTORSEARCH"
+        - "KMS"
+        - "standby"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: timeseries-lifecycle-deploy
+    description: >-
+      TIMESERIES collection with data lifecycle policy for log retention,
+      public network access, AWS-owned key (acceptable for non-compliance
+      logs), standby replicas ENABLED, OCU floor 4, data access policy with
+      IAM principals. Lifecycle policy defines 7-day min, 30-day max
+      retention.
+    input: |
+      Design a deployment plan for an OpenSearch Serverless TIMESERIES
+      collection for application logs. Emit the standard VERDICT block.
+
+      Requirements:
+      - Collection name: prod-logs
+      - Type: TIMESERIES
+      - Encryption: AWS-owned key (acceptable — logs are non-compliance data)
+      - Network: public (internal application will access the endpoint)
+      - Standby replicas: ENABLED
+      - OCU floor: 2 indexing + 2 search
+      - Data access: 2 IAM principals (IngestRole write, QueryRole read)
+      - Lifecycle: MinIndexRetention 7d, MaxIndexRetention 30d, index pattern prod-logs-*
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "timeseries-lifecycle-deploy"
+        - "VERDICT"
+        - "TIMESERIES"
+        - "lifecycle"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: kms-asymmetric-key-blocker
+    description: >-
+      Encryption policy references an asymmetric KMS key (RSA_2048).
+      OpenSearch Serverless requires SYMMETRIC_DEFAULT. Must emit
+      PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for an OpenSearch Serverless VECTORSEARCH
+      collection. Emit the standard VERDICT block.
+
+      Requirements:
+      - Collection name: prod-semantic-search
+      - Type: VECTORSEARCH
+      - Encryption: customer-managed KMS key arn:aws:kms:us-east-1:111111111111:key/def-456
+      - Network: VPC-only
+
+      Existing-account context: the KMS key def-456 was created as
+      RSA_2048 for a different application (asymmetric signing). The
+      operator assumed any KMS key works with OpenSearch Serverless.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "kms-asymmetric-key-blocker"
+        - "VERDICT"
+        - "SYMMETRIC_DEFAULT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-encryption-policy
+    description: >-
+      No encryption security policy exists before collection creation. The
+      collection would silently use an AWS-owned key with no key visibility.
+      The operator wants customer-managed KMS. Must emit
+      PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for an OpenSearch Serverless SEARCH
+      collection. Emit the standard VERDICT block.
+
+      Requirements:
+      - Collection name: prod-search
+      - Type: SEARCH
+      - Encryption: customer-managed KMS key arn:aws:kms:us-east-1:111111111111:key/abc-123
+      - Network: public
+
+      Existing-account context: this is a new account with no existing
+      OpenSearch Serverless collections. The operator has not created any
+      security policies yet. No encryption policy exists for any collection
+      pattern.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-encryption-policy"
+        - "VERDICT"
+        - "encryption"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-required-fields
+    description: >-
+      Incomplete deployment specification — missing collection type,
+      encryption requirement, and network requirement. Cannot produce a
+      deployment plan without required fields.
+    input: |
+      Design a deployment plan for an OpenSearch Serverless collection.
+      Emit the standard VERDICT block.
+
+      Requirements:
+      - Collection name: prod-data
+      - The user did not specify: collection type (SEARCH/TIMESERIES/
+        VECTORSEARCH), encryption requirement, network requirement,
+        or OCU floor.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-required-fields"
+        - "VERDICT"
+        - "REQUIRED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cur-automation-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CUR Automation Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "greenfield-cur-athena-automated",
+      "name": "Greenfield CUR + Athena setup on payer — all requirements satisfied (AUTOMATED)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/greenfield-cur-athena-automated.md",
+      "baseline_file": "baselines/greenfield-cur-athena-automated.md",
+      "expected_verdict": "AUTOMATED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "prod-cur-automation", "AWS::CUR::ReportDefinition", "VERDICT", "projection.enabled"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "linked-account-caller-manual",
+      "name": "Linked (member) account caller cannot create organization-wide CUR (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/linked-account-caller-manual.md",
+      "baseline_file": "baselines/linked-account-caller-manual.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "payer", "111111111111", "VERDICT", "222222222222"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "quicksight-standard-edition-manual",
+      "name": "QuickSight Standard edition blocks scheduled SPICE refresh on Athena datasets (MANUAL_STEP_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/quicksight-standard-edition-manual.md",
+      "baseline_file": "baselines/quicksight-standard-edition-manual.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "ENTERPRISE", "VERDICT", "Standard"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: AUTOMATED"]
+        }
+      ]
+    },
+    {
+      "id": "cur2-split-cost-allocation-automated",
+      "name": "CUR 2.0 with Split Cost Allocation Data on payer with EKS Container Insights (AUTOMATED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cur2-split-cost-allocation-automated.md",
+      "baseline_file": "baselines/cur2-split-cost-allocation-automated.md",
+      "expected_verdict": "AUTOMATED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATED", "split cost allocation", "VERDICT", "bcm-data-exports"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: MANUAL_STEP_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "missing-bucket-policy-manual",
+      "name": "CUR bucket policy missing athena.amazonaws.com READ grant (MANUAL_STEP_REQUIRED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-bucket-policy-manual.md",
+      "baseline_file": "baselines/missing-bucket-policy-manual.md",
+      "expected_verdict": "MANUAL_STEP_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["MANUAL_STEP_REQUIRED", "athena.amazonaws.com", "put-bucket-policy", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: AUTOMATED"]
+        }
+      ]
+    }
+  ]
+}

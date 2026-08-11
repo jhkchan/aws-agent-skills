@@ -1,0 +1,148 @@
+# Eval test cases for cloudformation-drift-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudformation-drift-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cfn-drift-modified-bucket-policy
+    description: Stack reports DRIFTED with MODIFIED drift on LogsBucket BucketPolicy Principal — out-of-band edit added a cross-account grant; choose RESET_TO_DRIFT
+    input: |
+      Scenario: A CloudFormation stack "logging-stack" in us-east-1
+      reports StackDriftStatus DRIFTED. LastDriftDetectionDateTime is
+      2026-08-05T09:14:22Z. describe-stack-resource-drifts shows the
+      LogsBucket resource (AWS::S3::Bucket,
+      logging-stack-logsbucket-abc) with ResourceDriftStatus MODIFIED
+      and one PropertyDifference on PropertyPath
+      /BucketPolicy/Document/Statement/0/Principal, ExpectedValue
+      {"Service": "logging.us-east-1.amazonaws.com"}, ActualValue
+      {"AWS": "arn:aws:iam::111122223333:root"}, DifferenceType
+      NOT_EQUAL. CloudTrail shows a PutBucketPolicy event at
+      2026-08-04T22:11:48Z by arn:aws:iam::111122223333:user/dev-alice
+      adding the cross-account grant. BucketPolicy is mutable on
+      AWS::S3::Bucket (does not require Replacement). The cross-account
+      grant is intentional — the dev account needs to write logs.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "MODIFIED"
+        - "LogsBucket"
+        - "BucketPolicy"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "Replacement: True"
+
+  - id: cfn-drift-deleted-iam-role
+    description: Stack reports DRIFTED with DELETED drift on TaskRole — operator must decide recreate vs remove-from-template
+    input: |
+      Scenario: A CloudFormation stack "app-platform" in us-east-1
+      reports StackDriftStatus DRIFTED. describe-stack-resource-drifts
+      shows the TaskRole resource (AWS::IAM::Role) with
+      ResourceDriftStatus DELETED. PhysicalResourceId
+      app-platform-TaskRole-abc no longer exists. CloudTrail shows
+      DeleteRole at 2026-08-03T15:22:11Z by
+      arn:aws:iam::111122223333:user/cleanup-bot. No other resources
+      in the stack reference TaskRole via Ref or GetAtt (it is a
+      standalone role assigned to external ECS tasks).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "DELETED"
+        - "TaskRole"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "MODIFIED"
+
+  - id: cfn-drift-addition-import-bucket
+    description: Operator discovers an out-of-band S3 bucket app-uploads-2026 that should be brought under stack management via resource import
+    input: |
+      Scenario: An operator discovers an S3 bucket
+      "app-uploads-2026" in us-east-1 that was created via the
+      console. It should be managed by the existing
+      "app-storage" CloudFormation stack. The bucket currently has
+      versioning enabled, an SSE-KMS encryption configuration using
+      key alias aws/s3, and a lifecycle rule transitioning
+      Standard IA objects to Glacier after 90 days. The
+      app-storage stack does not currently declare this bucket. The
+      operator wants to bring the bucket under stack management
+      without recreating it (the bucket has 4 TB of existing
+      objects).
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ADDITION"
+        - "IMPORT"
+        - "app-uploads-2026"
+        - "resources-to-import"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "delete the bucket"
+
+  - id: cfn-drift-update-blocked-immutable-property
+    description: MODIFIED drift on immutable RDS DBInstanceIdentifier — update would trigger Replacement; recommend REVERT_TO_TEMPLATE
+    input: |
+      Scenario: A CloudFormation stack "orders-db-stack" in
+      us-east-1 reports StackDriftStatus DRIFTED. The OrdersDB
+      resource (AWS::RDS::DBInstance) shows ResourceDriftStatus
+      MODIFIED with a PropertyDifference on
+      /DBInstanceIdentifier, ExpectedValue "orders-db-prod",
+      ActualValue "orders-db-prod-v2", DifferenceType NOT_EQUAL.
+      CloudTrail shows ModifyDBInstance at 2026-08-02T10:11:00Z by
+      arn:aws:iam::111122223333:user/dba-carol renaming the
+      instance. DBInstanceIdentifier is immutable — a stack update
+      would trigger Replacement (delete + recreate), causing data
+      loss. The operator does NOT want the instance replaced. The
+      rename was a mistake.
+    expected_verdict: ROOT_CAUSE_FOUND
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "MODIFIED"
+        - "OrdersDB"
+        - "DBInstanceIdentifier"
+        - "REVERT_TO_TEMPLATE"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: NEED_MORE_INFO"
+        - "RESET_TO_DRIFT"
+
+  - id: cfn-drift-vague-report-need-stack-info
+    description: Vague report of CloudFormation drift without stack name, region, or StackDriftStatus — request the identifying inputs
+    input: |
+      Scenario: A user reports "I think my CloudFormation stack is
+      drifted, can you check?" They mention it is a "production
+      stack in one of the eastern regions" but do not provide a
+      stack name, ARN, region, StackDriftStatus, or any
+      describe-stack-resource-drifts output.
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "VERDICT"
+        - "detect-stack-drift"
+      must_not_contain:
+        - "ROOT_CAUSE_FOUND"
+        - "ESCALATE"
+        - "Error:"
+        - "I cannot"

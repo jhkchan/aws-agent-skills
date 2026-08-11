@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "opensearch-serverless-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the OpenSearch Serverless Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "vectorsearch-full-security",
+      "name": "VECTORSEARCH collection with KMS, VPC, SAML, standby replicas — all checklist dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/vectorsearch-full-security.md",
+      "baseline_file": "baselines/vectorsearch-full-security.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "vectorsearch-full-security", "VERDICT", "PRE_CHECKS", "STEPS", "VECTORSEARCH", "KMS", "standby"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "timeseries-lifecycle-deploy",
+      "name": "TIMESERIES collection with lifecycle policy for log retention, AWS-owned key, public network",
+      "difficulty": "medium",
+      "prompt_file": "prompts/timeseries-lifecycle-deploy.md",
+      "baseline_file": "baselines/timeseries-lifecycle-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "timeseries-lifecycle-deploy", "VERDICT", "TIMESERIES", "lifecycle"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "kms-asymmetric-key-blocker",
+      "name": "Encryption policy references asymmetric KMS key — hard blocker, requires SYMMETRIC_DEFAULT",
+      "difficulty": "medium",
+      "prompt_file": "prompts/kms-asymmetric-key-blocker.md",
+      "baseline_file": "baselines/kms-asymmetric-key-blocker.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "kms-asymmetric-key-blocker", "VERDICT", "SYMMETRIC_DEFAULT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "missing-encryption-policy",
+      "name": "No encryption policy exists before collection creation — collection would use AWS-owned key silently",
+      "difficulty": "hard",
+      "prompt_file": "prompts/missing-encryption-policy.md",
+      "baseline_file": "baselines/missing-encryption-policy.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-encryption-policy", "VERDICT", "encryption"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "missing-required-fields",
+      "name": "Incomplete spec — missing collection type, encryption, network (PREREQUISITES_MISSING)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/missing-required-fields.md",
+      "baseline_file": "baselines/missing-required-fields.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-required-fields", "VERDICT", "REQUIRED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+# Eval test cases for globalaccelerator-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: globalaccelerator-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: multi-region-alb-active-active
+    description: >-
+      Standard multi-region active-active Global Accelerator with two
+      regional ALB endpoints (us-east-1 + eu-west-1), each in its own
+      endpoint group at traffic dial 100. Client IP reaches origin via
+      X-Forwarded-For (ALB). Flow logs to S3. All checklist dimensions
+      pass.
+    input: |
+      Design a deployment plan for a production Global Accelerator.
+      Emit the standard VERDICT block (ACCELERATOR_SPEC, VERDICT,
+      ARCHITECTURE, CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Accelerator name: prod-ga-multi-region
+      - IP source: Amazon pool (no BYOIP)
+      - IP version: IPv4
+      - Listener: TCP 443, client affinity NONE (stateless HTTPS)
+      - Endpoint group 1: region us-east-1, traffic dial 100
+        Endpoint: ALB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/prod-use1/abc (active), weight 128
+      - Endpoint group 2: region eu-west-1, traffic dial 100
+        Endpoint: ALB arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/app/prod-euw1/def (active), weight 128
+      - Health check: HTTPS path / port 443 interval 30s threshold 3
+      - Flow logs: S3 bucket prod-ga-flowlogs (bucket policy grants s3:PutObject to flowlogs.globalaccelerator.amazonaws.com)
+      - Cross-account: no
+      - Custom routing: no
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "multi-region-alb-active-active"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "X-Forwarded-For"
+        - "active-active"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: single-region-nlb-client-ip-preserve
+    description: >-
+      Single-region NLB endpoint with PreserveClientIpEnabled true. Origin
+      security group must allow client IP ranges (not just GA prefix pool).
+      Flow logs to CloudWatch Logs. Acceptable for IP-based security at
+      origin (gaming backend, financial API).
+    input: |
+      Design a deployment plan for a Global Accelerator. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Accelerator name: prod-ga-nlb-preserve-ip
+      - IP source: Amazon pool
+      - Listener: TCP 443, affinity NONE
+      - Endpoint group: region us-east-1, traffic dial 100
+        Endpoint: NLB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/net/prod-nlb/abc (active), weight 256, PreserveClientIpEnabled: true
+      - Origin security group: already updated to allow client CIDRs (0.0.0.0/0 for now)
+      - Health check: TCP port 443 interval 10s threshold 3
+      - Flow logs: CloudWatch Logs group /aws/globalaccelerator/prod-ga-nlb-preserve-ip (service-linked role has logs:PutLogEvents)
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "single-region-nlb-client-ip-preserve"
+        - "VERDICT"
+        - "PreserveClientIpEnabled"
+        - "NLB"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: byoip-cidr-not-provisioned
+    description: >-
+      BYOIP CIDR 203.0.113.0/24 is in PENDING_PROVISIONING state in
+      Route 53. Global Accelerator cannot advertise a CIDR that is not
+      PROVISIONED in the account. Must emit PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a Global Accelerator. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Accelerator name: prod-ga-byoip
+      - IP source: BYOIP 203.0.113.0/24
+      - Listener: TCP 443
+      - Endpoint group: region us-east-1
+        Endpoint: ALB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/prod-use1/abc (active)
+
+      Existing-account context: aws ec2 describe-byoip-cidrs returns
+      the CIDR 203.0.113.0/24 in state PENDING_PROVISIONING (ROA is
+      published with ARIN but Route 53 provisioning has not completed).
+      The user expects to advertise this CIDR through Global Accelerator
+      today.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "byoip-cidr-not-provisioned"
+        - "VERDICT"
+        - "PROVISIONED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: mixed-endpoint-types-blocked
+    description: >-
+      User attempts to mix an ALB and an NLB endpoint in the same
+      endpoint group. AWS Global Accelerator API rejects mixed endpoint
+      types with ValidationError. Must emit PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a Global Accelerator. Emit the
+      standard VERDICT block.
+
+      Requirements:
+      - Accelerator name: prod-ga-mixed
+      - Listener: TCP 443
+      - Endpoint group: region us-east-1, traffic dial 100
+        Endpoints:
+          - ALB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/prod-alb/abc (active), weight 128
+          - NLB arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/net/prod-nlb/def (active), weight 128
+
+      The user wants to load-balance across the ALB and NLB in the same
+      group, treating them as interchangeable targets.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "mixed-endpoint-types-blocked"
+        - "VERDICT"
+        - "homogeneous"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: cross-account-endpoint-shared
+    description: >-
+      Cross-account Global Accelerator: accelerator in the network
+      account (111111111111), endpoint ALB in a workload account
+      (222222222222) via RAM resource share that is ACTIVE. Acceptable
+      for centralized edge platform.
+    input: |
+      Design a deployment plan for a cross-account Global Accelerator.
+      Emit the standard VERDICT block.
+
+      Requirements:
+      - Accelerator name: prod-ga-cross-account (in account 111111111111)
+      - IP source: Amazon pool
+      - Listener: TCP 443, affinity NONE
+      - Endpoint group: region us-east-1, traffic dial 100
+        Endpoint: ALB arn:aws:elasticloadbalancing:us-east-1:222222222222:loadbalancer/app/prod-alb-workload/abc (active), weight 128
+      - RAM resource share arn:aws:ram:us-east-1:222222222222:resource-share/prod-alb-share/xyz is ACTIVE in both accounts (accepted by 111111111111)
+      - Health check: HTTPS / port 443 interval 30s
+      - Flow logs: S3 bucket prod-ga-flowlogs in account 111111111111
+
+      The network team owns the accelerator; the workload team owns
+      the ALB. The RAM share has been accepted.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-account-endpoint-shared"
+        - "VERDICT"
+        - "RAM"
+        - "222222222222"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

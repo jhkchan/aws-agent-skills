@@ -1,0 +1,45 @@
+# Eval configuration for elasticache-cost-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the
+# same case can run with-skill (SKILL.md loaded) vs without-skill
+# (baseline only) for delta comparison. This is the canonical
+# structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer
+# shim discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This
+# file does not replace it — it adds the structured with-skill-vs-
+# baseline dimension.
+skill_name: elasticache-cost-optimizer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: graviton-node-migration
+    difficulty: medium
+    prompt_file: prompts/graviton-node-migration.md
+    baseline_file: baselines/graviton-node-migration.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: ondemand-steady-state-rn-candidate
+    difficulty: easy
+    prompt_file: prompts/ondemand-steady-state-rn-candidate.md
+    baseline_file: baselines/ondemand-steady-state-rn-candidate.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: node-rightsizing-low-engine-cpu
+    difficulty: medium
+    prompt_file: prompts/node-rightsizing-low-engine-cpu.md
+    baseline_file: baselines/node-rightsizing-low-engine-cpu.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: serverless-candidate-variable-load
+    difficulty: hard
+    prompt_file: prompts/serverless-candidate-variable-load.md
+    baseline_file: baselines/serverless-candidate-variable-load.md
+    expected_verdict: OPPORTUNITY_FOUND
+  - id: already-optimal-graviton-rn-rightsized
+    difficulty: hard
+    prompt_file: prompts/already-optimal-graviton-rn-rightsized.md
+    baseline_file: baselines/already-optimal-graviton-rn-rightsized.md
+    expected_verdict: ALREADY_OPTIMAL

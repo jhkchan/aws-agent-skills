@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudformation-drift-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudFormation Drift Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cfn-drift-modified-bucket-policy",
+      "name": "MODIFIED drift on LogsBucket BucketPolicy Principal — out-of-band cross-account grant; choose RESET_TO_DRIFT",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cfn-drift-modified-bucket-policy.md",
+      "baseline_file": "baselines/cfn-drift-modified-bucket-policy.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "MODIFIED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "MODIFIED", "LogsBucket", "BucketPolicy", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "Replacement: True"]
+        }
+      ]
+    },
+    {
+      "id": "cfn-drift-deleted-iam-role",
+      "name": "DELETED drift on TaskRole after manual DeleteRole — choose recreate or remove-from-template",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cfn-drift-deleted-iam-role.md",
+      "baseline_file": "baselines/cfn-drift-deleted-iam-role.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "DELETED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "DELETED", "TaskRole", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "MODIFIED"]
+        }
+      ]
+    },
+    {
+      "id": "cfn-drift-addition-import-bucket",
+      "name": "Out-of-band S3 bucket app-uploads-2026 to be brought under stack management via resource import",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cfn-drift-addition-import-bucket.md",
+      "baseline_file": "baselines/cfn-drift-addition-import-bucket.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "ADDITION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ADDITION", "IMPORT", "app-uploads-2026", "resources-to-import", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "delete the bucket"]
+        }
+      ]
+    },
+    {
+      "id": "cfn-drift-update-blocked-immutable-property",
+      "name": "MODIFIED drift on immutable RDS DBInstanceIdentifier — recommend REVERT_TO_TEMPLATE to avoid Replacement",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cfn-drift-update-blocked-immutable-property.md",
+      "baseline_file": "baselines/cfn-drift-update-blocked-immutable-property.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_root_cause_category": "MODIFIED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "MODIFIED", "OrdersDB", "DBInstanceIdentifier", "REVERT_TO_TEMPLATE", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: NEED_MORE_INFO", "RESET_TO_DRIFT"]
+        }
+      ]
+    },
+    {
+      "id": "cfn-drift-vague-report-need-stack-info",
+      "name": "Vague report of drift without stack name, region, or status — request the identifying inputs",
+      "difficulty": "easy",
+      "prompt_file": "prompts/cfn-drift-vague-report-need-stack-info.md",
+      "baseline_file": "baselines/cfn-drift-vague-report-need-stack-info.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "VERDICT", "detect-stack-drift"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ESCALATE", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

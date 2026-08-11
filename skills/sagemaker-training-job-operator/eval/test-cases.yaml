@@ -1,0 +1,147 @@
+# Eval test cases for sagemaker-training-job-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: sagemaker-training-job-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: sagemaker-spot-training-checkpoint
+    description: Configure spot training with checkpointing S3 for a PyTorch job that must survive interruptions
+    input: |
+      Scenario: An operator wants to launch a SageMaker training
+      job "resnet-spot-2026-08" in us-east-1 on
+      ml.p4de.24xlarge with managed spot training. The job trains
+      ResNet-50 on ImageNet and is expected to take ~24 hours, but
+      spot interruptions are likely. The operator needs checkpoint
+      configuration so the job resumes from the last epoch after
+      each interruption, not from scratch. The PyTorch entry point
+      saves checkpoints to /opt/ml/checkpoints/checkpoint.pt at
+      the end of each epoch. The checkpoint S3 bucket is
+      s3://ml-checkpoints/resnet-spot/. The execution role
+      arn:aws:iam::111122223333:role/sagemaker-exec has
+      s3:GetObject and s3:PutObject on both the input, output,
+      and checkpoint buckets. Expected per-attempt training time
+      is 24 hours; the operator wants to budget for 3 retries.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "EnableManagedSpotTraining"
+        - "CheckpointConfig"
+        - "MaxWaitTimeInSeconds"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "from scratch"
+
+  - id: sagemaker-distributed-data-parallel
+    description: Configure SMDDP on 4 x ml.p5.48xlarge (32 GPUs total) with ShardedByS3Key input distribution and Training Compiler
+    input: |
+      Scenario: An operator wants to pretrain BERT-large on 4 ×
+      ml.p5.48xlarge instances (32 GPUs total) in us-east-1 using
+      SageMaker Distributed Data Parallel (SMDDP) with Training
+      Compiler enabled. The training data is in
+      s3://ml-datasets/bert/train/ (12M objects). The execution
+      role has the required S3, KMS, and ECR permissions. The
+      Service Quota for ml.p5.48xlarge is 8 (sufficient for 4
+      instances). The PyTorch GPU image is
+      763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training:2.3.0-gpu-py311-cu121-ubuntu22.04-sagemaker.
+      The operator wants to verify num_processes is set correctly
+      and the input is sharded across instances.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "sagemaker_distributed_dataparallel_enabled"
+        - "num_processes"
+        - "32"
+        - "ShardedByS3Key"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "FullyReplicated"
+
+  - id: sagemaker-training-blocked-quota
+    description: Launch BLOCKED because ml.p5.48xlarge Service Quota is zero — operator must request an increase first
+    input: |
+      Scenario: An operator wants to launch a training job
+      "llama-finetune-2026-08" in us-east-1 on ml.p5.48xlarge
+      (1 instance, 8 H100 GPUs). The execution role has all
+      required permissions. However, aws service-quotas
+      get-service-quota for ml.p5.48xlarge returns Value 0,
+      Adjustable true. The operator has not requested a quota
+      increase. The ECR image exists and is accessible. The
+      input data is reachable. The operator is asking why the
+      job cannot launch right now.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "quota"
+        - "P5"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: sagemaker-hpo-tuning-job
+    description: Set up automatic model tuning (HPO) with Bayesian strategy, warm start, and early stopping for a 50-job tuning run
+    input: |
+      Scenario: An operator wants to launch an HPO job
+      "bert-hpo-2026-08" in us-east-1 to tune learning_rate
+      (0.0001 to 0.1, logarithmic) and batch_size (32 to 256,
+      integer) for a BERT classifier. The objective is to
+      maximize validation:accuracy. The operator wants a
+      maximum of 50 training jobs, 4 in parallel, with
+      automatic early stopping. The base training definition
+      uses ml.p4de.24xlarge, the PyTorch GPU image, and the
+      execution role has all required permissions. The operator
+      also wants to warm-start from a previous tuning job
+      "bert-hpo-2026-07" using the same dataset and algorithm.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-hyper-parameter-tuning-job"
+        - "Bayesian"
+        - "WarmStartType"
+        - "IdenticalDataAndAlgorithm"
+        - "TrainingJobEarlyStoppingType"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: sagemaker-vague-job-config
+    description: Vague training job request missing required inputs (no algorithm spec, no input data, no instance type) — request the identifying inputs
+    input: |
+      Scenario: A user reports "I want to train a model on
+      SageMaker." They mention it is for "a transformer model"
+      but do not provide an algorithm spec / ECR image, input
+      data S3 location, output S3 location, instance type,
+      execution role ARN, or hyperparameters. They want to know
+      how to launch the training job.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "VERDICT"
+        - "algorithm"
+      must_not_contain:
+        - "READY"
+        - "COMPLETED"
+        - "Error:"
+        - "I cannot"

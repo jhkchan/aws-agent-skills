@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "pinpoint-campaign-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Pinpoint Campaign Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "email-campaign-full-security",
+      "name": "Standard email campaign with SES, segment, template, quiet time, A/B test holdout — all checklist dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/email-campaign-full-security.md",
+      "baseline_file": "baselines/email-campaign-full-security.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "email-campaign-full-security", "VERDICT", "PRE_CHECKS", "STEPS", "email", "holdout"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "journey-multistep-deploy",
+      "name": "Multi-step onboarding journey with SEND, WAIT, CONDITIONAL_SPLIT, END — activity graph validated",
+      "difficulty": "hard",
+      "prompt_file": "prompts/journey-multistep-deploy.md",
+      "baseline_file": "baselines/journey-multistep-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "journey-multistep-deploy", "VERDICT", "CONDITIONAL_SPLIT", "journey"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "ses-identity-not-verified",
+      "name": "Email channel references SES identity with PENDING verification — campaign would send zero messages",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ses-identity-not-verified.md",
+      "baseline_file": "baselines/ses-identity-not-verified.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "ses-identity-not-verified", "VERDICT", "verified"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "segment-zero-endpoints",
+      "name": "Segment dimensions too restrictive — resolves to 0 endpoints, campaign would send nothing",
+      "difficulty": "medium",
+      "prompt_file": "prompts/segment-zero-endpoints.md",
+      "baseline_file": "baselines/segment-zero-endpoints.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "segment-zero-endpoints", "VERDICT", "0 endpoints"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "missing-required-fields",
+      "name": "Incomplete spec — missing project, channel, segment (PREREQUISITES_MISSING)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/missing-required-fields.md",
+      "baseline_file": "baselines/missing-required-fields.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-required-fields", "VERDICT", "REQUIRED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "sagemaker-training-job-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SageMaker Training Job Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "sagemaker-spot-training-checkpoint",
+      "name": "Configure managed spot training with checkpointing S3 for a PyTorch ResNet-50 job that must survive interruptions",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sagemaker-spot-training-checkpoint.md",
+      "baseline_file": "baselines/sagemaker-spot-training-checkpoint.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "EnableManagedSpotTraining", "CheckpointConfig", "MaxWaitTimeInSeconds", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "from scratch"]
+        }
+      ]
+    },
+    {
+      "id": "sagemaker-distributed-data-parallel",
+      "name": "Configure SMDDP on 4 x ml.p5.48xlarge (32 GPUs total) with ShardedByS3Key input distribution and Training Compiler",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sagemaker-distributed-data-parallel.md",
+      "baseline_file": "baselines/sagemaker-distributed-data-parallel.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "sagemaker_distributed_dataparallel_enabled", "num_processes", "32", "ShardedByS3Key", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "FullyReplicated"]
+        }
+      ]
+    },
+    {
+      "id": "sagemaker-training-blocked-quota",
+      "name": "Launch BLOCKED because ml.p5.48xlarge Service Quota is zero — operator must request an increase first",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sagemaker-training-blocked-quota.md",
+      "baseline_file": "baselines/sagemaker-training-blocked-quota.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "quota", "P5", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "sagemaker-hpo-tuning-job",
+      "name": "Set up HPO with Bayesian strategy, IdenticalDataAndAlgorithm warm start, and automatic early stopping for a 50-job tuning run",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sagemaker-hpo-tuning-job.md",
+      "baseline_file": "baselines/sagemaker-hpo-tuning-job.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-hyper-parameter-tuning-job", "Bayesian", "WarmStartType", "IdenticalDataAndAlgorithm", "TrainingJobEarlyStoppingType", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "sagemaker-vague-job-config",
+      "name": "Vague training job request missing required inputs — request the identifying configuration",
+      "difficulty": "easy",
+      "prompt_file": "prompts/sagemaker-vague-job-config.md",
+      "baseline_file": "baselines/sagemaker-vague-job-config.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "VERDICT", "algorithm"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["READY", "COMPLETED", "Error:", "I cannot"]
+        }
+      ]
+    }
+  ]
+}

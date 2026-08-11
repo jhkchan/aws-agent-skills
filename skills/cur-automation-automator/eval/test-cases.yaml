@@ -1,0 +1,220 @@
+# Eval test cases for cur-automation-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cur-automation-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: greenfield-cur-athena-automated
+    description: >-
+      Greenfield CUR + Athena setup for a payer account. All requirements
+      satisfied (payer caller, CUR bucket with correct policy, Glue
+      catalog, KMS-backed Athena results bucket). Plan should produce
+      AUTOMATED with the full CloudFormation template including partition
+      projection TBLPROPERTIES and a non-primary workgroup with DSL.
+    input: |
+      Operation: create
+      Stack name: prod-cur-automation
+      Caller: payer account 111111111111
+      CUR bucket: prod-cur-bucket (us-east-1, versioning on,
+        BlockPublicAccess on, policy grants billingreports.amazonaws.com
+        + athena.amazonaws.com with aws:SourceAccount=111111111111)
+      Granularity: HOURLY
+      Resource-level: yes (AdditionalSchemaElements: Resources)
+      Format: Parquet
+      ReportVersioning: CREATE_NEW
+      Glue database: prod_cur (does not exist, will be created)
+      Athena workgroup: finops-cur (does not exist, will be created)
+        with EnforceWorkgroupConfiguration=true,
+        BytesScannedCutoffPerQuery=1TB
+      Athena results bucket: prod-athena-results (KMS SSE)
+      Query automation: top_spenders_by_service daily
+      Template format: CloudFormation
+
+      Requirement checks (already performed by caller):
+        aws organizations describe-organization:
+          MasterAccountId: 111111111111 (matches caller) — PAYER (OK)
+        aws sts get-caller-identity:
+          Account: 111111111111 (OK)
+        aws cur describe-report-definitions:
+          [] (no existing CUR with this name — OK to create)
+        aws s3api get-bucket-location --bucket prod-cur-bucket:
+          LocationConstraint: us-east-1 (OK, matches Glue region)
+        aws s3api get-bucket-versioning --bucket prod-cur-bucket:
+          Status: Enabled (OK)
+        aws s3api get-bucket-policy --bucket prod-cur-bucket:
+          Statement[0].Principal.Service: billingreports.amazonaws.com
+            with aws:SourceAccount=111111111111 (OK)
+          Statement[1].Principal.Service: athena.amazonaws.com
+            with aws:SourceAccount=111111111111 (OK)
+        aws glue get-database --name prod_cur:
+          EntityNotFoundException (will be created — OK)
+        aws athena list-work-groups:
+          only primary exists (finops-cur will be created — OK)
+        aws kms describe-key --key-id prod-athena-key:
+          enabled, key policy grants athena.amazonaws.com (OK)
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      REQUIREMENTS, IAC_TEMPLATE, MANUAL_GAPS, NOTES).
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "prod-cur-automation"
+        - "AWS::CUR::ReportDefinition"
+        - "VERDICT"
+        - "projection.enabled"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: linked-account-caller-manual
+    description: >-
+      Caller is a linked (member) account, not the payer. Plan should
+      produce MANUAL_STEP_REQUIRED with the specific gap and the exact
+      cross-account IAM role snippet to enable CUR visibility from the
+      linked account via Athena in the payer's Glue catalog.
+    input: |
+      Operation: create
+      Stack name: linked-account-cur
+      Caller: linked account 222222222222
+      Payer account: 111111111111
+      Goal: organization-wide FinOps dashboards
+
+      Requirement checks:
+        aws organizations describe-organization:
+          MasterAccountId: 111111111111
+        aws sts get-caller-identity:
+          Account: 222222222222 (does NOT match payer — FAIL)
+        aws cur describe-report-definitions:
+          AccessDenied (linked accounts cannot list CUR definitions)
+
+      Emit the standard VERDICT block.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "payer"
+        - "111111111111"
+        - "VERDICT"
+        - "222222222222"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: AUTOMATED"
+
+  - id: quicksight-standard-edition-manual
+    description: >-
+      Caller is payer and CUR bucket is set up, but the QuickSight
+      account is Standard edition which does not support scheduled
+      SPICE refresh on Athena datasets. Plan should produce
+      MANUAL_STEP_REQUIRED with the upgrade snippet.
+    input: |
+      Operation: add-quicksight
+      Stack name: prod-cur-quicksight
+      Caller: payer 111111111111
+      CUR + Athena already configured (verified)
+      QuickSight account: existing
+
+      Requirement checks:
+        aws quicksight describe-account --aws-account-id 111111111111:
+          AccountEdition: STANDARD (FAIL — scheduled SPICE refresh
+            requires ENTERPRISE)
+        aws s3api get-bucket-policy --bucket prod-cur-bucket:
+          OK (billingreports + athena service principals present)
+        aws athena list-work-groups:
+          finops-cur exists with BytesScannedCutoffPerQuery=1TB (OK)
+
+      Emit the standard VERDICT block.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "ENTERPRISE"
+        - "VERDICT"
+        - "Standard"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: AUTOMATED"
+
+  - id: cur2-split-cost-allocation-automated
+    description: >-
+      Request to enable CUR 2.0 with Split Cost Allocation Data on an
+      existing CUR setup. All requirements satisfied (payer caller,
+      EKS cluster with Container Insights enabled, BCM Data Exports
+      service-linked role present). Plan should produce AUTOMATED with
+      the BCM Data Exports create-export template.
+    input: |
+      Operation: migrate-cur2
+      Stack name: prod-cur2-sca
+      Caller: payer 111111111111
+      Goal: EKS per-pod cost attribution via SCAD
+      EKS cluster: prod-eks-cluster (Container Insights enabled)
+
+      Requirement checks:
+        aws organizations describe-organization:
+          MasterAccountId: 111111111111 (matches caller — PAYER, OK)
+        aws ce list-cost-allocation-tags --status Active:
+          aws:eks:clusterName: Active (OK)
+        aws eks describe-addon --cluster-name prod-eks-cluster \
+          --addon-name amazon-cloudwatch-observability:
+          status: ACTIVE (Container Insights enabled — OK)
+        aws iam get-role \
+          --role-name AWSServiceRoleForBCMDataExports:
+          exists (OK)
+        aws bcm-data-exports list-exports:
+          [] (no existing cur-2 export — OK to create)
+
+      Emit the standard VERDICT block.
+    expected_verdict: AUTOMATED
+    assertions:
+      must_contain:
+        - "AUTOMATED"
+        - "split cost allocation"
+        - "VERDICT"
+        - "bcm-data-exports"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: MANUAL_STEP_REQUIRED"
+
+  - id: missing-bucket-policy-manual
+    description: >-
+      Caller is payer and CUR bucket exists, but the bucket policy
+      does NOT grant athena.amazonaws.com READ access. Plan should
+      produce MANUAL_STEP_REQUIRED with the exact put-bucket-policy
+      snippet to add the athena service principal.
+    input: |
+      Operation: create
+      Stack name: prod-cur-stack
+      Caller: payer 111111111111
+      CUR bucket: prod-cur-bucket (us-east-1, exists)
+
+      Requirement checks:
+        aws organizations describe-organization:
+          MasterAccountId: 111111111111 (PAYER — OK)
+        aws s3api get-bucket-location --bucket prod-cur-bucket:
+          us-east-1 (OK)
+        aws s3api get-bucket-policy --bucket prod-cur-bucket:
+          only grants billingreports.amazonaws.com WRITE (FAIL —
+            athena.amazonaws.com missing)
+        aws glue get-database --name prod_cur:
+          EntityNotFoundException (will be created — OK)
+
+      Emit the standard VERDICT block.
+    expected_verdict: MANUAL_STEP_REQUIRED
+    assertions:
+      must_contain:
+        - "MANUAL_STEP_REQUIRED"
+        - "athena.amazonaws.com"
+        - "put-bucket-policy"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: AUTOMATED"
