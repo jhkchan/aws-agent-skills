@@ -207,65 +207,45 @@ GAP: Re-supply the discovery method (agent-based / agentless), the application o
 
 ### Step 0: Expert knowledge — non-obvious Discovery and Strategy behaviors
 
-These behaviors change the assessment plan if ignored:
-
-- **The Discovery Collector VM is an OVA deployed on vCenter or a
-  self-managed hypervisor.** It is NOT an AWS-managed service. The
-  operator downloads the OVA from the AWS console, deploys it, and
-  registers it with the Migration Hub home region. The Collector runs
-  in the on-premises environment and uploads data to AWS.
+- **The Discovery Collector VM is an OVA deployed on vCenter, NOT an
+  AWS-managed service.** The operator downloads, deploys, and registers
+  it with the home region. It runs on-premises and uploads to AWS.
 
 - **Agent-based and agentless discovery are complementary, not
-  alternatives.** Agentless (Collector VM) provides inventory and basic
-  performance; agents provide process-level and network-connection
-  detail. For a complete assessment, deploy BOTH: the Collector for
-  inventory and the agents on critical hosts for dependencies. The
-  Discovery service merges the data.
+  alternatives.** Agentless provides inventory and basic performance;
+  agents provide process-level and network-connection detail. Deploy
+  BOTH for a complete assessment. Discovery merges the data.
 
-- **Strategy Recommendations requires a minimum data volume to classify
-  strategy.** A server with less than 24 hours of performance data is
-  classified as "rehost" by default (insufficient data to recommend
-  right-sizing or replatform). For meaningful 6R classification, wait
-  until at least 7 days of data are collected before starting the
-  assessment.
+- **Strategy Recommendations needs 7+ days of data for meaningful 6R
+  classification.** A server with less than 24 hours of data defaults to
+  "rehost" (insufficient data for right-sizing or replatform).
 
 - **The 6R classification is per-application, not per-server.** Strategy
   Recommendations groups servers into applications using dependency
-  data. If dependencies are missing (agentless-only discovery), every
-  server is treated as a standalone application and the 6R output is
-  per-server. This loses the application-context strategy.
+  data. Without dependencies (agentless-only), every server is
+  standalone and the 6R output loses application context.
 
-- **Anti-pattern detection runs on the OS and DB engine version
-  reported by the Discovery agent.** If the agent is not installed, the
-  OS version comes from vCenter tools, which may be stale. An EOL OS
-  that vCenter reports as current produces a false-negative
-  anti-pattern. Always cross-check with agent-based data.
+- **Anti-pattern detection uses the OS and DB version from the agent.**
+  Without agents, OS version comes from vCenter tools, which may be
+  stale. An EOL OS reported as current by vCenter produces a
+  false-negative anti-pattern.
 
-- **MGN replication begins when the MGN agent is installed on the
-  source server and the source server is registered to the MGN service
-  in the home region.** The 6R "rehost" recommendation does not
-  auto-install MGN. The operator must deploy the agent, configure
-  replication settings, and validate a test cutover before the actual
-  cutover.
+- **MGN replication requires the MGN agent on the source and
+  registration to the home region.** The "rehost" recommendation does
+  not auto-install MGN. The operator deploys the agent, configures
+  replication, and validates a test cutover.
 
-- **DMS tasks for database replatform require AWS Schema Conversion Tool
-  (SCT) to run first for heterogeneous migrations** (Oracle to Aurora,
-  SQL Server to Aurora, etc.). SCT converts schema objects and stored
-  procedures; DMS replicates the data. The Strategy Recommendations
-  output flags the need for SCT but does not run it.
+- **DMS replatform requires AWS SCT first for heterogeneous migrations**
+  (Oracle to Aurora, SQL Server to Aurora). SCT converts schema and
+  stored procedures; DMS replicates data. Strategy Recommendations flags
+  the need but does not run SCT.
 
-- **The home region is set once and cannot be changed without losing
-  all Discovery data.** If the operator selects us-east-1 as the home
-  region and later wants eu-west-1, all collected data must be
-  re-imported. Always confirm the home region with stakeholders before
-  starting collection.
+- **The home region is set once and cannot be changed without losing all
+  Discovery data.** Confirm with stakeholders before starting collection.
 
-- **Migration Hub Orchestrator (introduced 2023-2024) provides managed
-  workflow templates for common migration patterns** (Windows rehost,
-  Linux rehost, database replatform). These templates integrate with
-  MGN and DMS and reduce the manual step count. Check whether a managed
-  template fits the application profile before building a custom
-  workflow.
+- **Migration Hub Orchestrator provides managed workflow templates** for
+  common patterns (Windows rehost, Linux rehost, database replatform).
+  Check template fit before building a custom workflow.
 
 ### Step 1: Choose the discovery method
 
@@ -690,43 +670,30 @@ output.
 
 **Hard ordering constraints:**
 
-1. The home region MUST be confirmed before any data collection. All
-   Discovery data is region-scoped and cannot be moved.
-2. The Collector VM MUST reach vCenter AND AWS before it can import or
-   upload. Verify both paths before deployment.
-3. Discovery agents MUST be installed before the collection window
-   starts. Agents installed mid-window produce partial data for those
-   hosts.
-4. The assessment MUST NOT start until the collection window completes
-   (7-14 days). Starting early produces unreliable right-sizing.
-5. Wave planning MUST NOT proceed without the dependency graph
-   (agent-based data). Agentless-only wave planning is blocked.
+1. Home region MUST be confirmed before any data collection (data is
+   region-scoped and cannot be moved).
+2. Collector VM MUST reach vCenter AND AWS (443) before deployment.
+3. Agents MUST be installed before the collection window starts.
+4. Assessment MUST NOT start until the collection window completes
+   (7-14 days).
+5. Wave planning MUST NOT proceed without the dependency graph.
 6. MGN test cutover MUST succeed before production cutover.
 
-**Parallelizable:** (a) Collector VM deployment and agent installation
-are independent; (b) MGN and DMS setup for different applications can
-proceed in parallel once the 6R strategies are confirmed.
+**Parallelizable:** Collector deployment and agent installation are
+independent; MGN and DMS setup for different applications can proceed in
+parallel once the 6R strategies are confirmed.
 
-## Pre-flight safety checks (run before starting any assessment)
+## Pre-flight safety checks
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`start-assessment`, `start-import-task`, MGN `start-cutover`, DMS
-  `start-replication-task`), emit:
-  `CONFIRM: About to <action> for assessment <name> in region <region>.
-  This affects <consequence>. Proceed? (yes/no)`
-
+- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
+  emit: `CONFIRM: About to <action> for assessment <name> in <region>.
+  Proceed? (yes/no)`
 - **Before deploying the Collector VM**, verify vCenter and AWS network
-  paths are open. A Collector deployed without network paths appears
-  healthy but never reports data.
-
+  paths are open.
 - **Before starting the assessment**, verify the collection window is at
-  least 7 days. Short windows produce unreliable right-sizing.
-
-- **Before a production MGN cutover**, verify a test cutover succeeded
-  and the test instance passed application-level smoke tests.
-
-- **Before a DMS cutover**, verify data parity (row counts + checksums)
-  between source and target.
+  least 7 days.
+- **Before a production MGN cutover**, verify a test cutover succeeded.
+- **Before a DMS cutover**, verify data parity (row counts + checksums).
 
 ## Appendix A — 6R strategy decision matrix
 
