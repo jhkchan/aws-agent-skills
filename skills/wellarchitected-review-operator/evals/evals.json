@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "wellarchitected-review-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Well-Architected Review Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "war-create-workload-all-pillars",
+      "name": "Create a production workload with all six base pillars plus the Prosperity lens, capturing the review owner and account scope",
+      "difficulty": "hard",
+      "prompt_file": "prompts/war-create-workload-all-pillars.md",
+      "baseline_file": "baselines/war-create-workload-all-pillars.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-workload", "PRODUCTION", "wellarchitected-prosperity", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "war-answer-security-pillar-high-risk",
+      "name": "Answer security pillar questions with a HIGH risk-tier rationale citing workload evidence (no automated rollback)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/war-answer-security-pillar-high-risk.md",
+      "baseline_file": "baselines/war-answer-security-pillar-high-risk.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "update-answer", "HIGH_ISSUE", "security", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "NO_ISSUE"]
+        }
+      ]
+    },
+    {
+      "id": "war-blocked-lens-not-imported",
+      "name": "BLOCKED because the Prosperity lens is referenced but not imported into the account",
+      "difficulty": "medium",
+      "prompt_file": "prompts/war-blocked-lens-not-imported.md",
+      "baseline_file": "baselines/war-blocked-lens-not-imported.md",
+      "expected_verdict": "BLOCKED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "wellarchitected-prosperity", "import-lens", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "war-milestone-and-consolidated-report",
+      "name": "Create a milestone after the review is complete and generate a PDF consolidated report",
+      "difficulty": "hard",
+      "prompt_file": "prompts/war-milestone-and-consolidated-report.md",
+      "baseline_file": "baselines/war-milestone-and-consolidated-report.md",
+      "expected_verdict": "COMPLETED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "create-milestone", "get-consolidated-report", "2026-Q3-baseline", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "war-trusted-advisor-integration",
+      "name": "Integrate Trusted Advisor findings as evidence for cost optimization pillar answers without auto-answering",
+      "difficulty": "hard",
+      "prompt_file": "prompts/war-trusted-advisor-integration.md",
+      "baseline_file": "baselines/war-trusted-advisor-integration.md",
+      "expected_verdict": "READY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "LowUtilizationEC2Resources", "costOptimization", "trustedadvisor", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "auto-answer"]
+        }
+      ]
+    }
+  ]
+}

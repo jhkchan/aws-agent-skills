@@ -1,0 +1,177 @@
+{
+  "skill": "ec2-launch-template-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the EC2 Launch Template Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Graviton + IMDSv2 + tag specs, capacity reservation targeting, multi-volume block devices, network interface with public IP + IPv6, and AMI architecture mismatch. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "imdsv2-tags-graviton",
+      "name": "Graviton web server with IMDSv2, tag specs, gp3 volumes, IPv6",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — arm64 AMI + m7g.large, IMDSv2 required, tag specs on instance+volume+ENI, gp3 block devices, IPv6 ENI",
+      "prompt": "Create a launch template named \"graviton-web-server\" in us-east-1. AMI: ami-0abcdef1234567890 (arm64, AL2023). Instance type: m7g.large. Key pair: prod-graviton-key. Security groups: sg-0abc123, sg-0def456 (both in VPC vpc-0abc123def). IAM instance profile: web-server-role (role attached). Subnet: subnet-0abc123def456. Public IP: yes. IPv6: 1 address. IMDSv2 required with hop limit 2 (containerized workload). Block devices: root 30 GB gp3 DeleteOnTermination true, secondary 100 GB gp3 6000 IOPS DeleteOnTermination true. Tags on instance (Name=graviton-web-server, Environment=production), volume (Name=graviton-web-root), network-interface (Name=graviton-web-eni-0). Account: 123456789012.",
+      "prompt_file": "prompts/imdsv2-tags-graviton.md",
+      "baseline_file": "baselines/imdsv2-tags-graviton.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAUNCH_TEMPLATE: lt-0abc123def456 (version 1, name: graviton-web-server)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] AMI: ami-0abcdef1234567890 (architecture: arm64)\n  [✓] Instance type: m7g.large (architecture: arm64)\n  [✓] Architecture match: arm64 == arm64\n  [✓] Key pair: prod-graviton-key\n  [✓] Security groups: sg-0abc123, sg-0def456 (VPC: vpc-0abc123def)\n  [✓] IAM instance profile: web-server-role\n  [✓] Block devices: root 30 gp3, secondary 100 gp3 6000 IOPS\n  [✓] Network interface: subnet-0abc123def456, public IP true, IPv6 1\n  [✓] IMDSv2: HttpTokens=required, hop limit 2\n  [✓] Tag specifications: instance, volume, network-interface\nVERIFICATION_COMMANDS:\n  aws ec2 describe-launch-template-versions --launch-template-id lt-0abc123def456 --versions 1\n  aws ec2 describe-launch-templates --launch-template-ids lt-0abc123def456",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "HttpTokens=required",
+            "arm64",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "gp3"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "capacity-reservation-targeting",
+      "name": "Launch template targeting a specific capacity reservation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — x86_64 AMI + c7i.large, targeted capacity reservation cr-0abc123def456, reservation matches",
+      "prompt": "Create a launch template targeting capacity reservation cr-0abc123def456 in us-east-1. AMI: ami-0xyz789 (x86_64, AL2023). Instance type: c7i.large. The reservation cr-0abc123def456 is active with InstanceType c7i.large, AvailabilityZone us-east-1a, InstancePlatform Linux/UNIX. Key pair: prod-key. Security group: sg-0resv123 (VPC vpc-0abc123def). IAM profile: compute-role. Subnet: subnet-0usEast1a. IMDSv2 required. Tags: Workload=reservation-bound. Account: 123456789012.",
+      "prompt_file": "prompts/capacity-reservation-targeting.md",
+      "baseline_file": "baselines/capacity-reservation-targeting.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAUNCH_TEMPLATE: lt-0resv001 (version 1, name: targeted-reservation-web)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] AMI: ami-0xyz789 (architecture: x86_64)\n  [✓] Instance type: c7i.large (architecture: x86_64)\n  [✓] Architecture match: x86_64 == x86_64\n  [✓] Capacity reservation: targeted: cr-0abc123def456\n  [✓] IMDSv2: HttpTokens=required\n  [✓] Tags: Workload=reservation-bound\nVERIFICATION_COMMANDS:\n  aws ec2 describe-capacity-reservations --capacity-reservation-ids cr-0abc123def456\n  aws ec2 describe-launch-template-versions --launch-template-id lt-0resv001",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "CapacityReservationSpecification",
+            "cr-0abc123def456",
+            "VERDICT",
+            "CHECKLIST",
+            "HttpTokens=required"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-volume-block-device",
+      "name": "Multi-volume gp3 + instance store on m5d.large data worker",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — x86_64 + m5d.large, root gp3 3000, data gp3 12000 IOPS 500 MB/s, ephemeral0 instance store",
+      "prompt": "Create a launch template for a data-processing worker on m5d.large in us-east-1. AMI: ami-0dataworker (x86_64). Block devices: root 50 GB gp3 3000 IOPS, data volume 500 GB gp3 12000 IOPS 500 MB/s throughput, and instance store ephemeral0 at /dev/sdb (m5d has NVMe). Key pair: data-key. Security group: sg-0data (VPC vpc-0data). IAM profile: data-role. Subnet: subnet-0data. IMDSv2 required hop limit 1. Tags: Application=data-worker, Environment=production. Account: 123456789012.",
+      "prompt_file": "prompts/multi-volume-block-device.md",
+      "baseline_file": "baselines/multi-volume-block-device.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAUNCH_TEMPLATE: lt-0data001 (version 1, name: data-worker)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] AMI: ami-0dataworker (architecture: x86_64)\n  [✓] Instance type: m5d.large (architecture: x86_64, instance store: yes)\n  [✓] Architecture match: x86_64 == x86_64\n  [✓] Block devices: root 50 gp3 3000 IOPS, data 500 gp3 12000 IOPS 500 MB/s, ephemeral0 at /dev/sdb\n  [✓] IMDSv2: HttpTokens=required, hop limit 1\n  [✓] Tags: Application=data-worker, Environment=production\nVERIFICATION_COMMANDS:\n  aws ec2 describe-launch-template-versions --launch-template-id lt-0data001",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "gp3",
+            "ephemeral0",
+            "12000",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network-interface-public-ip-ipv6",
+      "name": "Public-facing API server with public IP and IPv6 on primary ENI",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — x86_64 + c7i.xlarge, ENI DeviceIndex 0 with AssociatePublicIpAddress true + Ipv6AddressCount 1, gp3 root",
+      "prompt": "Create a launch template for a public-facing API server in us-east-1. AMI: ami-0apiimage (x86_64). Instance type: c7i.xlarge. The instance needs a public IP and one IPv6 address on its primary ENI. Subnet: subnet-0public (has IPv6 CIDR). Security group: sg-0api (VPC vpc-0public). Key pair: api-key. IAM profile: api-role. IMDSv2 required. Block device: root 30 GB gp3 DeleteOnTermination true. Tags: Name=api-server, Tier=public. Account: 123456789012.",
+      "prompt_file": "prompts/network-interface-public-ip-ipv6.md",
+      "baseline_file": "baselines/network-interface-public-ip-ipv6.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAUNCH_TEMPLATE: lt-0api001 (version 1, name: api-server)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] AMI: ami-0apiimage (architecture: x86_64)\n  [✓] Instance type: c7i.xlarge (architecture: x86_64)\n  [✓] Architecture match: x86_64 == x86_64\n  [✓] Network interface: subnet-0public, public IP true, IPv6 1\n  [✓] Block devices: root 30 gp3 DeleteOnTermination true\n  [✓] IMDSv2: HttpTokens=required\n  [✓] Tags: Name=api-server, Tier=public\nVERIFICATION_COMMANDS:\n  aws ec2 describe-launch-template-versions --launch-template-id lt-0api001",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AssociatePublicIpAddress",
+            "VERDICT",
+            "CHECKLIST",
+            "gp3"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "architecture-mismatch",
+      "name": "Graviton instance type with x86_64 AMI — architecture mismatch",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — x86_64 AMI paired with m7g.large (arm64); template would create but instance would fail to boot",
+      "prompt": "Create a launch template named \"web-server\" in us-east-1. AMI: ami-0x86image (x86_64, Amazon Linux 2023). Instance type: m7g.large (Graviton). Key pair: web-key. Security group: sg-0web (VPC vpc-0web). IAM profile: web-role. Subnet: subnet-0web. IMDSv2 required. Tags: Name=web-server. Account: 123456789012.",
+      "prompt_file": "prompts/architecture-mismatch.md",
+      "baseline_file": "baselines/architecture-mismatch.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "LAUNCH_TEMPLATE: web-server (us-east-1)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Architecture match: AMI ami-0x86image is x86_64 but instance type m7g.large is arm64 — instance would fail to boot. Use an arm64 AMI (e.g., al2023-ami-*-arm64) or an x86_64 instance type.\n  [✓] Key pair: web-key\n  [✓] Security group: sg-0web\nVERIFICATION_COMMANDS:\n  aws ec2 describe-images --image-ids ami-0x86image --query 'Images[0].Architecture'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "VERDICT",
+            "CHECKLIST",
+            "architecture"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

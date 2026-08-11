@@ -5,7 +5,7 @@
     "url": "https://github.com/jhkchan/aws-agent-skills"
   },
   "metadata": {
-    "description": "Eval-backed AWS CloudOps agent skills \u2014 229 skills across 6 task types",
+    "description": "Eval-backed AWS CloudOps agent skills \u2014 240 skills across 6 task types",
     "version": "2.1.0"
   },
   "plugins": [
@@ -242,7 +242,18 @@
         "./skills/managed-blockchain-deployer",
         "./skills/s3-intelligent-tiering-optimizer",
         "./skills/sns-subscription-operator",
-        "./skills/sqs-dlq-operator"
+        "./skills/sqs-dlq-operator",
+        "./skills/apigateway-http-api-deployer",
+        "./skills/backup-cross-region-operator",
+        "./skills/cloudwatch-rum-deployer",
+        "./skills/codepipeline-v2-deployer",
+        "./skills/ec2-launch-template-deployer",
+        "./skills/efs-access-point-deployer",
+        "./skills/emr-serverless-deployer",
+        "./skills/redshift-serverless-deployer",
+        "./skills/s3-bucket-policy-deployer",
+        "./skills/stepfunctions-express-deployer",
+        "./skills/wellarchitected-review-operator"
       ],
       "skill_count": 90
     }

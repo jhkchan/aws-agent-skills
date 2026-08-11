@@ -1,0 +1,149 @@
+# Eval test cases for s3-bucket-policy-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across HTTPS-only
+# enforcement, cross-account with ExternalId, VPC-endpoint-only,
+# CloudFront OAC, and policy size limit exceeded.
+skill: s3-bucket-policy-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: https-only-secure-transport
+    description: >-
+      Attach an HTTPS-only bucket policy using aws:SecureTransport
+      with the Bool condition operator. Expects READY_TO_DEPLOY
+      with the Bool operator cited (not StringNotEquals).
+    input: |
+      Attach an HTTPS-only policy to bucket "prod-app-data" in
+      us-east-1 (account 123456789012). Deny all non-HTTPS S3
+      traffic. Also disable ACLs with BucketOwnerEnforced and
+      enable Block Public Access (all 4 settings). Bucket exists
+      and has no existing policy.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws:SecureTransport"
+        - "Bool"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "BucketOwnerEnforced"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "StringNotEquals"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-external-id
+    description: >-
+      Grant a partner account read access to a specific prefix with
+      aws:ExternalId condition. Expects READY_TO_DEPLOY with the
+      cross-account role ARN and ExternalId in the checklist.
+    input: |
+      Grant partner account 998877665544 read access (GetObject +
+      ListBucket) to the "shared/" prefix on bucket
+      "prod-shared-data" in us-east-1 (account 123456789012).
+      Use ExternalId "partner-ext-abc123" to prevent the confused-
+      deputy problem. HTTPS-only Deny should also be present.
+      Bucket exists, ACLs disabled, BPA enabled.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws:ExternalId"
+        - "998877665544"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "shared/"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: vpc-endpoint-only-access
+    description: >-
+      Restrict bucket access to a specific VPC endpoint using
+      aws:SourceVpce with StringNotEquals Deny. Expects
+      READY_TO_DEPLOY with the VPC endpoint ID cited.
+    input: |
+      Restrict bucket "internal-data" in us-east-1 (account
+      123456789012) to only allow access through VPC endpoint
+      vpce-0abc123def456. Deny all traffic that does not come from
+      this endpoint. The bucket already has HTTPS-only enforced and
+      BPA enabled.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws:SourceVpce"
+        - "vpce-0abc123def456"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "StringNotEquals"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cloudfront-oac-policy
+    description: >-
+      Configure a CloudFront Origin Access Control (OAC) bucket
+      policy allowing CloudFront to serve objects from the bucket.
+      Expects READY_TO_DEPLOY with the cloudfront.amazonaws.com
+      service principal and AWS:SourceArn condition.
+    input: |
+      Set up a CloudFront OAC bucket policy for bucket
+      "cdn-origin-assets" in us-east-1 (account 123456789012).
+      CloudFront distribution ARN:
+      arn:aws:cloudfront::123456789012:distribution/E123ABCDEF456.
+      Allow s3:GetObject on all objects. The OAC config already
+      exists in CloudFront. HTTPS-only Deny should also be present.
+      ACLs disabled, BPA enabled.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cloudfront.amazonaws.com"
+        - "AWS:SourceArn"
+        - "E123ABCDEF456"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "canonical user"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: policy-size-limit-exceeded
+    description: >-
+      Operator has a policy JSON that exceeds the 20 KB S3 bucket
+      policy size limit. Expects PREREQUISITES_MISSING with the
+      size limit cited and Access Points recommended as mitigation.
+    input: |
+      Attach a bucket policy to bucket "large-policy-bucket" in
+      us-east-1 (account 123456789012). The policy JSON file is
+      24 KB (exceeds the 20 KB S3 limit). It contains per-team
+      Allow statements for 15 teams. The bucket exists with BPA
+      enabled.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "20 KB"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

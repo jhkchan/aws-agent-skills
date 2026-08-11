@@ -1,0 +1,141 @@
+# Eval test cases for wellarchitected-review-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: wellarchitected-review-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: war-create-workload-all-pillars
+    description: Create a production workload with all six base pillars plus the Prosperity lens, capturing the review owner and account scope
+    input: |
+      Scenario: An operator wants to create a Well-Architected
+      Tool workload for the "checkout-service" microservice in
+      us-east-1. Environment PRODUCTION. Review owner
+      "payments-platform@example.com". Lenses: wellarchitected
+      and wellarchitected-prosperity. Account 111122223333.
+      Regions us-east-1 and us-west-2. All six base pillar IDs
+      (operationalExcellence, security, reliability,
+      performance, costOptimization, sustainability) plus the
+      Prosperity lens. The Prosperity lens is already imported
+      into the account. The caller holds
+      wellarchitected:CreateWorkload and
+      wellarchitected:AssociateLenses.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-workload"
+        - "PRODUCTION"
+        - "wellarchitected-prosperity"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: war-answer-security-pillar-high-risk
+    description: Answer security pillar questions with a HIGH risk-tier rationale citing workload evidence (no automated rollback)
+    input: |
+      Scenario: An operator wants to answer the security pillar
+      questions for workload "checkout-service" (id
+      workload-abc123, lens wellarchitected, pillar security).
+      The workload has no automated rollback; the deployment
+      relies on manual canary watch. The operator wants the
+      risky choice marked with risk-tier HIGH_ISSUE and a
+      rationale tied to the deployment SOP. The lens
+      wellarchitected is associated; the caller holds
+      wellarchitected:UpdateAnswer.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "update-answer"
+        - "HIGH_ISSUE"
+        - "security"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "NO_ISSUE"
+
+  - id: war-blocked-lens-not-imported
+    description: BLOCKED because the Prosperity lens is referenced but not imported into the account
+    input: |
+      Scenario: An operator wants to associate the
+      wellarchitected-prosperity lens with workload
+      "checkout-service" (id workload-abc123) in us-east-1.
+      However, `aws wellarchitected list-lenses --region
+      us-east-1` does NOT include the Prosperity lens — it has
+      not been imported. The operator still wants to associate
+      the lens and answer Prosperity questions.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "wellarchitected-prosperity"
+        - "import-lens"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: war-milestone-and-consolidated-report
+    description: Create a milestone after the review is complete and generate a PDF consolidated report
+    input: |
+      Scenario: An operator has finished a quarterly review of
+      workload "checkout-service" (id workload-abc123) in
+      us-east-1. All six base pillars plus Prosperity have
+      every question answered. The operator wants to create a
+      milestone named "2026-Q3-baseline" and generate a PDF
+      consolidated report. The caller holds
+      wellarchitected:CreateMilestone and
+      wellarchitected:GetConsolidatedReport.
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "create-milestone"
+        - "get-consolidated-report"
+        - "2026-Q3-baseline"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+
+  - id: war-trusted-advisor-integration
+    description: Integrate Trusted Advisor findings as evidence for cost optimization pillar answers without auto-answering
+    input: |
+      Scenario: An operator wants to integrate Trusted Advisor
+      findings into the cost optimization pillar review for
+      workload "checkout-service" (id workload-abc123) in
+      us-east-1. TA check LowUtilizationEC2Resources reports
+      three underutilized EC2 instances. The operator wants
+      these findings surfaced as evidence in the answer
+      rationale for the right-sizing question, but the
+      risk-tier selection must be confirmed by the operator,
+      not auto-set by TA.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "LowUtilizationEC2Resources"
+        - "costOptimization"
+        - "trustedadvisor"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "auto-answer"

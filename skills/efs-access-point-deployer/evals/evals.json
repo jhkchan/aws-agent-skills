@@ -1,0 +1,181 @@
+{
+  "skill": "efs-access-point-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the EFS Access Points Deployer. Five-case proven set exercising READY_TO_DEPLOY / PREREQUISITES_MISSING across access-point creation with POSIX identity, mount-target gaps, IAM enforcement with the AccessPointArn Deny, EKS CSI driver integration, and Lambda cross-AZ mount-target gaps. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "efs-ap-with-posix-identity",
+      "name": "EFS access point with POSIX identity, root directory, TLS",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — AP with PosixUser + RootDirectory + CreationInfo + TLS mount",
+      "prompt": "Create an EFS access point for file system fs-0abc123def (account 123456789012, region us-east-1). AP name: team-a-ap. Root directory path: /data/team-a with auto-creation (owner uid 1000, gid 1000, permissions 0750). POSIX user identity: uid 1000, gid 1000, secondary gids 2000. The file system has encryption at rest, bursting throughput, mount targets in use1-az1, use1-az2, use1-az3, and Intelligent-Tiering lifecycle (IA after 30 days). amazon-efs-utils is installed on the EC2 ASG. Include TLS encryption in transit.",
+      "prompt_file": "prompts/efs-ap-with-posix-identity.md",
+      "baseline_file": "baselines/efs-ap-with-posix-identity.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCESS_POINT: team-a-ap\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] File-system baseline: fs-0abc123def, Encrypted=true, ThroughputMode=bursting\n  [✓] Mount targets in every compute AZ: 3 AZs covered (use1-az1, use1-az2, use1-az3)\n  [✓] amazon-efs-utils installed on EC2 ASG\n  [✓] Access point created: team-a-ap (root: /data/team-a, uid: 1000, gid: 1000, perms: 0750)\n  [✓] File-system policy: Deny on Null:AccessPointArn + Allow through AP\n  [✓] Mount via AP alias with TLS: mount -t efs -o tls,accesspoint=<AP_ID>\n  [OPTIONAL] (ECS/EKS) Integration: not requested\n  [OPTIONAL] (Lambda) Function VPC + AP: not requested\n  [✓] Intelligent-Tiering lifecycle: TransitionTo IA after 30 days\nVERIFICATION_COMMANDS:\n  aws efs describe-access-points --file-system-id fs-0abc123def\n  aws efs describe-file-system-policy --file-system-id fs-0abc123def\n  aws efs describe-mount-targets --file-system-id fs-0abc123def\n  aws efs describe-lifecycle-configuration --file-system-id fs-0abc123def",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "team-a-ap",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "elasticfilesystem:AccessPointArn",
+            "tls",
+            "1000"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-mount-target-az",
+      "name": "Three compute AZs but only two mount targets — must flag gap",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — mount target absent in us-west-2c",
+      "prompt": "Create an EFS access point \"internal-logs-ap\" for file system fs-998877 in account 123456789012 region us-west-2. Compute runs in us-west-2a, us-west-2b, and us-west-2c, but I just checked and mount targets exist only in 2a and 2b. File system has encryption at rest. POSIX uid 1001, gid 1001, root path /logs. Add the IAM file-system policy that forces access-point-only mounts.",
+      "prompt_file": "prompts/missing-mount-target-az.md",
+      "baseline_file": "baselines/missing-mount-target-az.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ACCESS_POINT: internal-logs-ap\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓] File-system baseline: fs-998877, Encrypted=true\n  [✗] Mount targets in every compute AZ: us-west-2c has no mount target — create one in subnet-2c before proceeding\n  [✓] amazon-efs-utils: cannot verify until target host is selected\n  [✓] Access point created: internal-logs-ap (root: /logs, uid: 1001, gid: 1001)\n  [✗] File-system policy: blocked pending mount target gap\n  [✗] Mount via AP alias with TLS: blocked pending mount target\nVERIFICATION_COMMANDS:\n  aws efs describe-mount-targets --file-system-id fs-998877\n  aws ec2 describe-subnets --filters Name=availability-zone,Values=us-west-2c",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "internal-logs-ap",
+            "VERDICT",
+            "CHECKLIST",
+            "mount target",
+            "us-west-2c"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "iam-policy-access-point-enforcement",
+      "name": "IAM file-system policy with the Null:AccessPointArn Deny closing the DNS-name bypass",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Allow with AP ARN condition + Deny on Null:AccessPointArn",
+      "prompt": "Create an EFS access point \"prod-app-ap\" on fs-aaaabbbbcccc (account 123456789012, region us-east-1). POSIX identity uid 2000, gid 2000, root /app, perms 0750. Attach a file-system policy that enforces access-point-only mounts: allow ClientMount + ClientWrite + ClientRootAccess through the AP ARN condition, AND deny any mount that did NOT come through an access point. All three AZs have mount targets; amazon-efs-utils is installed on the EC2 hosts.",
+      "prompt_file": "prompts/iam-policy-access-point-enforcement.md",
+      "baseline_file": "baselines/iam-policy-access-point-enforcement.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCESS_POINT: prod-app-ap\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] File-system baseline: fs-aaaabbbbcccc\n  [✓] Mount targets in every compute AZ: 3 AZs covered\n  [✓] amazon-efs-utils installed\n  [✓] Access point created: prod-app-ap (root: /app, uid: 2000, gid: 2000, perms: 0750)\n  [✓] File-system policy: Allow with elasticfilesystem:AccessPointArn + Deny on Null:AccessPointArn\n  [✓] Mount via AP alias with TLS: mount -t efs -o tls,accesspoint=<AP_ID>\n  [OPTIONAL] (ECS/EKS) Integration: not requested\n  [OPTIONAL] (Lambda) Function VPC + AP: not requested\n  [✓] Intelligent-Tiering lifecycle: verify present\nVERIFICATION_COMMANDS:\n  aws efs describe-access-points --file-system-id fs-aaaabbbbcccc\n  aws efs describe-file-system-policy --file-system-id fs-aaaabbbbcccc",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-app-ap",
+            "VERDICT",
+            "CHECKLIST",
+            "Null",
+            "elasticfilesystem:AccessPointArn",
+            "ClientRootAccess",
+            "ClientWrite"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eks-csi-driver-dynamic-ap",
+      "name": "EKS EFS CSI driver with dynamic access-point provisioning and ClientRootAccess",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — CSI driver StorageClass with provisioningMode efs-ap + IRSA role including ClientRootAccess",
+      "prompt": "Set up EKS cluster \"prod-cluster\" to consume an existing EFS file system fs-ccccdddddddd (account 123456789012, region us-east-1) via the EFS CSI driver. I want dynamic access-point provisioning per PVC with directoryPerms 700 and gidRange 1000-2000. The CSI driver IRSA role is arn:aws:iam::123456789012:role/efs-csi-driver-role. Verify the IRSA role includes ClientRootAccess. Mount targets exist in all three AZs.",
+      "prompt_file": "prompts/eks-csi-driver-dynamic-ap.md",
+      "baseline_file": "baselines/eks-csi-driver-dynamic-ap.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCESS_POINT: efs-csi-dynamic\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] File-system baseline: fs-ccccdddddddd\n  [✓] Mount targets in every compute AZ: 3 AZs covered\n  [✓] EFS CSI driver installed on EKS prod-cluster\n  [✓] Access point mode: dynamic per PVC via provisioningMode efs-ap\n  [✓] File-system policy: verify IAM allows the IRSA role\n  [✓] Mount via CSI driver with access points\n  [✓] (ECS/EKS) Integration wired: EKS StorageClass efs-sc, directoryPerms 700, gidRange 1000-2000\n  [OPTIONAL] (Lambda) Function VPC + AP: not requested\n  [✓] IRSA role includes elasticfilesystem:ClientRootAccess\nVERIFICATION_COMMANDS:\n  kubectl get pods -n kube-system -l app=efs-csi-controller\n  kubectl get storageclass efs-sc\n  aws iam get-role-policy --role-name efs-csi-driver-role",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "efs-csi",
+            "VERDICT",
+            "CHECKLIST",
+            "provisioningMode",
+            "ClientRootAccess",
+            "efs-ap"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lambda-efs-cross-az",
+      "name": "Lambda EFS mount with subnets in two AZs but mount target in only one",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — Lambda subnet in use1-az2 has no corresponding mount target",
+      "prompt": "Configure Lambda function \"file-processor\" to mount EFS file system fs-eeeeffff0000 (account 123456789012, region us-east-1) via access point fsap-9999aaaa2222 at /mnt/efs. The function's VPC config has subnets in use1-az1 (subnet-aaa) and use1-az2 (subnet-bbb). I just checked and the EFS has a mount target only in use1-az1. The function execution role has ClientMount + ClientWrite + ClientRootAccess. Make sure the mount works in both AZs.",
+      "prompt_file": "prompts/lambda-efs-cross-az.md",
+      "baseline_file": "baselines/lambda-efs-cross-az.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ACCESS_POINT: fsap-9999aaaa2222\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓] File-system baseline: fs-eeeeffff0000\n  [✗] Mount targets in every compute AZ: use1-az2 has no mount target — Lambda cold starts in subnet-bbb will time out at 50s\n  [✓] Access point exists: fsap-9999aaaa2222\n  [✓] Lambda role includes ClientMount + ClientWrite + ClientRootAccess\n  [✗] (Lambda) Function VPC + AP: blocked pending mount target in use1-az2\nVERIFICATION_COMMANDS:\n  aws efs describe-mount-targets --file-system-id fs-eeeeffff0000\n  aws ec2 describe-subnets --subnet-ids subnet-bbb --query 'Subnets[0].AvailabilityZone'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "file-processor",
+            "VERDICT",
+            "CHECKLIST",
+            "use1-az2",
+            "mount target"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    }
+  ]
+}

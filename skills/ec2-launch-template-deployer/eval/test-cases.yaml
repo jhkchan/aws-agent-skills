@@ -1,0 +1,173 @@
+# Eval test cases for ec2-launch-template-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across IMDSv2 + tags +
+# Graviton, capacity reservation targeting, multi-volume block
+# devices, network interface with public IP + IPv6, and AMI
+# architecture mismatch.
+skill: ec2-launch-template-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: imdsv2-tags-graviton
+    description: >-
+      Provision a launch template for a Graviton web server with
+      IMDSv2 required, tag specifications on instance + volume +
+      network-interface, gp3 block devices, and IPv6 on the ENI.
+      Expects READY_TO_DEPLOY with all checklist items verified
+      including architecture match, IMDSv2 enforcement, and tag
+      specs.
+    input: |
+      Create a launch template named "graviton-web-server" in
+      us-east-1. AMI: ami-0abcdef1234567890 (arm64, AL2023).
+      Instance type: m7g.large. Key pair: prod-graviton-key.
+      Security groups: sg-0abc123, sg-0def456 (both in VPC
+      vpc-0abc123def). IAM instance profile: web-server-role
+      (role attached). Subnet: subnet-0abc123def456. Public IP:
+      yes. IPv6: 1 address. IMDSv2 required with hop limit 2
+      (containerized workload). Block devices: root 30 GB gp3
+      DeleteOnTermination true, secondary 100 GB gp3 6000 IOPS
+      DeleteOnTermination true. Tags on instance (Name=
+      graviton-web-server, Environment=production), volume
+      (Name=graviton-web-root), network-interface (Name=
+      graviton-web-eni-0). Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "HttpTokens=required"
+        - "arm64"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "gp3"
+        - "TagSpecifications"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: capacity-reservation-targeting
+    description: >-
+      Provision a launch template that targets a specific capacity
+      reservation by ID. Expects READY_TO_DEPLOY with the
+      CapacityReservationSpecification in the checklist and a
+      verification command for the reservation.
+    input: |
+      Create a launch template targeting capacity reservation
+      cr-0abc123def456 in us-east-1. AMI: ami-0xyz789 (x86_64,
+      AL2023). Instance type: c7i.large. The reservation
+      cr-0abc123def456 is active with InstanceType c7i.large,
+      AvailabilityZone us-east-1a, InstancePlatform Linux/UNIX.
+      Key pair: prod-key. Security group: sg-0resv123 (VPC
+      vpc-0abc123def). IAM profile: compute-role. Subnet:
+      subnet-0usEast1a. IMDSv2 required. Tags: Workload=
+      reservation-bound. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "CapacityReservationSpecification"
+        - "cr-0abc123def456"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "HttpTokens=required"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: multi-volume-block-device
+    description: >-
+      Provision a launch template with multiple EBS gp3 volumes with
+      tuned IOPS and throughput plus an instance store ephemeral
+      mapping on an m5d.large. Expects READY_TO_DEPLOY with all
+      volumes listed in the checklist.
+    input: |
+      Create a launch template for a data-processing worker on
+      m5d.large in us-east-1. AMI: ami-0dataworker (x86_64). Block
+      devices: root 50 GB gp3 3000 IOPS, data volume 500 GB gp3
+      12000 IOPS 500 MB/s throughput, and instance store ephemeral0
+      at /dev/sdb (m5d has NVMe). Key pair: data-key. Security
+      group: sg-0data (VPC vpc-0data). IAM profile: data-role.
+      Subnet: subnet-0data. IMDSv2 required hop limit 1. Tags:
+      Application=data-worker, Environment=production. Account:
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "gp3"
+        - "ephemeral0"
+        - "12000"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: network-interface-public-ip-ipv6
+    description: >-
+      Provision a launch template with a primary network interface
+      that has AssociatePublicIpAddress true and Ipv6AddressCount 1.
+      Expects READY_TO_DEPLOY with the ENI configuration in the
+      checklist, confirming public IP and IPv6.
+    input: |
+      Create a launch template for a public-facing API server in
+      us-east-1. AMI: ami-0apiimage (x86_64). Instance type:
+      c7i.xlarge. The instance needs a public IP and one IPv6
+      address on its primary ENI. Subnet: subnet-0public (has IPv6
+      CIDR). Security group: sg-0api (VPC vpc-0public). Key pair:
+      api-key. IAM profile: api-role. IMDSv2 required. Block device:
+      root 30 GB gp3 DeleteOnTermination true. Tags: Name=api-server,
+      Tier=public. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AssociatePublicIpAddress"
+        - "Ipv6"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "gp3"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: architecture-mismatch
+    description: >-
+      Operator requests a Graviton instance type (m7g.large) with an
+      x86_64 AMI. The template would create successfully but the
+      instance would fail to boot. Expects PREREQUISITES_MISSING
+      with the architecture mismatch cited.
+    input: |
+      Create a launch template named "web-server" in us-east-1.
+      AMI: ami-0x86image (x86_64, Amazon Linux 2023). Instance
+      type: m7g.large (Graviton). Key pair: web-key. Security
+      group: sg-0web (VPC vpc-0web). IAM profile: web-role.
+      Subnet: subnet-0web. IMDSv2 required. Tags: Name=web-server.
+      Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "architecture"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

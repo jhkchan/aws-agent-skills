@@ -1,0 +1,173 @@
+{
+  "skill": "emr-serverless-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the EMR Serverless Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across application creation (Spark and Hive, release label), pre-initialized capacity, maximum capacity, VPC access, IAM execution role scoping, job submission (entry point, arguments, configuration overrides), Spark Connect interactive endpoints, and prerequisite failure branches (missing execution role, missing VPC subnets for private-database jobs). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "spark-production-etl",
+      "name": "Production Spark ETL application with pre-initialized capacity, VPC, full config",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — full checklist with execution role, capacity, VPC, job submission",
+      "prompt": "Deploy a production EMR Serverless Spark application named \"etl-spark-prod\" in us-east-1. Release label emr-7.2.0. Execution role EMRServerlessExecRole with S3 GetObject on etl-scripts and raw-data buckets, S3 PutObject on curated and emr-logs-123456789012 buckets, Glue GetTable/GetDatabase, CloudWatch Logs, Secrets Manager GetSecretValue on etl/db-creds. Pre-initialized capacity: 50 workers, 4 vCPU / 16 GB each. Maximum capacity: 200 workers burst ceiling. VPC access: subnets subnet-aaa, subnet-bbb, security group sg-emr-prod. S3 log bucket s3://emr-logs-123456789012/etl-spark-prod/. CloudWatch log group /aws/emr-serverless/etl-spark-prod. Job: entry point s3://etl-scripts/daily_transform.py, args --source s3://raw-data/events/ --target s3://curated/events/ --date 2026-08-11. Spark config: AQE enabled, shuffle partitions 200, KryoSerializer. Auto-start enabled, auto-stop idle 15 min. Account: 123456789012.",
+      "prompt_file": "prompts/spark-production-etl.md",
+      "baseline_file": "baselines/spark-production-etl.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APPLICATION: etl-spark-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Application type — Spark, release label emr-7.2.0\n  [✓]      Execution role — arn:aws:iam::123456789012:role/EMRServerlessExecRole (S3, Glue, CloudWatch, Secrets Manager scoped)\n  [✓]      Pre-initialized capacity — 50 workers, 4 vCPU / 16 GB each\n  [✓]      Maximum capacity — 200 workers (burst ceiling)\n  [✓]      VPC access — subnets subnet-aaa, subnet-bbb, security groups sg-emr-prod\n  [✓]      S3 log bucket — s3://emr-logs-123456789012/etl-spark-prod/\n  [✓]      CloudWatch logging — enabled, log group /aws/emr-serverless/etl-spark-prod\n  [✓]      Job submission — entry point s3://etl-scripts/daily_transform.py, args --source s3://raw-data/events/ --target s3://curated/events/ --date 2026-08-11\n  [✓]      Configuration overrides — spark.sql.adaptive.enabled=true, spark.sql.shuffle.partitions=200, KryoSerializer\n  [✓]      Tags — Environment=production, Application=etl-spark\nVERIFICATION_COMMANDS:\n  aws emr-serverless get-application --application-id <app-id>\n  aws iam get-role --role-name EMRServerlessExecRole\n  aws s3 ls s3://emr-logs-123456789012/etl-spark-prod/\n  aws logs describe-log-groups --log-group-name-prefix /aws/emr-serverless/etl-spark-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "etl-spark-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "execution role"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hive-batch-application",
+      "name": "Production Hive batch application for legacy HiveQL with Tez engine",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Hive application, cold start, Glue catalog, Tez",
+      "prompt": "Deploy a production EMR Serverless Hive application named \"hive-batch-prod\" in us-east-1. Release label emr-7.2.0. Execution role EMRHiveExecRole with S3 GetObject on hive-scripts bucket, S3 PutObject on emr-logs-123456789012, Glue GetTable/GetDatabase/GetPartitions. No pre-initialized capacity (cold start acceptable for nightly batch). Maximum capacity: 50 workers. No VPC access needed (Glue catalog only). S3 log bucket s3://emr-logs-123456789012/hive-batch/. CloudWatch log group /aws/emr-serverless/hive-batch-prod. Job: HiveQL query SELECT COUNT(*) FROM sales WHERE dt = '2026-08-11', init script s3://hive-scripts/hive-init.sql, Tez engine. Auto-start enabled, auto-stop idle 5 min. Account: 123456789012.",
+      "prompt_file": "prompts/hive-batch-application.md",
+      "baseline_file": "baselines/hive-batch-application.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APPLICATION: hive-batch-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Application type — Hive, release label emr-7.2.0\n  [✓]      Execution role — arn:aws:iam::123456789012:role/EMRHiveExecRole (S3, Glue scoped)\n  [✓]      Pre-initialized capacity — none (cold start for nightly batch)\n  [✓]      Maximum capacity — 50 workers (burst ceiling)\n  [✓]      VPC access — not required (Glue catalog only)\n  [✓]      S3 log bucket — s3://emr-logs-123456789012/hive-batch/\n  [✓]      CloudWatch logging — enabled, log group /aws/emr-serverless/hive-batch-prod\n  [✓]      Job submission — HiveQL SELECT COUNT(*) FROM sales, init script s3://hive-scripts/hive-init.sql, Tez engine\n  [✓]      Tags — Environment=production, Application=hive-batch\nVERIFICATION_COMMANDS:\n  aws emr-serverless get-application --application-id <app-id>\n  aws iam get-role --role-name EMRHiveExecRole\n  aws s3 ls s3://emr-logs-123456789012/hive-batch/\n  aws logs describe-log-groups --log-group-name-prefix /aws/emr-serverless/hive-batch-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "hive-batch-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "Hive"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-execution-role",
+      "name": "Spark application with no execution role provided",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — execution role required for runtime AWS API calls",
+      "prompt": "Deploy an EMR Serverless Spark application named \"report-spark-prod\" in us-east-1. Release label emr-7.2.0. Execution role: NONE PROVIDED (the operator forgot to create the IAM role). Pre-initialized capacity: 20 workers. Maximum capacity: 100 workers. VPC access: subnets subnet-aaa, subnet-bbb, security group sg-emr-prod. S3 log bucket s3://emr-logs-123456789012/report/. Job: entry point s3://etl-scripts/report.py, args --source s3://raw-data/sales/ --target s3://curated/sales/. Account: 123456789012.",
+      "prompt_file": "prompts/missing-execution-role.md",
+      "baseline_file": "baselines/missing-execution-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "APPLICATION: report-spark-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗]      Execution role — REQUIRED but NONE PROVIDED. The execution role is assumed by the EMR Serverless application for all runtime AWS API calls (S3 reads/writes, Glue catalog, CloudWatch logging). Without it, the job fails with AccessDeniedException on the first S3 operation. Create a role trusting emr-serverless.amazonaws.com with scoped S3/Glue/CloudWatch permissions.\n  [✓]      Application type — Spark, release label emr-7.2.0\n  [✓]      Pre-initialized capacity — 20 workers\n  [✓]      Maximum capacity — 100 workers\nVERIFICATION_COMMANDS:\n  aws iam get-role --role-name EMRServerlessExecRole\n  aws emr-serverless get-application --application-id <app-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "report-spark-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "execution role"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spark-connect-interactive",
+      "name": "Spark application with Spark Connect interactive endpoint for notebooks",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Spark Connect, pre-initialized capacity, interactive auto-stop",
+      "prompt": "Deploy a production EMR Serverless Spark application named \"analytics-spark-prod\" in us-east-1. Release label emr-7.2.0. Execution role EMRAnalyticsExecRole with S3 GetObject on curated bucket, Glue GetTable/GetDatabase, CloudWatch Logs. Pre-initialized capacity: 10 workers, 4 vCPU / 16 GB each. Maximum capacity: 100 workers. VPC access: subnets subnet-aaa, subnet-bbb, subnet-ccc, security group sg-emr-analytics. S3 log bucket s3://emr-logs-123456789012/analytics/. CloudWatch log group /aws/emr-serverless/analytics-spark-prod. Interactive endpoint: Spark Connect for Jupyter notebooks. Auto-start enabled, auto-stop idle 60 min (interactive workload). Account: 123456789012.",
+      "prompt_file": "prompts/spark-connect-interactive.md",
+      "baseline_file": "baselines/spark-connect-interactive.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APPLICATION: analytics-spark-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Application type — Spark, release label emr-7.2.0\n  [✓]      Execution role — arn:aws:iam::123456789012:role/EMRAnalyticsExecRole (S3, Glue, CloudWatch scoped)\n  [✓]      Pre-initialized capacity — 10 workers, 4 vCPU / 16 GB each\n  [✓]      Maximum capacity — 100 workers (burst ceiling)\n  [✓]      VPC access — subnets subnet-aaa, subnet-bbb, subnet-ccc, security groups sg-emr-analytics\n  [✓]      S3 log bucket — s3://emr-logs-123456789012/analytics/\n  [✓]      CloudWatch logging — enabled, log group /aws/emr-serverless/analytics-spark-prod\n  [✓]      Tags — Environment=production, Application=analytics\n  [✓]      Interactive endpoint — Spark Connect for Jupyter notebooks (billed per-second, auto-stop 60 min)\nVERIFICATION_COMMANDS:\n  aws emr-serverless get-application --application-id <app-id>\n  aws iam get-role --role-name EMRAnalyticsExecRole\n  aws s3 ls s3://emr-logs-123456789012/analytics/\n  aws logs describe-log-groups --log-group-name-prefix /aws/emr-serverless/analytics-spark-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "analytics-spark-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Spark Connect"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-vpc-subnets",
+      "name": "Spark job reading from private Aurora PostgreSQL without VPC subnets",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — VPC subnets required for private database access",
+      "prompt": "Deploy an EMR Serverless Spark application named \"db-spark-prod\" in us-east-1. Release label emr-7.2.0. Execution role EMRDbExecRole with S3 GetObject on etl-scripts, Secrets Manager GetSecretValue on etl/db-creds. Pre-initialized capacity: 30 workers. Maximum capacity: 100 workers. The Spark job reads from a private Aurora PostgreSQL cluster at db.cluster-xxx.us-east-1.rds.amazonaws.com in private subnets subnet-aaa, subnet-bbb. NO VPC SUBNETS OR SECURITY GROUPS CONFIGURED. S3 log bucket s3://emr-logs-123456789012/db-spark/. Job: entry point s3://etl-scripts/db_read.py, args --jdbc-url jdbc:postgresql://db.cluster-xxx.us-east-1.rds.amazonaws.com:5432/analytics --secret etl/db-creds. Account: 123456789012.",
+      "prompt_file": "prompts/missing-vpc-subnets.md",
+      "baseline_file": "baselines/missing-vpc-subnets.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "APPLICATION: db-spark-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Application type — Spark, release label emr-7.2.0\n  [✓]      Execution role — arn:aws:iam::123456789012:role/EMRDbExecRole (S3, Secrets Manager scoped)\n  [✓]      Pre-initialized capacity — 30 workers\n  [✗]      VPC access — REQUIRED for private Aurora PostgreSQL at db.cluster-xxx.us-east-1.rds.amazonaws.com. The job reads from a private database but NO VPC subnets or security groups are configured. Without VPC access, the job fails with ConnectionTimeoutException after the socket timeout. Configure network-configuration with subnets subnet-aaa, subnet-bbb and a security group allowing outbound 5432.\nVERIFICATION_COMMANDS:\n  aws emr-serverless get-application --application-id <app-id>\n  aws ec2 describe-subnets --subnet-ids subnet-aaa subnet-bbb",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "db-spark-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VPC"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+# Eval configuration for wellarchitected-review-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: wellarchitected-review-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: war-create-workload-all-pillars
+    difficulty: hard
+    prompt_file: prompts/war-create-workload-all-pillars.md
+    baseline_file: baselines/war-create-workload-all-pillars.md
+    expected_verdict: READY
+  - id: war-answer-security-pillar-high-risk
+    difficulty: hard
+    prompt_file: prompts/war-answer-security-pillar-high-risk.md
+    baseline_file: baselines/war-answer-security-pillar-high-risk.md
+    expected_verdict: READY
+  - id: war-blocked-lens-not-imported
+    difficulty: medium
+    prompt_file: prompts/war-blocked-lens-not-imported.md
+    baseline_file: baselines/war-blocked-lens-not-imported.md
+    expected_verdict: BLOCKED
+  - id: war-milestone-and-consolidated-report
+    difficulty: hard
+    prompt_file: prompts/war-milestone-and-consolidated-report.md
+    baseline_file: baselines/war-milestone-and-consolidated-report.md
+    expected_verdict: COMPLETED
+  - id: war-trusted-advisor-integration
+    difficulty: hard
+    prompt_file: prompts/war-trusted-advisor-integration.md
+    baseline_file: baselines/war-trusted-advisor-integration.md
+    expected_verdict: READY

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-rum-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch RUM Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "rum-cdn-static-site-enable",
+      "name": "Create a RUM app monitor and inject the CDN SDK on a static marketing site (errors, performance, http, 100% sample rate)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/rum-cdn-static-site-enable.md",
+      "baseline_file": "baselines/rum-cdn-static-site-enable.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "create-app-monitor", "SessionSampleRate", "checkout.example.com", "VERDICT", "AllowedOrigins"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "PREREQUISITES_MISSING", "AccessKey"]
+        }
+      ]
+    },
+    {
+      "id": "rum-npm-spa-with-xray",
+      "name": "Inject the aws-rum-web npm SDK in a React SPA with X-Ray trace correlation enabled, cookie domain set, guest role wired via Cognito",
+      "difficulty": "hard",
+      "prompt_file": "prompts/rum-npm-spa-with-xray.md",
+      "baseline_file": "baselines/rum-npm-spa-with-xray.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "aws-rum-web", "AwsRum", "enableXRay", "cookieDomain", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "PREREQUISITES_MISSING", "AccessKey"]
+        }
+      ]
+    },
+    {
+      "id": "rum-blocked-domain-missing-from-allowlist",
+      "name": "PREREQUISITES_MISSING because the production subdomain is not in the app monitor AllowedOrigins",
+      "difficulty": "medium",
+      "prompt_file": "prompts/rum-blocked-domain-missing-from-allowlist.md",
+      "baseline_file": "baselines/rum-blocked-domain-missing-from-allowlist.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "AllowedOrigins", "checkout-beta.example.com", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "rum-custom-events-and-custom-metrics",
+      "name": "Record a checkout_complete custom event and configure a RUM custom metric (CartValueTotal) in the AWS/RUM namespace",
+      "difficulty": "hard",
+      "prompt_file": "prompts/rum-custom-events-and-custom-metrics.md",
+      "baseline_file": "baselines/rum-custom-events-and-custom-metrics.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "recordEvent", "checkout_complete", "put-metrics-destination", "AWS/RUM", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "PREREQUISITES_MISSING", "checkout-complete"]
+        }
+      ]
+    },
+    {
+      "id": "rum-application-signals-correlation-gap",
+      "name": "PREREQUISITES_MISSING because Application Signals correlation is desired but the server has no discovered service and X-Ray sampling is 0%",
+      "difficulty": "medium",
+      "prompt_file": "prompts/rum-application-signals-correlation-gap.md",
+      "baseline_file": "baselines/rum-application-signals-correlation-gap.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "Application Signals", "FixedRate", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

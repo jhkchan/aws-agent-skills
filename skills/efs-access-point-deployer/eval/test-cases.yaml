@@ -1,0 +1,163 @@
+# Eval test cases for efs-access-point-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across access-point creation, mount-target gaps, IAM
+# enforcement, EKS CSI driver integration, and Lambda cross-AZ mounts.
+skill: efs-access-point-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: efs-ap-with-posix-identity
+    description: >-
+      Provision an EFS Access Point with explicit POSIX identity
+      (uid/gid), root directory auto-creation, and directory
+      permissions. File system exists with encryption, mount targets
+      in all 3 AZs, amazon-efs-utils installed. Expects READY_TO_DEPLOY.
+    input: |
+      Create an EFS access point for file system fs-0abc123def
+      (account 123456789012, region us-east-1). AP name:
+      "team-a-ap". Root directory path: /data/team-a with auto-creation
+      (owner uid 1000, gid 1000, permissions 0750). POSIX user
+      identity: uid 1000, gid 1000, secondary gids 2000. The file
+      system has encryption at rest, bursting throughput, mount
+      targets in use1-az1, use1-az2, use1-az3, and Intelligent-Tiering
+      lifecycle (IA after 30 days). amazon-efs-utils is installed on
+      the EC2 ASG. Include TLS encryption in transit.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "team-a-ap"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "elasticfilesystem:AccessPointArn"
+        - "tls"
+        - "1000"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-mount-target-az
+    description: >-
+      Three compute AZs but only two mount targets. Must flag the
+      mount-target gap and return PREREQUISITES_MISSING.
+    input: |
+      Create an EFS access point "internal-logs-ap" for file system
+      fs-998877 in account 123456789012 region us-west-2. Compute
+      runs in us-west-2a, us-west-2b, and us-west-2c, but I just
+      checked and mount targets exist only in 2a and 2b. File system
+      has encryption at rest. POSIX uid 1001, gid 1001, root path
+      /logs. Add the IAM file-system policy that forces
+      access-point-only mounts.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "internal-logs-ap"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "mount target"
+        - "us-west-2c"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: iam-policy-access-point-enforcement
+    description: >-
+      Provision an EFS access point and a file-system policy that
+      blocks the DNS-name bypass via the Null:AccessPointArn Deny.
+      Must include both Allow (with AccessPointArn condition) and
+      the Deny statement. Expects READY_TO_DEPLOY.
+    input: |
+      Create an EFS access point "prod-app-ap" on fs-aaaabbbbcccc
+      (account 123456789012, region us-east-1). POSIX identity uid
+      2000, gid 2000, root /app, perms 0750. Attach a file-system
+      policy that enforces access-point-only mounts: allow
+      ClientMount + ClientWrite + ClientRootAccess through the AP
+      ARN condition, AND deny any mount that did NOT come through an
+      access point. All three AZs have mount targets;
+      amazon-efs-utils is installed on the EC2 hosts.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "prod-app-ap"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "Null"
+        - "elasticfilesystem:AccessPointArn"
+        - "ClientRootAccess"
+        - "ClientWrite"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: eks-csi-driver-dynamic-ap
+    description: >-
+      Configure an EKS cluster to use EFS via the CSI driver with
+      dynamic access-point provisioning. Must include the IRSA role
+      with ClientRootAccess and the StorageClass with
+      provisioningMode: efs-ap. Expects READY_TO_DEPLOY.
+    input: |
+      Set up EKS cluster "prod-cluster" to consume an existing EFS
+      file system fs-ccccdddddddd (account 123456789012, region
+      us-east-1) via the EFS CSI driver. I want dynamic access-point
+      provisioning per PVC with directoryPerms 700 and gidRange
+      1000-2000. The CSI driver IRSA role is
+      arn:aws:iam::123456789012:role/efs-csi-driver-role. Verify the
+      IRSA role includes ClientRootAccess. Mount targets exist in
+      all three AZs.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "efs-csi"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "provisioningMode"
+        - "ClientRootAccess"
+        - "efs-ap"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: lambda-efs-cross-az
+    description: >-
+      Lambda function configured with subnets in two AZs but the EFS
+      has a mount target in only one. Must flag the cross-AZ gap and
+      return PREREQUISITES_MISSING.
+    input: |
+      Configure Lambda function "file-processor" to mount EFS file
+      system fs-eeeeffff0000 (account 123456789012, region
+      us-east-1) via access point fsap-9999aaaa2222 at
+      /mnt/efs. The function's VPC config has subnets in use1-az1
+      (subnet-aaa) and use1-az2 (subnet-bbb). I just checked and the
+      EFS has a mount target only in use1-az1. The function execution
+      role has ClientMount + ClientWrite + ClientRootAccess. Make
+      sure the mount works in both AZs.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "file-processor"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "use1-az2"
+        - "mount target"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"

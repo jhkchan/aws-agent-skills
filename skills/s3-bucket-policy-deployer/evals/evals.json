@@ -1,0 +1,179 @@
+{
+  "skill": "s3-bucket-policy-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the S3 Bucket Policy Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across HTTPS-only enforcement (aws:SecureTransport with Bool), cross-account access with ExternalId, VPC-endpoint-only restriction (aws:SourceVpce), CloudFront OAC policy, and policy size limit exceeded. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "https-only-secure-transport",
+      "name": "HTTPS-only bucket policy with aws:SecureTransport Bool Deny",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — aws:SecureTransport with Bool operator (not StringNotEquals), BucketOwnerEnforced, BPA all 4 True",
+      "prompt": "Attach an HTTPS-only policy to bucket \"prod-app-data\" in us-east-1 (account 123456789012). Deny all non-HTTPS S3 traffic. Also disable ACLs with BucketOwnerEnforced and enable Block Public Access (all 4 settings). Bucket exists and has no existing policy.",
+      "prompt_file": "prompts/https-only-secure-transport.md",
+      "baseline_file": "baselines/https-only-secure-transport.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUCKET_POLICY: prod-app-data (1 statement, 0.5 KB)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Bucket exists: prod-app-data\n  [✓] Policy version: 2012-10-17\n  [✓] Policy size: 0.5 KB (< 20 KB limit)\n  [✓] HTTPS-only (aws:SecureTransport Deny with Bool): present\n  [✓] ACLs disabled: BucketOwnerEnforced\n  [✓] Block Public Access: all 4 settings True\nVERIFICATION_COMMANDS:\n  aws s3api get-bucket-policy --bucket prod-app-data\n  aws s3api get-public-access-block --bucket prod-app-data\n  aws s3api get-bucket-ownership-controls --bucket prod-app-data",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws:SecureTransport",
+            "Bool",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "BucketOwnerEnforced"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "StringNotEquals",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-external-id",
+      "name": "Cross-account S3 access with ExternalId condition",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — partner role ARN principal, shared/ prefix, aws:ExternalId condition, HTTPS-only Deny present",
+      "prompt": "Grant partner account 998877665544 read access (GetObject + ListBucket) to the \"shared/\" prefix on bucket \"prod-shared-data\" in us-east-1 (account 123456789012). Use ExternalId \"partner-ext-abc123\" to prevent the confused-deputy problem. HTTPS-only Deny should also be present. Bucket exists, ACLs disabled, BPA enabled.",
+      "prompt_file": "prompts/cross-account-external-id.md",
+      "baseline_file": "baselines/cross-account-external-id.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUCKET_POLICY: prod-shared-data (2 statements, 1.2 KB)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Bucket exists: prod-shared-data\n  [✓] Policy version: 2012-10-17\n  [✓] Policy size: 1.2 KB (< 20 KB limit)\n  [✓] HTTPS-only (aws:SecureTransport Deny with Bool): present\n  [✓] Cross-account: 998877665544 (arn:aws:iam::998877665544:role/PartnerRole, external-id: partner-ext-abc123)\n  [✓] ACLs disabled: BucketOwnerEnforced\n  [✓] Block Public Access: all 4 settings True\nVERIFICATION_COMMANDS:\n  aws s3api get-bucket-policy --bucket prod-shared-data\n  aws s3api get-public-access-block --bucket prod-shared-data",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws:ExternalId",
+            "998877665544",
+            "VERDICT",
+            "CHECKLIST",
+            "shared/"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vpc-endpoint-only-access",
+      "name": "VPC-endpoint-only bucket policy with aws:SourceVpce Deny",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — StringNotEquals Deny on aws:SourceVpce vpce-0abc123def456, blocks all non-endpoint traffic",
+      "prompt": "Restrict bucket \"internal-data\" in us-east-1 (account 123456789012) to only allow access through VPC endpoint vpce-0abc123def456. Deny all traffic that does not come from this endpoint. The bucket already has HTTPS-only enforced and BPA enabled.",
+      "prompt_file": "prompts/vpc-endpoint-only-access.md",
+      "baseline_file": "baselines/vpc-endpoint-only-access.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUCKET_POLICY: internal-data (1 statement, 0.6 KB)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Bucket exists: internal-data\n  [✓] Policy version: 2012-10-17\n  [✓] Policy size: 0.6 KB (< 20 KB limit)\n  [✓] VPC-endpoint-only (aws:SourceVpce): vpce-0abc123def456\n  [✓] Block Public Access: all 4 settings True\nVERIFICATION_COMMANDS:\n  aws s3api get-bucket-policy --bucket internal-data\n  aws ec2 describe-vpc-endpoints --vpc-endpoint-ids vpce-0abc123def456",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws:SourceVpce",
+            "vpce-0abc123def456",
+            "VERDICT",
+            "CHECKLIST",
+            "StringNotEquals"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cloudfront-oac-policy",
+      "name": "CloudFront OAC bucket policy with AWS:SourceArn condition",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — cloudfront.amazonaws.com service principal, AWS:SourceArn condition, OAC config verified",
+      "prompt": "Set up a CloudFront OAC bucket policy for bucket \"cdn-origin-assets\" in us-east-1 (account 123456789012). CloudFront distribution ARN: arn:aws:cloudfront::123456789012:distribution/E123ABCDEF456. Allow s3:GetObject on all objects. The OAC config already exists in CloudFront. HTTPS-only Deny should also be present. ACLs disabled, BPA enabled.",
+      "prompt_file": "prompts/cloudfront-oac-policy.md",
+      "baseline_file": "baselines/cloudfront-oac-policy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BUCKET_POLICY: cdn-origin-assets (2 statements, 1.0 KB)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Bucket exists: cdn-origin-assets\n  [✓] Policy version: 2012-10-17\n  [✓] Policy size: 1.0 KB (< 20 KB limit)\n  [✓] HTTPS-only (aws:SecureTransport Deny with Bool): present\n  [✓] CloudFront OAC: distribution arn:aws:cloudfront::123456789012:distribution/E123ABCDEF456\n  [✓] ACLs disabled: BucketOwnerEnforced\n  [✓] Block Public Access: all 4 settings True\nVERIFICATION_COMMANDS:\n  aws s3api get-bucket-policy --bucket cdn-origin-assets\n  aws cloudfront get-origin-access-control --id E123ABCDEF456",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cloudfront.amazonaws.com",
+            "AWS:SourceArn",
+            "E123ABCDEF456",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "canonical user",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy-size-limit-exceeded",
+      "name": "Bucket policy exceeding 20 KB size limit",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — policy JSON is 24 KB, exceeds the 20 KB S3 bucket policy limit; Access Points recommended",
+      "prompt": "Attach a bucket policy to bucket \"large-policy-bucket\" in us-east-1 (account 123456789012). The policy JSON file is 24 KB (exceeds the 20 KB S3 limit). It contains per-team Allow statements for 15 teams. The bucket exists with BPA enabled.",
+      "prompt_file": "prompts/policy-size-limit-exceeded.md",
+      "baseline_file": "baselines/policy-size-limit-exceeded.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BUCKET_POLICY: large-policy-bucket (24 KB)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Policy size: 24 KB exceeds 20 KB limit — use S3 Access Points to split per-team policies into separate AP policy documents\n  [✓] Bucket exists: large-policy-bucket\n  [✓] Block Public Access: enabled\nVERIFICATION_COMMANDS:\n  wc -c policy.json\n  aws s3api get-bucket-policy --bucket large-policy-bucket",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "VERDICT",
+            "CHECKLIST",
+            "20 KB"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

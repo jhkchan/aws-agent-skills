@@ -1,0 +1,175 @@
+{
+  "skill": "redshift-serverless-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Redshift Serverless Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across namespace creation (DB name, admin credentials, KMS encryption, VPC security groups), workgroup creation (base RPU, subnet group, public access, enhanced VPC routing), usage limits, Data API, query editor v2, cross-Region snapshots, and cost controls, plus prerequisite failure branches (missing security group inbound for port 5439, missing customer-managed KMS key). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-namespace-workgroup",
+      "name": "Production namespace + workgroup with KMS, Secrets Manager, usage limits, Data API",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — full checklist with namespace, workgroup, usage limits, Data API",
+      "prompt": "Deploy a production Redshift Serverless namespace named \"analytics-ns-prod\" and workgroup \"analytics-wg-prod\" in us-east-1. Database name dev, admin user admin with Secrets Manager secret redshift/admin. Customer-managed KMS key alias/redshift-prod. Namespace IAM role RedshiftNSRole with S3 GetObject on ingest-bucket and Glue GetTable. Subnet group redshift-subnet-group spanning subnet-aaa, subnet-bbb, subnet-ccc across us-east-1a/b/c. Security group sg-redshift-prod with inbound 5439 from sg-analytics-app. Workgroup base capacity 128 RPU, public access disabled, enhanced VPC routing enabled, Data API enabled, query editor v2 associated. Usage limits: daily 500 RPU-hours (log), monthly 12000 RPU-hours (emit-metric). Log exports: userlog, connectionlog, useractivitylog. Account: 123456789012.",
+      "prompt_file": "prompts/production-namespace-workgroup.md",
+      "baseline_file": "baselines/production-namespace-workgroup.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WORKGROUP: analytics-wg-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Namespace — analytics-ns-prod, database dev, admin user admin\n  [✓]      Admin credentials — Secrets Manager secret redshift/admin\n  [✓]      KMS encryption — customer-managed key alias/redshift-prod (encryption enabled)\n  [✓]      IAM roles — RedshiftNSRole (S3 GetObject on ingest-bucket, Glue GetTable)\n  [✓]      VPC security groups — sg-redshift-prod (inbound 5439 from sg-analytics-app)\n  [✓]      Workgroup — analytics-wg-prod, base capacity 128 RPU\n  [✓]      Subnet group — redshift-subnet-group (3 subnets across 3 AZs)\n  [✓]      Public access — disabled\n  [✓]      Enhanced VPC routing — enabled\n  [✓]      Usage limits — daily 500 RPU-hours (log), monthly 12000 RPU-hour budget (emit-metric)\n  [✓]      Data API — enabled\n  [✓]      Query editor v2 — associated\n  [✓]      Log exports — userlog, connectionlog, useractivitylog\nVERIFICATION_COMMANDS:\n  aws redshift-serverless describe-workgroup --workgroup-name analytics-wg-prod\n  aws redshift-serverless describe-namespace --namespace-name analytics-ns-prod\n  aws redshift-serverless list-usage-limits\n  aws secretsmanager describe-secret --secret-id redshift/admin\n  aws kms describe-key --key-id alias/redshift-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "analytics-wg-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "enhanced VPC routing",
+            "usage limits"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-region-snapshots-dr",
+      "name": "Production namespace with scheduled snapshots and cross-Region copy to us-west-2",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — scheduled snapshots, cross-Region copy, destination-Region CMK",
+      "prompt": "Deploy a production Redshift Serverless namespace \"analytics-ns-prod\" and workgroup \"analytics-wg-prod\" in us-east-1. Database dev, admin user admin via Secrets Manager secret redshift/admin. Customer-managed KMS key alias/redshift-prod. Namespace IAM role RedshiftNSRole. Subnet group redshift-subnet-group across 3 AZs. Security group sg-redshift-prod with inbound 5439 from sg-analytics-app. Base capacity 128 RPU, public access disabled, enhanced VPC routing enabled, Data API enabled. Usage limits: daily 500 RPU-hours (log). Snapshots: automated every 8 hours, 7-day retention, cross-Region copy to us-west-2 with destination-Region KMS key alias/redshift-dr and snapshot copy grant analytics-copy-grant. Account: 123456789012.",
+      "prompt_file": "prompts/cross-region-snapshots-dr.md",
+      "baseline_file": "baselines/cross-region-snapshots-dr.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WORKGROUP: analytics-wg-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Namespace — analytics-ns-prod, database dev, admin user admin\n  [✓]      Admin credentials — Secrets Manager secret redshift/admin\n  [✓]      KMS encryption — customer-managed key alias/redshift-prod (encryption enabled)\n  [✓]      IAM roles — RedshiftNSRole\n  [✓]      VPC security groups — sg-redshift-prod (inbound 5439 from sg-analytics-app)\n  [✓]      Workgroup — analytics-wg-prod, base capacity 128 RPU\n  [✓]      Subnet group — redshift-subnet-group (3 subnets across 3 AZs)\n  [✓]      Public access — disabled\n  [✓]      Enhanced VPC routing — enabled\n  [✓]      Usage limits — daily 500 RPU-hours (log)\n  [✓]      Data API — enabled\n  [✓]      Snapshots — automated every 8 hours, 7-day retention, cross-Region copy to us-west-2 with KMS alias/redshift-dr\nVERIFICATION_COMMANDS:\n  aws redshift-serverless describe-workgroup --workgroup-name analytics-wg-prod\n  aws redshift-serverless describe-namespace --namespace-name analytics-ns-prod\n  aws redshift-serverless describe-scheduled-actions\n  aws kms describe-key --key-id alias/redshift-dr --region us-west-2",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "analytics-wg-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "cross-Region",
+            "us-west-2"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-security-group",
+      "name": "Security group without inbound port 5439 rule",
+      "difficulty": "hard",
+      "branch": "PREREQUISITES_MISSING — security group inbound rule required for database access",
+      "prompt": "Deploy a Redshift Serverless namespace \"analytics-ns-prod\" and workgroup \"analytics-wg-prod\" in us-east-1. Database dev, admin user admin via Secrets Manager secret redshift/admin. Customer-managed KMS key alias/redshift-prod. Subnet group redshift-subnet-group across subnet-aaa, subnet-bbb, subnet-ccc. Security group sg-redshift-prod with NO inbound rule for port 5439 (only outbound 443 to S3). Analytics application in sg-analytics-app needs JDBC access on port 5439. Base capacity 64 RPU, public access disabled, enhanced VPC routing enabled. Account: 123456789012.",
+      "prompt_file": "prompts/missing-security-group.md",
+      "baseline_file": "baselines/missing-security-group.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "WORKGROUP: analytics-wg-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Namespace — analytics-ns-prod, database dev, admin user admin\n  [✓]      Admin credentials — Secrets Manager secret redshift/admin\n  [✓]      KMS encryption — customer-managed key alias/redshift-prod (encryption enabled)\n  [✗]      VPC security groups — sg-redshift-prod has NO inbound rule for port 5439. The analytics application in sg-analytics-app cannot reach the workgroup via JDBC/ODBC. Add an inbound rule: port 5439, source sg-analytics-app.\n  [✓]      Workgroup — analytics-wg-prod, base capacity 64 RPU\n  [✓]      Subnet group — redshift-subnet-group (3 subnets)\nVERIFICATION_COMMANDS:\n  aws ec2 describe-security-groups --group-ids sg-redshift-prod --query 'SecurityGroups[0].IpPermissions[?FromPort==`5439`]'\n  aws redshift-serverless describe-workgroup --workgroup-name analytics-wg-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "analytics-wg-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "5439"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cost-controls-usage-limits",
+      "name": "BI workgroup with cost controls, usage limits, and CloudWatch monitoring",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — usage limits (daily + monthly), cost controls",
+      "prompt": "Deploy a production Redshift Serverless namespace \"bi-ns-prod\" and workgroup \"bi-wg-prod\" in us-east-1. Database reporting, admin user admin via Secrets Manager secret redshift/bi-admin. Customer-managed KMS key alias/redshift-bi. Namespace IAM role RedshiftBIRole with S3 GetObject on bi-ingest-bucket. Subnet group bi-subnet-group across 3 AZs. Security group sg-redshift-bi with inbound 5439 from sg-bi-tool. Base capacity 64 RPU, public access disabled, enhanced VPC routing enabled, Data API enabled. Usage limits: daily 200 RPU-hours (log), monthly 8000 RPU-hours (emit-metric). Log exports: userlog, connectionlog. No cross-Region snapshots needed. Account: 123456789012.",
+      "prompt_file": "prompts/cost-controls-usage-limits.md",
+      "baseline_file": "baselines/cost-controls-usage-limits.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WORKGROUP: bi-wg-prod\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓]      Namespace — bi-ns-prod, database reporting, admin user admin\n  [✓]      Admin credentials — Secrets Manager secret redshift/bi-admin\n  [✓]      KMS encryption — customer-managed key alias/redshift-bi (encryption enabled)\n  [✓]      IAM roles — RedshiftBIRole (S3 GetObject on bi-ingest-bucket)\n  [✓]      VPC security groups — sg-redshift-bi (inbound 5439 from sg-bi-tool)\n  [✓]      Workgroup — bi-wg-prod, base capacity 64 RPU\n  [✓]      Subnet group — bi-subnet-group (3 subnets across 3 AZs)\n  [✓]      Public access — disabled\n  [✓]      Enhanced VPC routing — enabled\n  [✓]      Usage limits — daily 200 RPU-hours (log), monthly 8000 RPU-hour budget (emit-metric)\n  [✓]      Data API — enabled\n  [✓]      Log exports — userlog, connectionlog\nVERIFICATION_COMMANDS:\n  aws redshift-serverless describe-workgroup --workgroup-name bi-wg-prod\n  aws redshift-serverless describe-namespace --namespace-name bi-ns-prod\n  aws redshift-serverless list-usage-limits\n  aws kms describe-key --key-id alias/redshift-bi",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "bi-wg-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "usage limits"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-kms-key",
+      "name": "Production namespace with CMK encryption requested but no KMS key provided",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — customer-managed KMS key required for production encryption",
+      "prompt": "Deploy a production Redshift Serverless namespace \"analytics-ns-prod\" and workgroup \"analytics-wg-prod\" in us-east-1. Database dev, admin user admin via Secrets Manager secret redshift/admin. Customer-managed KMS encryption required but NO KMS KEY PROVIDED (the operator forgot to create the CMK and did not supply an alias or ARN). Subnet group redshift-subnet-group across 3 AZs. Security group sg-redshift-prod with inbound 5439 from sg-analytics-app. Base capacity 128 RPU, public access disabled, enhanced VPC routing enabled. Cross-Region snapshots to us-west-2 planned. Account: 123456789012.",
+      "prompt_file": "prompts/missing-kms-key.md",
+      "baseline_file": "baselines/missing-kms-key.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "WORKGROUP: analytics-wg-prod\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✓]      Namespace — analytics-ns-prod, database dev, admin user admin\n  [✓]      Admin credentials — Secrets Manager secret redshift/admin\n  [✗]      KMS encryption — customer-managed key REQUIRED for production but NO key alias or ARN provided. The AWS-owned default key cannot be audited, rotated, or used for cross-Region snapshot copy. Create a CMK before deploying: aws kms create-key + aws kms create-alias --alias-name alias/redshift-prod.\n  [✓]      VPC security groups — sg-redshift-prod (inbound 5439 from sg-analytics-app)\nVERIFICATION_COMMANDS:\n  aws kms describe-key --key-id alias/redshift-prod\n  aws redshift-serverless describe-namespace --namespace-name analytics-ns-prod",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "analytics-wg-prod",
+            "VERDICT",
+            "CHECKLIST",
+            "KMS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable"
+          ]
+        }
+      ]
+    }
+  ]
+}

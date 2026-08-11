@@ -1,0 +1,200 @@
+# Eval test cases for apigateway-http-api-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: apigateway-http-api-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: lambda-proxy-jwt-cors
+    description: >-
+      Standard HTTP API (v2) with Lambda proxy integration, JWT
+      authorizer backed by Cognito, CORS configuration with explicit
+      origins and Authorization header, JSON access logging,
+      auto-deploy stage enabled, custom domain via ACM API mapping,
+      WAFv2 REGIONAL Web ACL. All checklist dimensions pass.
+    input: |
+      Design a deployment plan for a production HTTP API. Emit the
+      standard VERDICT block (API_SPEC, VERDICT, ARCHITECTURE,
+      CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - API type: HTTP (v2)
+      - Endpoint type: REGIONAL (us-east-1)
+      - Routes: GET /health [NONE], GET /users [JWT], POST /users [JWT],
+        GET /users/{userId} [JWT], ANY /{proxy+} [JWT]
+      - Integration: AWS_PROXY to Lambda user-service-handler
+      - Authorization: JWT, issuer
+        https://cognito-idp.us-east-1.amazonaws.com/us-east-1_abc/,
+        audience 1a2b3c4d
+      - CORS: allowOrigins=https://app.example.com,
+        allowMethods=GET,POST,OPTIONS,
+        allowHeaders=Authorization,Content-Type, allowCredentials=true,
+        maxAge=600
+      - Stage: '$default' with auto-deploy=true
+      - Access logging: JSON to CloudWatch log group
+        /aws/apigateway/prod-user-http
+      - Custom domain: api.example.com (ACM cert in us-east-1,
+        API mapping key empty)
+      - WAF: REGIONAL scope with CommonRuleSet + rate-based rule
+      - Throttle: 1000 rps / 500 burst default, 100/200 on POST /users
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "lambda-proxy-jwt-cors"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "AWS_PROXY"
+        - "JWT"
+        - "auto-deploy"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: step-functions-integration
+    description: >-
+      HTTP API with direct Step Functions START_SYNC_EXECUTION
+      integration (no Lambda in the path). Express Workflow triggered
+      synchronously by POST /orders. JWT authorizer protects the route.
+      Demonstrates the direct AWS integration contract.
+    input: |
+      Design a deployment plan for an HTTP API with a Step Functions
+      direct integration. Emit the standard VERDICT block.
+
+      Requirements:
+      - API type: HTTP (v2)
+      - Endpoint type: REGIONAL (us-east-1)
+      - Routes:
+        - GET /health [NONE]
+        - POST /orders [JWT] → Step Functions START_SYNC_EXECUTION
+          on Express Workflow orders-workflow
+        - ANY /{proxy+} [JWT] → Lambda proxy fallback
+      - State machine: arn:aws:states:us-east-1:111111111111:
+        stateMachine:orders-workflow
+      - JWT authorizer: Cognito issuer
+        https://cognito-idp.us-east-1.amazonaws.com/us-east-1_xyz/,
+        audience orders-client
+      - CORS: allowOrigins=https://shop.example.com,
+        allowMethods=GET,POST,OPTIONS,
+        allowHeaders=Authorization,Content-Type, allowCredentials=true
+      - Auto-deploy: true on '$default' stage
+      - Access logging: JSON to CloudWatch
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "step-functions-integration"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "STEP_FUNCTION"
+        - "StartSyncExecution"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: vpc-link-private-integration
+    description: >-
+      HTTP API with HTTP_PROXY via VPC link to an internal NLB for
+      private backend integration. AWS_IAM authorization for
+      service-to-service access. Demonstrates the VPC link contract
+      (subnets, security groups, NLB target).
+    input: |
+      Design a deployment plan for an HTTP API with a private backend
+      integration. Emit the standard VERDICT block.
+
+      Requirements:
+      - API type: HTTP (v2)
+      - Endpoint type: REGIONAL (us-east-1)
+      - Routes: GET /internal/health [NONE], GET /internal/orders
+        [AWS_IAM], POST /internal/orders [AWS_IAM]
+      - Integration: HTTP_PROXY via VPC link to NLB
+        prod-internal-nlb with HTTPS listener on 443
+      - VPC link: subnet-aaa, subnet-bbb (two AZs), security group
+        sg-egress-nlb
+      - Authorization: AWS_IAM (service-to-service)
+      - Access logging: JSON to CloudWatch
+      - WAF: REGIONAL with CommonRuleSet + KnownBadInputsRuleSet
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "vpc-link-private-integration"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VPC_LINK"
+        - "NLB"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-jwt-issuer
+    description: >-
+      JWT authorizer requested but the issuer URL is missing from
+      the spec. Cannot create the authorizer without it. Must emit
+      PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for an HTTP API. Emit the standard
+      VERDICT block.
+
+      Requirements:
+      - API type: HTTP (v2)
+      - Endpoint type: REGIONAL (us-east-1)
+      - Routes: GET /health [NONE], GET /users [JWT], POST /users [JWT]
+      - Integration: AWS_PROXY to Lambda users-handler
+      - Authorization: JWT (user did not specify the issuer URL or
+        audience — they expect the skill to flag this as missing)
+      - CORS: allowOrigins=https://app.example.com
+      - Stage: '$default' with auto-deploy=true
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-jwt-issuer"
+        - "VERDICT"
+        - "issuer"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: missing-integration-target
+    description: >-
+      Routes are defined but no integration target is specified.
+      Cannot produce a deployment plan without integration details.
+    input: |
+      Design a deployment plan for an HTTP API. Emit the standard
+      VERDICT block.
+
+      Requirements:
+      - API type: HTTP (v2)
+      - Endpoint type: REGIONAL (us-east-1)
+      - Routes: GET /health, GET /users, POST /users, GET /users/{id}
+      - Authorization: NONE for /health, JWT for the rest
+      - CORS: allowOrigins=https://app.example.com
+
+      The user did not specify: integration type (Lambda proxy, HTTP
+      proxy, VPC link, Step Functions, SQS, Kinesis) or any backend
+      target details.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "missing-integration-target"
+        - "VERDICT"
+        - "REQUIRED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

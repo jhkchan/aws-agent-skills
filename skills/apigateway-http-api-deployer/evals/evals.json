@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "apigateway-http-api-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the API Gateway HTTP API Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "lambda-proxy-jwt-cors",
+      "name": "Standard Lambda proxy HTTP API with Cognito JWT authorizer, CORS, auto-deploy, access logging — all checklist dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/lambda-proxy-jwt-cors.md",
+      "baseline_file": "baselines/lambda-proxy-jwt-cors.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "lambda-proxy-jwt-cors", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "AWS_PROXY", "JWT", "auto-deploy"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "step-functions-integration",
+      "name": "HTTP API with direct Step Functions START_SYNC_EXECUTION integration (no Lambda)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/step-functions-integration.md",
+      "baseline_file": "baselines/step-functions-integration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "step-functions-integration", "VERDICT", "CHECKLIST", "STEP_FUNCTION", "StartSyncExecution"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "vpc-link-private-integration",
+      "name": "HTTP API with HTTP_PROXY via VPC link to NLB for private backend integration",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpc-link-private-integration.md",
+      "baseline_file": "baselines/vpc-link-private-integration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "vpc-link-private-integration", "VERDICT", "CHECKLIST", "VPC_LINK", "NLB"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "missing-jwt-issuer",
+      "name": "JWT authorizer requested but no issuer URL — PREREQUISITES_MISSING",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-jwt-issuer.md",
+      "baseline_file": "baselines/missing-jwt-issuer.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-jwt-issuer", "VERDICT", "issuer"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "missing-integration-target",
+      "name": "Routes defined but no integration target — PREREQUISITES_MISSING",
+      "difficulty": "easy",
+      "prompt_file": "prompts/missing-integration-target.md",
+      "baseline_file": "baselines/missing-integration-target.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "missing-integration-target", "VERDICT", "REQUIRED"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

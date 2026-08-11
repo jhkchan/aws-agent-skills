@@ -1,0 +1,145 @@
+# Eval test cases for cloudwatch-rum-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-rum-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: rum-cdn-static-site-enable
+    description: Create a RUM app monitor and inject the CDN SDK on a static marketing site (errors, performance, http telemetries, 100% sample rate)
+    input: |
+      Scenario: An operator wants to enable CloudWatch RUM on
+      "checkout-web-prod" in us-east-1. The web app is served from
+      https://checkout.example.com (static HTML). The Cognito
+      identity pool us-east-1:abcd1234-efgh-5678 has an unauth
+      guest role "checkout-web-rum-guest" holding
+      rum:PutRumEvents on
+      arn:aws:rum:us-east-1:111122223333:appmonitor/checkout-web-prod.
+      The operator wants 100% session sampling, all three
+      telemetries (errors, performance, http), cookie domain
+      .example.com, and the CDN script tag integration.
+      Application version 1.0.0.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "create-app-monitor"
+        - "SessionSampleRate"
+        - "checkout.example.com"
+        - "VERDICT"
+        - "AllowedOrigins"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"
+        - "AccessKey"
+
+  - id: rum-npm-spa-with-xray
+    description: Inject the aws-rum-web npm SDK in a React SPA with X-Ray trace correlation enabled, cookie domain set, guest role wired via Cognito
+    input: |
+      Scenario: An operator wants to integrate CloudWatch RUM into
+      a React SPA "checkout-web" in us-east-1 via the
+      aws-rum-web npm package. The app monitor
+      "checkout-web-prod" already exists with EnableXRay=true
+      and AllowedOrigins=["https://app.example.com"]. The
+      server workload "checkout-api" is enabled for Application
+      Signals and the X-Ray Default sampling rule has
+      FixedRate=0.05. The operator wants cookie domain
+      .example.com, enableXRay=true in the SDK config, and the
+      npm constructor pattern. Identity pool
+      us-east-1:abcd1234-efgh-5678.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws-rum-web"
+        - "AwsRum"
+        - "enableXRay"
+        - "cookieDomain"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"
+        - "AccessKey"
+
+  - id: rum-blocked-domain-missing-from-allowlist
+    description: READY_TO_DEPLOY blocked because the production subdomain is not in the app monitor's AllowedOrigins
+    input: |
+      Scenario: An operator wants to deploy RUM on a new subdomain
+      https://checkout-beta.example.com. The app monitor
+      "checkout-web-prod" in us-east-1 has
+      AllowedOrigins=["https://checkout.example.com"] (no
+      beta subdomain). The guest role
+      arn:aws:iam::111122223333:role/checkout-web-rum-guest
+      holds rum:PutRumEvents on the app monitor ARN. The
+      operator wants to inject the SDK and expects telemetry
+      from the beta subdomain to flow.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "AllowedOrigins"
+        - "checkout-beta.example.com"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "READY_TO_DEPLOY"
+
+  - id: rum-custom-events-and-custom-metrics
+    description: Record a checkout_complete custom event and configure a RUM custom metric (CartValueTotal) extracted from event data into the AWS/RUM namespace
+    input: |
+      Scenario: An operator wants to track checkout funnel
+      completion in RUM on app monitor "checkout-web-prod"
+      (us-east-1). They want to record a custom event of type
+      "checkout_complete" with payload
+      {cartValue: 142.50, itemCount: 3, paymentMethod: "card"}
+      and then expose a CloudWatch custom metric
+      "CartValueTotal" in namespace AWS/RUM, extracted from
+      event.data.cartValue. The app monitor exists; the SDK is
+      already loaded via npm. The operator needs the
+      recordEvent call and the put-metrics-destination CLI.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "recordEvent"
+        - "checkout_complete"
+        - "put-metrics-destination"
+        - "AWS/RUM"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"
+        - "checkout-complete"
+
+  - id: rum-application-signals-correlation-gap
+    description: PREREQUISITES_MISSING because Application Signals correlation is desired but the server workload has no discovered service and X-Ray sampling is 0%
+    input: |
+      Scenario: An operator wants RUM to correlate client-side
+      sessions with server-side Application Signals for the
+      "checkout-api" service. The RUM app monitor
+      "checkout-web-prod" exists. However,
+      `aws application-signals list-services` returns an empty
+      list (Application Signals not yet enabled on the server
+      workload), and `aws xray get-sampling-rules` shows the
+      Default rule with FixedRate=0.0. The operator still wants
+      to enable RUM with client-side-only X-Ray tracing.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Application Signals"
+        - "FixedRate"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "READY_TO_DEPLOY"

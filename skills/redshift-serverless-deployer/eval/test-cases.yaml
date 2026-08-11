@@ -1,0 +1,184 @@
+# Eval test cases for redshift-serverless-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across namespace creation (DB name, admin credentials,
+# KMS encryption, VPC security groups), workgroup creation (base RPU,
+# subnet group, public access, enhanced VPC routing), usage limits,
+# Data API, query editor v2, cross-Region snapshots, and cost controls,
+# plus prerequisite failure branches (missing KMS key, missing VPC
+# security group with no port-5439 inbound).
+skill: redshift-serverless-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: production-namespace-workgroup
+    description: >-
+      Deploy a production Redshift Serverless namespace and workgroup
+      with customer-managed KMS encryption, Secrets Manager admin
+      credentials, namespace IAM role for COPY/UNLOAD, 3-AZ subnet
+      group, security group with port 5439 inbound, base capacity 128
+      RPU, enhanced VPC routing, Data API enabled, usage limits
+      (daily 500, monthly 12000 RPU-hours), and log exports. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Deploy a production Redshift Serverless namespace named
+      "analytics-ns-prod" and workgroup "analytics-wg-prod" in
+      us-east-1. Database name dev, admin user admin with Secrets
+      Manager secret redshift/admin. Customer-managed KMS key
+      alias/redshift-prod. Namespace IAM role RedshiftNSRole with
+      S3 GetObject on ingest-bucket and Glue GetTable. Subnet group
+      redshift-subnet-group spanning subnet-aaa, subnet-bbb,
+      subnet-ccc across us-east-1a/b/c. Security group sg-redshift-prod
+      with inbound 5439 from sg-analytics-app. Workgroup base capacity
+      128 RPU, public access disabled, enhanced VPC routing enabled,
+      Data API enabled, query editor v2 associated. Usage limits:
+      daily 500 RPU-hours (log), monthly 12000 RPU-hours
+      (emit-metric). Log exports: userlog, connectionlog,
+      useractivitylog. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "analytics-wg-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "enhanced VPC routing"
+        - "usage limits"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-region-snapshots-dr
+    description: >-
+      Deploy a production Redshift Serverless namespace and workgroup
+      with scheduled snapshots every 8 hours, 7-day retention, and
+      cross-Region snapshot copy to us-west-2 with a destination-Region
+      CMK alias/redshift-dr. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a production Redshift Serverless namespace "analytics-ns-prod"
+      and workgroup "analytics-wg-prod" in us-east-1. Database dev,
+      admin user admin via Secrets Manager secret redshift/admin.
+      Customer-managed KMS key alias/redshift-prod. Namespace IAM role
+      RedshiftNSRole. Subnet group redshift-subnet-group across 3 AZs.
+      Security group sg-redshift-prod with inbound 5439 from
+      sg-analytics-app. Base capacity 128 RPU, public access disabled,
+      enhanced VPC routing enabled, Data API enabled. Usage limits:
+      daily 500 RPU-hours (log). Snapshots: automated every 8 hours,
+      7-day retention, cross-Region copy to us-west-2 with
+      destination-Region KMS key alias/redshift-dr and snapshot copy
+      grant analytics-copy-grant. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "analytics-wg-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "cross-Region"
+        - "us-west-2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-security-group
+    description: >-
+      Deploy a Redshift Serverless namespace and workgroup but the
+      security group has no inbound rule for port 5439, so the Data API
+      and JDBC/ODBC clients cannot reach the workgroup. Expects
+      PREREQUISITES_MISSING — security group inbound rule required.
+    input: |
+      Deploy a Redshift Serverless namespace "analytics-ns-prod" and
+      workgroup "analytics-wg-prod" in us-east-1. Database dev, admin
+      user admin via Secrets Manager secret redshift/admin. Customer-
+      managed KMS key alias/redshift-prod. Subnet group
+      redshift-subnet-group across subnet-aaa, subnet-bbb, subnet-ccc.
+      Security group sg-redshift-prod with NO inbound rule for port
+      5439 (only outbound 443 to S3). Analytics application in
+      sg-analytics-app needs JDBC access on port 5439. Base capacity
+      64 RPU, public access disabled, enhanced VPC routing enabled.
+      Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "analytics-wg-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "5439"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: cost-controls-usage-limits
+    description: >-
+      Deploy a production Redshift Serverless namespace and workgroup
+      with usage limits (daily 200 RPU-hours log, monthly 8000
+      RPU-hours emit-metric) and a CloudWatch alarm on
+      ServerlessComputeCapacity. Expects READY_TO_DEPLOY.
+    input: |
+      Deploy a production Redshift Serverless namespace "bi-ns-prod"
+      and workgroup "bi-wg-prod" in us-east-1. Database reporting,
+      admin user admin via Secrets Manager secret redshift/bi-admin.
+      Customer-managed KMS key alias/redshift-bi. Namespace IAM role
+      RedshiftBIRole with S3 GetObject on bi-ingest-bucket. Subnet
+      group bi-subnet-group across 3 AZs. Security group sg-redshift-bi
+      with inbound 5439 from sg-bi-tool. Base capacity 64 RPU, public
+      access disabled, enhanced VPC routing enabled, Data API enabled.
+      Usage limits: daily 200 RPU-hours (log), monthly 8000 RPU-hours
+      (emit-metric). Log exports: userlog, connectionlog. No
+      cross-Region snapshots needed. Account: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "bi-wg-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "usage limits"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-kms-key
+    description: >-
+      Deploy a production Redshift Serverless namespace with customer-
+      managed KMS encryption but the CMK alias is not provided (the
+      operator forgot to create the key). Expects
+      PREREQUISITES_MISSING — CMK required for production encryption.
+    input: |
+      Deploy a production Redshift Serverless namespace "analytics-ns-prod"
+      and workgroup "analytics-wg-prod" in us-east-1. Database dev,
+      admin user admin via Secrets Manager secret redshift/admin.
+      Customer-managed KMS encryption required but NO KMS KEY PROVIDED
+      (the operator forgot to create the CMK and did not supply an
+      alias or ARN). Subnet group redshift-subnet-group across 3 AZs.
+      Security group sg-redshift-prod with inbound 5439 from
+      sg-analytics-app. Base capacity 128 RPU, public access disabled,
+      enhanced VPC routing enabled. Cross-Region snapshots to us-west-2
+      planned. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "analytics-wg-prod"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "KMS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
