@@ -1,0 +1,70 @@
+{
+  "skill": "ram-resource-share-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds genuine expert detail such as the full resource\u2011type/managed\u2011permission matrix, recent 2024\u20112026 feature changes (Organization ARN sharing, permission versioning, promotion API) and a decision matrix for RAM vs VPC peering. However, large portions merely restate standard RAM concepts and omit deep nuances for less\u2011common types (e.g., Glue, CodeBuild), so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific ordered procedure (resource\u2011type selection \u2192 principal selection \u2192 create share \u2192 associate permissions \u2192 add resources/principals \u2192 accept invitations) with concrete CLI snippets. Lacks some AWS\u2011specific procedural depth (e.g., using STS assume\u2011role for cross\u2011account shares, explicit IAM policy validation steps), so not a perfect 15."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete pitfalls (e.g., never set allowExternalPrincipals=true for intra\u2011Org shares, never share without validating principals) and explains why each is dangerous. Could include a few more edge\u2011cases, but overall strong."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter is complete, includes when_to_use, activation keywords, and a strict output contract with required labels. Slight vagueness in trigger phrasing and no explicit version field for the contract in metadata, so one point deducted."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "Uses quick\u2011navigation table and layers (high\u2011level contract, then detailed reasoning, matrix, CLI references). However, the initial sections are dense and embed critical anti\u2011pattern warnings deep in the document, causing potential cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Tightens freedom for destructive actions via a strict output contract and forbids extra prose. Yet it does not cap the number of resources/principals or warn about cost impact of large shares, leaving some leeway for risky operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (metadata \u2192 navigation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 matrix). Section naming is slightly ad\u2011hoc (e.g., \"Expert heuristic\" vs \"Reasoning framework\"), preventing a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Model output matches the strict checklist format, includes all required sections, and provides ready\u2011to\u2011run CLI commands. Missing: explicit error\u2011handling branches (e.g., what to do if a principal ARN is invalid) but overall an agent could execute successfully."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 38185,
+  "latency_ms": 12545,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

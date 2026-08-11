@@ -2,24 +2,17 @@
 name: route53-resolver-deployer
 description: >-
   Provisions Route 53 Resolver endpoints, forwarding rules, DNS Firewall,
-  and query logging configurations with secure networking defaults.
-  Supports inbound endpoints (on-prem DNS queries resolved by Route 53),
-  outbound endpoints (VPC conditional forwarding to on-prem DNS servers),
-  forwarding rules with rule associations to VPCs, Resolver DNS Firewall
-  (managed domain lists, custom domain lists, block/alert allow-override
-  actions), and Resolver query logging to CloudWatch Logs, S3, or Kinesis
-  Data Firehose. Runs pre-checks (subnet route table ownership, security
-  group ingress/egress on port 53, cross-account rule share VPC
-  associations, IAM route53resolver permissions, query log destination
-  ARN reachability), emits create-resolver-endpoint,
-  create-resolver-rule, associate-resolver-rule,
-  create-firewall-domain-list, create-firewall-rule,
-  create-firewall-rule-group-association, and put-resolver-query-log-config
-  CLIs behind a CONFIRM gate, verifies via get-resolver-endpoint and
-  list-resolver-rule-associations. Emits READY_TO_DEPLOY |
-  PREREQUISITES_MISSING. Use when provisioning Resolver inbound/outbound
-  endpoints, conditional forwarding rules, DNS Firewall policies, or
-  Resolver query logging.
+  and query logging with secure networking defaults. Supports inbound
+  endpoints (on-prem DNS to Route 53), outbound endpoints (VPC to
+  on-prem DNS), forwarding rules with VPC associations, Resolver DNS
+  Firewall (managed/custom domain lists, block/alert actions), and query
+  logging to CloudWatch, S3, or Kinesis. Runs pre-checks (subnet AZ
+  diversity, security group port 53 rules, IAM permissions, query log
+  destination policies), emits create-resolver-endpoint, create-resolver
+  -rule, create-firewall-rule, put-resolver-query-log-config CLIs behind
+  a CONFIRM gate, verifies via get-resolver-endpoint. Emits
+  READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when provisioning Resolver
+  endpoints, forwarding rules, DNS Firewall policies, or query logging.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

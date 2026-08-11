@@ -2,21 +2,19 @@
 name: ssm-patch-baseline-deployer
 description: >-
   Provisions SSM Patch Baselines with secure patch-management defaults —
-  baseline creation (operating system, product, classification, severity),
-  approval rules (auto-approve after N days, compliance severity level),
-  patch groups (tag-based targeting), patch baseline vs default AWS
-  baseline selection, maintenance window integration (register targets
-  and tasks), and custom repositories for Amazon Linux 2023, RHEL,
-  Ubuntu, Windows, and macOS. Runs pre-checks (operating system
-  validity, approval rule consistency, patch group tag key format, IAM
-  ssm:CreatePatchBaseline permission, instance role AmazonSSMManagedInstanceCore
-  attachment, maintenance window existence), emits create-patch-baseline,
-  register-patch-baseline-for-patch-group, register-target-with-maintenance-window,
-  and register-task-with-maintenance-window CLIs behind a CONFIRM gate,
-  verifies via describe-patch-baseline and describe-instance-patch-states.
-  Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating patch
-  baselines, configuring auto-approval rules, targeting patch groups,
-  or integrating with maintenance windows.
+  baseline creation (OS, product, classification, severity), approval
+  rules (auto-approve after N days, compliance level), patch groups
+  (tag-based targeting), default vs custom baseline selection,
+  maintenance window integration, and custom repositories for Amazon
+  Linux 2023, RHEL, Ubuntu, Windows, macOS. Runs pre-checks (OS
+  validity, product-OS matching, Patch Group tag key, instance role
+  AmazonSSMManagedInstanceCore, IAM permissions, maintenance window
+  task document), emits create-patch-baseline, register-patch-baseline
+  -for-patch-group, register-task-with-maintenance-window CLIs behind a
+  CONFIRM gate, verifies via describe-patch-baseline. Emits
+  READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating patch
+  baselines, configuring approval rules, targeting patch groups, or
+  integrating with maintenance windows.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

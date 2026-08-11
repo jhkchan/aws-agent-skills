@@ -186,26 +186,24 @@ the start.
 Three misconceptions dominate MemoryDB misdesign at provisioning time:
 
 - **"MemoryDB is just ElastiCache with a different name."** It is
-  not. ElastiCache is a cache (data is disposable, cache-miss is
-  acceptable, durability is optional). MemoryDB is a durable
-  database — it writes transactions to a Multi-AZ transaction log
-  before acknowledging, so a node failure does NOT lose committed
-  data. Pricing reflects this (MemoryDB is more expensive per node).
-  Use MemoryDB when the data MUST survive node loss; use ElastiCache
-  when the data is disposable.
+  not. ElastiCache is a cache (data is disposable, durability is
+  optional). MemoryDB is a durable database — it writes transactions
+  to a Multi-AZ transaction log before acknowledging, so a node
+  failure does NOT lose committed data. Pricing reflects this
+  (MemoryDB is more expensive per node). Use MemoryDB when the data
+  MUST survive node loss; use ElastiCache when the data is disposable.
 
-- **"Skip ACLs for simplicity."** MemoryDB REQUIRES an ACL to control
-  access — there is no "open" mode. The default `open-access` ACL
-  allows unrestricted access but should NEVER be used in production.
-  Create named users with least-privilege access (read-only for
-  analytics, read-write for the application).
+- **"Skip ACLs for simplicity."** MemoryDB REQUIRES an ACL — there
+  is no "open" mode. The default `open-access` ACL allows
+  unrestricted access but should NEVER be used in production. Create
+  named users with least-privilege access (read-only for analytics,
+  read-write for the application).
 
 - **"Data tiering is a free lunch."** Data tiering moves
-  infrequently-accessed keys to an SSD tier, lowering cost for large
-  datasets — but it trades latency. Tiered keys have 100x-1000x the
-  access latency of in-memory keys. Enable tiering only for
-  workloads with a clear hot/cold access pattern, not for general
-  use.
+  infrequently-accessed keys to an SSD tier, lowering cost — but
+  tiered keys have 100x-1000x the access latency of in-memory keys.
+  Enable tiering only for workloads with a clear hot/cold access
+  pattern, not for general use.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -256,37 +254,32 @@ the spec-sheet number; this heuristic gives the real figure.
 ```text
 usable_per_shard = node_memory_bytes × 0.50
 # 50% rule: Redis reserves ~50% for overhead, COPY-on-write fork
-# during snapshot/failover, and the QUERY/Sort buffer. Going above
-# 50% risks OOM during snapshot / failover.
+# during snapshot/failover, and the QUERY/Sort buffer.
 
 total_usable = usable_per_shard × number_of_shards
-max_item_size = 512 MB per single value (Redis hard limit, NOT node-size-dependent)
+max_item_size = 512 MB per single value (Redis hard limit)
 
-# With data tiering enabled (r6gd family):
-#   hot_tier  = node_memory × 0.50   (in-memory; sub-ms latency)
+# With data tiering (r6gd family):
+#   hot_tier  = node_memory × 0.50   (in-memory; sub-ms)
 #   cold_tier = ssd_size × 0.90      (SSD-backed; 100x-1000x latency)
-#   total_usable = hot_tier + cold_tier
-# Use tiering ONLY for workloads with a clear hot/cold access pattern.
 ```
 
 **Concrete example — db.r6g.24xlarge (612.30 GiB nominal):**
 
 | Topology | Calculation | Usable for application data |
 |---|---|---|
-| 3 shards × 1 primary + 1 replica each | 612.30 × 0.50 × 3 | **918.45 GiB** (replicas hold copies, no extra) |
+| 3 shards × 1 primary + 1 replica each | 612.30 × 0.50 × 3 | **918.45 GiB** |
 | 5 shards × 1 primary + 1 replica each | 612.30 × 0.50 × 5 | **1530.75 GiB** |
-| 3 shards with data tiering (db.r6gd.24xlarge, ~612 GiB RAM + ~1224 GiB SSD) | (612.30 × 0.50 × 3) + (1224 × 0.90 × 3) | **918.45 + 3304.8 = 4223.25 GiB** |
+| 3 shards, data tiering (r6gd, ~612 GiB RAM + ~1224 GiB SSD) | (612.30 × 0.50 × 3) + (1224 × 0.90 × 3) | **4223.25 GiB** |
 
 **Implication:** data tiering roughly 4-5x the usable budget for the
-SAME node count — but cold-tier access is 100x-1000x slower. Use
-tiering for large datasets with a clear hot/cold split.
+same node count — but cold-tier access is 100x-1000x slower.
 
 ## Expert heuristic: shard count estimator
 
 MemoryDB cluster mode distributes writes across shards. Each shard is
-a separate primary; the cluster hash-slots data across 16,384 slots
-sharded by key. The number of shards is the horizontal-write scaling
-factor.
+a separate primary; the cluster hash-slots data across 16,384 slots.
+The number of shards is the horizontal-write scaling factor.
 
 ```text
 required_shards = ceil(sustained_writes_per_sec / (node_write_baseline × 0.60))
@@ -294,17 +287,15 @@ max_shards = 500   # MemoryDB hard limit (250 soft)
 
 # db.r6g.24xlarge baseline: ~100,000 writes/sec per primary
 # Example: 200,000 writes/sec sustained
-# required_shards = ceil(200000 / (100000 × 0.60)) = ceil(3.33) = 4 shards
+# required_shards = ceil(200000 / (100000 × 0.60)) = 4 shards
 
 # For durability, ALWAYS >=1 replica per shard (Multi-AZ failover)
-# total_nodes = shards × (1 + replicas_per_shard)
 ```
 
-**Why 60%:** MemoryDB node baselines are measured with pipelined
-`SET` on small values. Real-world workloads have larger values,
-non-pipelined patterns, and `EVAL`/`SORT` that consume CPU. Leaving
-40% headroom is the threshold observed in production incident
-post-mortems.
+**Why 60%:** MemoryDB baselines are measured with pipelined `SET` on
+small values. Real-world workloads have larger values and non-
+pipelined patterns. 40% headroom is the threshold observed in
+production incident post-mortems.
 
 ## Expert heuristic: failover promotion semantics
 
@@ -376,14 +367,12 @@ node/AZ failure)?
 | Feature | MemoryDB | ElastiCache (Redis) |
 |---|---|---|
 | Use case | Durable in-memory DATABASE | In-memory CACHE |
-| Multi-AZ durability | Multi-AZ transaction log (zero committed loss) | Asynchronous replication (may lose in-flight writes) |
-| TLS at-rest | ON by default | Optional (set at creation) |
-| TLS in-transit | ON by default | Optional (set at creation) |
-| ACLs (user-based auth) | REQUIRED (no open mode) | Optional (AUTH token or ACL) |
-| Snapshots | YES (automated + manual) | YES (Redis only; automated + manual) |
+| Multi-AZ durability | Transaction log (zero committed loss) | Async replication (may lose in-flight writes) |
+| TLS at-rest / in-transit | ON by default | Optional (set at creation) |
+| ACLs (user-based auth) | REQUIRED | Optional (AUTH token or ACL) |
+| Snapshots | YES (automated + manual) | YES (Redis only) |
 | Data tiering (SSD) | YES (r6gd family) | NO |
 | Multi-Region | YES (Multi-Region engine) | YES (Global Datastore) |
-| Node types | db.r6g, db.r6gd (tiering), db.r7g | cache.r6g, cache.m6g, cache.t4g, etc. |
 | Pricing | Higher (durability overhead) | Lower |
 
 **Common mistake:** picking ElastiCache for a workload that needs
@@ -530,11 +519,10 @@ aws memorydb create-acl \
 
 **Attach the ACL at cluster creation via `--acl-name`.**
 
-**Access-string syntax** (Redis ACL format):
-- `on` — enable the user
-- `~*` — allow access to all keys (use `~prefix:*` to scope)
-- `+@all` — allow all commands; `-@all +@read` allows read commands
-  only; `+@write +@read` allows read+write
+**Access-string syntax** (Redis ACL format): `on` enables the user;
+`~*` allows all keys (use `~prefix:*` to scope); `+@all` allows all
+commands; `-@all +@read` allows read-only; `+@write +@read` allows
+read+write.
 
 **Common mistake:** using the default `open-access` ACL in
 production. Anyone with network access to the cluster can read/write
@@ -549,25 +537,17 @@ next reboot (not immediate).
 
 | Policy | Behavior when memory fills | Use when |
 |---|---|---|
-| `volatile-lru` | Evict LRU among keys with TTL only | Mixed store + cache (TTL'd items evicted, persistent kept) — DEFAULT for MemoryDB |
-| `allkeys-lru` | Evict least-recently-used key | Pure cache semantics (data is disposable) |
-| `noeviction` | Return OOM error on writes | Durable store (NEVER silently evict) |
-| `volatile-ttl` | Evict closest-to-expiry TTL'd key | Priority-based (soon-to-expire items go first) |
+| `volatile-lru` | Evict LRU among keys with TTL only | Mixed store + cache — DEFAULT for MemoryDB |
+| `allkeys-lru` | Evict least-recently-used key | Pure cache semantics (data disposable) |
+| `noeviction` | Return OOM error on writes | Strict durable store (NEVER silently evict) |
+| `volatile-ttl` | Evict closest-to-expiry TTL'd key | Priority-based (soon-to-expire first) |
 
 **Decision rule for MemoryDB (durable database):**
 - Default is `volatile-lru` — evicts only TTL'd keys, preserving
-  persistent data. This is the safe default for a database.
-- For a pure-cache use case (data is disposable): `allkeys-lru`.
+  persistent data. Safe default for a database.
+- For a pure-cache use case: `allkeys-lru`.
 - For a strict store (no eviction EVER): `noeviction`. Plan capacity
   so memory never fills.
-
-**Other MemoryDB parameters worth setting:**
-
-```text
-timeout 300          # Close idle clients after 5 min (default 0 = never)
-tcp-keepalive 60     # Send TCP keepalive every 60s (default 300)
-maxmemory-policy volatile-lru  # Per above table
-```
 
 ## Step 8 — Snapshots (automated + manual)
 
@@ -618,20 +598,17 @@ to an SSD tier, lowering cost for large datasets.
 
 **Behavior:**
 - Hot keys stay in memory (sub-ms latency).
-- Cold keys (least-recently-used) move to the SSD tier (100x-1000x
-  the latency of in-memory).
+- Cold keys (least-recently-used) move to SSD (100x-1000x the latency
+  of in-memory).
 - The SSD tier is ~2x the node's memory capacity.
 
-**When to use:**
-- Large dataset (hundreds of GB to TB) with a clear hot/cold access
-  pattern.
-- Cost optimization where cold-key latency is acceptable (analytics,
-  batch processing, rarely-accessed user data).
+**When to use:** large dataset (hundreds of GB to TB) with a clear
+hot/cold access pattern; cost optimization where cold-key latency is
+acceptable (analytics, batch, rarely-accessed user data).
 
-**When NOT to use:**
-- Workloads with uniform access patterns (no hot/cold split).
-- Latency-sensitive workloads where all keys must be sub-ms.
-- Small datasets that fit in memory without tiering.
+**When NOT to use:** uniform access patterns (no hot/cold split);
+latency-sensitive workloads where all keys must be sub-ms; small
+datasets that fit in memory without tiering.
 
 **Common mistake:** enabling data tiering for a uniform-access
 workload. All keys hit the SSD tier eventually, and latency degrades.
@@ -772,19 +749,6 @@ VERIFICATION_COMMANDS:
   aws memorydb describe-acls --acl-name prod-acl
   aws memorydb describe-subnet-groups --subnet-group-name prod-memorydb-subnet
   aws ec2 describe-subnets --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc
-```
-
-## Decision tree: MemoryDB vs ElastiCache
-
-```text
-Does the workload require durability (committed data MUST survive
-node/AZ failure with zero committed-transaction loss)?
-├── YES → MemoryDB  (this skill)
-│         Multi-AZ transaction log; higher cost per node
-└── NO  → Is the data disposable (cache-miss is acceptable)?
-    ├── YES → ElastiCache  (NOT this skill — use elasticache-cache-deployer)
-    │         No transaction log; may lose in-flight writes on failover
-    └── NO  → MemoryDB  (the safest choice)
 ```
 
 ## Error handling

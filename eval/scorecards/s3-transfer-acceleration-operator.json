@@ -1,0 +1,70 @@
+{
+  "skill": "s3-transfer-acceleration-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 15,
+      "max": 20,
+      "justification": "Adds region\u2011specific pricing, a detailed pre\u2011check ordering, a failure\u2011mode table and recent feature notes, which a generic model would not enumerate. However, most of the information is available in AWS docs and the skill omits edge cases such as acceleration unsupported in Africa or on S3 Outposts, so the delta is not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Offers a clear AWS\u2011specific mindset, ordered pre\u2011flight checks, exact CLI commands, and a confirm gate. Missing explicit rollback steps and detailed error\u2011handling after post\u2011verification failures, so 2 points are deducted."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list and a detailed failure\u2011mode table with reasons, which is strong. Missing a few common pitfalls (e.g., forgetting to update SDK config after disabling acceleration) and some reasons are brief, so it falls short of full credit."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, activation triggers and a clear invocation schema are present. The invocation_schema is vague about required fields and validation, and the skill does not define a strict JSON schema, preventing a perfect rating."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process, output format) well, but critical rules such as DNS\u2011compatibility checks are buried deep, and the initial quick\u2011reference table is dense, causing some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained by pre\u2011checks and a mandatory confirm gate. Cost acknowledgment is advisory rather than enforced, leading to a 1\u2011point deduction."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (overview, mindset, pre\u2011flight, process, output, anti\u2011patterns). Minor ad\u2011hoc ordering of some sections prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides decision trees, exact CLI snippets, and worked examples, enabling an agent to act. Lacks detailed error handling, rollback procedures, and guidance for partial failures, resulting in a 3\u2011point deduction."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 42208,
+  "latency_ms": 10193,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}
