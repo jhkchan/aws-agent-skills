@@ -1,0 +1,70 @@
+{
+  "skill": "eks-add-on-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides expert\u2011level heuristics not commonly known: explicit conflict\u2011resolution decision tree (OVERWRITE/RETAIN/PRESERVE/NONE), version\u2011compatibility matrix, migration pattern from self\u2011managed to EKS\u2011managed, and detailed comparison of IRSA vs Pod Identity. Adds concrete decision points a senior CloudOps engineer would rely on."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: exact CLI sequences, trust\u2011policy JSON for IRSA, Pod Identity association steps, and required order of prerequisite checks. Procedures are concrete to AWS rather than generic \"check security\" advice."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list with specific reasons (e.g., OVERWRITE destroys customizations). Missing a few edge\u2011case warnings (e.g., handling of add\u2011on deletion or cross\u2011account role assumptions) prevents a perfect score."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT and WHEN to invoke, and keywords/triggers are exhaustive. Minor weakness: activation keywords are long strings that could cause false positives in some parsers."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered well: quick navigation, high\u2011level mindset, step\u2011by\u2011step sections, NEVER list, output format, worked example, and error handling. No overload of details at the top, but some deep sections (e.g., full trust\u2011policy JSON) could be moved to references for tighter layering."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (create\u2011addon, update\u2011addon) are gated by extensive prerequisite checks and explicit conflict\u2011resolution flags. Creative tasks (e.g., custom configuration values) are given enough flexibility, while risky operations are tightly constrained."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 NEVER \u2192 Output format \u2192 Example \u2192 Error handling). Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 9,
+      "max": 15,
+      "justification": "Provides working CLI snippets, decision branches, and error handling. However, the model output violates the strict output contract by emitting multiple add\u2011on blocks in a single response and leaves placeholders like `<version>` unresolved, showing that an agent could mis\u2011execute the skill. These execution gaps force a significant deduction."
+    }
+  ],
+  "total_score": 99,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 47574,
+  "latency_ms": 14100,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

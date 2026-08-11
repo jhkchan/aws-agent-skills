@@ -1,0 +1,135 @@
+# Eval test cases for ses-email-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ses-email-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ses-domain-identity-dkim-spf-dmarc
+    description: Create a domain identity, publish DKIM CNAME records, configure MAIL FROM with MX + SPF, publish DMARC quarantine policy
+    input: |
+      Scenario: An operator wants to provision SES for the domain
+      example.com in us-east-1. The domain is hosted in Route 53
+      (hosted zone Z2ABCDEF12345). The account is out of sandbox
+      (production access granted). The operator wants DKIM signing
+      enabled, a custom MAIL FROM domain mail.example.com with MX +
+      SPF, and a DMARC quarantine policy with aggregate reports to
+      dmarc@example.com. Provide the create-email-identity, Route 53
+      record publication, MAIL FROM configuration, and DMARC
+      record sequence.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "create-email-identity"
+        - "dkim"
+        - "include:amazonses.com"
+        - "v=DMARC1"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"
+        - "p=reject"
+
+  - id: ses-configuration-set-event-publishing-and-ip-pool
+    description: Create a configuration set with CloudWatch + SNS event destinations and a dedicated IP pool with warmup enabled
+    input: |
+      Scenario: An operator wants a configuration set
+      "transactional-cs" in us-east-1 that publishes SEND,
+      DELIVERY, BOUNCE, COMPLAINT, OPEN, CLICK events to
+      CloudWatch (dimension Campaign) and BOUNCE + COMPLAINT to
+      SNS topic arn:aws:sns:us-east-1:111122223333:ses-feedback.
+      The operator also wants a dedicated IP pool
+      "transactional-pool" with automatic warmup enabled on 2
+      dedicated IPs (10.0.0.1, 10.0.0.2), assigned to the
+      configuration set. Domain identity example.com is already
+      verified.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "create-configuration-set"
+        - "MatchingEventTypes"
+        - "create-dedicated-ip-pool"
+        - "WarmupEnabled"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"
+
+  - id: ses-domain-stuck-pending-dkim
+    description: PREREQUISITES_MISSING because the domain identity is stuck in Pending — DKIM CNAME records not published in DNS
+    input: |
+      Scenario: An operator created the domain identity
+      example.com in us-east-1 via create-email-identity. However,
+      the DKIM tokens were never published as CNAME records in
+      Route 53. `aws sesv2 get-email-identity` returns
+      VerificationStatus=PENDING and DkimSigningAttributes
+      Status=NOTSTARTD. The operator tries to send a test email
+      and expects it to succeed.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "DKIM"
+        - "CNAME"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "READY_TO_DEPLOY"
+
+  - id: ses-sandbox-account-blocks-production-send
+    description: PREREQUISITES_MISSING because the account is still in the SES sandbox, blocking production sends
+    input: |
+      Scenario: An operator has a fully configured SES domain
+      identity example.com in us-east-1 (verified, DKIM signing,
+      MAIL FROM, DMARC, configuration set with event publishing,
+      dedicated IP pool with warmup). However,
+      `aws sesv2 get-account` returns EnforcementStatus=PRODUCTION
+      — wait, actually it returns the account is still in the
+      sandbox. The operator tries to send 10,000 emails to
+      unverified recipients and expects success.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "sandbox"
+        - "production access"
+        - "VERDICT"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "READY_TO_DEPLOY"
+
+  - id: ses-template-and-suppression-and-vpc-endpoint
+    description: Create an email template with Handlebars variables, configure account-level suppression on BOUNCE+COMPLAINT, and wire an SES VPC endpoint
+    input: |
+      Scenario: An operator in us-east-1 wants to create an email
+      template "OrderConfirmation" with HTML and text parts using
+      Handlebars variables ({{orderNumber}}, {{total}}, {{#each
+      items}}), configure the account-level suppression list to
+      suppress on both BOUNCE and COMPLAINT, and create an
+      interface VPC endpoint for sesv2 in vpc-abcdef1234 with
+      private DNS enabled. Domain identity example.com is verified;
+      configuration set transactional-cs exists.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "create-email-template"
+        - "put-suppression-attributes"
+        - "create-vpc-endpoint"
+        - "private-dns-enabled"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "PREREQUISITES_MISSING"

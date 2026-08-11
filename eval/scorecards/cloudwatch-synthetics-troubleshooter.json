@@ -1,0 +1,70 @@
+{
+  "skill": "cloudwatch-synthetics-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Introduces concrete, non\u2011trivial expert data: exact default and max timeout values per canary type, typical duration ranges, artifact SHA\u2011hash mismatch checks, blue/green deployment bucket nuances, and recent 2024\u20112026 feature changes (recording, visual\u2011monitoring tolerance). A capable model would know generic troubleshooting but not these precise thresholds and artifact\u2011validation steps."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, ordered diagnostic workflow (steps 0\u20119) with exact CLI commands for each failure path. Procedure is solid, but the multi\u2011step canary nuances (e.g., handling intermediate HAR files) are only briefly mentioned, leaving a small gap in exhaustive AWS\u2011specific reasoning."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a concrete \"NEVER\" list with clear reasoning for each pitfall, but only five anti\u2011patterns are covered; additional common missteps (e.g., over\u2011reliance on SuccessPercent alone, mishandling of VPC endpoint DNS) are omitted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Full front\u2011matter, detailed description, explicit activation triggers, and a precise invocation schema are present. The skill meets all required metadata and provides unambiguous WHEN\u2011to\u2011invoke guidance."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections: quick reference, strict output contract, mindset, heuristics, full process, anti\u2011patterns, remediation, and references. Critical rules are not buried, but the Process section is dense, causing some cognitive overload before a user reaches the concise decision tree."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (IAM policy changes, S3 updates) appear only in remediation steps with explicit commands and safety notes. Diagnostic steps are loosely constrained, matching the low\u2011fragility nature of the task. No over\u2011constrained creative steps are present."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (quick ref \u2192 mindset \u2192 expert heuristic \u2192 stepwise process \u2192 anti\u2011patterns \u2192 remediation). The structure is consistent with other CloudOps skills, aiding comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a complete decision tree, concrete CLI snippets, and worked examples that an agent can follow end\u2011to\u2011end. Minor gaps remain in handling obscure edge cases (e.g., missing CloudWatch metrics or corrupted run reports) which fall back to NEED_MORE_INFO, but overall the skill is actionable."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 40859,
+  "latency_ms": 15034,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

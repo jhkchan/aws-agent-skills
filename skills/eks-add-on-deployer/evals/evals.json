@@ -1,0 +1,177 @@
+{
+  "skill": "eks-add-on-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the EKS Add-On Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across EKS add-on scenarios (core add-ons on new cluster, EBS CSI with IRSA, Pod Identity for ADOT, Auto Mode manual override blocked, version conflict migration). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "core-addons-new-cluster",
+      "name": "Core EKS add-ons (vpc-cni, coredns, kube-proxy) on new EKS 1.30 cluster with IRSA",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — core networking add-ons, K8s 1.30 version compatibility, IRSA for vpc-cni, ENABLE_PREFIX_DELEGATION config, conflict resolution OVERWRITE",
+      "prompt": "I have a new EKS cluster named production-cluster running Kubernetes 1.30. I need to set up the core add-ons: vpc-cni, coredns, and kube-proxy. The cluster has an OIDC provider. For vpc-cni I want to use IRSA with the AmazonEKS_CNI_Policy. I want ENABLE_PREFIX_DELEGATION set to true. Account ID: 123456789012. Tags: Environment=production.",
+      "prompt_file": "prompts/core-addons-new-cluster.md",
+      "baseline_file": "baselines/core-addons-new-cluster.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EKS_ADDON: vpc-cni (version v1.18.1-eksbuild.3) on cluster production-cluster\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster: production-cluster — ACTIVE, Kubernetes 1.30\n  [✓] Add-on type: vpc-cni\n  [✓] Add-on version: v1.18.1-eksbuild.3 (compatible with K8s 1.30)\n  [✓] Management mode: EKS-managed\n  [✓] Conflict resolution: OVERWRITE\n  [✓] Configuration values: {\"env\":{\"ENABLE_PREFIX_DELEGATION\":\"true\"}}\n  [✓] IAM credential method: IRSA (role AmazonEKSVPCCNIRole)\n  [✓] OIDC provider: present\n  [✓] Auto Mode cluster: no\n  [✓] Health: ACTIVE\n  [✓] Tags: Environment=production\nVERIFICATION_COMMANDS:\n  aws eks describe-addon --cluster-name production-cluster --addon-name vpc-cni\n  aws eks list-addons --name production-cluster\n  kubectl get pods -n kube-system -l k8s-app=aws-node",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "vpc-cni",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "IRSA",
+            "1.30"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ebs-csi-irsa",
+      "name": "EBS CSI driver add-on with IRSA for PersistentVolume provisioning",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — aws-ebs-csi-driver with IRSA for ebs-csi-controller-sa, K8s 1.29 compatibility",
+      "prompt": "I need to install the aws-ebs-csi-driver add-on on my EKS cluster app-cluster (K8s 1.29) so I can use EBS PersistentVolumes. The cluster has an OIDC provider. Set up IRSA for the EBS CSI controller service account. Account ID: 123456789012.",
+      "prompt_file": "prompts/ebs-csi-irsa.md",
+      "baseline_file": "baselines/ebs-csi-irsa.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EKS_ADDON: aws-ebs-csi-driver (version v1.26.0-eksbuild.1) on cluster app-cluster\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster: app-cluster — ACTIVE, Kubernetes 1.29\n  [✓] Add-on type: aws-ebs-csi-driver\n  [✓] Add-on version: v1.26.0-eksbuild.1 (compatible with K8s 1.29)\n  [✓] Management mode: EKS-managed\n  [✓] Conflict resolution: OVERWRITE\n  [✓] IAM credential method: IRSA (role AmazonEBSCSIDriverRole)\n  [✓] Service account: ebs-csi-controller-sa (kube-system)\n  [✓] OIDC provider: present\n  [✓] Health: ACTIVE\nVERIFICATION_COMMANDS:\n  aws eks describe-addon --cluster-name app-cluster --addon-name aws-ebs-csi-driver\n  kubectl get pods -n kube-system -l app=ebs-csi-controller",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws-ebs-csi-driver",
+            "VERDICT",
+            "CHECKLIST",
+            "ebs-csi-controller-sa",
+            "IRSA"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pod-identity-adot",
+      "name": "EKS Pod Identity for ADOT collector add-on",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Pod Identity Agent installed, Pod Identity association for ADOT in observability namespace, pods.eks.amazonaws.com trust principal",
+      "prompt": "I want to use EKS Pod Identity (not IRSA) for my ADOT collector add-on on cluster observability-cluster (K8s 1.30). Install the Pod Identity Agent, create a Pod Identity role, and associate it with the ADOT service account in the observability namespace. Account ID: 123456789012.",
+      "prompt_file": "prompts/pod-identity-adot.md",
+      "baseline_file": "baselines/pod-identity-adot.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EKS_ADDON: adot (version v0.92.1-eksbuild.1) on cluster observability-cluster\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster: observability-cluster — ACTIVE, Kubernetes 1.30\n  [✓] Add-on type: adot\n  [✓] Management mode: EKS-managed\n  [✓] IAM credential method: Pod Identity (association in observability namespace)\n  [✓] Pod Identity Agent: eks-pod-identity-agent installed\n  [✓] Trust principal: pods.eks.amazonaws.com\n  [✓] Health: ACTIVE\nVERIFICATION_COMMANDS:\n  aws eks describe-addon --cluster-name observability-cluster --addon-name adot\n  aws eks list-pod-identity-associations --cluster-name observability-cluster\n  aws eks describe-addon --cluster-name observability-cluster --addon-name eks-pod-identity-agent",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Pod Identity",
+            "eks-pod-identity-agent",
+            "VERDICT",
+            "CHECKLIST",
+            "adot"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "auto-mode-manual-override",
+      "name": "Operator manually updates vpc-cni on EKS Auto Mode cluster (blocked)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Auto Mode manages vpc-cni automatically; manual changes are silently reverted by reconciliation",
+      "prompt": "My EKS cluster auto-mode-cluster uses EKS Auto Mode. I want to manually update the vpc-cni add-on to version v1.19.0-eksbuild.1 and set ENABLE_IPv6 to true. Account ID: 123456789012.",
+      "prompt_file": "prompts/auto-mode-manual-override.md",
+      "baseline_file": "baselines/auto-mode-manual-override.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "EKS_ADDON: vpc-cni on cluster auto-mode-cluster\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Auto Mode cluster: yes — vpc-cni is managed by EKS Auto Mode. Manual add-on creation/updates are silently reverted by Auto Mode reconciliation. Use cluster-level networking settings instead of add-on configuration values.\n  [✗] Configuration values: ENABLE_IPv6 must be set via cluster-level settings, not via --configuration-values on a managed add-on.\nVERIFICATION_COMMANDS:\n  aws eks describe-cluster --name auto-mode-cluster --query 'cluster.computeConfig'\n  aws eks describe-addon --cluster-name auto-mode-cluster --addon-name vpc-cni --query 'addon.status'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "Auto Mode",
+            "VERDICT",
+            "CHECKLIST",
+            "vpc-cni"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "version-conflict-resolution",
+      "name": "Migrate self-managed vpc-cni to EKS-managed with config preservation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — self-managed to EKS-managed migration, OVERWRITE conflict resolution, configuration-values migration pattern, customizations preserved",
+      "prompt": "My cluster migration-cluster (K8s 1.30) has a self-managed vpc-cni installed via Helm (the aws-node DaemonSet). I have custom env vars: AWS_VPC_K8S_CNI_LOGLEVEL=DEBUG and ENABLE_PREFIX_DELEGATION=true. I want to migrate to the EKS-managed vpc-cni add-on without losing my customizations. OIDC provider exists. Account ID: 123456789012.",
+      "prompt_file": "prompts/version-conflict-resolution.md",
+      "baseline_file": "baselines/version-conflict-resolution.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EKS_ADDON: vpc-cni (version v1.18.1-eksbuild.3) on cluster migration-cluster\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster: migration-cluster — ACTIVE, Kubernetes 1.30\n  [✓] Add-on type: vpc-cni\n  [✓] Management mode: EKS-managed (migrated from self-managed)\n  [✓] Conflict resolution: OVERWRITE (migration)\n  [✓] Configuration values: {\"env\":{\"AWS_VPC_K8S_CNI_LOGLEVEL\":\"DEBUG\",\"ENABLE_PREFIX_DELEGATION\":\"true\"}}\n  [✓] IAM credential method: IRSA (role AmazonEKSVPCCNIRole)\n  [✓] Self-managed add-on: present (resolving with OVERWRITE, re-applying config via configuration-values)\n  [✓] Health: ACTIVE\nVERIFICATION_COMMANDS:\n  aws eks describe-addon --cluster-name migration-cluster --addon-name vpc-cni\n  kubectl get ds -n kube-system aws-node\n  kubectl get pods -n kube-system -l k8s-app=aws-node",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "OVERWRITE",
+            "VERDICT",
+            "CHECKLIST",
+            "configuration-values"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

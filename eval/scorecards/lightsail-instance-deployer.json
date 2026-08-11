@@ -1,0 +1,70 @@
+{
+  "skill": "lightsail-instance-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds concrete expert details not commonly known: exact bundle minimums for app+OS blueprints (e.g., WordPress requires medium_3_0), static IP billing rates, VPC peering being one\u2011way per region, snapshot retention defaults, load balancer layer\u20114 limitation, CDN origin restrictions, and recent multi\u2011AZ database behavior. However, much of the content restates publicly documented facts, so not a full 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific step order (pre\u2011flight checks, allocate static IP before DNS, enable VPC peering before private RDS access, enable snapshot add\u2011on, configure firewall, confirm gate). Minor generic phrasing remains (e.g., \"verify IAM permissions\" without exact policy list), but overall procedure is highly targeted."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a concrete \"NEVER\" list of five high\u2011impact pitfalls with clear reasoning (e.g., never configure DNS before static IP, never expose Lightsail DB publicly). The warnings are specific and experience\u2011driven. One minor shortfall is the absence of a broader list of less critical pitfalls (e.g., orphaned block disks)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, keywords, tags, metadata, when_to_use, activation_triggers, invocation_schema). The description clearly states WHAT it does and WHEN to invoke. Slight gap: activation triggers are phrased as strings rather than a formal schema, but still reliable for activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Content is layered: high\u2011level overview, quick reference, pre\u2011flight, detailed process steps, common patterns, NEVER list, heuristics, and strict output contract. Critical rules are not buried, and detailed CLI examples are only in the process section, avoiding overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained with a mandatory CONFIRM gate, pre\u2011checks, and strict NEVER rules. Creative planning steps allow flexibility. However, the example outputs still contain placeholder tokens (e.g., <static-ip>) which could lead to over\u2011permissive execution in practice."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure: Mindset, Quick navigation, Process, Output contract, NEVER list, Heuristic. The pattern aids comprehension, though the layout mixes Markdown tables with free\u2011form text, making the overall schema slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides complete decision trees, exact AWS CLI commands, pre\u2011check list, and error handling via VERDICT. However, placeholders like <static-ip> require runtime substitution, and some edge cases (e.g., handling IAM permission denial, region mismatches, cleanup after partial failure) are not fully detailed."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 52226,
+  "latency_ms": 15631,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

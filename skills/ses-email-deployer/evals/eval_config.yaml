@@ -1,0 +1,43 @@
+# Eval configuration for ses-email-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ses-email-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: ses-domain-identity-dkim-spf-dmarc
+    difficulty: hard
+    prompt_file: prompts/ses-domain-identity-dkim-spf-dmarc.md
+    baseline_file: baselines/ses-domain-identity-dkim-spf-dmarc.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: ses-configuration-set-event-publishing-and-ip-pool
+    difficulty: hard
+    prompt_file: prompts/ses-configuration-set-event-publishing-and-ip-pool.md
+    baseline_file: baselines/ses-configuration-set-event-publishing-and-ip-pool.md
+    expected_verdict: READY_TO_DEPLOY
+  - id: ses-domain-stuck-pending-dkim
+    difficulty: medium
+    prompt_file: prompts/ses-domain-stuck-pending-dkim.md
+    baseline_file: baselines/ses-domain-stuck-pending-dkim.md
+    expected_verdict: PREREQUISITES_MISSING
+  - id: ses-sandbox-account-blocks-production-send
+    difficulty: medium
+    prompt_file: prompts/ses-sandbox-account-blocks-production-send.md
+    baseline_file: baselines/ses-sandbox-account-blocks-production-send.md
+    expected_verdict: PREREQUISITES_MISSING
+  - id: ses-template-and-suppression-and-vpc-endpoint
+    difficulty: hard
+    prompt_file: prompts/ses-template-and-suppression-and-vpc-endpoint.md
+    baseline_file: baselines/ses-template-and-suppression-and-vpc-endpoint.md
+    expected_verdict: READY_TO_DEPLOY

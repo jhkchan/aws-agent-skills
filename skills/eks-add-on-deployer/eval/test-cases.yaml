@@ -1,0 +1,144 @@
+# Eval test cases for eks-add-on-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across EKS add-on scenarios
+# (core add-ons on new cluster, EBS CSI with IRSA, Pod Identity,
+#  Auto Mode managed add-on, version conflict resolution).
+skill: eks-add-on-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: core-addons-new-cluster
+    description: >-
+      Provision core EKS add-ons (vpc-cni, coredns, kube-proxy) on a
+      new EKS 1.30 cluster with IRSA for vpc-cni. Expects
+      READY_TO_DEPLOY with version compatibility verified and conflict
+      resolution strategy specified.
+    input: |
+      I have a new EKS cluster named production-cluster running
+      Kubernetes 1.30. I need to set up the core add-ons: vpc-cni,
+      coredns, and kube-proxy. The cluster has an OIDC provider. For
+      vpc-cni I want to use IRSA with the AmazonEKS_CNI_Policy. I want
+      ENABLE_PREFIX_DELEGATION set to true. Account ID: 123456789012.
+      Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "vpc-cni"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "IRSA"
+        - "1.30"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ebs-csi-irsa
+    description: >-
+      Provision the EBS CSI driver add-on with an IRSA role for
+      PersistentVolume provisioning. Expects READY_TO_DEPLOY with the
+      service account ebs-csi-controller-sa and IRSA role cited.
+    input: |
+      I need to install the aws-ebs-csi-driver add-on on my EKS cluster
+      app-cluster (K8s 1.29) so I can use EBS PersistentVolumes. The
+      cluster has an OIDC provider. Set up IRSA for the EBS CSI
+      controller service account. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws-ebs-csi-driver"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "ebs-csi-controller-sa"
+        - "IRSA"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: pod-identity-adot
+    description: >-
+      Set up EKS Pod Identity for the ADOT collector add-on. Expects
+      READY_TO_DEPLOY with Pod Identity Agent installed, Pod Identity
+      association created, and the simpler trust model noted.
+    input: |
+      I want to use EKS Pod Identity (not IRSA) for my ADOT collector
+      add-on on cluster observability-cluster (K8s 1.30). Install the
+      Pod Identity Agent, create a Pod Identity role, and associate it
+      with the ADOT service account in the observability namespace.
+      Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Pod Identity"
+        - "eks-pod-identity-agent"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "adot"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: auto-mode-manual-override
+    description: >-
+      Operator wants to manually update vpc-cni on an EKS Auto Mode
+      cluster. Auto Mode manages vpc-cni automatically; manual changes
+      are silently reverted. Expects PREREQUISITES_MISSING.
+    input: |
+      My EKS cluster auto-mode-cluster uses EKS Auto Mode. I want to
+      manually update the vpc-cni add-on to version v1.19.0-eksbuild.1
+      and set ENABLE_IPv6 to true. Account ID: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Auto Mode"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "vpc-cni"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: version-conflict-resolution
+    description: >-
+      Operator has a self-managed vpc-cni (Helm-installed aws-node)
+      and wants to migrate to the EKS-managed add-on. Has custom env
+      vars. Expects READY_TO_DEPLOY with OVERWRITE conflict resolution
+      and migration pattern documented.
+    input: |
+      My cluster migration-cluster (K8s 1.30) has a self-managed
+      vpc-cni installed via Helm (the aws-node DaemonSet). I have
+      custom env vars: AWS_VPC_K8S_CNI_LOGLEVEL=DEBUG and
+      ENABLE_PREFIX_DELEGATION=true. I want to migrate to the
+      EKS-managed vpc-cni add-on without losing my customizations.
+      OIDC provider exists. Account ID: 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "OVERWRITE"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "configuration-values"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

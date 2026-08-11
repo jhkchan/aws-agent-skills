@@ -1,0 +1,70 @@
+{
+  "skill": "dms-task-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete, non\u2011obvious expert details (e.g., RDS MySQL binlog_retention_hours default 0, FreeableMemory <500\u202fMB threshold for dms.r5.large, LogMiner role requirement, LOB default 32\u202fKB) and a full decision\u2011tree with specific probes. Misses a few niche cases (e.g., DMU\u2011utilization metrics for DMS Serverless)."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific diagnostic mindset: pre\u2011flight metadata collection, engine\u2011specific short\u2011circuit tables, ordered CLI probes, and verification before remediation. Some steps (e.g., SG checks) are generic but still follow AWS tooling."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a concrete NEVER list with clear reasoning (e.g., never diagnose without logs, never ignore binlog_retention, never assume Logging=DETAILED). Could include a few more recent pitfalls (e.g., Serverless scaling limits)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, activation triggers, when_to_use/when_not_to_use, and invocation_schema are present. The description is thorough but slightly verbose, making the exact trigger marginally less crisp."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Layers information well: high\u2011level overview, quick\u2011navigation table, pre\u2011flight commands, then deep step\u2011by\u2011step tree. The navigation table is dense, which adds some cognitive load early."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Tight constraints for any state\u2011changing CLI (mandatory CONFIRM gate, pre\u2011state capture) and generous freedom for diagnostic queries. Calibration matches task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (description \u2192 navigation \u2192 pre\u2011flight \u2192 decision tree \u2192 anti\u2011patterns \u2192 safety checks \u2192 heuristics). Minor ad\u2011hoc ordering of sections prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI examples, decision branches, and error\u2011handling flows. Lacks explicit handling for multi\u2011task inputs and ambiguous error messages, and the fallback for unknown engines could be clearer."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 44785,
+  "latency_ms": 6640,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

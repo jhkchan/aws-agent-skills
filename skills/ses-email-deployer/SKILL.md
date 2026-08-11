@@ -242,14 +242,14 @@ account is throttled at sandbox limits:
 
 | Prerequisite | Why it matters | How to verify |
 |---|---|---|
-| **Domain ownership or DNS access** | DKIM CNAME, MAIL FROM MX, SPF TXT, DMARC TXT records must be published. | `aws route53 list-resource-record-sets --hosted-zone-id <id>` |
-| **SES account out of sandbox (production access)** | Sandbox limits sends to verified addresses and caps at 1/sec. | `aws sesv2 get-account --region <r>` (`EnforcementStatus` = `PRODUCTION`) |
-| **Route 53 hosted zone (or third-party DNS)** | DNS records for verification. Route 53 is simplest; third-party works. | `aws route53 list-hosted-zones` |
-| **IAM permissions for caller** | Caller needs `sesv2:CreateEmailIdentity`, `sesv2:CreateConfigurationSet`, `sesv2:CreateDedicatedIpPool`, `sesv2:CreateEmailTemplate`, `route53:ChangeResourceRecordSets`. | `aws sts get-caller-identity` |
+| **Domain ownership or DNS access** | DKIM CNAME, MAIL FROM MX, SPF TXT, DMARC TXT must be published. | `aws route53 list-resource-record-sets --hosted-zone-id <id>` |
+| **SES account out of sandbox** | Sandbox limits sends to verified addresses at 1/sec. | `aws sesv2 get-account --region <r>` (`EnforcementStatus` = `PRODUCTION`) |
+| **Route 53 hosted zone (or third-party DNS)** | DNS records for verification. Route 53 is simplest. | `aws route53 list-hosted-zones` |
+| **IAM permissions for caller** | Needs `sesv2:CreateEmailIdentity`, `sesv2:CreateConfigurationSet`, `sesv2:CreateDedicatedIpPool`, `sesv2:CreateEmailTemplate`, `route53:ChangeResourceRecordSets`. | `aws sts get-caller-identity` |
 | **SNS topic for bounce / complaint feedback** (optional) | Required for real-time bounce / complaint processing. | `aws sns list-topics` |
-| **CloudWatch Logs / Firehose for event publishing** (optional) | Event destinations for the configuration set. | `aws logs describe-log-groups`, `aws firehose list-delivery-streams` |
-| **Dedicated IP quota** (optional) | Dedicated IPs require service quota increase. Default is 0. | `aws service-quotas get-service-quota --service-code ses --quota-code L-1BCE5A11` |
-| **VPC for SES VPC endpoint** (optional) | Required for private SES API access from VPC. | `aws ec2 describe-vpcs` |
+| **CloudWatch / Firehose for event publishing** (optional) | Event destinations for the configuration set. | `aws logs describe-log-groups`, `aws firehose list-delivery-streams` |
+| **Dedicated IP quota** (optional) | Dedicated IPs require service quota increase (default is 0). | `aws service-quotas get-service-quota --service-code ses --quota-code L-1BCE5A11` |
+| **VPC for SES VPC endpoint** (optional) | Required for private SES API access. | `aws ec2 describe-vpcs` |
 
 ## Deployment procedure (apply in order)
 
@@ -265,9 +265,8 @@ aws sesv2 create-email-identity \
   --region us-east-1
 ```
 
-The response returns `DkimTokens` — 3 tokens like
-`abc123.example.com.amazonses.com`. Each token maps to a CNAME
-record in Route 53.
+The response returns `DkimTokens` — 3 tokens. Each maps to a
+CNAME record in Route 53.
 
 ### Step 2: Publish DKIM CNAME records in Route 53
 
@@ -282,33 +281,9 @@ HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
 cat > /tmp/dkim-change.json <<'EOF'
 {
   "Changes": [
-    {
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "abc123._domainkey.example.com",
-        "Type": "CNAME",
-        "TTL": 1800,
-        "ResourceRecords": [{ "Value": "abc123.dkim.amazonses.com" }]
-      }
-    },
-    {
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "def456._domainkey.example.com",
-        "Type": "CNAME",
-        "TTL": 1800,
-        "ResourceRecords": [{ "Value": "def456.dkim.amazonses.com" }]
-      }
-    },
-    {
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "ghi789._domainkey.example.com",
-        "Type": "CNAME",
-        "TTL": 1800,
-        "ResourceRecords": [{ "Value": "ghi789.dkim.amazonses.com" }]
-      }
-    }
+    {"Action": "CREATE", "ResourceRecordSet": {"Name": "abc123._domainkey.example.com", "Type": "CNAME", "TTL": 1800, "ResourceRecords": [{"Value": "abc123.dkim.amazonses.com"}]}},
+    {"Action": "CREATE", "ResourceRecordSet": {"Name": "def456._domainkey.example.com", "Type": "CNAME", "TTL": 1800, "ResourceRecords": [{"Value": "def456.dkim.amazonses.com"}]}},
+    {"Action": "CREATE", "ResourceRecordSet": {"Name": "ghi789._domainkey.example.com", "Type": "CNAME", "TTL": 1800, "ResourceRecords": [{"Value": "ghi789.dkim.amazonses.com"}]}}
   ]
 }
 EOF
@@ -318,9 +293,8 @@ aws route53 change-resource-record-sets \
   --change-batch file:///tmp/dkim-change.json
 ```
 
-DNS propagation typically takes 1-15 minutes. SES polls the
-records; `VerificationStatus` flips to `Success` once all 3 are
-resolvable. Verify:
+SES polls the records; `VerificationStatus` flips to `Success`
+once all 3 are resolvable (1-15 minutes). Verify:
 
 ```bash
 aws sesv2 get-email-identity --email-identity example.com --region us-east-1
@@ -404,9 +378,8 @@ aws route53 change-resource-record-sets \
   --change-batch file:///tmp/dmarc-change.json
 ```
 
-`p=quarantine` is the recommended starting policy; escalate to
-`p=reject` once alignment is verified. `adkim=s` and `aspf=s`
-enforce strict DKIM and SPF alignment.
+Start with `p=quarantine`; escalate to `p=reject` once alignment
+is verified. `adkim=s` / `aspf=s` enforce strict alignment.
 
 ### Step 5: Create the configuration set with event publishing
 
@@ -589,34 +562,32 @@ aws ec2 create-vpc-endpoint \
   --region us-east-1
 ```
 
-For Mail Manager (ingress analysis and egress rule sets), create
-an ingress point and egress rule set via the SES v2 API:
+For Mail Manager (ingress analysis and egress rule sets):
 
 ```bash
-# Create a Mail Manager egress rule set
 aws sesv2 create-email-traffic-policy \
   --policy-name transactional-egress \
   --policy-statements '[{"Conditions": {...}, "Actions": {...}}]' \
   --region us-east-1
 ```
 
-Mail Manager lets you inspect inbound email, apply filtering
-rules, and route to workloads or mailboxes. It is distinct from
-the SES sending pipeline.
+Mail Manager inspects inbound email, applies filtering rules, and
+routes to workloads or mailboxes. It is distinct from the SES
+sending pipeline.
 
 ## Resource-type matrix
 
-| Resource | SES v2 API | CloudFormation | Terraform |
-|---|---|---|---|
-| Domain identity | `create-email-identity` | `AWS::SESV2::ConfigurationSet` (identity via Identity property) | `aws_sesv2_email_identity` |
-| DKIM tokens | `get-email-identity` (DkimAttributes) | Auto-generated | `aws_sesv2_email_identity_dkim_signing_attributes` |
-| MAIL FROM domain | `put-email-identity-mail-from-domain` | `AWS::SESV2::MailFrom` | `aws_sesv2_email_identity_mail_from` |
-| Configuration set | `create-configuration-set` | `AWS::SESV2::ConfigurationSet` | `aws_sesv2_configuration_set` |
-| Event destination | `create-configuration-set-event-destination` | `AWS::SESV2::ConfigurationSetEventDestination` | `aws_sesv2_configuration_set_event_destination` |
-| Dedicated IP pool | `create-dedicated-ip-pool` | N/A (CLI / SDK only) | `aws_sesv2_dedicated_ip_pool` |
-| Email template | `create-email-template` | `AWS::SESV2::Template` | `aws_sesv2_email_template` |
-| Suppression list | `put-suppression-attributes` | N/A (account-level) | N/A (via `aws_sesv2_account_suppression_attributes`) |
-| VPC endpoint | `ec2 create-vpc-endpoint` | `AWS::EC2::VPCEndpoint` | `aws_vpc_endpoint` |
+| Resource | SES v2 API | Terraform |
+|---|---|---|
+| Domain identity | `create-email-identity` | `aws_sesv2_email_identity` |
+| DKIM tokens | `get-email-identity` (DkimAttributes) | `aws_sesv2_email_identity_dkim_signing_attributes` |
+| MAIL FROM domain | `put-email-identity-mail-from-domain` | `aws_sesv2_email_identity_mail_from` |
+| Configuration set | `create-configuration-set` | `aws_sesv2_configuration_set` |
+| Event destination | `create-configuration-set-event-destination` | `aws_sesv2_configuration_set_event_destination` |
+| Dedicated IP pool | `create-dedicated-ip-pool` | `aws_sesv2_dedicated_ip_pool` |
+| Email template | `create-email-template` | `aws_sesv2_email_template` |
+| Suppression list | `put-suppression-attributes` | `aws_sesv2_account_suppression_attributes` |
+| VPC endpoint | `ec2 create-vpc-endpoint` | `aws_vpc_endpoint` |
 
 ## Edge-case handling
 
@@ -728,26 +699,21 @@ the SES sending pipeline.
 ## Pre-flight safety checks (run before any SES CLI)
 
 - **Confirm the account is out of sandbox:** `aws sesv2
-  get-account` (`EnforcementStatus` = `PRODUCTION`). If sandbox,
-  request production access via the SES console.
+  get-account` (`EnforcementStatus` = `PRODUCTION`).
 - **Confirm domain ownership / DNS access:** `aws route53
-  list-hosted-zones` (or your DNS provider). DKIM, MAIL FROM, and
-  DMARC records must be publishable.
+  list-hosted-zones`. DKIM, MAIL FROM, DMARC must be publishable.
 - **Confirm the dedicated IP quota:** `aws service-quotas
   get-service-quota --service-code ses --quota-code L-1BCE5A11`.
-  Default is 0; request an increase if needed.
 - **Confirm the SNS topic exists for bounce / complaint:** `aws
-  sns list-topics`. Create one if missing
-  (sns-topic-deployer).
-- **Confirm IAM permissions:** the caller needs
+  sns list-topics`. Create one if missing (sns-topic-deployer).
+- **Confirm IAM permissions:** caller needs
   `sesv2:CreateEmailIdentity`,
   `sesv2:CreateConfigurationSet`,
   `sesv2:CreateDedicatedIpPool`,
   `sesv2:CreateEmailTemplate`,
   `route53:ChangeResourceRecordSets`.
-- **Confirm VPC settings (if VPC endpoint desired):** `aws ec2
-  describe-vpcs` — `enableDnsHostnames` and `enableDnsSupport`
-  must both be `true`.
+- **Confirm VPC settings (if VPC endpoint desired):**
+  `enableDnsHostnames` and `enableDnsSupport` must both be `true`.
 
 ## Output format — MANDATORY literal labels
 
@@ -806,8 +772,7 @@ AWS CloudOps / Email Infrastructure Provisioning.
 
 - **Amazon SES Developer Guide** — https://docs.aws.amazon.com/ses/latest/dg/Welcome.html
 - **SES v2 API reference** — https://docs.aws.amazon.com/ses/latest/APIReference-V2/
-- **Verifying a domain identity** — https://docs.aws.amazon.com/ses/latest/dg/creating-identities.html
-- **DKIM signing** — https://docs.aws.amazon.com/ses/latest/dg/send-email-authenticate-dkim.html
+- **Verifying a domain identity + DKIM** — https://docs.aws.amazon.com/ses/latest/dg/creating-identities.html
 - **MAIL FROM domain** — https://docs.aws.amazon.com/ses/latest/dg/mail-from.html
 - **Configuration sets + event publishing** — https://docs.aws.amazon.com/ses/latest/dg/using-configuration-sets.html
 - **Dedicated IP pools + warmup** — https://docs.aws.amazon.com/ses/latest/dg/dedicated-ip.html

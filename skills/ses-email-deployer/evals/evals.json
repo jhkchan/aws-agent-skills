@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ses-email-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SES Email Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "ses-domain-identity-dkim-spf-dmarc",
+      "name": "Create a domain identity, publish DKIM CNAME records, configure MAIL FROM with MX + SPF, publish DMARC quarantine policy",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ses-domain-identity-dkim-spf-dmarc.md",
+      "baseline_file": "baselines/ses-domain-identity-dkim-spf-dmarc.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "create-email-identity", "dkim", "include:amazonses.com", "v=DMARC1", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "PREREQUISITES_MISSING", "p=reject"]
+        }
+      ]
+    },
+    {
+      "id": "ses-configuration-set-event-publishing-and-ip-pool",
+      "name": "Configuration set with CloudWatch + SNS event destinations and a dedicated IP pool with warmup",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ses-configuration-set-event-publishing-and-ip-pool.md",
+      "baseline_file": "baselines/ses-configuration-set-event-publishing-and-ip-pool.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "create-configuration-set", "MatchingEventTypes", "create-dedicated-ip-pool", "WarmupEnabled", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "ses-domain-stuck-pending-dkim",
+      "name": "PREREQUISITES_MISSING because DKIM CNAME records are not published in DNS",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ses-domain-stuck-pending-dkim.md",
+      "baseline_file": "baselines/ses-domain-stuck-pending-dkim.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "DKIM", "CNAME", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "ses-sandbox-account-blocks-production-send",
+      "name": "PREREQUISITES_MISSING because the account is still in the SES sandbox",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ses-sandbox-account-blocks-production-send.md",
+      "baseline_file": "baselines/ses-sandbox-account-blocks-production-send.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "sandbox", "production access", "VERDICT", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "ses-template-and-suppression-and-vpc-endpoint",
+      "name": "Create an email template with Handlebars variables, configure suppression on BOUNCE+COMPLAINT, and wire an SES VPC endpoint",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ses-template-and-suppression-and-vpc-endpoint.md",
+      "baseline_file": "baselines/ses-template-and-suppression-and-vpc-endpoint.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "create-email-template", "put-suppression-attributes", "create-vpc-endpoint", "private-dns-enabled", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "PREREQUISITES_MISSING"]
+        }
+      ]
+    }
+  ]
+}
