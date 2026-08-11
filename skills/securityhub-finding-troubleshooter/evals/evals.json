@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "securityhub-finding-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Security Hub Finding Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "s3-bpa-failed-true-positive",
+      "name": "FSBP S3.1 with RestrictPublicBuckets=false and bucket ACL granting AllUsers READ — true control failure on a non-public-website bucket",
+      "difficulty": "medium",
+      "prompt_file": "prompts/s3-bpa-failed-true-positive.md",
+      "baseline_file": "baselines/s3-bpa-failed-true-positive.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "S3_BPA",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "s3-bpa-failed-true-positive", "S3_BPA", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "VERDICT: ESCALATE", "LAYER: FALSE_POSITIVE"]
+        }
+      ]
+    },
+    {
+      "id": "cis-1-3-not-available-config-rule-error",
+      "name": "CIS.1.3 NOT_AVAILABLE because the Config rule Lambda lacks iam:GetCredentialReport — keys themselves compliant, AWS-side evaluation gap",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cis-1-3-not-available-config-rule-error.md",
+      "baseline_file": "baselines/cis-1-3-not-available-config-rule-error.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "AWS_SIDE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "cis-1-3-not-available-config-rule-error", "AWS_SIDE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "LAYER: IAM_PASSWORD_POLICY", "LAYER: FALSE_POSITIVE"]
+        }
+      ]
+    },
+    {
+      "id": "ec2-imdsv2-resolved-stale-cache",
+      "name": "EC2.8 finding marked RESOLVED with HttpTokens=required in place — finding is in 3-5 day archive window, FALSE_POSITIVE for SOC concerns",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ec2-imdsv2-resolved-stale-cache.md",
+      "baseline_file": "baselines/ec2-imdsv2-resolved-stale-cache.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "FALSE_POSITIVE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "ec2-imdsv2-resolved-stale-cache", "FALSE_POSITIVE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "LAYER: EC2_IMDSV2", "LAYER: AWS_SIDE"]
+        }
+      ]
+    },
+    {
+      "id": "kms-rotation-true-failure",
+      "name": "KMS.3 finding on customer-managed CMK billing-prod-key with EnableKeyRotation=false — true control failure, no documented exception",
+      "difficulty": "medium",
+      "prompt_file": "prompts/kms-rotation-true-failure.md",
+      "baseline_file": "baselines/kms-rotation-true-failure.md",
+      "expected_verdict": "ROOT_CAUSE_FOUND",
+      "expected_layer": "KMS_ROTATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_FOUND", "kms-rotation-true-failure", "KMS_ROTATION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: NEED_MORE_INFO", "LAYER: FALSE_POSITIVE"]
+        }
+      ]
+    },
+    {
+      "id": "aggregator-missing-member-account",
+      "name": "Aggregator account 111111111111 cannot see findings from member 222222222222 — invitation expired, member not in list-members, NEED_MORE_INFO",
+      "difficulty": "hard",
+      "prompt_file": "prompts/aggregator-missing-member-account.md",
+      "baseline_file": "baselines/aggregator-missing-member-account.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "expected_layer": "AGGREGATOR_GAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "aggregator-missing-member-account", "AGGREGATOR_GAP", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: ROOT_CAUSE_FOUND", "VERDICT: ESCALATE", "LAYER: FALSE_POSITIVE"]
+        }
+      ]
+    }
+  ]
+}

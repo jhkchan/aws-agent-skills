@@ -8,16 +8,15 @@ description: >-
   Suppressed, Resolved) and severity (Critical, High, Medium, Low) to
   the failed control, then to the per-service remediation (S3 BPA, IAM
   password policy, EC2 IMDSv2, KMS rotation, CloudTrail data events,
-  Config conformance). Identifies findings stuck in Resolved-but-still-
-  failing, NOT_AVAILABLE with StatusReasons, multi-account aggregation
-  gaps, and standards disabled mid-audit. Configures custom actions
-  (EventBridge rule to Lambda) for auto-remediation, manages
-  enabled-standards, and applies the latest Automation Rules
-  (2024-2026) and custom controls for centre-of-excellence workflows.
-  Emits ROOT_CAUSE_FOUND with the specific control failure, NEED_MORE_
-  INFO, or ESCALATE. Use when triaging a Security Hub finding,
-  diagnosing a control that will not resolve, or designing a
-  remediation runbook.
+  Config conformance). Identifies findings stuck in
+  Resolved-but-still-failing, NOT_AVAILABLE with StatusReasons,
+  multi-account aggregation gaps, and standards disabled mid-audit.
+  Configures custom actions (EventBridge rule to Lambda) for
+  auto-remediation, manages enabled-standards, and applies Automation
+  Rules and custom controls. Emits ROOT_CAUSE_FOUND with the specific
+  control failure, NEED_MORE_INFO, or ESCALATE. Use when triaging a
+  Security Hub finding, diagnosing a control that will not resolve, or
+  designing a remediation runbook.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -162,7 +161,7 @@ SUPPRESSION:
   - <otherwise: "Not applicable — true control failure">
 REMEDIATION:
   1. <specific action with CLI command>
-  2. <verification command after the fix — usually aws securityhub get-findings re-check>
+  2. <verification — usually aws securityhub get-findings re-check>
 CONFIRM: Before any state-changing CLI, emit and await operator approval:
   "CONFIRM: About to <action> on <resource>. Proceed? (yes/no)"
 ```
@@ -259,46 +258,43 @@ CLI or Config.**
 ### Step 0: Non-obvious behaviours that change the diagnosis
 
 - **A `RESOLVED` finding that keeps reappearing is a re-evaluation
-  race.** Security Hub re-evaluates the control on a Config change or
-  periodic schedule. If the resource is fixed but the rule re-runs
-  before the cached state propagates, the finding flips back to FAILED.
-  Wait one full eval cycle (5-30 min) before escalating. If still
-  flapping after 30 min, the rule is mis-attributing the resource.
+  race.** Security Hub re-evaluates on Config change or periodic
+  schedule. If the resource is fixed but the rule re-runs before the
+  cached state propagates, the finding flips back to FAILED. Wait one
+  full eval cycle (5-30 min) before escalating. If still flapping
+  after 30 min, the rule is mis-attributing the resource.
 
 - **`NOT_AVAILABLE` does NOT mean the resource is compliant.** It
   means the Config rule could not evaluate — typically because the
-  resource is out of scope (e.g., a Lambda control evaluating an
-  account with no Lambda functions), the rule errored, or the rule's
-  source bucket is unavailable. Read `Compliance.StatusReasons` for
-  the specific code.
+  resource is out of scope (Lambda control, no Lambda in account), the
+  rule errored, or the source bucket is unavailable. Read
+  `Compliance.StatusReasons` for the specific code.
 
 - **Security Hub severity ≠ Config rule severity.** Security Hub
-  assigns `Severity.Label` based on the standard's scoring (CIS,
-  PCI, FSBP). A control with `HIGH` Security Hub severity may be a
-  `Critical` Config rule. Operators should not be surprised that a
-  CIS Low (severity 1.x) maps to a Security Hub `INFORMATIONAL`.
+  assigns `Severity.Label` based on the standard's scoring. A CIS Low
+  (severity 1.x) maps to Security Hub `INFORMATIONAL`; an FSBP
+  Critical can map to either `CRITICAL` or `HIGH`.
 
 - **Cross-account aggregation has up to 5 min latency.** A finding
   fixed in a member account may still appear FAILED in the aggregator
-  account for up to 5 minutes. Verify by querying the member account
-  directly: `aws securityhub get-findings --region <member-region>`.
+  for up to 5 minutes. Verify by querying the member account directly.
 
 - **Custom controls (custom ASFF) fire from Config or EventBridge.**
   A custom Security Hub control is a Config rule (custom Lambda-backed)
-  that emits ASFF findings via `BatchImportFindings`. If the rule
-  exists but findings stop, the Lambda function's
-  `securityhub:BatchImportFindings` IAM permission is the usual culprit.
+  that emits ASFF via `BatchImportFindings`. If the rule exists but
+  findings stop, the Lambda's `securityhub:BatchImportFindings` IAM
+  permission is the usual culprit.
 
 - **FSBP control IDs (e.g., `S3.1`, `EC2.8`) are stable; standard
   control IDs (e.g., `CIS.1.5`) change with version.** CIS 1.2 →
   CIS 1.4 added new controls; the numeric suffix may not match the
-  prior runbook. Always cross-reference `GeneratorId` against the
-  current standard's ARN before remediating.
+  prior runbook. Cross-reference `GeneratorId` against the current
+  standard's ARN before remediating.
 
 - **Disabling a standard mid-audit does NOT clear existing findings.**
   Findings already in the system stay ACTIVE until the next eval cycle
-  (or 3-5 days). To clear them, suppress or update the workflow status
-  explicitly.
+  (or 3-5 days). Explicitly suppress or update the workflow status to
+  clear immediately.
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -583,14 +579,11 @@ confirmed FALSE_POSITIVE or out of permanent scope. Use Automation
 Rules (preferred 2024+) over manual `update-findings`.
 
 ```bash
-# Create an Automation Rule to archive known FPs
 aws securityhub create-automation-rule \
-  --rule-name "archive-cis-1-3-known-ci-keys" \
-  --rule-order 1 \
+  --rule-name "archive-cis-1-3-known-ci-keys" --rule-order 1 \
   --description "Archive CIS.1.3 findings on the CI deployment role" \
   --criteria '<json-criteria>' \
-  --actions '[{"Type":"FINDING_FIELDS_UPDATE","FindingFieldsUpdate":{"Workflow":{"Status":"SUPPRESSED"}}}]' \
-  --tags '{"CreatedBy":"securityhub-troubleshooter"}'
+  --actions '[{"Type":"FINDING_FIELDS_UPDATE","FindingFieldsUpdate":{"Workflow":{"Status":"SUPPRESSED"}}}]'
 ```
 
 **Suppression patterns by FP class** (full criteria JSON in
@@ -607,8 +600,8 @@ aws securityhub create-automation-rule \
 
 ### Step 14: Custom actions via EventBridge → Lambda
 
-For auto-remediation, recommend an EventBridge rule that triggers a
-Lambda on finding state change:
+For auto-remediation, recommend an EventBridge rule that triggers
+Lambda on finding import:
 
 ```text
 EventBridge source: aws.securityhub
@@ -645,47 +638,42 @@ outage), emit:
   the service CLI or Config.** A Security Hub finding is a control
   evaluation, not ground truth. The resource's actual state — confirmed
   via `s3api` / `iam` / `ec2` / `kms` / `cloudtrail` — must match the
-  control failure. A finding with no resource probe is a hypothesis.
+  control failure.
 
 - **NEVER suppress a finding family with a blanket Automation Rule.**
   Suppressing all `CIS.1.3*` or all `EC2.8*` hides real failures.
-  Always scope suppression to a specific resource, account, or
-  principal via Automation Rule criteria; prefer explicit FP rule
-  ordering over global archive.
+  Scope suppression to a specific resource, account, or principal via
+  Automation Rule criteria.
 
 - **NEVER treat `NOT_AVAILABLE` as compliant.** It means the Config
   rule could not evaluate. The resource is in an unknown state —
   investigate `Compliance.StatusReasons` and either fix the rule or
-  scope the resource before clearing the finding.
+  scope the resource before clearing.
 
-- **NEVER trust a `RESOLVED` finding that immediately re-fails.**
-  Security Hub re-evaluates on Config change or periodic schedule. A
-  finding that flips RESOLVED → FAILED within 30 minutes indicates a
-  race (resource not yet propagated) or a second resource of the same
-  type. Verify with Config resource history before closing.
+- **NEVER trust a `RESOLVED` finding that immediately re-fails.** A
+  finding that flips RESOLVED → FAILED within 30 min indicates a race
+  or a second resource of the same type. Verify with Config resource
+  history before closing.
 
 - **NEVER disable a standard mid-audit without expecting stale
-  findings.** Disabling a standard stops new evaluations but does NOT
-  clear existing findings. They remain ACTIVE until the next eval
-  cycle (or 3-5 days). Explicitly suppress or update workflow status
-  for any findings the operator wants removed immediately.
+  findings.** Disabling stops new evaluations but does NOT clear
+  existing findings — they remain ACTIVE for 3-5 days. Explicitly
+  suppress or update workflow status to clear immediately.
 
 ## Expert heuristic
 
 When triaging a Security Hub finding, ask three questions in order.
 (1) Does the finding's `Compliance.Status` match the resource's actual
 state? A `FAILED` finding with no corroborating service CLI failure is
-a stale cache or a Config rule error — check `StatusReasons`. (2) Is
-the resource in the same account and region as the Security Hub
-finding? Cross-account aggregation has up to 5 min latency, and a
-member account's local Security Hub view is more current than the
-aggregator's. (3) Is the rule backing the control running correctly?
-Config rule Lambda errors, missing IAM permissions, and out-of-scope
-resource types produce `NOT_AVAILABLE` findings that look like control
-failures but are evaluation gaps. A finding matching all three (true
-FAILED, same region, healthy Config rule) is almost certainly a real
-control failure — proceed to remediation. The middle case is where
-senior judgment matters.
+a stale cache or Config rule error — check `StatusReasons`. (2) Is the
+resource in the same account and region as the finding? Cross-account
+aggregation has up to 5 min latency; the member account's local view is
+more current than the aggregator's. (3) Is the rule backing the control
+running correctly? Config rule Lambda errors, missing IAM permissions,
+and out-of-scope resource types produce `NOT_AVAILABLE` findings that
+look like control failures but are evaluation gaps. A finding matching
+all three (true FAILED, same region, healthy rule) is almost certainly
+a real control failure — proceed to remediation.
 
 ## Output format
 
@@ -699,9 +687,9 @@ state-changing CLI.
 FINDING: arn:aws:securityhub:us-east-1:111:finding/abc (S3.1 on customer-data-prod)
 VERDICT: ROOT_CAUSE_FOUND
 REASON: The account-level S3 Public Access Block has
-  RestrictPublicBuckets=false, and the bucket customer-data-prod has a
-  public-read ACL applied by a legacy deployment script. The control
-  S3.1 correctly evaluates FAILED (Step 2a).
+  RestrictPublicBuckets=false, and the bucket has a public-read ACL
+  applied by a legacy deployment script. The control S3.1 correctly
+  evaluates FAILED (Step 2a).
 LAYER: S3_BPA
 SEVERITY: HIGH
 STANDARD: FSBP
@@ -711,23 +699,20 @@ EVIDENCE:
     Compliance.Status = FAILED, Severity.Label = HIGH.
   - Probe: aws s3control get-public-access-block returns
     RestrictPublicBuckets=false, IgnorePublicAcls=false.
-  - Probe: aws s3api get-bucket-acl customer-data-prod shows a grant
-    to AllUsers with READ.
-  - FP ruled out: the bucket is NOT a documented public website
-    (no CloudFront distribution in front, no signed-URL pattern in
-    the application code, the S3 access log shows access from
-    corporate IPs only — not a public consumer pattern).
+  - Probe: aws s3api get-bucket-acl shows AllUsers READ grant.
+  - FP ruled out: bucket is NOT a documented public website (no
+    CloudFront, no signed-URL pattern, S3 access logs show corporate
+    IPs only — not a public consumer pattern).
 SUPPRESSION: Not applicable — true control failure.
 REMEDIATION:
   1. Lock down the account-level BPA:
      aws s3control put-public-access-block --account-id 111 \
        --public-access-block-configuration \
        BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
-  2. Remove the public ACL on the bucket:
-     aws s3api put-bucket-acl --bucket customer-data-prod --acl private
-  3. Verify: aws securityhub get-findings on S3.1 for the bucket
-     returns Compliance.Status=PASSED within 5-30 minutes of the
-     next eval cycle.
+  2. Remove the public ACL: aws s3api put-bucket-acl --bucket
+     customer-data-prod --acl private
+  3. Verify: get-findings on S3.1 returns Compliance.Status=PASSED
+     within 5-30 min of the next eval cycle.
 CONFIRM: "CONFIRM: About to put-public-access-block on account 111 and
   remove the public ACL on customer-data-prod. Proceed? (yes/no)"
 ```
@@ -738,37 +723,33 @@ CONFIRM: "CONFIRM: About to put-public-access-block on account 111 and
 FINDING: arn:aws:securityhub:us-east-1:111:finding/def (CIS.1.3 access-key age)
 VERDICT: ROOT_CAUSE_FOUND
 REASON: The CIS.1.3 finding is NOT_AVAILABLE because the Config rule
-  backing it has no evaluations in the last 24 hours — the rule's
-  Lambda function errored on a missing IAM permission. The access keys
-  themselves are compliant; the failure is in the evaluation layer
+  Lambda errored on a missing iam:GetCredentialReport permission. The
+  keys themselves are compliant; the failure is in the evaluation layer
   (Step 8).
 LAYER: AWS_SIDE
 SEVERITY: MEDIUM
 STANDARD: CIS
 EVIDENCE:
   - Security Hub finding: Compliance.Status = NOT_AVAILABLE,
-    Compliance.StatusReasons[0].ReasonCode = CONFIG_EVALUATION_ERROR,
-    Description mentions the Config rule Lambda ARN.
-  - Probe: aws configservice describe-config-rules on
-    securityhub-cis-1-3 returns the Lambda-backed rule with
+    Compliance.StatusReasons[0].ReasonCode = CONFIG_EVALUATION_ERROR.
+  - Probe: describe-config-rules on securityhub-cis-1-3 shows
     LastEvaluationTime 26 hours ago.
-  - Probe: aws logs filter-log-events on the rule's log group shows
-    "AccessDenied: iam:GetCredentialReport" on the last invocation.
-  - FP ruled out: aws iam get-credential-report shows all active keys
-    rotated within the last 60 days — the resource state is compliant;
-    only the evaluation is broken.
+  - Probe: filter-log-events on the rule's log group shows
+    "AccessDenied: iam:GetCredentialReport".
+  - FP ruled out: get-credential-report shows all active keys rotated
+    within 60 days — the resource state is compliant.
 SUPPRESSION: Not applicable — fix the rule Lambda IAM policy.
 REMEDIATION:
-  1. Attach the missing permission to the rule's IAM role:
-     aws iam put-role-policy --role-name <rule-role> \
+  1. Attach iam:GetCredentialReport to the rule's IAM role:
+     aws iam put-role-policy --role-name <rule-role>
        --policy-document file://iam-getcredential-allow.json
   2. Trigger re-evaluation:
-     aws configservice start-config-rules-evaluation \
+     aws configservice start-config-rules-evaluation
        --config-rule-names securityhub-cis-1-3
-  3. Verify: aws securityhub get-findings on CIS.1.3 returns
-     Compliance.Status=PASSED within 5-15 minutes.
-CONFIRM: "CONFIRM: About to attach iam:GetCredentialReport permission
-  to the Config rule role and trigger re-evaluation. Proceed? (yes/no)"
+  3. Verify: get-findings on CIS.1.3 returns Compliance.Status=PASSED
+     within 5-15 minutes.
+CONFIRM: "CONFIRM: About to attach iam:GetCredentialReport and trigger
+  re-evaluation. Proceed? (yes/no)"
 ```
 
 ## Domain
@@ -782,50 +763,43 @@ and Custom Action / Automation Rule Configuration.
 - **Security Hub Automation Rules (2024-2025):** GA feature that lets
   customers define serverless rules to update finding fields
   automatically — severity, workflow status, notes, related findings.
-  Supersedes manual `update-findings` for FP suppression and severity
-  tuning. Rules are ordered; the first match wins. Verify with
-  `aws securityhub list-automation-rules` and `get-automation-rules`.
+  Supersedes manual `update-findings` for FP suppression. Rules are
+  ordered; first match wins. Verify with `list-automation-rules` and
+  `get-automation-rules`.
 
-- **Security Hub Custom Controls (2024-2025):** Lets customers author
-  controls in ASFF and emit findings via Config rule Lambda +
+- **Security Hub Custom Controls (2024-2025):** Customers author
+  controls in ASFF, emit findings via Config rule Lambda +
   `BatchImportFindings`. Useful for organization-specific policies
-  (tag compliance, internal naming). Custom controls live alongside
-  CIS / PCI / FSBP findings.
+  (tag compliance, internal naming).
 
 - **Security Hub central configuration (2024-2025):** In Organizations
   with delegated admin, the admin can push a configuration policy to
-  member accounts that mandates standards, custom controls, and
-  Automation Rules. Verify with
-  `aws securityhub get-configuration-policy`.
+  member accounts mandating standards, custom controls, and
+  Automation Rules.
 
 - **FSBP expansion (2024-2025):** New FSBP controls for Amazon
   Bedrock (model access, guardrails), Amazon Q (data residency), and
-  SageMaker (model monitoring). The standard's control IDs are
-  stable across versions; check `describe-standards` for the latest
-  control count.
+  SageMaker (model monitoring). Control IDs are stable; check
+  `describe-standards` for the latest count.
 
 - **Security Hub cross-Region aggregation GA (2024):** A single
-  aggregator account can collect findings from all member accounts
-  and regions. Latency is up to 5 min — verify with
-  `get-finding-aggregator` and `list-members`.
+  aggregator account collects findings from all member accounts and
+  regions. Latency up to 5 min — verify with `get-finding-aggregator`
+  and `list-members`.
 
-- **AWS Resilience Hub integration (2024):** Security Hub can now
-  receive findings from AWS Resilience Hub (RTO/RPO policy violations)
-  via ASFF. Treat as a separate `ProductFields.ProviderName` for
-  filtering.
+- **AWS Resilience Hub integration (2024):** Security Hub can receive
+  findings from AWS Resilience Hub (RTO/RPO policy violations) via
+  ASFF. Treat as a separate `ProductFields.ProviderName` for filtering.
 
 - **Security Hub Inspector V2 finding deduplication (2024-2025):**
-  Inspector findings imported into Security Hub now deduplicate on
-  the same `GeneratorId` + resource — earlier versions produced
-  duplicate findings on re-scan.
+  Inspector findings now deduplicate on the same `GeneratorId` +
+  resource — earlier versions produced duplicates on re-scan.
 
 ## AWS documentation
 
 - **Security Hub User Guide** — https://docs.aws.amazon.com/securityhub/latest/userguide/
 - **Security Hub controls reference** — https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-controls-reference.html
-- **CIS AWS Foundations Benchmark** — https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html
-- **PCI DSS controls** — https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-pci-controls.html
-- **FSBP controls** — https://docs.aws.amazon.com/securityhub/latest/userguide/fsbp-standard-controls.html
+- **CIS / PCI / FSBP / NIST controls** — https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-controls-reference.html
 - **Security Hub Automation Rules** — https://docs.aws.amazon.com/securityhub/latest/userguide/automation-rules.html
 - **Security Hub ASFF** — https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-findings-format.html
 - **AWS CLI Security Hub reference** — https://docs.aws.amazon.com/cli/latest/reference/securityhub/

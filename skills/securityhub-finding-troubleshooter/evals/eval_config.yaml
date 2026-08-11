@@ -1,0 +1,48 @@
+# Eval configuration for securityhub-finding-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: securityhub-finding-troubleshooter
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: s3-bpa-failed-true-positive
+    difficulty: medium
+    prompt_file: prompts/s3-bpa-failed-true-positive.md
+    baseline_file: baselines/s3-bpa-failed-true-positive.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: S3_BPA
+  - id: cis-1-3-not-available-config-rule-error
+    difficulty: hard
+    prompt_file: prompts/cis-1-3-not-available-config-rule-error.md
+    baseline_file: baselines/cis-1-3-not-available-config-rule-error.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: AWS_SIDE
+  - id: ec2-imdsv2-resolved-stale-cache
+    difficulty: medium
+    prompt_file: prompts/ec2-imdsv2-resolved-stale-cache.md
+    baseline_file: baselines/ec2-imdsv2-resolved-stale-cache.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: FALSE_POSITIVE
+  - id: kms-rotation-true-failure
+    difficulty: medium
+    prompt_file: prompts/kms-rotation-true-failure.md
+    baseline_file: baselines/kms-rotation-true-failure.md
+    expected_verdict: ROOT_CAUSE_FOUND
+    expected_layer: KMS_ROTATION
+  - id: aggregator-missing-member-account
+    difficulty: hard
+    prompt_file: prompts/aggregator-missing-member-account.md
+    baseline_file: baselines/aggregator-missing-member-account.md
+    expected_verdict: NEED_MORE_INFO
+    expected_layer: AGGREGATOR_GAP
