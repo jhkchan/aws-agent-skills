@@ -1,0 +1,70 @@
+{
+  "skill": "cloudtrail-lake-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill supplies many expert\u2011level details not usually restated by a generic model: exact retention limits (90\u20113653 days or INDEFINITE), KMS key\u2011policy requirements, the \"partition\u2011or\u2011perish\" heuristic, multi\u2011column partitioning (2025), EDS replication, cost and latency baselines, and precise failure\u2011mode tables. However it omits some operational limits (e.g., maximum number of Event Data Stores per account, maximum query length) and does not mention newer limits such as query result size caps, so the knowledge is not absolutely complete."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedural flow: ordered pre\u2011checks (region alignment, KMS policy, organization scope, retention, etc.), explicit CONFIRM gate, capture of pre\u2011state, and detailed Athena\u2011federation steps. Some steps are described generically (e.g., \"check IAM permissions\" without listing exact actions) which prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list with specific reasons (e.g., never run without a time filter, never assume global scope, never delete without disabling termination protection). Missing a few common pitfalls such as forgetting to set S3 bucket policies for Athena result locations or overlooking Lake Formation grant inheritance, so the anti\u2011pattern coverage is strong but not exhaustive."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The only inconsistency is the mention of a \"VERDICT: ERROR\" response for malformed input, which contradicts the strict output contract that allows only READY, BLOCKED, or COMPLETED. This violates full compliance."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns, and examples. The initial sections are dense, which can cause some cognitive overload, but critical rules are still surfaced early enough."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive operations are tightly constrained by mandatory CONFIRM gates and exhaustive pre\u2011checks. Creative tasks (query authoring) are given freedom but are calibrated by requiring a partition filter and column selection guidance. No over\u2011constrained or under\u2011constrained areas were found."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a clear, repeatable pattern (mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 anti\u2011patterns \u2192 heuristics). The structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides decision trees, concrete CLI commands, verification steps, and worked examples that an agent could follow. However the contract conflict (VERDICT: ERROR) and the lack of explicit handling for pagination errors, API rate\u2011limit retries, and eventual\u2011consistency windows after EDS creation reduce practical reliability."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 54052,
+  "latency_ms": 13279,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "amplify-app-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill consolidates many known Amplify practices but adds only a few truly novel heuristics (e.g., the explicit dependency graph and cost table). A large portion restates standard AWS documentation, so it does not achieve full expert delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a detailed 10\u2011step AWS\u2011specific provisioning flow and decision trees, but includes a generic \u201cverify prerequisites\u201d step that is not uniquely AWS\u2011focused, costing one point."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons, yet omits a few common pitfalls such as over\u2011permissive IAM roles for SSR compute and missing CDK bootstrap validation."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and includes a rich keyword list; the output contract is unambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (summary, quick\u2011nav table, detailed sections) but the long narrative blocks and deep references are interspersed, causing some cognitive overload for an agent."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (create\u2011app, domain association) are allowed with minimal input validation; tighter constraints (e.g., explicit schema validation of repo URL, region, app name) would better match the fragility of provisioning."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Philosophy \u2192 Steps \u2192 NEVER \u2192 Output), but the ordering is slightly ad\u2011hoc and not a formally defined template, losing a point."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides actionable CLI commands, decision trees, and example outputs, yet lacks explicit error\u2011handling branches (e.g., what to do if ACM validation times out or a CodeConnections connection stays PENDING)."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 46223,
+  "latency_ms": 31992,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

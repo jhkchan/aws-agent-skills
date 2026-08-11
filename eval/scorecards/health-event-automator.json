@@ -1,13 +1,70 @@
 {
   "skill": "health-event-automator",
   "model_id": "amazon.nova-pro-v1:0",
-  "dimensions": [],
-  "total_score": 0,
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides expert\u2011level specifics not usually memorized: concrete lead\u2011time defaults per change type, mandatory DLQ on every EventBridge target, exact sequence to enable org\u2011wide Health view (enable\u2011service\u2011access, register delegated admin, then create org rule), recent 2024\u20112026 feature list (User Notifications, Health Omics, Scheduler), and a decision tree for routing based on eventTypeCategory. This goes beyond a generic model's knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: pre\u2011flight spec gate, enable\u2011health\u2011service\u2011access before delegating admin, create org\u2011wide rule in delegated admin account, attach DeadLetterConfig to every target, enforce impact\u2011choice before DR failover, and fallback poller for tier\u20110 latency. Procedures are concrete and ordered for AWS."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never trigger DR without impact evaluation, never omit DLQ, never rely solely on EventBridge due to up\u2011to\u201110\u2011minute lag). Missing a few common pitfalls such as least\u2011privilege IAM policy guidance and handling of pagination in describe\u2011affected\u2011entities, hence a small deduction."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Full frontmatter, clear description, explicit WHEN_TO_USE, WHEN_NOT_TO_USE, activation_triggers, and a precise invocation_schema. The output contract is unambiguous, enabling reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Top\u2011level summary and quick\u2011navigation table give a concise entry point; detailed sections (pre\u2011flight, rule creation, enrichment, org view, scheduler, etc.) are revealed on demand. Critical rules (DLQ, impact gate) are highlighted early, while deep references (full Step Functions definition) are at the end."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (DR failover, ASG scaling) are tightly constrained: mandatory confirmation prompt, impact\u2011choice gating, DLQ requirement, and idempotency checks. Creative tasks (chat delivery via User Notifications) are left freer. Minor gap: no explicit max schedule length for Scheduler beyond the 1\u2011year limit."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern used in other CloudOps skills: Mindset \u2192 Pre\u2011flight \u2192 Detailed design sections \u2192 NEVER anti\u2011patterns \u2192 Expert heuristics \u2192 Edge cases \u2192 Output contract. Structure is consistent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides runnable CLI commands, Lambda code snippets, Step Functions definition, verification steps, and synthetic replay guidance, enabling an agent to implement the design. Lacks IAM policy examples and pagination handling for describe\u2011affected\u2011entities, and the DLQ attachment commands assume SQS permissions are already in place, leading to a modest deduction."
+    }
+  ],
+  "total_score": 108,
   "max_score": 120,
-  "grade": "F",
-  "token_count": 0,
-  "latency_ms": 0,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "grade": "A",
+  "token_count": 48973,
+  "latency_ms": 6790,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
 }

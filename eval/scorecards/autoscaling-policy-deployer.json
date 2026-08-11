@@ -1,0 +1,70 @@
+{
+  "skill": "autoscaling-policy-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds genuine expert knowledge: silent\u2011failure table, dual\u2011policy trap, predictive\u2011scaling 24h history requirement, capacity\u2011rebalance no\u2011op, warm\u2011pool race conditions, specific ordering constraints and concrete CLI flag nuances. Some sections merely restate AWS docs, preventing a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an explicit 9\u2011step AWS\u2011CLI procedure, rationale for each ordering decision, and verification commands; only a few steps remain generic (e.g., \u201cconfirm baseline\u201d) rather than fully AWS\u2011specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list of five specific anti\u2011patterns with clear why\u2011it\u2011fails explanations, but omits other common traps such as missing IAM service\u2011linked role, mis\u2011configured cooldowns, or overly aggressive MinSize/MaxSize settings."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, activation triggers, and invocation schema are all present and well\u2011formed; however the skill lacks an explicit input\u2011schema definition or a concrete example payload, which would improve reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered from a quick reference to deep sections (reasoning, dependency graph, heuristics, full 9\u2011step procedure). The full procedure appears early, adding some cognitive load, but overall the layering is effective."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive provisioning is gated by prerequisite checks and a verification step, matching the fragility of the task; however the skill does not constrain policy count, warm\u2011pool size limits, or other quantitative safety guards, leaving a bit too much freedom."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (overview \u2192 activation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 output format) that aids comprehension; no ad\u2011hoc structure detected."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, verification commands, and a strict output contract, enabling an agent to execute the skill. Missing explicit error\u2011handling branches for failed commands and a few optional\u2011section examples reduce completeness."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 43695,
+  "latency_ms": 13585,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

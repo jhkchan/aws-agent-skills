@@ -1,0 +1,176 @@
+{
+  "skill": "amplify-app-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-10",
+  "description": "Structured eval definitions for the Amplify App Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across workload types (Next.js SSR with Gen 2 backend, React SPA static, missing prerequisites, Vue SSR Gen 2 pipeline-deploy, Angular SPA with third-party DNS domain) and missing-prerequisite branches. Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "nextjs-ssr-gen2-backend",
+      "name": "Production Next.js 14 SSR with Amplify Gen 2 backend (Cognito, AppSync, S3)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — GitHub CodeConnections, SSR rendering, Gen 2 backend with auth/data/storage, custom domain via Route 53, Secrets Manager for Stripe",
+      "prompt": "Provision a production Amplify app named \"prod-web\" in us-east-1. Framework is Next.js 14 with SSR rendering. Git provider is GitHub (repo github.com/example/prod-web, CodeConnections connection github-amplify in AVAILABLE state). amplify.yml is committed. Custom domain app.example.com via Route 53 hosted zone Z111 (same account), ACM cert arn:aws:acm:us-east-1:111:certificate/abc in us-east-1, status ISSUED. Backend is Amplify Gen 2 with Cognito auth, AppSync GraphQL data, S3 storage (per-user prefixes). Environment variables: API_URL, NODE_ENV, NEXT_PUBLIC_API_URL plaintext; STRIPE_SECRET_KEY via Secrets Manager ref. Custom headers: HSTS, X-Content-Type-Options nosniff, X-Frame-Options DENY, CSP default-src 'self'. Redirects: SPA rewrite /<*> -> /index.html status 200. CI/CD on every push; main=prod, staging=staging.example.com, PR previews. Account ID: 123456789012.",
+      "prompt_file": "prompts/nextjs-ssr-gen2-backend.md",
+      "baseline_file": "baselines/nextjs-ssr-gen2-backend.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APP: prod-web\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Git provider: GitHub (CodeConnections github-amplify AVAILABLE)\n  [✓] Repository: github.com/example/prod-web (amplify.yml committed)\n  [✓] Framework: Next.js 14\n  [✓] Rendering mode: SSR\n  [✓] Build settings: ampx pipeline-deploy + npm run build\n  [✓] Environment variables: 3 plaintext, 1 Secrets Manager ref (STRIPE_SECRET_KEY)\n  [✓] Custom headers: HSTS, nosniff, X-Frame-Options DENY, CSP\n  [✓] Redirects: /<*> -> /index.html status 200\n  [✓] Custom domain: app.example.com (ACM cert ISSUED, Route 53 auto-validated)\n  [✓] Backend (Gen 2): Cognito auth, AppSync GraphQL, S3 storage\n  [✓] CI/CD: branch builds; main=prod, staging=staging, PR=preview\nVERIFICATION_COMMANDS:\n  aws amplify get-app --app-id dXXXX\n  aws amplify list-branches --app-id dXXXX\n  aws amplify get-domain-association --app-id dXXXX --domain-name example.com\n  aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:111:certificate/abc --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "prod-web",
+            "VERDICT",
+            "CHECKLIST",
+            "SSR",
+            "Gen 2",
+            "Cognito"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "react-spa-static-no-backend",
+      "name": "React 18 Vite SPA marketing site on CodeCommit with Route 53 domain",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — SPA rendering, no backend, CodeCommit service role, custom domain via Route 53",
+      "prompt": "Provision an Amplify app named \"marketing-site\" in us-east-1. Framework is React 18 (Vite), rendering mode SPA (client-side, CDN-served, no SSR). Git provider is CodeCommit (repo codecommit::us-east-1://marketing-site, service role AWSAmplifyServiceRole). amplify.yml committed. Custom domain marketing.example.com via Route 53 hosted zone Z222 (same account), ACM cert arn:aws:acm:us-east-1:111:certificate/def in us-east-1, status ISSUED. No backend (static SPA, no Gen 2). Environment variables: VITE_API_URL, NODE_ENV plaintext. Custom headers: HSTS, X-Content-Type-Options nosniff. Redirects: /<*> -> /index.html status 200 (SPA rewrite for React Router). CI/CD on every push to main. Account ID: 123456789012.",
+      "prompt_file": "prompts/react-spa-static-no-backend.md",
+      "baseline_file": "baselines/react-spa-static-no-backend.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APP: marketing-site\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Git provider: CodeCommit (service role AWSAmplifyServiceRole)\n  [✓] Repository: codecommit::us-east-1://marketing-site (amplify.yml committed)\n  [✓] Framework: React 18 (Vite)\n  [✓] Rendering mode: SPA\n  [✓] Build settings: npm ci + npm run build (artifacts: dist/**/*)\n  [✓] Environment variables: 2 plaintext (VITE_API_URL, NODE_ENV)\n  [✓] Custom headers: HSTS, nosniff\n  [✓] Redirects: /<*> -> /index.html status 200 (SPA rewrite)\n  [✓] Custom domain: marketing.example.com (Route 53 auto-validated)\n  [✓] Backend (Gen 2): N/A (static SPA)\n  [✓] CI/CD: branch builds; main=marketing.example.com\nVERIFICATION_COMMANDS:\n  aws amplify get-app --app-id dXXXX\n  aws amplify list-branches --app-id dXXXX",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "marketing-site",
+            "VERDICT",
+            "CHECKLIST",
+            "SPA",
+            "React",
+            "CodeCommit"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "VERDICT: PREREQUISITES_MISSING",
+            "SSR"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-git-provider-and-amplify-yml",
+      "name": "Operator requests an Amplify app without Git provider, repo, framework, or amplify.yml status",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Git provider, repo URL, framework, rendering mode, amplify.yml all unspecified",
+      "prompt": "Help me deploy a new Amplify app called \"new-app\" in us-east-1. It's a React frontend — I think SSR or something. Region us-east-1, account 123456789012.",
+      "prompt_file": "prompts/missing-git-provider-and-amplify-yml.md",
+      "baseline_file": "baselines/missing-git-provider-and-amplify-yml.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "APP: new-app\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Git provider: NOT specified — need CodeCommit / GitHub / GitLab / Bitbucket + connection\n  [✗] Repository: NOT specified — need repo URL with amplify.yml committed\n  [✗] Framework: React (assumed) — version not specified\n  [✗] Rendering mode: NOT specified — need SSR / SSG / SPA / ISR\n  [✗] ACM certificate: NOT specified — custom domain needs cert in us-east-1\nVERIFICATION_COMMANDS:\n  aws codeconnections list-connections\n  aws acm list-certificates --region us-east-1\n  aws route53 list-hosted-zones",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "new-app",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gen2-backend-ampx-pipeline-deploy",
+      "name": "Vue 3 Nuxt SSR with Amplify Gen 2 backend on GitLab (AppSync + Lambda resolver)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Gen 2 pipeline-deploy in build phase, CDK bootstrap verified, AppSync + Lambda resolver",
+      "prompt": "Provision an Amplify Gen 2 backend deployment for app \"vue-ssr-shop\" in us-east-1. Frontend is Vue 3 (Nuxt) SSR. Git provider is GitLab (repo gitlab.com/example/vue-ssr-shop, CodeConnections connection gitlab-ampx AVAILABLE). amplify.yml committed with `npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID` in the build phase. Backend is Gen 2 TypeScript CDK with AppSync GraphQL data and a Lambda function resolver. CDK bootstrap CDKToolkit exists in us-east-1. Custom domain shop.example.com via Route 53 hosted zone Z333, ACM cert arn:aws:acm:us-east-1:111:certificate/ghi ISSUED. Environment variables: VUE_APP_API_URL, NODE_ENV plaintext; DB_PASSWORD via Secrets Manager. Custom headers: HSTS, X-Content-Type-Options. Redirects: /<*> -> /index.html status 200. CI/CD on every push; main=prod, staging=staging.shop. Account ID: 123456789012.",
+      "prompt_file": "prompts/gen2-backend-ampx-pipeline-deploy.md",
+      "baseline_file": "baselines/gen2-backend-ampx-pipeline-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APP: vue-ssr-shop\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Git provider: GitLab (CodeConnections gitlab-ampx AVAILABLE)\n  [✓] Repository: gitlab.com/example/vue-ssr-shop (amplify.yml committed)\n  [✓] Framework: Vue 3 (Nuxt)\n  [✓] Rendering mode: SSR\n  [✓] Build settings: npx ampx pipeline-deploy --branch $AWS_BRANCH + npm run build\n  [✓] Environment variables: 2 plaintext, 1 Secrets Manager ref (DB_PASSWORD)\n  [✓] Custom headers: HSTS, nosniff\n  [✓] Redirects: /<*> -> /index.html status 200\n  [✓] Custom domain: shop.example.com (ACM cert ISSUED, Route 53)\n  [✓] Backend (Gen 2): AppSync GraphQL, Lambda function resolver\n  [✓] CI/CD: branch builds; main=shop.example.com, staging=staging.shop\nVERIFICATION_COMMANDS:\n  aws amplify get-app --app-id dXXXX\n  aws cloudformation describe-stacks --stack-name CDKToolkit\n  aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:111:certificate/ghi --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "vue-ssr-shop",
+            "VERDICT",
+            "CHECKLIST",
+            "pipeline-deploy",
+            "Gen 2"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "ampx sandbox",
+            "ampx push"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-domain-third-party-dns",
+      "name": "Angular SPA with custom domain on third-party DNS (GoDaddy) — manual CNAME validation",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — custom domain on GoDaddy (not Route 53); manual DNS CNAME validation required; cert PENDING_VALIDATION",
+      "prompt": "Provision an Amplify app named \"admin-portal\" in us-east-1. Framework is Angular 17 (SPA). Git provider is Bitbucket (repo bitbucket.org/example/admin-portal, CodeConnections bitbucket-conn AVAILABLE). amplify.yml committed. Custom domain portal.example.com — but example.com is hosted on GoDaddy (NOT Route 53). ACM cert arn:aws:acm:us-east-1:111:certificate/jkl in us-east-1, status PENDING_VALIDATION. amplify.yml has SPA rewrite /<*> -> /index.html status 200, security headers (HSTS, nosniff, X-Frame-Options DENY). No backend. Environment variables: API_BASE_URL, NODE_ENV. CI/CD on every push to main. Account ID: 123456789012.",
+      "prompt_file": "prompts/custom-domain-third-party-dns.md",
+      "baseline_file": "baselines/custom-domain-third-party-dns.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APP: admin-portal\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Git provider: Bitbucket (CodeConnections bitbucket-conn AVAILABLE)\n  [✓] Repository: bitbucket.org/example/admin-portal (amplify.yml committed)\n  [✓] Framework: Angular 17\n  [✓] Rendering mode: SPA\n  [✓] Build settings: npm ci + npm run build\n  [✓] Environment variables: 2 plaintext\n  [✓] Custom headers: HSTS, nosniff, X-Frame-Options DENY\n  [✓] Redirects: /<*> -> /index.html status 200\n  [✓] Custom domain: portal.example.com (GoDaddy DNS — manual CNAME validation required; cert PENDING_VALIDATION)\n  [✓] Backend (Gen 2): N/A\n  [✓] CI/CD: branch builds; main=portal.example.com\nVERIFICATION_COMMANDS:\n  aws amplify get-app --app-id dXXXX\n  aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:111:certificate/jkl --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "admin-portal",
+            "VERDICT",
+            "CHECKLIST",
+            "GoDaddy",
+            "DNS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "s3-object-lambda-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides deep, expert\u2011level details (silent\u2011failure table, exact ordering constraints, concurrency trap, WriteGetObjectResponse nuance, event\u2011schema keys, multi\u2011region caveats). Missing explicit mention that Object Lambda does not replicate data across regions and that cross\u2011region routing must be handled externally, which would be valuable expert knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: exact CLI commands, trust\u2011policy for s3-object-lambda, required permission set, reserved concurrency workflow, and verification steps. One generic \u201cverify prerequisites\u201d bullet could be more AWS\u2011specific (e.g., explicit IAM policy version handling)."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 12,
+      "max": 15,
+      "justification": "A solid NEVER list of five concrete pitfalls is present, each with a why, but the list is not exhaustive. It omits common anti\u2011patterns such as missing CloudWatch alarm thresholds for Lambda throttles, cross\u2011region latency pitfalls, and over\u2011permissive AP policies. The coverage is therefore incomplete."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS, and activation triggers are enumerated. Lacks a tiny example of how the skill is invoked via the orchestration layer, which would make activation deterministic."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (quick reference, detailed steps, heuristics, optional features). However, the 9\u2011step table and the full reasoning framework are dense and could overload the agent before it knows which parts are required."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive provisioning steps are tightly specified, but the skill does not provide a safety\u2011net such as a dry\u2011run mode or explicit confirmation prompt before creating resources. For a fragile operation, tighter constraints would be expected."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (metadata, quick navigation, stepwise procedure, anti\u2011patterns, output contract). The layout is slightly ad\u2011hoc rather than a formally named template, costing one point."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "The skill supplies a decision tree, CLI commands, and a strict output contract, enabling an agent to act. Missing are explicit error\u2011handling branches (e.g., rollback if step 4 fails), guidance for handling verification mismatches, and examples of region\u2011mismatch remediation. These gaps reduce real\u2011world usability."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 44477,
+  "latency_ms": 16354,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

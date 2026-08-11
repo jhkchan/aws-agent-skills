@@ -1,0 +1,70 @@
+{
+  "skill": "datasync-task-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many concrete, non\u2011obvious decision points (e.g., 1\u2011year schedule horizon, bandwidth\u2011limit vs agent uplink, exact IAM/KMS permission chains, PosixPermissions constraints per destination, SMB secret requirement, FSx ONTAP SVM reachability). This depth goes beyond a generic model\u2019s baseline knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: agent activation, IAM trust chain verification, KMS key\u2011policy checks, option\u2011consistency rules, and a mandatory CONFIRM gate. The only shortfall is a few generic steps (e.g., \"capture pre\u2011state\") that are not uniquely DataSync\u2011specific."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never use VerifyMode\u202fNONE for compliance, never set PosixPermissions\u202fPRESERVE on SMB). Missing a few niche pitfalls (cross\u2011region latency, multi\u2011agent contention) prevents a perfect score."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. Minor vagueness in activation_triggers formatting prevents a perfect score."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Layers information cleanly: quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns. No cognitive overload, but the extensive tables could be trimmed for absolute optimal layering."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained by mandatory CONFIRM gates and exhaustive pre\u2011checks; creative tasks (e.g., discovery) are given appropriate flexibility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (frontmatter \u2192 overview \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 anti\u2011patterns). The ordering of some subsections feels ad\u2011hoc, preventing a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Agents can execute the skill end\u2011to\u2011end: clear CLI commands, decision trees, and example blocks are provided. Missing are explicit handling of partial failures in POST_VERIFY (e.g., when FilesTransferred < EstimatedFilesToTransfer) and a more detailed error\u2011shape for malformed input beyond a generic VERDICT: ERROR."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 54284,
+  "latency_ms": 5423,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

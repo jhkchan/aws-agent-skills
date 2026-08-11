@@ -1,13 +1,70 @@
 {
   "skill": "backup-compliance-automator",
   "model_id": "amazon.nova-pro-v1:0",
-  "dimensions": [],
-  "total_score": 0,
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many concrete AWS Backup commands, control names, and nuanced gotchas (e.g., Vault Lock modes, cross\u2011account copy policy) that a generic model would not enumerate, but a large portion of the content is a verbatim restatement of AWS documentation (control lists, CLI syntax) without original decision\u2011making insight, reducing the true delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides AWS\u2011specific procedures: pre\u2011flight spec gate, step\u2011by\u2011step Vault Lock mode change, delegated admin registration, and orchestrations via Step Functions and EventBridge Scheduler. Lacks an explicit decision tree for choosing a compliance framework (SOC2 vs HIPAA vs custom) based on input, which prevents a fully perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list with clear reasons (e.g., never use GOVERNANCE Vault Lock for regulated frameworks, never skip legal\u2011hold testing). The list is relatively short and omits other common pitfalls such as over\u2011reliance on Backup Report Stream for audit\u2011grade evidence, so points are deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and when_to_use/when_not_to_use are well\u2011defined. Invocation schema is described in prose rather than a strict JSON schema, which could hinder reliable activation by an agent."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a navigation table and layered sections (summary \u2192 detailed pillars \u2192 anti\u2011patterns \u2192 heuristics). Nonetheless, the initial document front\u2011loads a large amount of detail, and critical safety rules (confirmation prompts) are buried later, causing some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive actions (Vault Lock LOCK_MODE) require explicit confirmation, and irreversible steps are highlighted. Creative design steps (framework selection) are loosely constrained, leaving room for ambiguous outputs."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (frontmatter \u2192 overview \u2192 mindset \u2192 pre\u2011flight \u2192 pillars \u2192 detailed implementations \u2192 NEVER \u2192 heuristics \u2192 edge cases \u2192 output contract). Minor deviation: the \u201cExpert heuristic callouts\u201d section is not a standard label but the overall structure is coherent."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides runnable CLI commands, Lambda snippets, Step Functions definition, and strict output contract, enabling an agent to act. However, edge\u2011case handling (e.g., regional availability of Backup Search, fallback when a service is unavailable) is not fully enumerated, leaving execution gaps."
+    }
+  ],
+  "total_score": 106,
   "max_score": 120,
-  "grade": "F",
-  "token_count": 0,
-  "latency_ms": 0,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "grade": "B",
+  "token_count": 46455,
+  "latency_ms": 11449,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
 }

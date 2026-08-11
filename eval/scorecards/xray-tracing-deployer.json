@@ -1,0 +1,70 @@
+{
+  "skill": "xray-tracing-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides extensive, concrete AWS\u2011specific knowledge not typically known by a generic model: exact IAM policy JSON, systemd unit file, sidecar container JSON, DaemonSet yaml, sampling rule semantics (priority, reservoir, fixed rate), recent feature changes (2024\u20112026), cost\u2011control guidance, cross\u2011account tracing, SQS/EventBridge propagation, and detailed edge\u2011case handling."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes a clear AWS\u2011specific deployment mindset: ordered steps (IAM \u2192 daemon \u2192 SDK \u2192 sampling \u2192 groups \u2192 ServiceLens), reasoning framework, platform\u2011matrix decisions, and pre\u2011flight safety checks. Only minor generic phrasing (\"check IAM\") prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Includes a useful NEVER list with concrete reasons, yet it only covers five top pitfalls and omits other common anti\u2011patterns (e.g., high\u2011cardinality annotations, missing trace\u2011context propagation for SQS/EventBridge, cost\u2011explosion from unbounded custom rules)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter and description are present, and the output contract is well defined. However, the trigger list is a long free\u2011form paragraph without explicit activation keywords or a concise \u201cwhen to invoke\u201d pattern, which could cause unreliable skill activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick navigation, contract, reasoning, procedure, NEVER, heuristics), but the initial sections are dense and contain many tables and code blocks, risking cognitive overload before the agent reaches the core checklist."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately for a potentially destructive deployment: requires pre\u2011flight checks, explicit IAM verification, daemon status, and sampling validation. Slightly over\u2011constrains by mandating exact CLI commands for every platform, which could limit flexibility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable pattern (metadata, strict contract, reasoning, procedure, anti\u2011patterns, heuristics, references) that aligns with established CloudOps skill structures."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI snippets, checklist format, and verification commands, enabling an agent to act. Missing are explicit error\u2011handling branches (e.g., what to do if daemon status check fails) and fallback steps for failed IAM attachment, which limits robustness."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 40611,
+  "latency_ms": 19346,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
