@@ -1,0 +1,286 @@
+# Eval test cases for codebuild-build-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it.
+skill: codebuild-build-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: docker-privileged-mode-not-set
+    description: >-
+      CodeBuild project running a Docker-in-Docker build (docker build
+      in the BUILD phase). The project's environment.privilegedMode is
+      false. Every build fails with "Cannot connect to the Docker
+      daemon." Expected root cause: DOCKER_PRIVILEGED_MODE.
+    input: |
+      Symptom: project cb-prod-api fails during the BUILD phase on
+      every build. The buildspec runs "docker build -t app ." as the
+      first BUILD command; it fails with "Cannot connect to the Docker
+      daemon at unix:///var/run/docker.sock. Is the docker daemon
+      running?"
+
+      ProjectName: cb-prod-api
+      BuildId: cb-prod-api:abc12345
+      Environment:
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        PrivilegedMode: false
+        ComputeType: BUILD_GENERAL1_LARGE
+      Buildspec:
+        Phases:
+          Install: { runtime-versions: { nodejs: 20 } }
+          Build: { commands: [ "docker build -t app ." ] }
+      VpcConfig: (none)
+      Cache: (none)
+
+      Recent log pattern:
+        [Container] BUILD: docker build -t app .
+        Cannot connect to the Docker daemon at unix:///var/run/docker.sock.
+        Is the docker daemon running?
+        Phase complete: BUILD State: FAILED
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "docker-privileged-mode-not-set"
+        - "DOCKER_PRIVILEGED_MODE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: IMAGE_PULL_AUTH"
+
+  - id: ecr-pull-cross-account-auth
+    description: >-
+      CodeBuild uses a cross-account ECR image as the build environment
+      image. The service role lacks ecr:BatchGetImage on the cross-
+      account repo. Build fails in INSTALL with
+      BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE. Expected root cause:
+      IMAGE_PULL_AUTH.
+    input: |
+      Symptom: project cb-deploy-runner fails in the INSTALL phase
+      before any buildspec command runs. The error is
+      BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE for image
+      111111111111.dkr.ecr.us-east-1.amazonaws.com/base-images:latest.
+      The CodeBuild project is in account 222222222222; the ECR repo
+      is in account 111111111111.
+
+      ProjectName: cb-deploy-runner
+      BuildId: cb-deploy-runner:def67890
+      Environment:
+        Image: 111111111111.dkr.ecr.us-east-1.amazonaws.com/base-images:latest
+        PrivilegedMode: false
+        ComputeType: BUILD_GENERAL1_MEDIUM
+      ServiceRole: arn:aws:iam::222222222222:role/service-role-codebuild-cb-deploy-runner
+      ServiceRolePolicies:
+        - AWSCodeBuildDeveloperAccess (managed)
+        - inline: { s3-artifacts: s3:PutObject on artifacts bucket }
+      ServiceRole ECR permissions: NOT PRESENT
+      ECR Repository: 111111111111.dkr.ecr.us-east-1.amazonaws.com/base-images
+      Image exists: yes, 850 MB compressed
+      Build is NOT VPC-attached.
+
+      Phase details:
+        phaseType: INSTALL
+        phaseStatus: FAILED
+        contexts[0].message: "BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE:
+          Unable to pull
+          111111111111.dkr.ecr.us-east-1.amazonaws.com/base-images:latest"
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "ecr-pull-cross-account-auth"
+        - "IMAGE_PULL_AUTH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: IMAGE_PULL_SIZE"
+
+  - id: artifact-s3-permission-denied
+    description: >-
+      CodeBuild build succeeds through POST_BUILD but fails in
+      UPLOAD_ARTIFACTS with Access Denied on the S3 artifacts bucket.
+      The service role lacks s3:PutObject on the bucket. Expected root
+      cause: ARTIFACT_S3_PERMISSION.
+    input: |
+      Symptom: project cb-web-frontend completes all buildspec phases
+      successfully but fails at UPLOAD_ARTIFACTS with "Access Denied"
+      when uploading to the S3 artifacts bucket.
+
+      ProjectName: cb-web-frontend
+      BuildId: cb-web-frontend:ghi78901
+      Phases:
+        INSTALL: SUCCEEDED
+        PRE_BUILD: SUCCEEDED
+        BUILD: SUCCEEDED
+        POST_BUILD: SUCCEEDED
+        UPLOAD_ARTIFACTS: FAILED
+      Artifacts:
+        Type: S3
+        Location: codebuild-artifacts-prod-us-east-1
+        Packaging: ZIP
+        EncryptionDisabled: false
+      ServiceRole: arn:aws:iam::333333333333:role/service-role-cb-web-frontend
+      ServiceRolePolicies:
+        - AWSCodeBuildReadOnlyAccess (managed)
+        - inline: { logs: logs:CreateLogStream, logs:PutLogEvents }
+      ServiceRole S3 permissions on artifacts bucket: NOT PRESENT
+      EncryptionKey: arn:aws:kms:us-east-1:333333333333:key/prod-key
+
+      Phase details:
+        phaseType: UPLOAD_ARTIFACTS
+        phaseStatus: FAILED
+        contexts[0].message: "Access Denied"
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "artifact-s3-permission-denied"
+        - "ARTIFACT_S3_PERMISSION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: ARTIFACT_KMS"
+
+  - id: vpc-no-nat-package-install
+    description: >-
+      VPC-attached CodeBuild in a private subnet without a NAT Gateway.
+      The INSTALL phase fails when running "npm install" because the
+      build cannot reach registry.npmjs.org. Expected root cause:
+      VPC_NO_EGRESS.
+    input: |
+      Symptom: project cb-backend-api fails in the INSTALL phase when
+      running "npm install". The error is "npm ERR! network request
+      failed" for registry.npmjs.org. The project is VPC-attached in
+      a private subnet with no route to a NAT Gateway and no VPC
+      endpoints for external services.
+
+      ProjectName: cb-backend-api
+      BuildId: cb-backend-api:jkl23456
+      Environment:
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        PrivilegedMode: false
+      VpcConfig:
+        VpcId: vpc-0abc123
+        Subnets: [subnet-private-a, subnet-private-b]
+        SecurityGroupIds: [sg-codebuild]
+      Subnet context:
+        subnet-private-a: CIDR 10.0.10.0/24, route table has no
+          NAT Gateway route, no 0.0.0.0/0 route
+        subnet-private-b: CIDR 10.0.11.0/24, route table has no
+          NAT Gateway route, no 0.0.0.0/0 route
+      SG sg-codebuild egress: 0.0.0.0/0 port 443 (egress allows HTTPS)
+      VPC endpoints: S3 gateway only (no interface endpoints for npm)
+
+      Buildspec:
+        Phases:
+          Install:
+            runtime-versions: { nodejs: 20 }
+            commands: [ "npm install" ]
+      Phase details:
+        phaseType: INSTALL
+        phaseStatus: FAILED
+
+      Recent log pattern:
+        npm ERR! code ETIMEDOUT
+        npm ERR! network request to https://registry.npmjs.org/ failed
+        npm ERR! network This is a problem related to network
+        connectivity.
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "vpc-no-nat-package-install"
+        - "VPC_NO_EGRESS"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: VPC_SG_BLOCKING"
+
+  - id: buildspec-runtime-version-deprecated
+    description: >-
+      CodeBuild buildspec references a removed runtime version
+      (python: 3.7). The INSTALL phase fails with YAML_FILE_ERROR.
+      Python 3.7 was removed from CodeBuild managed images. Expected
+      root cause: BUILDSPEC_SYNTAX (runtime availability).
+    input: |
+      Symptom: project cb-data-pipeline started failing after a
+      routine dependency update. The INSTALL phase fails with
+      YAML_FILE_ERROR before any buildspec command runs. The buildspec
+      references python 3.7 which was deprecated and removed from
+      CodeBuild managed images.
+
+      ProjectName: cb-data-pipeline
+      BuildId: cb-data-pipeline:mno34567
+      Environment:
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        PrivilegedMode: false
+      Buildspec:
+        version: 0.2
+        phases:
+          install:
+            runtime-versions:
+              python: 3.7
+            commands:
+              - pip install -r requirements.txt
+          build:
+            commands:
+              - python main.py
+      Phase details:
+        phaseType: INSTALL
+        phaseStatus: FAILED
+        contexts[0].statusCode: YAML_FILE_ERROR
+        contexts[0].message: "Phase context status code: YAML_FILE_ERROR
+          Message: Unknown runtime version"
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "buildspec-runtime-version-deprecated"
+        - "BUILDSPEC_SYNTAX"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: RUNTIME_VERSION"

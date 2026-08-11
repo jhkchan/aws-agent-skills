@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "codebuild-build-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CodeBuild Build Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "docker-privileged-mode-not-set",
+      "name": "Docker-in-Docker build fails — project environment privilegedMode is false, 'docker build' returns daemon not running",
+      "difficulty": "hard",
+      "prompt_file": "prompts/docker-privileged-mode-not-set.md",
+      "baseline_file": "baselines/docker-privileged-mode-not-set.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "DOCKER_PRIVILEGED_MODE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "docker-privileged-mode-not-set", "DOCKER_PRIVILEGED_MODE", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: IMAGE_PULL_AUTH"]
+        }
+      ]
+    },
+    {
+      "id": "ecr-pull-cross-account-auth",
+      "name": "Cross-account ECR image pull fails — service role lacks ecr:BatchGetImage on the cross-account repo",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ecr-pull-cross-account-auth.md",
+      "baseline_file": "baselines/ecr-pull-cross-account-auth.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "IMAGE_PULL_AUTH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "ecr-pull-cross-account-auth", "IMAGE_PULL_AUTH", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: IMAGE_PULL_SIZE"]
+        }
+      ]
+    },
+    {
+      "id": "artifact-s3-permission-denied",
+      "name": "Artifact upload fails at UPLOAD_ARTIFACTS — service role lacks s3:PutObject on the artifacts bucket",
+      "difficulty": "medium",
+      "prompt_file": "prompts/artifact-s3-permission-denied.md",
+      "baseline_file": "baselines/artifact-s3-permission-denied.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "ARTIFACT_S3_PERMISSION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "artifact-s3-permission-denied", "ARTIFACT_S3_PERMISSION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: ARTIFACT_KMS"]
+        }
+      ]
+    },
+    {
+      "id": "vpc-no-nat-package-install",
+      "name": "VPC-attached build in private subnet without NAT — npm install fails with ETIMEDOUT to registry.npmjs.org",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpc-no-nat-package-install.md",
+      "baseline_file": "baselines/vpc-no-nat-package-install.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "VPC_NO_EGRESS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "vpc-no-nat-package-install", "VPC_NO_EGRESS", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: VPC_SG_BLOCKING"]
+        }
+      ]
+    },
+    {
+      "id": "buildspec-runtime-version-deprecated",
+      "name": "Buildspec references removed runtime version (python 3.7) — INSTALL phase fails with YAML_FILE_ERROR",
+      "difficulty": "medium",
+      "prompt_file": "prompts/buildspec-runtime-version-deprecated.md",
+      "baseline_file": "baselines/buildspec-runtime-version-deprecated.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "BUILDSPEC_SYNTAX",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "buildspec-runtime-version-deprecated", "BUILDSPEC_SYNTAX", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: RUNTIME_VERSION"]
+        }
+      ]
+    }
+  ]
+}

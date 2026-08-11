@@ -1,0 +1,49 @@
+# Eval configuration for iot-core-thing-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: iot-core-thing-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: full-thing-cert-policy-binding
+    difficulty: hard
+    prompt_file: prompts/full-thing-cert-policy-binding.md
+    baseline_file: baselines/full-thing-cert-policy-binding.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: topic-rule-sql-timestream
+    difficulty: hard
+    prompt_file: prompts/topic-rule-sql-timestream.md
+    baseline_file: baselines/topic-rule-sql-timestream.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: device-shadow-named
+    difficulty: medium
+    prompt_file: prompts/device-shadow-named.md
+    baseline_file: baselines/device-shadow-named.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: greengrass-component-deployment
+    difficulty: medium
+    prompt_file: prompts/greengrass-component-deployment.md
+    baseline_file: baselines/greengrass-component-deployment.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-cert-thing-binding
+    difficulty: easy
+    prompt_file: prompts/missing-cert-thing-binding.md
+    baseline_file: baselines/missing-cert-thing-binding.md
+    expected_verdict: PREREQUISITES_MISSING

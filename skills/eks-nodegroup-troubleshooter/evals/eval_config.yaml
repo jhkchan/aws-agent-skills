@@ -1,0 +1,48 @@
+# Eval configuration for eks-nodegroup-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: eks-nodegroup-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: vpc-cni-ip-exhaustion
+    difficulty: hard
+    prompt_file: prompts/vpc-cni-ip-exhaustion.md
+    baseline_file: baselines/vpc-cni-ip-exhaustion.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: VPC_CNI_IP_EXHAUSTION
+  - id: node-iam-role-missing-ecr
+    difficulty: hard
+    prompt_file: prompts/node-iam-role-missing-ecr.md
+    baseline_file: baselines/node-iam-role-missing-ecr.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: NODE_IAM_ROLE_ECR
+  - id: nodegroup-ami-version-mismatch
+    difficulty: hard
+    prompt_file: prompts/nodegroup-ami-version-mismatch.md
+    baseline_file: baselines/nodegroup-ami-version-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: NODEGROUP_VERSION_MISMATCH
+  - id: asg-instance-capacity-unavailable
+    difficulty: medium
+    prompt_file: prompts/asg-instance-capacity-unavailable.md
+    baseline_file: baselines/asg-instance-capacity-unavailable.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: INSTANCE_CAPACITY
+  - id: custom-ami-bootstrap-script-error
+    difficulty: hard
+    prompt_file: prompts/custom-ami-bootstrap-script-error.md
+    baseline_file: baselines/custom-ami-bootstrap-script-error.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: CUSTOM_AMI_BOOTSTRAP

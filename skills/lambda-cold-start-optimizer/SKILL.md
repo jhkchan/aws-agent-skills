@@ -1,6 +1,6 @@
 ---
 name: lambda-cold-start-optimizer
-description: 'Optimises AWS Lambda cold-start latency across seven dimensions: memory allocation vs initialization time (Power Tuning finds the latency-optimal memory, not just cost-optimal), provisioned concurrency (allocation sizing, scheduling, autoscaling for latency-critical paths), SnapStart (Java only — init phase snapshot eliminates 1-3 s of init), init phase optimization (lazy initialization, global-scope connection pooling, SDK client reuse), VPC cold start penalty (hyperplane ENI elimination since 2019 — VPCs no longer add cold-start overhead), runtime selection (compiled vs interpreted, ARM64 Graviton price-performance), and deployment package size reduction (Layers, Proguarded JARs, slim ZIPs). Covers EFS mount latency, database connection reuse, runtime deprecation warning impact, X-Ray tracing overhead, and CloudWatch Lambda Insights for init-duration telemetry. Emits OPTIMIZED when cold-start p95 < SLO and all init-phase levers are applied, or FURTHER_OPTIMIZATION_AVAILABLE with the highest-leverage remaining lever.'
+description: 'Optimises AWS Lambda cold-start latency across seven dimensions: memory allocation vs initialization time (Power Tuning latency-optimal memory), provisioned concurrency (allocation sizing and autoscaling for latency-critical paths), SnapStart (Java only — init snapshot eliminates 1-3 s of init), init phase optimization (lazy initialization, global-scope connection pooling), VPC cold start penalty (hyperplane ENI elimination since 2019), runtime selection (compiled vs interpreted, ARM64 Graviton), and deployment package size reduction (Layers, Proguarded JARs, slim ZIPs). Covers EFS mount latency, runtime deprecation impact, X-Ray overhead, and CloudWatch Lambda Insights init-duration telemetry. Emits OPTIMIZED when cold-start p95 < SLO and all init-phase levers applied, or FURTHER_OPTIMIZATION_AVAILABLE with the highest-leverage remaining lever.'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -190,7 +190,7 @@ these metrics before any recommendation. Full CLI sequences are in
 **Required data sources** (summarized — see reference for full CLI):
 1. Function configuration: `aws lambda get-function-configuration`
 2. Duration + InitDuration (14-30 day window): `aws cloudwatch get-metric-statistics` with Lambda Insights
-3. Cold-start count: Lambda Insights `coldStarts` metric or CloudWatch `Invocations` vs unique container IDs
+3. Cold-start count: Lambda Insights `coldStarts` metric or `Invocations` vs unique container IDs
 4. SnapStart config: `aws lambda get-function-configuration --query 'SnapStart'`
 5. Provisioned concurrency configs: `aws lambda list-provisioned-concurrency-configs`
 6. VPC config: `aws lambda get-function-configuration --query 'VpcConfig'`
@@ -201,16 +201,12 @@ these metrics before any recommendation. Full CLI sequences are in
 
 | Condition | Effect on optimization |
 |---|---|
-| `InitDuration` metric absent (Lambda Insights not enabled) | Enable Lambda Insights first. Fall back to `Duration` spikes as cold-start proxy; mark confidence MEDIUM. |
-| `Invocations` Sum = 0 over 14 days | Emit **OPTIMIZED** with note "dormant function — no cold-start traffic." |
-| Observation window < 14 days | **NEED_MORE_INFO**. Minimum 14 days; 30 days preferred to capture traffic-pattern variance. |
-| Cold-start count absent | Estimate cold-start frequency from ConcurrentExecutions and traffic-pattern analysis. Mark confidence MEDIUM. |
+| `InitDuration` absent (Lambda Insights not enabled) | Enable Lambda Insights. Fall back to `Duration` spikes; mark confidence MEDIUM. |
+| `Invocations` Sum = 0 over 14 days | Emit **OPTIMIZED** with note "dormant function." |
+| Observation window < 14 days | **NEED_MORE_INFO**. Minimum 14 days; 30 days preferred. |
+| Cold-start count absent | Estimate from ConcurrentExecutions + traffic-pattern analysis. Mark confidence MEDIUM. |
 | Function `State != Active` | Skip optimization; surface as BLOCKED. |
 | Runtime = java8 (legacy) | SnapStart not supported. Recommend runtime upgrade first (Step 6). |
-
-When CloudWatch Duration and Lambda Insights InitDuration disagree,
-Lambda Insights is the authoritative source for cold-start analysis —
-it instruments the init phase separately from the handler.
 
 ## Process — Optimization logic (apply in order)
 
@@ -220,56 +216,35 @@ These operational gotchas route a recommendation away from the obvious
 choice:
 
 - **VPC cold start is solved (since 2019).** Hyperplane ENIs reduced
-  VPC cold-start overhead from 5-10 s to <100 ms. Do NOT attribute cold-
-  start latency to VPC attachment without verifying ENI health. If VPC
-  cold-start latency persists, check for ENI limits, subnet exhaustion,
-  or stale SecurityGroup references.
+  VPC cold-start overhead from 5-10 s to <100 ms. Do NOT attribute
+  cold-start latency to VPC without verifying ENI health.
 - **SnapStart is Java-only.** It snapshots the JVM after init. Node.js,
-  Python, and Go do not benefit (their init is already fast). Do not
-  recommend SnapStart for non-Java runtimes.
+  Python, and Go do not benefit. Never recommend SnapStart for non-Java.
 - **SnapStart requires versioned aliases.** You cannot enable SnapStart
-  on `$LATEST`. Publish a version, create an alias, then enable. The
-  trigger must invoke the alias, not the function ARN.
-- **SnapStart has a restore cost (~150-200 ms).** It is not zero. The
-  snapshot restore is faster than full init (200 ms vs 3 s) but not
-  instantaneous. For ultra-low-latency APIs (<100 ms SLO), provisioned
-  concurrency is still needed on top of SnapStart.
+  on `$LATEST`. Publish a version, create an alias, then enable.
+- **SnapStart has a restore cost (~150-200 ms).** For ultra-low-latency
+  APIs (<100 ms SLO), provisioned concurrency is still needed on top.
 - **Provisioned concurrency charges for idle.** A function at 1 GB with
-  10 provisioned concurrent executions and no traffic costs ~$394/month
-  idle. This is the #1 provisioned-concurrency cost trap. Always pair
+  10 provisioned and no traffic costs ~$394/month idle. Always pair
   with a cost-justification check.
-- **Provisioned concurrency does not support `$LATEST`.** It must be
-  attached to a version or alias. Publish a version first.
-- **X-Ray tracing adds overhead.** Each traced invocation adds 10-50 ms
-  of instrumentation overhead. For ultra-low-latency functions, evaluate
-  sampling rate (default 5% for SDK-based sampling, or parent-based
-  sampling via trace headers).
-- **CloudWatch Lambda Insights adds a small overhead.** The Lambda
-  Insights extension Layer runs as an extension, adding ~10-20 ms per
-  invocation. The telemetry value outweighs the cost for cold-start
-  analysis.
+- **Provisioned concurrency does not support `$LATEST`.** Attach to a
+  version or alias. Publish a version first.
+- **X-Ray tracing adds 10-50 ms overhead** per traced invocation.
+  Evaluate sampling rate for ultra-low-latency functions.
+- **Lambda Insights adds ~10-20 ms overhead** via the extension Layer.
+  The telemetry value outweighs the cost for cold-start analysis.
 - **Lambda Layers can INCREASE init time.** Each Layer is a separate
-  .zip; Lambda extracts and merges them at init. Excessive Layers (5+)
-  add measurable extraction overhead.
-- **ARM64 (Graviton) has different cold-start characteristics.** ARM64
-  instances may have slightly different init profiles than x86_64.
-  Benchmark both architectures with Power Tuning before assuming parity.
-- **EFS mount adds latency on cold starts.** If the function mounts EFS,
-  the first invocation incurs EFS mount latency (100-500 ms). This is
-  separate from Lambda init. Use provisioned concurrency or local /tmp
-  for latency-critical paths.
+  .zip extracted independently. Keep Layers to 3-5 maximum.
+- **ARM64 may have different init profiles.** Benchmark both
+  architectures with Power Tuning before assuming parity.
+- **EFS mount adds 100-500 ms on cold starts.** Use provisioned
+  concurrency or local /tmp for latency-critical paths.
 - **Runtime deprecation blocks optimizations.** Deprecated runtimes
   (nodejs16, java8, python3.7) may not support SnapStart, ARM64, or
-  current Lambda Insights. Always check runtime deprecation status
-  before recommending other optimizations.
-- **Database connection reuse is runtime-specific.** Node.js (pg,
-  mysql2), Python (psycopg2, pymysql), and Java (HikariCP) all support
-  connection pooling, but the global-scope pattern differs. See Step 4
-  for runtime-specific patterns.
+  current Lambda Insights. Check deprecation status first.
 - **Init code runs once per execution environment.** Lambda reuses
-  execution environments across invocations. Global-scope code runs once
-  per container lifecycle (minutes to hours), not per invocation. This
-  is the foundation of init phase optimization.
+  environments across invocations. Global-scope code runs once per
+  container lifecycle, not per invocation.
 
 ### Step 1: Memory allocation vs initialization time
 
@@ -397,55 +372,46 @@ aws lambda get-function-configuration \
 ### Step 4: Init phase optimization (lazy initialization, connection pooling)
 
 Regardless of runtime, the init phase is where most cold-start time
-lives. The goal: move heavy initialization OUTSIDE the handler into
-global scope, so it runs once per warm container, not per invocation.
+lives. Move heavy initialization OUTSIDE the handler into global scope,
+so it runs once per warm container, not per invocation.
 
-**The global-scope pattern:**
+**The global-scope pattern (Python):**
 ```python
-# Python — BAD (per-invocation init)
-import boto3
+# BAD — per-invocation init
 def handler(event, context):
     client = boto3.client('dynamodb')  # Re-created every invocation
     db = psycopg2.connect(...)          # 200-500 ms TLS overhead every time
-    # ...
 
-# Python — GOOD (global-scope init, reused across invocations)
-import boto3
+# GOOD — global-scope init, reused across invocations
 _DDB = boto3.client('dynamodb')  # Created once per container
-
+_db = None
 def _get_db():
-    """Lazy-init: only connects on first invocation, reused after."""
     global _db
     if _db is None:
         _db = psycopg2.connect(...)
     return _db
-
 def handler(event, context):
     db = _get_db()
-    # ...
 ```
 
 **Runtime-specific connection reuse patterns:**
 
 | Runtime | DB library | Pattern |
 |---|---|---|
-| Node.js | pg (PostgreSQL) | `const pool = new Pool({...})` at module scope |
-| Node.js | mysql2 | `const pool = mysql2.createPool({...})` at module scope |
-| Python | psycopg2 | Global connection with lazy-init + validity check |
-| Python | pymysql | Global connection with lazy-init |
-| Java | HikariCP | `DataSource` as static field; HikariCP manages pooling |
-| Go | database/sql | `sql.Open()` at package level; connection pool built-in |
+| Node.js | pg, mysql2 | `const pool = new Pool({...})` at module scope |
+| Python | psycopg2, pymysql | Global connection with lazy-init + validity check |
+| Java | HikariCP | `DataSource` as static field |
+| Go | database/sql | `sql.Open()` at package level |
 
 **Init-phase checklist:**
 
 | Symptom | Fix |
 |---|---|
 | InitDuration > 500 ms (non-Java) | Move SDK clients, DB connections to global scope |
-| InitDuration > 1 s (Java without SnapStart) | Enable SnapStart (Step 3) |
-| InitDuration spikes after deploy | Check for new heavy dependencies in the import chain |
+| InitDuration > 1 s (Java, no SnapStart) | Enable SnapStart (Step 3) |
+| InitDuration spikes after deploy | Check for new heavy dependencies in import chain |
 | DB connection per invocation | Use global connection pool with validity check |
 | HTTP client per invocation | Use global HTTP client with keep-alive |
-| Config file loaded per invocation | Cache config in global scope; refresh on container reuse |
 
 ### Step 5: VPC cold start penalty (hyperplane ENI elimination)
 
@@ -455,35 +421,30 @@ VPC attachment is NO LONGER a primary cold-start driver.
 
 **When VPC still causes latency:**
 
-| Condition | Diagnosis | Fix |
-|---|---|---|
-| ENI limit hit (account-level) | `aws ec2 describe-network-interfaces` shows high ENI count | Request ENI limit increase; consolidate functions into fewer subnets |
-| Subnet IP exhaustion | `aws ec2 describe-subnets` shows low AvailableIpAddressCount | Expand subnet CIDR; use dedicated Lambda subnets |
-| SecurityGroup stale reference | `aws lambda get-function-configuration` shows SG that no longer exists | Update SG references |
-| NAT Gateway latency | Function reaches internet via NAT Gateway | Use VPC endpoints for AWS service traffic (S3, DynamoDB, SQS) |
+| Condition | Fix |
+|---|---|
+| ENI limit hit | Request limit increase; consolidate into fewer subnets |
+| Subnet IP exhaustion | Expand subnet CIDR; use dedicated Lambda subnets |
+| SecurityGroup stale reference | Update SG references |
+| NAT Gateway latency | Use VPC endpoints for AWS service traffic (S3, DynamoDB, SQS) |
 
 **VPC cold-start diagnostic CLI:**
 ```bash
-# Check ENI count for the function
 aws ec2 describe-network-interfaces \
   --filters Name=description,Values="AWS Lambda VPC ENI*" \
   --query 'NetworkInterfaces[*].{Id:NetworkInterfaceId,Subnet:SubnetId,Status:Status}' \
   --output table
 
-# Check subnet IP availability
-aws ec2 describe-subnets \
-  --subnet-ids <subnet-ids-from-VpcConfig> \
+aws ec2 describe-subnets --subnet-ids <subnet-ids-from-VpcConfig> \
   --query 'Subnets[*].{SubnetId:SubnetId,AvailableIPs:AvailableIpAddressCount,CIDR:CidrBlock}' \
   --output table
 ```
 
 **Recommendation:** If VPC cold-start latency is <100 ms (hyperplane
-ENI working), VPC is NOT the bottleneck. Move to other dimensions. If
-latency is >500 ms, investigate ENI/subnet/SG issues above.
+ENI working), VPC is NOT the bottleneck. If >500 ms, investigate
+ENI/subnet/SG issues.
 
 ### Step 6: Runtime selection (compiled vs interpreted, ARM64 Graviton)
-
-Runtime choice affects both init speed and steady-state duration.
 
 **Init speed by runtime (typical, no SnapStart):**
 
@@ -494,28 +455,22 @@ Runtime choice affects both init speed and steady-state duration.
 | Python 3.12 | 100-300 ms | Interpreter startup |
 | Ruby 3.x | 200-400 ms | Interpreter startup |
 | .NET 8 | 500-1500 ms | CLR + ASP.NET Core bootstrap |
-| Java 21 (no SnapStart) | 1500-3500 ms | JVM + framework (Spring) bootstrap |
+| Java 21 (no SnapStart) | 1500-3500 ms | JVM + framework bootstrap |
 | Java 21 (with SnapStart) | 150-250 ms | Snapshot restore |
 
 **Recommendation framework:**
 
 | Current runtime | Recommendation |
 |---|---|
-| Java (no SnapStart) | Enable SnapStart first (Step 3). If still latency-sensitive, evaluate runtime migration. |
-| Java (with SnapStart, still slow) | Init phase optimization (Step 4) + memory tuning (Step 1). Runtime migration is a last resort. |
-| nodejs16 (deprecated) | Upgrade to nodejs20 or nodejs22. Deprecated runtimes may miss optimization features. |
+| Java (no SnapStart) | Enable SnapStart (Step 3). If still slow, evaluate migration. |
+| Java (SnapStart, still slow) | Init phase optimization (Step 4) + memory tuning (Step 1). |
+| nodejs16 (deprecated) | Upgrade to nodejs20+. Deprecated runtimes miss optimizations. |
 | java8 (deprecated) | Upgrade to java21. java8 does not support SnapStart. |
 | python3.7 (deprecated) | Upgrade to python3.12. |
 
-**ARM64 (Graviton) for latency:**
-```bash
-aws lambda update-function-configuration --function-name <name> --architectures arm64
-aws lambda publish-version --function-name <name>
-```
-
-ARM64 provides ~20% better price-performance AND often faster init for
-interpreted runtimes. For compiled runtimes (Go, Java with native libs),
-verify ARM compatibility before migration.
+**ARM64 (Graviton):** ~20% better price-performance AND often faster
+init for interpreted runtimes. Verify ARM compatibility for compiled
+runtimes before migration.
 
 ### Step 7: Deployment package size reduction
 
@@ -614,8 +569,8 @@ TARGET: <function-name>
 VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
 REASON: <1-2 sentences naming the recommendation and the supporting data>
 RECOMMENDATION:
-  Current: <memory> MB, <runtime>, <architecture>, <SnapStart status>, <provisioned concurrency>, <package size>
-  Proposed: <memory> MB, <runtime>, <architecture>, <SnapStart status>, <provisioned concurrency>, <package size>
+  Current: <memory> MB, <runtime>, <architecture>, <SnapStart>, <provisioned concurrency>, <package size>
+  Proposed: <memory> MB, <runtime>, <architecture>, <SnapStart>, <provisioned concurrency>, <package size>
   Dimensions changed: <memory | provisioned_concurrency | snapstart | init_phase | vpc | runtime | package>
   Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
   Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
@@ -633,43 +588,13 @@ CONFIRM: Before executing any state-changing CLI, emit and await operator
   Proceed? (yes/no)"
 ```
 
-Full worked examples (SnapStart enablement, provisioned concurrency
-sizing, init phase refactor, already-optimized, NEED_MORE_INFO, and
-end-to-end walkthrough) are in `references/worked-examples.md`.
+Full worked examples are in `references/worked-examples.md`.
 
 ## STRICT output contract
 
-The rules below are hard constraints. Violating any one produces a
-misclassification or an arithmetic contradiction that breaks downstream
-automation. Self-check EVERY emitted block against these rules before
-returning the response.
-
-### Required output structure
-
-Every response MUST be a single block using these literal labels, in
-this order. Do NOT substitute markdown headings, camelCase, or bold
-variants.
-
-```text
-TARGET: <function-name>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <memory> MB, <runtime>, <architecture>, <SnapStart>, <provisioned concurrency>, <package size>
-  Proposed: <memory> MB, <runtime>, <architecture>, <SnapStart>, <provisioned concurrency>, <package size>
-  Dimensions changed: <memory | provisioned_concurrency | snapstart | init_phase | vpc | runtime | package>
-  Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_LATENCY_IMPACT:
-  Current cold-start p95: <ms>
-  Projected cold-start p95: <ms>
-  Latency reduction: <ms> (<pct>%)
-  SLO: p95 < <ms>
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: <confirmation prompt text>
-```
+The rules below are hard constraints. Self-check EVERY emitted block
+against these rules before returning the response. Do NOT substitute
+markdown headings, camelCase, or bold variants for the literal labels.
 
 ### FORBIDDEN output patterns
 
@@ -715,47 +640,31 @@ VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
 REASON: Java 21 function with InitDuration p95 of 3200 ms and SnapStart
   NOT enabled. Enabling SnapStart eliminates 90% of init phase (snapshot
   restore drops InitDuration from 3200 ms to ~200 ms). Function is a
-  sync API (API Gateway) with cold-start p95 exceeding the 1000 ms SLO.
-  Package size (52 MB fat JAR) is a secondary contributor.
+  sync API with cold-start p95 exceeding the 1000 ms SLO.
 RECOMMENDATION:
-  Current: 512 MB, java21, x86_64, SnapStart OFF, no provisioned concurrency, 52 MB
-  Proposed: 512 MB, java21, x86_64, SnapStart ON, no provisioned concurrency, 52 MB
+  Current: 512 MB, java21, x86_64, SnapStart OFF, no PC, 52 MB
+  Proposed: 512 MB, java21, x86_64, SnapStart ON, no PC, 52 MB
   Dimensions changed: snapstart (Step 3)
-  Dimensions checked: memory ✓ (not CPU-bound)  provisioned_concurrency ✓ (evaluated in Step 2)
-    snapstart → (enable)  init_phase ✓ (lazy init already applied)
-    vpc ✓ (no VPC)  runtime ✓ (java21 current)  package ✓ (secondary)
-  Confidence: HIGH — SnapStart is supported on java21; function uses
-    standard Corretto distribution; no container-image; no unique-ID
-    dependency in init.
+  Dimensions checked: memory ✓  provisioned_concurrency ✓  snapstart → (enable)
+    init_phase ✓  vpc ✓  runtime ✓  package ✓
+  Confidence: HIGH — SnapStart supported on java21; no container-image.
 ESTIMATED_LATENCY_IMPACT:
   Current cold-start p95: 5000 ms (InitDuration: 3200 ms + Duration: 1800 ms)
   Projected cold-start p95: 2000 ms (InitDuration: 200 ms + Duration: 1800 ms)
   Latency reduction: 3000 ms (60%)
-  SLO: p95 < 1000 ms — SnapStart alone does NOT meet SLO; pair with
-    provisioned concurrency for full SLO compliance.
+  SLO: p95 < 1000 ms — pair with provisioned concurrency for full SLO.
 MIGRATION_STEPS:
-  1. Enable SnapStart on the function:
+  1. Enable SnapStart:
      aws lambda update-function-configuration --function-name order-api-prod
        --snap-start '{"ApplyOn":"PublishedVersions"}'
-  2. Publish a version (SnapStart snapshots the version):
-     aws lambda publish-version --function-name order-api-prod
-  3. Update the production alias to point at the new version:
-     aws lambda update-alias --function-name order-api-prod --name prod
-       --function-version <new-version>
-  4. Verify SnapStart optimization status:
-     aws lambda get-function-configuration --function-name order-api-prod
+  2. Publish a version: aws lambda publish-version --function-name order-api-prod
+  3. Update alias: aws lambda update-alias --function-name order-api-prod
+       --name prod --function-version <new-version>
+  4. Verify: aws lambda get-function-configuration --function-name order-api-prod
        --qualifier <new-version> --query 'SnapStart.OptimizationStatus'
-     Expect: "On" status after 1-2 minutes.
-  5. Monitor InitDuration for 7 days post-change:
-     aws cloudwatch get-metric-statistics --namespace AWS/Lambda
-       --metric-name Duration --dimensions Name=FunctionName,Value=order-api-prod
-       --start-time $(date -d '-7 days' +%FT%TZ) --end-time $(date +%FT%TZ)
-       --period 3600 --statistics Average,p95 --output json
-  6. If SLO still not met (projected p95 = 2000 ms > 1000 ms SLO),
-     add provisioned concurrency (Step 2).
-CONFIRM: About to enable SnapStart on order-api-prod (java21, publish
-  version, update alias). Projected cold-start reduction: 3000 ms (60%).
-  Proceed? (yes/no)
+  5. Monitor InitDuration for 7 days. If SLO unmet, add provisioned concurrency.
+CONFIRM: About to enable SnapStart on order-api-prod (publish version,
+  update alias). Projected cold-start reduction: 3000 ms (60%). Proceed?
 ```
 
 **Self-check before emit:**
@@ -826,63 +735,52 @@ and rarely the bottleneck.
 ## Pre-flight safety checks (run before any remediation CLI)
 
 - **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
-  emit and await operator approval. Do NOT execute until confirmed.
+  emit and await operator approval.
 - **Publish a version before enabling SnapStart.** SnapStart applies to
   published versions, not `$LATEST`.
 - **Test SnapStart before cutover.** Network connections reset on
-  restore; verify DB reconnection logic handles this.
-- **Verify provisioned concurrency cost envelope.** Provisioned
-  concurrency charges for idle time; confirm the cost is justified by
-  the latency SLO.
-- **Test memory changes via staging alias.** Higher memory changes
-  cost; verify the latency improvement justifies the cost increase.
-- **SnapStart + database connections.** Ensure connection validity
-  checks (lazy reconnect) are in place before enabling SnapStart.
-- **Provisioned concurrency removal causes cold starts.** Verify the
-  latency SLO tolerates cold starts if removing provisioned concurrency.
-- **Power Tuning invokes the function.** Ensure the function is
-  idempotent and downstream tolerates test load.
-- **Bulk-operation limit:** Process at most 5 functions per batch. Sort
-  by estimated latency impact, verify each batch before proceeding.
+  restore; verify DB reconnection logic.
+- **Verify provisioned concurrency cost envelope.** Idle charges must be
+  justified by the latency SLO.
+- **Test memory changes via staging alias.** Higher memory increases
+  cost; verify latency improvement justifies.
+- **SnapStart + DB connections.** Ensure connection validity checks
+  (lazy reconnect) are in place.
+- **Provisioned concurrency removal causes cold starts.** Verify SLO
+  tolerates cold starts.
+- **Power Tuning invokes the function.** Ensure idempotency.
+- **Bulk-operation limit:** 5 functions per batch, sorted by estimated
+  latency impact.
 
 ## Recent AWS features (2024-2026)
 
-- **Lambda SnapStart (2024-2025 expansion):** Originally Java-only,
-  now stable on java21+. Check current support matrix for additional
-  runtimes.
-- **Hyperplane ENI (GA since 2019):** VPC cold-start overhead reduced
-  to <100 ms. VPC attachment is no longer a cold-start driver.
+- **Lambda SnapStart (2024-2025):** Java-only, stable on java21+. Check
+  current support matrix for additional runtimes.
+- **Hyperplane ENI (GA since 2019):** VPC cold-start overhead <100 ms.
+  VPC is no longer a cold-start driver.
 - **Lambda ARM64 (Graviton) GA:** All major runtimes support arm64.
-  ~20% better price-performance and often faster init for interpreted
+  ~20% better price-performance; often faster init for interpreted
   runtimes.
-- **AWS Lambda Power Tuning:** De facto standard for empirical memory
-  tuning. Supports latency mode (`fastest`) and cost mode (`cheapest`).
+- **AWS Lambda Power Tuning:** Supports latency mode (`fastest`) and
+  cost mode (`cheapest`).
 - **Lambda Insights:** Provides `InitDuration`, `memory_used`,
-  `cpu_total_time`, and `coldStarts` metrics. Required for cold-start
-  analysis. Enable via extension Layer.
+  `cpu_total_time`, `coldStarts`. Required for cold-start analysis.
 - **Provisioned Concurrency autoscaling (2024):** Application Auto
-  Scaling supports provisioned concurrency on Lambda aliases via
-  target-tracking on `ProvisionedConcurrencyUtilization`.
-- **Lambda runtime deprecation schedule (2024-2026):** nodejs16, java8,
-  python3.7 deprecated. Upgrading unlocks SnapStart, ARM64, and current
-  Lambda Insights.
-- **EFS for Lambda (GA):** EFS mount adds 100-500 ms latency on cold
-  starts. Use /tmp or provisioned concurrency for latency-critical
-  paths.
+  Scaling on Lambda aliases via target-tracking on
+  `ProvisionedConcurrencyUtilization`.
+- **Runtime deprecation (2024-2026):** nodejs16, java8, python3.7
+  deprecated. Upgrading unlocks SnapStart, ARM64, current Insights.
+- **EFS for Lambda (GA):** Adds 100-500 ms on cold starts. Use /tmp or
+  provisioned concurrency for latency-critical paths.
 
 ## References
 
 - `references/cold-start-metrics-and-power-tuning.md` — Power Tuning
-  deployment guide (latency mode), Lambda Insights metrics reference,
-  memory-to-CPU mapping, SnapStart CLI sequences, ARM64 compatibility
-  matrix, package size thresholds, regional notes.
-- `references/worked-examples.md` — full worked examples (SnapStart
-  enablement, provisioned concurrency sizing, init phase refactor,
-  memory tuning, already-optimized, NEED_MORE_INFO, end-to-end
-  walkthrough).
-- `references/error-handling-and-edge-cases.md` — CLI/data-source failure
-  handling, operational edge cases, container-image functions, extended
-  NEVER list, SnapStart caveats, EFS latency, X-Ray overhead.
+  deployment (latency mode), Lambda Insights metrics, memory-to-CPU
+  mapping, SnapStart CLI sequences, ARM64 matrix, package thresholds.
+- `references/worked-examples.md` — SnapStart enablement, provisioned
+  concurrency sizing, init phase refactor, memory tuning, already-
+  optimal, NEED_MORE_INFO, end-to-end walkthrough.
 
 ## Domain
 
@@ -894,10 +792,9 @@ AWS CloudOps / Lambda Serverless Cold-Start Latency Optimization.
 - **Lambda SnapStart** — https://docs.aws.amazon.com/lambda/latest/dg/configuration-snapstart.html
 - **Lambda provisioned concurrency** — https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html
 - **Lambda VPC networking** — https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html
-- **Lambda function configuration (memory)** — https://docs.aws.amazon.com/lambda/latest/dg/configuration-memory.html
+- **Lambda memory configuration** — https://docs.aws.amazon.com/lambda/latest/dg/configuration-memory.html
 - **Lambda runtime deprecation** — https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
 - **CloudWatch Lambda Insights** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights.html
-- **AWS Lambda Power Tuning (open source)** — https://github.com/alexcasalboni/aws-lambda-power-tuning
-- **Lambda execution environment** — https://docs.aws.amazon.com/lambda/latest/dg/runtimes-context.html
+- **AWS Lambda Power Tuning (OSS)** — https://github.com/alexcasalboni/aws-lambda-power-tuning
 - **AWS CLI Lambda reference** — https://docs.aws.amazon.com/cli/latest/reference/lambda/
-- **AWS Well-Architected Framework — Performance Efficiency** — https://docs.aws.amazon.com/wellarchitected/latest/performance-efficiency-pillar/welcome.html
+- **Well-Architected — Performance Efficiency** — https://docs.aws.amazon.com/wellarchitected/latest/performance-efficiency-pillar/welcome.html

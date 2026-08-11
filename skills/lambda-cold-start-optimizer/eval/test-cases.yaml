@@ -1,0 +1,257 @@
+# Eval test cases for lambda-cold-start-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per cold-start optimization pattern.
+# Each case's FunctionName embeds the test-case id so the model naturally
+# echoes it (avoids assertion-token mismatch). The decision framework in
+# SKILL.md produces exactly the expected verdicts below.
+skill: lambda-cold-start-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: snapstart-enablement
+    description: >-
+      Java 21 function with SnapStart NOT enabled. InitDuration p95 is
+      3200 ms. Sync API (API Gateway) with 1000 ms p95 SLO. Expected
+      verdict: FURTHER_OPTIMIZATION_AVAILABLE with SnapStart enablement.
+    input: |
+      FunctionName: fn-snapstart-enablement
+      Runtime: java21
+      MemorySize: 512 MB
+      Architecture: x86_64
+      Region: us-east-1
+      SnapStart: NOT_ENABLED
+      VpcConfig: none
+      TracingConfig: Passthrough
+      Package size: 48 MB (fat JAR)
+      ProvisionedConcurrency: 0
+      SLO: p95 cold-start < 1000 ms
+
+      Metrics (last 30 days):
+        - Duration avg: 1800 ms, p95: 2400 ms
+        - InitDuration avg: 3100 ms (cold start), p95: 3200 ms
+        - Invocations: 5,000,000/month
+        - ColdStarts: ~75,000/month (1.5% of invocations)
+        - Errors: 0
+
+      Workload context: Java 21 Spring Boot REST API behind API Gateway
+      (sync, user-facing). Uses standard Corretto distribution. No
+      container-image. DB connections initialized in global scope.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_LATENCY_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "snapstart-enablement"
+        - "RECOMMENDATION"
+        - "ESTIMATED_LATENCY_IMPACT"
+        - "MIGRATION_STEPS"
+        - "SnapStart"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: provisioned-concurrency-sizing
+    description: >-
+      Node.js sync API with cold-start p95 of 2800 ms exceeding the
+      500 ms SLO. No provisioned concurrency configured. Steady traffic.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with provisioned
+      concurrency sizing.
+    input: |
+      FunctionName: fn-provisioned-concurrency-sizing
+      Runtime: nodejs20.x
+      MemorySize: 1024 MB
+      Architecture: arm64
+      Region: us-east-1
+      SnapStart: N/A (non-Java runtime)
+      VpcConfig: none
+      TracingConfig: Passthrough
+      Package size: 12 MB
+      ProvisionedConcurrency: 0
+      SLO: p95 cold-start < 500 ms
+
+      Metrics (last 30 days):
+        - Duration avg: 120 ms, p95: 180 ms
+        - InitDuration avg: 800 ms, p95: 2800 ms
+        - Invocations: 20,000,000/month
+        - ColdStarts: ~300,000/month (1.5% of invocations)
+        - ConcurrentExecutions: avg 15, p50 12, p75 20, p95 35, p99 50
+        - Errors: 5
+
+      Workload context: Node.js API Gateway endpoint (sync,
+      user-facing). Steady traffic 24/7. Init already optimized
+      (global-scope clients). ARM64 already enabled.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_LATENCY_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "provisioned-concurrency-sizing"
+        - "RECOMMENDATION"
+        - "ESTIMATED_LATENCY_IMPACT"
+        - "provisioned concurrency"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: init-phase-refactor
+    description: >-
+      Python function where DB connections and SDK clients are
+      initialized inside the handler (per-invocation). InitDuration
+      moderate but Duration inflated by per-invocation TLS overhead.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with init phase
+      optimization.
+    input: |
+      FunctionName: fn-init-phase-refactor
+      Runtime: python3.12
+      MemorySize: 256 MB
+      Architecture: x86_64
+      Region: us-east-1
+      SnapStart: N/A (non-Java runtime)
+      VpcConfig: none
+      TracingConfig: Passthrough
+      Package size: 8 MB
+      ProvisionedConcurrency: 0
+      SLO: p95 steady-state < 500 ms
+
+      Metrics (last 30 days):
+        - Duration avg: 680 ms, p95: 920 ms
+        - InitDuration avg: 350 ms, p95: 500 ms
+        - Invocations: 8,000,000/month
+        - ColdStarts: ~120,000/month
+        - Errors: 2
+
+      Code pattern (detected from description):
+        - Handler creates boto3 clients per invocation
+        - Handler opens psycopg2 DB connection per invocation
+        - No global-scope initialization
+
+      Workload context: Python microservice behind API Gateway. Uses
+      RDS PostgreSQL. No connection pooling — each invocation creates
+      a fresh TLS connection (200-500 ms overhead).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_LATENCY_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "init-phase-refactor"
+        - "RECOMMENDATION"
+        - "ESTIMATED_LATENCY_IMPACT"
+        - "init"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: already-optimized-function
+    description: >-
+      Node.js function at Power Tuning latency optimum, ARM64 enabled,
+      init optimized (global scope), no SnapStart (non-Java), cold-start
+      p95 within SLO. Expected verdict: OPTIMIZED.
+    input: |
+      FunctionName: fn-already-optimized-function
+      Runtime: nodejs20.x
+      MemorySize: 512 MB
+      Architecture: arm64
+      Region: us-east-1
+      SnapStart: N/A (non-Java runtime)
+      VpcConfig: none
+      TracingConfig: Passthrough
+      Package size: 4 MB
+      ProvisionedConcurrency: 0
+      SLO: p95 cold-start < 1000 ms
+
+      Metrics (last 30 days):
+        - Duration avg: 45 ms, p95: 82 ms
+        - InitDuration avg: 180 ms, p95: 250 ms
+        - Invocations: 10,000,000/month
+        - ColdStarts: ~150,000/month
+        - Errors: 0
+
+      Power Tuning result:
+        - Fastest: 512 MB at 45 ms avg (current IS the optimum)
+        - Cheapest: 512 MB at 45 ms avg
+
+      Workload context: Webhook receiver. All SDK clients at global
+      scope. ARM64 enabled. No VPC. Package slim (4 MB). Cold-start
+      p95 (250 ms + 82 ms = 332 ms) well within 1000 ms SLO.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_LATENCY_IMPACT, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized-function"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+
+  - id: memory-tuning-for-cold-start
+    description: >-
+      Python function at 128 MB where InitDuration and Duration both
+      scale with memory (CPU-bound). Power Tuning shows latency
+      improvement at 1024 MB. Expected verdict: FURTHER_OPTIMIZATION
+      AVAILABLE with memory increase.
+    input: |
+      FunctionName: fn-memory-tuning-for-cold-start
+      Runtime: python3.12
+      MemorySize: 128 MB
+      Architecture: x86_64
+      Region: us-east-1
+      SnapStart: N/A (non-Java runtime)
+      VpcConfig: none
+      TracingConfig: Passthrough
+      Package size: 15 MB
+      ProvisionedConcurrency: 0
+      SLO: p95 cold-start < 2000 ms
+
+      Metrics (last 30 days):
+        - Duration avg: 3200 ms, p95: 4100 ms
+        - InitDuration avg: 900 ms, p95: 1200 ms
+        - Invocations: 3,000,000/month
+        - ColdStarts: ~45,000/month
+        - Errors: 0
+
+      Power Tuning result (latency mode):
+        - Tested: [128, 256, 512, 1024, 2048]
+        - Fastest: 1024 MB — InitDuration 300 ms, Duration 800 ms
+        - Current (128 MB): InitDuration 900 ms, Duration 3200 ms
+
+      Workload context: Python data enrichment pipeline (CPU-bound).
+      Processes JSON payloads with heavy regex and computation. Init
+      already at global scope. No VPC.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_LATENCY_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "memory-tuning-for-cold-start"
+        - "RECOMMENDATION"
+        - "ESTIMATED_LATENCY_IMPACT"
+        - "memory"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"

@@ -1,0 +1,263 @@
+# Eval test cases for dynamodb-throttling-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per throttling-prevention pattern. Each
+# case's TableName embeds the test-case id so the model naturally echoes
+# it. The decision framework in SKILL.md produces exactly the expected
+# verdicts below.
+skill: dynamodb-throttling-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: write-sharding-hot-partition
+    description: >-
+      PROVISIONED table with 45,000 ThrottledRequests on Write over 30
+      days. Partition key (user_id) has high write skew — top 1% of
+      user_ids generate 80% of writes. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with write sharding.
+    input: |
+      TableName: tbl-write-sharding-hot-partition
+      Region: us-east-1
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5000
+        WriteCapacityUnits: 3000
+      PartitionKey: user_id (String)
+      GSI: event-type-index (partition key: event_type, 50 distinct values)
+      TTL: not enabled
+
+      Metrics (last 30 days):
+        - ThrottledRequests: 45,000 (on Write)
+        - ConsumedWriteCapacityUnits: avg 2800/s, max 3500/s
+        - ConsumedReadCapacityUnits: avg 1200/s, max 1800/s
+        - ReturnedItemCount: avg 50/query
+
+      Throttling pattern: spikes at top-of-hour batch writes (same
+      user_id values concentrated in few partitions). CloudTrail
+      analysis confirms 80/20 write skew — top 1% of user_ids
+      generate 80% of writes.
+
+      Workload context: user event tracking table. High-volume writes
+      from mobile app batch uploads. Writes concentrated on active
+      users. Reads are key-based lookups by user_id.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_THROUGHPUT_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "write-sharding-hot-partition"
+        - "RECOMMENDATION"
+        - "ESTIMATED_THROUGHPUT_IMPACT"
+        - "MIGRATION_STEPS"
+        - "sharding"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: gsi-backpressure-throttling
+    description: >-
+      Table with GSI partition key that has low cardinality (status
+      field with 3 values). GSI throttling back-pressures the base
+      table. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with
+      GSI partition key redesign.
+    input: |
+      TableName: tbl-gsi-backpressure-throttling
+      Region: us-east-1
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 10000
+        WriteCapacityUnits: 5000
+      PartitionKey: order_id (String)
+      GSI: status-index (partition key: status — 3 values: PENDING,
+          PROCESSING, COMPLETED)
+      TTL: not enabled
+
+      Metrics (last 30 days):
+        - ThrottledRequests: 28,000 (on Write, correlated with GSI)
+        - ConsumedWriteCapacityUnits: avg 4200/s, max 4800/s
+        - GSI ConsumedWriteCapacityUnits: avg 1800/s, max 2500/s
+        - ThrottledRequests (GSI): 22,000
+
+      Throttling pattern: GSI throttling dominates (22,000 of 28,000
+      total). The status-index GSI has only 3 distinct partition key
+      values. Writes to COMPLETED status (80% of writes) all go to
+      one GSI partition.
+
+      Workload context: order management table. Base table partition
+      key (order_id) is well-distributed (UUID). GSI partition key
+      (status) is low-cardinality with severe skew.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_THROUGHPUT_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "gsi-backpressure-throttling"
+        - "RECOMMENDATION"
+        - "ESTIMATED_THROUGHPUT_IMPACT"
+        - "GSI"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: capacity-mode-switch
+    description: >-
+      PROVISIONED table with bursty, unpredictable write patterns.
+      Throttling occurs during sudden traffic spikes that exceed burst
+      capacity. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with
+      capacity mode switch to on-demand.
+    input: |
+      TableName: tbl-capacity-mode-switch
+      Region: us-east-1
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2000
+        WriteCapacityUnits: 1000
+      AutoScaling:
+        Write: target=70, min=500, max=5000
+      PartitionKey: session_id (String, UUID — well-distributed)
+      GSI: none
+      TTL: enabled (24h expiry)
+
+      Metrics (last 30 days):
+        - ThrottledRequests: 15,000 (on Write)
+        - ConsumedWriteCapacityUnits: avg 800/s, max 4500/s
+        - ConsumedReadCapacityUnits: avg 600/s, max 1200/s
+
+      Throttling pattern: unpredictable traffic spikes — typically
+      3-5x normal traffic for 10-15 minutes, several times per day.
+      Auto-scaling reacts too slowly (minutes). Burst capacity
+      (300s bucket) exhausted during sustained spikes.
+
+      Workload context: session tracking table for a consumer app.
+      Traffic spikes driven by viral content — unpredictable timing
+      and magnitude. Partition key (UUID) is well-distributed; the
+      issue is capacity, not distribution.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_THROUGHPUT_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "capacity-mode-switch"
+        - "RECOMMENDATION"
+        - "ESTIMATED_THROUGHPUT_IMPACT"
+        - "on-demand"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: already-optimized-table
+    description: >-
+      PROVISIONED table with zero ThrottledRequests, well-distributed
+      partition key, batch writes used, exponential backoff configured.
+      Expected verdict: OPTIMIZED.
+    input: |
+      TableName: tbl-already-optimized-table
+      Region: us-east-1
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 8000
+        WriteCapacityUnits: 4000
+      AutoScaling:
+        Read: target=70, min=2000, max=20000
+        Write: target=70, min=1000, max=10000
+      PartitionKey: device_id (String, UUID — well-distributed)
+      GSI: device-type-index (partition key: device_type — 500+ values,
+          evenly distributed)
+      TTL: enabled (7-day expiry, staggered)
+
+      Metrics (last 30 days):
+        - ThrottledRequests: 0
+        - ConsumedWriteCapacityUnits: avg 3200/s, max 3800/s
+        - ConsumedReadCapacityUnits: avg 6500/s, max 7500/s
+        - BurstCapacityBalance: avg 85% remaining
+
+      Client patterns:
+        - Writes use BatchWriteItem (16 items/batch)
+        - Exponential backoff with jitter configured (max 10 retries)
+        - Conditional writes for idempotency on high-volume paths
+
+      Workload context: IoT telemetry ingestion. Partition key is UUID
+      (high cardinality, even distribution). GSI partition key has 500+
+      values, well-distributed. Batch writes from ingestion workers.
+      No throttling observed in 30-day window.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_THROUGHPUT_IMPACT, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized-table"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+
+  - id: batch-write-migration
+    description: >-
+      Table receiving high-volume writes via individual PutItem calls.
+      No partition-level throttling, but client-side connection pool
+      exhaustion and request-rate throttling. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with BatchWriteItem migration.
+    input: |
+      TableName: tbl-batch-write-migration
+      Region: us-east-1
+      BillingMode: ON_DEMAND
+      PartitionKey: event_id (String, UUID — well-distributed)
+      GSI: none
+      TTL: not enabled
+
+      Metrics (last 30 days):
+        - ThrottledRequests: 3,200 (sporadic, during write bursts)
+        - ConsumedWriteCapacityUnits: avg 1200/s, max 3500/s
+        - ConsumedReadCapacityUnits: avg 200/s
+
+      Client patterns:
+        - Writes use individual PutItem calls
+        - Write rate: ~1,200 items/second at peak
+        - Connection pool exhaustion observed at peak (SDK errors)
+        - No batch writes implemented
+        - No exponential backoff configured
+
+      Throttling pattern: sporadic throttling during write bursts.
+      Root cause is request-rate pressure (1,200 individual PutItem
+      calls/second), not partition-level hot spots. Partition key is
+      well-distributed UUID.
+
+      Workload context: event logging service on on-demand mode.
+      High volume of small writes from application servers. Each
+      PutItem is a single item (~500 bytes).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_THROUGHPUT_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "batch-write-migration"
+        - "RECOMMENDATION"
+        - "ESTIMATED_THROUGHPUT_IMPACT"
+        - "batch"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"

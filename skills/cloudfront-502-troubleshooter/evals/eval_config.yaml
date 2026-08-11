@@ -1,0 +1,48 @@
+# Eval configuration for cloudfront-502-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudfront-502-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: origin-tls-protocol-mismatch-https-only
+    difficulty: hard
+    prompt_file: prompts/origin-tls-protocol-mismatch-https-only.md
+    baseline_file: baselines/origin-tls-protocol-mismatch-https-only.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: ORIGIN_TLS_PROTOCOL_MISMATCH
+  - id: lambda-at-edge-viewer-request-runtime-error
+    difficulty: hard
+    prompt_file: prompts/lambda-at-edge-viewer-request-runtime-error.md
+    baseline_file: baselines/lambda-at-edge-viewer-request-runtime-error.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: LAMBDA_AT_EDGE_ERROR
+  - id: oac-misconfiguration-s3-bucket-policy-stale
+    difficulty: hard
+    prompt_file: prompts/oac-misconfiguration-s3-bucket-policy-stale.md
+    baseline_file: baselines/oac-misconfiguration-s3-bucket-policy-stale.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: OAC_MISCONFIGURATION
+  - id: failover-behaviour-points-at-primary-not-group
+    difficulty: hard
+    prompt_file: prompts/failover-behaviour-points-at-primary-not-group.md
+    baseline_file: baselines/failover-behaviour-points-at-primary-not-group.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: FAILOVER_MISCONFIGURATION
+  - id: cached-error-response-stale-502-after-recovery
+    difficulty: medium
+    prompt_file: prompts/cached-error-response-stale-502-after-recovery.md
+    baseline_file: baselines/cached-error-response-stale-502-after-recovery.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: CACHED_ERROR_RESPONSE

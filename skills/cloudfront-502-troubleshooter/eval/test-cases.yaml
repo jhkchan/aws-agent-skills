@@ -1,0 +1,342 @@
+# Eval test cases for cloudfront-502-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: cloudfront-502-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: origin-tls-protocol-mismatch-https-only
+    description: >-
+      CloudFront distribution's OriginProtocolPolicy was changed to
+      https-only in the last deploy. Origin ALB listens only on HTTP
+      port 80 (no HTTPS listener). Every /api/* request returns 502
+      with x-cache: Error from origin. Origin access log shows zero
+      matching requests (TLS handshake never completes). Expected
+      layer: ORIGIN_TLS_PROTOCOL_MISMATCH.
+    input: |
+      Symptom: CloudFront distribution d111111abcdef8.cloudfront.net
+      returns HTTP 502 to 100% of viewers on /api/* since 14:10 UTC.
+      The distribution config was edited 1 hour ago to set
+      OriginProtocolPolicy: https-only on the api.alb origin.
+
+      DistributionId: E1Q2W3R4Y5Z6A7
+      DomainName: d111111abcdef8.cloudfront.net
+      Origin: api-tls-protocol-mismatch-https-only.alb.example.com
+        (ALB)
+      OriginProtocolPolicy: https-only
+      ViewerProtocolPolicy: redirect-to-https
+      Status: Deployed
+
+      curl https://d111111abcdef8.cloudfront.net/api/users
+        HTTP/2 502
+        x-cache: Error from origin
+        x-amz-cf-id: <redacted>
+        x-amz-cf-pop: IAD89-C1
+
+      aws elbv2 describe-load-balancers output:
+        - DNSName: api-tls-protocol-mismatch-https-only.alb.example.com
+        - Listeners: HTTP:80 only (no HTTPS:443 listener)
+        - State: active
+
+      openssl s_client -connect \
+        api-tls-protocol-mismatch-https-only.alb.example.com:443
+        connect: Connection refused
+
+      Origin access logs in the last 30 minutes: zero matching
+        requests on the /api/users path (TLS handshake never
+        completes).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "origin-tls-protocol-mismatch-https-only"
+        - "ORIGIN_TLS_PROTOCOL_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ORIGIN_CONNECTION_TIMEOUT"
+
+  - id: lambda-at-edge-viewer-request-runtime-error
+    description: >-
+      CloudFront behaviour has a Lambda@Edge viewer-request function
+      that throws on a specific request shape. x-edge-result-type:
+      FunctionExecutionError. Logs in us-east-1 only show ERROR.
+      Expected layer: LAMBDA_AT_EDGE_ERROR.
+    input: |
+      Symptom: CloudFront distribution returns 502 to 5% of viewers
+      on /search/* since 09:00 UTC. The function was deployed 1 hour
+      ago with a new query-string parser.
+
+      DistributionId: E2QW3R4Y5Z6A7B
+      DomainName: d222222bcdefg9.cloudfront.net
+      Origin: api.app.example.com (ALB, healthy)
+
+      curl https://d222222bcdefg9.cloudfront.net/search?q=shoes
+        HTTP/2 502
+        x-cache: Error from cloudfront
+        x-edge-result-type: FunctionExecutionError
+        x-amz-cf-id: <redacted>
+        x-amz-cf-pop: SFO53-C2
+
+      Lambda@Edge function config:
+        FunctionName: lambda-at-edge-viewer-request-runtime-error
+        Region: us-east-1 (Lambda@Edge functions always in us-east-1)
+        Runtime: nodejs20.x
+        Handler: index.handler
+
+      aws logs filter-log-events (us-east-1) on
+        /aws/lambda/us-east-1.lambda-at-edge-viewer-request-runtime-error:
+        - ERROR  Cannot read properties of undefined
+                 (reading 'split')
+        -   at handler (/var/task/index.js:42)
+        -   at Runtime.handleOnceNonStreaming (node:runtime:1234)
+        - Task timed out after 5s (1 occurrence)
+
+      The error reproduces only when the query string is missing the
+      expected "q" parameter; the function does
+      `event.Records[0].cf.request.querystring.split('&')` without
+      a null check.
+
+      Origin direct probe:
+        curl -sv --resolve api.app.example.com:443:<ip> \
+          https://api.app.example.com/search?q=shoes
+        → HTTP/1.1 200 OK (origin healthy)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "lambda-at-edge-viewer-request-runtime-error"
+        - "LAMBDA_AT_EDGE_ERROR"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ORIGIN_CONNECTION_TIMEOUT"
+
+  - id: oac-misconfiguration-s3-bucket-policy-stale
+    description: >-
+      CloudFront distribution migrated from OAI to OAC. S3 bucket
+      policy still references the legacy OAI CanonicalUser principal.
+      S3 returns 403 to CloudFront; viewer sees 502. Expected layer:
+      OAC_MISCONFIGURATION.
+    input: |
+      Symptom: CloudFront distribution d333333cdefgh0.cloudfront.net
+      returns 502 to all viewers fetching /assets/* since 11:00 UTC.
+      The team migrated from OAI to OAC yesterday.
+
+      DistributionId: E3QW3R4Y5Z6A7C
+      DomainName: d333333cdefgh0.cloudfront.net
+      Origin: oac-misconfiguration-s3-bucket-policy-stale.s3.us-east-1.amazonaws.com
+      OriginAccessControlId: E3A4B5C6D7E8F9
+      SigningBehavior: always
+
+      curl https://d333333cdefgh0.cloudfront.net/assets/logo.png
+        HTTP/2 502
+        x-cache: Error from origin
+        x-amz-cf-id: <redacted>
+
+      aws cloudfront list-origin-access-controls output:
+        - Id: E3A4B5C6D7E8F9
+          OriginAccessControlConfig:
+            Name: oac-misconfiguration-s3-bucket-policy-stale
+            OriginAccessControlOriginType: s3
+            SigningBehavior: always
+            SigningProtocol: sigv4
+
+      aws s3api get-bucket-policy --bucket \
+        oac-misconfiguration-s3-bucket-policy-stale:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "OldOAI",
+              "Effect": "Allow",
+              "Principal": {
+                "CanonicalUser":
+                  "a1b2c3d4e5f6...legacy-oai-canonical-user-id..."
+              },
+              "Action": "s3:GetObject",
+              "Resource":
+                "arn:aws:s3:::oac-misconfiguration-s3-bucket-policy-stale/*"
+            }
+          ]
+        }
+
+      Note: The bucket policy still references the legacy OAI
+      CanonicalUser principal; it does not include the
+      cloudfront.amazonaws.com service principal or the
+      AWS:SourceArn condition required for OAC.
+
+      aws s3api head-object --bucket \
+        oac-misconfiguration-s3-bucket-policy-stale --key assets/logo.png
+        → 200 OK (object exists, anonymous read may work or fail
+          depending on bucket default)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "oac-misconfiguration-s3-bucket-policy-stale"
+        - "OAC_MISCONFIGURATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ORIGIN_CONNECTION_TIMEOUT"
+
+  - id: failover-behaviour-points-at-primary-not-group
+    description: >-
+      Multi-origin distribution with OriginGroup defined. CacheBehavior
+      TargetOriginId points at the primary origin, not the group.
+      Primary origin fails; failover never triggers. Expected layer:
+      FAILOVER_MISCONFIGURATION.
+    input: |
+      Symptom: CloudFront distribution returns 502 when the primary
+      origin fails. Secondary origin is healthy but receives zero
+      traffic. Operators expected automatic failover.
+
+      DistributionId: E4QW3R4Y5Z6A7D
+      DomainName: d444444defghi1.cloudfront.net
+      PrimaryOrigin: primary.failover-behaviour-points-at-primary-not-group.example.com
+      SecondaryOrigin: secondary.failover-behaviour-points-at-primary-not-group.example.com
+
+      aws cloudfront get-distribution-config output (excerpt):
+        Origins:
+          Items:
+            - Id: primary
+              DomainName: primary.failover-behaviour-points-at-primary-not-group.example.com
+            - Id: secondary
+              DomainName: secondary.failover-behaviour-points-at-primary-not-group.example.com
+        OriginGroups:
+          Items:
+            - Id: group-1
+              FailoverCriteria:
+                StatusCodes:
+                  Items: [500, 502, 503, 504]
+              Members:
+                Items:
+                  - OriginId: primary
+                  - OriginId: secondary
+        DefaultCacheBehavior:
+          TargetOriginId: primary   # <-- WRONG: should be group-1
+
+      curl primary origin directly:
+        → Connection refused (primary is down)
+      curl secondary origin directly:
+        → HTTP/1.1 200 OK (secondary is healthy)
+
+      CloudFront access logs show only primary-origin fetches;
+        secondary never contacted.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "failover-behaviour-points-at-primary-not-group"
+        - "FAILOVER_MISCONFIGURATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ORIGIN_CONNECTION_TIMEOUT"
+
+  - id: cached-error-response-stale-502-after-recovery
+    description: >-
+      Origin recovered (direct probe returns 200), but CloudFront
+      continues to serve 502 for 5 minutes. Custom Error Response
+      with ErrorCachingMinTTL: 300 caches the 502 page. Expected
+      layer: CACHED_ERROR_RESPONSE.
+    input: |
+      Symptom: CloudFront distribution d555555efghij2.cloudfront.net
+      serves 502 on /checkout/* even though the origin has been
+      healthy for 6 minutes (per direct probe and per origin access
+      log showing 200 responses). Operators believe CloudFront is
+      broken.
+
+      DistributionId: E5QW3R4Y5Z6A7E
+      DomainName: d555555efghij2.cloudfront.net
+      Origin: checkout.cached-error-response-stale-502-after-recovery.example.com
+
+      curl -sv --resolve \
+        checkout.cached-error-response-stale-502-after-recovery.example.com:443:<ip> \
+        https://checkout.cached-error-response-stale-502-after-recovery.example.com/checkout/cart
+        → HTTP/1.1 200 OK (origin healthy; content returned)
+
+      curl https://d555555efghij2.cloudfront.net/checkout/cart
+        HTTP/2 502
+        x-cache: Error from cloudfront
+        age: 312
+
+      curl -H 'Cache-Control: no-cache' \
+        https://d555555efghij2.cloudfront.net/checkout/cart
+        → HTTP/2 200, x-cache: Miss from cloudfront
+        (no-cache request bypasses the error cache and fetches from
+        origin successfully)
+
+      aws cloudfront get-distribution-config output (excerpt):
+        CustomErrorResponses:
+          Items:
+            - ErrorCode: 502
+              ErrorCachingMinTTL: 300
+              ResponseCode: '502'
+              ResponsePagePath: /errors/502.html
+
+      Origin timeline:
+        - 12:00 UTC: origin app deployed a broken version; returned
+          502 for 90 seconds
+        - 12:01:30 UTC: rollback completed; origin returns 200
+        - 12:07 UTC (now): CloudFront still serving 502
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "cached-error-response-stale-502-after-recovery"
+        - "CACHED_ERROR_RESPONSE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ORIGIN_CONNECTION_TIMEOUT"

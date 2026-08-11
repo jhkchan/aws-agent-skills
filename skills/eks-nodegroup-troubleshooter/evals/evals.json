@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "eks-nodegroup-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EKS NodeGroup Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "vpc-cni-ip-exhaustion",
+      "name": "VPC CNI IP exhaustion — 12 pods Pending, subnet AvailableIpAddressCount 3 and 1, WARM_ENI_TARGET default",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpc-cni-ip-exhaustion.md",
+      "baseline_file": "baselines/vpc-cni-ip-exhaustion.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "VPC_CNI_IP_EXHAUSTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "vpc-cni-ip-exhaustion", "VPC_CNI_IP_EXHAUSTION", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: SCHEDULING_INSUFFICIENT_RESOURCES"]
+        }
+      ]
+    },
+    {
+      "id": "node-iam-role-missing-ecr",
+      "name": "Node IAM role missing AmazonEC2ContainerRegistryReadOnly — every pod ImagePullBackOff on new node group",
+      "difficulty": "hard",
+      "prompt_file": "prompts/node-iam-role-missing-ecr.md",
+      "baseline_file": "baselines/node-iam-role-missing-ecr.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "NODE_IAM_ROLE_ECR",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "node-iam-role-missing-ecr", "NODE_IAM_ROLE_ECR", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: ECR_ENDPOINT"]
+        }
+      ]
+    },
+    {
+      "id": "nodegroup-ami-version-mismatch",
+      "name": "Node group AMI at 1.28 while cluster control plane at 1.30 — nodes join but immediately NotReady",
+      "difficulty": "hard",
+      "prompt_file": "prompts/nodegroup-ami-version-mismatch.md",
+      "baseline_file": "baselines/nodegroup-ami-version-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "NODEGROUP_VERSION_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "nodegroup-ami-version-mismatch", "NODEGROUP_VERSION_MISMATCH", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: KUBELET_ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "asg-instance-capacity-unavailable",
+      "name": "ASG InsufficientInstanceCapacity for m5.large in us-east-1a — node group cannot scale to desired capacity",
+      "difficulty": "medium",
+      "prompt_file": "prompts/asg-instance-capacity-unavailable.md",
+      "baseline_file": "baselines/asg-instance-capacity-unavailable.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "INSTANCE_CAPACITY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "asg-instance-capacity-unavailable", "INSTANCE_CAPACITY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: SCALING_CONFIG"]
+        }
+      ]
+    },
+    {
+      "id": "custom-ami-bootstrap-script-error",
+      "name": "Custom AMI bootstrap.sh has wrong --apiserver-endpoint — instances launch but never register with API server",
+      "difficulty": "hard",
+      "prompt_file": "prompts/custom-ami-bootstrap-script-error.md",
+      "baseline_file": "baselines/custom-ami-bootstrap-script-error.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CUSTOM_AMI_BOOTSTRAP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "custom-ami-bootstrap-script-error", "CUSTOM_AMI_BOOTSTRAP", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: ASG_LAUNCH_FAILURE"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "lambda-cold-start-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Lambda Cold Start Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "snapstart-enablement",
+      "name": "Java 21 function with SnapStart NOT enabled, InitDuration p95 3200 ms — enable SnapStart",
+      "difficulty": "medium",
+      "prompt_file": "prompts/snapstart-enablement.md",
+      "baseline_file": "baselines/snapstart-enablement.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "snapstart-enablement", "RECOMMENDATION", "ESTIMATED_LATENCY_IMPACT", "MIGRATION_STEPS", "SnapStart"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "provisioned-concurrency-sizing",
+      "name": "Node.js sync API, cold-start p95 2800 ms exceeding 500 ms SLO, steady traffic — add provisioned concurrency",
+      "difficulty": "hard",
+      "prompt_file": "prompts/provisioned-concurrency-sizing.md",
+      "baseline_file": "baselines/provisioned-concurrency-sizing.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "provisioned-concurrency-sizing", "RECOMMENDATION", "ESTIMATED_LATENCY_IMPACT", "provisioned concurrency"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "init-phase-refactor",
+      "name": "Python function with per-invocation DB connections and SDK clients — refactor to global scope",
+      "difficulty": "medium",
+      "prompt_file": "prompts/init-phase-refactor.md",
+      "baseline_file": "baselines/init-phase-refactor.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "init-phase-refactor", "RECOMMENDATION", "ESTIMATED_LATENCY_IMPACT", "init"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized-function",
+      "name": "Node.js at Power Tuning optimum, ARM64, init optimized, cold-start within SLO — already optimized",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized-function.md",
+      "baseline_file": "baselines/already-optimized-function.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized-function", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"]
+        }
+      ]
+    },
+    {
+      "id": "memory-tuning-for-cold-start",
+      "name": "Python function at 128 MB, CPU-bound, Power Tuning shows latency improvement at 1024 MB — increase memory",
+      "difficulty": "hard",
+      "prompt_file": "prompts/memory-tuning-for-cold-start.md",
+      "baseline_file": "baselines/memory-tuning-for-cold-start.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "memory-tuning-for-cold-start", "RECOMMENDATION", "ESTIMATED_LATENCY_IMPACT", "memory"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}

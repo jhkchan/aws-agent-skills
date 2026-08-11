@@ -1,0 +1,301 @@
+# Eval test cases for eks-nodegroup-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it.
+skill: eks-nodegroup-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: vpc-cni-ip-exhaustion
+    description: >-
+      EKS managed node group with 5 nodes in two /24 private subnets.
+      VPC CNI warm ENI pool consumes all available IPs. 12 pods stuck
+      Pending with "FailedScheduling: insufficient IP addresses."
+      Subnet AvailableIpAddressCount is 3 and 1. Expected root cause:
+      VPC_CNI_IP_EXHAUSTION.
+    input: |
+      Symptom: 12 pods are stuck Pending with
+      "FailedScheduling: 0/5 nodes are available: insufficient IP
+      addresses." All 5 nodes are Ready. The cluster is prod-cluster,
+      node group prod-ng-1.
+
+      ClusterName: prod-cluster
+      NodeGroupName: prod-ng-1
+      KubernetesVersion: "1.30"
+      InstanceTypes: ["m5.large"]
+      Subnets: ["subnet-private-a", "subnet-private-b"]
+      ScalingConfig: { minSize: 3, desiredSize: 5, maxSize: 10 }
+      VpcConfig: { subnets: subnet-private-a, subnet-private-b }
+
+      kubectl get nodes:
+        ip-10-0-10-10.ec2.internal   Ready    <none>   45h   v1.30.0
+        ip-10-0-10-11.ec2.internal   Ready    <none>   45h   v1.30.0
+        ip-10-0-11-10.ec2.internal   Ready    <none>   45h   v1.30.0
+        ip-10-0-11-11.ec2.internal   Ready    <none>   45h   v1.30.0
+        ip-10-0-10-12.ec2.internal   Ready    <none>   45h   v1.30.0
+
+      kubectl describe node ip-10-0-10-10.ec2.internal:
+        Allocatable:
+          pods: 29
+        Allocated resources:
+          (All 29 pod slots allocated)
+
+      Subnet context:
+        subnet-private-a: CIDR 10.0.10.0/24,
+          AvailableIpAddressCount: 3
+        subnet-private-b: CIDR 10.0.11.0/24,
+          AvailableIpAddressCount: 1
+
+      VPC CNI config:
+        aws-node DaemonSet: Running (3/3)
+        WARM_ENI_TARGET: 1 (default)
+        ENABLE_PREFIX_DELEGATION: false
+
+      kubectl get pods -A (sample):
+        app-pod-7b4   Pending   0/1   0   15m
+        app-pod-7b5   Pending   0/1   0   15m
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "vpc-cni-ip-exhaustion"
+        - "VPC_CNI_IP_EXHAUSTION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: SCHEDULING_INSUFFICIENT_RESOURCES"
+
+  - id: node-iam-role-missing-ecr
+    description: >-
+      New EKS node group created with a node IAM role that only has
+      AmazonEKSWorkerNodePolicy (missing AmazonEC2ContainerRegistryReadOnly).
+      Every pod on the node group shows ImagePullBackOff. Expected root
+      cause: NODE_IAM_ROLE_ECR.
+    input: |
+      Symptom: every pod on the newly created node group prod-ng-2
+      shows ImagePullBackOff. The pods are trying to pull images from
+      ECR (111111111111.dkr.ecr.us-east-1.amazonaws.com/app:v1). The
+      image exists in ECR and the repo policy allows same-account
+      access.
+
+      ClusterName: prod-cluster
+      NodeGroupName: prod-ng-2
+      KubernetesVersion: "1.30"
+      NodeRole: arn:aws:iam::111111111111:role/eks-prod-ng-2
+      NodeRoleAttachedPolicies:
+        - AmazonEKSWorkerNodePolicy
+      AmazonEC2ContainerRegistryReadOnly: NOT ATTACHED
+
+      kubectl get pods -A (sample):
+        app-pod-1   ImagePullBackOff   0/1   0   8m
+        app-pod-2   ImagePullBackOff   0/1   0   8m
+        app-pod-3   ImagePullBackOff   0/1   0   8m
+
+      kubectl describe pod app-pod-1:
+        Warning  Failed   kubelet  Failed to pull image
+          "111111111111.dkr.ecr.us-east-1.amazonaws.com/app:v1":
+          rpc error: code = Unknown desc = Error response from daemon:
+          pull access denied for
+          111111111111.dkr.ecr.us-east-1.amazonaws.com/app:v1
+
+      ECR context:
+        Repository: 111111111111.dkr.ecr.us-east-1.amazonaws.com/app
+        Image tag v1 exists, 450 MB
+        Repository policy: allows same-account Lambda and EC2 access
+        Build is not VPC-attached with endpoint issues
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "node-iam-role-missing-ecr"
+        - "NODE_IAM_ROLE_ECR"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: ECR_ENDPOINT"
+
+  - id: nodegroup-ami-version-mismatch
+    description: >-
+      EKS cluster upgraded to K8s 1.30 but node group AMI is still at
+      1.28. Nodes join the cluster but are immediately NotReady. The
+      kubelet version is two minor versions behind the API server.
+      Expected root cause: NODEGROUP_VERSION_MISMATCH.
+    input: |
+      Symptom: after upgrading the EKS control plane to 1.30, 3 of 5
+      nodes in the node group are NotReady. Pods are being evicted.
+      The node group AMI version has not been updated.
+
+      ClusterName: prod-cluster
+      NodeGroupName: prod-ng-1
+      ClusterKubernetesVersion: "1.30"
+      NodeGroupAmiType: AL2_x86_64
+      NodeGroupVersion: "1.28"
+      NodeGroupReleaseVersion: "1.28.7-20240625"
+
+      kubectl get nodes:
+        ip-10-0-10-10   Ready     <none>   120d   v1.28.7-eks-ba74326
+        ip-10-0-10-11   Ready     <none>   120d   v1.28.7-eks-ba74326
+        ip-10-0-10-12   NotReady  <none>   5m     v1.28.7-eks-ba74326
+        ip-10-0-11-10   NotReady  <none>   5m     v1.28.7-eks-ba74326
+        ip-10-0-11-11   NotReady  <none>   5m     v1.28.7-eks-ba74326
+
+      kubectl describe node ip-10-0-10-12:
+        Conditions:
+          Ready: False  Reason: KubeletNotReady
+          Message: container runtime network not ready
+
+      The kubelet version (v1.28.7) is two minor versions behind the
+      API server (v1.30). EKS supports at most one minor version skew.
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "nodegroup-ami-version-mismatch"
+        - "NODEGROUP_VERSION_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: KUBELET_ERROR"
+
+  - id: asg-instance-capacity-unavailable
+    description: >-
+      EKS node group using m5.large instances. The ASG fails to launch
+      new instances with InsufficientInstanceCapacity in us-east-1a.
+      Node count stays below desiredCapacity. Expected root cause:
+      INSTANCE_CAPACITY.
+    input: |
+      Symptom: the node group prod-ng-1 cannot scale from 3 to 5
+      nodes. The ASG desired capacity was raised to 5 but only 3
+      instances are running. The cluster autoscaler shows "scale-up
+      failed" and the ASG activity shows InsufficientInstanceCapacity.
+
+      ClusterName: prod-cluster
+      NodeGroupName: prod-ng-1
+      InstanceTypes: ["m5.large"]
+      Subnets: ["subnet-private-a (us-east-1a)", "subnet-private-b (us-east-1b)"]
+      ScalingConfig: { minSize: 3, desiredSize: 5, maxSize: 10 }
+      CurrentRunningInstances: 3 (out of desired 5)
+
+      ASG Activity (most recent):
+        StatusCode: Failed
+        StatusMessage: "Launching a new EC2 instance. Status Reason:
+          Insufficient instance capacity. us-east-1a."
+        Cause: "At 2026-08-11T14:30:00Z a user request created a
+          launch configuration change."
+
+      aws eks describe-nodegroup health:
+        issues: []
+
+      kubectl get nodes:
+        (3 Ready nodes, all in us-east-1b subnet)
+
+      kubectl get events:
+        Warning  FailedScheduling  15 pods Pending (insufficient nodes)
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "asg-instance-capacity-unavailable"
+        - "INSTANCE_CAPACITY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: SCALING_CONFIG"
+
+  - id: custom-ami-bootstrap-script-error
+    description: >-
+      EKS node group with a custom AMI. The bootstrap.sh script has an
+      incorrect --apiserver-endpoint value. EC2 instances launch but
+      never register with the API server. Nodes never appear in kubectl
+      get nodes. Expected root cause: CUSTOM_AMI_BOOTSTRAP.
+    input: |
+      Symptom: a new node group prod-ng-custom was created with a
+      custom AMI. EC2 instances launch (visible in the ASG and EC2
+      console) but never appear in kubectl get nodes. The ASG marks
+      them unhealthy after the health check grace period and
+      replaces them, creating a cycle.
+
+      ClusterName: prod-cluster
+      NodeGroupName: prod-ng-custom
+      AmiType: CUSTOM_TEMPLATE
+      LaunchTemplate:
+        ImageId: ami-0abc123def456 (custom AMI)
+        UserData: |
+          #!/bin/bash
+          /etc/eks/bootstrap.sh prod-cluster \
+            --apiserver-endpoint https://10.0.0.1 \
+            --b64-cluster-ca LS0tLS1CRUdJTi
+          /opt/aws/bin/cfn-signal
+
+      Cluster API server endpoint: https://A1B2C3D4...gr7.us-east-1.eks.amazonaws.com
+      (The user-data has 10.0.0.1 which is a private IP, NOT the
+      EKS API server endpoint)
+
+      ASG Activity:
+        StatusCode: Failed
+        StatusMessage: "Instance became unhealthy"
+
+      aws ec2 get-console-output (instance i-0xyz):
+        + /etc/eks/bootstrap.sh prod-cluster --apiserver-endpoint https://10.0.0.1
+        ...
+        [error] Failed to connect to API server https://10.0.0.1:
+          dial tcp 10.0.0.1:443: connect: connection refused
+        [error] kubelet failed to start: unable to load bootstrap
+          kubeconfig
+
+      kubectl get nodes:
+        (empty — no nodes from this node group registered)
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "custom-ami-bootstrap-script-error"
+        - "CUSTOM_AMI_BOOTSTRAP"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: ASG_LAUNCH_FAILURE"

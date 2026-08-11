@@ -1,0 +1,281 @@
+# Eval test cases for cloudwatch-alarm-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: cloudwatch-alarm-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: dimension-case-mismatch
+    description: >-
+      Alarm on AWS/Lambda Errors stuck in INSUFFICIENT_DATA since
+      creation 3 days ago. Alarm dimension FunctionName=Fn-Orders-API
+      (capitalised) does not match the emitted metric dimension
+      FunctionName=fn-orders-api (lowercase). CloudWatch dimension
+      values are case-sensitive exact strings. Expected layer:
+      METRIC_DIMENSION_MISMATCH.
+    input: |
+      Symptom: HighErrorRateAlarm has been in INSUFFICIENT_DATA for 3
+      days. The Lambda function fn-orders-api is clearly emitting
+      Errors — we can see them on the dashboard.
+
+      AlarmName: HighErrorRateAlarm
+      StateValue: INSUFFICIENT_DATA
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{Name: FunctionName, Value: Fn-Orders-API}]
+      Period: 300
+      Statistic: Sum
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      TreatMissingData: missing
+
+      Metric evidence: dashboard (dimensionless query on AWS/Lambda
+      Errors) shows non-zero values for fn-orders-api every 5 minutes
+      for the last 24 hours.
+
+      list-metrics output for AWS/Lambda Errors includes:
+        {Namespace: AWS/Lambda, MetricName: Errors,
+         Dimensions: [{Name: FunctionName, Value: fn-orders-api}]}
+
+      get-metric-data with the alarm's exact dimension set
+      (FunctionName=Fn-Orders-API) returns Values: [].
+      get-metric-data with the corrected dimension
+      (FunctionName=fn-orders-api) returns Values: [3, 1, 0, 7, 2].
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "dimension-case-mismatch"
+        - "METRIC_DIMENSION_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: NAMESPACE_TYPO"
+
+  - id: period-misalignment-standard-metric
+    description: >-
+      Alarm on a standard 60-second-resolution metric (AWS/EC2
+      CPUUtilization) with Period: 1. Alarm sits in INSUFFICIENT_DATA
+      because no sub-60s data points exist. The operator lowered the
+      period for "more sensitivity." Expected layer:
+      PERIOD_MISALIGNMENT.
+    input: |
+      Symptom: HighCpuAlarm has been in INSUFFICIENT_DATA since I set
+      it up yesterday. The EC2 dashboard clearly shows CPUUtilization
+      fluctuating between 40% and 90%.
+
+      AlarmName: HighCpuAlarm
+      StateValue: INSUFFICIENT_DATA
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions: [{Name: InstanceId, Value: i-0abc123def456}]
+      Period: 1
+      Statistic: Average
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 1
+      TreatMissingData: missing
+
+      Metric evidence: AWS/EC2 CPUUtilization is a standard-resolution
+      metric (60-second native storage resolution). Dashboard at 1-
+      minute granularity shows values 40-90%.
+
+      get-metric-data with Period: 1 returns Values: [].
+      get-metric-data with Period: 60 returns Values:
+        [42.5, 78.1, 91.3, 65.0, 88.7].
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "period-misalignment"
+        - "PERIOD_MISALIGNMENT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: METRIC_DIMENSION_MISMATCH"
+
+  - id: action-sns-policy-missing
+    description: >-
+      Disk-space alarm transitions to ALARM 4 times in 24 hours but
+      the on-call Slack receives nothing. AlarmActions targets an SNS
+      topic whose policy lacks the cloudwatch.amazonaws.com
+      sns:Publish grant. Alarm history shows no Action entries. The
+      topic was created via Terraform (IaC), not the console. Expected
+      layer: ACTION_SNS_POLICY.
+    input: |
+      Symptom: ProductionDiskSpaceAlarm fires (we see it on the
+      dashboard in ALARM state), but the on-call Slack channel
+      received zero notifications in the last 24 hours despite 4 ALARM
+      transitions.
+
+      AlarmName: ProductionDiskSpaceAlarm
+      StateValue: ALARM
+      Namespace: CWAgent
+      MetricName: disk_used_percent
+      Dimensions: [{Name: host, Value: prod-web-1},
+                   {Name: path, Value: /}]
+      Period: 60
+      Statistic: Average
+      Threshold: 90
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 3
+      AlarmActions: [arn:aws:sns:us-east-1:111111111111:OpsNotifications]
+      TreatMissingData: missing
+
+      describe-alarm-history StateHistory shows 4 OK -> ALARM
+      transitions in the last 24 hours.
+      describe-alarm-history --history-type Action returns NO entries
+      in the last 24 hours.
+
+      SNS topic OpsNotifications policy (created via Terraform):
+        Statements allow EventBridge sns:Publish and the CI/CD user
+        sns:Publish. There is NO statement granting
+        cloudwatch.amazonaws.com sns:Publish.
+
+      SNS topic works otherwise: a test publish from the CLI delivers
+      to the Slack subscription within 2 seconds.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "action-sns-policy-missing"
+        - "ACTION_SNS_POLICY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ACTION_MISSING"
+
+  - id: statistic-mismatch-dashboard-vs-alarm
+    description: >-
+      Latency alarm stays OK while the p99 dashboard shows the metric
+      clearly breaching 500ms. Alarm uses Statistic: Average; dashboard
+      uses p99. Average smooths single-request spikes that p99 surfaces.
+      Expected layer: STATISTIC_MISMATCH.
+    input: |
+      Symptom: ApiLatencyAlarm stays in OK state even though the p99
+      latency dashboard clearly shows sustained spikes above 500ms
+      during the afternoon traffic peak.
+
+      AlarmName: ApiLatencyAlarm
+      StateValue: OK
+      Namespace: AppMetrics
+      MetricName: RequestLatency
+      Dimensions: [{Name: Service, Value: orders-api}]
+      Period: 60
+      Statistic: Average
+      Threshold: 500
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 5
+      DatapointsToAlarm: 5
+      TreatMissingData: missing
+
+      Dashboard query: AppMetrics RequestLatency p99 over 1-minute
+      periods for Service=orders-api.
+
+      get-metric-data with Statistic: Average returns values in the
+      80-180ms range (well under the 500ms threshold).
+      get-metric-data with ExtendedStatistic: p99 returns values in
+      the 400-1200ms range, with sustained windows above 500ms during
+      the peak.
+
+      Operator's intent: "alert when any sustained window has p99
+      latency above 500ms."
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "statistic-mismatch"
+        - "STATISTIC_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: THRESHOLD_STATIC"
+
+  - id: composite-rule-insufficient-propagation
+    description: >-
+      Composite alarm never transitions to ALARM despite one child
+      alarm being in ALARM. Rule is ALARM(c1) AND ALARM(c2); child c2
+      is in INSUFFICIENT_DATA, which propagates as false under AND.
+      The operator intended either-child (OR) semantics. Expected
+      layer: COMPOSITE_RULE.
+    input: |
+      Symptom: PaymentServiceDegradation composite alarm stays in OK
+      even though one of its child alarms (HighErrorRate) has been in
+      ALARM for 30 minutes. The operator intended the composite to
+      fire when EITHER child is in ALARM.
+
+      AlarmName: PaymentServiceDegradation
+      StateValue: OK
+      AlarmRule: ALARM(HighErrorRate) AND ALARM(HighLatency)
+      AlarmActions: [arn:aws:sns:us-east-1:111111111111:OpsPager]
+
+      Child alarms (describe-alarms):
+        - HighErrorRate: StateValue ALARM (last 30 minutes)
+        - HighLatency:   StateValue INSUFFICIENT_DATA (last 30
+          minutes; the latency metric source stopped emitting 2 hours
+          ago)
+
+      Operator's stated intent: "page the on-call when either the
+      error rate OR the latency spikes."
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "composite-rule-insufficient-propagation"
+        - "COMPOSITE_RULE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TREAT_MISSING_DATA"

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudfront-502-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudFront 502 Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "origin-tls-protocol-mismatch-https-only",
+      "name": "CloudFront 502 after OriginProtocolPolicy changed to https-only; ALB origin listens only on HTTP port 80",
+      "difficulty": "hard",
+      "prompt_file": "prompts/origin-tls-protocol-mismatch-https-only.md",
+      "baseline_file": "baselines/origin-tls-protocol-mismatch-https-only.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "ORIGIN_TLS_PROTOCOL_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "origin-tls-protocol-mismatch-https-only", "ORIGIN_TLS_PROTOCOL_MISMATCH", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: ORIGIN_CONNECTION_TIMEOUT"]
+        }
+      ]
+    },
+    {
+      "id": "lambda-at-edge-viewer-request-runtime-error",
+      "name": "CloudFront 502 with x-edge-result-type: FunctionExecutionError; Lambda@Edge viewer-request function throws on undefined query string",
+      "difficulty": "hard",
+      "prompt_file": "prompts/lambda-at-edge-viewer-request-runtime-error.md",
+      "baseline_file": "baselines/lambda-at-edge-viewer-request-runtime-error.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "LAMBDA_AT_EDGE_ERROR",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "lambda-at-edge-viewer-request-runtime-error", "LAMBDA_AT_EDGE_ERROR", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: ORIGIN_CONNECTION_TIMEOUT"]
+        }
+      ]
+    },
+    {
+      "id": "oac-misconfiguration-s3-bucket-policy-stale",
+      "name": "CloudFront 502 after migrating OAI to OAC; S3 bucket policy still references legacy CanonicalUser principal",
+      "difficulty": "hard",
+      "prompt_file": "prompts/oac-misconfiguration-s3-bucket-policy-stale.md",
+      "baseline_file": "baselines/oac-misconfiguration-s3-bucket-policy-stale.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "OAC_MISCONFIGURATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "oac-misconfiguration-s3-bucket-policy-stale", "OAC_MISCONFIGURATION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: ORIGIN_CONNECTION_TIMEOUT"]
+        }
+      ]
+    },
+    {
+      "id": "failover-behaviour-points-at-primary-not-group",
+      "name": "CloudFront 502 when primary origin fails; CacheBehavior TargetOriginId points at primary, not the OriginGroup",
+      "difficulty": "hard",
+      "prompt_file": "prompts/failover-behaviour-points-at-primary-not-group.md",
+      "baseline_file": "baselines/failover-behaviour-points-at-primary-not-group.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "FAILOVER_MISCONFIGURATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "failover-behaviour-points-at-primary-not-group", "FAILOVER_MISCONFIGURATION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: ORIGIN_CONNECTION_TIMEOUT"]
+        }
+      ]
+    },
+    {
+      "id": "cached-error-response-stale-502-after-recovery",
+      "name": "CloudFront 502 persists for 5+ minutes after origin recovered; Custom Error Response ErrorCachingMinTTL: 300",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cached-error-response-stale-502-after-recovery.md",
+      "baseline_file": "baselines/cached-error-response-stale-502-after-recovery.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CACHED_ERROR_RESPONSE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "cached-error-response-stale-502-after-recovery", "CACHED_ERROR_RESPONSE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: ORIGIN_CONNECTION_TIMEOUT"]
+        }
+      ]
+    }
+  ]
+}

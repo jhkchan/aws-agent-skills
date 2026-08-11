@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "dynamodb-throttling-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the DynamoDB Throttling Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "write-sharding-hot-partition",
+      "name": "PROVISIONED table with 45K ThrottledRequests, user_id partition key with 80/20 write skew — write sharding",
+      "difficulty": "hard",
+      "prompt_file": "prompts/write-sharding-hot-partition.md",
+      "baseline_file": "baselines/write-sharding-hot-partition.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "write-sharding-hot-partition", "RECOMMENDATION", "ESTIMATED_THROUGHPUT_IMPACT", "MIGRATION_STEPS", "sharding"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "gsi-backpressure-throttling",
+      "name": "GSI partition key with 3 values (status), GSI throttling back-pressures base table — GSI redesign",
+      "difficulty": "hard",
+      "prompt_file": "prompts/gsi-backpressure-throttling.md",
+      "baseline_file": "baselines/gsi-backpressure-throttling.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "gsi-backpressure-throttling", "RECOMMENDATION", "ESTIMATED_THROUGHPUT_IMPACT", "GSI"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "capacity-mode-switch",
+      "name": "PROVISIONED table with bursty unpredictable writes, burst capacity exhausted during spikes — switch to on-demand",
+      "difficulty": "medium",
+      "prompt_file": "prompts/capacity-mode-switch.md",
+      "baseline_file": "baselines/capacity-mode-switch.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "capacity-mode-switch", "RECOMMENDATION", "ESTIMATED_THROUGHPUT_IMPACT", "on-demand"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized-table",
+      "name": "PROVISIONED table with zero throttling, UUID partition key, batch writes, backoff configured — already optimized",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized-table.md",
+      "baseline_file": "baselines/already-optimized-table.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized-table", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"]
+        }
+      ]
+    },
+    {
+      "id": "batch-write-migration",
+      "name": "On-demand table with 1200 PutItem/s causing client-side exhaustion — migrate to BatchWriteItem",
+      "difficulty": "medium",
+      "prompt_file": "prompts/batch-write-migration.md",
+      "baseline_file": "baselines/batch-write-migration.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "batch-write-migration", "RECOMMENDATION", "ESTIMATED_THROUGHPUT_IMPACT", "batch"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}

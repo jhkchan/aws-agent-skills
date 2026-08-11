@@ -1,0 +1,70 @@
+{
+  "skill": "rekognition-collection-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 15,
+      "max": 20,
+      "justification": "The skill provides useful heuristics (threshold vs collection size, shard\u2011level scaling, KMS\u2011at\u2011creation gotcha) that a baseline model may not surface, but the majority of the content restates AWS documentation verbatim. The added expert knowledge is limited to a few tables, so full delta is not achieved."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (CLI commands, dependency graph, IAM role requirements) and follow a logical order, yet some steps are generic (e.g., \u201cverify prerequisites\u201d) and the exact ordering for creating the IAM role before the stream processor is only implied, not explicitly mandated."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "A comprehensive NEVER list is present with concrete reasons for each pitfall. One item (SNS with sync ops) could include a deeper explanation of why the API rejects it, so a single point is deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, includes description, keywords, when_to_use, activation keywords, and a strict output contract. Missing a formal versioned schema identifier for the checklist, which prevents a perfect score."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill includes a quick\u2011navigation table and layered sections, but the main body front\u2011loads a large amount of detail (heuristics, tables, full CLI scripts) before the agent knows which part is needed, creating cognitive overload for simple requests."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (collection creation, KMS encryption) are highlighted, and defaults are calibrated (threshold 80%+, shard count scaling). Nonetheless, the skill does not require an explicit confirmation step before issuing a create\u2011collection command, leaving a fragile operation under\u2011constrained."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The document follows a recognizable pattern (activation, mindset, prerequisites, step\u2011by\u2011step, NEVER, output format, error handling). Minor inconsistency in ordering of sections (e.g., error handling appears after output format) prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides runnable CLI snippets, checklist template, and worked examples. However the model output examples show ambiguous handling of optional components (many checklist items marked N/A without guidance) and no guidance for partial deployments, which could cause agents to emit invalid checklists."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 39194,
+  "latency_ms": 12584,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

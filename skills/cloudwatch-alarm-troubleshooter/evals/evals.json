@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-alarm-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Alarm Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "dimension-case-mismatch",
+      "name": "Alarm stuck INSUFFICIENT_DATA — dimension value case mismatch (Fn-Orders-API vs fn-orders-api)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/dimension-case-mismatch.md",
+      "baseline_file": "baselines/dimension-case-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "METRIC_DIMENSION_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "dimension-case-mismatch", "METRIC_DIMENSION_MISMATCH", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: NAMESPACE_TYPO"]
+        }
+      ]
+    },
+    {
+      "id": "period-misalignment-standard-metric",
+      "name": "Alarm INSUFFICIENT_DATA — Period: 1 on a standard 60s AWS/EC2 CPUUtilization metric",
+      "difficulty": "hard",
+      "prompt_file": "prompts/period-misalignment-standard-metric.md",
+      "baseline_file": "baselines/period-misalignment-standard-metric.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "PERIOD_MISALIGNMENT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "period-misalignment", "PERIOD_MISALIGNMENT", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: METRIC_DIMENSION_MISMATCH"]
+        }
+      ]
+    },
+    {
+      "id": "action-sns-policy-missing",
+      "name": "Alarm fires 4x in 24h, no Slack notification — SNS topic policy missing cloudwatch.amazonaws.com grant (Terraform-created topic)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/action-sns-policy-missing.md",
+      "baseline_file": "baselines/action-sns-policy-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "ACTION_SNS_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "action-sns-policy-missing", "ACTION_SNS_POLICY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: ACTION_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "statistic-mismatch-dashboard-vs-alarm",
+      "name": "Latency alarm stays OK while p99 dashboard breaches — alarm on Average, dashboard on p99",
+      "difficulty": "medium",
+      "prompt_file": "prompts/statistic-mismatch-dashboard-vs-alarm.md",
+      "baseline_file": "baselines/statistic-mismatch-dashboard-vs-alarm.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "STATISTIC_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "statistic-mismatch", "STATISTIC_MISMATCH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: THRESHOLD_STATIC"]
+        }
+      ]
+    },
+    {
+      "id": "composite-rule-insufficient-propagation",
+      "name": "Composite alarm never fires despite one child ALARM — INSUFFICIENT child propagates as false under AND; operator intended OR",
+      "difficulty": "hard",
+      "prompt_file": "prompts/composite-rule-insufficient-propagation.md",
+      "baseline_file": "baselines/composite-rule-insufficient-propagation.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "COMPOSITE_RULE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "composite-rule-insufficient-propagation", "COMPOSITE_RULE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TREAT_MISSING_DATA"]
+        }
+      ]
+    }
+  ]
+}

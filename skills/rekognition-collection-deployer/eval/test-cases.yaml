@@ -87,7 +87,7 @@ test_cases:
     assertions:
       must_contain:
         - "READY_TO_DEPLOY"
-        "moderation"
+        - "moderation"
         - "VERDICT"
         - "CHECKLIST"
       must_not_contain:

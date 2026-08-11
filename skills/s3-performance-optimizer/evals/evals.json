@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-performance-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Performance Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "multipart-upload-large-put-single-stream",
+      "name": "5 GB daily CSV uploaded as a single PUT; ~80 s wall-clock. Multipart with 10 parallel parts would finish in ~8-10 s.",
+      "difficulty": "medium",
+      "prompt_file": "prompts/multipart-upload-large-put-single-stream.md",
+      "baseline_file": "baselines/multipart-upload-large-put-single-stream.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_layer": "MULTIPART_UPLOAD",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "multipart-upload-large-put-single-stream", "MULTIPART_UPLOAD", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "LAYER: TRANSFER_ACCELERATION"]
+        }
+      ]
+    },
+    {
+      "id": "byte-range-fetch-tail-read-log-trailer",
+      "name": "Application reads only the last 1 KB of a 5 GB log file but uses full GET (~40 s). Byte-range fetch would return in single-digit ms.",
+      "difficulty": "medium",
+      "prompt_file": "prompts/byte-range-fetch-tail-read-log-trailer.md",
+      "baseline_file": "baselines/byte-range-fetch-tail-read-log-trailer.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_layer": "BYTE_RANGE_FETCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "byte-range-fetch-tail-read-log-trailer", "BYTE_RANGE_FETCH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "LAYER: MULTIPART_UPLOAD"]
+        }
+      ]
+    },
+    {
+      "id": "s3-select-csv-filter-pushdown",
+      "name": "Daily 100 GB CSV full-scan with 5% selectivity. Client-side filter takes ~3 hours. S3 Select pushdown would reduce transfer 10-20x.",
+      "difficulty": "hard",
+      "prompt_file": "prompts/s3-select-csv-filter-pushdown.md",
+      "baseline_file": "baselines/s3-select-csv-filter-pushdown.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_layer": "S3_SELECT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "s3-select-csv-filter-pushdown", "S3_SELECT", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "LAYER: MULTIPART_UPLOAD"]
+        }
+      ]
+    },
+    {
+      "id": "express-one-zone-ml-model-serving-latency",
+      "name": "ML cold-start reads 200 MB model weights; p99 FirstByteLatency 80 ms on standard S3; target <10 ms. S3 Express One Zone delivers single-digit-ms.",
+      "difficulty": "hard",
+      "prompt_file": "prompts/express-one-zone-ml-model-serving-latency.md",
+      "baseline_file": "baselines/express-one-zone-ml-model-serving-latency.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_layer": "EXPRESS_ONE_ZONE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "express-one-zone-ml-model-serving-latency", "EXPRESS_ONE_ZONE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "LAYER: MULTIPART_UPLOAD"]
+        }
+      ]
+    },
+    {
+      "id": "prefix-distribution-hot-shard-503-throttling",
+      "name": "Telemetry ingest at 15,000 PUT/sec to single date-based prefix; sustained 503 SlowDown. Hash-prefix sharding restores headroom.",
+      "difficulty": "hard",
+      "prompt_file": "prompts/prefix-distribution-hot-shard-503-throttling.md",
+      "baseline_file": "baselines/prefix-distribution-hot-shard-503-throttling.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_layer": "PREFIX_DISTRIBUTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "prefix-distribution-hot-shard-503-throttling", "PREFIX_DISTRIBUTION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "LAYER: MULTIPART_UPLOAD"]
+        }
+      ]
+    }
+  ]
+}

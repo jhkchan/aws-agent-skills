@@ -1,0 +1,48 @@
+# Eval configuration for cloudwatch-alarm-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudwatch-alarm-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: dimension-case-mismatch
+    difficulty: hard
+    prompt_file: prompts/dimension-case-mismatch.md
+    baseline_file: baselines/dimension-case-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: METRIC_DIMENSION_MISMATCH
+  - id: period-misalignment-standard-metric
+    difficulty: hard
+    prompt_file: prompts/period-misalignment-standard-metric.md
+    baseline_file: baselines/period-misalignment-standard-metric.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: PERIOD_MISALIGNMENT
+  - id: action-sns-policy-missing
+    difficulty: hard
+    prompt_file: prompts/action-sns-policy-missing.md
+    baseline_file: baselines/action-sns-policy-missing.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: ACTION_SNS_POLICY
+  - id: statistic-mismatch-dashboard-vs-alarm
+    difficulty: medium
+    prompt_file: prompts/statistic-mismatch-dashboard-vs-alarm.md
+    baseline_file: baselines/statistic-mismatch-dashboard-vs-alarm.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: STATISTIC_MISMATCH
+  - id: composite-rule-insufficient-propagation
+    difficulty: hard
+    prompt_file: prompts/composite-rule-insufficient-propagation.md
+    baseline_file: baselines/composite-rule-insufficient-propagation.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: COMPOSITE_RULE
