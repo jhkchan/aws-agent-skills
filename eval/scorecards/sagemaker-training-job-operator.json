@@ -1,0 +1,70 @@
+{
+  "skill": "sagemaker-training-job-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many non\u2011trivial expert details (e.g., P5/Trn1 default quota zero, exact WarmPoolConfig MaxIdleSeconds limit, SMDDP num_processes = total GPUs, Training Compiler version matrix, training\u2011plan reservation workflow). These are concrete decision points a senior operator would need, not just restated docs. Missing a few niche nuances (e.g., region\u2011specific quota limits, IAM trust policy requirements) prevents a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific procedure: ordered pre\u2011checks, step\u2011by\u2011step CLI plan, verdict decision tree, and explicit CONFIRM gate. The process is clearly tied to SageMaker concepts. Deducted 1 point because the procedure for handling post\u2011failure log analysis is only mentioned briefly, not a full step."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never launch spot without checkpointing, never use GPU image on CPU instance, never forget warm\u2011pool cleanup). Lacks a few anti\u2011patterns such as forgetting to tag resources for cost tracking, so 1 point deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use/when_not_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. The only shortfall is that the activation triggers are a long list without a concise \"trigger condition\" field, making reliable activation slightly less crisp."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill layers information (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process \u2192 Output contract), but the Mindset section is dense and many details (e.g., full tables of failure reasons) are presented up\u2011front, causing some cognitive overload. Hence a moderate deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (launch, stop, register) are gated by a CONFIRM step and strict pre\u2011checks. Creative or informational queries are left unconstrained. The spot\u2011training example omits the optional `--checkpoint-local-path` flag mentioned in the narrative, a minor over\u2011permissiveness."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Activation, Mindset, Quick reference, Process, Output contract, Edge cases, Anti\u2011patterns). The pattern is consistent but not labeled with a formal template, so one point is deducted."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, decision trees, and example outputs that an agent could execute. Minor gaps: the examples omit handling of CLI failures, pagination for list commands, and do not show cleanup of temporary resources in all scenarios. These omissions could cause an agent to get stuck, so 2 points deducted."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 47731,
+  "latency_ms": 18107,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

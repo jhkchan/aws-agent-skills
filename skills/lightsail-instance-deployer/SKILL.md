@@ -125,35 +125,30 @@ READY_TO_DEPLOY checklist.
 **One-line takeaway:** Lightsail is **not** "a toy EC2" — it is a
 **bundled compute platform** with predictable pricing that includes
 the instance, a fixed-GB SSD, a monthly data-transfer allowance, and
-managed add-ons (snapshots, load balancers, DNS, distributions).
-The bundle is the unit of economics; the VPC peering toggle is the
-unit of network reach; the static IP is the unit of DNS stability.
+managed add-ons (snapshots, load balancers, DNS, distributions). The
+bundle is the unit of economics; the VPC peering toggle is the unit
+of network reach; the static IP is the unit of DNS stability.
 
 Three facts make Lightsail provisioning different from "give me a
 small EC2":
 
 - **Lightsail lives in its own VPC, isolated from the default EC2-VPC.**
   Without VPC peering, a Lightsail instance CANNOT reach RDS,
-  ElastiCache, or any resource in the customer's default EC2-VPC.
-  This is the #1 surprise for teams migrating from EC2. The peering
-  toggle (`peer-vpc`) is per-region, one-way (Lightsail → EC2-VPC),
-  and MUST be enabled before the instance can reach private
-  resources.
+  ElastiCache, or any resource in the customer's default EC2-VPC. This
+  is the #1 surprise for teams migrating from EC2. The peering toggle
+  (`peer-vpc`) is per-region, one-way (Lightsail → EC2-VPC).
 
-- **The bundle (plan) includes data transfer — but overage is metered.**
-  Each bundle includes a monthly outbound transfer allowance (1 TB
-  on the small plans, up to 8 TB on the largest). Inbound is always
-  free. Once the allowance is exceeded, overage is billed per GB
-  (typically $0.09/GB). Static IP attachment is free while attached
-  but billed ($0.005/hour) when detached — orphan static IPs are a
-  common cost leak.
+- **The bundle includes data transfer — overage is metered.** Each
+  bundle includes a monthly outbound transfer allowance (1 TB on
+  small plans, up to 8 TB on the largest). Inbound is always free.
+  Overage ~$0.09/GB. Static IP attachment is free while attached but
+  billed ($0.005/hour) when detached — orphan IPs are a common cost leak.
 
 - **App+OS blueprints (WordPress, LAMP, Node.js) bundle the application
   stack.** A WordPress blueprint ships with WordPress, Apache, MySQL,
-  and PHP pre-installed and configured. This is NOT the same as an
-  OS-only blueprint with `apt install wordpress`. Use app+OS when you
-  want the bundled stack with the vendor's defaults; use OS-only when
-  you want full control of the application stack.
+  and PHP pre-installed. This is NOT the same as OS-only with
+  `apt install wordpress`. Use app+OS when you want the bundled stack
+  with vendor defaults; use OS-only when you need full control.
 
 ## Quick navigation
 
@@ -174,38 +169,27 @@ small EC2":
 | `PREREQUISITES_MISSING` | Any pre-check failed (blueprint not found in the selected region, bundle unavailable in region, AZ does not exist in region, SSH key region mismatch, app+OS blueprint requires a minimum bundle the spec doesn't meet, VPC peering requested but EC2-VPC has no default VPC, multi-AZ database primary AZ mismatch, distribution origin unreachable, IAM permission missing, instance name collision) | List failures, do NOT execute |
 | `READY_TO_DEPLOY` | All pre-checks passed; awaiting CONFIRM gate | Emit exact CLI sequence with full instance config, wait for operator yes |
 
-**Deployment checklist (every dimension must pass):**
-
-| Dimension | Requirement | Step |
-|---|---|---|
-| Blueprint | OS-only (Amazon Linux 2023, Ubuntu 22.04, Debian, etc.) or app+OS (WordPress, LAMP, Node.js, etc.) | Step 1 |
-| Bundle (plan) | CPU/RAM/SSD/transfer fits the workload. App+OS may require a minimum bundle | Step 2 |
-| Availability Zone | Valid AZ in the selected region | Step 3 |
-| Static IP | Attached before exposing via DNS (avoids IP churn on stop/start) | Step 4 |
-| DNS zone | Lightsail DNS zone created, A record maps to the static IP | Step 5 |
-| VPC peering | Enabled when accessing RDS/ElastiCache/private EC2-VPC resources | Step 6 |
-| Snapshots | Automatic (daily or weekly schedule, retention window) + manual (pre-deploy) | Step 7 |
-| Load balancer | Lightsail LB for HA (TCP/TLS, health check, sticky sessions) | Step 8 |
-| Container service | Optional; for containerized apps instead of an instance | Step 9 |
-| Distribution | Optional; CloudFront-backed CDN fronting an instance or bucket | Step 10 |
-| Database | Optional; multi-AZ managed Lightsail database for HA | Step 11 |
-| Firewall | Instance firewall rules per port (defaults to 22, 80, 443) | Step 12 |
-| User data | cloud-init launch script (if customization needed) | Step 13 |
-| SSH key | Default Lightsail key or uploaded custom key | Step 14 |
+**Deployment checklist (every dimension must pass):** Blueprint (OS-only
+or app+OS) — Step 1; Bundle sizing (CPU/RAM/SSD/transfer; app+OS minimum)
+— Step 2; AZ valid in region — Step 3; Static IP attached before DNS —
+Step 4; DNS zone + A record to static IP — Step 5; VPC peering enabled
+if RDS/ElastiCache access needed — Step 6; Snapshots (automatic +
+manual) — Step 7; Load balancer for HA (optional) — Step 8; Container
+service (optional) — Step 9; Distribution/CDN (optional) — Step 10;
+Database (optional; multi-AZ for HA) — Step 11; Firewall (22/80/443
+defaults, tightened per CIDR) — Step 12; User data (cloud-init,
+optional) — Step 13; SSH key (default or custom) — Step 14.
 
 **Lightsail limits (2026):**
 
-- Bundles (plans) per region: 1 of each size (soft limit; default 5-20).
-- Static IPs per region: 5 (soft limit; raise via support ticket).
-- DNS zones per account: 5 (soft limit).
-- DNS records per zone: no hard cap.
-- Snapshots per account: depends on storage; no fixed count cap.
-- Load balancers per region: 5 (soft limit).
-- Container services per region: 5 (soft limit).
-- Distributions per region: 5 (soft limit).
-- Databases per region: varies by database engine (15 default for MySQL).
-- Instance name length: 255 chars; alphanumeric + hyphen.
-- User data size: 16 KB.
+- Bundles per region: 1 of each size (soft limit; default 5-20).
+- Static IPs per region: 5 (soft limit).
+- DNS zones per account: 5 (soft limit). DNS records per zone: no hard cap.
+- Snapshots: depends on storage; no fixed count cap.
+- Load balancers / container services / distributions per region: 5 each (soft).
+- Databases per region: varies by engine (15 default for MySQL).
+- Instance name: 255 chars, alphanumeric + hyphen. User data size: 16 KB.
+- Availability Zones: 2-6 per region (Lightsail may not support all EC2 AZs).
 - Availability Zones: 2-6 per region ( Lightsail may not support all EC2 AZs in a region).
 
 ## Pre-flight: deployment specification gate (run before architecture output)
@@ -571,24 +555,19 @@ for Amazon Linux, `ubuntu` for Ubuntu, `admin` for Debian).
 - **LAMP app with static IP + DNS.** OS-only or LAMP blueprint,
   `medium_3_0` bundle, static IP attached, Lightsail DNS zone with
   A record to the static IP, daily automatic snapshots, firewall
-  80/443 from anywhere, 22 from corporate CIDR. Single-instance
-  deployment for low-traffic sites.
+  80/443 from anywhere, 22 from corporate CIDR. Single-instance.
 
 - **WordPress HA behind Lightsail LB.** Two `medium_3_0` WordPress
-  instances in different AZs, Lightsail LB on port 443 with TLS,
-  sticky sessions (WordPress stores sessions in files by default).
-  Multi-AZ Lightsail database for HA. Daily snapshots + manual
-  pre-update.
+  instances in different AZs, Lightsail LB on 443 with TLS, sticky
+  sessions. Multi-AZ Lightsail database for HA. Daily snapshots.
 
 - **RDS private access via VPC peering.** Lightsail instance with
-  VPC peering enabled; RDS in the default EC2-VPC with `publicly-accessible: false`;
+  VPC peering enabled; RDS in default EC2-VPC with `publicly-accessible: false`;
   RDS security group allows inbound from the Lightsail VPC CIDR.
-  The Lightsail instance reaches RDS by private IP only.
 
-- **Container service for stateless API.** Container service with
-  `small` power, scale 2, public endpoint with health check. Push
-  container image to ECR; Lightsail pulls and deploys. Use for
-  stateless APIs that don't need a full EC2 instance.
+- **Container service for stateless API.** Container service, `small`
+  power, scale 2, public endpoint with health check. Image from ECR.
+  Use for stateless APIs that don't need a full EC2 instance.
 
 ## Output format
 
@@ -739,19 +718,17 @@ regression.
 3. **NEVER deploy a production database with `publicly-accessible:
    true`.** It exposes the DB to the internet. Always set
    `publicly-accessible: false`; reach the DB via peered Lightsail
-   instances or EC2-VPC resources by private IP. Block at pre-check.
+   instances by private IP. Block at pre-check.
 
-4. **NEVER deploy an app+OS blueprint on a bundle below the vendor's
-   minimum.** WordPress on `nano_3_0` (512 MB RAM) will install but
-   fail under load — MySQL OOMs, PHP-FPM exhausts workers, the site
-   goes down. Pre-check the bundle against the blueprint minimum
-   (`medium_3_0` for most app+OS blueprints).
+4. **NEVER deploy an app+OS blueprint on a bundle below the vendor
+   minimum.** WordPress on `nano_3_0` (512 MB RAM) installs but fails
+   under load — MySQL OOMs, PHP-FPM exhausts workers. Pre-check the
+   bundle against the blueprint minimum (`medium_3_0` for most app+OS).
 
-5. **NEVER leave orphan static IPs.** A static IP attached to a
-   running instance is free; detached, it bills $0.005/hour (~$3.60/mo).
-   When deleting an instance, also `release-static-ip` any IP that
-   was attached and is no longer needed. Pre-check the static IP
-   inventory.
+5. **NEVER leave orphan static IPs.** Attached: free. Detached:
+   $0.005/hour (~$3.60/mo). When deleting an instance, also
+   `release-static-ip` any IP no longer needed. Pre-check the static
+   IP inventory.
 
 ## Expert heuristic: choosing bundle (plan) for workload type
 
@@ -772,22 +749,19 @@ and budget. The heuristic below resolves the trade-off.
 **Decision rules:**
 - For app+OS blueprints, NEVER go below the vendor minimum (typically
   `medium_3_0`, 4 GB). Smaller bundles install but fail under load.
-- For OS-only with a custom stack, profile the app's RAM at peak and
-  add 50% headroom. CPU scales linearly with bundle size (1 CPU nano
-  → 16 CPU 2xlarge).
+- For OS-only with a custom stack, profile RAM at peak and add 50%
+  headroom. CPU scales linearly with bundle size.
 - For HA, prefer 2x `medium_3_0` behind a Lightsail LB over 1x
   `xlarge_3_0`. The HA pair survives AZ failure; the single large
   instance does not.
-- Data transfer: monitor outbound usage. If consistently near the
-  bundle's allowance, consider a Lightsail distribution (CDN) to
-  offload cacheable content, or upgrade to a bundle with more transfer.
-- Snapshots are billed at ~$0.05/GB-month. A `medium_3_0` snapshot
-  (80 GB) costs ~$4/month — manageable; a `2xlarge_3_0` snapshot
-  (640 GB) costs ~$32/month — review retention carefully.
+- Data transfer: monitor outbound. Near the allowance? Add a Lightsail
+  distribution (CDN) to offload cacheable content.
+- Snapshots billed at ~$0.05/GB-month. A `medium_3_0` snapshot (80 GB)
+  is ~$4/month; a `2xlarge_3_0` (640 GB) is ~$32/month — review
+  retention carefully.
 
 ALWAYS emit the bundle choice as a PRE_CHECKS row naming the workload
-type, the selected bundle, and the rationale (vendor minimum,
-headroom, HA distribution).
+type, selected bundle, and rationale (vendor minimum, headroom, HA).
 
 ## Recent AWS features (2024-2026)
 
