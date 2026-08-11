@@ -1,0 +1,168 @@
+# Eval test cases for config-aggregator-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING
+# classification across aggregation topologies (organization aggregator
+# with delegated admin, authorized accounts cross-region, org-level
+# conformance packs, Lambda processor org rules, proactive rules) and
+# prerequisite failure branches (missing organization ID / delegated admin).
+skill: config-aggregator-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: org-aggregator-delegated-admin
+    description: >-
+      Provision an organization Config aggregator with delegated
+      administrator, all-region source, conformance pack at org
+      level, and org config rule with Lambda processor. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Provision an AWS Config aggregator in us-east-1. Name:
+      org-compliance-aggregator. Type: organization aggregator.
+      Organization ID: o-abc123def. Delegated administrator
+      account: 123456789012. Source: all accounts in the
+      organization, all AWS regions. Conformance pack:
+      OperationalBestPractices-for-Security deployed at
+      organization level from S3 template
+      s3://config-templates-123456789012/security-best-practices.yaml.
+      Organization config rule: tag-policy-compliance (Lambda
+      processor, function config-tag-policy-rule). Tags:
+      Environment=production, Governance=compliance.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "org-compliance-aggregator"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "OrganizationAggregationSource"
+        - "delegated administrator"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: authorized-accounts-cross-region
+    description: >-
+      Provision an authorized-account Config aggregator
+      aggregating 3 specific accounts across us-east-1 and
+      eu-west-1 with explicit PutAggregationAuthorization on
+      each source account. Expects READY_TO_DEPLOY.
+    input: |
+      Provision an AWS Config aggregator in us-east-1. Name:
+      authorized-accounts-aggregator. Type: authorized accounts.
+      Source accounts: 111111111111, 222222222222, 333333333333.
+      Regions: us-east-1, eu-west-1. Each source account will
+      call PutAggregationAuthorization for aggregator account
+      123456789012 in both regions. Conformance pack:
+      OperationalBestPractices-for-CloudWatch deployed on
+      aggregator account. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "authorized-accounts-aggregator"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "AccountAggregationSource"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-organization-delegated-admin
+    description: >-
+      Provision an organization Config aggregator but the
+      delegated administrator has not been registered and Config
+      is not enabled as a trusted service in Organizations.
+      Expects PREREQUISITES_MISSING — delegated admin must be
+      configured before creating an organization aggregator.
+    input: |
+      Provision an AWS Config aggregator in us-east-1. Name:
+      org-compliance-aggregator. Type: organization aggregator.
+      Organization ID: o-abc123def. I have not yet enabled Config
+      as a trusted service in Organizations or registered a
+      delegated administrator. Source: all accounts, all regions.
+      Conformance pack: OperationalBestPractices-for-Security.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "org-compliance-aggregator"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "delegated administrator"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+
+  - id: org-conformance-pack-deployment
+    description: >-
+      Deploy a conformance pack at organization level from a
+      sample template with custom input parameters, alongside
+      an existing organization aggregator. Expects
+      READY_TO_DEPLOY.
+    input: |
+      Deploy a conformance pack at the organization level in
+      us-east-1 on delegated admin account 123456789012.
+      Organization aggregator org-compliance-aggregator already
+      exists. Conformance pack name: OperationalBestPractices-
+      for-EC2. Template S3 URI: s3://config-templates-123456789012
+      /ec2-best-practices.yaml. Input parameters:
+      DesiredInstanceType=t3.medium, AllowedRegions=us-east-1.
+      Deploy to all accounts in the organization. Tags:
+      Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "OperationalBestPractices-for-EC2"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: proactive-rules-lambda-processor
+    description: >-
+      Provision a Config aggregator with proactive rules enabled
+      (StartResourceEvaluation) and a Lambda processor
+      organization config rule for custom compliance logic.
+      Expects READY_TO_DEPLOY.
+    input: |
+      Provision an AWS Config aggregator in us-east-1. Name:
+      org-compliance-aggregator. Organization ID: o-abc123def.
+      Delegated admin: 123456789012. Deploy a proactive Config
+      rule s3-bucket-versioning-proactive (Proactive mode enabled)
+      for pre-deployment resource evaluation. Deploy an
+      organization config rule custom-encryption-check with
+      Lambda processor function config-encryption-evaluator
+      (runtime python3.12, role ConfigLambdaRole). Source: all
+      accounts, all regions. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "org-compliance-aggregator"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "proactive"
+        - "Lambda"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"

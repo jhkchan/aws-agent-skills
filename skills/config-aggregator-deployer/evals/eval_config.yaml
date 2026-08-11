@@ -1,0 +1,48 @@
+# Eval configuration for config-aggregator-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: config-aggregator-deployer
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: org-aggregator-delegated-admin
+    difficulty: hard
+    prompt_file: prompts/org-aggregator-delegated-admin.md
+    baseline_file: baselines/org-aggregator-delegated-admin.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: authorized-accounts-cross-region
+    difficulty: hard
+    prompt_file: prompts/authorized-accounts-cross-region.md
+    baseline_file: baselines/authorized-accounts-cross-region.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-organization-delegated-admin
+    difficulty: hard
+    prompt_file: prompts/missing-organization-delegated-admin.md
+    baseline_file: baselines/missing-organization-delegated-admin.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: org-conformance-pack-deployment
+    difficulty: medium
+    prompt_file: prompts/org-conformance-pack-deployment.md
+    baseline_file: baselines/org-conformance-pack-deployment.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: proactive-rules-lambda-processor
+    difficulty: hard
+    prompt_file: prompts/proactive-rules-lambda-processor.md
+    baseline_file: baselines/proactive-rules-lambda-processor.md
+    expected_verdict: READY_TO_DEPLOY

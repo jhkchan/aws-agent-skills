@@ -1,0 +1,185 @@
+# Eval test cases for lightsail-instance-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: lightsail-instance-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: lamp-app-static-ip-dns-ready
+    description: >-
+      Standard LAMP blueprint deployment with a static IP attached,
+      Lightsail DNS zone with an A record pointing to the static IP,
+      daily automatic snapshots with 7-day retention, and a tightened
+      firewall (22 from corporate CIDR, 80/443 from anywhere). All
+      checklist dimensions pass.
+    input: |
+      Design a deployment plan for a production Lightsail instance.
+      Emit the standard VERDICT block (INSTANCE_SPEC, VERDICT,
+      ARCHITECTURE, CHECKLIST, FINDINGS, DEPLOY_COMMANDS).
+
+      Requirements:
+      - Instance name: prod-lamp
+      - Blueprint: LAMP 8 (app+OS, blueprint_id lamp_8)
+      - Bundle: medium_3_0 (4 GB RAM, 2 CPU, 80 GB SSD, 4 TB transfer) — meets LAMP minimum
+      - Availability Zone: us-east-1a (valid in region)
+      - Static IP: prod-lamp-ip (allocated, not attached to another instance)
+      - DNS: zone example.com exists; A record app.example.com → static IP
+      - Snapshots: automatic daily at 05:00 UTC, 7-day retention
+      - Firewall: 22 from corporate CIDR 10.0.0.0/8; 80 and 443 from 0.0.0.0/0
+      - VPC peering: not required (no RDS/ElastiCache access)
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "lamp-app-static-ip-dns-ready"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "DEPLOY_COMMANDS"
+        - "medium_3_0"
+        - "static IP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: wordpress-bundle-lb-ha-ready
+    description: >-
+      WordPress HA deployment: two medium_3_0 WordPress instances in
+      different AZs behind a Lightsail load balancer on port 443 with
+      TLS and sticky sessions. Daily snapshots + manual pre-update.
+      Acceptable for production WordPress with HA.
+    input: |
+      Design a deployment plan for a production HA Lightsail
+      deployment. Emit the standard VERDICT block.
+
+      Requirements:
+      - Two instances: prod-wp-1 (us-east-1a), prod-wp-2 (us-east-1b)
+      - Blueprint: wordpress (app+OS)
+      - Bundle: medium_3_0 (4 GB RAM) — meets WordPress minimum
+      - Load balancer: Lightsail LB prod-wp-lb on port 443 with TLS, sticky sessions, health check path /
+      - Snapshots: automatic daily at 03:00 UTC, 7-day retention, plus manual snapshot before each update
+      - Firewall: 443 from 0.0.0.0/0; 22 from corporate CIDR 10.0.0.0/8
+      - VPC peering: not required
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "wordpress-bundle-lb-ha-ready"
+        - "VERDICT"
+        - "load balancer"
+        - "medium_3_0"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: vpc-peering-not-enabled-blocked
+    description: >-
+      User wants the Lightsail instance to reach an RDS database in
+      the default EC2-VPC, but VPC peering is not enabled. Lightsail
+      lives in its own VPC and CANNOT reach EC2-VPC resources without
+      peering. Must emit PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a Lightsail instance that needs to
+      reach a private RDS database. Emit the standard VERDICT block.
+
+      Requirements:
+      - Instance name: prod-app
+      - Blueprint: ubuntu_22_04 (OS-only)
+      - Bundle: small_3_0 (2 GB RAM)
+      - AZ: us-east-1a
+      - Static IP: required
+      - DNS: zone app.example.com
+      - VPC peering: required — the instance must reach RDS at db-private.xxxxxxx.us-east-1.rds.amazonaws.com (private, in the default EC2-VPC)
+
+      Existing-account context: aws lightsail is-vpc-peered --region
+      us-east-1 returns false. The RDS instance has publicly-accessible=false
+      and its security group allows inbound from the Lightsail VPC CIDR
+      (172.26.0.0/16) — but peering has never been enabled.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "vpc-peering-not-enabled-blocked"
+        - "VERDICT"
+        - "peer-vpc"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: distribution-with-static-origin-ready
+    description: >-
+      Lightsail distribution (CDN) fronting a static origin (Lightsail
+      instance). Default cache behavior, TLS via ACM, origin protocol
+      http-only. Acceptable for fronting a static site or media-heavy
+      instance.
+    input: |
+      Design a deployment plan for a Lightsail distribution in front
+      of an existing Lightsail instance. Emit the standard VERDICT block.
+
+      Requirements:
+      - Distribution name: prod-cdn
+      - Origin: prod-static-site (Lightsail instance in us-east-1, running, reachable on port 80)
+      - Origin protocol policy: http-only
+      - Default cache behavior: cache
+      - TLS: ACM certificate attached (cert ARN in us-east-1, ISSUED)
+      - Instance exists and is reachable
+
+      Existing-account context: the Lightsail instance prod-static-site
+      exists in us-east-1 and serves HTTP on port 80. The ACM certificate
+      for cdn.example.com is ISSUED in us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "distribution-with-static-origin-ready"
+        - "VERDICT"
+        - "cache"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: bundle-below-app-os-minimum-blocked
+    description: >-
+      User picked nano_3_0 (512 MB RAM) for a WordPress deployment.
+      WordPress requires medium_3_0 (4 GB RAM) minimum — smaller
+      bundles install but fail under load (MySQL OOMs, PHP-FPM
+      exhausts workers). Must emit PREREQUISITES_MISSING.
+    input: |
+      Design a deployment plan for a WordPress Lightsail instance.
+      Emit the standard VERDICT block.
+
+      Requirements:
+      - Instance name: prod-wp
+      - Blueprint: wordpress (app+OS)
+      - Bundle: nano_3_0 (512 MB RAM, 1 CPU, 20 GB SSD, 1 TB transfer) — chosen for cost savings
+      - AZ: us-east-1a
+      - Static IP: required
+      - DNS: zone blog.example.com
+      - Snapshots: automatic daily
+
+      Existing-account context: the user is cost-conscious and selected
+      the smallest bundle to keep monthly spend under $5. The WordPress
+      blueprint installs on nano_3_0 but MySQL and PHP-FPM together
+      exceed 512 MB under any non-trivial load.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "bundle-below-app-os-minimum-blocked"
+        - "VERDICT"
+        - "medium_3_0"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

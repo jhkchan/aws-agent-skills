@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "lightsail-instance-deployer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Lightsail Instance Deployer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "lamp-app-static-ip-dns-ready",
+      "name": "Standard LAMP blueprint deployment with static IP, DNS, snapshots, tightened firewall — all checklist dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/lamp-app-static-ip-dns-ready.md",
+      "baseline_file": "baselines/lamp-app-static-ip-dns-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "lamp-app-static-ip-dns-ready", "VERDICT", "CHECKLIST", "DEPLOY_COMMANDS", "medium_3_0", "static IP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "wordpress-bundle-lb-ha-ready",
+      "name": "WordPress HA behind Lightsail LB with sticky sessions, multi-AZ instances, daily snapshots",
+      "difficulty": "medium",
+      "prompt_file": "prompts/wordpress-bundle-lb-ha-ready.md",
+      "baseline_file": "baselines/wordpress-bundle-lb-ha-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "wordpress-bundle-lb-ha-ready", "VERDICT", "load balancer", "medium_3_0"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "vpc-peering-not-enabled-blocked",
+      "name": "RDS private access required but VPC peering not enabled — hard blocker for Lightsail reach",
+      "difficulty": "medium",
+      "prompt_file": "prompts/vpc-peering-not-enabled-blocked.md",
+      "baseline_file": "baselines/vpc-peering-not-enabled-blocked.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "vpc-peering-not-enabled-blocked", "VERDICT", "peer-vpc"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    },
+    {
+      "id": "distribution-with-static-origin-ready",
+      "name": "Lightsail distribution (CDN) fronting a static-site instance with ACM TLS",
+      "difficulty": "hard",
+      "prompt_file": "prompts/distribution-with-static-origin-ready.md",
+      "baseline_file": "baselines/distribution-with-static-origin-ready.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY_TO_DEPLOY", "distribution-with-static-origin-ready", "VERDICT", "cache"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: PREREQUISITES_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "bundle-below-app-os-minimum-blocked",
+      "name": "nano_3_0 bundle below WordPress minimum — installs but fails under load",
+      "difficulty": "easy",
+      "prompt_file": "prompts/bundle-below-app-os-minimum-blocked.md",
+      "baseline_file": "baselines/bundle-below-app-os-minimum-blocked.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["PREREQUISITES_MISSING", "bundle-below-app-os-minimum-blocked", "VERDICT", "medium_3_0"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: READY_TO_DEPLOY"]
+        }
+      ]
+    }
+  ]
+}

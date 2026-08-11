@@ -1,0 +1,224 @@
+# Eval test cases for cloudfront-invalidation-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudfront-invalidation-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-invalidation-all-paths-ready
+    description: >-
+      Operator wants to invalidate all cached objects on a Deployed
+      CloudFront distribution using /* path pattern. All pre-checks
+      pass: distribution Deployed, Enabled, caller has
+      cloudfront:CreateInvalidation, CallerReference unique, path
+      pattern valid. Plan should produce READY with the
+      create-invalidation CLI and a CONFIRM gate.
+    input: |
+      Operation: create-invalidation
+      DistributionId: E1ABC2DEF3GHI4
+      DomainName: d111111abcdef8.cloudfront.net
+      Paths: ["/*"]
+
+      Distribution metadata (aws cloudfront get-distribution):
+        Id: E1ABC2DEF3GHI4
+        Status: Deployed
+        DomainName: d111111abcdef8.cloudfront.net
+        DistributionConfig:
+          Enabled: true
+          Origins:
+            Items:
+              - Id: S3-origin
+                DomainName: prod-bucket.s3.amazonaws.com
+          ContinuousDeploymentPolicyId: null
+        LastModifiedTime: 2026-08-09T14:00:00Z
+
+      Recent invalidations (aws cloudfront list-invalidations, last 30 days):
+        Total: 3 invalidations, total paths this month: 12
+        CallerReferences used: inv-20260715-001, inv-20260801-001, inv-20260805-002
+
+      Caller identity: arn:aws:iam::111111111111:role/CloudFrontAdmin
+      IAM policy grants: cloudfront:CreateInvalidation on
+        arn:aws:cloudfront::111111111111:distribution/E1ABC2DEF3GHI4
+
+      CallerReference to use: inv-20260810-001
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, COST, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-invalidation"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "/*"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: create-invalidation-bulk-cost-advisory
+    description: >-
+      Operator wants to invalidate 1,247 individual paths on a Deployed
+      distribution. Monthly cumulative path count is 1,247 (247 beyond
+      the 1,000 free tier). Pre-checks pass but cost advisory must be
+      surfaced. Plan should produce READY with cost warning $1.24.
+    input: |
+      Operation: create-invalidation
+      DistributionId: E2XYZ5678GHIJ9
+      DomainName: d222222bcdefg9.cloudfront.net
+      Paths: 1,247 individual object paths (provided in invalidation-batch.json)
+
+      Distribution metadata (aws cloudfront get-distribution):
+        Id: E2XYZ5678GHIJ9
+        Status: Deployed
+        DistributionConfig:
+          Enabled: true
+          ContinuousDeploymentPolicyId: null
+
+      Monthly cumulative path count: 1,247 (247 beyond 1,000 free tier)
+      CallerReference: inv-20260810-002 (unique)
+      Caller has cloudfront:CreateInvalidation
+
+      Emit the standard VERDICT block with cost analysis.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "create-invalidation"
+        - "VERDICT"
+        - "0.005"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: wait-invalidation-completed
+    description: >-
+      Operator wants to verify an invalidation has reached Completed
+      status. The invalidation was created 2 minutes ago. All checks
+      pass. Emit COMPLETED with post-verification results.
+    input: |
+      Operation: wait-invalidation
+      DistributionId: E1ABC2DEF3GHI4
+      InvalidationId: I2XYZ5678UVW90
+
+      Invalidation metadata (aws cloudfront get-invalidation):
+        Id: I2XYZ5678UVW90
+        Status: Completed
+        CreateTime: 2026-08-10T15:30:00Z
+        InvalidationBatch:
+          CallerReference: inv-20260810-001
+          Paths:
+            Quantity: 1
+            Items: ["/*"]
+
+      Spot-check:
+        curl -I https://d111111abcdef8.cloudfront.net/index.html
+        Result: HTTP/1.1 200 OK
+        X-Cache: Miss from CloudFront
+        Age: 0
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "Completed"
+        - "VERDICT"
+        - "POST_VERIFY"
+        - "X-Cache"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: create-invalidation-suspended-distribution-blocked
+    description: >-
+      Operator tries to create an invalidation on a Suspended
+      distribution. Pre-checks must BLOCK and surface the
+      distribution status issue.
+    input: |
+      Operation: create-invalidation
+      DistributionId: E3SUSPENDED001
+      DomainName: d333333suspend.cloudfront.net
+      Paths: ["/*"]
+
+      Distribution metadata (aws cloudfront get-distribution):
+        Id: E3SUSPENDED001
+        Status: Suspended
+        DistributionConfig:
+          Enabled: false
+          ContinuousDeploymentPolicyId: null
+
+      Caller has cloudfront:CreateInvalidation.
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "Suspended"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "create-invalidation"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: create-invalidation-staging-continuous-deployment-ready
+    description: >-
+      Operator wants to invalidate /api/v2/* on a distribution with a
+      continuous deployment policy. Pre-checks identify the staging
+      distribution and plan to invalidate staging first. Plan should
+      produce READY with staging-targeted invalidation.
+    input: |
+      Operation: create-invalidation
+      DistributionId: E1ABC2DEF3GHI4 (primary)
+      DomainName: d111111abcdef8.cloudfront.net
+      Paths: ["/api/v2/*"]
+
+      Distribution metadata (aws cloudfront get-distribution):
+        Id: E1ABC2DEF3GHI4
+        Status: Deployed
+        DistributionConfig:
+          Enabled: true
+          ContinuousDeploymentPolicyId: CDP1XYZ
+
+      Continuous deployment policy (aws cloudfront get-continuous-deployment-policy):
+        Id: CDP1XYZ
+        StagingDistribution:
+          Id: E5STAGING123
+          DnsName: d555555staging.cloudfront.net
+        TrafficConfig:
+          Type: SingleWeight
+          SingleWeight:
+            Weight: 0.1 (10% traffic to staging)
+
+      Caller has cloudfront:CreateInvalidation on BOTH distributions.
+      CallerReference: stg-20260810-001 (unique)
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "staging"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"

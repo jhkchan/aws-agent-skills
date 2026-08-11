@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudfront-invalidation-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudFront Invalidation Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-invalidation-all-paths-ready",
+      "name": "Create /* invalidation on Deployed distribution — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/create-invalidation-all-paths-ready.md",
+      "baseline_file": "baselines/create-invalidation-all-paths-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-invalidation", "VERDICT", "PRE_CHECKS", "/*", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "create-invalidation-bulk-cost-advisory",
+      "name": "Create 1,247-path invalidation — cost advisory beyond free tier (READY with cost warning)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/create-invalidation-bulk-cost-advisory.md",
+      "baseline_file": "baselines/create-invalidation-bulk-cost-advisory.md",
+      "expected_verdict": "READY",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "create-invalidation", "VERDICT", "0.005", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "wait-invalidation-completed",
+      "name": "Verify invalidation reached Completed status + spot-check (COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/wait-invalidation-completed.md",
+      "baseline_file": "baselines/wait-invalidation-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "Completed", "VERDICT", "POST_VERIFY", "X-Cache"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    },
+    {
+      "id": "create-invalidation-suspended-distribution-blocked",
+      "name": "Create invalidation on Suspended distribution — not Deployed (BLOCKED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/create-invalidation-suspended-distribution-blocked.md",
+      "baseline_file": "baselines/create-invalidation-suspended-distribution-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "Suspended", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "create-invalidation", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "create-invalidation-staging-continuous-deployment-ready",
+      "name": "Invalidate staging distribution in continuous deployment — all pre-checks pass (READY)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/create-invalidation-staging-continuous-deployment-ready.md",
+      "baseline_file": "baselines/create-invalidation-staging-continuous-deployment-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "staging", "VERDICT", "PRE_CHECKS", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

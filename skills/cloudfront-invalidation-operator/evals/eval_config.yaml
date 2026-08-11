@@ -1,0 +1,47 @@
+# Eval configuration for cloudfront-invalidation-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: cloudfront-invalidation-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: create-invalidation-all-paths-ready
+    difficulty: medium
+    prompt_file: prompts/create-invalidation-all-paths-ready.md
+    baseline_file: baselines/create-invalidation-all-paths-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: create-invalidation-bulk-cost-advisory
+    difficulty: hard
+    prompt_file: prompts/create-invalidation-bulk-cost-advisory.md
+    baseline_file: baselines/create-invalidation-bulk-cost-advisory.md
+    expected_verdict: READY
+    expected_risk: HIGH
+  - id: wait-invalidation-completed
+    difficulty: medium
+    prompt_file: prompts/wait-invalidation-completed.md
+    baseline_file: baselines/wait-invalidation-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: LOW
+  - id: create-invalidation-suspended-distribution-blocked
+    difficulty: hard
+    prompt_file: prompts/create-invalidation-suspended-distribution-blocked.md
+    baseline_file: baselines/create-invalidation-suspended-distribution-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: create-invalidation-staging-continuous-deployment-ready
+    difficulty: hard
+    prompt_file: prompts/create-invalidation-staging-continuous-deployment-ready.md
+    baseline_file: baselines/create-invalidation-staging-continuous-deployment-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
