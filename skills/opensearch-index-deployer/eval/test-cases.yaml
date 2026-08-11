@@ -1,0 +1,150 @@
+# Eval test cases for opensearch-index-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across OpenSearch index
+# scenarios (production logs with ILM, k-NN vector search, zero-
+# downtime alias reindex, data stream for time-series, missing
+# domain endpoint prerequisite failure).
+skill: opensearch-index-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: production-logs-ilm
+    description: >-
+      Provision a production logs index with ILM policy for
+      hot/warm/cold tiering, strict dynamic mapping, shard sizing for
+      150 GB estimated data, rollover alias. Expects READY_TO_DEPLOY
+      with ILM policy, rollover alias, and shard sizing noted.
+    input: |
+      Create an OpenSearch index for application logs on domain
+      search-mydomain-abc123.us-east-1.es.amazonaws.com. Estimated
+      150 GB of logs per day. Use strict dynamic mapping. 5 primary
+      shards, 1 replica. Create an ILM policy that rolls over at
+      50 GB or 1 day, moves to warm after 7 days, and deletes after
+      90 days. Rollover alias logs-app-write. Index template
+      logs-template for pattern logs-app-*. Tags: Environment=
+      production, Application=app-logs.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "logs-app"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "ilm"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: knn-vector-search
+    description: >-
+      Provision a k-NN vector search index for semantic search with
+      768-dimensional embeddings, HNSW method, cosine similarity.
+      Expects READY_TO_DEPLOY with index.knn=true, dimension, method,
+      and space_type noted.
+    input: |
+      Create a k-NN vector search index on domain search-vectordomain
+      -xyz789.us-east-1.es.amazonaws.com. 768-dimensional embeddings
+      from a sentence transformer model. Use HNSW method with cosine
+      similarity and nmslib engine. ef_construction 512, m 48. 3
+      primary shards, 1 replica. Index name vector-search-v1. Tags:
+      Environment=production, UseCase=semantic-search.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "knn"
+        - "768"
+        - "cosinesimil"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: alias-reindex-zero-downtime
+    description: >-
+      Provision a zero-downtime reindex workflow from products-v1 to
+      products-v2 with updated mappings. Expects READY_TO_DEPLOY with
+      alias swap noted, reindex API called, and atomic alias action.
+    input: |
+      Create a zero-downtime reindex plan on domain search-prod-abc
+      .us-east-1.es.amazonaws.com. Current index products-v1 needs a
+      mapping change: add a new SKU keyword field and change metadata
+      from object to nested. Create products-v2 with updated mappings.
+      Use alias products for read traffic. 5 primary shards, 1 replica.
+      Strict dynamic mapping. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "products-v2"
+        - "alias"
+        - "reindex"
+        - "nested"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: data-stream-time-series
+    description: >-
+      Provision a data stream for time-series metrics ingestion.
+      Expects READY_TO_DEPLOY with data stream template, backing
+      index configuration, and append-only semantics noted.
+    input: |
+      Create a data stream for application metrics on domain search
+      -metrics-abc.us-east-1.es.amazonaws.com. Metrics include
+      timestamp, metric_name, value, and tags. Expected 200 GB per
+      day. 10 primary shards, 1 replica. Data stream name metrics-ds.
+      Create a data stream template with ILM integration for rollover
+      and tiering. Tags: Environment=production, DataType=metrics.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "data_stream"
+        - "metrics-ds"
+        - "rollover"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-domain-endpoint
+    description: >-
+      Operator requests an OpenSearch index but does not provide the
+      domain endpoint or auth credentials. This is a prerequisite
+      failure. Expects PREREQUISITES_MISSING with the domain endpoint
+      gap cited.
+    input: |
+      Create an OpenSearch index for my application. 5 primary shards,
+      1 replica. I need ILM and alias management.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "endpoint"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

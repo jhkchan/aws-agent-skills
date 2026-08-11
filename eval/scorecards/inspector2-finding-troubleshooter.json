@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 15,
+      "score": 13,
       "max": 20,
-      "justification": "Adds concrete, expert\u2011level decision tree, specific AWS CLI probes, SBOM integration steps, and recent 2024\u20112026 Inspector features that a generic model would not enumerate, but much of the content restates publicly documented procedures, limiting the delta."
+      "justification": "The skill adds some concrete AWS\u2011specific details (e.g., exact CLI probes, recent Inspector features like SBOM export) but most of the content restates what a senior CloudOps engineer already knows. No novel decision thresholds, quantitative cut\u2011offs, or proprietary heuristics are introduced."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedural ordering (batch\u2011get\u2011finding\u2011details first, then type\u2011specific probes) and a clear mindset, yet some steps are generic (e.g., \"check security\") and lack a fully documented, unique AWS\u2011only workflow."
+      "justification": "Procedures are AWS\u2011specific (e.g., always run `batch-get-finding-details` first, then SSM inventory, then patch commands) and the mindset section clearly distinguishes finding types. The only shortfall is occasional reliance on generic advice like \u201ccheck current state\u201d without prescribing the exact order of verification for every branch, leaving minor ambiguity."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Includes a concrete NEVER list with reasoning (e.g., never emit ROOT_CAUSE_FOUND without a failing probe), but the list is limited to five items and omits other common pitfalls such as IAM permission errors, pagination failures, or rate\u2011limit handling."
+      "justification": "Provides a concrete NEVER list with reasoning (e.g., never emit ROOT_CAUSE_FOUND without a failing probe). Missing are anti\u2011patterns around IAM permission errors, CLI throttling, and handling of redacted code snippets beyond the brief note, which would be expected from experienced operators."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use/when_not_to_use, keywords, and a strict output contract are provided. Missing a single explicit activation trigger (e.g., a required intent phrase) prevents a perfect score."
+      "justification": "Frontmatter, description, keywords, and a strict output contract are present, yet the \u2018when_to_use\u2019 narrative is somewhat vague and does not define a precise conditional trigger that an agent could reliably parse."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "The skill layers high\u2011level overview, detailed tables, and step\u2011by\u2011step commands, but the initial sections are dense and present many details up front, causing potential cognitive overload."
+      "justification": "The skill layers high\u2011level purpose, then detailed steps, and finally deep references. However, the initial sections already contain extensive tables, command blocks, and anti\u2011patterns, which may overload an agent before it knows which branch to follow. Critical rules are sometimes buried in later tables rather than highlighted up front."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a CONFIRM prompt and read\u2011only probes are emphasized. However, some remediation commands (e.g., rebuilding ECR images) are described without tighter constraints or safety checks."
+      "justification": "Destructive actions (patching, SG changes, image deletion) are gated by an explicit `CONFIRM` step and safety checks (staleness, SSM agent status). The only minor issue is that the calibration for read\u2011only probes is not explicitly limited, but overall the balance is strong."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011Patterns \u2192 Output format), aiding comprehension. The structure is slightly ad\u2011hoc in places (mix of tables and narrative) preventing a perfect score."
+      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011Patterns \u2192 Output format). The structure is consistent and aids comprehension, earning near\u2011max points."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI examples, and worked output blocks. Lacks explicit error handling for CLI failures, pagination, and IAM permission issues, which could hinder execution in real environments."
+      "justification": "Provides a complete decision tree, concrete CLI commands, and worked examples that an agent could follow. Lacks explicit error\u2011handling branches (e.g., what to do if `aws ssm list-inventory-entries` fails due to missing permissions) and does not cover edge cases like redacted code snippets beyond a brief note, which reduces reliability in production."
     }
   ],
-  "total_score": 103,
+  "total_score": 99,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45824,
-  "latency_ms": 10946,
+  "token_count": 47381,
+  "latency_ms": 4901,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

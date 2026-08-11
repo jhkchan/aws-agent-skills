@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 14,
       "max": 20,
-      "justification": "The skill consolidates many AWS Directory Service specifics (dependency graph, decision trees, LDAPS lifecycle, trust\u2011direction nuances) that a generic model would not enumerate in one place, but most of the content is restating official documentation rather than novel expert insight. No brand\u2011new thresholds, cost\u2011based decision criteria, or undocumented gotchas are introduced."
+      "justification": "Adds concrete decision trees, a configuration dependency graph, edition\u2011size constraints, LDAPS certificate lifecycle, and multi\u2011region replication limits that are not trivially known by a baseline model, but most of the facts are documented in AWS docs, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific step order and exact CLI commands (VPC checks, subnet verification, conditional forwarder creation, trust creation, LDAPS enablement). Some procedures remain generic (e.g., \"verify network connectivity\" without concrete tests), preventing a perfect score."
+      "justification": "Provides AWS\u2011specific CLI command sequences and ordering for each provisioning step, reflecting real\u2011world workflow; however a few steps are described only at a high level (e.g., generic VPC DNS verification) rather than a fully detailed procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never use AD Connector when trusts are needed). Missing are some common pitfalls such as forgetting to enable VPC flow logs for audit, or overlooking cross\u2011region latency impacts, which would have strengthened the anti\u2011pattern coverage."
+      "justification": "Contains a concrete NEVER list with specific reasons (e.g., never use AD Connector for trusts/LDAPS, never change edition after creation). Missing some additional pitfalls such as IAM policy mis\u2011configurations or subnet overlap, so not perfect."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, description, activation keywords, and output contract are well\u2011formed. However, the \"when_to_use\" section could be more precise about mutually exclusive scenarios (e.g., cannot request both Simple AD and Managed AD in the same invocation), leading to a slight deduction."
+      "justification": "Front\u2011matter, description, activation keywords, output contract, and when\u2011to\u2011use section are all present and clear. The skill could improve by explicitly enumerating the negative trigger set (what *not* to invoke) in a separate list, so 1 point is taken."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information effectively: quick navigation, high\u2011level mindset, then detailed step\u2011by\u2011step sections. Some dense tables (dependency graph) are placed early, which could overload a first\u2011time reader, hence a minor penalty."
+      "justification": "Uses sections, quick\u2011navigation table, and layered detail (high\u2011level mindset \u2192 deep heuristics \u2192 step\u2011by\u2011step). The repeated full checklist examples in the skill body add some cognitive load, but core information is still layered appropriately."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (directory creation) are gated by a prerequisite checklist and a strict output contract, matching the fragility of the task. The calibration is imperfect because parameter validation (e.g., directory name length, allowed characters) is not explicitly enforced."
+      "justification": "Enforces prerequisite verification and a PREREQUISITES_MISSING verdict, tightly constraining destructive provisioning. Could further restrict ambiguous inputs (e.g., missing directory\u2011type) but overall calibration is solid."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable skill pattern (mindset, heuristics, step list, output format, error handling). The structure is coherent, but the inclusion of multiple example blocks in the model output section slightly breaks the single\u2011pattern flow."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Stepwise Process \u2192 NEVER list \u2192 Output format) that aligns with established CloudOps skill structures."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides actionable CLI commands, a ready\u2011to\u2011deploy checklist, and error\u2011handling guidance, enabling an agent to execute the skill. Missing edge\u2011case handling (IAM permission errors, region mismatches, cross\u2011account role assumptions) and occasional inconsistencies in example outputs (e.g., \"Edition/Size: N/A\" for AD Connector) reduce usability."
+      "justification": "Model output violates the strict single\u2011block contract by emitting multiple checklist blocks in one response, which would break downstream automation. Minor inconsistencies in type naming (e.g., \"ManagedMicrosoftAD\" vs \"Managed Microsoft AD\") also reduce reliability."
     }
   ],
-  "total_score": 102,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 36966,
-  "latency_ms": 8172,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "token_count": 38022,
+  "latency_ms": 7299,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

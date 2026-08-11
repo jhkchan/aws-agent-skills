@@ -1,0 +1,177 @@
+{
+  "skill": "opensearch-index-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the OpenSearch Index Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across OpenSearch index scenarios (production logs with ILM tiering, k-NN vector search with HNSW, zero-downtime alias reindex, data stream for time-series metrics, missing domain endpoint prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-logs-ilm",
+      "name": "Production logs index with ILM hot/warm/cold tiering",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — production logs index with strict mapping, 5 primary shards for 150 GB, ILM rollover at 50 GB/1d, warm at 7d, delete at 90d, rollover alias",
+      "prompt": "Create an OpenSearch index for application logs on domain search-mydomain-abc123.us-east-1.es.amazonaws.com. Estimated 150 GB of logs per day. Use strict dynamic mapping. 5 primary shards, 1 replica. Create an ILM policy that rolls over at 50 GB or 1 day, moves to warm after 7 days, and deletes after 90 days. Rollover alias logs-app-write. Index template logs-template for pattern logs-app-*. Tags: Environment=production, Application=app-logs.",
+      "prompt_file": "prompts/production-logs-ilm.md",
+      "baseline_file": "baselines/production-logs-ilm.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "OPENSEARCH_INDEX: logs-app-000001\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Dynamic mapping: strict\n  [✓] Primary shards: 5 (target: ~30 GB/shard)\n  [✓] Replica shards: 1\n  [✓] ILM policy: logs-ilm-policy (rollover: 50gb | 1d)\n  [✓] Rollover alias: logs-app-write (is_write_index: true)\n  [✓] Index template: logs-template\nVERIFICATION_COMMANDS:\n  curl -s \"<endpoint>/logs-app-000001\" -u \"user:pass\"",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "logs-app",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "ilm"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "knn-vector-search",
+      "name": "k-NN vector search index with HNSW and cosine similarity",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — k-NN vector search index with 768 dimensions, HNSW method, cosinesimil space type, nmslib engine, ef_construction 512, m 48",
+      "prompt": "Create a k-NN vector search index on domain search-vectordomain-xyz789.us-east-1.es.amazonaws.com. 768-dimensional embeddings from a sentence transformer model. Use HNSW method with cosine similarity and nmslib engine. ef_construction 512, m 48. 3 primary shards, 1 replica. Index name vector-search-v1. Tags: Environment=production, UseCase=semantic-search.",
+      "prompt_file": "prompts/knn-vector-search.md",
+      "baseline_file": "baselines/knn-vector-search.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "OPENSEARCH_INDEX: vector-search-v1\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] k-NN vector search: enabled (dimension: 768, method: hnsw, space: cosinesimil)\n  [✓] Primary shards: 3\n  [✓] Replica shards: 1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "knn",
+            "768",
+            "cosinesimil",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "alias-reindex-zero-downtime",
+      "name": "Zero-downtime alias reindex with mapping change",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — zero-downtime reindex from products-v1 to products-v2, add SKU keyword field, change metadata from object to nested, alias swap",
+      "prompt": "Create a zero-downtime reindex plan on domain search-prod-abc.us-east-1.es.amazonaws.com. Current index products-v1 needs a mapping change: add a new SKU keyword field and change metadata from object to nested. Create products-v2 with updated mappings. Use alias products for read traffic. 5 primary shards, 1 replica. Strict dynamic mapping. Tags: Environment=production.",
+      "prompt_file": "prompts/alias-reindex-zero-downtime.md",
+      "baseline_file": "baselines/alias-reindex-zero-downtime.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "OPENSEARCH_INDEX: products-v2\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Alias: products → products-v2\n  [✓] Reindex: products-v1 → products-v2\n  [✓] Mapping change: metadata nested, SKU keyword added",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "products-v2",
+            "alias",
+            "reindex",
+            "nested",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data-stream-time-series",
+      "name": "Data stream for time-series metrics with ILM integration",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — data stream for metrics-ds, 10 primary shards for 200 GB/day, data stream template with ILM rollover and tiering",
+      "prompt": "Create a data stream for application metrics on domain search-metrics-abc.us-east-1.es.amazonaws.com. Metrics include timestamp, metric_name, value, and tags. Expected 200 GB per day. 10 primary shards, 1 replica. Data stream name metrics-ds. Create a data stream template with ILM integration for rollover and tiering. Tags: Environment=production, DataType=metrics.",
+      "prompt_file": "prompts/data-stream-time-series.md",
+      "baseline_file": "baselines/data-stream-time-series.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "OPENSEARCH_INDEX: metrics-ds (data stream)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Data stream: enabled\n  [✓] Primary shards: 10\n  [✓] Rollover: automatic (data stream lifecycle)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "data_stream",
+            "metrics-ds",
+            "rollover",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-domain-endpoint",
+      "name": "OpenSearch index request without domain endpoint (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — operator does not provide domain endpoint or auth credentials",
+      "prompt": "Create an OpenSearch index for my application. 5 primary shards, 1 replica. I need ILM and alias management.",
+      "prompt_file": "prompts/missing-domain-endpoint.md",
+      "baseline_file": "baselines/missing-domain-endpoint.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "OPENSEARCH_INDEX: unknown\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Domain endpoint: not provided — index creation requires a reachable OpenSearch domain endpoint\n  [✗] Auth credentials: not provided — sigv4 or basic auth required",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "endpoint",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}
