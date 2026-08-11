@@ -1,0 +1,70 @@
+{
+  "skill": "codecommit-repository-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides several expert\u2011level heuristics not found in baseline models (e.g., KMS key policy must grant codecommit service, cross\u2011account KMS and repository policy both required, distinction between notification rules and triggers, branch protection via IAM separate from approval rules). Some restatement of common knowledge prevents a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Lists AWS\u2011specific step order, dependency graph, and exact CLI commands. Slightly generic in the IAM branch\u2011protection step (does not detail attaching the policy to groups/users), hence a small deduction."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Comprehensive \"NEVER\" list with concrete reasons (e.g., missing KMS key grant, confusing notification rules with triggers). Misses a warning about configuring both notification rules and triggers for the same event, so deduct one point."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, and when_to_use are present and well\u2011formed. The activation trigger wording is a bit vague (e.g., \"create codecommit repository\" could match many intents) and the \"Do NOT invoke\" clause is brief, leading to a modest deduction."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses quick\u2011navigation table and layered sections, but the initial \u201cMindset\u201d and extensive heuristics dump a lot of information before the concise checklist, creating some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Appropriately tightens freedom for destructive actions by requiring prerequisite checks. However, it does not explicitly require a confirmation step before creating the repository, leaving a small gap for accidental execution."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). Slight ad\u2011hoc ordering of sections (e.g., mixing prerequisites with steps) prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 6,
+      "max": 15,
+      "justification": "Model output frequently violates the strict output contract: extra prose before the checklist, multiple checklist blocks, missing fields (e.g., Notification rule, Auth method) and N/A placeholders where configuration was expected. These errors show the skill does not give an agent enough deterministic guidance to succeed reliably."
+    }
+  ],
+  "total_score": 100,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 41501,
+  "latency_ms": 4724,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

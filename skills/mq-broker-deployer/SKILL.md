@@ -3,20 +3,19 @@ name: mq-broker-deployer
 description: >-
   Provisions Amazon MQ brokers with production defaults: ActiveMQ vs
   RabbitMQ engine selection, deployment mode (single-instance vs
-  active/standby vs cluster), broker instance type sizing (mq.t3.micro
-  to mq.m5.16xl), EBS storage with KMS encryption at-rest, TLS
-  in-transit, authentication (LDAP, ActiveMQ web console, basic),
-  security groups and subnet placement, public access vs private
-  broker, CloudWatch alarms for broker metrics (CpuUtilization,
-  MemoryUtilization, enqueueCount), message persistence, queues/topics,
-  auto minor version upgrade, and maintenance window. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating an Amazon MQ broker, choosing ActiveMQ vs RabbitMQ,
-  designing HA topology, sizing broker instances, wiring LDAP auth,
-  or configuring CloudWatch alarms. Triggers: create Amazon MQ broker,
-  provision ActiveMQ, provision RabbitMQ, Amazon MQ active/standby,
-  Amazon MQ cluster, mq.t3, mq.m5, Amazon MQ LDAP, broker CloudWatch
-  alarms, Amazon MQ encryption, Amazon MQ maintenance window.
+  active/standby vs cluster), broker instance type sizing, EBS storage
+  with KMS encryption at-rest, TLS in-transit, authentication (LDAP,
+  ActiveMQ web console, basic), security groups and subnet placement,
+  public vs private broker, CloudWatch alarms for broker metrics
+  (CpuUtilization, MemoryUtilization, enqueueCount), message
+  persistence, queues/topics, auto minor version upgrade, and
+  maintenance window. Emits a READY_TO_DEPLOY checklist with
+  verification commands. Use when creating an Amazon MQ broker,
+  choosing ActiveMQ vs RabbitMQ, designing HA topology, sizing broker
+  instances, wiring LDAP auth, or configuring CloudWatch alarms.
+  Triggers: create Amazon MQ, provision ActiveMQ, provision RabbitMQ,
+  Amazon MQ active/standby, Amazon MQ cluster, mq.t3, mq.m5, Amazon
+  MQ LDAP, broker CloudWatch alarms, Amazon MQ encryption.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

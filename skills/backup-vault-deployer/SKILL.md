@@ -1,25 +1,21 @@
 ---
 name: backup-vault-deployer
 description: >-
-  Provisions AWS Backup vaults with production defaults: vault creation
-  (create-backup-vault with KMS encryption key and tags), backup
-  policies and plans (rule-based with lifecycle to cold storage,
-  schedule, copy-to-region), vault lock (governance mode vs compliance
-  mode — WORM with MinRetentionDays, MaxRetentionDays,
-  ChangeableForDays), vault access policy (resource-based IAM for
-  cross-account backup), backup report plans, cross-region and
-  cross-account backup copy configuration, continuous vs periodic
-  backups (PITR for EC2/RDS/DynamoDB), resource-type coverage
-  (EC2/RDS/EFS/DynamoDB/S3/FSx/Storage Gateway), recovery point
-  lifecycle, and Audit Manager integration for compliance evidence.
+  Provisions AWS Backup vaults with production defaults: vault
+  creation (KMS encryption, tags), backup plans (rule-based with
+  lifecycle, schedule, cross-region copy), vault lock (governance vs
+  compliance mode WORM with MinRetentionDays, MaxRetentionDays,
+  ChangeableForDays), vault access policy for cross-account backup,
+  backup report plans, continuous vs periodic backups (PITR for
+  EC2/RDS/DynamoDB), resource-type coverage
+  (EC2/RDS/EFS/DynamoDB/S3/FSx), and Audit Manager integration.
   Emits a READY_TO_DEPLOY checklist with verification commands. Use
   when creating a backup vault, locking a vault for compliance,
-  deploying a backup plan with cross-region copy, configuring backup
-  policies at the org level, or setting up continuous backups for
-  PITR. Triggers: create backup vault, vault lock compliance mode,
-  backup plan deploy, backup policy, cross-region backup copy,
-  continuous backup pitr, backup vault access policy, backup report
-  plan, aws backup org policy.
+  deploying a backup plan with cross-region copy, or setting up
+  continuous backups for PITR. Triggers: create backup vault, vault
+  lock compliance mode, backup plan deploy, backup policy,
+  cross-region backup copy, continuous backup pitr, backup vault
+  access policy, backup report plan, aws backup org policy.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

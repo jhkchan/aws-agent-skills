@@ -1,23 +1,22 @@
 ---
 name: macie-data-classifier
 description: >-
-  Audits Amazon Macie data discovery and classification posture across S3
-  estates — sensitive data discovery jobs (PII, financial, credentials
-  via managed data identifiers), custom data identifiers (regex-based),
-  automated sensitive data discovery vs targeted one-time/scheduled jobs,
-  bucket-level vs job-level scanning, job scoping with inclusion/exclusion
-  criteria, finding types and severities, suppression rules architecture,
-  multi-account topology (Macie administrator/member via Organizations),
-  findings publication to Security Hub and CloudWatch Events / EventBridge,
-  data sampling depth vs full-scan trade-off, and custom identifier regex
-  cost modeling. Emits a CLASSIFIED | PARTIALLY_CLASSIFIED | UNCLASSIFIED
-  verdict with a gap-cited checklist and verification commands. Use when
-  assessing Macie coverage, auditing PII detection posture, validating
-  classification job scoping, reviewing suppression rule hygiene, checking
-  multi-account Macie delegation, or verifying Security Hub integration.
-  Triggers: audit macie, macie data classification review, pii discovery
-  coverage, macie job scoping audit, sensitive data s3 scan, custom data
-  identifier review, macie security hub integration, macie multi-account.
+  Audits Amazon Macie data discovery and classification posture across
+  S3 estates — sensitive data discovery jobs (PII, financial,
+  credentials via managed data identifiers), custom data identifiers
+  (regex-based), automated sensitive data discovery (ASDD) vs targeted
+  one-time/scheduled jobs, job scoping with inclusion/exclusion
+  criteria, finding types and severities, suppression rules, multi-
+  account topology (Macie administrator/member via Organizations),
+  findings publication to Security Hub and CloudWatch Events, data
+  sampling depth vs full-scan trade-off, and custom identifier regex
+  cost modeling. Emits a CLASSIFIED, PARTIALLY_CLASSIFIED, or
+  UNCLASSIFIED verdict with a gap-cited checklist. Use when assessing
+  Macie coverage, auditing PII detection posture, validating
+  classification job scoping, reviewing suppression rule hygiene, or
+  verifying Security Hub integration. Triggers: audit macie, macie
+  data classification, pii discovery coverage, macie job scoping,
+  sensitive data s3 scan, custom data identifier, macie security hub.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

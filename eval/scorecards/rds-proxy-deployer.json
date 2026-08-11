@@ -1,0 +1,70 @@
+{
+  "skill": "rds-proxy-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides concrete expert heuristics not in baseline models: required Secrets Manager JSON schema, proxy endpoint vs cluster endpoint distinction, MaxConnectionsPercent placement on target group, ACU\u2011based sizing table, mandatory SG ingress rule, IAM auth \u2194 TLS coupling, and multi\u2011AZ subnet requirements. Only minor omission of newer engine\u2011specific limits."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a concrete AWS\u2011specific procedure order (create proxy \u2192 create target\u2011group \u2192 attach target) with exact CLI flags, verification steps, and prerequisite checks. Lacks coverage of alternative IaC paths (Terraform/CFN) which would make the procedure fully comprehensive."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a detailed \"NEVER\" list (10 items) each with clear reasoning (e.g., why connecting to the cluster endpoint defeats the proxy, why MaxConnectionsPercent must not be 100%). Includes error\u2011handling guidance. Only minor omission is a warning about re\u2011using an existing proxy name."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete with description, triggers, keywords, version, author, license, compatibility, and verdict shape. The skill description clearly states WHAT it does, WHEN to invoke, and provides activation keywords. No missing elements."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered: quick navigation, high\u2011level mindset, deep heuristics, step\u2011by\u2011step commands, NEVER list, output format, and error handling. Slight overload in the long heuristics section prevents a perfect score."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (proxy creation) are tightly constrained by prerequisite verification and explicit checklist. Creative aspects (e.g., choosing tags) are left open. Could tighten region handling and name\u2011collision checks, but overall well calibrated."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable CloudOps skill pattern: Mindset, Dependency Graph, Heuristics, Stepwise Procedure, NEVER list, Output Contract, Worked Example, Error Handling. Structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides complete CLI commands, checklist, verification commands, and worked examples that the model output reproduces correctly. Minor gap: no explicit guidance for handling pre\u2011existing resources (proxy name conflict) or idempotent runs."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 38769,
+  "latency_ms": 16888,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
