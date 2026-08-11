@@ -1,0 +1,182 @@
+{
+  "skill": "connect-instance-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Connect Instance Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across the Amazon Connect provisioning surface (contact flow with InvokeLambda block + Lambda resource policy + exceptions handled, routing profile with skill requirements and proficiency levels, Lex V2 IVR integration with published alias and locale match, toll-free phone number claim in matching region, missing-instance-ID prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "contact-flow-with-lambda",
+      "name": "Contact flow with InvokeLambda block and exceptions handled",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — InvokeLambda block with FunctionARN for lookup-customer, Lambda.AccessDenied and Lambda.Timeout exceptions handled via transfer to default queue, Lambda resource policy granting connect.amazonaws.com invoke permission explicitly cited",
+      "prompt": "Create an Amazon Connect contact flow on instance inst-abc123 named \"inbound-main-flow\". The flow should invoke Lambda function lookup-customer (arn:aws:lambda:us-east-1:123456789012:function:lookup-customer) and branch on the returned \"department\" attribute. Handle Lambda.AccessDenied and Lambda.Timeout exceptions by transferring to the default queue. Instance ARN arn:aws:connect:us-east-1:123456789012:instance/inst-abc123.",
+      "prompt_file": "prompts/contact-flow-with-lambda.md",
+      "baseline_file": "baselines/contact-flow-with-lambda.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CONNECT_INSTANCE: inst-abc123 (my-connect-cc, SAML)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Contact flow: inbound-main-flow (CONTACT_FLOW, all referenced resources verified)\n  [✓] Lambda integration: arn:aws:lambda:us-east-1:123456789012:function:lookup-customer (resource policy grants connect.amazonaws.com)\n  [✓] Exceptions: Lambda.AccessDenied → transfer-default; Lambda.Timeout → transfer-default\nVERIFICATION_COMMANDS:\n  aws connect describe-contact-flow --instance-id inst-abc123 --contact-flow-id <flow-id>\n  aws lambda get-policy --function-name lookup-customer",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "InvokeLambda",
+            "lookup-customer",
+            "connect.amazonaws.com",
+            "AccessDenied",
+            "Timeout",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "routing-profile-skill-requirements",
+      "name": "Routing profile with skill requirements and proficiency levels",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — routing profile with Sales (proficiency ≥ 4) and Support (proficiency ≥ 4) skill requirements, queue associations, VOICE concurrency 1; skill-based routing model explained",
+      "prompt": "Create a routing profile on instance inst-abc123 named \"tier-1-sales-support\". Associate queues sales-queue (priority 1) and support-queue (priority 2). Skill requirements: Sales (proficiency ≥ 4), Support (proficiency ≥ 4). Voice channel concurrency 1.",
+      "prompt_file": "prompts/routing-profile-skill-requirements.md",
+      "baseline_file": "baselines/routing-profile-skill-requirements.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CONNECT_INSTANCE: inst-abc123 (my-connect-cc, SAML)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Routing profile: tier-1-sales-support (sales-queue P1, support-queue P2, VOICE concurrency 1)\n  [✓] Skill requirements: Sales (proficiency ≥ 4), Support (proficiency ≥ 4)\nVERIFICATION_COMMANDS:\n  aws connect describe-routing-profile --instance-id inst-abc123 --routing-profile-id <profile-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "skill",
+            "proficiency",
+            "Sales",
+            "Support",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lex-bot-ivr-integration",
+      "name": "Lex V2 IVR integration with published alias and locale match",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — InvokeAmazonLex block on inbound-main-flow, Lex V2 bot CustomerService alias Prod (published), intent RouteCall, slot department, branch on department to sales-queue or support-queue",
+      "prompt": "Add a Lex IVR block to the inbound-main-flow on instance inst-abc123. Use Lex V2 bot CustomerService, alias Prod (arn:aws:lex:us-east-1:123456789012:bot-alias/CustomerService:Prod). Intent RouteCall, slot \"department\". Branch on department value to sales-queue or support-queue.",
+      "prompt_file": "prompts/lex-bot-ivr-integration.md",
+      "baseline_file": "baselines/lex-bot-ivr-integration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CONNECT_INSTANCE: inst-abc123 (my-connect-cc, SAML)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Lex bot: arn:aws:lex:us-east-1:123456789012:bot-alias/CustomerService:Prod (V2, published, en_US)\n  [✓] IVR: intent RouteCall, slot department, branch to sales-queue / support-queue\nVERIFICATION_COMMANDS:\n  aws lexv2-models describe-bot-alias --bot-id <bot-id> --bot-alias-id <alias-id>\n  aws connect describe-contact-flow --instance-id inst-abc123 --contact-flow-id <flow-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "InvokeAmazonLex",
+            "Lex V2",
+            "published",
+            "RouteCall",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "Lex V1",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phone-number-claim",
+      "name": "Toll-free phone number claim in matching region",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — claim toll-free number +18005551234 for instance inst-abc123 in us-east-1, region matches instance",
+      "prompt": "Claim the toll-free number +18005551234 for Connect instance inst-abc123 in us-east-1. Description: Main inbound toll-free. Tag Project=inbound.",
+      "prompt_file": "prompts/phone-number-claim.md",
+      "baseline_file": "baselines/phone-number-claim.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CONNECT_INSTANCE: inst-abc123 (my-connect-cc, SAML)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Phone number: +18005551234 (toll-free, us-east-1)\nVERIFICATION_COMMANDS:\n  aws connect describe-phone-number --instance-id inst-abc123 --phone-number-id <phone-number-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "toll-free",
+            "+18005551234",
+            "us-east-1",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-instance-id-prereq",
+      "name": "Contact flow request with missing instance ID (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — operator requests a contact flow but no instance ID is provided; flows are children of an instance",
+      "prompt": "Create a contact flow named inbound-main-flow. The flow should invoke Lambda function lookup-customer. No instance ID is provided. Queues sales-queue and support-queue.",
+      "prompt_file": "prompts/missing-instance-id-prereq.md",
+      "baseline_file": "baselines/missing-instance-id-prereq.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "CONNECT_INSTANCE: <missing>\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Instance: no instance ID provided — contact flows require a parent instance",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "instance",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,154 @@
+# Eval test cases for account-factory-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Account Factory scenarios
+# (standard account vending with SSO and Guardrails, custom baseline via
+# StackSets, group-based SSO auto-assignment, account termination,
+# unregistered OU prerequisite failure).
+skill: account-factory-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: standard-account-vending
+    description: >-
+      Vend a standard production account via Account Factory with SSO
+      permission set assignment, Guardrail inheritance, and baseline
+      StackSets. Expects READY_TO_DEPLOY with all checklist items
+      verified.
+    input: |
+      Vend a new AWS account "data-platform-prod" via Control Tower
+      Account Factory in us-east-1. Root email
+      aws+prod-data-platform@company.com. Target OU "Custom
+      (DataPlatform)" (ou-bbb-ccc). SSO admin email
+      platform-lead@company.com. Assign DataEngineerAccess permission
+      set to group DataPlatformTeam. Management account 123456789012.
+      Identity Center instance ssoins-12345. Tags: Environment=production,
+      OU=DataPlatform.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Service Catalog"
+        - "Account Factory"
+        - "REGISTERED"
+        - "Guardrails"
+        - "DataEngineerAccess"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "StackSets"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: custom-baseline-stacksets
+    description: >-
+      Vend an account with a custom baseline beyond the default Control
+      Tower StackSets (custom VPC StackSet). Expects READY_TO_DEPLOY
+      with custom StackSet deployment verified alongside baseline.
+    input: |
+      Vend a new account "ml-platform-prod" via Account Factory with a
+      custom baseline. Root email aws+prod-ml@company.com. OU "Custom
+      (ML)" (ou-ml-001). Custom StackSet "CustomBaseline-VPC" deploying
+      a VPC with public/private subnets. Default Control Tower baseline
+      expected. Assign MLResearcherAccess to MLTeam group. Management
+      account 123456789012. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "CustomBaseline-VPC"
+        - "StackSet"
+        - "baseline"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: group-sso-auto-assignment
+    description: >-
+      Vend an account and verify group-based SSO auto-assignment at the
+      OU level, including permission set provisioning. Expects
+      READY_TO_DEPLOY with SSO provisioning confirmed.
+    input: |
+      Vend a new account "security-audit" via Account Factory in OU
+      "Custom (Security)" (ou-sec-001). Root email
+      aws+security-audit@company.com. Assign SecurityAuditorAccess
+      permission set to SecurityTeam group for this account. SSO
+      instance ssoins-12345. Management account 123456789012. Tags:
+      Environment=production, Team=Security.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        "SecurityAuditorAccess"
+        - "SecurityTeam"
+        - "provision"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: account-termination
+    description: >-
+      Terminate an existing Account Factory account and verify proper
+      lifecycle handling. Expects READY_TO_DEPLOY with termination
+      process and account lifecycle stages noted.
+    input: |
+      Terminate the account "sandbox-dev-001" (account-id 111122223333)
+      that was vended via Account Factory. The account is in OU
+      "Custom (Sandbox)" (ou-sbx-001). Management account 123456789012.
+      Remove SSO assignments, dis-enroll from Control Tower, and note
+      the 90-day SUSPENDED period.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "terminate"
+        - "SUSPENDED"
+        - "90"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: unregistered-ou-prerequisite
+    description: >-
+      Operator requests account vending into an OU that is NOT
+      registered with Control Tower. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the unregistered OU cited.
+    input: |
+      Vend a new account "legacy-app" via Account Factory into OU
+      "LegacyApps" (ou-leg-999) which is NOT registered with Control
+      Tower. Root email aws+legacy-app@company.com. Management account
+      123456789012. Tags: Environment=production.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "LegacyApps"
+        - "registered"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "ou-leg-999"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

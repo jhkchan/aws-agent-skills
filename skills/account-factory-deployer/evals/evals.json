@@ -1,0 +1,181 @@
+{
+  "skill": "account-factory-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the AWS Control Tower Account Factory Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Account Factory scenarios (standard account vending with SSO and Guardrails, custom baseline via CloudFormation StackSets, group-based SSO auto-assignment with provisioning, account termination lifecycle, unregistered OU prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "standard-account-vending",
+      "name": "Standard account vending via Account Factory with SSO and Guardrails",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Service Catalog provisioning, registered OU, Guardrail inheritance, SSO permission set, baseline StackSets",
+      "prompt": "Vend a new AWS account \"data-platform-prod\" via Control Tower Account Factory in us-east-1. Root email aws+prod-data-platform@company.com. Target OU \"Custom (DataPlatform)\" (ou-bbb-ccc). SSO admin email platform-lead@company.com. Assign DataEngineerAccess permission set to group DataPlatformTeam. Management account 123456789012. Identity Center instance ssoins-12345. Tags: Environment=production, OU=DataPlatform.",
+      "prompt_file": "prompts/standard-account-vending.md",
+      "baseline_file": "baselines/standard-account-vending.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCOUNT_FACTORY: data-platform-prod (123456789012) in OU DataPlatform (ou-bbb-ccc)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Account email: aws+prod-data-platform@company.com — UNIQUE\n  [✓] Target OU: Custom (DataPlatform) (ou-bbb-ccc) — REGISTERED\n  [✓] Guardrails (SCP): preventive controls inherited from OU\n  [✓] Baseline StackSets: AWSControlTowerLogging — DEPLOYED, AWSControlTowerSecurity — DEPLOYED\n  [✓] Permission sets: DataEngineerAccess assigned to DataPlatformTeam\n  [✓] SSO provisioning: SUCCEEDED\nVERIFICATION_COMMANDS:\n  aws organizations describe-account --account-id 123456789012\n  aws organizations list-policies-for-target --target-id 123456789012 --filter SERVICE_CONTROL_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Service Catalog",
+            "Guardrails",
+            "DataEngineerAccess",
+            "StackSets",
+            "REGISTERED",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-baseline-stacksets",
+      "name": "Account vending with custom baseline via CloudFormation StackSets",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — custom StackSet deployed alongside default Control Tower baseline, VPC customization verified",
+      "prompt": "Vend a new account \"ml-platform-prod\" via Account Factory with a custom baseline. Root email aws+prod-ml@company.com. OU \"Custom (ML)\" (ou-ml-001). Custom StackSet \"CustomBaseline-VPC\" deploying a VPC with public/private subnets. Default Control Tower baseline expected. Assign MLResearcherAccess to MLTeam group. Management account 123456789012. Tags: Environment=production.",
+      "prompt_file": "prompts/custom-baseline-stacksets.md",
+      "baseline_file": "baselines/custom-baseline-stacksets.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCOUNT_FACTORY: ml-platform-prod (<account-id>) in OU ML (ou-ml-001)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Custom baseline: CustomBaseline-VPC — DEPLOYED\n  [✓] Baseline StackSets: all DEPLOYED\n  [✓] Permission sets: MLResearcherAccess assigned to MLTeam",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "CustomBaseline-VPC",
+            "StackSet",
+            "baseline",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "group-sso-auto-assignment",
+      "name": "Group-based SSO auto-assignment with permission set provisioning",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — SSO group assignment, permission set provisioned to account, three-way binding verified",
+      "prompt": "Vend a new account \"security-audit\" via Account Factory in OU \"Custom (Security)\" (ou-sec-001). Root email aws+security-audit@company.com. Assign SecurityAuditorAccess permission set to SecurityTeam group for this account. SSO instance ssoins-12345. Management account 123456789012. Tags: Environment=production, Team=Security.",
+      "prompt_file": "prompts/group-sso-auto-assignment.md",
+      "baseline_file": "baselines/group-sso-auto-assignment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCOUNT_FACTORY: security-audit (<account-id>) in OU Security (ou-sec-001)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Permission sets: SecurityAuditorAccess assigned to SecurityTeam\n  [✓] SSO provisioning: SecurityAuditorAccess provisioned — SUCCEEDED\n  [✓] Three-way binding: SecurityTeam + SecurityAuditorAccess + account",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SecurityAuditorAccess",
+            "SecurityTeam",
+            "provision",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "account-termination",
+      "name": "Account Factory account termination with lifecycle handling",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — terminate provisioned product, SSO removal, 90-day SUSPENDED period noted",
+      "prompt": "Terminate the account \"sandbox-dev-001\" (account-id 111122223333) that was vended via Account Factory. The account is in OU \"Custom (Sandbox)\" (ou-sbx-001). Management account 123456789012. Remove SSO assignments, dis-enroll from Control Tower, and note the 90-day SUSPENDED period.",
+      "prompt_file": "prompts/account-termination.md",
+      "baseline_file": "baselines/account-termination.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACCOUNT_FACTORY: sandbox-dev-001 (111122223333)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] SSO assignments: removed\n  [✓] Control Tower enrollment: dis-enrolled\n  [✓] Lifecycle: SUSPENDED (90 days to permanent closure)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "terminate",
+            "SUSPENDED",
+            "90",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unregistered-ou-prerequisite",
+      "name": "Account vending into unregistered OU (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — OU 'LegacyApps' (ou-leg-999) is not registered with Control Tower; no Guardrails or baselines",
+      "prompt": "Vend a new account \"legacy-app\" via Account Factory into OU \"LegacyApps\" (ou-leg-999) which is NOT registered with Control Tower. Root email aws+legacy-app@company.com. Management account 123456789012. Tags: Environment=production.",
+      "prompt_file": "prompts/unregistered-ou-prerequisite.md",
+      "baseline_file": "baselines/unregistered-ou-prerequisite.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ACCOUNT_FACTORY: legacy-app\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Target OU: LegacyApps (ou-leg-999) — NOT REGISTERED with Control Tower",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "LegacyApps",
+            "registered",
+            "ou-leg-999",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

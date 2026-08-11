@@ -1,0 +1,173 @@
+# Eval test cases for datazone-domain-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across DataZone topologies
+# (domain with S3 source and glossary governance, cross-account
+# subscription workflow, Redshift data warehouse blueprint, glossary-
+# driven governance with auto-classification, missing cross-account
+# IAM role prerequisite failure).
+skill: datazone-domain-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: domain-with-s3-source
+    description: >-
+      Provision a DataZone domain with an S3 data source connection,
+      cross-account IAM role chaining, glossary governance, and a
+      subscription workflow. Expects READY_TO_DEPLOY with the cross-
+      account IAM role trust policy verified, glossary terms with
+      subscription policies, and the request-approve subscription
+      model noted.
+    input: |
+      Create an Amazon DataZone domain called analytics-domain in
+      us-east-1, account 111111111111. Domain execution role
+      arn:aws:iam::111111111111:role/service-role/AmazonDataZoneDomainExecution.
+      Create a project customer-analytics. Add an S3 data source
+      my-customer-events in source account 222222222222, region
+      us-east-1. The source account IAM role is
+      DataZoneS3AccessRole. Create glossary terms PII (requires data
+      steward approval) and Public (auto-approve). KMS CMK
+      alias/datazone-cmk for encryption. Tags: Environment=production,
+      Domain=analytics.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "analytics-domain"
+        - "customer-analytics"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Cross-account IAM role"
+        - "request-approve"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-subscription
+    description: >-
+      Provision a DataZone domain with a cross-account subscription
+      workflow where the consumer project is in a different account
+      than the data source. Expects READY_TO_DEPLOY with cross-account
+      subscription noted, IAM role chaining for the consumer account,
+      and the request-approve model.
+    input: |
+      Create a DataZone domain called shared-analytics in us-east-1,
+      account 111111111111. Project data-marketplace in account
+      111111111111. S3 data source shared-data-lake in account
+      222222222222. Consumer project bi-reporting in account
+      333333333333 needs to subscribe to assets from data-marketplace.
+      The subscription workflow should use request-approve with the
+      project owner as approver. IAM roles: DataZoneS3AccessRole in
+      222222222222, DataZoneConsumerRole in 333333333333. Tags:
+      Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-account"
+        - "333333333333"
+        - "222222222222"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "request-approve"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: redshift-environment-profile
+    description: >-
+      Provision a DataZone domain with a Redshift data source using
+      the Default Data Warehouse blueprint and an environment profile.
+      Expects READY_TO_DEPLOY with the blueprint enabled, environment
+      profile mapping to a specific account and region, and the
+      Redshift connection via Secrets Manager noted.
+    input: |
+      Create a DataZone domain called dw-domain in us-east-1, account
+      111111111111. Project sales-analytics. Add a Redshift data
+      source sales-dw-cluster, database sales_db, in account
+      222222222222. Redshift credentials in Secrets Manager secret
+      arn:aws:secretsmanager:us-east-1:222222222222:secret:redshift-creds.
+      Source account IAM role DataZoneRedshiftAccessRole. Enable the
+      Default Data Warehouse blueprint. Create an environment profile
+      production-dw targeting account 222222222222, region us-east-1.
+      Tags: Environment=production, Blueprint=data-warehouse.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Default Data Warehouse"
+        - "environment profile"
+        - "Redshift"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: glossary-governance
+    description: >-
+      Provision a DataZone domain with a comprehensive glossary-driven
+      governance model including Lambda-based metadata enrichment for
+      auto-classification. Expects READY_TO_DEPLOY with glossary terms
+      carrying subscription policies, metadata enrichment configured,
+      and the governance model noted.
+    input: |
+      Create a DataZone domain called governed-catalog in us-east-1,
+      account 111111111111. Project enterprise-data. Create glossary
+      terms: Public (auto-approve), Internal (project owner approval),
+      Confidential (data steward approval), Restricted (executive
+      multi-level approval). Configure Lambda-based metadata
+      enrichment function datazone-auto-classify to auto-tag assets
+      with PII classification based on column name patterns. S3 data
+      source enterprise-data-lake in account 222222222222. Tags:
+      Environment=production, Governance=enterprise.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "glossary"
+        - "metadata enrichment"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-iam-role
+    description: >-
+      Operator requests a DataZone domain with a cross-account S3 data
+      source, but the IAM role in the source account does not exist.
+      This is a prerequisite failure. Expects PREREQUISITES_MISSING
+      with the missing IAM role cited.
+    input: |
+      Create a DataZone domain called new-domain in us-east-1, account
+      111111111111. Project analytics. Add an S3 data source
+      my-data-bucket in source account 222222222222. The source
+      account IAM role is NonExistentRole. Tags: Environment=dev.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "IAM role"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "NonExistentRole"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

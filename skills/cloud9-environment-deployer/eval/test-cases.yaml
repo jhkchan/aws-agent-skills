@@ -1,0 +1,161 @@
+# Eval test cases for cloud9-environment-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Cloud9 topologies
+# (SSM no-ingress Ubuntu with auto-hibernate, SSH Amazon Linux with
+# key pair, team sharing with write permissions, aggressive cost
+# optimization hibernation, missing instance profile prerequisite
+# failure).
+skill: cloud9-environment-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ssm-no-ingress-ubuntu
+    description: >-
+      Provision a Cloud9 environment with SSM connection mode (no
+      ingress), Ubuntu platform, auto-hibernation at 30 minutes, and
+      CodeCommit integration. Expects READY_TO_DEPLOY with CONNECT_SSM
+      noted, no inbound security group rules, AmazonSSMManagedInstanceCore
+      in the instance profile, and auto-hibernation set.
+    input: |
+      Create a Cloud9 environment named dev-team-ide in us-east-1.
+      t3.medium instance, Ubuntu platform, SSM connection mode (no
+      ingress). Subnet subnet-aaa11122. Security group sg-cloud9-ssm
+      with no inbound rules. Instance profile Cloud9InstanceProfile
+      with AmazonSSMManagedInstanceCore. Auto-hibernate at 30 minutes.
+      Tags: Environment=production, Team=dev.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SSM"
+        - "CONNECT_SSM"
+        - "Ubuntu"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "AmazonSSMManagedInstanceCore"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ssh-connection-amazon-linux
+    description: >-
+      Provision a Cloud9 environment with SSH connection mode, Amazon
+      Linux 2, key pair, and security group with port 22. Expects
+      READY_TO_DEPLOY with CONNECT_SSH noted, key pair required, port
+      22 ingress from trusted CIDR.
+    input: |
+      Create a Cloud9 environment named legacy-ide in us-east-1.
+      t3.large instance, Amazon Linux 2, SSH connection mode. Subnet
+      subnet-public111. Security group sg-cloud9-ssh with port 22 from
+      10.0.0.0/8. Key pair my-cloud9-key. Instance profile
+      Cloud9SSHProfile. Auto-hibernate at 60 minutes. Tags:
+      Environment=staging, Team=ops.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SSH"
+        - "CONNECT_SSH"
+        - "Amazon Linux"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: team-sharing-write
+    description: >-
+      Provision a Cloud9 environment shared with team members with
+      write permissions. Expects READY_TO_DEPLOY with sharing noted,
+      read-write members listed, and each user connecting with own
+      credentials.
+    input: |
+      Create a Cloud9 environment named team-shared-ide in us-east-1.
+      t3.medium instance, Amazon Linux 2, SSM connection mode. Subnet
+      subnet-aaa11122. Instance profile Cloud9InstanceProfile with
+      AmazonSSMManagedInstanceCore. Auto-hibernate at 60 minutes.
+      Share with users teammate1 and teammate2 (read-write) and
+      reviewer1 (read-only). Tags: Environment=production, Team=dev.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SSM"
+        - "sharing"
+        - "read-write"
+        - "read-only"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cost-optimization-hibernate
+    description: >-
+      Provision a Cloud9 environment with aggressive cost optimization
+      via 15-minute auto-hibernation. Expects READY_TO_DEPLOY with
+      15-minute hibernation noted, cost impact flagged, and t3.micro
+      or t3.medium instance.
+    input: |
+      Create a Cloud9 environment named budget-ide in us-east-1.
+      t3.micro instance, Amazon Linux 2, SSM connection mode. Subnet
+      subnet-aaa11122. Instance profile Cloud9InstanceProfile with
+      AmazonSSMManagedInstanceCore. Aggressive auto-hibernate at 15
+      minutes for cost optimization. Tags: Environment=dev,
+      CostOptimized=true.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "15"
+        - "auto-hibernation"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-instance-profile
+    description: >-
+      Operator requests a Cloud9 environment with SSM connection mode
+      but the instance profile does not have AmazonSSMManagedInstanceCore.
+      SSM connection requires SSM permissions. Expects
+      PREREQUISITES_MISSING with instance profile SSM permissions cited.
+    input: |
+      Create a Cloud9 environment named broken-ide in us-east-1.
+      t3.medium instance, Amazon Linux 2, SSM connection mode. Subnet
+      subnet-aaa11122. Instance profile BasicEC2Role (does NOT include
+      AmazonSSMManagedInstanceCore). Auto-hibernate at 30 minutes.
+      Tags: Environment=test.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "instance profile"
+        - "SSM"
+        - "AmazonSSMManagedInstanceCore"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

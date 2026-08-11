@@ -1,0 +1,181 @@
+{
+  "skill": "qldb-ledger-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the QLDB Ledger Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across QLDB topologies (standard ledger with STANDARD permissions mode and deletion protection, cryptographic verification via digest + proof hash chain, stream to Kinesis for real-time CDC, journal export to S3 for compliance audit, ALLOW_ALL permissions mode prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "standard-ledger-verification",
+      "name": "Production QLDB ledger with STANDARD permissions mode, deletion protection, and hash chain verification",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — STANDARD permissions mode, deletion protection enabled, KMS customer-managed key, tables and indexes defined, hash chain verification workflow documented",
+      "prompt": "Create a QLDB ledger named audit-ledger in us-east-1. Permissions mode STANDARD. Enable deletion protection. KMS key arn:aws:kms:us-east-1:123456789012:key/abc123. Tables: transactions, accounts, audit_log. Indexes on transactions(transactionId, fromAccount) and accounts(accountId). Tags: Environment=production, Application=audit, Compliance=SOX.",
+      "prompt_file": "prompts/standard-ledger-verification.md",
+      "baseline_file": "baselines/standard-ledger-verification.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QLDB_LEDGER: audit-ledger\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Ledger name: audit-ledger\n  [✓] Permissions mode: STANDARD\n  [✓] Deletion protection: enabled\n  [✓] KMS encryption: customer-managed\n  [✓] Tables: transactions, accounts, audit_log\n  [✓] Indexes: transactions(transactionId, fromAccount), accounts(accountId)\n  [✓] Cryptographic verification: digest + proof workflow documented\n  [✓] Revision hash chain: SHA-256 chained blocks\nVERIFICATION_COMMANDS:\n  aws qldb describe-ledger --name audit-ledger --region us-east-1\n  aws qldb get-digest --name audit-ledger --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "audit-ledger",
+            "STANDARD",
+            "deletion protection",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "hash chain"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cryptographic-verification",
+      "name": "QLDB ledger with cryptographic digest and proof verification workflow",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — digest + proof hash chain verification workflow documented, STANDARD permissions, deletion protection",
+      "prompt": "Create a QLDB ledger named compliance-ledger in us-east-1 for regulatory compliance with cryptographic verification. Permissions mode STANDARD. Deletion protection enabled. KMS key arn:aws:kms:us-east-1:123456789012:key/verify123. I need the full digest and proof verification workflow documented. Tables: compliance_records. Indexes on compliance_records(recordId). Tags: Environment=production, Compliance=HIPAA.",
+      "prompt_file": "prompts/cryptographic-verification.md",
+      "baseline_file": "baselines/cryptographic-verification.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QLDB_LEDGER: compliance-ledger\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Permissions mode: STANDARD\n  [✓] Deletion protection: enabled\n  [✓] Cryptographic verification: digest + proof workflow documented\n  [✓] Revision hash chain: SHA-256 chained blocks\nVERIFICATION_COMMANDS:\n  aws qldb get-digest --name compliance-ledger --region us-east-1\n  aws qldb get-revision --name compliance-ledger ...",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "compliance-ledger",
+            "digest",
+            "proof",
+            "VERDICT",
+            "CHECKLIST",
+            "hash chain"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stream-kinesis-cdc",
+      "name": "QLDB ledger with Kinesis Data Streams for real-time CDC",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Kinesis stream configured, IAM role for QLDB to write to Kinesis, stream started with inclusive start time",
+      "prompt": "Create a QLDB ledger named realtime-events in us-east-1 with streaming to Kinesis for real-time CDC. Permissions mode STANDARD. Deletion protection. KMS key arn:aws:kms:us-east-1:123456789012:key/stream456. Kinesis stream qldb-events-stream. IAM role QLDBStreamRole. Stream start time 2026-08-05T00:00:00Z. Tags: Environment=production, Pipeline=CDC.",
+      "prompt_file": "prompts/stream-kinesis-cdc.md",
+      "baseline_file": "baselines/stream-kinesis-cdc.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QLDB_LEDGER: realtime-events\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Permissions mode: STANDARD\n  [✓] Stream to Kinesis: configured (stream: qldb-events-stream)\n  [✓] IAM role: QLDBStreamRole\n  [✓] Stream start time: 2026-08-05T00:00:00Z\nVERIFICATION_COMMANDS:\n  aws qldb describe-ledger --name realtime-events --region us-east-1\n  aws qldb list-journal-kinesis-streams-for-ledger --ledger-name realtime-events --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "realtime-events",
+            "Kinesis",
+            "CDC",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "export-s3-compliance",
+      "name": "QLDB ledger with journal export to S3 for compliance audit",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — S3 bucket configured, IAM role for QLDB to write to S3, export time range documented",
+      "prompt": "Create a QLDB ledger named regulatory-ledger in us-east-1 with journal export to S3 for compliance audit. Permissions mode STANDARD. Deletion protection. KMS key arn:aws:kms:us-east-1:123456789012:key/export789. S3 bucket qldb-regulatory-export. IAM role QLDBExportRole. Export time range 2026-01-01 to 2026-12-31. Tags: Environment=production, Compliance=GDPR.",
+      "prompt_file": "prompts/export-s3-compliance.md",
+      "baseline_file": "baselines/export-s3-compliance.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "QLDB_LEDGER: regulatory-ledger\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Permissions mode: STANDARD\n  [✓] Journal export to S3: configured (bucket: qldb-regulatory-export)\n  [✓] IAM role: QLDBExportRole\n  [✓] Export time range: 2026-01-01 to 2026-12-31\nVERIFICATION_COMMANDS:\n  aws qldb describe-ledger --name regulatory-ledger --region us-east-1\n  aws qldb list-journal-s3-exports-for-ledger --name regulatory-ledger --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "regulatory-ledger",
+            "S3",
+            "export",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "allow-all-insecure",
+      "name": "QLDB ledger with ALLOW_ALL permissions mode and no deletion protection (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — ALLOW_ALL permissions mode grants full CRUD to all principals; no deletion protection risks catastrophic data loss; should use STANDARD with deletion protection for production",
+      "prompt": "Create a QLDB ledger named prod-ledger in us-east-1. Permissions mode ALLOW_ALL. No deletion protection. KMS key arn:aws:kms:us-east-1:123456789012:key/abc123. Tags: Environment=production.",
+      "prompt_file": "prompts/allow-all-insecure.md",
+      "baseline_file": "baselines/allow-all-insecure.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "QLDB_LEDGER: prod-ledger\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Permissions mode: ALLOW_ALL — grants full CRUD to all principals; use STANDARD for production\n  [✗] Deletion protection: disabled — production ledgers MUST have deletion protection enabled",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "ALLOW_ALL",
+            "deletion protection",
+            "VERDICT",
+            "CHECKLIST",
+            "STANDARD"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

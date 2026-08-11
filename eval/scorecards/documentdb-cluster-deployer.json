@@ -1,0 +1,70 @@
+{
+  "skill": "documentdb-cluster-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds several expert heuristics not in baseline docs (storage\u2011autoscaling ceiling headroom rule, index\u2011before\u2011query requirement, change\u2011streams retention recommendation, KMS\u2011key immutability, global\u2011cluster failover scripting). However, a large portion restates standard AWS steps (cluster creation, subnet group creation) that a capable model already knows, so full 20 is not earned."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific provisioning sequence (subnet group \u2192 parameter group \u2192 cluster \u2192 instances \u2192 replicas \u2192 promotion tier) and detailed CLI commands for each step. Procedure is largely complete but a few generic checks (e.g., \"verify VPC\") lack AWS\u2011specific nuance."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never deploy without indexes, never leave storage ceiling default, never disable TLS, never use t3.medium in production, never assume global\u2011cluster failover is automatic, never change KMS key post\u2011creation). Missing only a brief rationale for the \"never use ALLOW_ALL\" rule."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, triggers, and a strict output contract are present. Slight deduction because activation triggers are embedded in free\u2011form text and the \"when_to_use\" field lives in metadata rather than a dedicated, unambiguous spec section, which could affect reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a top\u2011level summary, quick\u2011navigation table, then deep sections (mindset, heuristics, step\u2011by\u2011step, anti\u2011patterns, output format). However, the checklist details are presented in full early, which can overload the agent before prerequisite verification."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (cluster creation, KMS key selection) are tightly constrained with explicit CLI flags and prerequisite checks. Creative tasks (index design) are given flexible guidelines but still bounded by expert rules. Slight over\u2011freedom in allowing any index description without validation."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Dependency graph \u2192 Stepwise process \u2192 Anti\u2011pattern list \u2192 Output format. Structure is coherent, though the inclusion of a separate \u201cRecent features\u201d section feels slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Agent can generate the required checklist and commands; examples mostly succeed. However, some model outputs violate the checklist contract (e.g., \"Indexing strategy: to be documented\" or missing required headroom %), which would cause downstream automation failures. Also no explicit decision tree for choosing global vs regional clusters."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 50696,
+  "latency_ms": 11639,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

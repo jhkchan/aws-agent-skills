@@ -1,0 +1,183 @@
+{
+  "skill": "cloud9-environment-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Cloud9 Environment Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Cloud9 topologies (SSM no-ingress Ubuntu with auto-hibernate and CodeCommit, SSH Amazon Linux with key pair and port 22, team sharing with read-write permissions, aggressive 15-minute cost-optimization hibernation, missing instance profile SSM permissions prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "ssm-no-ingress-ubuntu",
+      "name": "SSM no-ingress Cloud9 on Ubuntu with auto-hibernation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — CONNECT_SSM mode, Ubuntu platform, no inbound SG rules, AmazonSSMManagedInstanceCore in instance profile, 30-min auto-hibernate",
+      "prompt": "Create a Cloud9 environment named dev-team-ide in us-east-1. t3.medium instance, Ubuntu platform, SSM connection mode (no ingress). Subnet subnet-aaa11122. Security group sg-cloud9-ssm with no inbound rules. Instance profile Cloud9InstanceProfile with AmazonSSMManagedInstanceCore. Auto-hibernate at 30 minutes. Tags: Environment=production, Team=dev.",
+      "prompt_file": "prompts/ssm-no-ingress-ubuntu.md",
+      "baseline_file": "baselines/ssm-no-ingress-ubuntu.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUD9_ENVIRONMENT: dev-team-ide (abc12345-6789-def0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Environment name: dev-team-ide\n  [✓] Instance type: t3.medium (2 vCPU, 4 GB RAM)\n  [✓] Platform: Ubuntu\n  [✓] Connection mode: SSM (CONNECT_SSM, no ingress)\n  [✓] Subnet: subnet-aaa11122\n  [✓] Security group: sg-cloud9-ssm (no inbound rules)\n  [✓] Instance profile: Cloud9InstanceProfile (includes AmazonSSMManagedInstanceCore)\n  [✓] Key pair: Not required (SSM mode)\n  [✓] Auto-hibernation: 30 minutes\nVERIFICATION_COMMANDS:\n  aws cloud9 describe-environments --environment-ids abc12345-6789-def0 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SSM",
+            "CONNECT_SSM",
+            "Ubuntu",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "AmazonSSMManagedInstanceCore"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ssh-connection-amazon-linux",
+      "name": "SSH-connected Cloud9 on Amazon Linux 2 with key pair",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — CONNECT_SSH mode, Amazon Linux 2, key pair required, port 22 from trusted CIDR, 60-min auto-hibernate",
+      "prompt": "Create a Cloud9 environment named legacy-ide in us-east-1. t3.large instance, Amazon Linux 2, SSH connection mode. Subnet subnet-public111. Security group sg-cloud9-ssh with port 22 from 10.0.0.0/8. Key pair my-cloud9-key. Instance profile Cloud9SSHProfile. Auto-hibernate at 60 minutes. Tags: Environment=staging, Team=ops.",
+      "prompt_file": "prompts/ssh-connection-amazon-linux.md",
+      "baseline_file": "baselines/ssh-connection-amazon-linux.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUD9_ENVIRONMENT: legacy-ide (def98765-4321-abc0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Environment name: legacy-ide\n  [✓] Instance type: t3.large (2 vCPU, 8 GB RAM)\n  [✓] Platform: Amazon Linux 2\n  [✓] Connection mode: SSH (CONNECT_SSH, port 22)\n  [✓] Subnet: subnet-public111 (public)\n  [✓] Security group: sg-cloud9-ssh (port 22 from 10.0.0.0/8)\n  [✓] Key pair: my-cloud9-key\n  [✓] Auto-hibernation: 60 minutes\nVERIFICATION_COMMANDS:\n  aws cloud9 describe-environments --environment-ids def98765-4321-abc0 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SSH",
+            "CONNECT_SSH",
+            "Amazon Linux",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "team-sharing-write",
+      "name": "Cloud9 environment shared with team members (read-write and read-only)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — SSM connection, team sharing with 2 read-write + 1 read-only member, each user connects with own credentials",
+      "prompt": "Create a Cloud9 environment named team-shared-ide in us-east-1. t3.medium instance, Amazon Linux 2, SSM connection mode. Subnet subnet-aaa11122. Instance profile Cloud9InstanceProfile with AmazonSSMManagedInstanceCore. Auto-hibernate at 60 minutes. Share with users teammate1 and teammate2 (read-write) and reviewer1 (read-only). Tags: Environment=production, Team=dev.",
+      "prompt_file": "prompts/team-sharing-write.md",
+      "baseline_file": "baselines/team-sharing-write.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUD9_ENVIRONMENT: team-shared-ide (ghi11111-2222-def0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Environment name: team-shared-ide\n  [✓] Connection mode: SSM (CONNECT_SSM, no ingress)\n  [✓] Instance profile: Cloud9InstanceProfile (includes AmazonSSMManagedInstanceCore)\n  [✓] Auto-hibernation: 60 minutes\n  [✓] Sharing: 3 members (2 read-write, 1 read-only)\nVERIFICATION_COMMANDS:\n  aws cloud9 describe-environments --environment-ids ghi11111-2222-def0 --region us-east-1\n  aws cloud9 describe-environment-memberships --environment-id ghi11111-2222-def0 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SSM",
+            "sharing",
+            "read-write",
+            "read-only",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cost-optimization-hibernate",
+      "name": "Cost-optimized Cloud9 with aggressive 15-minute auto-hibernation",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — SSM connection, 15-minute auto-hibernate, cost impact flagged, t3.micro instance",
+      "prompt": "Create a Cloud9 environment named budget-ide in us-east-1. t3.micro instance, Amazon Linux 2, SSM connection mode. Subnet subnet-aaa11122. Instance profile Cloud9InstanceProfile with AmazonSSMManagedInstanceCore. Aggressive auto-hibernate at 15 minutes for cost optimization. Tags: Environment=dev, CostOptimized=true.",
+      "prompt_file": "prompts/cost-optimization-hibernate.md",
+      "baseline_file": "baselines/cost-optimization-hibernate.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUD9_ENVIRONMENT: budget-ide (jkl33333-4444-def0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Environment name: budget-ide\n  [✓] Instance type: t3.micro (2 vCPU, 1 GB RAM)\n  [✓] Connection mode: SSM (CONNECT_SSM, no ingress)\n  [✓] Auto-hibernation: 15 minutes\nVERIFICATION_COMMANDS:\n  aws cloud9 describe-environments --environment-ids jkl33333-4444-def0 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "15",
+            "auto-hibernation",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-instance-profile",
+      "name": "SSM-connected Cloud9 without AmazonSSMManagedInstanceCore (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — SSM connection requires AmazonSSMManagedInstanceCore in the instance profile; BasicEC2Role does not have it",
+      "prompt": "Create a Cloud9 environment named broken-ide in us-east-1. t3.medium instance, Amazon Linux 2, SSM connection mode. Subnet subnet-aaa11122. Instance profile BasicEC2Role (does NOT include AmazonSSMManagedInstanceCore). Auto-hibernate at 30 minutes. Tags: Environment=test.",
+      "prompt_file": "prompts/missing-instance-profile.md",
+      "baseline_file": "baselines/missing-instance-profile.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "CLOUD9_ENVIRONMENT: broken-ide\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Instance profile: BasicEC2Role is missing AmazonSSMManagedInstanceCore — SSM connection requires SSM permissions in the instance profile",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "instance profile",
+            "SSM",
+            "AmazonSSMManagedInstanceCore",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}
