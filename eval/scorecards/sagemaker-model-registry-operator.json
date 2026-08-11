@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides many AWS\u2011specific nuances (approval state machine, KMS encryption scope, ValidationSpecification, AdditionalInferenceSpecifications, Model Card auto\u2011population, EventBridge rule pattern) that a generic model would not enumerate, but most of this information is already documented in official AWS docs, so the delta is solid but not groundbreaking."
+      "justification": "The skill provides many concrete details (approval-state matrix, pre\u2011check priority order, exact CLI flags, KMS key checks) that a generic model would not enumerate, but a large portion restates official documentation without adding novel decision thresholds or hidden gotchas, so it falls short of a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Defines an AWS\u2011specific procedural flow: ordered pre\u2011checks, mandatory CONFIRM gate, snapshot before mutation, post\u2011verification steps, and per\u2011operation checklists. However, some steps (e.g., IAM permission check) are described generically without the exact AWS CLI or simulation command, leaving a slight gap in procedure specificity."
+      "justification": "Procedures are AWS\u2011specific (snapshot before change, confirm gate, exact pre\u2011check ordering). However, some steps remain generic (e.g., \u201ccheck IAM permissions\u201d without a concrete simulation command for each operation) and the delete\u2011package workflow is only mentioned in passing, leaving a gap in a complete end\u2011to\u2011end procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with clear rationales (e.g., never register production packages without a group, never set Approved at registration, never approve without InferenceSpecification). Missing a few common pitfalls such as forgetting required tags or mishandling pagination errors, which prevents a perfect score."
+      "justification": "A solid NEVER list is provided with concrete reasons (e.g., never register production packages without a group, never approve without inference spec). It omits a few common pitfalls such as never reuse a ModelPackageName across regions or never rely on default KMS keys for cross\u2011account sharing, so the list is not exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use/when_not_to_use, activation_triggers, and invocation_schema are all present, giving an agent reliable activation cues. The activation_triggers list is overly broad (includes low\u2011level CLI names) which could cause spurious activation, thus a small deduction."
+      "justification": "Frontmatter, description, when\u2011to\u2011use, activation triggers, and invocation schema are all present and well\u2011formed. The activation triggers are overly broad and the invocation schema lacks a formal JSON schema or validation rules, which could cause ambiguous activation in edge cases."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses a clear hierarchy (quick reference, mindset, pre\u2011flight, process, patterns, output format, anti\u2011patterns) that layers information. The initial sections are dense, potentially overloading the agent before it knows which part to read, so not fully optimal."
+      "justification": "Information is layered (quick reference, mindset, pre\u2011flight, process, patterns, output format). The quick reference table is dense and may overload the reader before deeper sections, but overall the hierarchy is clear."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained with CONFIRM gates, state snapshots, and exhaustive pre\u2011checks. For read\u2011only actions (list/describe) the same heavy gating is still suggested, which is unnecessary but does not introduce risk."
+      "justification": "Destructive operations are guarded by a mandatory CONFIRM gate and extensive pre\u2011checks, showing good calibration. The only shortfall is the lack of a dedicated safety checklist for the `delete-model-package` operation, which is mentioned only in passing."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns) that aids comprehension. Minor inconsistency in naming sections (e.g., mixing \u2018\u00a7\u2019 symbols with plain headings) makes the pattern slightly ad\u2011hoc."
+      "justification": "The skill follows a recognizable structure (What it does, Quick navigation, Mindset, Pre\u2011flight, Process, Output format, Anti\u2011Patterns). However, the pattern is not explicitly labeled as a known framework, making it slightly ad\u2011hoc rather than a formally named pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI examples, and a strict output contract, enabling an agent to act. The sample model outputs contain inconsistencies (e.g., STATE values not matching allowed list, VERDICT READY for approve without clear transition to COMPLETED, ambiguous placeholders like <returned-arn>), and some edge cases (pagination failures, network errors) are not covered, reducing practical reliability."
+      "justification": "The skill supplies decision trees, concrete CLI examples, and worked output blocks that an agent could follow. Missing are handling of pagination beyond 100 results, explicit retry/back\u2011off strategies for transient AWS errors, and a ready\u2011made example for the `list` operation, which leaves edge\u2011case execution incomplete."
     }
   ],
   "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46106,
-  "latency_ms": 8505,
+  "token_count": 44961,
+  "latency_ms": 8737,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

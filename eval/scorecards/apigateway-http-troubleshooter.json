@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert details not usually known by a generic model: exact 29\u2011second integration timeout hard cap, precise route\u2011priority order (exact \u2192 greedy \u2192 $default), payload\u2011format version effects on body encoding, JWT authorizer field nuances (Issuer exact match, Audience case\u2011sensitivity, IdentitySource header mapping), VPC\u2011link health\u2011check sequence, and a full decision\u2011tree mapping symptoms to layers."
+      "justification": "Adds concrete expert details not usually known by a generic model: the immutable 29\u2011second integration timeout, exact payload format version 2.0 base64 behavior, precise route\u2011priority order (exact \u2192 greedy \u2192 $default), JWT authorizer identity\u2011source matching, VPC\u2011link health\u2011check sequence, and the distinction between HTTP\u2011API and REST\u2011API CORS handling. However, most of these facts are documented and a capable model could retrieve them, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific reasoning: first identify API type (HTTP vs REST), run read\u2011only get\u2011* probes, verify stage deployment before any state\u2011changing command, and require explicit CONFIRM before updates. Procedures are tailored to API\u202fGateway, not generic \"check security\" steps."
+      "justification": "Encodes an AWS\u2011specific diagnostic mindset with a step\u2011by\u2011step decision tree and exact CLI probes for each layer (e.g., get\u2011authorizer \u2192 check IdentitySource, get\u2011integration \u2192 verify PayloadFormatVersion). The procedure is clearly AWS\u2011centric rather than generic \"check logs\" advice. Minor deduction because some steps (e.g., \"run get\u2011api\") are generic and could be refined."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The NEVER list contains many concrete pitfalls with clear reasons (e.g., never assume PayloadFormatVersion 1.0, never conflate access vs execution logging). It omits a few common gotchas such as missing IAM role for CloudWatch logs, which prevents a perfect score."
+      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., never claim ROOT_CAUSE_IDENTIFIED without a failing probe, never mix HTTP\u2011API and REST\u2011API tooling, never raise Lambda timeout past 29\u202fs). The only shortfall is the omission of a specific warning about missing IAM role permissions for CloudWatch logs, which would strengthen the list."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, activation_triggers exhaustive, invocation_schema clearly defined, description explains WHAT, WHEN, and KEYWORDS. Minor omission: no explicit note about required AWS CLI version, but overall activation criteria are reliable."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, invocation_schema, and a minimal example are all present and well\u2011formed, enabling reliable activation. Minor vagueness in some trigger wording prevents a perfect score."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick start \u2192 decision tree \u2192 output format \u2192 worked examples \u2192 anti\u2011patterns \u2192 heuristics \u2192 graph. However, anti\u2011pattern list and heuristics appear after the core flow, adding some cognitive load; still acceptable progressive disclosure."
+      "justification": "The skill layers information: Quick Navigation \u2192 Quick Start \u2192 detailed sections (Mindset, Philosophy, Decision Tree, Output, Anti\u2011Patterns). Critical rules are not buried, but the Quick Start bullet list is dense, which could cause initial cognitive overload. Hence a small deduction."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 15,
       "max": 15,
-      "justification": "All mutating actions (update\u2011authorizer, update\u2011integration, create\u2011deployment) are gated by an explicit CONFIRM prompt; read\u2011only probes are used first. Fragile operations are tightly constrained, while diagnostic probing remains free."
+      "justification": "Destructively changing commands (update\u2011authorizer, update\u2011integration, create\u2011deployment) are gated behind explicit CONFIRM prompts. Read\u2011only probes are used first. The calibration matches the fragility of the operations perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (navigation table, mindset, philosophy, decision tree, output contract, anti\u2011patterns, heuristics, dependency graph). The structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Philosophy \u2192 Decision Tree \u2192 Output Format \u2192 Anti\u2011Patterns). Headings are logical, but the inclusion of some ad\u2011hoc sections (e.g., Configuration dependency graph) slightly breaks a strict template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides working examples, exact CLI commands, and a deterministic output contract, enabling an agent to execute the skill. However, it omits detailed steps for parameter\u2011mapping errors and some edge cases (e.g., pagination, multi\u2011region APIs), leaving gaps for certain failure modes."
+      "justification": "Provides a deterministic output contract, concrete CLI commands, worked examples, and handling of INSUFFICIENT_DATA. The model output examples are correct, showing the skill can be used end\u2011to\u2011end. Minor deduction for lack of explicit guidance when multiple layers appear plausible (ambiguous symptom handling)."
     }
   ],
-  "total_score": 107,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 39096,
-  "latency_ms": 15672,
+  "grade": "A",
+  "token_count": 38973,
+  "latency_ms": 14532,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

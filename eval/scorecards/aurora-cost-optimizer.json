@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Provides concrete break\u2011even formula for I/O\u2011Optimized (break_even_IO_millions = storage_GB \u00d7 0.4) and specific ACU cost ($0.12/h) and storage pricing, which a generic model would not know. However, many pricing numbers (e.g., $0.10/GB storage, $0.20/million I/O) are publicly documented and thus not novel, limiting the delta."
+      "justification": "Provides concrete break\u2011even formula for I/O\u2011Optimized, specific ACU pricing, and instance\u2011class cost numbers, but many thresholds (e.g., CPU <20%, I/O >30%) are generic CloudOps heuristics that a competent model already knows. Some pricing figures are region\u2011specific and may become stale, limiting the truly novel expert insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Implements an AWS\u2011specific stepwise workflow (data\u2011gate, Cost Explorer reconciliation, CLI commands, confirmation gating). A few steps (e.g., \"Validate input\") are generic and could be more Aurora\u2011focused, preventing a perfect score."
+      "justification": "Offers a detailed, AWS\u2011specific step\u2011by\u2011step workflow (data\u2011gate, Cost Explorer reconciliation, CLI commands). However a few procedures are generic, such as \u201cverify CPU after downsize\u201d without mentioning Aurora\u2011specific metrics like DBLoad or storage auto\u2011shrink checks, which would make the mindset more tightly tied to Aurora."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a solid NEVER list with concrete reasoning (e.g., never switch to I/O\u2011Optimized without break\u2011even calc, never drop Serverless MinCapacity below SLA). Two points deducted for missing a few common pitfalls such as snapshot\u2011retention policies, cross\u2011region data\u2011transfer cost nuances, and the risk of over\u2011right\u2011sizing readers that serve as failover targets."
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never switch I/O tier without break\u2011even calc). Missing some nuanced pitfalls: no warning about using I/O\u2011Optimized with cross\u2011region replication latency, and no explicit anti\u2011pattern for combining Reserved Instances with Serverless v2 (which is unsupported)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, activation triggers, invocation schema, and example are all present. The \"when_not_to_use\" section is a paragraph rather than a structured list, making automated trigger detection slightly less reliable."
+      "justification": "Frontmatter is complete, description, activation triggers, and invocation schema are well defined. Lacks an explicit example of a full output block (including ASSUMPTIONS and CONFIRM) in the specification section, which would aid reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill is well\u2011sectioned (quick start, mindset, pre\u2011flight, step\u2011by\u2011step, anti\u2011patterns) allowing layered reading, but the initial sections dump a large amount of detail before the concise contract, creating some cognitive overload. Hence 2 points deducted."
+      "justification": "The skill layers information (quick start, mindset, step list) but critical anti\u2011pattern rules and break\u2011even calculations are buried deep, causing cognitive overload for an agent that must parse the whole document before acting."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly gated (CONFIRM, snapshot, batch limit). However, the rule for Serverless v2 ACU tuning allows any reduction to 1\u20112 ACU without explicitly requiring latency validation beyond a brief note, leaving a small freedom\u2011calibration gap."
+      "justification": "Calibrates well for destructive actions (snapshot, CONFIRM, one\u2011dimension\u2011per\u2011window, batch limit of 3). The batch limit of three clusters may still be too permissive for fragile operations; a tighter limit (e.g., one cluster per batch) would be safer."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Output contract \u2192 Mindset \u2192 Stepwise process \u2192 Anti\u2011patterns \u2192 Navigation). The ordering of sections is slightly ad\u2011hoc (e.g., anti\u2011patterns appear after the full process), preventing a perfect score."
+      "justification": "Follows a recognizable skill pattern (metadata, contract, quick start, mindset, stepwise process, anti\u2011patterns, navigation). Minor inconsistency: the Quick Reference table mixes verdict thresholds with dimensions, slightly breaking the uniform sectioning."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision matrices, and worked examples, enabling an agent to act. Lacks explicit error\u2011handling branches (e.g., what to do if RI purchase fails or I/O\u2011Optimized switch returns an error) and does not cover all edge cases such as Aurora Limitless migration failures."
+      "justification": "Provides decision matrices, concrete CLI commands, and example blocks, enabling an agent to act. Lacks explicit handling for partial Cost Explorer data, missing I/O metrics, and does not specify error\u2011handling steps for CLI failures, which could cause execution gaps."
     }
   ],
-  "total_score": 107,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45885,
-  "latency_ms": 14359,
+  "token_count": 46399,
+  "latency_ms": 8307,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

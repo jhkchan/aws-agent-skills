@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Introduces several expert\u2011level heuristics not typically known to a baseline model: precise cost\u2011crossover calculation between provisioned and on\u2011demand, exact mode\u2011switch throttling window (15\u202fmin), concrete IteratorAge alarm thresholds tied to retention period, and the 20\u2011consumer soft limit for enhanced fan\u2011out. These details provide genuine delta, though some of the basic limits (e.g., 1\u202fMiB/sec per shard) are already common knowledge, hence a small deduction."
+      "justification": "Adds concrete expert heuristics not usually in a baseline model: cost\u2011crossover formula for provisioned vs on\u2011demand, IteratorAge threshold tied to retention period, explicit 15\u2011minute throttling rule for mode switches, and the exact data\u2011retrieval fee calculation for enhanced fan\u2011out. These specifics constitute genuine delta knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific, ordered procedures: decision tree for mode selection, shard\u2011sizing formula, exact CLI commands for creation, encryption, consumer registration, and CloudWatch alarm setup. The only shortfall is the lack of explicit IaC (Terraform/CFN) snippets despite mentioning compatibility, which prevents a perfect score."
+      "justification": "Offers AWS\u2011specific step\u2011by\u2011step CLI procedures, decision trees for mode selection, shard\u2011sizing formula, and precise command sequences. The only shortfall is a generic \"verify prerequisites\" step that could be more AWS\u2011specific (e.g., checking for existing stream name collisions)."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never specify shard count for on\u2011demand, never grant kinesis:* on *, never omit kinesis:DescribeStream). Also lists common mistakes per step. Missing a few deeper pitfalls such as IAM policy versioning or handling stale consumer registrations, so one point is deducted."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never specify shard count for on\u2011demand, never grant kinesis:* on *, never skip IteratorAge alarm). Lacks a warning about forgetting to enable encryption when compliance requires it, so the anti\u2011pattern coverage is not exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete (name, description, version, author, license, keywords, tags, dependencies, metadata). Description clearly states WHAT the skill does, WHEN to invoke, and provides activation keywords. Slight weakness: the output contract schema is described in prose but not formalized as a JSON schema, which could affect strict automation."
+      "justification": "Front\u2011matter is complete, description, triggers, keywords, and when_to_use are all present. The output contract is precisely defined. The only minor shortfall is the absence of an explicit \u2018activation pattern\u2019 field beyond the keyword list, which could make automated trigger matching slightly less reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill is well\u2011structured with a quick\u2011navigation table and layered sections, but the initial body front\u2011loads a large amount of detail (heuristics, tables, full command sets) before the concise checklist. This can cause cognitive overload for agents that only need a high\u2011level trigger, thus a modest deduction."
+      "justification": "Uses a navigation table, top\u2011level summary, then deep sections, keeping the initial cognitive load low. However, some critical NEVER warnings are buried deep in the long \u201cNEVER do these things\u201d block, requiring a scroll to discover them."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Calibrates freedom appropriately for destructive actions: requires prerequisite verification, strict output contract, and NEVER rules. Could be tighter on input validation (e.g., enforce stream\u2011name regex, reject negative shard counts) and on handling existing resources."
+      "justification": "Destructive actions (stream creation) are gated by a prerequisite checklist, which is appropriate. However, the skill does not enforce idempotency checks (e.g., existing stream) and leaves some optional steps (IAM role creation, KMS key creation) under\u2011specified, giving too much freedom in those areas."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows the established skill pattern (metadata frontmatter, mindset, step\u2011by\u2011step process, NEVER list, output format). The pattern is clear and aids comprehension; no major deviation."
+      "justification": "Follows a recognizable structure (metadata, mindset, heuristics, stepwise process, never list, output format, error handling). The inclusion of a loosely formatted \"Recent features\" section feels ad\u2011hoc, preventing a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 14,
       "max": 15,
-      "justification": "Agent can execute the skill: decision trees, ready\u2011to\u2011deploy checklist, verification commands, and concrete CLI snippets. Gaps remain: no guidance for handling already\u2011existing streams, no error\u2011handling flow for failed API calls, and no instructions for partial updates or idempotent re\u2011runs."
+      "justification": "Provides working CLI commands, decision trees, verification commands, and error\u2011handling guidance. Model output examples conform to the contract. Minor usability issue: some checklist examples omit optional fields (e.g., missing SNS topic for IteratorAge alarm in one example) and do not demonstrate handling of a missing KMS key policy error."
     }
   ],
-  "total_score": 106,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47626,
-  "latency_ms": 11883,
+  "token_count": 47200,
+  "latency_ms": 10184,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

@@ -1,0 +1,150 @@
+# Eval test cases for firewall-manager-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across FMS policy topologies
+# (WAF policy with managed rule groups targeting an OU, security group
+# content audit policy, Network Firewall policy with remediation,
+# missing FMS admin delegation, WAF policy with invalid managed rule
+# group ARN).
+skill: firewall-manager-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: waf-policy-ou-targeting
+    description: >-
+      Provision an FMS WAF policy targeting the Prod OU with managed
+      rule groups (AWSManagedRulesCommonRuleSet) and auto-remediation
+      with a 7-day grace period. Expects READY_TO_DEPLOY with admin
+      account delegated, OU scope, managed rule groups cited, and
+      remediation grace period noted.
+    input: |
+      Create an FMS WAF policy named org-waf-common-rules targeting
+      OU ou-prod-abcdef in us-east-1. FMS admin account is 111111111111.
+      Use AWSManagedRulesCommonRuleSet and
+      AWSManagedRulesKnownBadInputsRuleSet managed rule groups.
+      Remediation should be auto-apply with a 7-day grace period.
+      Include tags: Environment=production. Exclude tags:
+      ComplianceExempt=true. Policy priority 1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "WAFV2"
+        - "ou-prod-abcdef"
+        - "111111111111"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "AWSManagedRulesCommonRuleSet"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: security-group-content-audit
+    description: >-
+      Provision an FMS security group content audit policy targeting
+      specific accounts. Expects READY_TO_DEPLOY with content audit
+      mode noted, audit rules referenced, and monitor-only remediation
+      (safe rollout).
+    input: |
+      Create an FMS security group policy named org-sg-audit-no-ssh-open
+      targeting accounts 111111111111 and 222222222222 in us-east-1.
+      FMS admin account is 000000000000. Use content audit mode to
+      check that no security group has port 22 open to 0.0.0.0/0.
+      Start in monitor-only mode (RemediationEnabled=false) for safe
+      rollout. Policy priority 2.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SECURITY_GROUPS_CONTENT_AUDIT"
+        - "monitor-only"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: network-firewall-policy-remediation
+    description: >-
+      Provision an FMS Network Firewall policy with auto-remediation
+      across multiple Regions. Expects READY_TO_DEPLOY with subnet
+      mappings cited, stateless and stateful rule groups referenced,
+      and remediation grace period noted.
+    input: |
+      Create an FMS Network Firewall policy named org-nfw-inspection
+      targeting OU ou-workloads-abcdef in us-east-1. FMS admin account
+      is 111111111111. Use stateless rule group rs-stateless-aaa and
+      stateful rule group rs-stateful-bbb. Firewall subnets are
+      subnet-aaa and subnet-bbb in each target account. Remediation
+      auto-apply with 14-day grace period. Policy priority 1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "NETWORK_FIREWALL"
+        - "subnet-aaa"
+        - "subnet-bbb"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-fms-admin-delegation
+    description: >-
+      Operator requests an FMS WAF policy but no FMS administrator
+      account has been delegated. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the admin delegation gap cited.
+    input: |
+      Create an FMS WAF policy named org-waf-policy targeting OU
+      ou-prod-abcdef in us-east-1. No FMS admin account has been
+      delegated yet. Use AWSManagedRulesCommonRuleSet. Remediation
+      auto-apply with 7-day grace.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "admin"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: overlapping-priority-conflict
+    description: >-
+      Operator requests a new WAF policy at the same priority as an
+      existing policy targeting overlapping accounts. This creates a
+      priority conflict that must be flagged.
+    input: |
+      Create an FMS WAF policy named org-waf-secondary targeting OU
+      ou-prod-abcdef in us-east-1. FMS admin account is 111111111111.
+      There is already a WAF policy org-waf-primary at priority 1
+      targeting the same OU. The new policy should be at priority 1.
+      Use AWSManagedRulesSQLiRuleSet. Remediation monitor-only.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "priority"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

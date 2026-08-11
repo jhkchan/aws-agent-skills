@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 14,
       "max": 20,
-      "justification": "Provides expert\u2011level details not commonly known: exact OAM ordering constraints, filter\u2011language syntax (Namespace IN, prefix()), org\u2011wide sink\u2011policy condition (aws:PrincipalOrgID), AMP cross\u2011account role\u2011trust nuances, and recent 2024\u20112026 feature changes. This is genuine delta beyond a baseline model, but some sections merely restate public docs."
+      "justification": "The skill repeats much of the public OAM documentation (sink creation, link steps, IAM policies). The only genuine delta are the specific filter\u2011language examples, recent 2024\u20112026 feature notes, and the concise NEVER list. Most content a capable model already knows, so a full 20 is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedural flow (sink \u2192 policy \u2192 source\u2011role \u2192 link \u2192 verification \u2192 Grafana \u2192 AMP \u2192 Application Signals) with concrete CLI snippets and IAM JSON. The steps are ordered per AWS best\u2011practice, not generic \"check security\" advice."
+      "justification": "Provides an AWS\u2011specific ordered procedure (sink \u2192 policy \u2192 role \u2192 link \u2192 Grafana/AMP wiring) and concrete CLI/JSON snippets. Missing explicit rollback or idempotency steps for destructive actions (e.g., what to do if the sink already exists), which is a gap in expert\u2011level mindset."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons and an extensive edge\u2011case table, but omits a few common pitfalls (cost explosion with many source accounts, region\u2011mismatch errors) and lacks explicit reasoning for some warnings."
+      "justification": "Contains a concrete NEVER list with reasons (wildcard sink policy, creating links from the wrong account, etc.). The list is limited to five items and could include more nuanced pitfalls (e.g., policy condition ordering, tag propagation), so it falls short of a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, triggers, keywords, and a precise output contract with mandatory labels. The only shortfall is a missing explicit \"when to invoke\" field in the frontmatter (it lives in metadata only)."
+      "justification": "Frontmatter is complete and the output contract is well defined. However, the skill lacks a succinct activation predicate field (e.g., a boolean \"trigger_when\"), and the \"when_to_use\" paragraph is verbose, making reliable automated triggering slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Information is layered: quick navigation \u2192 strict contract \u2192 reasoning \u2192 prerequisites \u2192 step\u2011by\u2011step procedure \u2192 edge cases \u2192 recent features \u2192 NEVER \u2192 heuristics. However, the initial sections already contain many dense tables, which can overload a first\u2011pass read."
+      "justification": "The skill uses sections and a quick\u2011navigation table, but the initial body dumps extensive CLI, JSON, and policy details before the reader reaches the \"NEVER\" or \"Edge\u2011case\" sections, causing cognitive overload. References are mentioned but not actually included, so deep details are hidden behind non\u2011existent files."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (sink creation, policy updates) are tightly constrained by required JSON templates and explicit \"NEVER\" rules. Creative sections (optional tags, org\u2011wide policy) are marked OPTIONAL, matching task fragility."
+      "justification": "Destructive steps (sink creation, policy put) are given without pre\u2011flight existence checks or idempotent guards, which is too permissive for a fragile operation. The skill otherwise constrains creative tasks well (e.g., optional org\u2011wide policy)."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (contract \u2192 reasoning \u2192 prerequisites \u2192 step\u2011by\u2011step \u2192 anti\u2011patterns \u2192 verification), but section naming is slightly ad\u2011hoc and the overall structure deviates from a strict template."
+      "justification": "Follows a recognizable pattern (metadata, navigation, output contract, reasoning, prerequisites, procedure, anti\u2011patterns, heuristics). Minor inconsistency: the navigation table does not perfectly map to section headings, breaking the otherwise clean pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 12,
       "max": 15,
-      "justification": "The skill supplies runnable CLI commands and a decision tree, but model outputs show frequent deviations: missing required checklist items, using OPTIONAL for mandatory entries, and omitting the VERDICT when PREREQUISITES_MISSING. These gaps indicate the contract is still ambiguous enough to cause incorrect agent behavior."
+      "justification": "Provides a usable checklist, CLI command list, and step\u2011by\u2011step guide, enabling an agent to execute the deployment. Lacks explicit error\u2011handling branches (e.g., AccessDenied on link creation), no guidance for retry or rollback, and the model output examples show variability, indicating ambiguity in some required fields."
     }
   ],
-  "total_score": 103,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43357,
-  "latency_ms": 13851,
+  "token_count": 42591,
+  "latency_ms": 27029,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

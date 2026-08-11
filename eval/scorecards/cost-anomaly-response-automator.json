@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill provides many AWS\u2011specific nuances (CAD impact vs total spend, Budgets single\u2011threshold limitation, CUR partitioning, kill\u2011switch patterns, recent 2024\u20112026 feature changes). However, a large portion restates publicly documented behavior rather than delivering brand\u2011new decision criteria or proprietary thresholds, so it falls short of a perfect delta."
+      "justification": "The skill contains many concrete AWS details (CAD monitor types, Budgets action limits, CUR partitioning, kill\u2011switch pattern, recent 2024\u20112026 feature changes). However, most of this information is already available in official docs; the skill does not introduce a novel decision matrix or proprietary heuristics that a senior CloudOps engineer could not find elsewhere, so it falls short of a perfect delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011centric decision tree, explicit ordering (kill\u2011switch \u2192 dry\u2011run \u2192 approval), and step\u2011function orchestration patterns. Only minor generic phrasing (\u201ccheck security\u201d) prevents a perfect score."
+      "justification": "Provides an AWS\u2011specific decision tree, explicit ordering of guardrails, and concrete CLI steps. A small deduction is made because some procedures (e.g., \u201crun a dry\u2011run first\u201d) are generic best\u2011practice statements rather than AWS\u2011unique sequencing."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "The NEVER section lists concrete anti\u2011patterns with clear why\u2011clauses (e.g., never run Budgets EC2\u2011stop automatically, never grant *:* IAM). One minor gap: it could add more nuanced pitfalls such as accidental privilege escalation via overly broad Lambda roles, but overall the anti\u2011pattern coverage is strong."
+      "justification": "Contains a concrete NEVER list with specific reasons (e.g., never use AUTOMATIC for EC2\u2011stop, never grant *:* IAM). One minor shortfall: it does not explicitly warn against using Budgets actions for resources that auto\u2011scale without updating the instance list, which is a common pitfall."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and a detailed invocation_schema are present. The only shortfall is the lack of a concrete JSON example of a valid invocation payload, which could cause ambiguity for an agent trying to construct the request."
+      "justification": "Frontmatter, description, activation triggers, and a detailed JSON invocation schema are present and well\u2011formed. One point is deducted because the activation triggers are extensive but lack a concise mapping to latency expectations, and the schema example does not show a concrete usage illustration."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers high\u2011level contract, decision tree, then deep technical details, which aids step\u2011wise consumption. Yet the initial sections are dense and include many tables and code blocks, causing some cognitive overload before the core rules are reached."
+      "justification": "The document layers high\u2011level overview, decision tree, guardrails, and deep technical snippets, which is good progressive disclosure. However, large blocks of CLI commands appear early, creating cognitive overload before the reader knows which path they need."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly guarded (dry\u2011run, approval gate, kill\u2011switch) while notification\u2011only flows are left flexible. The only minor weakness is the kill\u2011switch description could be more explicit about disabling EventBridge rules versus Parameter Store flags."
+      "justification": "Destructive actions are tightly guarded (kill\u2011switch, approval gate, dry\u2011run) while notification\u2011only paths are left flexible. A point is deducted because the kill\u2011switch is only described via Parameter Store; alternative mechanisms for environments without SSM are not covered."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (frontmatter \u2192 mindset \u2192 decision tree \u2192 guardrails \u2192 output contract). However, the structure mixes several styles (markdown tables, code blocks, narrative) rather than adhering to a single canonical template, making it slightly ad\u2011hoc."
+      "justification": "The skill follows a recognizable pattern (mindset \u2192 decision tree \u2192 guardrails \u2192 output contract \u2192 anti\u2011patterns \u2192 heuristic). Minor deduction for slight ad\u2011hoc section naming and inconsistent numbering, which slightly reduces pattern clarity."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "The skill provides actionable CLI snippets, a decision tree, and worked examples that an agent could follow. Nonetheless, the examples do not demonstrate handling of some edge cases (e.g., unconfirmed SNS subscription, missing CUR partitions) and the skill lacks an automated validation step for guardrails, limiting full practical reliability."
+      "justification": "Provides actionable CLI snippets, decision trees, and full example blocks that an agent could follow. Missing a complete end\u2011to\u2011end CloudFormation/Infrastructure\u2011as\u2011Code template and limited error\u2011handling guidance (e.g., handling unconfirmed SNS subscriptions) prevent a perfect score."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42516,
-  "latency_ms": 9472,
+  "token_count": 42502,
+  "latency_ms": 6407,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

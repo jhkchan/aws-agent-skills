@@ -1,0 +1,178 @@
+{
+  "skill": "timestream-database-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Timestream Database Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Timestream topologies (database+table with retention and scheduled query, magnetic store write properties with S3 integration, partition key enforcement for high-cardinality tables, batch load task for historical ingestion, missing S3 bucket policy for magnetic store writes). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "database-table-scheduled-query",
+      "name": "Timestream database with table, retention properties, and scheduled query",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — database creation, table with memory/magnetic TTL, scheduled query with target table and SNS notification",
+      "prompt": "Create a Timestream database named IoTSensorData in us-east-1. Create a table TemperatureReadings with memory store TTL of 12 hours and magnetic store TTL of 365 days. Create a scheduled query named HourlyTemperatureAggregation that aggregates temperature readings hourly into a target table HourlyTempAggregates. SNS topic for errors: arn:aws:sns:us-east-1:123456789012:timestream-errors. Execution role: arn:aws:iam::123456789012:role/TimestreamSQRole. Tags: Environment=production, Team=iot.",
+      "prompt_file": "prompts/database-table-scheduled-query.md",
+      "baseline_file": "baselines/database-table-scheduled-query.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TIMESTREAM: IoTSensorData / TemperatureReadings\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Database: IoTSensorData (region us-east-1)\n  [✓] Table: TemperatureReadings\n  [✓] Memory store TTL: 12h\n  [✓] Magnetic store TTL: 365d\n  [✓] Scheduled query: HourlyTemperatureAggregation\n  [✓] Scheduled query notification: SNS arn:aws:sns:us-east-1:123456789012:timestream-errors\n  [✓] Scheduled query execution role: arn:aws:iam::123456789012:role/TimestreamSQRole\n  [✓] Tags: Environment=production, Team=iot\nVERIFICATION_COMMANDS:\n  aws timestream-write describe-database --database-name IoTSensorData --region us-east-1\n  aws timestream-write describe-table --database-name IoTSensorData --table-name TemperatureReadings --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "IoTSensorData",
+            "TemperatureReadings",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "HourlyTemperatureAggregation"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "magnetic-store-write-s3",
+      "name": "Timestream table with magnetic store write properties and S3 integration",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — magnetic store write properties enabled, S3 bucket with bucket policy for late-arrival data",
+      "prompt": "Create a Timestream database named IoTSensorData and table EventLogs in us-east-1. Memory store TTL 6 hours, magnetic store TTL 730 days. Enable magnetic store writes with S3 bucket timestream-late-arrival-us-east-1 for late-arrival data. The bucket already has a policy granting Timestream s3:PutObject. Tags: Environment=production.",
+      "prompt_file": "prompts/magnetic-store-write-s3.md",
+      "baseline_file": "baselines/magnetic-store-write-s3.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TIMESTREAM: IoTSensorData / EventLogs\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Database: IoTSensorData (region us-east-1)\n  [✓] Table: EventLogs\n  [✓] Memory store TTL: 6h\n  [✓] Magnetic store TTL: 730d\n  [✓] Magnetic store writes: Enabled (S3: timestream-late-arrival-us-east-1)\n  [✓] Tags: Environment=production\nVERIFICATION_COMMANDS:\n  aws timestream-write describe-table --database-name IoTSensorData --table-name EventLogs --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EventLogs",
+            "magnetic store writes",
+            "timestream-late-arrival-us-east-1",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "partition-key-enforcement",
+      "name": "Timestream table with partition key enforcement for high-cardinality queries",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — partition key enforcement REQUIRED for query performance on high-cardinality dimension-filtered workload",
+      "prompt": "Create a Timestream database named MetricsDB and table HighCardinalityMetrics in us-east-1. Memory store TTL 1 hour, magnetic store TTL 90 days. Enable partition key enforcement with EnforcementInRecord=REQUIRED. Queries frequently filter by device_id and region. Tags: Environment=production, Workload=high-cardinality.",
+      "prompt_file": "prompts/partition-key-enforcement.md",
+      "baseline_file": "baselines/partition-key-enforcement.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TIMESTREAM: MetricsDB / HighCardinalityMetrics\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Database: MetricsDB (region us-east-1)\n  [✓] Table: HighCardinalityMetrics\n  [✓] Memory store TTL: 1h\n  [✓] Magnetic store TTL: 90d\n  [✓] Partition key enforcement: REQUIRED\n  [✓] Tags: Environment=production, Workload=high-cardinality\nVERIFICATION_COMMANDS:\n  aws timestream-write describe-table --database-name MetricsDB --table-name HighCardinalityMetrics --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "HighCardinalityMetrics",
+            "partition key",
+            "REQUIRED",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "batch-load-task",
+      "name": "Timestream batch load task for historical S3 data ingestion",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — batch load task created with CSV data source S3 bucket and report configuration",
+      "prompt": "Create a Timestream database named HistoricalData and table SensorArchive in us-east-1 with memory store TTL 1 hour and magnetic store TTL 3650 days. Create a batch load task to ingest CSV data from S3 bucket historical-sensor-data (prefix 2024/) into the table. Report bucket: batch-load-reports. Tags: Environment=production, Purpose=historical-backfill.",
+      "prompt_file": "prompts/batch-load-task.md",
+      "baseline_file": "baselines/batch-load-task.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TIMESTREAM: HistoricalData / SensorArchive\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Database: HistoricalData (region us-east-1)\n  [✓] Table: SensorArchive\n  [✓] Memory store TTL: 1h\n  [✓] Magnetic store TTL: 3650d\n  [✓] Batch load task: configured (data source: historical-sensor-data/2024/, report: batch-load-reports)\n  [✓] Tags: Environment=production, Purpose=historical-backfill\nVERIFICATION_COMMANDS:\n  aws timestream-write describe-table --database-name HistoricalData --table-name SensorArchive --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SensorArchive",
+            "batch load",
+            "historical-sensor-data",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-s3-bucket-policy",
+      "name": "Timestream magnetic store writes without S3 bucket policy (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — S3 bucket lacks bucket policy granting Timestream s3:PutObject; magnetic store writes will silently fail",
+      "prompt": "Create a Timestream table LateArrivalData with magnetic store writes enabled using S3 bucket my-data-bucket. The bucket does NOT have a bucket policy granting Timestream s3:PutObject. Database name IoTSensorData, region us-east-1. Memory store TTL 6h, magnetic store TTL 365d.",
+      "prompt_file": "prompts/missing-s3-bucket-policy.md",
+      "baseline_file": "baselines/missing-s3-bucket-policy.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "TIMESTREAM: IoTSensorData / LateArrivalData\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Magnetic store writes: bucket my-data-bucket missing required bucket policy granting Timestream s3:PutObject",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "bucket policy",
+            "VERDICT",
+            "CHECKLIST",
+            "my-data-bucket"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

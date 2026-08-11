@@ -1,0 +1,167 @@
+# Eval test cases for batch-compute-environment-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Batch compute topologies
+# (EC2 with BEST_FIT_PROGRESSIVE, Fargate with job queue and job
+# definition, spot with array jobs and dependencies, missing instance
+# role, invalid allocation strategy for spot).
+skill: batch-compute-environment-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ec2-best-fit-progressive
+    description: >-
+      Provision an EC2 Batch compute environment with
+      BEST_FIT_PROGRESSIVE allocation strategy, launch template, and a
+      job queue with priority. Expects READY_TO_DEPLOY with the
+      allocation strategy cited, instance types listed, and the job
+      queue referencing the compute environment.
+    input: |
+      Create an AWS Batch EC2 compute environment named batch-ec2-prod
+      in us-east-1. Use BEST_FIT_PROGRESSIVE allocation strategy.
+      Instance types: m5.large, m5.xlarge, m5.2xlarge. Instance role
+      arn:aws:iam::123456789012:instance-profile/batch-instance-profile.
+      Launch template batch-custom-lt. Min vCPUs 0, max 256, desired 0.
+      Subnets subnet-aaa11122, subnet-bbb22233. Security group
+      sg-batch111. Create a job queue production-queue with priority 500
+      referencing this compute environment. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "BEST_FIT_PROGRESSIVE"
+        - "batch-ec2-prod"
+        - "production-queue"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "ENABLED"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: fargate-job-queue-definition
+    description: >-
+      Provision a Fargate Batch compute environment with a job queue and
+      a job definition specifying container image, vCPUs, memory, and
+      environment variables. Expects READY_TO_DEPLOY with Fargate
+      platform version noted and the job definition registered.
+    input: |
+      Create an AWS Batch Fargate compute environment named
+      batch-fargate-prod in us-east-1. Max vCPUs 128. Subnets
+      subnet-aaa11122, subnet-bbb22233. Security group sg-batch-fargate.
+      Create a job queue fargate-queue with priority 300. Register a job
+      definition data-etl-v1 with image
+      123456789012.dkr.ecr.us-east-1.amazonaws.com/data-etl:latest,
+      vCPUs 2, memory 4096 MB. Environment variables: S3_BUCKET=etl-data,
+      LOG_LEVEL=INFO. Fargate platform version LATEST. Tags:
+      Environment=production, Workload=etl.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Fargate"
+        - "batch-fargate-prod"
+        - "data-etl-v1"
+        - "LATEST"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: spot-array-jobs-dependencies
+    description: >-
+      Provision a spot-based Batch compute environment with
+      SPOT_CAPACITY_OPTIMIZED and an On-Demand fallback, plus array
+      jobs with sequential dependencies. Expects READY_TO_DEPLOY with
+      the dual compute environment pattern noted.
+    input: |
+      Create a spot Batch compute environment batch-spot-env in
+      us-east-1 with SPOT_CAPACITY_OPTIMIZED. Instance types m5.large,
+      m5.xlarge, c5.large, c5.xlarge. Max vCPUs 1000. Spot fleet role
+      arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet.
+      Also create an On-Demand fallback batch-ondemand-env with
+      BEST_FIT_PROGRESSIVE, max vCPUs 200. Create job queue
+      production-queue priority 500 referencing spot (order 1) and
+      ondemand (order 2). Submit an array job of size 100 with
+      sequential dependency on a preceding ingest job. Instance role
+      arn:aws:iam::123456789012:instance-profile/batch-instance-profile.
+      Subnets subnet-aaa11122, subnet-bbb22233. SG sg-batch111.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SPOT_CAPACITY_OPTIMIZED"
+        - "BEST_FIT_PROGRESSIVE"
+        - "batch-spot-env"
+        - "batch-ondemand-env"
+        - "array"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-instance-role
+    description: >-
+      Operator requests an EC2 Batch compute environment but the
+      instance role is missing. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the instance role gap cited.
+    input: |
+      Create an AWS Batch EC2 compute environment named batch-ec2-env
+      in us-east-1. BEST_FIT_PROGRESSIVE. Instance types m5.large,
+      m5.xlarge. No instance role specified. Min vCPUs 0, max 128.
+      Subnets subnet-aaa11122. Security group sg-batch111. Create job
+      queue my-queue priority 100.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "instance role"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: invalid-allocation-strategy-spot
+    description: >-
+      Operator requests a spot compute environment with BEST_FIT
+      allocation strategy. BEST_FIT does not support spot; this is a
+      prerequisite failure. Expects PREREQUISITES_MISSING with the
+      allocation strategy mismatch cited.
+    input: |
+      Create an AWS Batch spot compute environment named batch-spot-env
+      in us-east-1 with BEST_FIT allocation strategy. Instance types
+      m5.large, m5.xlarge. Max vCPUs 500. Instance role
+      arn:aws:iam::123456789012:instance-profile/batch-instance-profile.
+      Spot fleet role
+      arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet.
+      Subnets subnet-aaa11122. SG sg-batch111.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "SPOT_CAPACITY_OPTIMIZED"
+        - "allocation strategy"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

@@ -1,0 +1,49 @@
+# Eval configuration for firewall-manager-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: firewall-manager-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: waf-policy-ou-targeting
+    difficulty: hard
+    prompt_file: prompts/waf-policy-ou-targeting.md
+    baseline_file: baselines/waf-policy-ou-targeting.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: security-group-content-audit
+    difficulty: hard
+    prompt_file: prompts/security-group-content-audit.md
+    baseline_file: baselines/security-group-content-audit.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: network-firewall-policy-remediation
+    difficulty: hard
+    prompt_file: prompts/network-firewall-policy-remediation.md
+    baseline_file: baselines/network-firewall-policy-remediation.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-fms-admin-delegation
+    difficulty: medium
+    prompt_file: prompts/missing-fms-admin-delegation.md
+    baseline_file: baselines/missing-fms-admin-delegation.md
+    expected_verdict: PREREQUISITES_MISSING
+
+  - id: overlapping-priority-conflict
+    difficulty: medium
+    prompt_file: prompts/overlapping-priority-conflict.md
+    baseline_file: baselines/overlapping-priority-conflict.md
+    expected_verdict: PREREQUISITES_MISSING

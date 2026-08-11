@@ -1,0 +1,180 @@
+{
+  "skill": "batch-compute-environment-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Batch Compute Environment Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Batch compute topologies (EC2 with BEST_FIT_PROGRESSIVE and launch template, Fargate with job queue and job definition, spot with SPOT_CAPACITY_OPTIMIZED and On-Demand fallback plus array jobs, missing instance role prerequisite failure, invalid allocation strategy for spot prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "ec2-best-fit-progressive",
+      "name": "EC2 Batch compute environment with BEST_FIT_PROGRESSIVE and launch template",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — EC2 compute environment, BEST_FIT_PROGRESSIVE, launch template, job queue with priority",
+      "prompt": "Create an AWS Batch EC2 compute environment named batch-ec2-prod in us-east-1. Use BEST_FIT_PROGRESSIVE allocation strategy. Instance types: m5.large, m5.xlarge, m5.2xlarge. Instance role arn:aws:iam::123456789012:instance-profile/batch-instance-profile. Launch template batch-custom-lt. Min vCPUs 0, max 256, desired 0. Subnets subnet-aaa11122, subnet-bbb22233. Security group sg-batch111. Create a job queue production-queue with priority 500 referencing this compute environment. Tags: Environment=production.",
+      "prompt_file": "prompts/ec2-best-fit-progressive.md",
+      "baseline_file": "baselines/ec2-best-fit-progressive.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BATCH_COMPUTE: batch-ec2-prod (EC2, BEST_FIT_PROGRESSIVE)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Compute environment type: EC2\n  [✓] Compute environment name: batch-ec2-prod\n  [✓] State: ENABLED\n  [✓] Allocation strategy: BEST_FIT_PROGRESSIVE\n  [✓] Instance types: m5.large, m5.xlarge, m5.2xlarge\n  [✓] Instance role: arn:aws:iam::123456789012:instance-profile/batch-instance-profile\n  [✓] Launch template: batch-custom-lt ($Default)\n  [✓] Min vCPUs: 0, Max vCPUs: 256, Desired vCPUs: 0\n  [✓] Subnets: subnet-aaa11122, subnet-bbb22233\n  [✓] Security groups: sg-batch111\n  [✓] Job queue: production-queue (priority: 500, compute environments: batch-ec2-prod)\nVERIFICATION_COMMANDS:\n  aws batch describe-compute-environments --compute-environments batch-ec2-prod\n  aws batch describe-job-queues --job-queues production-queue",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "BEST_FIT_PROGRESSIVE",
+            "batch-ec2-prod",
+            "production-queue",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "ENABLED"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fargate-job-queue-definition",
+      "name": "Fargate Batch compute environment with job queue and job definition",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Fargate compute environment, job queue with priority, job definition with container image, vCPUs, memory, environment variables, Fargate platform LATEST",
+      "prompt": "Create an AWS Batch Fargate compute environment named batch-fargate-prod in us-east-1. Max vCPUs 128. Subnets subnet-aaa11122, subnet-bbb22233. Security group sg-batch-fargate. Create a job queue fargate-queue with priority 300. Register a job definition data-etl-v1 with image 123456789012.dkr.ecr.us-east-1.amazonaws.com/data-etl:latest, vCPUs 2, memory 4096 MB. Environment variables: S3_BUCKET=etl-data, LOG_LEVEL=INFO. Fargate platform version LATEST. Tags: Environment=production, Workload=etl.",
+      "prompt_file": "prompts/fargate-job-queue-definition.md",
+      "baseline_file": "baselines/fargate-job-queue-definition.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BATCH_COMPUTE: batch-fargate-prod (Fargate)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Compute environment type: Fargate\n  [✓] Compute environment name: batch-fargate-prod\n  [✓] State: ENABLED\n  [✓] Max vCPUs: 128\n  [✓] Subnets: subnet-aaa11122, subnet-bbb22233\n  [✓] Security groups: sg-batch-fargate\n  [✓] Job queue: fargate-queue (priority: 300)\n  [✓] Job definition: data-etl-v1 (image: data-etl:latest, vCPUs: 2, memory: 4096 MB)\n  [✓] Fargate platform version: LATEST",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Fargate",
+            "batch-fargate-prod",
+            "data-etl-v1",
+            "LATEST",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spot-array-jobs-dependencies",
+      "name": "Spot with SPOT_CAPACITY_OPTIMIZED, On-Demand fallback, and array jobs",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — spot CE with SPOT_CAPACITY_OPTIMIZED, On-Demand fallback CE with BEST_FIT_PROGRESSIVE, dual-CE job queue, array job of 100 with sequential dependency",
+      "prompt": "Create a spot Batch compute environment batch-spot-env in us-east-1 with SPOT_CAPACITY_OPTIMIZED. Instance types m5.large, m5.xlarge, c5.large, c5.xlarge. Max vCPUs 1000. Spot fleet role arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet. Also create an On-Demand fallback batch-ondemand-env with BEST_FIT_PROGRESSIVE, max vCPUs 200. Create job queue production-queue priority 500 referencing spot (order 1) and ondemand (order 2). Submit an array job of size 100 with sequential dependency on a preceding ingest job. Instance role arn:aws:iam::123456789012:instance-profile/batch-instance-profile. Subnets subnet-aaa11122, subnet-bbb22233. SG sg-batch111.",
+      "prompt_file": "prompts/spot-array-jobs-dependencies.md",
+      "baseline_file": "baselines/spot-array-jobs-dependencies.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BATCH_COMPUTE: batch-spot-env (EC2, SPOT_CAPACITY_OPTIMIZED)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Allocation strategy: SPOT_CAPACITY_OPTIMIZED\n  [✓] Instance types: m5.large, m5.xlarge, c5.large, c5.xlarge\n  [✓] Max vCPUs: 1000\n  [✓] Spot fleet role: AWSServiceRoleForEC2SpotFleet\n  [✓] Fallback CE: batch-ondemand-env (BEST_FIT_PROGRESSIVE, max 200 vCPUs)\n  [✓] Job queue: production-queue (priority: 500, CE order: spot→ondemand)\n  [✓] Job dependencies: sequential (array size: 100, depends on ingest)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SPOT_CAPACITY_OPTIMIZED",
+            "BEST_FIT_PROGRESSIVE",
+            "batch-spot-env",
+            "batch-ondemand-env",
+            "array",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-instance-role",
+      "name": "EC2 Batch compute environment with missing instance role (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no instance role specified; EC2 instances cannot register with ECS agent",
+      "prompt": "Create an AWS Batch EC2 compute environment named batch-ec2-env in us-east-1. BEST_FIT_PROGRESSIVE. Instance types m5.large, m5.xlarge. No instance role specified. Min vCPUs 0, max 128. Subnets subnet-aaa11122. Security group sg-batch111. Create job queue my-queue priority 100.",
+      "prompt_file": "prompts/missing-instance-role.md",
+      "baseline_file": "baselines/missing-instance-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BATCH_COMPUTE: batch-ec2-env (EC2, BEST_FIT_PROGRESSIVE)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Instance role: MISSING — EC2 compute environment requires an instance role with ecs.amazonaws.com trust policy",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "instance role",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "invalid-allocation-strategy-spot",
+      "name": "Spot compute environment with BEST_FIT (invalid allocation strategy)",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — BEST_FIT does not support spot; spot requires SPOT_CAPACITY_OPTIMIZED",
+      "prompt": "Create an AWS Batch spot compute environment named batch-spot-env in us-east-1 with BEST_FIT allocation strategy. Instance types m5.large, m5.xlarge. Max vCPUs 500. Instance role arn:aws:iam::123456789012:instance-profile/batch-instance-profile. Spot fleet role arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet. Subnets subnet-aaa11122. SG sg-batch111.",
+      "prompt_file": "prompts/invalid-allocation-strategy-spot.md",
+      "baseline_file": "baselines/invalid-allocation-strategy-spot.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BATCH_COMPUTE: batch-spot-env (EC2, BEST_FIT)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Allocation strategy: INVALID — spot compute environments require SPOT_CAPACITY_OPTIMIZED, not BEST_FIT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "SPOT_CAPACITY_OPTIMIZED",
+            "allocation strategy",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

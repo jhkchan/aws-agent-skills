@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides many specific expert details (15+ health\u2011checker regions, interval tiers, failure\u2011threshold math, exact CLI probes) that a generic model would not enumerate, but a large portion restates publicly documented facts without novel decision thresholds or unique heuristics, losing 4 points."
+      "justification": "Adds concrete expert knowledge (failure\u2011threshold math, exact health\u2011checker IP\u2011range limitation, a ten\u2011category diagnostic tree, and precise CLI probes) that a generic model would not enumerate, but a sizable portion restates publicly documented behavior rather than novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific reasoning (probe\u2011first, verify health\u2011checker IPs, then endpoint health) and a clear step\u2011by\u2011step procedure, yet the ordering of some checks (e.g., network\u2011visibility before protocol mismatch) is only implied, not explicitly mandated."
+      "justification": "Provides AWS\u2011specific step order (pre\u2011flight probes, per\u2011layer CLI commands, confirmation gate) and a clear diagnostic mindset, yet some procedures are generic (e.g., \u201calways verify with a probe\u201d) and not uniquely tied to Route\u00a053."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete pitfalls, but a few warnings are generic (e.g., \u201cnever assume latency\u2011based routing serves the nearest endpoint\u201d) and lack detailed why\u2011this\u2011fails explanations, reducing the anti\u2011pattern depth."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., health\u2011checker IP visibility, certificate SAN mismatch, inverted calculated checks). One minor shortfall is the absence of a few edge\u2011case pitfalls such as mixed\u2011protocol health checks."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, activation triggers, invocation schema, and example are all present and well\u2011formed. The activation trigger list is exhaustive but could cause over\u2011triggering; a tighter, more precise trigger definition would be ideal."
+      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and invocation schema are present. The activation trigger list is overly exhaustive, making precise activation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick navigation, quick start, deep sections) but front\u2011loads large tables and long prose before the minimal actionable steps, creating cognitive overload for an agent that needs a concise first pass."
+      "justification": "Information is layered (quick start \u2192 detailed decision tree \u2192 deep references), but the initial Quick\u2011start table and symptom\u2011triage matrix front\u2011load a lot of detail, which could cause cognitive overload before the agent knows what it needs."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive commands are gated by explicit CONFIRM prompts, matching fragility. However, the skill does not warn about cost implications of fast health checks or TTL changes, a minor calibration gap."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and read\u2011only probes are default. Calibration is strong, though the skill relies on the operator to enforce the confirmation rather than programmatically restricting execution."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (navigation \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 anti\u2011patterns \u2192 heuristics), but the structure mixes several styles (tables, prose, code blocks) making it slightly ad\u2011hoc rather than a single canonical template."
+      "justification": "Follows a coherent pattern (navigation, mindset, philosophy, decision tree, output contract, anti\u2011patterns, heuristics, graph) that aligns with the expected skill architecture."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, output format, worked examples, and safety checks, enabling an agent to act. Lacks explicit handling for partially missing configuration (e.g., health\u2011check ID absent but other data present) and some edge\u2011case branching, resulting in a 2\u2011point deduction."
+      "justification": "Provides a usable decision tree, concrete CLI commands, output format, and worked examples, enabling an agent to act. Lacks explicit handling for ambiguous multi\u2011layer symptoms and does not define a fallback when multiple layers appear plausible."
     }
   ],
-  "total_score": 105,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43442,
-  "latency_ms": 9685,
+  "token_count": 43338,
+  "latency_ms": 36063,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

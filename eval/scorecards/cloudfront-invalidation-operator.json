@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill supplies many nuanced, expert\u2011level facts that a generic model would not enumerate: the 3,000\u2011path hard limit per CreateInvalidation call, the per\u2011account 1,000\u2011path free tier, $0.005 per extra path, the exact behavior of wildcards (only at end of segment), CallerReference deduplication semantics, the 15\u2011concurrent\u2011InProgress limit, continuous\u2011deployment policy requirements (invalidate both staging and primary), Lambda@Edge vs CloudFront Functions propagation times, and the interaction with S3 Object Lambda. These details constitute genuine delta knowledge."
+      "justification": "Provides expert\u2011level specifics (3,000\u2011path batch limit, $0.005 per path beyond 1,000, wildcard only at segment end, CallerReference deduplication, continuous\u2011deployment dual\u2011distribution invalidation, Lambda@Edge propagation times) that go beyond a baseline model. Deducted 3 points because many of these facts are documented in AWS docs and a capable model could already retrieve them."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and ordered (pre\u2011flight checks, CONFIRM gate, CLI command construction, polling). The cost\u2011analysis and compare\u2011strategy branches are less fleshed out and rely on generic \u201cread\u2011only\u201d steps, preventing a perfect score."
+      "justification": "Offers a clear AWS\u2011specific procedure: ordered pre\u2011checks, confirmation gate, exact CLI syntax, post\u2011verification steps, and continuous\u2011deployment handling. Deducted 1 point for omission of a concrete pagination loop algorithm (e.g., while\u2011next\u2011marker) in the pre\u2011flight section."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete pitfalls (e.g., reusing CallerReference, listing individual objects instead of wildcards, invalidating without fixing origin, forgetting staging invalidation) and explains why each is harmful. Includes a failure\u2011mode table mapping symptoms to root causes and fixes, giving experience\u2011driven warnings."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., CallerReference reuse, mid\u2011segment wildcards, exceeding free tier, forgetting staging invalidation). Deducted 2 points because it does not address anti\u2011patterns such as API throttling, retry back\u2011off, or over\u2011reliance on large wildcard invalidations that can hit the 15\u2011concurrent\u2011inflight limit."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Full frontmatter is present (name, description, version, author, license, compatibility, keywords, tags, metadata, verdict shape, when_to_use, activation_triggers, invocation_schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides precise activation keywords, enabling reliable triggering."
+      "justification": "Full frontmatter, rich description, when_to_use, activation_triggers, and invocation_schema are present, enabling reliable activation. Deducted 1 point because the activation_triggers list includes some overly generic phrases (e.g., \"clear CDN cache\") that could fire the skill in unrelated contexts."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns) but the initial sections are dense, forcing the reader to absorb a large amount before reaching the concise quick\u2011reference table. This creates some cognitive overload."
+      "justification": "Uses quick navigation, layered sections, and concise top\u2011level tables before deep details, which reduces cognitive load. Deducted 2 points because the Quick Reference table still packs many rules (pre\u2011check order, cost baselines) that a novice might need to parse before deciding to proceed."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly guarded by a CONFIRM gate and pre\u2011checks, while read\u2011only operations are given more freedom. Cost warnings are advisory rather than enforced, leaving a small gap in calibration for high\u2011cost scenarios."
+      "justification": "Destructive actions are tightly gated by CONFIRM and pre\u2011checks; cost warnings are explicit. Deducted 1 point for not providing guidance on how to split a >3,000\u2011path invalidation into multiple calls beyond merely noting the hard limit."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (What it does, Quick navigation, Mindset, Pre\u2011flight, Process, Output format, Anti\u2011patterns). Minor inconsistency in ordering of tables vs narrative makes the pattern slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns). Deducted 1 point because section headings are sometimes inconsistent (e.g., \"Pre\u2011flight safety checks\" vs \"Pre\u2011flight: distribution metadata gate\"), slightly breaking the uniform pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI commands, example outputs, and verification steps, enabling an agent to act. Missing explicit handling for pagination limits, API throttling, and detailed error\u2011recovery paths reduces usability in edge cases."
+      "justification": "Provides decision trees, concrete CLI commands, verification steps, and worked examples that an agent could execute. Deducted 2 points because error handling (e.g., retry on AccessDenied, handling TooManyInvalidationsInProgress) and explicit retry/back\u2011off strategies are not fully fleshed out."
     }
   ],
-  "total_score": 109,
+  "total_score": 107,
   "max_score": 120,
-  "grade": "A",
-  "token_count": 41602,
-  "latency_ms": 20177,
+  "grade": "B",
+  "token_count": 41158,
+  "latency_ms": 17296,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

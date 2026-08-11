@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Provides concrete, senior\u2011engineer level details not usually known to a generic model: exact IAM policy statements per data source, authentication immutability rule, decision matrix for Standard vs Enterprise, recent 2024\u20112026 feature list, and precise CLI flag combinations. However, some content merely restates AWS docs without novel insight, preventing a perfect score."
+      "justification": "Provides concrete decision matrices (auth immutability, permission\u2011type trade\u2011offs), exact IAM policy snippets, recent feature notes (Grafana 11, AMP cross\u2011account), and a 10\u2011step provisioning workflow that a generic model would not generate on its own."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific provisioning workflow (10\u2011step procedure, exact order of workspace creation \u2192 IAM role \u2192 data sources \u2192 dashboard \u2192 alerting). The only shortfall is occasional reliance on generic advice like \"verify prerequisites\" without tying each verification to a concrete AWS CLI command."
+      "justification": "Encodes AWS\u2011specific ordering (workspace \u2192 auth \u2192 IAM role \u2192 data sources \u2192 dashboard \u2192 alerting) and precise CLI flags for each service. Procedure is detailed but still generic in places (e.g., \"verify VPC\" without exact commands)."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete \"NEVER\" list of five anti\u2011patterns with clear reasoning (auth mode immutability, service\u2011managed roles for compliance, incomplete alerting layers, querying inactive AMP, hard\u2011coded data source UIDs). Missing a broader set of pitfalls (e.g., VPC\u2011attached data source networking, quota limits) and no explicit \"WARN\" handling for edge cases."
+      "justification": "Includes a solid NEVER list with reasons (auth mode immutability, service\u2011managed vs customer\u2011managed, incomplete alerting, AMP ACTIVE check, hard\u2011coded data sources). However only five anti\u2011patterns are covered and other common pitfalls (e.g., missing VPC config for private data sources, tag compliance) are omitted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter includes description, version, triggers, keywords, activation list, and a strict output contract with required literal labels. The only shortfall is the absence of an explicit example of a PREREQUISITES_MISSING response."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, keywords, and output format are all present and well\u2011structured. Minor weakness: the \"when_to_use\" paragraph could be tighter about exclusive triggers, but overall compliance is high."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 14,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, prerequisites, detailed step\u2011by\u2011step, then deep references. Critical rules (output contract, NEVER list) are highlighted early. Slight overload in the long \"Provisioning procedure\" section where some details could be deferred to references."
+      "justification": "Uses a top\u2011level quick reference, then layered sections (Mindset, Prerequisites, Procedure, Patterns, Output format). The full JSON dashboard example is long but placed in a dedicated subsection, so cognitive overload is limited."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom appropriately for irreversible provisioning: warns about immutable authentication, least\u2011privilege IAM roles, and service\u2011managed vs customer\u2011managed choices. Slightly loose on placeholder handling in example commands."
+      "justification": "Destructive actions (workspace creation, IAM role) are tightly constrained: placeholders must be filled, checklist forces verification, and forbidden patterns are enumerated. Creative sections (dashboard JSON) retain flexibility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (frontmatter \u2192 overview \u2192 mindset \u2192 navigation table \u2192 detailed sections \u2192 output contract). The structure is consistent and aids comprehension. Slight deviation: the \"Provisioning commands\" examples are interleaved with narrative, breaking the pure pattern."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick navigation \u2192 Detailed sections \u2192 Output contract). The structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 8,
+      "score": 9,
       "max": 15,
-      "justification": "Model output shows gaps: missing required checklist items (e.g., AMP data source not listed when relevant), use of placeholder <id> in API\u2011key command violating the strict output contract, and incomplete IAM role association in some examples. These defects would cause downstream automation failures."
+      "justification": "Model output examples omit required checklist items (e.g., VPC configuration line, some data source entries) and sometimes miss verification commands for all resources. This violates the strict output contract and would cause downstream automation failures."
     }
   ],
-  "total_score": 102,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47673,
-  "latency_ms": 5542,
+  "token_count": 49347,
+  "latency_ms": 16770,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

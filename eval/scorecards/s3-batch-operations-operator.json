@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds substantial expert knowledge: explicit pre\u2011check ordering, concrete thresholds (RequestsPerSecond 1\u20112500, CompletionWindow limits), detailed failure\u2011code taxonomy, KMS key\u2011policy nuance, Lambda concurrency sizing, and the two\u2011stage nature of Glacier restores. This goes beyond a generic model's baseline. Minor overlap with public docs prevents a perfect score."
+      "justification": "The skill provides many expert\u2011level specifics (e.g., exact RequestsPerSecond limits, ETA calculation, role two\u2011sided permission requirements, Lambda reserved concurrency >= RPS, versioned inventory requirement for version\u2011aware ops). However, a large portion restates official AWS documentation without adding novel decision trees or unique heuristics, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific reasoning: the \"manifest\u202f+\u202frole\u202f+\u202freport\u202f+\u202frate\u2011control\" quad, the false\u2011green trap, ordered pre\u2011check sequence, and explicit confirm\u2011gate before any state\u2011changing CLI. Procedure is concrete and AWS\u2011centric. Deducted 1 point for a minor generic phrasing in the pre\u2011flight section (\"run ALL pre\u2011checks\" without emphasizing the AWS\u2011specific ordering beyond the list)."
+      "justification": "Procedures are AWS\u2011specific and ordered (pre\u2011flight checks, confirm gate, CLI sequence, post\u2011verification). The only shortfall is that some operations (e.g., cancel\u2011job, update\u2011priority) are mentioned but not given the exact CLI flags or step\u2011by\u2011step commands, leaving a minor gap in procedural completeness."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., missing operation\u2011specific grants, header row in CSV, assuming Status:Complete means success, omitting RequestsPerSecond for billion\u2011object jobs). Only loses a point because it does not explicitly warn about forgetting to set the report scope to FailedTasksOnly for large jobs (though mentioned elsewhere) and could include a pitfall about versioned\u2011manifest mismatch for object\u2011lock operations."
+      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., never trust Status:Complete, never omit Lambda principal, never run billion\u2011object jobs without RequestsPerSecond). Lacks a few edge\u2011cases (cross\u2011account role trust) but overall strong."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Complete frontmatter, clear description, when_to_use, activation_triggers, and invocation_schema. The only shortfall is the absence of an explicit example input schema (JSON fields) in the frontmatter, which would aid automated activation."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are all present and unambiguous. An agent can reliably know when and how to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level sections give a concise overview (quick reference, mindset, pre\u2011flight) before diving into deep details (full CLI examples, exhaustive anti\u2011pattern table). However, the initial \"What this skill does\" paragraph is dense and could overload the reader; a shorter executive summary would improve layering."
+      "justification": "The skill is well\u2011structured with a quick\u2011reference table, but the initial sections are dense and front\u2011load many details before the concise reference, which can cause cognitive overload for a first\u2011time user."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Calibrates freedom appropriately: destructive jobs require strict pre\u2011checks and a CONFIRM gate; creative jobs (e.g., Lambda invoke) allow rate\u2011control tuning. Minor gap: no explicit warning about overwriting existing objects when using copy\u2011with\u2011new\u2011encryption."
+      "justification": "Destructive actions are tightly constrained by mandatory pre\u2011checks and a CONFIRM gate, while creative planning steps are left flexible. Calibration matches task fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows the established skill pattern (frontmatter, purpose, navigation table, mindset, process, output contract, anti\u2011patterns). Section ordering is slightly ad\u2011hoc but overall recognisable."
+      "justification": "The skill follows a clear, repeatable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Heuristics), making it instantly recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides actionable CLI commands, decision trees, and sample output blocks that an agent can execute. Inconsistency: the pre\u2011flight description mentions emitting VERDICT: ERROR for malformed input, but the STRICT output contract only permits READY, BLOCKED, COMPLETED, creating a conflict. Placeholders like <etag> are not explained, and there is no explicit handling for unknown operation types."
+      "justification": "Agent can follow the decision tree, run pre\u2011checks, emit the required fenced output, and execute the CLI steps. However, there are gaps: pagination handling for large inventory listings is only mentioned briefly, cross\u2011region job nuances lack concrete steps, the output contract does not cover the VERDICT=ERROR case described elsewhere, and some examples deviate slightly from the strict block format (e.g., extra parentheses). These reduce practical reliability."
     }
   ],
-  "total_score": 107,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 51227,
-  "latency_ms": 23780,
+  "grade": "A",
+  "token_count": 50324,
+  "latency_ms": 19112,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

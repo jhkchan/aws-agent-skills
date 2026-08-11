@@ -1,0 +1,175 @@
+{
+  "skill": "firewall-manager-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Firewall Manager Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across FMS policy topologies (WAF policy with managed rule groups targeting an OU, security group content audit policy, Network Firewall policy with remediation, missing FMS admin delegation prerequisite failure, overlapping policy priority conflict prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "waf-policy-ou-targeting",
+      "name": "FMS WAF policy with managed rule groups targeting the Prod OU",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — WAF policy (WAFV2), OU-based targeting, AWSManagedRulesCommonRuleSet + KnownBadInputsRuleSet, auto-remediation with 7-day grace, include/exclude tags",
+      "prompt": "Create an FMS WAF policy named org-waf-common-rules targeting OU ou-prod-abcdef in us-east-1. FMS admin account is 111111111111. Use AWSManagedRulesCommonRuleSet and AWSManagedRulesKnownBadInputsRuleSet managed rule groups. Remediation should be auto-apply with a 7-day grace period. Include tags: Environment=production. Exclude tags: ComplianceExempt=true. Policy priority 1.",
+      "prompt_file": "prompts/waf-policy-ou-targeting.md",
+      "baseline_file": "baselines/waf-policy-ou-targeting.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FMS_POLICY: org-waf-common-rules (type: WAFV2)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] FMS admin account: 111111111111 (delegated)\n  [✓] AWS Organizations: enabled\n  [✓] Policy type: WAFV2\n  [✓] Target scope: ORG_UNIT (ou-prod-abcdef)\n  [✓] Remediation: auto-apply (grace: 7 days)\n  [✓] Managed rule groups: AWSManagedRulesCommonRuleSet, AWSManagedRulesKnownBadInputsRuleSet\n  [✓] Include tags: Environment=production\n  [✓] Exclude tags: ComplianceExempt=true\n  [✓] Policy priority: 1\nVERIFICATION_COMMANDS:\n  aws fms list-policies --region us-east-1\n  aws fms get-admin-account --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "WAFV2",
+            "ou-prod-abcdef",
+            "111111111111",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "AWSManagedRulesCommonRuleSet"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "security-group-content-audit",
+      "name": "FMS security group content audit policy with monitor-only remediation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SECURITY_GROUPS_CONTENT_AUDIT, account-level targeting, monitor-only (RemediationEnabled=false), safe rollout",
+      "prompt": "Create an FMS security group policy named org-sg-audit-no-ssh-open targeting accounts 111111111111 and 222222222222 in us-east-1. FMS admin account is 000000000000. Use content audit mode to check that no security group has port 22 open to 0.0.0.0/0. Start in monitor-only mode (RemediationEnabled=false) for safe rollout. Policy priority 2.",
+      "prompt_file": "prompts/security-group-content-audit.md",
+      "baseline_file": "baselines/security-group-content-audit.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FMS_POLICY: org-sg-audit-no-ssh-open (type: SECURITY_GROUPS_CONTENT_AUDIT)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] FMS admin account: 000000000000 (delegated)\n  [✓] Policy type: SECURITY_GROUPS_CONTENT_AUDIT\n  [✓] Target scope: ACCOUNT (111111111111, 222222222222)\n  [✓] Remediation: monitor-only\n  [✓] Policy priority: 2\nVERIFICATION_COMMANDS:\n  aws fms list-policies --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SECURITY_GROUPS_CONTENT_AUDIT",
+            "monitor-only",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network-firewall-policy-remediation",
+      "name": "FMS Network Firewall policy with auto-remediation and subnet mappings",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — NETWORK_FIREWALL, OU targeting, stateless+stateful rule groups, subnet mappings, auto-remediation with 14-day grace",
+      "prompt": "Create an FMS Network Firewall policy named org-nfw-inspection targeting OU ou-workloads-abcdef in us-east-1. FMS admin account is 111111111111. Use stateless rule group rs-stateless-aaa and stateful rule group rs-stateful-bbb. Firewall subnets are subnet-aaa and subnet-bbb in each target account. Remediation auto-apply with 14-day grace period. Policy priority 1.",
+      "prompt_file": "prompts/network-firewall-policy-remediation.md",
+      "baseline_file": "baselines/network-firewall-policy-remediation.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FMS_POLICY: org-nfw-inspection (type: NETWORK_FIREWALL)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] FMS admin account: 111111111111 (delegated)\n  [✓] Policy type: NETWORK_FIREWALL\n  [✓] Target scope: ORG_UNIT (ou-workloads-abcdef)\n  [✓] Network Firewall subnets: subnet-aaa, subnet-bbb\n  [✓] Remediation: auto-apply (grace: 14 days)\n  [✓] Policy priority: 1\nVERIFICATION_COMMANDS:\n  aws fms list-policies --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "NETWORK_FIREWALL",
+            "subnet-aaa",
+            "subnet-bbb",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-fms-admin-delegation",
+      "name": "FMS WAF policy without admin account delegation (prerequisite failure)",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — no FMS administrator account delegated; put-policy will fail with AccessDeniedException",
+      "prompt": "Create an FMS WAF policy named org-waf-policy targeting OU ou-prod-abcdef in us-east-1. No FMS admin account has been delegated yet. Use AWSManagedRulesCommonRuleSet. Remediation auto-apply with 7-day grace.",
+      "prompt_file": "prompts/missing-fms-admin-delegation.md",
+      "baseline_file": "baselines/missing-fms-admin-delegation.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "FMS_POLICY: org-waf-policy (type: WAFV2)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] FMS admin account: NOT delegated — associate-admin-account required before policy creation",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "admin",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "overlapping-priority-conflict",
+      "name": "FMS WAF policy with overlapping priority targeting same OU (prerequisite failure)",
+      "difficulty": "medium",
+      "branch": "PREREQUISITES_MISSING — existing WAF policy at priority 1 targeting same OU; first-match wins means the new policy would never apply",
+      "prompt": "Create an FMS WAF policy named org-waf-secondary targeting OU ou-prod-abcdef in us-east-1. FMS admin account is 111111111111. There is already a WAF policy org-waf-primary at priority 1 targeting the same OU. The new policy should be at priority 1. Use AWSManagedRulesSQLiRuleSet. Remediation monitor-only.",
+      "prompt_file": "prompts/overlapping-priority-conflict.md",
+      "baseline_file": "baselines/overlapping-priority-conflict.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "FMS_POLICY: org-waf-secondary (type: WAFV2)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Policy priority: conflict — org-waf-primary at priority 1 targets the same OU; first-match wins prevents this policy from applying",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "priority",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert thresholds (Graviton ~20% cheaper, Serverless break\u2011even ~50\u202fMB/s, partition\u2011per\u2011broker <400, cost formulas) that a generic model would not know, but many statements simply restate well\u2011known best practices, so the delta is not maximal."
+      "justification": "Provides concrete, expert\u2011level thresholds (e.g., BytesInPerSec <10\u202fMB/s, total ingress <50\u202fMB/s, retention >168\u202fh, partition >400 per broker) and a break\u2011even formula for Serverless vs provisioned (~50\u202fMB/s). These specifics are not generic model knowledge, but some statements merely restate known facts, so 3 points are deducted."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific CLI sequences, blue/green migration pattern, and ordering of data\u2011gate checks, yet some steps are generic (e.g., \"run CloudWatch metrics\") and the exact ordering across all seven dimensions is not fully codified, leaving ambiguity."
+      "justification": "Defines an AWS\u2011specific workflow: exact CLI commands, blue/green migration order, verification steps, and cost\u2011reconciliation via Cost Explorer. However, verification steps are described generically (\u201cwatch metrics\u201d) without a precise procedure, costing 2 points."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons, but omits several common pitfalls such as ignoring Reserved Instance/commit discounts, overlooking cross\u2011region replication cost, and failing to verify IAM least\u2011privilege for Cost Explorer access."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never reduce broker count below 3, never migrate to Graviton on Kafka\u202f2.x, never shrink EBS in\u2011place). One minor omission (no explicit warning about using default retention without audit) leads to a 1\u2011point deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use/when_not_to_use, activation_triggers, and invocation schema are all present and well\u2011formed, yet the trigger list is overly exhaustive (risking false activations) and the output schema version is not explicitly versioned."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, invocation_schema, and example are all present. Activation triggers are a long list that could be tighter, so 1 point is deducted."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "The document front\u2011loads a large amount of detail (full tables, step\u2011by\u2011step logic) before the concise top\u2011level contract, risking cognitive overload. Critical anti\u2011pattern rules are buried later rather than highlighted up front."
+      "justification": "The document is dense; many detailed tables and step\u2011by\u2011step instructions appear early, which can overload the agent. Core high\u2011level intent is clear, but critical rules (e.g., NEVER list) are buried deep rather than surfaced first."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Calibrates tightly for destructive actions (confirmation prompts, blue/green migration guidance) and relaxes for analysis, yet it still permits multiple dimension changes in a single migration window, which is risky for fragile operations."
+      "justification": "Destructive actions (broker count reduction, EBS shrink) are gated by blue/green migration and CONFIRM prompts, showing good calibration. However, the schema does not enforce these constraints programmatically, leaving some leeway for unsafe execution."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (What it does, Output contract, Mindset, Process steps, Anti\u2011patterns, Navigation), but the placement of anti\u2011patterns after the main process slightly breaks the expected logical flow."
+      "justification": "Follows a recognizable pattern (What it does, Output contract, Mindset, Steps, Anti\u2011patterns, Navigation). Minor ad\u2011hoc sections (e.g., quick reference table) prevent a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 7,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision matrices, and example output blocks, enabling an agent to act. However, edge cases such as missing CloudWatch data, regional pricing variations, or incomplete savings fields in the example outputs are not fully addressed, which could cause execution failures."
+      "justification": "The model output omits several required fields (e.g., missing most Monthly savings lines, missing some dimension cost rows, inconsistent ESTIMATED_SAVINGS layout). Recommendations sometimes lack full verification steps, and the output does not always conform to the strict contract, reducing real\u2011world usability."
     }
   ],
-  "total_score": 104,
+  "total_score": 99,
   "max_score": 120,
   "grade": "B",
-  "token_count": 48992,
-  "latency_ms": 12894,
+  "token_count": 48913,
+  "latency_ms": 14774,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5
