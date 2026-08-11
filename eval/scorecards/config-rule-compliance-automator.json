@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 14,
       "max": 20,
-      "justification": "The skill supplies many concrete, senior\u2011engineer details (coverage maps, exact CLI flags, idempotency nuances, memory limits, StackSet auto\u2011deployment requirements). However, most of these facts are already documented in AWS docs and known to experienced CloudOps engineers, so the incremental delta is limited. It also omits a few newer 2025\u20112026 nuances (e.g., exact pricing impact of Config Aggregator selective aggregation), preventing a perfect score."
+      "justification": "The skill compiles many known AWS Config facts (e.g., idempotency, remediation only on new evaluations, CAPABILITY_IAM requirement) but offers little truly novel expert insight beyond what a senior CloudOps engineer could already find in official docs. The coverage tables and decision tree are useful but largely restate public information rather than providing new heuristics or thresholds."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific 5\u2011stage pipeline (select \u2192 deploy \u2192 remediate \u2192 aggregate \u2192 monitor) and a precise decision tree for managed vs custom rule selection, plus pre\u2011flight checks (recorder status, backup, dry\u2011run). The only shortfall is a few generic \u201cverify security\u201d style steps that could be more AWS\u2011tailored."
+      "justification": "Encodes the five\u2011stage pipeline (select, deploy, remediate, aggregate, monitor) and provides step\u2011by\u2011step AWS\u2011specific CLI commands, a decision tree, and pre\u2011flight checks. Some procedures are generic (backup, confirm) and lack AWS\u2011specific rollback or failure\u2011recovery steps, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains an extensive NEVER list with concrete reasons (region\u2011scoped rules, idempotency, remediation only on new evaluations, missing CAPABILITY_IAM, etc.). One minor omission: it does not warn about the risk of exceeding Config rule limits (max 300 per region), which is a common pitfall."
+      "justification": "Provides a thorough NEVER list with concrete reasons (region\u2011scoped rules, automatic remediation risks, missing CAPABILITY_IAM, backlog remediation, etc.). Missing a few anti\u2011patterns such as cost implications of Lambda rules and over\u2011privileged IAM roles, so a small deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present, enabling reliable activation. The description could be tighter, but overall the spec is sufficient for an agent to know when to invoke."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. The output contract is defined, but the skill lacks an explicit output schema definition and versioning details, making activation slightly less reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The skill layers information well: high\u2011level mindset, quick navigation table, step\u2011by\u2011step process, and deep appendices. However, critical anti\u2011pattern warnings are duplicated in both the main body and the appendix, causing some redundancy, and a few essential safety checks (confirmation gate) are buried in the pre\u2011flight section rather than highlighted up front."
+      "justification": "The document layers information (Mindset \u2192 Quick navigation \u2192 Steps \u2192 Appendices). However, the initial sections are dense and contain many details that could overwhelm an agent before it knows which part to use, leading to some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (custom Lambda remediation) are gated with a manual flag and a confirmation prompt, while safe actions are automated. The only shortfall is the lack of an explicit \u201cdry\u2011run\u201d mode for StackSet deployments, which would further tighten constraints for high\u2011impact operations."
+      "justification": "Destructive actions are gated by a mandatory CONFIRM prompt and the skill distinguishes between automatic and manual remediation based on blast radius. Yet the calibration for creative tasks (e.g., custom Lambda design) is less constrained, leaving room for overly permissive generation."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick navigation \u2192 Detailed Process \u2192 Anti\u2011patterns \u2192 Appendices), aiding comprehension. Slightly ad\u2011hoc in ordering of appendices but overall pattern is clear."
+      "justification": "Follows a recognizable structure (Mindset \u2192 Navigation \u2192 Process \u2192 Anti\u2011Patterns \u2192 Appendices) that aids comprehension. The 'Recent features' ad\u2011hoc section slightly breaks the strict pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Supplies working CLI snippets, Lambda code, CloudFormation templates, output contract, and examples that an agent could execute. Lacks explicit guidance for handling partial failures, rollback, or retry logic beyond the basic \u2018MaximumAutomaticAttempts\u2019, and some examples omit backlog remediation steps, preventing flawless end\u2011to\u2011end execution."
+      "justification": "Provides runnable CLI snippets, Lambda code, and output templates, but lacks integrated error\u2011handling flow (e.g., backup/restore of existing rules, handling name collisions) and the model\u2019s sample outputs show inconsistencies (e.g., marking manual remediation as AUTOMATION_DEPLOYED)."
     }
   ],
-  "total_score": 107,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 37755,
-  "latency_ms": 4969,
+  "token_count": 37493,
+  "latency_ms": 7732,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

@@ -1,0 +1,172 @@
+{
+  "skill": "rekognition-collection-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Rekognition Collection Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Rekognition topologies (KMS-encrypted collection with face indexing, stream processor with Kinesis shard-level parallelism, content moderation and label detection pipeline, custom labels model lifecycle, missing KMS key prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "kms-collection-face-index",
+      "name": "KMS-encrypted Rekognition collection with face indexing and 85% threshold",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — KMS collection, ExternalImageId indexing, 85% face match threshold, IAM role with S3 access",
+      "prompt": "Create a Rekognition collection \"employee-faces\" in us-east-1 with KMS encryption using key arn:aws:kms:us-east-1:123456789012:key/abcd-1234. Index faces from S3 bucket my-face-bucket using ExternalImageId employee-001. Set face search threshold to 85%. IAM role arn:aws:iam::123456789012:role/RekognitionRole. Tags: Environment=production, UseCase=employee-access.",
+      "prompt_file": "prompts/kms-collection-face-index.md",
+      "baseline_file": "baselines/kms-collection-face-index.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "REKOGNITION: employee-faces (arn:aws:rekognition:us-east-1:123456789012:collection/employee-faces)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Collection: employee-faces — created\n  [✓] KMS encryption: enabled (arn:aws:kms:us-east-1:123456789012:key/abcd-1234)\n  [✓] Face indexing: ExternalImageId=employee-001\n  [✓] Face search threshold: 85%\n  [✓] IAM role: arn:aws:iam::123456789012:role/RekognitionRole\nVERIFICATION_COMMANDS:\n  aws rekognition describe-collection --collection-id employee-faces --region us-east-1\n  aws rekognition list-faces --collection-id employee-faces --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "employee-faces",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "kms"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stream-processor-kinesis",
+      "name": "Stream processor with Kinesis input/output streams and shard-level parallelism",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — stream processor reading from 4-shard Kinesis input, writing to 2-shard output, face match threshold 85%, IAM role with triple permission",
+      "prompt": "Create a Rekognition stream processor \"camera-feed-processor\" in us-east-1. Input stream: rekognition-input (4 shards). Output stream: rekognition-output (2 shards). Collection: employee-faces. Face match threshold: 85%. IAM role: arn:aws:iam::123456789012:role/RekognitionStreamProcessorRole. Tags: Environment=production, Pipeline=video-access.",
+      "prompt_file": "prompts/stream-processor-kinesis.md",
+      "baseline_file": "baselines/stream-processor-kinesis.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "REKOGNITION: employee-faces (stream processor: camera-feed-processor)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Stream processor: camera-feed-processor — created\n  [✓] Input Kinesis stream: rekognition-input (4 shards)\n  [✓] Output Kinesis stream: rekognition-output (2 shards)\n  [✓] Face match threshold: 85%\n  [✓] Stream processor IAM role: arn:aws:iam::123456789012:role/RekognitionStreamProcessorRole\nVERIFICATION_COMMANDS:\n  aws rekognition describe-stream-processor --name camera-feed-processor --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "camera-feed-processor",
+            "rekognition-input",
+            "rekognition-output",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "moderation-and-labels-pipeline",
+      "name": "Content moderation and label detection pipeline with SNS async notification",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — content moderation min confidence 60%, label detection max 50, SNS topic for async jobs",
+      "prompt": "Create a Rekognition content moderation and label detection pipeline in us-east-1. Min moderation confidence: 60%. Max labels: 50, min label confidence: 75%. Async video jobs from S3 bucket my-video-bucket. SNS notification topic: arn:aws:sns:us-east-1:123456789012:rekognition-complete. IAM role for SNS: arn:aws:iam::123456789012:role/RekognitionSNSRole. Tags: Environment=production, Pipeline=moderation.",
+      "prompt_file": "prompts/moderation-and-labels-pipeline.md",
+      "baseline_file": "baselines/moderation-and-labels-pipeline.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "REKOGNITION: moderation-labels pipeline\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Content moderation: enabled (min confidence: 60%)\n  [✓] Label detection: enabled (max labels: 50, min confidence: 75%)\n  [✓] SNS topic (async): arn:aws:sns:us-east-1:123456789012:rekognition-complete\n  [✓] IAM role (SNS): arn:aws:iam::123456789012:role/RekognitionSNSRole\nVERIFICATION_COMMANDS:\n  aws sns get-topic-attributes --topic-arn arn:aws:sns:us-east-1:123456789012:rekognition-complete --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "moderation",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-labels-lifecycle",
+      "name": "Custom labels project with training dataset and model deployment",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — custom labels project created, training data in S3, model started with 1 inference unit",
+      "prompt": "Create a Rekognition custom labels project \"industrial-defects\" in us-east-1. Training data manifest at s3://my-bucket/training/manifest.json. Model output bucket: my-bucket/model-output/. Start model with 1 inference unit. IAM role: arn:aws:iam::123456789012:role/RekognitionCustomLabelsRole. Tags: Environment=production, UseCase=defect-detection.",
+      "prompt_file": "prompts/custom-labels-lifecycle.md",
+      "baseline_file": "baselines/custom-labels-lifecycle.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "REKOGNITION: industrial-defects (custom labels)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Custom labels project: industrial-defects — created\n  [✓] Training data: s3://my-bucket/training/manifest.json\n  [✓] Model version: v1 — RUNNING (1 inference unit)\n  [✓] IAM role: arn:aws:iam::123456789012:role/RekognitionCustomLabelsRole\nVERIFICATION_COMMANDS:\n  aws rekognition describe-project-versions --project-arn <project-arn> --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "industrial-defects",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-kms-key",
+      "name": "Encrypted collection requested without KMS key ARN (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — operator wants KMS encryption but has no key ARN; KMS cannot be added after creation",
+      "prompt": "Create a Rekognition collection \"secure-faces\" in us-east-1 with KMS encryption. I need compliance-grade encryption but I don't have a KMS key ARN yet. Index 10000 faces. Tags: Environment=production, Compliance=GDPR.",
+      "prompt_file": "prompts/missing-kms-key.md",
+      "baseline_file": "baselines/missing-kms-key.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "REKOGNITION: secure-faces\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] KMS key: missing — KMS encryption requested but no key ARN provided; KMS must be set at collection creation and cannot be added later",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "KMS",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

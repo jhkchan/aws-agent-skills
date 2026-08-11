@@ -1,0 +1,49 @@
+# Eval configuration for rekognition-collection-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: rekognition-collection-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: kms-collection-face-index
+    difficulty: hard
+    prompt_file: prompts/kms-collection-face-index.md
+    baseline_file: baselines/kms-collection-face-index.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: stream-processor-kinesis
+    difficulty: hard
+    prompt_file: prompts/stream-processor-kinesis.md
+    baseline_file: baselines/stream-processor-kinesis.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: moderation-and-labels-pipeline
+    difficulty: medium
+    prompt_file: prompts/moderation-and-labels-pipeline.md
+    baseline_file: baselines/moderation-and-labels-pipeline.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: custom-labels-lifecycle
+    difficulty: medium
+    prompt_file: prompts/custom-labels-lifecycle.md
+    baseline_file: baselines/custom-labels-lifecycle.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-kms-key
+    difficulty: easy
+    prompt_file: prompts/missing-kms-key.md
+    baseline_file: baselines/missing-kms-key.md
+    expected_verdict: PREREQUISITES_MISSING

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Provides concrete, up\u2011to\u2011date pricing (e.g., REST $3.50/M, HTTP $1.00/M, WAF $5/rule\u202f+\u202f$1/M, cache $0.02/hr\u202fGB) and a detailed decision matrix with numeric thresholds (>50% idempotent GETs, 4xx throttle >1%). Includes non\u2011obvious AWS\u2011specific behaviours (REST vs HTTP feature gaps, cache being REST\u2011only, VPC endpoint hourly cost). This information is beyond what a generic model would know, but some numbers (e.g., Lambda per\u2011request cost) are not fully sourced, so not a perfect 20."
+      "justification": "The skill supplies concrete, expert\u2011level data not usually memorised by a generic model: exact per\u2011million request rates for REST vs HTTP APIs, cache\u2011cost formula, WAF rule cost, VPC endpoint hourly cost, a seven\u2011dimension decision matrix, and a migration checklist that lists every REST\u2011only feature. This information would teach a senior CloudOps engineer a specific decision tree. However, much of the content (e.g., basic throttling concepts, generic cost\u2011per\u2011GB numbers) is already widely known, so the delta is strong but not perfect."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific workflow: pre\u2011flight data gate \u2192 Step\u202f0 non\u2011obvious behaviours \u2192 ordered steps (API type, throttle, usage plans, caching, payload, WAF/VPC). Each step includes exact CLI commands and calculations. The only shortfall is occasional generic advice (\"check security\") that could be tighter."
+      "justification": "The step\u2011by\u2011step process (API\u2011type selection, throttle tuning, usage\u2011plan creation, caching, payload, WAF/VPC) is AWS\u2011specific and ordered logically. However several procedures are generic (e.g., \"check metrics\", \"verify data quality\") and lack deeper AWS\u2011only reasoning such as regional quota limits or IAM permission checks."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete \"NEVER\" list with specific reasons (e.g., never migrate without checking mapping templates, never enable caching on HTTP API). However, the list is limited to five items and omits other common pitfalls (e.g., forgetting to update stage variables after migration), and some anti\u2011patterns are only mentioned later in prose rather than a dedicated list."
+      "justification": "A detailed NEVER list is present, with five concrete anti\u2011patterns and clear rationales (e.g., never recommend caching on HTTP API, never enable caching without fitting the working set). The list could be expanded to cover additional pitfalls (e.g., forgetting to update stage variables after migration), so it falls just short of maximal coverage."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Full frontmatter with name, description, version, author, license, compatibility, keywords, tags, metadata, when_to_use, when_not_to_use, activation_triggers, invocation_schema, and a valid example. The description clearly states WHAT the skill does, WHEN to invoke, and provides KEYWORDS for activation."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are all present and detailed. The only minor gap is the lack of an explicit versioned pricing matrix per region, which would improve deterministic activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick start, mindset, decision matrix, pre\u2011flight gate, detailed step\u2011by\u2011step sections, and deep references. Some sections are dense, but critical rules are not buried."
+      "justification": "The document layers information well: a quick\u2011start summary, then mindset, then a step\u2011by\u2011step process, followed by deep references and anti\u2011patterns. Some deep technical tables (full cost formulas) appear early, which could overload a first\u2011pass reader, preventing a perfect score."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions are gated by an explicit CONFIRM prompt and safety checks. Recommendations are tightly constrained (e.g., no caching on HTTP API, migration only after feature check). Creative tasks (e.g., cost estimation) have generous freedom."
+      "justification": "Destructive actions are gated with a CONFIRM prompt and the skill warns against unsafe recommendations (e.g., caching on HTTP API). However some recommendations (e.g., enabling cache) lack calibrated constraints on cache size vs working set, leaving room for over\u2011permissive actions."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Process steps \u2192 Anti\u2011Patterns \u2192 Output contract). Minor ad\u2011hoc headings (e.g., \"Step 0 non\u2011obvious behaviours\") prevent a perfect score."
+      "justification": "The document follows a recognizable pattern (overview, quick navigation, mindset, stepwise process, anti\u2011patterns, safety checks). The structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 10,
       "max": 15,
-      "justification": "Provides decision trees, CLI snippets, and a strict output contract that an agent can follow. However, the supplied example outputs contain a critical violation: a usage\u2011plan recommendation emits VERDICT FURTHER_OPTIMIZATION_AVAILABLE with $0.00 monthly saving, breaking the zero\u2011savings rule. Some examples also show inconsistent cost breakdowns (e.g., backend Lambda cost introduced without prior definition). These gaps reduce practical reliability."
+      "justification": "Provides output format, CLI commands, and examples, but the model outputs reveal gaps: a recommendation with zero dollar savings still emits FURTHER_OPTIMIZATION_AVAILABLE (violating the zero\u2011savings rule), and some savings calculations lack full breakdowns. Edge\u2011case handling (e.g., missing metrics) is present but not enforced in the examples."
     }
   ],
-  "total_score": 106,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46189,
-  "latency_ms": 12753,
+  "token_count": 45943,
+  "latency_ms": 11483,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill aggregates many AWS\u2011documented facts (e.g., 50 docs per class, cost per inference\u2011unit\u2011hour) but does not introduce truly novel expert insight such as a proprietary decision matrix or undocumented thresholds. It restates known guidance rather than providing new, senior\u2011engineer\u2011level heuristics."
+      "justification": "The skill provides many expert heuristics (50\u2011doc minimum, cost trade\u2011offs, native PDF requirements, auto\u2011scaling metric) that a generic model would not enumerate, but a large portion restates AWS documentation verbatim and omits deeper tuning guidance (e.g., hyper\u2011parameter limits, language\u2011code nuances, advanced threshold tuning for multi\u2011label)."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and well ordered (data\u2011format \u2192 IAM role \u2192 KMS \u2192 VPC \u2192 create\u2011document\u2011classifier \u2192 endpoint \u2192 auto\u2011scaling). The only shortfall is the lack of a concrete least\u2011privilege IAM policy example, which would complete the mindset for secure provisioning."
+      "justification": "Provides a clear AWS\u2011specific workflow (training \u2192 endpoint \u2192 auto\u2011scaling) and concrete CLI steps, but includes generic actions like \u201ccheck status\u201d without detailing the exact AWS\u2011specific order (e.g., verify IAM trust policy before training, confirm VPC endpoint DNS resolution)."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list (10 items) with concrete reasons (e.g., multi\u2011class on overlapping categories, <50 docs per class, endpoint for batch workloads). Lacks a few niche pitfalls such as forgetting to update CloudWatch alarms after scaling policy changes."
+      "justification": "The NEVER list is detailed and reasoned (e.g., never use multi\u2011class for overlapping categories, never deploy endpoint for batch workloads). It lacks a few common pitfalls such as forgetting to set the correct AWS region, exceeding service limits, and deleting model versions that are still referenced by endpoints."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, description, keywords, and trigger list are present, but the \"when to invoke\" guidance is embedded in a long paragraph rather than a concise, bullet\u2011point rule, making automated activation slightly ambiguous."
+      "justification": "Frontmatter, description, when\u2011to\u2011use, triggers, and output contract are all present and well\u2011formed. Minor issue: activation triggers are listed but not formalized as a distinct field, making automated matching slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The skill layers information well (quick navigation \u2192 detailed steps), yet the initial sections (mindset, heuristics, dependency graph) are dense and could overload an agent before it knows whether it needs that depth."
+      "justification": "The document is dense; critical rules (e.g., 50\u2011doc minimum) are buried inside heuristics rather than highlighted up front, leading to cognitive overload for an agent that must parse the whole text before acting."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (create\u2011classifier, create\u2011endpoint) are guarded by a thorough checklist, but the skill does not explicitly constrain region selection or enforce that the same region is used for all resources, a subtle fragility for cross\u2011region mistakes."
+      "justification": "Good safety checks (prerequisite verification, doc\u2011count gating) for destructive actions, but still permits endpoint creation without an explicit cost\u2011budget guard or a \u201cnever create endpoint for low\u2011volume workloads unless approved\u201d rule."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The overall structure follows a recognizable pattern (mindset \u2192 steps \u2192 NEVER \u2192 output format), yet the inclusion of a large markdown table and mixed\u2011style headings makes the pattern slightly ad\u2011hoc rather than a clean, reusable template."
+      "justification": "Follows a recognizable structure (mindset, quick navigation, step\u2011by\u2011step, output format) but the overall layout feels ad\u2011hoc rather than adhering to a strict, reusable pattern like Mindset \u2192 Procedure \u2192 Output."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill provides working CLI snippets, decision trees, and error\u2011handling guidance, but it lacks explicit remediation steps for a FAILED training job, version\u2011rollback procedures, and pagination handling for list\u2011operations, leaving edge cases unaddressed."
+      "justification": "Provides working CLI snippets, a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling guidance. Missing explicit branch for handling a FAILED training job in the checklist (status check only in prose), which could leave an agent without a clear remediation path."
     }
   ],
-  "total_score": 105,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46688,
-  "latency_ms": 12776,
+  "token_count": 48195,
+  "latency_ms": 13541,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0
