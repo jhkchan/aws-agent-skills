@@ -63,7 +63,7 @@ metadata:
   phase: 1
   supports_pipeline: true
   entry_point: false
-  family: App Integration
+  family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active

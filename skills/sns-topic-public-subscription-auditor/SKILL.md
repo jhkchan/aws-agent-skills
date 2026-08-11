@@ -45,7 +45,7 @@ metadata:
   phase: 2
   supports_pipeline: true
   entry_point: false
-  family: App Integration
+  family: AppIntegration
   verdict_shape: "PUBLIC_SUBSCRIPTION | NO_ENCRYPTION | CONFIG_GAP | OK"
   when_to_use: >-
     Reviewing an SNS topic policy before production deployment, checking for

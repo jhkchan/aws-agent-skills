@@ -25,7 +25,7 @@ metadata:
   phase: 0
   supports_pipeline: true
   entry_point: true
-  family: Orchestration
+  family: Management
 ---
 
 ## Natural Language Triggers

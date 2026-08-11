@@ -46,7 +46,7 @@ metadata:
   phase: 2
   supports_pipeline: true
   entry_point: false
-  family: App Integration
+  family: AppIntegration
   verdict_shape: "PUBLIC_NO_AUTH | NO_RATE_LIMIT | CONFIG_GAP | OK"
   when_to_use: >-
     Reviewing an API Gateway REST/HTTP API before production deployment,

@@ -52,7 +52,7 @@ metadata:
   phase: 2
   supports_pipeline: true
   entry_point: false
-  family: Developer Tools
+  family: DevTools
   verdict_shape: "PRIVILEGED | SECRET_LEAK | NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK"
   when_to_use: >-
     Reviewing a CodeBuild project before production deployment, checking for

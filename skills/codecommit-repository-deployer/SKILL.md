@@ -65,7 +65,7 @@ metadata:
   phase: 1
   supports_pipeline: true
   entry_point: false
-  family: Dev Tools
+  family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active

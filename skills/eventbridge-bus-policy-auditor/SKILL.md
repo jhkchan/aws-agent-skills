@@ -48,7 +48,7 @@ metadata:
   phase: 2
   supports_pipeline: true
   entry_point: false
-  family: Developer Tools
+  family: DevTools
   verdict_shape: "PUBLIC_BUS | NO_DLQ | NO_ENCRYPTION | CONFIG_GAP | OK"
   when_to_use: >-
     Reviewing an EventBridge event bus policy before production deployment,

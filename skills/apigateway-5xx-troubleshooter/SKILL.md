@@ -55,7 +55,7 @@ metadata:
   phase: 2
   supports_pipeline: true
   entry_point: false
-  family: App Integration
+  family: AppIntegration
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
