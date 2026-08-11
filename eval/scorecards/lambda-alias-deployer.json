@@ -1,0 +1,70 @@
+{
+  "skill": "lambda-alias-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Introduces several expert heuristics not found in baseline docs\u2014immutable version numbers, alias name immutability, full weighted\u2011traffic\u2011shifting lifecycle, provisioned\u2011concurrency\u2011on\u2011alias vs version, SnapStart snapshot timing, and a recent\u2011features table. These provide genuine delta, but the skill omits deeper cost analysis, service limits, and some edge\u2011case nuances, preventing a perfect score."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedural flow: publish version \u2192 create alias \u2192 configure traffic\u2011shifting \u2192 add permission \u2192 set provisioned concurrency \u2192 enable SnapStart. The steps are concrete, but some parts (e.g., generic \"verify prerequisites\") are vague and not ordered, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a concrete NEVER list with clear rationales and an error\u2011handling section covering common Lambda errors (invalid version, alias conflict, concurrency stuck, etc.). Missing some additional pitfalls such as alias count limits, account\u2011level concurrency quotas, and cost\u2011impact warnings."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation keywords, and strict output contract are all present. Minor issue: the skill does not explicitly version its schema or provide a machine\u2011readable trigger pattern, which could affect reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a quick\u2011navigation table and layers information (summary \u2192 detailed steps \u2192 deep references). However, many critical rules (e.g., NEVER list) are embedded deep in large tables, causing some cognitive overload for a first\u2011time reader."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Enforces prerequisite checks before any destructive operation and calibrates freedom for optional features (traffic shifting, concurrency, SnapStart). Slight looseness in optional verification commands (e.g., commands appear even when a feature is disabled) keeps it from full marks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure: Mindset \u2192 Expert heuristics \u2192 Stepwise process \u2192 NEVER list \u2192 Output format. Consistent pattern aids comprehension; a tiny inconsistency in section ordering prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 9,
+      "max": 15,
+      "justification": "Model output examples reveal inconsistencies: some checklists omit required verification commands (e.g., missing provisioned\u2011concurrency verification), others provide contradictory N/A fields, and multiple divergent formats appear. These gaps would hinder an agent from reliably executing the skill without additional error\u2011handling logic."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 37587,
+  "latency_ms": 9122,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

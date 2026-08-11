@@ -199,6 +199,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | clb-to-alb-migration-operator | amazon.nova-pro-v1:0 | 106/120 | B | 4/5 | 13.6s | 46106 |
 | cleanrooms-collaboration-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 20.3s | 47219 |
 | cloudformation-stack-troubleshooter | amazon.nova-pro-v1:0 | 109/120 | A | 3/5 | 13.7s | 48363 |
+| cloudformation-stackset-deployer | amazon.nova-pro-v1:0 | 109/120 | A | 5/5 | 8.9s | 41767 |
 | cloudfront-cache-troubleshooter | amazon.nova-pro-v1:0 | 100/120 | B | 5/5 | 11.8s | 39738 |
 | cloudfront-cost-optimizer | amazon.nova-pro-v1:0 | 112/120 | A | 5/5 | 9.8s | 72815 |
 | cloudfront-distribution-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 13.3s | 39728 |
@@ -210,6 +211,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | cloudtrail-lake-operator | amazon.nova-pro-v1:0 | 106/120 | B | 4/5 | 13.3s | 54052 |
 | cloudtrail-org-trail-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.7s | 38562 |
 | cloudwatch-alarm-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 39.2s | 36433 |
+| cloudwatch-alarm-notification-automator | amazon.nova-pro-v1:0 | 104/120 | B | 4/5 | 9.5s | 40641 |
 | cloudwatch-alarm-operator | amazon.nova-pro-v1:0 | 111/120 | A | 3/5 | 13.2s | 40696 |
 | cloudwatch-application-signals-deployer | amazon.nova-pro-v1:0 | 99/120 | B | 5/5 | 11.4s | 40203 |
 | cloudwatch-dashboard-deployer | amazon.nova-pro-v1:0 | 109/120 | A | 4/5 | 15.1s | 45281 |
@@ -240,6 +242,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | dlm-lifecycle-policy-auditor | amazon.nova-pro-v1:0 | 112/120 | A | 6/6 | 6.2s | 41975 |
 | dms-replication-task-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 18.3s | 39911 |
 | dr-failover-automator | amazon.nova-pro-v1:0 | 106/120 | B | 0/5 | 13.2s | 45693 |
+| dynamodb-autoscaling-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 4/5 | 8.1s | 50983 |
 | dynamodb-backup-operator | amazon.nova-pro-v1:0 | 109/120 | A | 4/5 | 9.9s | 47165 |
 | dynamodb-global-tables-operator | amazon.nova-pro-v1:0 | 110/120 | A | 4/5 | 6.8s | 43494 |
 | dynamodb-table-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.8s | 38416 |
@@ -251,6 +254,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | ec2-instance-recovery-operator | amazon.nova-pro-v1:0 | 105/120 | B | 4/5 | 14.7s | 42825 |
 | ec2-rightsizing-optimizer | amazon.nova-pro-v1:0 | 108/120 | A | 3/5 | 14.9s | 65548 |
 | ec2-security-group-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 5/5 | 11.5s | 38372 |
+| ec2-spot-fleet-deployer | amazon.nova-pro-v1:0 | 105/120 | B | 2/5 | 8.5s | 40419 |
 | ecr-repository-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 12.4s | 46409 |
 | ecs-fargate-deployer | amazon.nova-pro-v1:0 | 104/120 | B | 1/5 | 12.8s | 39121 |
 | ecs-task-definition-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 13.9s | 45015 |
@@ -286,6 +290,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | iam-role-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 20.9s | 54672 |
 | incident-response-automator | amazon.nova-pro-v1:0 | 109/120 | A | 0/5 | 4.9s | 55975 |
 | inspector2-coverage-finding-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.3s | 52550 |
+| inspector2-coverage-operator | amazon.nova-pro-v1:0 | 102/120 | B | 5/5 | 6.5s | 42054 |
 | kafka-connect-troubleshooter | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 12.5s | 39928 |
 | kafka-msk-troubleshooter | amazon.nova-pro-v1:0 | 106/120 | B | 5/5 | 15.0s | 40993 |
 | kinesis-firehose-troubleshooter | amazon.nova-pro-v1:0 | 102/120 | B | 5/5 | 12.1s | 55992 |
@@ -294,6 +299,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | kms-key-policy-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 17.2s | 49516 |
 | kms-key-rotation-operator | amazon.nova-pro-v1:0 | 109/120 | A | 4/5 | 4.6s | 45796 |
 | lakeformation-data-lake-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 13.1s | 43103 |
+| lambda-alias-deployer | amazon.nova-pro-v1:0 | 101/120 | B | 4/5 | 9.1s | 37587 |
 | lambda-cost-optimizer | amazon.nova-pro-v1:0 | 103/120 | B | 5/5 | 11.0s | 44329 |
 | lambda-function-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 3/5 | 9.6s | 49830 |
 | lambda-invocation-troubleshooter | amazon.nova-pro-v1:0 | 108/120 | A | 4/5 | 10.9s | 67093 |
@@ -335,6 +341,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | s3-access-troubleshooter | amazon.nova-pro-v1:0 | 108/120 | A | 4/5 | 12.0s | 54581 |
 | s3-batch-operations-operator | amazon.nova-pro-v1:0 | 107/120 | B | 4/5 | 17.5s | 49385 |
 | s3-glacier-restore-operator | amazon.nova-pro-v1:0 | 109/120 | A | 4/5 | 15.2s | 39528 |
+| s3-intelligent-tiering-optimizer | amazon.nova-pro-v1:0 | 104/120 | B | 5/5 | 15.2s | 48604 |
 | s3-lifecycle-optimizer | amazon.nova-pro-v1:0 | 108/120 | A | 4/5 | 18.2s | 74901 |
 | s3-object-lambda-deployer | amazon.nova-pro-v1:0 | 103/120 | B | 0/5 | 16.4s | 44477 |
 | s3-public-access-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 5/5 | 14.7s | 40044 |
@@ -353,8 +360,10 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | service-catalog-portfolio-deployer | amazon.nova-pro-v1:0 | 105/120 | B | 4/5 | 19.4s | 44942 |
 | service-quotas-usage-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 5.6s | 36547 |
 | shield-advanced-coverage-auditor | amazon.nova-pro-v1:0 | 116/120 | A | 6/6 | 4.5s | 46206 |
+| sns-subscription-operator | amazon.nova-pro-v1:0 | 110/120 | A | 4/5 | 8.8s | 45981 |
 | sns-topic-deployer | amazon.nova-pro-v1:0 | 100/120 | B | 2/5 | 11.9s | 40062 |
 | sns-topic-public-subscription-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 17.2s | 39910 |
+| sqs-dlq-operator | amazon.nova-pro-v1:0 | 105/120 | B | 3/5 | 6.3s | 44357 |
 | sqs-dlq-policy-auditor | amazon.nova-pro-v1:0 | 112/120 | A | 6/6 | 13.2s | 39513 |
 | sqs-queue-deployer | amazon.nova-pro-v1:0 | 110/120 | A | 4/5 | 18.4s | 41800 |
 | ssm-association-troubleshooter | amazon.nova-pro-v1:0 | 101/120 | B | 4/5 | 10.9s | 39584 |

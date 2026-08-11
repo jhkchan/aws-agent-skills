@@ -1,0 +1,70 @@
+{
+  "skill": "sns-subscription-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides many concrete, up\u2011to\u2011date details (e.g., 30\u202fKB filter\u2011policy limit, 3\u2011day token validity, FIFO topic restrictions, recent 2024\u20112026 features). However, a large portion restates information that is already available in AWS documentation, so the net expert delta is strong but not absolute."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers a clear AWS\u2011specific procedure order (pre\u2011checks, confirm gate, capture pre\u2011state, post\u2011verification). One minor deduction because the pre\u2011check description includes a generic \"run all checks\" phrasing rather than a fully explicit decision tree for every protocol."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Includes a concrete top\u20115 NEVER list with reasons and additional anti\u2011pattern notes. Missing several common pitfalls (e.g., forgetting RawMessageDelivery for Lambda triggers, IAM role permissions for cross\u2011account subscriptions) and lacks exhaustive coverage, so the anti\u2011pattern section is solid but not comprehensive."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Front\u2011matter, description, when\u2011to\u2011use, activation triggers, and keywords are all present. The invocation_schema is vague (no strict JSON schema or field definitions) and no concrete input example is given, which weakens reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Content is layered well (quick reference \u2192 heuristics \u2192 pre\u2011flight \u2192 process \u2192 contract \u2192 examples \u2192 anti\u2011patterns). Slight deduction because edge\u2011case handling is embedded rather than a separate deeper layer, causing a minor overload for readers seeking only high\u2011level guidance."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive operations are tightly constrained with a mandatory CONFIRM gate, pre\u2011check blocking, and state capture. Non\u2011destructive diagnostics are left flexible, matching task fragility appropriately."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (What it does, navigation table, quick reference, expert heuristic, pre\u2011flight, process, output contract, examples, anti\u2011patterns, edge cases) that aligns with established skill templates."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides actionable CLI commands, decision trees, verification steps, and realistic examples, enabling an agent to execute the plan. Lacks explicit error\u2011handling branches for CLI failures and does not detail pagination handling for list\u2011operations, which could cause execution gaps."
+    }
+  ],
+  "total_score": 110,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 45981,
+  "latency_ms": 8798,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

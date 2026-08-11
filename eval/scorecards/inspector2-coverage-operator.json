@@ -1,0 +1,70 @@
+{
+  "skill": "inspector2-coverage-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds several expert\u2011level specifics (autoEnable applies only to new members, deep\u2011inspection requires the AmazonInspector-ManageAWSAgent association, SBOM export needs explicit S3 bucket policy and KMS key grants, runtime support matrix for Lambda, cost\u2011per\u2011scan notes). These details are not obvious to a generic model, but most are documented elsewhere, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedural flow: ordered pre\u2011flight checks, mandatory CONFIRM gate, snapshot before state\u2011changing CLI, and post\u2011verification steps. Missing a documented rollback/recovery procedure for failed enable/disable actions, which prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 12,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never enable deep inspection without the SSM association, never call enable\u2011delegated\u2011admin from a member). Lacks some common pitfalls such as cost\u2011explosion warnings for large\u2011scale enablement and missing guidance on handling API throttling."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, activation triggers, and invocation schema are present. The invocation_schema is a free\u2011form text block rather than a strict JSON schema, making automated activation slightly ambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Content is layered: quick reference, mindset, pre\u2011flight, process, patterns, output format, anti\u2011patterns. Some sections (quick reference) are dense, but critical rules are still surfaced early, so overall progressive disclosure is effective."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive operations are tightly constrained with pre\u2011checks, CONFIRM gate, and state snapshots. Creative/reporting tasks are given flexibility. No over\u2011constraining observed; only minor room for tighter limits on concurrent SBOM exports."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Common patterns \u2192 Output \u2192 Anti\u2011patterns). Section naming is slightly ad\u2011hoc (e.g., \"\u00a7 Quick reference\"), but overall structure aligns with established skill templates."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, decision trees, and worked examples that an agent could execute. Missing handling for pagination, API rate\u2011limit errors, and detailed cost\u2011estimation steps. Edge cases like partial failures or concurrent SBOM exports are only briefly mentioned."
+    }
+  ],
+  "total_score": 102,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 42054,
+  "latency_ms": 6534,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
