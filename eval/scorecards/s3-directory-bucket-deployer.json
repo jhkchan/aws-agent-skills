@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert details not usually in a baseline model: exact bucket name syntax (`base--az-id--x-s3`), account\u2011specific AZ\u2011ID resolution, silent\u2011failure matrix, and precise anti\u2011pattern reasons. However, much of the content (e.g., that S3 Express One Zone exists, that it lacks versioning) is already documented, so the delta is strong but not maximal."
+      "justification": "Adds concrete expert details not in generic docs: double\u2011dash `base--az-id--x-s3` naming, account\u2011specific AZ\u2011ID resolution, silent\u2011failure matrix, required `s3express` ARN format, separate `s3tables` API for Iceberg. However a portion restates known AWS concepts, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific 8\u2011step provisioning workflow with exact CLI commands and ordering rationale (AZ ID before name, bucket before compute, etc.). Some steps remain generic (e.g., \u201cverify compute placement\u201d) and could list concrete API calls or filters, preventing a perfect score."
+      "justification": "Provides an AWS\u2011specific 8\u2011step provisioning workflow with ordering rationale and verification commands. Missing some procedural depth (e.g., IAM role creation, explicit region\u2011support check) and generic placeholders for optional specs, preventing a full score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list of five pitfalls, each with a clear \u2018why it\u2019s wrong\u2019 explanation. Missing are additional common pitfalls such as KMS key region mismatches, bucket\u2011name collisions when the base name contains \u2018--\u2019, and IAM role misconfigurations, so the anti\u2011pattern coverage is good but not exhaustive."
+      "justification": "Contains a solid NEVER list of five concrete pitfalls with clear \"why it's wrong\" explanations (e.g., using `create-bucket`, zone\u2011mismatch, wrong ARN, unsupported features, wrong API for table buckets). Could include additional pitfalls such as KMS\u2011key region mismatches or subnet\u2011AZ filtering errors."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Full frontmatter, clear description, activation triggers, invocation schema, and a strict output contract with required literal labels. The only shortfall is the absence of an explicit example of a PREREQUISITES_MISSING response in the skill body, which would aid reliable activation."
+      "justification": "Frontmatter includes all required fields, description, keywords, activation triggers, and an invocation schema. Missing a concrete JSON example of the input payload, but otherwise the skill can be reliably matched to a request."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick reference, navigation table, detailed heuristics, and deep sections. The quick\u2011reference table packs many details early, which could overload the agent before it knows whether it needs that depth, thus deducting a point."
+      "justification": "Information is layered: quick reference, navigation table, detailed reasoning, heuristics, prerequisites, step\u2011by\u2011step procedure, anti\u2011patterns, and output format. Some sections (full command listings) are dense, but critical rules remain near the top."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (bucket creation) are tightly gated by verification commands and checklist constraints. However, table\u2011bucket creation lacks explicit uniqueness checks and the skill does not enforce limits on optional parameters, leaving a small freedom gap."
+      "justification": "Destructive actions (bucket creation) are gated by a checklist and verification commands, matching the fragility of the operation. Slight looseness remains because the skill suggests emitting the `create-directory-bucket` command before the final verification step."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (overview \u2192 navigation \u2192 procedure \u2192 heuristics \u2192 anti\u2011patterns \u2192 contract). The structure is consistent and aids comprehension, missing only a formalized header hierarchy that some patterns prescribe."
+      "justification": "Follows a recognizable pattern (overview \u2192 navigation \u2192 contract \u2192 reasoning \u2192 dependency graph \u2192 heuristics \u2192 prerequisites \u2192 procedure \u2192 anti\u2011patterns \u2192 output format). Structure is consistent with other well\u2011crafted skills."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides working CLI snippets, a strict output contract, and example responses. Some example outputs omit verification commands for every checklist item or use mismatched instance tags, indicating a small usability gap for an agent executing the skill cold."
+      "justification": "Provides concrete CLI commands, verification steps, and example outputs, enabling an agent to act. Lacks explicit error\u2011handling branches, does not cover all optional parameters (e.g., when encryption is omitted), and some examples omit failure\u2011path handling, reducing usability."
     }
   ],
-  "total_score": 104,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42921,
-  "latency_ms": 14164,
+  "token_count": 42934,
+  "latency_ms": 20258,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

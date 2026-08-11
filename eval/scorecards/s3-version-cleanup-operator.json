@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 14,
       "max": 20,
-      "justification": "Adds specific 2026 cost rates, exact pre\u2011check priority order, and a detailed read\u2011merge\u2011write lifecycle procedure that a typical model would not enumerate, but the bulk of the content restates standard AWS documentation, limiting the true delta."
+      "justification": "The skill compiles many AWS\u2011specific facts (cost rates, exact pre\u2011check ordering, lifecycle replace semantics, Object Lock nuances) into a single reference and adds a decision\u2011tree style priority list. However, almost all of these points are documented in AWS manuals and a capable model could already retrieve them, so the added delta is moderate rather than groundbreaking."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific sequence of API calls (get\u2011bucket\u2011versioning \u2192 get\u2011lifecycle \u2192 merge \u2192 put) and a mandatory CONFIRM gate, yet it omits explicit guidance for cross\u2011account bucket access and the exact IAM role trust policy needed for Batch Operations, leaving a procedural gap."
+      "justification": "Provides an AWS\u2011specific procedure: run ordered pre\u2011checks, merge existing lifecycle JSON before PUT, use a mandatory CONFIRM gate, and verify post\u2011operation state. The steps are concrete, but a few items remain generic (e.g., \u201cverify caller has permissions\u201d without listing exact IAM actions per operation) and the invocation schema is not fully fleshed out."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with clear reasoning (e.g., PUT replaces lifecycle config, Object Lock Compliance blocks deletions). However only five top items are listed and it neglects other common pitfalls such as delete\u2011marker handling, accidental current\u2011version deletion, and version\u2011id mismatches."
+      "justification": "Includes a solid top\u20115 NEVER list with concrete reasons (e.g., PUT replaces lifecycle, Compliance mode blocks deletions). It also warns about MFADelete, legal holds, and manifest generation. Missing are some less\u2011obvious pitfalls such as cross\u2011account IAM delegation, pagination throttling, and the risk of unintentionally expanding rule prefixes."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, activation triggers and when_to_use are well defined, and an invocation schema is present. The schema is slightly vague about required JSON fields (e.g., exact operation enum values), which could cause ambiguous activation."
+      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and versioning are present. The invocation_schema describes two input modes but does not enumerate required JSON fields, leaving a slight ambiguity for an agent deciding when to fire the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses a quick\u2011navigation table and layers information from high\u2011level overview to deep technical details, but the Quick reference section repeats many details already covered later, creating some cognitive overload."
+      "justification": "The document layers information: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns, etc. The initial quick\u2011reference tables are dense, which could overload a first\u2011time reader, but critical rules are still discoverable on demand."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained by pre\u2011checks, CONFIRM gate, and post\u2011verification, while estimation tasks remain flexible. Minor over\u2011freedom appears in the batch\u2011delete example where placeholders (<job-id>) and missing manifest size limits could allow unsafe execution."
+      "justification": "Destructive actions are tightly constrained by pre\u2011checks and a mandatory CONFIRM gate, matching the fragility of S3 version deletions. Auditing and estimation operations are given more freedom, which is appropriate. Minor over\u2011constraint: the audit path could benefit from optional deeper cost\u2011model toggles."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns) with consistent headings, aiding comprehension."
+      "justification": "Follows a recognizable pattern (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns). The ordering is logical, though the anti\u2011patterns section appears after the process rather than as a separate safety layer, making the pattern slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a full output template, worked examples, and verification steps, enabling an agent to act. Nonetheless some CLI snippets contain minor inaccuracies (e.g., missing required fields in s3control create\u2011job, inconsistent storage\u2011class naming GLACIER_IR vs GIR) that could cause execution failures."
+      "justification": "Provides concrete CLI commands, exact JSON merge guidance, and worked examples that an agent could follow. Some inconsistencies appear (e.g., GLACIER_IR vs GIR in examples) and the Batch Operations manifest snippet omits required CSV header details, which could cause execution errors. Overall, usable but not flawless."
     }
   ],
   "total_score": 102,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41342,
-  "latency_ms": 14290,
+  "token_count": 41351,
+  "latency_ms": 7892,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

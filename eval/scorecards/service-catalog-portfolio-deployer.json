@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 14,
       "max": 20,
-      "justification": "Adds deep expert knowledge: silent\u2011failure dependency table, exact ordering constraints, recent AWS features (Terraform Open Source, App Registry, delegated admin). However many points restate official docs rather than novel decision trees, so not a full 20."
+      "justification": "The skill supplies several expert\u2011level insights (region\u2011scoped portfolio shares, silent\u2011failure matrix, LAUNCH constraint pitfalls, TagOptions vs SCP distinction) that a generic model would not enumerate, but most of the content restates known AWS Service Catalog concepts rather than delivering a novel decision tree or exclusive threshold."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific 8\u2011step procedure, concrete CLI commands, and verification steps. Some steps (e.g., \"validate template\") are generic and not uniquely AWS\u2011oriented, costing a point."
+      "justification": "Encodes an AWS\u2011specific 8\u2011step provisioning workflow with precise CLI commands and verification steps, reflecting senior CloudOps thinking. Deducted for occasional generic phrasing (e.g., \"verify prerequisites\") and lack of a formalized decision tree for branching on missing prerequisites."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasons (no LAUNCH, template\u2011based rule testing, org\u2011root share, region\u2011scoped share, TagOptions misuse). Only five items; additional common pitfalls (trust\u2011policy over\u2011privilege, duplicate portfolio IDs) are missing."
+      "justification": "Contains a concrete NEVER list of five high\u2011impact anti\u2011patterns with clear \"why\" explanations, plus additional pitfalls in the dependency graph. Missing a few common pitfalls (e.g., forgetting to set the active provisioning artifact flag) prevents a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter includes description, keywords, activation triggers, when_to_use, and invocation_schema. The invocation_schema is narrative rather than a strict JSON schema, which could hinder reliable routing."
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. The \"when_to_use\" field is verbose but clear. Minor weakness: the activation triggers list duplicates some terms and could be tighter for reliable routing."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Well\u2011layered: quick reference, navigation table, deep heuristics, and detailed procedure. The quick\u2011reference table packs many details early, creating some cognitive load."
+      "justification": "Uses a layered structure: quick navigation table, concise quick reference, then deeper sections (reasoning, heuristics, procedure). Critical rules are not buried, but the initial sections still contain a dense amount of detail, causing mild cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Calibrates freedom appropriately: prerequisites checks before destructive creates, strict NEVER rules for privileged actions, and verification commands. Lacks explicit safeguards for idempotency (e.g., handling existing portfolios) which leaves some fragility."
+      "justification": "Destructive actions (portfolio, product, constraints) are guarded by a prerequisite checklist and verification commands, showing good calibration. Creative tasks (e.g., naming conventions) are less constrained, which is appropriate, but the skill does not explicitly limit the number of products per portfolio, a potential fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Navigation \u2192 Procedure \u2192 Anti\u2011pattern \u2192 Output contract). Minor ad\u2011hoc ordering of sections prevents a perfect score."
+      "justification": "Follows a recognizable pattern (intro \u2192 navigation \u2192 quick ref \u2192 activation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 output contract). The pattern is coherent and aids comprehension; only a minor deviation is the mixed use of markdown tables and free\u2011form text."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 10,
       "max": 15,
-      "justification": "Agent can execute the steps, but model outputs reveal violations: use of undefined '[\u2014]' status marker, ambiguous share\u2011region representation for multi\u2011region portfolios, and missing WARN note for TEMPLATE\u2011based LAUNCH constraints. These gaps reduce real\u2011world reliability."
+      "justification": "Includes decision trees, checklist, verification commands, and example outputs. Yet the sample model outputs violate the strict contract (e.g., using \"[\u2014]\" instead of required \"[\u2717]\" with a reason, missing region info in some SHARE rows). These inconsistencies indicate the skill may lead to non\u2011compliant agent responses."
     }
   ],
-  "total_score": 105,
+  "total_score": 98,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44942,
-  "latency_ms": 19445,
+  "token_count": 40668,
+  "latency_ms": 12684,
   "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }

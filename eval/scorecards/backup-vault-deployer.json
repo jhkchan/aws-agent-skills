@@ -1,0 +1,70 @@
+{
+  "skill": "backup-vault-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides several expert heuristics not found in baseline models (vault\u2011lock immutability differences, cross\u2011region copy prerequisite checklist, retention\u2011window validation). However it stops short of a full decision tree that maps regulatory requirements to lock mode, leaving a small knowledge gap."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific and ordered (create vault \u2192 verify KMS \u2192 apply tags \u2192 set vault lock \u2192 create plan \u2192 add selections \u2192 configure cross\u2011region copy \u2192 set access policy \u2192 create report plan). CLI snippets and JSON payloads are concrete. However, some steps are described at a high level (e.g., \u201cverify tag coverage\u201d) without a concrete verification command, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., governance vs compliance, missing KMS policy, tag coverage). Lacks one specific anti\u2011pattern: using the default AWSBackupServiceRole without least\u2011privilege restrictions, which would be a valuable warning."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, and activation triggers are present. The 'when_to_use' section is verbose but does not give a crisp, machine\u2011readable trigger list; also no explicit example of a negative trigger (when NOT to invoke)."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses quick\u2011navigation table and layered sections, but the NEVER list appears at the very end, forcing the reader to scroll past core steps before seeing critical pitfalls. A more front\u2011loaded placement would reduce cognitive load."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Constrains destructive actions with prerequisite checks and lock\u2011mode validation. However it gives no constraints on naming conventions or tag key/value policies for the vault, leaving too much freedom for potentially non\u2011compliant names."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 NEVER \u2192 Output format). The headings are slightly ad\u2011hoc (e.g., 'Quick navigation' vs a standard 'Procedure' section), preventing a perfectly uniform template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Model output generally matches the required checklist, but contains syntax errors in cron expressions (e.g., \"cron(0 5? * MON\u2011SAT *)\"), which would cause AWS CLI rejection. Also the output does not validate the existence of the KMS key before emitting the checklist, a practical gap."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 37154,
+  "latency_ms": 16965,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

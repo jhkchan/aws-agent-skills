@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert details not usually known by a baseline model: V2 trigger JSON filter syntax, cross\u2011account KMS key\u2011policy requirements, the silent\u2011empty\u2011string behavior of namespace variables, and precise migration gotchas (PollForSourceChanges, leftover CloudWatch Events rule)."
+      "justification": "Provides several expert\u2011level specifics (e.g., exact KMS key\u2011policy requirements, silent empty\u2011string variable failure, precise trigger\u2011filter JSON semantics) that go beyond generic documentation, but many statements simply restate known AWS docs without novel decision trees or thresholds."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific step\u2011by\u2011step workflow (pre\u2011flight checks, trigger creation, cross\u2011account wiring, bucket hardening). Some procedures remain generic (e.g., \"verify IAM permissions\" without enumerating the exact actions per action type)."
+      "justification": "Provides an AWS\u2011specific procedural flow (migration heuristic, exact order of source \u2192 trigger \u2192 build \u2192 deploy \u2192 approval \u2192 cross\u2011account wiring) and concrete checklist items, but some steps are described generically (e.g., \u201cvalidate IAM permissions\u201d) without the precise AWS\u2011specific verification sequence."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Includes a concrete NEVER list with reasoning (unscoped triggers, wildcard IAM, sharing bucket without KMS, secrets in variables, stale PollForSourceChanges). The list is useful but limited; it omits other common pitfalls (e.g., KMS key rotation, missing CodeConnections OAuth handshake) and therefore loses points."
+      "justification": "Contains a solid NEVER list with concrete reasoning (no unfiltered triggers, no bucket\u2011only policy, no secret variables, no wildcards, no PollForSourceChanges). Does not mention the anti\u2011pattern of overly permissive IAM trust policies or attaching AWS\u2011managed full\u2011access policies, which would strengthen the list."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The only shortfall is a slightly vague \"when_to_use\" paragraph that could be tighter about exact trigger\u2011filter conditions, but overall the spec is reliable for activation."
+      "justification": "Front\u2011matter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. The activation triggers are a long list but still unambiguous. Could improve by providing a concrete JSON example of the input shape."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The document layers information well (quick reference, pre\u2011flight gate, detailed step\u2011by\u2011step, deep references). Some anti\u2011pattern warnings are buried deep in the text, which could cause cognitive overload for a fast\u2011acting agent, so a small deduction."
+      "justification": "The document layers information (quick reference \u2192 detailed steps \u2192 deep references), but critical anti\u2011pattern warnings and security constraints are buried deep, forcing readers to scroll through many sections before seeing essential rules."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (KMS key creation, IAM role creation, bucket hardening) are tightly constrained with mandatory checks and a confirmation gate. The only minor issue is that creative tasks like naming conventions are left open, but overall calibration matches fragility."
+      "justification": "Destructive actions (IAM role creation, KMS key policy) are tightly constrained with explicit conditions, while creative choices (e.g., optional manual approval) are left flexible. However, the skill does not enforce the constraints programmatically, leaving room for over\u2011permissive output."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process steps \u2192 Heuristics \u2192 Output contract). The structure aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Process steps \u2192 Heuristics \u2192 Output format \u2192 Verification \u2192 Edge cases \u2192 NEVER list). Minor inconsistency in section naming (e.g., \"Quick navigation\" vs \"Process \u2014 Architecture planning\") prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 10,
       "max": 15,
-      "justification": "Provides a usable output format, checklist, and concrete CLI commands. However, the example model outputs show inconsistencies (missing manual\u2011approval block, missing variable validation, incomplete cross\u2011account policy details) and the skill lacks explicit error\u2011handling branches beyond missing spec, leading to gaps in real\u2011world execution."
+      "justification": "Provides decision trees, checklist, and concrete CLI commands, but model outputs sometimes violate the skill's own anti\u2011patterns (e.g., attaching AWSFullAccess policies, missing KMS policy details, or using an unscoped trigger). These gaps show that an agent following the skill could produce insecure or non\u2011compliant pipelines."
     }
   ],
-  "total_score": 102,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45440,
-  "latency_ms": 14940,
+  "token_count": 46037,
+  "latency_ms": 12192,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

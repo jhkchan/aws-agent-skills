@@ -3,20 +3,17 @@ name: route53-health-check-troubleshooter
 description: >-
   Diagnoses Amazon Route 53 health check and DNS failover failures
   through a ten-category diagnostic tree: endpoint health check
-  failures (HTTP/HTTPS/TCP protocol mismatch, status code threshold,
-  certificate mismatch), calculated health check logic errors
-  (AND/OR/NOT inverted logic, child health check aggregation),
-  health check interval and failure threshold misconfiguration
-  (consecutive failures, fast/standard interval, measurement period),
-  latency measurement discrepancies (latency graph vs health status),
-  DNS failover routing issues (active-active, active-passive, weighted,
-  latency-based, geolocation), health check region selection and
-  caller IP visibility (15+ regions for endpoint checks, CloudFront
-  edge POP vs Route 53 health checker IP), CloudWatch alarm-based
-  health check threshold ambiguity (alarm period, datapoints,
-  evaluation periods), DNS resolution verification (NS delegation
-  glue records, authoritative zone mismatch), and hosted zone
-  delegation issues (glue record propagation, TTL on NS records).
+  failures (HTTP/HTTPS/TCP protocol mismatch, certificate mismatch),
+  calculated health check logic errors (AND/OR/NOT inverted logic,
+  child aggregation), health check interval and failure threshold
+  misconfiguration (consecutive failures, fast/standard interval),
+  DNS failover routing issues (active-active, active-passive,
+  weighted, latency-based, geolocation), health check region
+  selection and caller IP visibility (15+ regions, health checker
+  IPs external to VPC), CloudWatch alarm-based health check threshold
+  ambiguity (alarm period, datapoints, evaluation periods), DNS
+  resolution verification (NS delegation glue records, TTL caching),
+  and hosted zone delegation issues (glue record propagation).
   Walks symptoms to a verified root cause with evidence-backed probes;
   emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
 version: 0.1.0
