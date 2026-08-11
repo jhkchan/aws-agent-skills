@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides concrete expert heuristics not found in generic models: e.g., 100\u00d7 median task bytes as a skew threshold, the need for a self\u2011referencing security\u2011group rule for Glue ENIs, the exact Spark\u2011UI event\u2011log path extraction, and the Glue\u2011version\u2011specific Spark\u2011SQL calendar change. These are actionable decision points a senior CloudOps engineer would value."
+      "justification": "Adds concrete expert details not in generic knowledge: specific skew threshold (100x median bytes), self\u2011referencing security\u2011group rule, exact CLI probe commands, precise category mapping, and nuanced Glue version quirks. However, much of the content restates existing AWS documentation, so not a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific diagnostic flow (get\u2011job\u2011run \u2192 CloudWatch logs \u2192 bookmark \u2192 connection SG \u2192 Spark UI) and ties each probe to a concrete AWS CLI command. However, the ordering of IAM permission checks is only implied, not explicitly placed before catalog probes, leaving a minor procedural gap."
+      "justification": "Encodes a clear AWS\u2011centric workflow: get\u2011job\u2011run \u2192 log probe \u2192 bookmark \u2192 connection \u2192 Spark UI, with exact CLI ordering. Minor gap: no explicit procedure for using CloudWatch Insights or Glue job metrics dashboards, which would tighten the mindset further."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with detailed reasoning (e.g., never raise workers to fix OOM without checking skew). Missing a critical anti\u2011pattern: diagnosing a failure when the job state is SUCCEEDED, which led to the model output mis\u2011classifying a bookmark\u2011stall on a successful run."
+      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never raise workers for OOM without checking skew). Lacks anti\u2011patterns for newer features like flexible execution preempt, Iceberg jobs, and Ray workloads, leaving a few important pitfalls uncovered."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, activation triggers, invocation schema, and example are all present and clear. The only shortfall is a slightly vague \"when_to_use\" clause that does not explicitly mention the RUNNING\u2011past\u2011SLA scenario, but overall compliance is high."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, invocation_schema, and example are all present and well\u2011formed. Some activation triggers are overly generic (e.g., \"Glue version 2.0 vs 3.0 vs 4.0\"), which could cause ambiguous activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information well: high\u2011level purpose, quick\u2011start checklist, detailed step\u2011by\u2011step decision tree, anti\u2011pattern list, and deep references. No critical overload, though the worked examples are lengthy, which could be trimmed for faster skim."
+      "justification": "Information is layered (quick start, mindset, step\u2011by\u2011step, anti\u2011patterns, references), but the initial sections are dense and front\u2011load many details, risking cognitive overload before the agent knows what to invoke."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions (reset\u2011job\u2011bookmark, security\u2011group changes) are gated by explicit safety warnings, but the calibration could be tighter (e.g., mandatory operator confirmation flag is mentioned but not enforced by the skill definition)."
+      "justification": "Destructive actions (security\u2011group changes, bookmark reset, job updates) are gated by explicit confirmation steps and backup commands. Creative tasks (diagnosis) are left open, matching task fragility precisely."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 quick reference \u2192 stepwise decision tree \u2192 anti\u2011patterns), yet the structure mixes narrative tables with procedural code, making it slightly ad\u2011hoc."
+      "justification": "The skill follows a recognizable pattern (description, mindset, decision steps, anti\u2011patterns, navigation). A few sections (e.g., anti\u2011pattern list) are inserted ad\u2011hoc rather than as a distinct, consistently named block, breaking the otherwise clean pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 12,
       "max": 15,
-      "justification": "Agent can execute most probes and emit the required block, but the skill omits detailed steps for the JDBC_CRED and DYNAMICFRAME_TYPE categories, leaves parsing of CLI JSON output to the agent without guidance, and some thresholds (e.g., skew detection) are vague, reducing reliability."
+      "justification": "An agent can follow the decision tree and produce the required output block, and the provided examples work. Nonetheless, some categories (JDBC_CRED, Ray jobs, Iceberg, flexible\u2011execution pre\u2011emption) lack dedicated probes, and there is no example for the NEED_MORE_INFO verdict, which could cause execution gaps in edge cases."
     }
   ],
-  "total_score": 104,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45528,
-  "latency_ms": 11860,
+  "token_count": 46302,
+  "latency_ms": 17291,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

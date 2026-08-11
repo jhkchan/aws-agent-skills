@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 16,
       "max": 20,
-      "justification": "Provides many AWS\u2011specific numbers (1769\u202fMB\u202f=\u202f1\u202fvCPU, 20% ARM64 discount, cost formula) that a generic model may not know, but it stops short of delivering the full break\u2011even calculus for provisioned concurrency or a region\u2011by\u2011region pricing matrix, limiting the expert delta."
+      "justification": "Provides several concrete, expert\u2011level numbers (e.g., 1769\u202fMB\u202f=\u202f1\u202fvCPU, $0.00005/request for provisioned concurrency, $394/month idle cost for 1\u202fGB/10\u202fconcurrency) and a decision matrix that a generic model would not know off\u2011hand. However much of the content restates publicly documented facts, so it does not reach full novelty."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific workflow: pre\u2011flight data gate, Power Tuning deployment, step\u2011by\u2011step memory, concurrency, duration, frequency, architecture checks, and exact CLI commands. Some procedures remain generic (e.g., \u201ccheck latency\u201d without concrete SLO values) which prevents a perfect score."
+      "justification": "Encodes an AWS\u2011specific reasoning flow (memory\u2011first, then concurrency, then architecture) with exact CLI commands and a step\u2011by\u2011step process. Some procedures are generic (e.g., \u201ccheck latency SLO\u201d) and error\u2011handling steps are thin, costing a few points."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with reasoning (e.g., never change memory without Power Tuning evidence). The list is limited to five top items and omits other common pitfalls such as Layer\u2011induced cold\u2011start overhead, versioning traps, and IAM permission edge cases."
+      "justification": "Contains a solid NEVER list (5 top anti\u2011patterns) and explains why each is dangerous. Missing are a few additional common pitfalls (e.g., forgetting to update aliases after version publish) and deeper reasoning for some items, so it falls short of perfect."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS, activation triggers, invocation schema, and a minimal example are all present. Only minor vagueness in the \u201cwhen_to_use\u201d paragraph (mixes several scenarios) prevents a perfect score."
+      "justification": "Full front\u2011matter, clear description, activation triggers, invocation schema, and example are present. The \u2018when to invoke\u2019 description could be tighter, but overall the spec is solid."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses quick navigation and layered sections effectively, yet the \"Quick start\" and \"Step 0\" sections dump many detailed numbers and CLI snippets up front, creating potential cognitive overload."
+      "justification": "Uses quick navigation, a concise Quick\u2011Start, then deeper sections, achieving layered information. Some early sections (Quick\u2011Start) still contain dense formulas that could overload the reader, hence a small deduction."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by an explicit CONFIRM prompt and pre\u2011flight safety checks; creative tasks (e.g., architecture migration) are left flexible. However, the skill\u2019s own examples violate the zero\u2011savings rule and present unsafe batch\u2011size changes without explicit safeguards, indicating imperfect calibration."
+      "justification": "Destructive actions are gated by an explicit CONFIRM step, bulk\u2011operation limits, and safety checks. Minor gap: regional pricing variations are not explicitly constrained, but overall calibration is strong."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Process steps \u2192 Output format \u2192 Anti\u2011patterns \u2192 Safety checks). The pattern is clear, but some sections (e.g., \u201cStep 0 non\u2011obvious behaviours\u201d) feel ad\u2011hoc, preventing a flawless rating."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Anti\u2011Patterns \u2192 Output contract). Structure is coherent; a slight ad\u2011hoc naming of sections prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 6,
+      "score": 11,
       "max": 15,
-      "justification": "Model output generated from the skill shows multiple critical failures: contradictory reasoning (over\u2011provisioned yet upsizing memory), incorrect cost math (compute cost mis\u2011calculated), zero\u2011saving rule violation, and inconsistent savings arithmetic. These indicate the skill does not reliably guide an agent to correct, error\u2011free execution."
+      "justification": "Provides decision trees, CLI snippets, and a strict output contract, enabling an agent to act. Yet the supplied model examples contain calculation errors (e.g., omitted provisioned\u2011concurrency idle cost) and some inconsistencies with the contract (missing Dimensions checked symbols in one example). These gaps reduce confidence in real\u2011world execution."
     }
   ],
-  "total_score": 95,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43750,
-  "latency_ms": 22506,
+  "token_count": 41546,
+  "latency_ms": 13655,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

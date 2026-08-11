@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 14,
       "max": 20,
-      "justification": "The skill aggregates known AWS CloudTrail troubleshooting knowledge into a decision tree and checklist, but it does not introduce truly novel expert insight (e.g., a new threshold, undocumented exception, or proprietary best\u2011practice). Most content could be assembled from existing AWS docs, so the delta is limited."
+      "justification": "The skill largely restates documented CloudTrail troubleshooting steps; the only genuine delta is the curated decision\u2011tree mapping symptoms to failure categories, which is useful but not a deep novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (e.g., read both describe\u2011trails and get\u2011trail\u2011status, check event selectors, bucket policy conditions). However a few steps are generic (\u201cverify KMS policy\u201d) without the exact statement to add, leaving some ambiguity."
+      "justification": "Procedures are AWS\u2011specific and ordered, but the skill omits checking CloudWatch metric alarms or IAM permission verification before applying changes, leaving a gap in the expert mindset."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete NEVER list with reasoning (e.g., never assume outage, never enable all S3 data events without cost warning). Missing a few additional pitfalls such as cross\u2011account bucket ownership conflicts, so not a perfect 15."
+      "justification": "Provides a concrete NEVER list with reasoning (e.g., never assume outage, never confuse describe\u2011trails with get\u2011trail\u2011status). The list is limited to five items and omits other common pitfalls such as pagination of CLI output, IAM permission errors, or cost\u2011impact warnings for wide\u2011scope data events."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, activation triggers, and invocation schema are present. Slight omission: the frontmatter lacks an explicit \"when_to_use\" field (it lives in metadata), which could affect automated activation."
+      "justification": "Frontmatter is complete, activation triggers and invocation schema are defined, and the output contract is explicit. Missing is a brief \"when NOT to use\" clause that would help an agent avoid invoking the skill in unrelated contexts."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses progressive layers: activation \u2192 mindset \u2192 quick reference \u2192 stepwise process \u2192 output contract. The initial quick\u2011reference table may overload the top layer, and some deep details are buried in large blocks, leading to a 2\u2011point deduction."
+      "justification": "The skill layers information (activation \u2192 mindset \u2192 quick reference \u2192 detailed steps), but the quick\u2011reference table repeats details that could be deferred, and critical bucket\u2011policy rules are buried deeper rather than highlighted up front."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 12,
       "max": 15,
-      "justification": "Calibrates freedom: destructive actions (start\u2011logging, bucket\u2011policy edits) are guarded by verification steps and warnings (cost, backup). Does not explicitly advise backing up existing bucket policy before overwrite, costing 1 point."
+      "justification": "Destructive actions (e.g., start\u2011logging, update\u2011trail) are constrained, yet the skill does not enforce permission checks or require explicit confirmation before applying changes, leaving room for accidental impact."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns), but some sections (e.g., Recent AWS features) feel ad\u2011hoc rather than part of the core pattern."
+      "justification": "The skill follows a recognizable pattern (activation, mindset, quick reference, process steps, output format). The mixture of tables, narrative, and YAML blocks feels slightly ad\u2011hoc rather than a single, clean template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a deterministic output format, concrete CLI examples, and verification steps, enabling an agent to act. Minor issues: a few command examples contain syntax quirks (missing space before &&) and placeholders like <bucket> that need substitution, which could cause execution errors."
+      "justification": "Provides a usable decision tree, concrete CLI commands, and a perfect example output, but lacks guidance for handling API errors, throttling, or missing CLI tools, and does not include validation of JSON parsing results."
     }
   ],
-  "total_score": 103,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40922,
-  "latency_ms": 8907,
+  "token_count": 40463,
+  "latency_ms": 12097,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

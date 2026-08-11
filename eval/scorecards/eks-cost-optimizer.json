@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Provides concrete, expert\u2011level heuristics not usually known to a generic model: specific breakeven pod\u2011density for Fargate (~3\u20114 pods per node), precise utilization thresholds (CPU <30% & Memory <50% for downsize), Spot readiness checklist, Karpenter consolidation savings estimate (20\u201140%), exact Fargate pricing numbers, and a step\u2011by\u2011step cost\u2011impact formula. However, most facts are publicly documented, so the delta is strong but not maximal."
+      "justification": "Provides concrete, quantitative thresholds (CPU<30%, Memory<50%, requests/usage>2\u00d7, Fargate breakeven 3\u20114 pods per node, Spot savings up to 90%, Karpenter 20\u201140% savings, Savings\u2011Plan discount ranges) and specific decision formulas that a generic model would not enumerate. However, most numbers are publicly documented and a senior CloudOps engineer could already know them, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific decision workflow (bin\u2011packing \u2192 right\u2011size \u2192 Fargate vs EC2 \u2192 Spot \u2192 Karpenter \u2192 Savings Plan) with precise CLI commands, data\u2011gate checks, and conflict\u2011arbitration rules. Only minor generic phrasing (e.g., \"verify\") prevents a perfect score."
+      "justification": "Encodes an AWS\u2011specific, ordered workflow (pre\u2011flight data gate, bin\u2011packing before right\u2011sizing, Spot readiness checklist, Karpenter migration steps) with concrete CLI snippets. Some procedures (e.g., node drain, scaling config) are generic Kubernetes actions and the guidance lacks exhaustive edge\u2011case handling, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Includes a concrete top\u20115 NEVER list with clear reasoning, but the list is limited; other common pitfalls such as ignoring pod anti\u2011affinity during consolidation or overlooking IAM role permissions are absent."
+      "justification": "Contains a top\u20115 NEVER list with explicit reasons (e.g., never downsize before checking requests/usage, never use Spot without PDB/NTH, never claim Savings Plans on Fargate). The list is useful but limited; it omits other common pitfalls such as IAM role mis\u2011configurations or control\u2011plane cost misconceptions, and the anti\u2011pattern section could be more exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Full front\u2011matter, clear description, explicit WHEN\u2011TO\u2011USE / WHEN\u2011NOT\u2011TO\u2011USE, activation triggers, invocation schema, and a minimal valid input example. All required metadata present and well\u2011formed."
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, invocation schema, and example are all present. The \"when_to_use\" and \"when_not_to_use\" sections give clear activation guidance. Minor vagueness in some activation trigger phrasing could lead to occasional false activations."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick\u2011start for immediate action, strict output contract, then deeper sections (mindset, pre\u2011flight, process, references). The only issue is that the quick\u2011start paragraph packs many rules, causing slight cognitive overload."
+      "justification": "Information is layered logically: quick start, strict output contract, mindset, quick reference, pre\u2011flight, process, output format, heuristics, NEVER list, references. Critical rules are not buried, but the heuristic tables and full reference sections are dense, adding some cognitive load."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by CONFIRM prompts and safety checks, yet the skill does not explicitly limit batch size for pricing\u2011model changes, leaving a minor fragility gap for large\u2011scale operations."
+      "justification": "Destructive operations are tightly constrained by CONFIRM prompts, batch limits, and pre\u2011flight safety checks. Creative estimations (savings calculations) are given reasonable assumptions. Slight looseness in pricing\u2011model assumptions (e.g., fixed discount rates) prevents a perfect score."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable documentation pattern (quick start \u2192 strict contract \u2192 navigation \u2192 mindset \u2192 process \u2192 output format \u2192 heuristics \u2192 NEVER \u2192 references). Structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern used in other CloudOps skills: Mindset \u2192 Process \u2192 Output contract \u2192 References. The structure is coherent and aids comprehension, missing only a minor consistency tweak (e.g., naming of sections)."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 9,
       "max": 15,
-      "justification": "Examples mostly follow the required output block, but several violate the exact field names: missing \"Monthly (right-size + bin-pack)\" in the Fargate example, alternative monthly sub\u2011fields in the bin\u2011packing example, and inconsistent ordering. These gaps would cause an agent to produce malformed responses, reducing practical usability."
+      "justification": "Model output examples violate the strict output contract: the first example omits the required \"Monthly (compute model)\" line instead of using N/A, and the skill mentions verdicts like NEED_MORE_INFO and BLOCKED that are not listed in the contract. These inconsistencies would cause an agent to produce malformed responses or miss required fields, reducing practical usability."
     }
   ],
-  "total_score": 107,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41916,
-  "latency_ms": 19344,
+  "token_count": 42475,
+  "latency_ms": 17278,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

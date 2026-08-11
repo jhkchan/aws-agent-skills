@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 14,
       "max": 20,
-      "justification": "Provides many concrete IDs, commands, and a decision tree, but most of the information (e.g., cache\u2011key composition, x\u2011edge\u2011result\u2011type values) is already known to a senior CloudOps engineer; no novel thresholds or exclusive expert heuristics are introduced."
+      "justification": "The skill mostly restates standard CloudFront caching concepts that a competent model already knows; the only genuine delta are a few specific managed\u2011policy IDs and a concrete decision\u2011tree layout, which is useful but not enough for a high score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "The step\u2011by\u2011step diagnostic flow is AWS\u2011specific and well ordered, yet some procedures (e.g., \"Check origin headers\") are generic and the ordering of WAF vs Lambda@Edge checks could be tighter."
+      "justification": "Procedures are AWS\u2011specific and detailed, but the ordering is occasionally generic (e.g., \"list\u2011distributions\" before confirming the distribution ID) and the critical precedence check \u2013 origin Cache\u2011Control overrides policy unless explicitly overridden \u2013 is mentioned only in passing rather than as a mandatory first step."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Includes a solid \"NEVER\" list with reasoning, but only five items and missing deeper explanations for some (e.g., why \"/*\" invalidations are dangerous beyond cost)."
+      "justification": "Provides a concrete \"NEVER\" list with clear reasoning, but the list is limited to five items and omits other common pitfalls such as mismatched MinTTL/DefaultTTL/MaxTTL relationships or accidental caching of error responses."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter, activation triggers, invocation schema, when\u2011to\u2011use/when\u2011not\u2011to\u2011use, and a strict output contract are all present and unambiguous."
+      "justification": "Frontmatter, activation triggers, when\u2011to\u2011use/not\u2011to\u2011use, invocation schema, and output contract are all present and well\u2011formed. Lacks an explicit sample invocation and a concise one\u2011line usage example, which would make activation more reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The document layers information (activation \u2192 quick reference \u2192 detailed process), but the initial sections are dense; a brief executive summary would reduce cognitive load."
+      "justification": "The document front\u2011loads a large amount of information (mindset, quick reference, full decision tree, anti\u2011patterns, command reference) before the core diagnostic steps, which can cause cognitive overload; critical \"NEVER\" rules appear later rather than at the top."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (policy updates, invalidations) are accompanied by safety warnings, yet the skill does not enforce explicit confirmation steps before applying changes."
+      "justification": "Destructive actions (e.g., creating a new cache policy, issuing invalidations) are presented without explicit safety gates or confirmation prompts, which could be too permissive for a fragile operation."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Activation, Mindset, Process, Output, Anti\u2011Patterns), but the pattern is custom rather than a standard template, causing a minor deduction."
+      "justification": "The overall layout follows a recognizable troubleshooting pattern but mixes tables, narrative, and code blocks in an ad\u2011hoc way rather than adhering to a single, clean template; the structure is recognizable but not fully standardized."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI commands, and examples, but lacks guidance for missing logs, error handling for CLI failures, and fallback paths when required inputs are unavailable."
+      "justification": "The skill supplies a usable decision tree, concrete CLI commands, and output contract, yet it lacks guidance for scenarios where required inputs (logs, policy ID) are missing or partially available, and it does not cover fallback strategies for those edge cases."
     }
   ],
-  "total_score": 104,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40253,
-  "latency_ms": 22162,
+  "token_count": 39738,
+  "latency_ms": 11832,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

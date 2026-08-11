@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 16,
       "max": 20,
-      "justification": "The skill compiles many known AWS recovery steps and recent feature mentions, but most of the content restates publicly documented procedures. It adds limited truly novel expert insight (e.g., a few specific decision thresholds), so it falls short of a full delta."
+      "justification": "Adds concrete expert details not usually recalled by a generic model: a decision matrix linking specific status check outcomes to stop/start vs reboot, recent 2024\u20112026 AWS features (automatic recovery, capacity\u2011reservation preservation API, EC2 Serial Console), precise capacity\u2011reservation re\u2011binding steps, and placement\u2011group capacity checks. These constitute genuine delta knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and well ordered (pre\u2011flight, confirm gate, operation steps). However some steps are generic (e.g., \u201ccapture pre\u2011state\u201d) and the exact ordering for ASG process suspension/resumption is not fully detailed, leaving a minor procedural gap."
+      "justification": "Encodes AWS\u2011specific procedures: ordered pre\u2011flight checks, exact CLI commands with required flags, ASG process suspension/resume, capacity\u2011reservation modification, and a mandatory CONFIRM gate. The mindset (preserve state then restore) is clearly articulated. Minor loss: no explicit flowchart, but procedures are specific enough."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., instance\u2011store data loss, ASG health\u2011check suspension). Missing a few common pitfalls such as forgetting IAM role permissions for SSM, so not perfect."
+      "justification": "Provides a detailed NEVER list with concrete reasons (e.g., never stop an instance\u2011store root, never suspend ASG without resuming, never double\u2011recover alarms). The list is thorough but could include a few more edge\u2011cases (e.g., handling of spot\u2011instance interruptions)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The 'when_to_use' narrative is slightly verbose but still unambiguous, resulting in a small deduction."
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation_schema are present, giving an agent clear when to invoke. Slight weakness: activation triggers are a free\u2011form list rather than a deterministic predicate, which could cause ambiguous activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered logically (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns, etc.). The anti\u2011pattern section is dense and could overload a first\u2011time reader, so a modest penalty is applied."
+      "justification": "The skill layers information: quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns, and expert heuristics. However, the anti\u2011pattern section and recent\u2011features appendix are long and may overload the reader before they are needed."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a CONFIRM prompt and pre\u2011checks, showing good calibration. Nonetheless, the READY state can be emitted without an explicit acknowledgment of data\u2011loss risk beyond a failed pre\u2011check, which could be tighter for high\u2011fragility ops."
+      "justification": "Destructive operations are tightly constrained by pre\u2011checks, CONFIRM gate, and explicit data\u2011loss warnings. The calibration is appropriate, though there is no mechanism for an operator to explicitly acknowledge data\u2011loss risk to override a BLOCKED verdict."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (What it does, navigation, mindset, pre\u2011flight, process, output contract, anti\u2011patterns). One subsection (\u201cExpert knowledge \u2014 non\u2011obvious EC2 recovery behaviors\u201d) breaks the flow, slightly reducing pattern consistency."
+      "justification": "Follows a recognizable structure (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Heuristics). The pattern aids comprehension; only minor deviation is the mixed placement of cost baselines and recent\u2011feature notes."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision trees, and worked examples, enabling an agent to act. However the output contract only allows READY/BLOCKED/COMPLETED, yet the pre\u2011flight description mentions emitting VERDICT: ERROR, creating a contradiction. Also no guidance on handling the operator's response to the CONFIRM prompt, leaving execution ambiguous."
+      "justification": "Provides concrete CLI steps, decision trees, and a strict output contract that an agent can follow. However, the skill contradicts its own contract by allowing a VERDICT: ERROR for malformed input, which is not listed as a valid verdict, and it lacks explicit handling for pagination edge\u2011cases in pre\u2011flight. These inconsistencies reduce practical usability."
     }
   ],
-  "total_score": 102,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43174,
-  "latency_ms": 11634,
+  "token_count": 43177,
+  "latency_ms": 13369,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

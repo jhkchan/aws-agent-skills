@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Most of the content restates official AWS documentation (e.g., egress filter defaults, virtual node vs workload, mTLS via SDS). It lacks a truly novel decision tree or proprietary thresholds that a senior CloudOps engineer would not already know."
+      "justification": "Adds concrete expert details not in a generic model: default egress filter recommendation, weight\u2011sum rule, mTLS via SDS, circuit\u2011breaking thresholds, recent 2024\u20112026 feature notes, and a decision tree for weighted routing. However much of the content restates official docs, so full 20 is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific reasoning (pre\u2011flight IAM, Cloud Map namespace, ACM PCA status, ordered CLI creation, snapshot before weighted\u2011route update, confirm gate). The only deduction is the generic \u201crun pre\u2011checks\u201d phrasing which is not uniquely AWS\u2011specific."
+      "justification": "Encodes AWS\u2011specific procedures: ordered pre\u2011flight IAM/CloudMap/ACM checks, exact CLI creation order (mesh \u2192 nodes \u2192 router \u2192 route \u2192 gateway), mandatory CONFIRM gate, snapshot before route updates, and side\u2011car injection steps. Only minor generic phrasing (e.g., \"verify permissions\") prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is solid and explains why each pitfall is dangerous, yet it omits a few common traps such as mixing CLI and CRD routes on the same mesh and relying on the CLI\u2019s automatic weight normalization without verification."
+      "justification": "Provides a detailed NEVER list with concrete reasons (e.g., never use ALLOW_ALL in production, never mix CLI and CRD for gateway routes, never treat virtual nodes as workloads). Lacks a few additional pitfalls (e.g., forgetting to set health checks) and some reasons could be deeper, so deduct two points."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter, description, activation triggers, and invocation schema are present, but the trigger list omits some realistic verbs like \"update mesh\" or \"delete route\", making activation slightly less reliable."
+      "justification": "Complete frontmatter, clear description, explicit when\u2011to\u2011use, activation triggers, invocation schema, and verdict shape. An agent can reliably decide when to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process) but the initial quick\u2011reference tables are dense and front\u2011load many details, which can cause cognitive overload before the reader knows which sections are critical."
+      "justification": "Information is layered: quick reference first, then mindset, pre\u2011flight, process, patterns, and output format. The only issue is occasional dense tables that could overload a first read."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are gated by a CONFIRM prompt, but the skill does not define how the gate is enforced (timeout, abort handling) and leaves the confirmation mechanism to the operator, slightly under\u2011calibrating safety."
+      "justification": "Destructive actions are tightly constrained by a CONFIRM gate and exhaustive pre\u2011flight checks; creative spec refinement is allowed with minimal constraints. Calibration matches task fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "The overall structure follows a recognizable pattern (mindset \u2192 process \u2192 patterns \u2192 output), yet the mix of markdown tables, narrative blocks, and code snippets feels a bit ad\u2011hoc rather than a single, clean template."
+      "justification": "Follows a recognizable skill pattern (What it does, Mindset, Quick navigation, Process, Common patterns, Output contract) that aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI commands, error handling flow, and example outputs that an agent could execute. Lacks explicit handling of mixed CLI/CRD management conflicts and does not detail how to fill optional fields when they are omitted, leaving edge\u2011case ambiguity."
+      "justification": "Provides working CLI command templates, decision trees, error handling via PREREQUISITES_MISSING, and concrete examples. Deductions for placeholder tokens like '<full spec>' in some examples and limited discussion of CLI failure handling."
     }
   ],
-  "total_score": 106,
+  "total_score": 110,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 45013,
-  "latency_ms": 9745,
+  "grade": "A",
+  "token_count": 44770,
+  "latency_ms": 25803,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

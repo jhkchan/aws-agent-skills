@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert details not usually memorized: exact numeric limits for RequestsPerSecond, CompletionWindow, KMS policy nuance (must grant Encrypt explicitly), Lambda reserved concurrency matching rate limit, two\u2011stage nature of Glacier restores, failure\u2011code table, and the subtle difference between job Status=Active vs. Complete. Some sections merely restate AWS docs, but the depth of decision\u2011tree information provides genuine delta."
+      "justification": "The skill provides many expert\u2011level specifics (e.g., exact RequestsPerSecond range, ETA calculation, role\u2011two\u2011sided permission model, Lambda reserved\u2011concurrency guidance, Glacier restore two\u2011stage nuance). However, a sizable portion restates AWS documentation verbatim (manifest format description, basic CLI syntax) and lacks a concise decision tree for selecting the correct operation type based on manifest versioning, which prevents a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific workflow: ordered pre\u2011flight checklist, role\u2011two\u2011sided permission model, confirm\u2011gate before any state\u2011changing CLI, operation\u2011specific grant matrix, and explicit handling of job priority and rate\u2011control. Lacks a concise decision tree for choosing the correct operation type based on manifest content, which would make the procedure fully complete."
+      "justification": "Procedures are AWS\u2011specific and ordered (pre\u2011checks \u2192 CONFIRM \u2192 create\u2011job \u2192 poll). Yet some steps are generic (e.g., \u201cverify cost estimation\u201d without concrete formula) and the mindset section mixes high\u2011level philosophy with procedural detail, reducing the pure procedural clarity."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "A thorough NEVER list with concrete reasons (e.g., missing IAM grants cause 100% failure, header rows in CSV cause NoSuchKey, Status:Complete is not success). Some warnings are generic or lack specific error codes (e.g., missing iam:PassRole is noted only indirectly). Overall strong but not exhaustive."
+      "justification": "A solid NEVER list is present with concrete reasons (e.g., missing IAM grants, header rows in CSV, false\u2011green trap). Some anti\u2011patterns lack depth of explanation (e.g., why a header row causes NoSuchKey is only hinted) and a few common pitfalls (e.g., cross\u2011region report bucket latency) are omitted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The invocation_schema describes input shapes but does not provide a formal JSON schema, leaving some ambiguity for automated parsing."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are all present and well\u2011formed. The activation triggers are a long list but still unstructured, and the \"when_to_use\" paragraph is dense, making reliable automated activation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Content is layered: quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns. Nevertheless, the early sections are dense, potentially overloading the agent before it knows whether it needs the deep details."
+      "justification": "The skill layers information (quick reference, mindset, pre\u2011flight, process, anti\u2011patterns) but the initial sections already contain extensive tables and detailed bullet points, which can overload the agent before it knows whether it needs that depth. Critical rules (e.g., CONFIRM gate) are buried among many paragraphs."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained by mandatory pre\u2011checks and a CONFIRM gate. Rate\u2011control limits are explicitly bounded. Minor gap: no lower\u2011bound guidance for tiny jobs and no explicit safe defaults for missing optional fields."
+      "justification": "Destructive operations are guarded by deterministic pre\u2011checks and a mandatory CONFIRM gate, showing good calibration. However, there is no explicit safeguard on maximum manifest size or automatic throttling for extremely large jobs beyond the rate\u2011control hint, leaving some fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (description \u2192 navigation \u2192 mindset \u2192 process \u2192 contract \u2192 anti\u2011patterns). A few sections (e.g., \"Expert heuristic\") feel inserted rather than part of the core pattern, but overall the structure is coherent."
+      "justification": "The skill follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011patterns). The ordering of sections is slightly ad\u2011hoc (e.g., Anti\u2011Patterns appears after Output format), but overall the structure is coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 11,
       "max": 15,
-      "justification": "Provides concrete CLI commands, output contract, and worked examples that an agent could follow. Placeholders like <etag> and <returned-id> require manual substitution, and error handling for malformed input is limited to a generic VERDICT:ERROR case. Edge cases such as pagination failures or partial manifest corruption are not fully covered."
+      "justification": "Provides concrete CLI commands, output contract, and worked examples, enabling an agent to act. Nonetheless, the contract and the skill text conflict: the contract disallows VERDICT: ERROR, yet the skill later says to emit VERDICT: ERROR on failed verification. This inconsistency can cause execution errors. Additionally, some edge cases (e.g., handling pagination for inventory manifests >100 objects, retry logic for transient failures) are only briefly mentioned."
     }
   ],
-  "total_score": 106,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49634,
-  "latency_ms": 14553,
+  "token_count": 48849,
+  "latency_ms": 12189,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

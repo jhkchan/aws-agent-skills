@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 14,
       "max": 20,
-      "justification": "Provides many concrete, up\u2011to\u2011date AWS specifics (CLI flags, health\u2011check timing math, Aurora Global unplanned failover steps, non\u2011blocking DRS agent, Resilience Hub drift detection, recent 2024\u20112026 feature notes). This is beyond generic knowledge but still largely restates documented procedures, so not a perfect 20."
+      "justification": "Adds concrete decision\u2011tree thresholds (e.g., RTO >24h \u2192 backup) and specific gotchas (split\u2011brain, health\u2011check detection time) that a senior CloudOps engineer would find useful, but the bulk of the content restates publicly documented AWS behaviours and commands, offering limited truly novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures (CLI steps, health\u2011check creation, Step Functions state machine) and a clear decision\u2011tree mindset. However some steps are generic (e.g., \u201cverify primary is down\u201d without AWS\u2011specific verification method) and the ordering for mixed components (e.g., DRS launch vs. Aurora failover) is not fully articulated."
+      "justification": "Encodes AWS\u2011specific pre\u2011flight checks, CLI sequences, and a kill\u2011switch workflow, demonstrating expert thinking. Some procedures remain generic (e.g., \u201cverify primary is down\u201d without service\u2011specific verification steps for DynamoDB or EC2), preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Includes a solid NEVER list with concrete reasons (split\u2011brain, missing drill, single health check). Missing are deeper anti\u2011patterns such as IAM role drift, missing tag propagation, and why certain TTL values are dangerous, which would make the list more exhaustive."
+      "justification": "Provides a detailed NEVER list with concrete reasons (split\u2011brain, missing verification, health\u2011check sensitivity) and explains why each is dangerous. Lacks a few niche anti\u2011patterns such as IAM role drift during DRS launch, so one point is deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are all present and unambiguous. An agent can reliably know when to invoke the skill."
+      "justification": "Frontmatter is complete and well\u2011formed; description, when_to_use, when_not_to_use, activation_triggers, and invocation_schema are all present. The strict output contract is clearly defined, enabling reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill uses a navigation table and layers details, but large code blocks (full CLI commands, full Step Functions definition) appear early, creating cognitive overload. Some critical rules (e.g., mandatory confirmation gate) are buried later rather than highlighted up front."
+      "justification": "Uses a navigation table and layered sections (mindset, decision tree, component details) to avoid overload, but the initial \u201cWhat this skill does\u201d block is dense and mixes high\u2011level intent with low\u2011level CLI examples, causing some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are guarded by explicit confirmation prompts, kill\u2011switch checks, and drill mode guidance. Creative tasks (designing a DR plan) are not over\u2011constrained. Minor deduction for occasional over\u2011specific placeholders (e.g., <zone-id>) that could limit flexibility."
+      "justification": "Destructive actions are gated by explicit confirmation prompts, dry\u2011run flags, and kill\u2011switch checks. Creative design tasks are left open with heuristic callouts. One point deducted for not tightening constraints around IAM role creation and permission validation, which are also fragile."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (overview \u2192 mindset \u2192 pre\u2011flight \u2192 component sections \u2192 output contract \u2192 anti\u2011patterns \u2192 heuristics). The structure aids comprehension, though the \u201cExpert heuristic\u201d and \u201cRecent features\u201d sections feel tacked on rather than integrated."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Pre\u2011flight \u2192 Decision Tree \u2192 Component\u2011by\u2011component implementation \u2192 Output contract \u2192 NEVER \u2192 Heuristics \u2192 Recent features. The structure is coherent, but the ordering of some sections (e.g., anti\u2011patterns after output contract) is slightly unconventional."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides runnable CLI snippets, a full Step Functions definition, and strict output contract, enabling an agent to execute the plan. Deductions for placeholder values (<region>, <account>), lack of explicit error\u2011handling guidance for CLI failures, and limited guidance on handling missing input fields beyond the pre\u2011flight gate."
+      "justification": "Provides working CLI snippets, Step Functions definition, strict output contract, and multiple worked examples, enabling an agent to execute the plan. Missing handling for partial failures (e.g., replication lag exceeding RPO) and limited guidance on synchronising cross\u2011region Lambda env vars reduces usability."
     }
   ],
-  "total_score": 106,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45772,
-  "latency_ms": 11925,
+  "token_count": 46262,
+  "latency_ms": 24212,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

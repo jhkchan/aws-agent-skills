@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 12,
       "max": 20,
-      "justification": "Provides many concrete details (FIFO deduplication, KMS key policy, delivery\u2011logging role) that a novice would not know, but a large portion restates standard AWS documentation without new decision thresholds (e.g., no quantitative rule for when to pick FIFO vs Standard beyond generic TPS limits)."
+      "justification": "The skill mostly compiles well\u2011known SNS concepts (topic types, KMS, delivery logging) that a competent model already knows. It adds a modest decision matrix and a few specific policy snippets, but no deep, novel decision tree or exception that a senior CloudOps engineer would learn for the first time."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Lists a precise deployment order (topic type \u2192 KMS \u2192 access policy \u2192 logging \u2192 filter \u2192 DLQ) and supplies exact CLI snippets for each step, reflecting AWS\u2011specific procedural thinking. Some steps (e.g., generic \"verify before deployment\") are not uniquely AWS\u2011specific, costing a point."
+      "justification": "Provides a clear AWS\u2011specific ordering (topic type \u2192 KMS \u2192 access policy \u2192 logging \u2192 filters \u2192 DLQ) and concrete CLI commands, but some steps (e.g., generic \"verify prerequisites\") are generic and not fully AWS\u2011tailored, losing a few points."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The NEVER section enumerates several high\u2011impact pitfalls with clear why\u2011statements (FIFO suffix, wildcard Principal, cross\u2011account CMK, missing delivery logging, topic\u2011level DLQ). It omits a few common anti\u2011patterns such as handling PendingConfirmation subscriptions and over\u2011reliance on default retry settings, so it falls short of full coverage."
+      "justification": "Contains a solid NEVER list with concrete reasons (wildcard Principal, FIFO topic misuse, cross\u2011account AWS\u2011managed key), yet omits a few common pitfalls such as forgetting the 5\u2011minute deduplication window when disabling ContentBasedDeduplication, so it is not exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description explains WHAT and WHEN, activation keywords are exhaustive, and the invocation contract and output format are unambiguous. The only minor gap is the lack of an explicit JSON schema for the checklist rows."
+      "justification": "Frontmatter, description, keywords, triggers, and a detailed invocation contract are present, enabling reliable activation. The activation keyword list is overly long, which could cause ambiguous triggers, and the \u2018when to use\u2019 clause is embedded in metadata rather than a concise top\u2011level statement."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses a quick\u2011navigation table, high\u2011level overview, then deep\u2011dive sections, keeping the initial cognitive load low. However, the CLI command blocks are large and could be deferred to a reference file, causing slight overload."
+      "justification": "The skill layers information (quick navigation \u2192 high\u2011level reasoning \u2192 detailed steps). Critical rules like delivery\u2011logging requirements are buried several sections deep, creating potential cognitive overload for an agent that needs them early."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Pre\u2011flight safety checks tightly constrain destructive actions (topic creation, policy attachment) and require prerequisite verification. It does not address destructive updates like topic deletion, but the skill\u2019s scope is creation only, so calibration is appropriate."
+      "justification": "Destructive actions (topic creation, policy changes) are guarded by pre\u2011flight checks and safety notes, but the guidance on cross\u2011account KMS key policy could be tighter (e.g., explicit example of required Condition), leaving a slight freedom gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (contract \u2192 reasoning \u2192 prerequisites \u2192 step\u2011by\u2011step \u2192 anti\u2011patterns \u2192 output format). The structure is clear and reusable across skills."
+      "justification": "Follows a recognizable pattern (invocation contract \u2192 reasoning framework \u2192 stepwise procedure \u2192 NEVER \u2192 output format). Minor inconsistency in formatting (mix of markdown tables and plain text) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides decision trees, error\u2011handling tables, verification commands, and ready\u2011to\u2011copy CLI snippets, enabling an agent to act. Missing are ready\u2011made IaC snippets (Terraform/CFN) and explicit rollback procedures, which limits end\u2011to\u2011end execution."
+      "justification": "Model outputs generally match the required checklist format, but some examples omit required verification commands for optional items (e.g., DLQ) and occasionally miss the dual role\u202f+\u202fresource\u2011policy citation for delivery logging, indicating gaps that could cause an agent to produce incomplete deployments."
     }
   ],
-  "total_score": 102,
+  "total_score": 99,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40513,
-  "latency_ms": 11726,
+  "token_count": 40537,
+  "latency_ms": 12211,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

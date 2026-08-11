@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides concrete, expert\u2011level thresholds (e.g., I/O >30% of bill, ACU floor >2 with CPU<10%, break\u2011even formula storage_GB*0.4M I/O) and exact pricing numbers ($0.12/ACU\u2011hour, $0.18/GB storage). A capable model could state generic cost levers, but these specific decision rules and cost figures constitute genuine delta, though some statements merely restate known AWS docs."
+      "justification": "Provides concrete break\u2011even formula for I/O\u2011Optimized tier and specific ACU cost numbers, but most of the pricing thresholds and decision matrices are restatements of publicly documented Aurora pricing; a capable model could already generate similar guidance, so true expert delta is limited."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The procedure is AWS\u2011specific: ordered data\u2011gate, Cost Explorer reconciliation, per\u2011dimension decision matrices, snapshot\u2011before\u2011change, one\u2011dimension\u2011per\u2011maintenance\u2011window, and explicit CLI steps. The only shortfall is a generic \"validate input\" step that could be more explicit about AWS\u2011specific validation (e.g., checking engine version compatibility)."
+      "justification": "Includes AWS\u2011specific CLI steps and a logical order of data\u2011gate \u2192 cost\u2011reconciliation \u2192 dimension analysis, yet some procedures (e.g., generic \"validate input\" and \"watch CPU for 24h\") are generic CloudOps steps rather than Aurora\u2011unique reasoning, leading to a modest deduction."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasoning for each pitfall (e.g., never switch I/O\u2011Optimized without break\u2011even calc, never drop Serverless min\u2011capacity below SLA, never buy RI for a cluster slated for migration). Each anti\u2011pattern is tied to a real cost impact, meeting the full criteria."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., break\u2011even I/O calculation, latency SLA before lowering Serverless min, RI term vs migration plans). One point deducted because the list could be expanded to cover a few niche pitfalls (e.g., cross\u2011region snapshot costs) that are omitted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use/when_not_to_use, activation_triggers, invocation_schema, and example are all present. The only minor defect is that the activation_triggers list is long and could cause false positives; a tighter trigger set would improve reliability."
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present. However, the example output omits several optional fields (e.g., per\u2011dimension savings breakdown) and the skill does not explicitly state how to handle missing required fields, so it falls short of a perfect spec."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information well (high\u2011level overview, quick start, mindset, step\u2011by\u2011step process, anti\u2011patterns, navigation). However, the initial sections are dense and include many tables, which may overload an agent before it knows which section to consult for a given query."
+      "justification": "The document layers high\u2011level \"Quick start\" and \"Mindset\" before deep sections, but the opening pages already contain extensive tables, break\u2011even formulas, and CLI snippets, which can overload the agent before it knows which dimension to focus on. A tighter top\u2011level summary would improve progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly gated (CONFIRM, snapshot, one\u2011dimension\u2011per\u2011window, batch limit of 3 clusters). Creative tasks (e.g., triage) are left open. The only gap is that RI purchase steps do not explicitly verify that the offering matches the exact instance class and engine version before purchase."
+      "justification": "Destructive actions are gated by CONFIRM and snapshot steps, and batch limits are defined. A slight deduction because the RI purchase step lacks an explicit confirmation gate in the narrative (it appears only in the example) and the skill does not enforce a maximum number of RI purchases per run."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (metadata, what\u2011it\u2011does, strict output contract, quick start, mindset, stepwise process, anti\u2011patterns, navigation, heuristics, safety checks) that aligns with other AWS CloudOps skills."
+      "justification": "The skill follows a recognizable structure (description \u2192 contract \u2192 mindset \u2192 stepwise process \u2192 anti\u2011patterns \u2192 navigation), but the pattern is custom rather than a documented standard (e.g., no explicit \"Mindset\u2011Navigation\u2011Philosophy\u2011Process\" labeling). Hence a small deduction."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 11,
       "max": 15,
-      "justification": "The skill defines a strict output contract, but the model's example outputs omit several required sub\u2011fields (e.g., missing most Monthly savings lines, missing Confidence sub\u2011field in some cases). This contract violation shows the skill is not fully executable as\u2011is, reducing practical usability."
+      "justification": "Model output produces valid optimisation blocks with required fields (TARGET, VERDICT, RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS, CONFIRM). However, the ESTIMATED_SAVINGS section omits many dimension\u2011specific lines (e.g., right\u2011sizing, RI) when not applicable, which may violate the strict output contract that expects those fields. Also the output mixes multiple clusters in one invocation without a clear batch delimiter, which could confuse an agent."
     }
   ],
-  "total_score": 107,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46740,
-  "latency_ms": 15706,
+  "token_count": 46761,
+  "latency_ms": 21647,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

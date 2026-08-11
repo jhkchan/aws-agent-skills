@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds many non\u2011obvious AWS specifics (e.g., CAD Impact.TotalImpact vs total spend, Budgets action single\u2011threshold limitation, CUR partition\u2011repair steps, kill\u2011switch pattern, approval\u2011gate design, recent 2024\u20112026 feature changes). A capable model could list commands, but the skill provides decision\u2011trees and nuanced thresholds that a senior CloudOps engineer would learn."
+      "justification": "Provides concrete, up\u2011to\u2011date AWS nuances (e.g., CAD Impact.TotalImpact vs total spend, Budgets single\u2011threshold limitation, CUR partitioning, kill\u2011switch importance, recent 2024\u20112026 feature changes). These details are beyond a generic model's baseline knowledge and constitute real expert delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Procedures are largely AWS\u2011specific (EventBridge \u2192 Lambda, Step Functions approval gate, Parameter Store kill\u2011switch), but the description of implementing the kill\u2011switch is generic (\u201ccheck Parameter Store\u201d) without concrete steps (e.g., IAM policy to read the parameter, Lambda code snippet). This genericness costs 2 points."
+      "justification": "Encodes AWS\u2011specific decision\u2011tree and step\u2011by\u2011step CLI procedures for each detection source and response pattern. Some steps are generic (\"check kill\u2011switch\") and could be more AWS\u2011specific, but overall the mindset and procedures are well\u2011aligned to CloudOps."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., never use automatic EC2\u2011stop in Budgets, never grant *:* IAM, never hard\u2011code webhook URLs). Minor gap: does not explicitly warn against using CloudWatch billing alarms as a substitute for CAD in real\u2011time scenarios."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never run Budgets EC2\u2011stop automatically, never grant *:* IAM, never assume SNS delivery). Only minor omission: no explicit warning about IAM deny\u2011policy attaching to the workflow\u2019s own role."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Complete front\u2011matter, clear description, when\u2011to\u2011use/when\u2011not\u2011to\u2011use, activation triggers, full JSON invocation schema, and a strict output contract that an agent can parse reliably."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and a precise invocation_schema are present. The \"when to invoke\" narrative could be tighter, but the spec is sufficient for reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level summary, quick\u2011navigation table, then deeper sections (mindset, decision tree, guardrails, NEVER, heuristics). Some sections are lengthy, causing slight cognitive overload, but critical rules are not buried."
+      "justification": "Top\u2011level sections (quick navigation, mindset, decision tree) give a high\u2011level view before deep CLI examples. However, the early inclusion of full command blocks and extensive tables adds cognitive load earlier than ideal."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained (approval gate, kill\u2011switch, dry\u2011run) while notification\u2011only paths remain flexible. No over\u2011constraining of creative tasks."
+      "justification": "Destructive actions are tightly guarded (dry\u2011run, approval gate, kill\u2011switch) while notification\u2011only paths remain flexible. The dry\u2011run guidance is present but not enforced by a concrete schema, leaving a small calibration gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 decision tree \u2192 guardrails \u2192 output format \u2192 NEVER \u2192 heuristic \u2192 recent features). Structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Navigation \u2192 Guardrails \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Heuristics. Structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides actionable CLI snippets, decision tree, example output blocks, and remediation steps that an agent can execute. Slight deduction for missing guidance on multi\u2011account scaling of monitors and for not covering every edge case (e.g., handling deleted resources in tag\u2011step)."
+      "justification": "Provides concrete CLI commands, decision trees, and worked examples that an agent can follow. Missing some edge\u2011case branches (e.g., cross\u2011account anomaly handling) and a few vague trigger descriptions, preventing a perfect score."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43178,
-  "latency_ms": 13325,
+  "token_count": 42510,
+  "latency_ms": 12884,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

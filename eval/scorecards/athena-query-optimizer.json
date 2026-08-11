@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 15,
+      "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert details not typically recalled by a generic model: specific performance multipliers (Parquet 10\u2011100x), cost reduction percentages, exact partition\u2011projection trigger (>100K partitions), cost formula ($5/TB), and precise CLI/SQL snippets. However much of this is documented elsewhere, so the delta is strong but not maximal."
+      "justification": "Provides concrete, expert\u2011level thresholds and formulas not typically known by a generic model: partition\u2011projection trigger (>100K partitions), exact $5/TB cost model, compression ratio impacts, bucket count recommendation (256), and a step\u2011by\u2011step decision framework. Adds genuine delta beyond baseline knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific optimization mindset and ordered procedure (file format \u2192 partitioning \u2192 query rewrite \u2192 workgroup \u2192 CTAS \u2192 bucketing). Includes exact AWS CLI commands, Athena JSON workgroup config, and CTAS syntax. Some steps are generic (e.g., \"validate input\") which prevents a perfect score."
+      "justification": "Encodes AWS\u2011specific procedures: ordered optimization steps, exact CLI commands for Glue, Athena, S3, JSON payload for workgroup updates, and engine\u2011version checks. Lacks a few deeper procedural nuances (e.g., handling IAM permissions), hence a small deduction."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Includes a concrete \u201cNEVER\u201d list with reasons (e.g., never use GZIP for Parquet, never set workgroup limits without measuring p99). It could be stronger by adding more anti\u2011patterns (e.g., over\u2011partitioning into tiny files) and deeper reasoning for each."
+      "justification": "Contains a concrete \"NEVER\" list with specific reasons (e.g., never use GZIP on Parquet, never set workgroup limits without p99 measurement). Missing a couple of less obvious pitfalls (e.g., over\u2011bucketing) prevents a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter is complete, activation triggers and invocation schema are well defined, and when\u2011to\u2011use/when\u2011not\u2011to\u2011use sections are present. Missing is an explicit example invocation or entry\u2011point flag that would make automated activation absolutely reliable."
+      "justification": "Full frontmatter, clear description, explicit activation triggers, and a precise invocation schema. All required metadata present and unambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The document layers information (quick start \u2192 mindset \u2192 process \u2192 deep references) effectively. The quick\u2011start section, however, packs a lot of detail that could overwhelm a first\u2011time reader, slightly breaking the progressive\u2011disclosure ideal."
+      "justification": "Content is layered logically (quick start \u2192 mindset \u2192 process \u2192 output format \u2192 deep references). No cognitive overload, but the \"Quick reference\" table repeats some info, causing slight redundancy."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (CTAS, workgroup changes) are gated by a CONFIRM step, batch limits are set, and safe\u2011guard checks are listed. Cost\u2011estimate language for CTAS is a bit vague (e.g., \u201cestimated cost $6\u201d), but overall calibration is strong."
+      "justification": "Destructive actions (CTAS, workgroup changes) are gated by explicit CONFIRM prompts and batch limits; creative recommendations remain flexible. Minor over\u2011constraint in the \"Never\" list (e.g., blanket ban on GZIP) slightly reduces freedom."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 process \u2192 output contract \u2192 heuristics \u2192 anti\u2011patterns). Some headings (e.g., \u201cQuick navigation\u201d) feel ad\u2011hoc, preventing a perfectly clean pattern."
+      "justification": "Follows a recognizable structure (Mindset \u2192 Process \u2192 Output \u2192 Heuristics \u2192 NEVER \u2192 References). Slight deviation in ordering of sections (e.g., \"Quick navigation\" before \"Mindset\") prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides a deterministic output block, working CLI examples, and estimation formulas, enabling an agent to act. Edge cases such as missing query history or federated\u2011query cost models are only briefly noted, and some cost assumptions may be optimistic, leaving gaps for real\u2011world execution."
+      "justification": "Model output examples fully comply with the strict output contract and are executable. Minor issues: target identifiers contain hyphens (potential Athena naming problem) and a small inconsistency in cost\u2011saving arithmetic, but overall an agent could act on the skill successfully."
     }
   ],
-  "total_score": 104,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 40792,
-  "latency_ms": 9538,
+  "grade": "A",
+  "token_count": 41224,
+  "latency_ms": 35170,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0
