@@ -764,41 +764,32 @@ failing. Each flips a diagnosis if missed:
 
 ## Recent AWS features (2024-2026)
 
-- **DMS Serverless (2024 GA):** Auto-provisions replication instance
-  capacity based on workload, scaling up/down automatically. Eliminates
-  the manual instance-class tuning in Step 6b/6c. No fixed replication
-  instance; capacity is Data Migration Units (DMUs). The diagnostic
-  tree is the same; instance-capacity probes become DMU-utilization
-  probes.
+- **DMS Serverless (2024 GA):** Auto-provisions replication capacity,
+  scaling up/down automatically. Eliminates manual instance-class
+  tuning. No fixed replication instance; capacity is Data Migration
+  Units (DMUs). Instance-capacity probes become DMU-utilization probes.
 
 - **DMS with Babelfish for Aurora PostgreSQL (2024 GA):** Babelfish
-  enables T-SQL (SQL Server dialect) on Aurora PostgreSQL. DMS can
-  migrate SQL Server to Aurora PostgreSQL with Babelfish, and the
-  target understands T-SQL constraints and stored procedures. Target-
-  side diagnosis (Step 5b) must account for Babelfish's T-SQL-to-
-  PostgreSQL translation — some constraint error messages differ.
+  enables T-SQL on Aurora PostgreSQL. DMS migrates SQL Server to
+  Aurora PostgreSQL with Babelfish; target understands T-SQL
+  constraints. Target-side diagnosis must account for Babelfish's
+  T-SQL-to-PostgreSQL translation.
 
 - **Amazon DMS Fleet Advisor (2024 GA):** Pre-migration assessment tool
-  that inventories on-premises databases, analyzes migration
-  complexity, and recommends target engines and task configurations.
-  Runs BEFORE the DMS task — not a troubleshooting tool. Use for
-  greenfield planning, not diagnosing a failed task.
+  that inventories databases, analyzes complexity, recommends target
+  engines. Runs BEFORE the DMS task — not a troubleshooting tool.
 
 - **DMS data validation (2024 enhancement):** Validates data between
-  source and target (row count, checksum, full comparison) after
-  migration. Enable via `Validation` in task settings. Validation
-  failures appear in `awsdms_control` schema tables and task logs.
-  Useful for catching silent data loss (LOB truncation, table-mapping
-  exclusions).
+  source and target (row count, checksum, full comparison). Enable via
+  `Validation` in task settings. Failures appear in `awsdms_control`
+  schema tables and task logs. Catches silent data loss.
 
 - **DMS Zero-ETL integration (2025):** For Aurora/RDS PostgreSQL to
-  Redshift, DMS can use the native Zero-ETL integration (no DMS task
-  required). Different pipeline from DMS replication tasks; do not
-  confuse Zero-ETL with DMS CDC.
+  Redshift, native Zero-ETL (no DMS task required). Different pipeline
+  — do not confuse with DMS CDC.
 
-- **DMS support for MySQL 8.0 and PostgreSQL 16 (2024-2026):** Added
-  CDC support for MySQL 8.0 (improved binlog performance) and
-  PostgreSQL 16 (improved logical replication slot management). Older
+- **DMS support for MySQL 8.0 and PostgreSQL 16 (2024-2026):** Improved
+  binlog performance and logical replication slot management. Older
   engine versions may have CDC bugs fixed in newer releases.
 
 ## Domain
