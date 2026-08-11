@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "inspector2-coverage-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Inspector v2 Coverage Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "enable-standalone-ready",
+      "name": "Enable Inspector v2 for EC2+ECR+Lambda in a standalone account (READY)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/enable-standalone-ready.md",
+      "baseline_file": "baselines/enable-standalone-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "111111111111", "EC2 ECR LAMBDA", "inspector2 enable", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "delegated-admin-ready",
+      "name": "Enable delegated admin account for Inspector org-mode (READY with one-way door)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/delegated-admin-ready.md",
+      "baseline_file": "baselines/delegated-admin-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "222222222222", "enable-delegated-admin-account", "VERDICT", "CONFIRM", "one-way"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "ecr-rescan-ready",
+      "name": "Enable ECR rescan-on-push for a repository (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ecr-rescan-ready.md",
+      "baseline_file": "baselines/ecr-rescan-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod-app", "put-image-scanning-configuration", "scanOnPush", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "member-enable-blocked",
+      "name": "Member account enable blocked under org-mode (BLOCKED — delegated admin required)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/member-enable-blocked.md",
+      "baseline_file": "baselines/member-enable-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "delegated admin", "222222222222", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED", "inspector2 enable --account-ids 333333333333"]
+        }
+      ]
+    },
+    {
+      "id": "sbom-export-completed",
+      "name": "SBOM export to S3 — post-verification passed (COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/sbom-export-completed.md",
+      "baseline_file": "baselines/sbom-export-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "CYCLONEDX_1_5", "inspector-sbom-prod", "VERDICT", "POST_VERIFY"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

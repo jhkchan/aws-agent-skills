@@ -2,22 +2,21 @@
 name: sns-subscription-operator
 description: >-
   Operates AWS SNS subscription workflows end-to-end — subscription
-  creation (HTTP/HTTPS/SQS/Lambda/email/email-json/sms/firehose/
-  application), subscription confirmation (PendingConfirmation to
-  Confirmed via token or auto-confirm for SQS/Lambda), filter-policy
-  design (message attributes, subscription filter-policy scope),
-  delivery policies (retry backoff, min/max delay, dead-letter queue
-  via redrive), subscription attributes (RawMessageDelivery,
-  ConfirmationTimeout, topic ARN verification), and diagnostic loops
+  creation (HTTP/HTTPS/SQS/Lambda/email/sms/firehose), subscription
+  confirmation (PendingConfirmation to Confirmed via token or
+  auto-confirm for SQS/Lambda), filter-policy design (message
+  attributes, FilterPolicyScope), delivery policies (retry backoff,
+  dead-letter queue via redrive), subscription attributes
+  (RawMessageDelivery), and diagnostic loops
   (list-subscriptions-by-topic, get-subscription-attributes,
-  CloudTrail Subscribe/Confirm/SetSubscriptionAttributes events).
-  Runs deterministic pre-checks (topic exists, endpoint reachable,
-  topic policy permits subscription, protocol valid, filter policy
-  JSON valid, DLQ target exists for redrive) behind a CONFIRM gate
-  and emits a READY, BLOCKED, or COMPLETED verdict per operation.
-  Use when creating subscriptions, confirming pending subscriptions,
-  debugging filter-policy matches, configuring delivery retry and
-  DLQ, or diagnosing why messages are not delivered.
+  CloudTrail events). Runs deterministic pre-checks (topic exists,
+  endpoint reachable, topic policy permits subscription, protocol
+  valid, filter-policy JSON valid, DLQ target exists for redrive)
+  behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED
+  verdict per operation. Use when creating subscriptions, confirming
+  pending subscriptions, debugging filter-policy matches, configuring
+  delivery retry and DLQ, or diagnosing why messages are not
+  delivered.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -760,10 +759,10 @@ message delivery or creates a security exposure.
 
 - **SNS message data protection (2024-2026):** A message data
   protection policy on the topic can audit, mask, or deny messages
-  containing sensitive data (PII, financial data, health data) based
-  on message attributes or body content. Subscribers may receive
-  masked messages or no message if the policy denies. Verify the
-  topic's `getDataProtectionPolicy` when diagnosing missing messages.
+  containing sensitive data (PII, financial, health) based on message
+  attributes or body content. Subscribers may receive masked messages
+  or no message if the policy denies. Verify the topic's
+  `getDataProtectionPolicy` when diagnosing missing messages.
 
 - **Subscription filter-policy scope for MessageBody (2024):**
   `FilterPolicyScope: MessageBody` enables filtering on the JSON
@@ -798,4 +797,3 @@ AWS CloudOps / SNS Subscription Operations & App Integration.
 - **SNS dead-letter queues** — https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html
 - **SNS message data protection** — https://docs.aws.amazon.com/sns/latest/dg/sns-data-protection.html
 - **SNS FIFO topics** — https://docs.aws.amazon.com/sns/latest/dg/fifo-message-delivery.html
-- **AWS CLI: sns** — https://docs.aws.amazon.com/cli/latest/reference/sns/

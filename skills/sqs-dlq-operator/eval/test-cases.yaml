@@ -1,0 +1,233 @@
+# Eval test cases for sqs-dlq-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: sqs-dlq-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-standard-dlq-wire-redrive-ready
+    description: >-
+      Create a Standard DLQ and wire a redrive policy on the source
+      queue. Source exists, DLQ name is available, types match (both
+      Standard), retention will be 14 days, maxReceiveCount=5, the
+      Lambda consumer has ReportBatchItemFailures enabled, and the
+      visibility timeout comfortably exceeds the consumer p99. All
+      pre-checks pass; plan should produce READY with the create-queue
+      + set-queue-attributes CLI behind a CONFIRM gate.
+    input: |
+      Operation: create
+      Source queue: prod-orders (Standard, VisibilityTimeout=60)
+      DLQ name: prod-orders-dlq (Standard, 14-day retention)
+      maxReceiveCount: 5
+      Region: us-east-1. Account: 111111111111.
+
+      Pre-flight checks (performed by caller):
+        aws sqs get-queue-url --queue-name prod-orders:
+          https://sqs.us-east-1.amazonaws.com/111111111111/prod-orders
+        aws sqs get-queue-attributes --queue-url <source> --attribute-names All:
+          FifoQueue: (not set — Standard)
+          VisibilityTimeout: 60
+          RedrivePolicy: (not set — no existing DLQ)
+        aws sqs get-queue-url --queue-name prod-orders-dlq:
+          AWSSimpleQueueService.NonExistentQueue (name available)
+        aws lambda list-event-source-mappings \
+          --event-source-arn arn:aws:sqs:us-east-1:111111111111:prod-orders:
+          UUID: a1b2c3d4, BatchSize: 10, VisibilityTimeout: 60,
+          FunctionResponseTypes: [ReportBatchItemFailures]
+        Lambda Duration p99 (last 7 days): 8s
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, STATE, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-orders-dlq"
+        - "create-queue"
+        - "VERDICT"
+        - "CONFIRM"
+        - "RedrivePolicy"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: fifo-type-mismatch-blocked
+    description: >-
+      Create a DLQ for a FIFO source queue, but the proposed DLQ name
+      does NOT end in .fifo. The skill MUST BLOCK on the type-mismatch
+      pre-check (SQS silently drops redriven messages on FIFO/Standard
+      mismatch). Surface the exact mismatch and the corrected name.
+    input: |
+      Operation: create
+      Source queue: prod-orders.fifo (FIFO, VisibilityTimeout=120)
+      Proposed DLQ name: prod-orders-dlq (Standard — WRONG, should be .fifo)
+      maxReceiveCount: 10
+      Region: us-east-1. Account: 111111111111.
+
+      Pre-flight checks (performed by caller):
+        aws sqs get-queue-url --queue-name prod-orders.fifo:
+          https://sqs.us-east-1.amazonaws.com/111111111111/prod-orders.fifo
+        aws sqs get-queue-attributes --queue-url <source> --attribute-names All:
+          FifoQueue: true
+          VisibilityTimeout: 120
+        aws sqs get-queue-url --queue-name prod-orders-dlq:
+          AWSSimpleQueueService.NonExistentQueue (name available)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "FIFO"
+        - -"fifo"
+        - "VERDICT"
+        - "type"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: analyze-dlq-visibility-timeout-race-blocked
+    description: >-
+      Analyze a DLQ that is filling with messages. All sampled DLQ
+      messages have valid payloads (no poison pills), but the Lambda
+      event source mapping lacks ReportBatchItemFailures and the
+      VisibilityTimeout (30s) is shorter than the Lambda Duration p99
+      (52s). The skill MUST BLOCK on these two root causes and surface
+      the exact remediation (enable partial-batch responses + increase
+      visibility timeout to >= 312s = 6x p99).
+    input: |
+      Operation: analyze
+      DLQ: prod-orders-dlq
+      Region: us-east-1. Account: 111111111111.
+
+      Pre-flight checks (performed by caller):
+        aws sqs get-queue-attributes --queue-url <dlq> --attribute-names All:
+          ApproximateNumberOfMessagesVisible: 1247
+          MessageRetentionPeriod: 1209600 (14 days)
+        aws sqs receive-message --queue-url <dlq> --max-number-of-messages 10:
+          10 messages received, all with valid JSON payloads
+          (no malformed data, no missing fields)
+          ApproximateReceiveCount on each: 10 (matches maxReceiveCount)
+        aws sqs get-queue-attributes --queue-url <source> --attribute-names All:
+          VisibilityTimeout: 30
+          RedrivePolicy: maxReceiveCount: 10
+        aws lambda list-event-source-mappings \
+          --event-source-arn arn:aws:sqs:us-east-1:111111111111:prod-orders:
+          UUID: a1b2c3d4, BatchSize: 10, VisibilityTimeout: 30,
+          FunctionResponseTypes: [] (NOT set — no partial-batch)
+        Lambda Duration p99 (last 7 days): 52s
+        Lambda CloudWatch Logs (last 1 hour, filter "ERROR"): 0 errors
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "ReportBatchItemFailures"
+        - "VisibilityTimeout"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: replay-startmessagemovetask-completed
+    description: >-
+      Replay 1247 messages from the DLQ back to the source via
+      StartMessageMoveTask. The root cause (Lambda consumer could not
+      handle a new field) has been patched in deploy v1.4.2. The replay
+      task has completed: 1247 moved, 0 failed, DLQ depth returned to
+      zero, source queue receiving. Plan should produce COMPLETED.
+    input: |
+      Operation: replay (post-verification after execution)
+      DLQ: prod-orders-dlq -> Source: prod-orders
+      Region: us-east-1. Account: 111111111111.
+
+      Root cause (now fixed):
+        Lambda consumer threw NullReferenceException on a new
+        optional field "discountCode" added in API v2. Patched in
+        deploy v1.4.2 to handle null gracefully.
+
+      Pre-replay DLQ depth: 1247 messages
+      maxReceiveCount on source: 5
+      VisibilityTimeout on source: 60s (>= Lambda p99 of 8s)
+      Lambda event source mapping: ReportBatchItemFailures enabled
+
+      Executed CLI:
+        aws sqs start-message-move-task \
+          --source-arn arn:aws:sqs:us-east-1:111111111111:prod-orders-dlq \
+          --destination-arn arn:aws:sqs:us-east-1:111111111111:prod-orders \
+          --max-number-of-messages-per-second 100
+        TaskHandle: AAE...)
+
+      Post-execution checks (all passed):
+        aws sqs list-message-move-tasks --source-arn <dlq-arn>:
+          Status: COMPLETED, FilesMoved: 1247, FilesFailed: 0,
+          StartedTimestamp: 2026-08-11T10:00:00Z,
+          EndedTimestamp: 2026-08-11T10:00:13Z (13 seconds)
+        aws cloudwatch get-metric-statistics (DLQ depth post-replay):
+          ApproximateNumberOfMessagesVisible: 0
+        aws cloudwatch get-metric-statistics (source queue):
+          NumberOfMessagesReceived increased by ~1247 over replay window
+        Lambda CloudWatch Logs (filter "ERROR"): 0 errors on replayed
+          messages (patch confirmed working)
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "prod-orders"
+        - "StartMessageMoveTask"
+        - "VERDICT"
+        - "POST_VERIFY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
+
+  - id: replay-no-active-consumer-blocked
+    description: >-
+      Attempt to replay messages from a DLQ back to a source queue
+      that has NO active consumer (the Lambda event source mapping
+      was disabled during an incident). Replaying messages into a
+      source with no consumer just re-accumulates them. The skill
+      MUST BLOCK on the no-active-consumer pre-check.
+    input: |
+      Operation: replay
+      DLQ: prod-orders-dlq -> Source: prod-orders
+      Region: us-east-1. Account: 111111111111.
+
+      Pre-flight checks (performed by caller):
+        aws sqs get-queue-attributes --queue-url <dlq>:
+          ApproximateNumberOfMessagesVisible: 842
+        aws sqs list-dead-letter-source-queues --queue-url <dlq>:
+          https://sqs.us-east-1.amazonaws.com/111111111111/prod-orders
+        aws lambda list-event-source-mappings \
+          --event-source-arn arn:aws:sqs:us-east-1:111111111111:prod-orders:
+          UUID: a1b2c3d4, State: Disabling (mapping disabled during
+            incident, not yet re-enabled)
+        Root cause status: consumer patched (deploy v1.4.2), but
+          mapping NOT yet re-enabled
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "consumer"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"

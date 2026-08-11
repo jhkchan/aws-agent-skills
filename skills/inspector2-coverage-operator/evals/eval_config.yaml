@@ -1,0 +1,48 @@
+# Eval configuration for inspector2-coverage-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: inspector2-coverage-operator
+snapshot_date: "2026-08-10"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: enable-standalone-ready
+    difficulty: easy
+    prompt_file: prompts/enable-standalone-ready.md
+    baseline_file: baselines/enable-standalone-ready.md
+    expected_verdict: READY
+    expected_risk: LOW
+  - id: delegated-admin-ready
+    difficulty: hard
+    prompt_file: prompts/delegated-admin-ready.md
+    baseline_file: baselines/delegated-admin-ready.md
+    expected_verdict: READY
+    expected_risk: MODERATE
+  - id: ecr-rescan-ready
+    difficulty: medium
+    prompt_file: prompts/ecr-rescan-ready.md
+    baseline_file: baselines/ecr-rescan-ready.md
+    expected_verdict: READY
+    expected_risk: LOW
+  - id: member-enable-blocked
+    difficulty: hard
+    prompt_file: prompts/member-enable-blocked.md
+    baseline_file: baselines/member-enable-blocked.md
+    expected_verdict: BLOCKED
+    expected_risk: HIGH
+  - id: sbom-export-completed
+    difficulty: medium
+    prompt_file: prompts/sbom-export-completed.md
+    baseline_file: baselines/sbom-export-completed.md
+    expected_verdict: COMPLETED
+    expected_risk: LOW

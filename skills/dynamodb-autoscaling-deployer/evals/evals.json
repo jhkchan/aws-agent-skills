@@ -1,0 +1,172 @@
+{
+  "skill": "dynamodb-autoscaling-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the DynamoDB Auto-Scaling Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across DynamoDB auto-scaling scenarios (table RCU/WCU target tracking, GSI auto-scaling, custom cooldown tuning for spiky workloads, on-demand table requiring mode switch, missing table/SLR prerequisites). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "table-target-tracking",
+      "name": "Table read/write target tracking at 70% utilization",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — PROVISIONED table, RCU + WCU scalable targets, target tracking policies at 70%, SLR cited",
+      "prompt": "Configure DynamoDB auto-scaling for table orders-table (arn: aws:dynamodb:us-east-1:111111111111:table/orders-table). The table is in PROVISIONED mode. Set up target tracking for both read and write capacity at 70% utilization. MinCapacity=10, MaxCapacity=40000 for both RCU and WCU. ScaleOutCooldown=60, ScaleInCooldown=60. Application auto-scaling service-linked role is available. Account ID: 111111111111.",
+      "prompt_file": "prompts/table-target-tracking.md",
+      "baseline_file": "baselines/table-target-tracking.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DYNAMODB_AUTOSCALING: orders-table (arn:aws:dynamodb:us-east-1:111111111111:table/orders-table)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Table: orders-table (arn:aws:dynamodb:us-east-1:111111111111:table/orders-table)\n  [✓] Capacity mode: PROVISIONED (required for auto-scaling)\n  [✓] Application auto-scaling role: AWSServiceRoleForApplicationAutoScaling_DynamoDBFeedback (SLR)\n  [✓] Table read scaling: scalable target (Min=10, Max=40000) + policy (Target=70%, ScaleOut=60s, ScaleIn=60s)\n  [✓] Table write scaling: scalable target (Min=10, Max=40000) + policy (Target=70%, ScaleOut=60s, ScaleIn=60s)\nVERIFICATION_COMMANDS:\n  aws application-autoscaling describe-scalable-targets --service-namespace dynamodb --resource-ids table/orders-table\n  aws application-autoscaling describe-scaling-policies --service-namespace dynamodb --resource-id table/orders-table\n  aws dynamodb describe-table --table-name orders-table --query Table.BillingModeSummary",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "target tracking",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "PROVISIONED",
+            "70"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gsi-autoscaling",
+      "name": "GSI read/write target tracking for status-index",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — GSI scalable targets with resource-id table/<name>/index/<gsi>, dynamodb:index dimensions",
+      "prompt": "Configure DynamoDB auto-scaling for the GSI status-index on table orders-table (arn:aws:dynamodb:us-east-1:111111111111: table/orders-table). The table is in PROVISIONED mode. The table already has auto-scaling configured; I need GSI auto-scaling for status-index. Target utilization 70%. MinCapacity=5, MaxCapacity=20000 for both RCU and WCU. Cooldowns 60s each. Account ID: 111111111111.",
+      "prompt_file": "prompts/gsi-autoscaling.md",
+      "baseline_file": "baselines/gsi-autoscaling.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DYNAMODB_AUTOSCALING: orders-table / status-index\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] GSI status-index read scaling: scalable target (Min=5, Max=20000) + policy (Target=70%, ScaleOut=60s, ScaleIn=60s)\n  [✓] GSI status-index write scaling: scalable target (Min=5, Max=20000) + policy (Target=70%, ScaleOut=60s, ScaleIn=60s)\nVERIFICATION_COMMANDS:\n  aws application-autoscaling describe-scalable-targets --service-namespace dynamodb --resource-ids table/orders-table/index/status-index\n  aws application-autoscaling describe-scaling-policies --service-namespace dynamodb --resource-id table/orders-table/index/status-index",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "VERDICT",
+            "CHECKLIST",
+            "status-index",
+            "dynamodb:index"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-cooldown-tuning",
+      "name": "Spiky workload with TargetValue=50, aggressive scale-out, conservative scale-in, throttle alarm",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — TargetValue=50, ScaleOutCooldown=0, ScaleInCooldown=300, throttle alarm on ThrottledRequests",
+      "prompt": "Configure DynamoDB auto-scaling for table events-table (arn: aws:dynamodb:us-east-1:111111111111:table/events-table). The table is PROVISIONED mode. This is a spiky workload — use target utilization 50% for both read and write. MinCapacity=20, MaxCapacity=30000. ScaleOutCooldown=0 (aggressive scale-out), ScaleInCooldown=300 (conservative scale-in to prevent flapping). Also create a CloudWatch throttle alarm on ThrottledRequests > 0 sending to SNS arn:aws:sns:us-east-1:111111111111:alerts. Account ID: 111111111111.",
+      "prompt_file": "prompts/custom-cooldown-tuning.md",
+      "baseline_file": "baselines/custom-cooldown-tuning.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DYNAMODB_AUTOSCALING: events-table (arn:aws:dynamodb:us-east-1:111111111111:table/events-table)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Table read scaling: scalable target (Min=20, Max=30000) + policy (Target=50%, ScaleOut=0s, ScaleIn=300s)\n  [✓] Table write scaling: scalable target (Min=20, Max=30000) + policy (Target=50%, ScaleOut=0s, ScaleIn=300s)\n  [✓] Throttle alarm: CloudWatch alarm on ThrottledRequests > 0 → arn:aws:sns:us-east-1:111111111111:alerts\nVERIFICATION_COMMANDS:\n  aws application-autoscaling describe-scaling-policies --service-namespace dynamodb --resource-id table/events-table\n  aws cloudwatch describe-alarms --namespace AWS/DynamoDB --dimensions Name=TableName,Value=events-table",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "VERDICT",
+            "CHECKLIST",
+            "ThrottledRequests",
+            "50"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "on-demand-vs-provisioned",
+      "name": "On-demand table requiring mode switch before auto-scaling",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — table is ON-DEMAND, skill advises switch to PROVISIONED first, then configures auto-scaling",
+      "prompt": "I want to set up DynamoDB auto-scaling on table users-table (arn:aws:dynamodb:us-east-1:111111111111:table/users-table). The table is currently ON-DEMAND. Target utilization 70%, MinCapacity=5, MaxCapacity=10000 for both RCU and WCU. Cooldowns 60s. Account ID: 111111111111.",
+      "prompt_file": "prompts/on-demand-vs-provisioned.md",
+      "baseline_file": "baselines/on-demand-vs-provisioned.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DYNAMODB_AUTOSCALING: users-table (arn:aws:dynamodb:us-east-1:111111111111:table/users-table)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Capacity mode: PROVISIONED (switched from ON-DEMAND — required for auto-scaling)\n  [✓] Table read scaling: scalable target (Min=5, Max=10000) + policy (Target=70%, ScaleOut=60s, ScaleIn=60s)\n  [✓] Table write scaling: scalable target (Min=5, Max=10000) + policy (Target=70%, ScaleOut=60s, ScaleIn=60s)\nVERIFICATION_COMMANDS:\n  aws dynamodb describe-table --table-name users-table --query Table.BillingModeSummary\n  aws application-autoscaling describe-scaling-policies --service-namespace dynamodb --resource-id table/users-table",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PROVISIONED",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-prerequisites",
+      "name": "Non-existent table and unconfirmed SLR",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — table does not exist (cannot verify ARN, billing mode, or current capacity); operator unsure of table existence",
+      "prompt": "Configure DynamoDB auto-scaling for table non-existent-table. Target 70%, Min=5, Max=10000. I'm not sure if the table exists or what mode it's in. Just set up the scaling. Account ID: 111111111111.",
+      "prompt_file": "prompts/missing-prerequisites.md",
+      "baseline_file": "baselines/missing-prerequisites.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "DYNAMODB_AUTOSCALING: non-existent-table\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Table existence: NOT verified — 'non-existent-table' cannot be confirmed. Run: aws dynamodb describe-table --table-name non-existent-table\n  [✗] Table ARN: NOT available — table must exist to register scalable targets\n  [✗] Capacity mode: NOT verified — must be PROVISIONED for auto-scaling\n  [✗] Application auto-scaling SLR: NOT confirmed\nVERIFICATION_COMMANDS:\n  aws dynamodb describe-table --table-name non-existent-table\n  aws iam get-role --role-name AWSServiceRoleForApplicationAutoScaling_DynamoDBFeedback",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

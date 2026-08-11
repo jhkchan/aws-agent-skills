@@ -1,0 +1,224 @@
+# Eval test cases for inspector2-coverage-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: inspector2-coverage-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: enable-standalone-ready
+    description: >-
+      Enable Inspector v2 for EC2, ECR, and Lambda in us-east-1
+      (standalone account). Region is supported; autoEnable is false
+      at the org level (or no org). Account is currently DISABLED
+      for all three resource types. 12 EC2 instances have SSM agent
+      online; 4 ECR repositories exist; 8 Lambda functions in
+      supported runtimes. Plan should produce READY with the
+      inspector2 enable CLI, CONFIRM gate, and the cost caveat.
+    input: |
+      Operation: enable
+      Account: 111111111111
+      Region: us-east-1
+      Resource types: EC2, ECR, LAMBDA
+
+      Pre-checks (already performed by caller):
+        aws inspector2 describe-organization-configuration:
+          autoEnable: {ec2: false, ecr: false, lambda: false}
+          delegatedAdminAccountId: (none — standalone)
+        aws inspector2 batch-get-account-status --account-ids 111111111111:
+          ec2: DISABLED
+          ecr: DISABLED
+          lambda: DISABLED
+        aws ec2 describe-instances --filters Name=instance-state-name,Values=running:
+          12 running instances
+        aws ssm describe-instance-information:
+          12 instances with PingStatus: Online
+        aws ecr describe-repositories: 4 repositories
+        aws lambda list-functions: 8 functions (python3.12 x5, nodejs20.x x3)
+        Caller IAM role: InspectorOperatorRole with inspector2:Enable
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, STATE, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "111111111111"
+        - "EC2 ECR LAMBDA"
+        - "inspector2 enable"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: delegated-admin-ready
+    description: >-
+      Enable delegated admin account for Inspector across an AWS
+      Organization. Caller is the Organizations management account;
+      no existing delegated admin; target account is in the same
+      org root. Plan should produce READY with the
+      enable-delegated-admin-account CLI and the one-way-door
+      caveat.
+    input: |
+      Operation: enable-delegated-admin
+      Management account (caller): 111111111111
+      Target delegated admin: 222222222222
+      Region: us-east-1
+
+      Pre-checks:
+        aws inspector2 list-delegated-admin-accounts: (empty — no existing)
+        aws organizations describe-organization:
+          OrganizationId: o-abc123def456
+          ManagementAccountId: 111111111111
+        aws organizations list-roots: 222222222222 in root r-abc
+        Caller IAM role: OrgsManagementRole with
+          inspector2:EnableDelegatedAdminAccount
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "222222222222"
+        - "enable-delegated-admin-account"
+        - "VERDICT"
+        - "CONFIRM"
+        - "one-way"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: ecr-rescan-ready
+    description: >-
+      Enable rescan-on-push for an ECR repository to drive Inspector
+      scans on every image push. Repository exists in a supported
+      region; caller holds ecr:PutImageScanningConfiguration. Plan
+      should produce READY.
+    input: |
+      Operation: configure-ecr-rescan
+      Repository: prod-app
+      Region: us-east-1
+      ScanOnPush: true
+
+      Pre-checks:
+        aws ecr describe-repositories --repository-names prod-app:
+          repositoryArn: arn:aws:ecr:us-east-1:111111111111:repository/prod-app
+          createdAt: 2026-01-15
+        aws ecr describe-image-scanning-configuration --repository-name prod-app:
+          scanOnPush: false
+        Region us-east-1 supports ecr-enhanced: true
+        Caller IAM role holds ecr:PutImageScanningConfiguration
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-app"
+        - "put-image-scanning-configuration"
+        - "scanOnPush"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: member-enable-blocked
+    description: >-
+      Attempt to enable Inspector from a member account under
+      org-mode (delegated admin already configured). Should BLOCK
+      with the reason and the remediation (delegate admin must
+      perform).
+    input: |
+      Operation: enable
+      Account: 333333333333 (member under org-mode)
+      Region: us-east-1
+      Resource types: EC2
+
+      Pre-checks:
+        aws inspector2 describe-organization-configuration:
+          autoEnable: {ec2: true, ecr: true, lambda: true}
+          delegatedAdminAccountId: 222222222222
+          maxAccountLimitReached: false
+        aws inspector2 list-members --only-associated:
+          333333333333 with relationshipStatus: ENABLED
+        Caller IAM role: MemberAccountOperatorRole with
+          inspector2:Enable (but caller is the member, not the
+          delegated admin)
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "delegated admin"
+        - "222222222222"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+        - "inspector2 enable --account-ids 333333333333"
+
+  - id: sbom-export-completed
+    description: >-
+      Start an SBOM export in CycloneDX 1.5 format for an account's
+      ECR images. Pre-checks pass; export executed; post-verification
+      shows status COMPLETED and the S3 object exists. Plan should
+      produce COMPLETED.
+    input: |
+      Operation: export-sbom (post-verification after execution)
+      Account: 111111111111
+      Region: us-east-1
+      Report format: CYCLONEDX_1_5
+      S3 destination: s3://inspector-sbom-prod/sbom/us-east-1/
+      KMS key: arn:aws:kms:us-east-1:111111111111:key/abcd1234
+      Resource filter: AWS_ECR_CONTAINER_IMAGE
+
+      Pre-checks (passed):
+        aws s3api get-bucket-policy --bucket inspector-sbom-prod:
+          grants s3:PutObject to inspector2 service principal
+        aws kms describe-key --key-id arn:aws:kms:us-east-1:111111111111:key/abcd1234:
+          KeyState: Enabled, policy grants kms:GenerateDataKey to inspector2
+        aws inspector2 list-sbom-export: no concurrent export for
+          this scope
+
+      Executed CLI:
+        aws inspector2 start-sbom-export --report-format CYCLONEDX_1_5 \
+          --s3-destination '{"bucketName":"inspector-sbom-prod","kmsKeyArn":"arn:aws:kms:us-east-1:111111111111:key/abcd1234","keyPrefix":"sbom/us-east-1/"}' \
+          --resource-filter-criteria '{"accountId":[{"comparison":"EQUALS","value":"111111111111"}],"resourceType":[{"comparison":"EQUALS","value":"AWS_ECR_CONTAINER_IMAGE"}]}' \
+          --client-token 1723305600
+        Returned reportId: 0a1b2c3d-4e5f-6071-8290-abcd1234ef56
+
+      Post-execution checks (all passed):
+        aws inspector2 list-sbom-export --report-id 0a1b2c3d-4e5f-6071-8290-abcd1234ef56:
+          status: COMPLETED
+          destinationBucket: inspector-sbom-prod
+        aws s3api head-object --bucket inspector-sbom-prod \
+          --key sbom/us-east-1/0a1b2c3d-4e5f-6071-8290-abcd1234ef56.json:
+          ContentLength: 482310
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "CYCLONEDX_1_5"
+        - "inspector-sbom-prod"
+        - "VERDICT"
+        - "POST_VERIFY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"

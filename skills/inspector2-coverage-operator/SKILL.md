@@ -1,27 +1,22 @@
 ---
 name: inspector2-coverage-operator
 description: >-
-  Operates Amazon Inspector v2 coverage across an AWS Organization or
-  single account — enables / disables Inspector per account and
-  region, manages EC2 coverage (SSM agent presence, association
-  state, OS scan coverage), ECR coverage (container image scanning,
-  deep inspection, re-scan on push), Lambda coverage (function code
-  scanning, package dependencies), surfaces coverage gaps (uncovered
+  Operates Amazon Inspector v2 coverage across an AWS Organization
+  or single account — enables / disables Inspector per account and
+  region, manages EC2 coverage (SSM agent, deep inspection), ECR
+  coverage (image scanning, rescan on push), Lambda coverage (code
+  scanning, dependencies), surfaces coverage gaps (uncovered
   resources, SSM-missing instances, disabled regions), configures
-  delegated admin for Organizations-wide coverage, and operates the
-  latest Inspector capabilities (Lambda code vulnerability scanning,
-  Inspector SBOM export, EC2 deep inspection with custom paths,
-  ECR enhanced scan frequency). Runs deterministic pre-checks
-  (delegated admin state, member accounts, region activation, SSM
-  agent online, ECR repository scan config, Lambda scan eligibility),
-  emits the exact inspector2:Enable / Disable /
-  UpdateOrganizationConfiguration / AssociateMember /
-  BatchGetMemberEc2DeepInspectionState CLI behind a CONFIRM gate,
-  and verifies coverage state post-apply. Emits a verdict
-  (READY | BLOCKED | COMPLETED). Use when enabling Inspector for a
-  new account or region, diagnosing EC2/ECR/Lambda coverage gaps,
-  configuring delegated admin for org-wide scanning, exporting SBOMs,
-  or rolling out Lambda code vulnerability scanning.
+  delegated admin for org-wide coverage, and operates the latest
+  capabilities (Lambda code vulnerability scanning, SBOM export,
+  EC2 deep inspection, ECR enhanced scan). Runs deterministic
+  pre-checks (delegated admin, members, region activation, SSM
+  online, ECR config, Lambda eligibility), emits the exact
+  inspector2:Enable / Disable / UpdateOrganizationConfiguration
+  CLI behind a CONFIRM gate, and verifies coverage post-apply.
+  Emits a verdict (READY | BLOCKED | COMPLETED). Use when enabling
+  Inspector, diagnosing coverage gaps, configuring delegated admin,
+  exporting SBOMs, or rolling out Lambda code scanning.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -714,11 +709,9 @@ NOTES: <org-mode vs standalone rationale, scan-type caveats, SSM/S3/KMS prerequi
 - **Snapshot before enable/disable** (`batch-get-account-status
   --output json > /tmp/inspector2-$(date +%s).json`) for diff
   against post-apply state.
-- **Verify SSM agent online** before any EC2 coverage operation
-  (`ssm describe-instance-information --query
-  'InstanceInformationList[?PingStatus==`Online`]'`).
-- **Verify S3 + KMS for SBOM export** before `start-sbom-export`.
-- **Estimate cost** before broad enablement via `list-usage-totals`.
+- **Verify SSM agent online** before EC2 coverage operations.
+- **Verify S3 + KMS** for SBOM export before `start-sbom-export`.
+- **Estimate cost** via `list-usage-totals` before broad enablement.
 
 ## Expert heuristic: standalone vs org-mode enable
 

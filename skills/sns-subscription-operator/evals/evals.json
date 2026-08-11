@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "sns-subscription-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SNS Subscription Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-sqs-subscription-ready",
+      "name": "Create SQS subscription with filter policy — all pre-checks pass (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/create-sqs-subscription-ready.md",
+      "baseline_file": "baselines/create-sqs-subscription-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "subscribe", "VERDICT", "PRE_CHECKS", "FilterPolicy", "RawMessageDelivery", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "http-subscription-pending-confirmation",
+      "name": "HTTPS subscription stuck in PendingConfirmation — confirm via token (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/http-subscription-pending-confirmation.md",
+      "baseline_file": "baselines/http-subscription-pending-confirmation.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "confirm-subscription", "VERDICT", "PendingConfirmation", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "filter-policy-attribute-mismatch",
+      "name": "SQS subscription not receiving messages — filter policy attribute name mismatch (COMPLETED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/filter-policy-attribute-mismatch.md",
+      "baseline_file": "baselines/filter-policy-attribute-mismatch.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "FilterPolicy", "VERDICT", "attribute", "set-subscription-attributes"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: READY"]
+        }
+      ]
+    },
+    {
+      "id": "delivery-policy-dlq-setup",
+      "name": "Configure delivery retry policy (5 retries, exponential backoff) and DLQ on HTTPS subscription (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/delivery-policy-dlq-setup.md",
+      "baseline_file": "baselines/delivery-policy-dlq-setup.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "DeliveryPolicy", "RedrivePolicy", "VERDICT", "CONFIRM", "deadLetterTargetArn"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-subscription-blocked",
+      "name": "Cross-account subscription — topic policy denies subscriber, queue policy missing (BLOCKED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-subscription-blocked.md",
+      "baseline_file": "baselines/cross-account-subscription-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "VERDICT", "sns:Subscribe", "cross-account"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    }
+  ]
+}

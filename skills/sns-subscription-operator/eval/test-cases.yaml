@@ -1,0 +1,221 @@
+# Eval test cases for sns-subscription-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: sns-subscription-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-sqs-subscription-ready
+    description: >-
+      Operator wants to create an SQS subscription on an SNS topic
+      with a filter policy and RawMessageDelivery. All pre-checks
+      pass: topic exists, protocol valid, queue ARN valid, topic
+      policy allows Subscribe, queue policy allows SendMessage from
+      the topic. Caller owns the queue (auto-confirmation applies).
+      Plan should produce READY with the subscribe CLI and a CONFIRM
+      gate.
+    input: |
+      Operation: create
+      TopicArn: arn:aws:sns:us-east-1:111111111111:order-events
+      Protocol: sqs
+      Endpoint: arn:aws:sqs:us-east-1:111111111111:order-processing-queue
+      FilterPolicy: {"event_type": ["order_created", "order_updated"]}
+      RawMessageDelivery: true
+
+      Topic attributes (aws sns get-topic-attributes):
+        Owner: 111111111111
+        Policy: allows sns:Subscribe for arn:aws:iam::111111111111:root
+
+      Queue attributes (aws sqs get-queue-attributes):
+        QueueArn: arn:aws:sqs:us-east-1:111111111111:order-processing-queue
+        Policy: allows sqs:SendMessage from
+          arn:aws:sns:us-east-1:111111111111:order-events
+
+      Calling identity: arn:aws:iam::111111111111:role/AppDeployRole
+      (owns both the topic and the queue)
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "subscribe"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "FilterPolicy"
+        - "RawMessageDelivery"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: http-subscription-pending-confirmation
+    description: >-
+      An HTTP/HTTPS subscription is stuck in PendingConfirmation. The
+      operator wants to confirm it. The endpoint is reachable and
+      returned 200 for the confirmation POST. Verify the plan extracts
+      the token and calls confirm-subscription.
+    input: |
+      Operation: confirm
+      TopicArn: arn:aws:sns:us-east-1:111111111111:alert-notifications
+      SubscriptionArn: arn:aws:sns:us-east-1:111111111111:alert-notifications:9f8e7d6c-...
+      Protocol: https
+      Endpoint: https://hooks.example.com/sns
+
+      Subscription attributes (aws sns get-subscription-attributes):
+        PendingConfirmation: true
+        ConfirmationWasAuthenticated: false
+
+      Endpoint check: HEAD https://hooks.example.com/sns returns 200
+      Token (from confirmation POST received by endpoint):
+        51b2ff37-extended-token-xyz
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "confirm-subscription"
+        - "VERDICT"
+        - "PendingConfirmation"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: filter-policy-attribute-mismatch
+    description: >-
+      An SQS subscription exists and is confirmed but receives no
+      messages. Diagnosis reveals the filter policy uses attribute
+      name "event_type" but the publisher sends "type". Verify the
+      plan identifies the mismatch and updates the filter policy.
+    input: |
+      Operation: diagnose
+      TopicArn: arn:aws:sns:us-east-1:111111111111:order-events
+      SubscriptionArn: arn:aws:sns:us-east-1:111111111111:order-events:1234-abcd
+      Protocol: sqs
+      Endpoint: arn:aws:sqs:us-east-1:111111111111:order-processing-queue
+
+      Subscription attributes (aws sns get-subscription-attributes):
+        PendingConfirmation: false
+        FilterPolicy: {"event_type": ["order_created", "order_updated"]}
+        FilterPolicyScope: MessageAttributes
+        RawMessageDelivery: true
+
+      Publisher message attributes (observed via CloudTrail / SNS logs):
+        type (NOT event_type): order_created
+        order_id: ORD-12345
+
+      Queue attributes: policy allows sqs:SendMessage from the topic ARN.
+      No messages in the queue despite 500+ publishes in the last hour.
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "FilterPolicy"
+        - "VERDICT"
+        - "attribute"
+        - "set-subscription-attributes"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: READY"
+
+  - id: delivery-policy-dlq-setup
+    description: >-
+      Operator wants to configure a delivery retry policy (5 retries,
+      exponential backoff) and a DLQ on an HTTPS subscription that has
+      been failing. DLQ SQS ARN exists and has the correct policy.
+      Verify the plan produces READY with both set-subscription-
+      attributes calls.
+    input: |
+      Operation: set-delivery-policy
+      TopicArn: arn:aws:sns:us-east-1:111111111111:alert-notifications
+      SubscriptionArn: arn:aws:sns:us-east-1:111111111111:alert-notifications:5678-efgh
+      Protocol: https
+      Endpoint: https://api.example.com/webhook
+
+      Desired delivery policy:
+        numRetries: 5
+        minDelayTarget: 1
+        maxDelayTarget: 16
+        backoffFunction: exponential
+
+      Desired DLQ: arn:aws:sqs:us-east-1:111111111111:sns-dlq
+
+      DLQ check (aws sqs get-queue-attributes):
+        QueueArn: arn:aws:sqs:us-east-1:111111111111:sns-dlq
+        Policy: allows sqs:SendMessage from sns.amazonaws.com with
+          Condition ArnEquals aws:SourceArn = the topic ARN
+
+      Subscription attributes:
+        PendingConfirmation: false
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "DeliveryPolicy"
+        - "RedrivePolicy"
+        - "VERDICT"
+        - "CONFIRM"
+        - "deadLetterTargetArn"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: cross-account-subscription-blocked
+    description: >-
+      Operator in account 111111111111 wants to subscribe an SQS queue
+      to a topic owned by account 222222222222. The topic policy does
+      NOT allow sns:Subscribe for the subscriber's account, and the
+      queue policy does NOT allow sqs:SendMessage from the topic ARN.
+      Verify the plan produces BLOCKED with both failures listed.
+    input: |
+      Operation: create
+      TopicArn: arn:aws:sns:us-east-1:222222222222:shared-events
+      Protocol: sqs
+      Endpoint: arn:aws:sqs:us-east-1:111111111111:my-queue
+
+      Topic attributes (aws sns get-topic-attributes):
+        Owner: 222222222222
+        Policy: allows sns:Subscribe ONLY for arn:aws:iam::222222222222:root
+        (does NOT include account 111111111111)
+
+      Queue attributes (aws sqs get-queue-attributes):
+        QueueArn: arn:aws:sqs:us-east-1:111111111111:my-queue
+        Policy: does NOT allow sqs:SendMessage from the topic ARN
+
+      Calling identity: arn:aws:iam::111111111111:role/AppDeployRole
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "VERDICT"
+        - "sns:Subscribe"
+        - "cross-account"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
