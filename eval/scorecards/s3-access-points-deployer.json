@@ -1,0 +1,70 @@
+{
+  "skill": "s3-access-points-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Introduces several expert\u2011level specifics not commonly known: the exact condition key `s3:DataAccessPointArn` for the through\u2011AP\u2011only Deny, the silent\u2011failure modes of MRAP (no backfill) and Object Lambda (concurrency limits), the Outposts ARN namespace and API difference, and the cost amplification details of cross\u2011region MRAP traffic. These constitute genuine delta beyond a baseline model, though some sections merely restate generic S3 knowledge, hence a small deduction."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes a precise 9\u2011step AWS\u2011specific provisioning order, VPC\u2011endpoint policy construction, bucket\u2011policy Deny placement, and per\u2011AP BPA steps. The procedure reflects senior\u2011engineer thinking. Minor gap: no explicit decision tree for choosing Internet vs VPC origin beyond a simple description."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a concrete NEVER list of five high\u2011impact anti\u2011patterns with clear \"why it\u2019s wrong\" explanations (e.g., missing Deny, copying bucket ARN into AP policy, cross\u2011account BPA assumptions, missing Lambda concurrency, MRAP backfill). Could be stronger with additional pitfalls (e.g., IAM role trust boundaries), but overall solid."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, dependencies, metadata, activation triggers, invocation schema). Description clearly states WHAT, WHEN, and KEYWORDS. No missing elements."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered: quick reference table, navigation matrix, reasoning framework, dependency graph, heuristics, prerequisites, detailed 9\u2011step procedure, NEVER list, and strict output contract. Critical rules are not buried, and the top\u2011level sections are concise."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (bucket\u2011policy changes, AP creation) are gated behind PREREQUISITES_MISSING checks; optional features are clearly marked. However, the bucket\u2011policy Deny example mistakenly includes a Null condition on aws:SourceVpc, which over\u2011constrains a fragile operation and could cause failure."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (overview \u2192 quick navigation \u2192 activation \u2192 invocation contract \u2192 reasoning \u2192 dependency graph \u2192 heuristics \u2192 prerequisites \u2192 step\u2011by\u2011step \u2192 NEVER \u2192 output contract). Structure aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides working CLI snippets, verification commands, and a decision tree that an agent could execute. Defects: bucket\u2011policy Deny example uses an incorrect Null condition (aws:SourceVpc instead of s3:DataAccessPointArn) and the AP policy Resource for object\u2011level access uses a malformed ARN (missing \"object\" segment). These errors would cause a real deployment to fail or be insecure."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 49324,
+  "latency_ms": 16966,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
