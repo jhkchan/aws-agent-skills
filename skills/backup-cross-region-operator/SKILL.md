@@ -159,14 +159,13 @@ operator knows what is reversible.
    COMPLIANCE mode unless lengthening `MaxRetentionDays`.
 
 **Copy baselines (2026):**
-- Cross-region copy: minutes to hours depending on data size and
+- Cross-region copy: minutes to hours depending on size and
   inter-region bandwidth.
 - Cross-account copy (org-mode): adds ~5-15% overhead for KMS
   re-encryption and IAM propagation.
-- Continuous backup cross-region: 1-second RPO within the source
+- Continuous backup cross-region: 1-second RPO within source
   region; cross-region copy is asynchronous (minutes to hours).
-- DR vault lock: active within ~30 seconds; grace window
-  (`ChangeableForDays`) max 3 days.
+- DR vault lock: active within ~30s; grace window max 3 days.
 
 ## Mindset
 
@@ -176,7 +175,7 @@ Three cross-region AWS Backup realities drive every operation:
   region. Cross-region copy creates a separate recovery point in
   the destination region's vault; it does NOT replicate the vault
   itself. The destination vault's name, KMS key, and lock
-  configuration are independent of the source. Operators frequently
+  configuration are independent of the source. Operators often
   assume the source vault's lock applies to the destination — it
   does not.
 
@@ -713,12 +712,10 @@ NOTES: <region-binding caveat, KMS ownership rationale, org-mode requirement, in
 - **MANDATORY CONFIRMATION GATE** before any state-changing CLI.
 - **Snapshot before lock change** (`describe-backup-vault --output
   json > /tmp/<vault>-xregion-$(date +%s).json`) — no rollback for
-  COMPLIANCE-mode locks applied in error (after grace).
-- **Verify destination vault + KMS** before any copy or restore —
-  the destination region's vault and key are independent of source.
+  COMPLIANCE-mode locks after grace.
+- **Verify destination vault + KMS** before any copy or restore.
 - **Verify Organizations state** for cross-account operations.
-- **Estimate cost** for large cross-region copies — inter-region
-  data transfer fees apply on top of destination storage.
+- **Estimate cost** for large cross-region copies.
 
 ## Expert heuristic: cross-region vs cross-account
 
@@ -745,21 +742,20 @@ CROSS-ACCOUNT (different accounts)
 
 | ResourceType | Cross-region behavior |
 |---|---|
-| `EC2` | Snapshot copied; restore creates new instance in destination region |
-| `RDS` | Snapshot copied; restore creates new DB instance with new endpoint |
+| `EC2` | Snapshot copied; restore creates new instance in destination |
+| `RDS` | Snapshot copied; restore creates new DB instance |
 | `EBS` | Snapshot copied; restore creates new volume |
 | `S3` | Versioning backup copied; restore overwrites by version |
 | `DynamoDB` | Backup copied; restore replaces table |
 | `EFS` | File system copied; restore to new file system |
 | `Aurora` | Cluster snapshot copied; restore to new cluster |
-| `FSx` | Volume-level copy; filesystem type-specific restore |
+| `FSx` | Volume-level copy; filesystem-type-specific restore |
 
 **Copy duration baselines:** EBS minutes; RDS 15-60 min; EFS hours;
-FSx 30-120 min; S3 minutes-hours depending on object count.
+FSx 30-120 min; S3 minutes-hours by object count.
 
 ALWAYS pair cross-region copy with a quarterly DR drill — operators
-frequently set up cross-region copy and never test-restore, then
-discover permission gaps during an actual incident.
+often skip test-restore and discover permission gaps during an incident.
 
 ## Recent AWS features (2024-2026)
 

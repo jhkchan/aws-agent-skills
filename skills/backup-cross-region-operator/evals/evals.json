@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "backup-cross-region-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Backup Cross-Region Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "add-copy-rule-ready",
+      "name": "Add cross-region copy rule to backup plan (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/add-copy-rule-ready.md",
+      "baseline_file": "baselines/add-copy-rule-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "prod-daily-with-dr", "create-backup-plan", "us-west-2", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "start-cross-region-copy-ready",
+      "name": "Start a manual cross-region copy job (READY)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/start-cross-region-copy-ready.md",
+      "baseline_file": "baselines/start-cross-region-copy-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "start-copy-job", "dr-vault", "us-west-2", "VERDICT", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-blocked",
+      "name": "Cross-account copy to non-org account (BLOCKED — same Organization required)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-blocked.md",
+      "baseline_file": "baselines/cross-account-blocked.md",
+      "expected_verdict": "BLOCKED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["BLOCKED", "Organization", "222222222222", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "lock-dr-vault-ready",
+      "name": "Apply COMPLIANCE-mode DR vault lock in us-west-2 (READY with irreversibility caveat)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/lock-dr-vault-ready.md",
+      "baseline_file": "baselines/lock-dr-vault-ready.md",
+      "expected_verdict": "READY",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["READY", "COMPLIANCE", "ChangeableForDays", "put-backup-vault-lock-configuration", "VERDICT", "CONFIRM", "irreversible"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: BLOCKED", "VERDICT: COMPLETED", "GOVERNANCE"]
+        }
+      ]
+    },
+    {
+      "id": "cross-region-restore-completed",
+      "name": "Cross-region restore for EC2 from DR region — post-verification passed (COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cross-region-restore-completed.md",
+      "baseline_file": "baselines/cross-region-restore-completed.md",
+      "expected_verdict": "COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["COMPLETED", "i-restored-xregion", "us-west-2", "VERDICT", "POST_VERIFY"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: READY", "VERDICT: BLOCKED"]
+        }
+      ]
+    }
+  ]
+}

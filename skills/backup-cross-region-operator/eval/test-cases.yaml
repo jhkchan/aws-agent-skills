@@ -1,0 +1,236 @@
+# Eval test cases for backup-cross-region-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: backup-cross-region-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: add-copy-rule-ready
+    description: >-
+      Add a cross-region copy rule to an existing backup plan. Source
+      vault in us-east-1, destination vault dr-vault in us-west-2
+      with KMS key xyz. Destination vault MaxRetentionDays 3650 >=
+      copy rule DeleteAfterDays 90. All pre-checks pass. Plan
+      should produce READY.
+    input: |
+      Operation: add-copy-rule
+      Plan name: prod-daily-with-dr
+      Source region: us-east-1
+      Source vault: prod-daily-vault
+      Destination region: us-west-2
+      Destination vault ARN: arn:aws:backup:us-west-2:111111111111:backup-vault:dr-vault
+      Destination KMS key: arn:aws:kms:us-west-2:111111111111:key/xyz
+      Copy rule lifecycle: DeleteAfterDays=90
+
+      Pre-checks (already performed by caller):
+        aws backup describe-backup-vault --backup-vault-name dr-vault --region us-west-2:
+          Vault exists, EncryptionKeyArn: arn:aws:kms:us-west-2:111111111111:key/xyz
+          VaultLock.LockState: LOCKED, Mode: COMPLIANCE,
+          MaxRetentionDays: 3650
+        aws kms describe-key --key-id xyz --region us-west-2:
+          KeyState: Enabled, KeyManager: CUSTOMER
+          Policy grants kms:GenerateDataKey, kms:Decrypt to
+            backup.us-west-2.amazonaws.com
+        DeleteAfterDays 90 <= MaxRetentionDays 3650: PASS
+        Caller IAM role holds backup:CreateBackupPlan
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "prod-daily-with-dr"
+        - "create-backup-plan"
+        - "us-west-2"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: start-cross-region-copy-ready
+    description: >-
+      Start a manual cross-region copy job for a recovery point.
+      Source recovery point COMPLETED in us-east-1, destination
+      vault dr-vault in us-west-2 with KMS key xyz. All pre-checks
+      pass. Plan should produce READY.
+    input: |
+      Operation: start-copy
+      Source region: us-east-1
+      Source vault: prod-daily-vault
+      Recovery point ARN: arn:aws:backup:us-east-1:111111111111:recovery-point:1-2-3-4
+      Destination region: us-west-2
+      Destination vault ARN: arn:aws:backup:us-west-2:111111111111:backup-vault:dr-vault
+      IAM role: arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole
+
+      Pre-checks:
+        aws backup describe-recovery-point:
+          Status: COMPLETED, ResourceType: EC2
+        aws backup describe-backup-vault --backup-vault-name dr-vault --region us-west-2:
+          Vault exists with KMS key xyz
+        Source KMS key grants kms:Decrypt to backup.us-east-1: PASS
+        Destination KMS key grants kms:GenerateDataKey to backup.us-west-2: PASS
+        Source IAM role holds backup:StartCopyJob: PASS
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "start-copy-job"
+        - "dr-vault"
+        - "us-west-2"
+        - "VERDICT"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+
+  - id: cross-account-blocked
+    description: >-
+      Attempt cross-account copy from a source account to a
+      destination account NOT in the same AWS Organization. Should
+      BLOCK with the same-org requirement and the standalone
+      alternative as remediation.
+    input: |
+      Operation: cross-account-enable
+      Source account: 111111111111
+      Destination account: 222222222222
+      Region: us-east-1
+
+      Pre-checks:
+        aws organizations describe-organization:
+          ManagementAccountId: 999999999999
+          Id: o-abc123
+        aws organizations list-accounts:
+          999999999999 (mgmt), 111111111111 (member)
+          222222222222 NOT FOUND
+        aws organizations describe-effective-policy --policy-type BACKUP_POLICY:
+          (no policy attached)
+        aws:DisableCrossAccountBackup: not set
+
+      Emit the standard VERDICT block.
+    expected_verdict: BLOCKED
+    assertions:
+      must_contain:
+        - "BLOCKED"
+        - "Organization"
+        - "222222222222"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: COMPLETED"
+
+  - id: lock-dr-vault-ready
+    description: >-
+      Apply COMPLIANCE-mode vault lock on the DR vault dr-vault in
+      us-west-2. Vault currently UNLOCKED, MinRetentionDays 30,
+      MaxRetentionDays 3650, ChangeableForDays 3. Plan should
+      produce READY with the irreversibility caveat.
+    input: |
+      Operation: lock-dr-vault
+      Region: us-west-2
+      Vault name: dr-vault
+      Mode: COMPLIANCE
+      MinRetentionDays: 30
+      MaxRetentionDays: 3650
+      ChangeableForDays: 3
+      Justification: DR vault immutable for CIS 3.6
+
+      Pre-checks:
+        aws backup describe-backup-vault --backup-vault-name dr-vault --region us-west-2:
+          VaultLock.LockState: (absent — UNLOCKED)
+          NumberOfRecoveryPoints: 12 (oldest 10 days)
+        Caller IAM role holds backup:PutBackupVaultLockConfiguration
+        MinRetentionDays 30 <= MaxRetentionDays 3650: PASS
+        ChangeableForDays 3 <= 3 max grace: PASS
+
+      Emit the standard VERDICT block.
+    expected_verdict: READY
+    assertions:
+      must_contain:
+        - "READY"
+        - "COMPLIANCE"
+        - "ChangeableForDays"
+        - "put-backup-vault-lock-configuration"
+        - "VERDICT"
+        - "CONFIRM"
+        - "irreversible"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: BLOCKED"
+        - "VERDICT: COMPLETED"
+        - "GOVERNANCE"
+
+  - id: cross-region-restore-completed
+    description: >-
+      Start a cross-region restore for an EC2 instance from a
+      recovery point in the DR region us-west-2. Pre-checks pass;
+      restore executed; post-verification shows Status COMPLETED
+      and CreatedResourceArn populated. Plan should produce COMPLETED.
+    input: |
+      Operation: start-cross-region-restore (post-verification after execution)
+      Source region: us-west-2 (DR region)
+      Destination region: us-west-2 (restore runs in DR region)
+      Vault: dr-vault
+      RecoveryPointArn: arn:aws:backup:us-west-2:111111111111:recovery-point:5-6-7-8
+      Resource type: EC2
+      Metadata:
+        InstanceId: i-restored-xregion
+        SubnetId: subnet-xyz
+        SecurityGroupIds: sg-xyz
+        InstanceType: t3.medium
+
+      Pre-checks (passed):
+        aws backup describe-recovery-point --backup-vault-name dr-vault \
+          --recovery-point-arn arn:aws:backup:us-west-2:111111111111:recovery-point:5-6-7-8 \
+          --region us-west-2:
+          Status: COMPLETED
+          ResourceType: EC2
+          EncryptionKeyArn: arn:aws:kms:us-west-2:111111111111:key/xyz
+        Destination region KMS key grants kms:Decrypt to restore role: PASS
+        IAM role AWSBackupDefaultServiceRole holds ec2:RunInstances,
+          kms:Decrypt: PASS
+
+      Executed CLI:
+        aws backup start-restore-job \
+          --recovery-point-arn arn:aws:backup:us-west-2:111111111111:recovery-point:5-6-7-8 \
+          --metadata '{"InstanceId":"i-restored-xregion","SubnetId":"subnet-xyz","SecurityGroupIds":"sg-xyz","InstanceType":"t3.medium"}' \
+          --iam-role-arn arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole \
+          --resource-type EC2 \
+          --region us-west-2
+
+      Post-execution checks (all passed):
+        aws backup describe-restore-job --restore-job-id RESTORE-XREGION-XYZ \
+          --region us-west-2:
+          Status: COMPLETED
+          CreatedResourceArn: arn:aws:ec2:us-west-2:111111111111:instance/i-restored-xregion
+          CompletionDate: 2026-08-09T16:42:17Z
+        aws ec2 describe-instances --instance-ids i-restored-xregion --region us-west-2:
+          State: running
+          LaunchTime: 2026-08-09T16:35:02Z
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: COMPLETED
+    assertions:
+      must_contain:
+        - "COMPLETED"
+        - "i-restored-xregion"
+        - "us-west-2"
+        - "VERDICT"
+        - "POST_VERIFY"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: READY"
+        - "VERDICT: BLOCKED"
