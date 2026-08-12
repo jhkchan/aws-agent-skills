@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Adds many specific AWS nuances (e.g., subscription\u2011filter 2x concurrency budget, data\u2011protection redaction, silent retention deletions, cross\u2011account resource\u2011policy gating) that a generic model may not enumerate, but the core concepts (IAM, sequence token, log group naming) are already well\u2011known, so it falls short of a perfect 20."
+      "justification": "The skill aggregates many known AWS facts (sequence\u2011token rules, subscription\u2011filter concurrency budget, data\u2011protection redaction) into a single diagnostic tree, which is useful but largely restates documentation rather than introducing novel decision thresholds or previously undocumented edge\u2011cases."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific step order and concrete CLI commands for each diagnostic layer, but some procedures are generic (e.g., \"run describe\u2011log-groups\" without explicit region handling or pagination) and the branching criteria in the decision tree are not always spelled out with precise thresholds."
+      "justification": "Provides an AWS\u2011specific diagnostic order (naming \u2192 IAM \u2192 token \u2192 agent \u2192 VPC Flow Logs \u2192 etc.) and concrete CLI probes for each layer, reflecting senior engineer thinking. The only shortfall is occasional reliance on generic advice like \"check IAM\" without always tying it to the exact resource ARN pattern."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is concrete and explains why each pitfall is bad, yet it omits several common anti\u2011patterns such as KMS key permission mismatches, subtle resource\u2011policy conflicts, and misuse of CloudWatch Logs Insights when diagnosing ingestion, reducing completeness."
+      "justification": "Includes a detailed NEVER list with concrete pitfalls (e.g., never emit ROOT_CAUSE_IDENTIFIED without a failing probe, never assume a single token refresh fixes collisions) and reasons. Missing are a few edge\u2011case warnings such as KMS\u2011encrypted log groups causing silent PutLogEvents failures."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, activation triggers, invocation schema, and example are complete, but the description lacks a separate concise \"WHEN to invoke\" bullet distinct from the longer narrative, and there is no explicit versioning compatibility note for future schema changes."
+      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and provides activation triggers, invocation schema, and an example. The only minor gap is that the \"entry_point\" flag is false, which could confuse runtimes that expect a true entry point."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Quick\u2011start section gives a high\u2011level map, but the bulk of the document is dense; critical safety rules (confirmation gate) are buried deep, which can overload the reader before they reach the most important constraints."
+      "justification": "The skill presents a concise quick\u2011start map, but the bulk of the document (tables, long prose, anti\u2011patterns) is dense and some critical rules (e.g., confirmation gates) are buried deep, causing potential cognitive overload for a first\u2011time user."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Excellent calibration: all state\u2011changing CLI commands are gated behind explicit CONFIRM prompts, and read\u2011only probes are used first, matching the fragility of CloudWatch Logs operations."
+      "justification": "Destructive actions (put\u2011retention\u2011policy, put\u2011resource\u2011policy, put\u2011function\u2011concurrency) are gated behind explicit CONFIRM prompts. Non\u2011destructive probes are unrestricted, matching task fragility. No over\u2011constraining of creative steps."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable structure (quick start, mindset, philosophy, stepwise process, anti\u2011patterns, safety checks, remediation), but mixes tables and narrative inconsistently and deviates from a strict heading hierarchy, preventing a perfectly uniform pattern."
+      "justification": "The document follows a clear, repeatable pattern (quick\u2011start, mindset, philosophy, step\u2011by\u2011step decision tree, anti\u2011patterns, safety checks, remediation) that aligns with established CloudOps skill structures."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI commands, and output format examples, yet it lacks handling for pagination, explicit region selection, and robust error handling for CLI failures; also no fallback when simulate\u2011principal\u2011policy is unavailable."
+      "justification": "Provides exact AWS CLI commands, decision tree, output format, and worked examples that an agent can follow end\u2011to\u2011end. Minor usability gaps: pagination handling is omitted, region selection is assumed, and some probes lack error\u2011handling branches."
     }
   ],
-  "total_score": 106,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45686,
-  "latency_ms": 13104,
+  "token_count": 45329,
+  "latency_ms": 10480,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

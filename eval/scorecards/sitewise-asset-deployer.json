@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "The skill provides several expert\u2011level insights not found in generic docs (e.g., the configuration dependency graph, the hierarchy\u2011in\u2011the\u2011model nuance, and detailed transform\u2011expression syntax). However, the bulk of the content restates AWS documentation verbatim, so the delta is strong but not maximal."
+      "justification": "Adds several concrete heuristics not obvious from generic knowledge (e.g., hierarchy must be defined in the PARENT model, alias uniqueness across the account, OPC\u2011UA nodePathMappings as the single point of failure, exact transform expression syntax, recent feature list). However much of the content restates official AWS documentation, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and correctly ordered (model \u2192 asset \u2192 gateway \u2192 OPC\u2011UA source \u2192 aliases \u2192 ingestion). A minor shortfall is the generic \u201cverify IAM permissions\u201d step, which could reference the exact required actions per operation."
+      "justification": "Procedures are AWS\u2011specific (CLI commands, polling for ACTIVE status, explicit ordering based on the dependency graph). Some steps remain generic (e.g., \"verify IAM permissions\") and lack deeper AWS\u2011centric decision logic, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasons (hierarchy on asset instance, ingesting into transforms, duplicate aliases, missing nodePathMappings, etc.). Could be stronger by adding more edge\u2011case pitfalls (e.g., model versioning impacts, alarm hysteresis misuse)."
+      "justification": "A concrete NEVER list is provided with specific reasons (e.g., never define hierarchies on asset instances, never ingest into transform/metric, never duplicate aliases). The list is strong but could be expanded with additional pitfalls such as IAM role mis\u2011configurations for portals."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description explains WHAT and WHEN, includes keywords, triggers, and a strict output contract with literal labels. Minor omission: no explicit versioning field for generated assets, but otherwise activation criteria are clear."
+      "justification": "Full front\u2011matter, clear description, explicit WHEN_TO_USE, activation keywords, strict output contract, and checklist format meet all specification requirements."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick navigation \u2192 detailed sections \u2192 deep references) well, but the Mindset paragraph and expert heuristics are dense blocks that front\u2011load many details, creating slight cognitive overload."
+      "justification": "The skill layers information (overview \u2192 quick navigation \u2192 detailed steps \u2192 heuristics \u2192 never list \u2192 output format). However, the initial sections contain a large amount of detail that could overload an agent before it knows which part is needed, so two points are deducted."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom appropriately: prerequisites are verified, destructive actions are gated behind a checklist, and the skill limits creative freedom where automation is fragile. Lacks explicit constraints for destructive operations like asset deletion, which could be risky."
+      "justification": "Destructive actions (model creation, gateway provisioning) are gated by prerequisite checks and a READY_TO_DEPLOY checklist, showing good calibration. One point deducted because the gateway creation step does not explicitly restrict unsupported regions, leaving a small freedom gap for a fragile operation."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset, Quick navigation, Stepwise process, NEVER list, Output format). A few ad\u2011hoc sections (e.g., \"Expert heuristic\") break the otherwise clean structure."
+      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Dependency graph \u2192 Heuristics \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). The structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 11,
       "max": 15,
-      "justification": "Provides a complete checklist, concrete CLI commands, error\u2011handling guidance, and multiple worked examples. However, some examples include extra prose before the checklist and there is no explicit branch for handling API errors or partial requests, resulting in a modest deduction."
+      "justification": "Provides detailed CLI commands, a ready\u2011to\u2011deploy checklist, and error\u2011handling guidance. Model outputs reveal gaps: some outputs mark READY_TO_DEPLOY despite missing required measurement properties or hierarchy definitions, and certain checklist items are omitted, indicating incomplete validation logic."
     }
   ],
-  "total_score": 106,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 51292,
-  "latency_ms": 9846,
+  "token_count": 49263,
+  "latency_ms": 7248,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides specific expert details (worker\u2011type executor mapping, exact heap sizes, G.025X limitations, security\u2011group inbound rule checks, bookmark\u2011key mismatch logic) that a generic model would not enumerate, but it does not introduce truly novel thresholds (e.g., no concrete %\u2011of\u2011heap rule) and some metric names are inaccurate, limiting the delta."
+      "justification": "Provides concrete, senior\u2011engineer level details (worker\u2011type \u2192 executor mapping, specific CloudWatch metric name, exact CLI probes, 15\u2011layer decision tree). However, ~4 points are deducted because much of the content restates publicly documented Glue behaviour that a capable model could already generate (e.g., \"G.2X doubles executor count\", generic OOM reasoning)."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Encodes a senior\u2011engineer mindset (read\u2011only probes first, confirm before state changes) and an AWS\u2011specific order (pre\u2011flight gather, then layer\u2011by\u2011layer diagnostics). However several steps are generic (\"check logs\", \"verify IAM role\") and lack the precise AWS\u2011specific ordering that would make the procedure flawless."
+      "justification": "Encodes an AWS\u2011specific diagnostic workflow: pre\u2011flight gather, read\u2011only probes, ordered layer traversal, and mandatory CONFIRM before any state\u2011changing CLI. One point deducted because some procedures (e.g., \"check CloudWatch Logs\") are generic and not uniquely Glue\u2011specific."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never declare ROOT_CAUSE without a failing probe, never run Spark on G.025X). Missing a few common pitfalls such as forgetting to grant Glue the required logs permissions in the IAM role."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never declare ROOT_CAUSE without a failing probe, never run Spark on G.025X). One point deducted because a couple of warnings lack explicit failure\u2011mode examples (e.g., the rule about \"never assume bookmark is enabled\" could cite a concrete schema\u2011change scenario)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, activation triggers, invocation schema, and example are all present and clear. The trigger list is exhaustive but slightly noisy, which could affect reliable activation."
+      "justification": "Front\u2011matter is complete, description clearly states WHAT it does, WHEN to invoke, and includes a rich keyword list, activation triggers, invocation schema, and example. No missing fields."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level Quick\u2011Start gives a concise map, with deeper sections layered below. Nonetheless, the skill front\u2011loads a large amount of detail (full tables, philosophy, full command blocks) which may cause cognitive overload before the agent knows which layer is needed."
+      "justification": "Top\u2011level Quick\u2011Start gives a concise entry point, and deeper sections are layered. However, the skill front\u2011loads a large amount of detail (full philosophy, extensive tables) before the core diagnostic steps, which can cause cognitive overload and hides some critical rules (e.g., the CONFIRM gate) deep in the document."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions (reset\u2011bookmark, update\u2011job) are gated behind explicit CONFIRM prompts and read\u2011only probes are prioritized. One minor gap: the cost impact of increasing workers is mentioned but not emphasized enough for fragile budget\u2011sensitive environments."
+      "justification": "Destructive actions are gated behind explicit CONFIRM prompts; read\u2011only probes are the default. The level of specificity matches the fragility of Glue job configuration changes."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (quick start \u2192 mindset \u2192 philosophy \u2192 pre\u2011flight \u2192 diagnostic steps \u2192 output format \u2192 anti\u2011patterns). The pattern is coherent but not explicitly labeled, which slightly reduces recognizability."
+      "justification": "Follows a coherent pattern (Mindset \u2192 Philosophy \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Stepwise Process \u2192 Output format \u2192 Anti\u2011patterns), matching established skill templates."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Agent can execute the diagnostic flow with provided commands and output format. Missing guidance for handling multiple simultaneous failure signals and for edge cases like missing permissions or partial log data, which could leave the agent stuck."
+      "justification": "Provides a usable decision tree, concrete CLI commands, and output format, enabling an agent to act. Two points deducted because some commands (e.g., the CloudWatch metric \"glue.executor.memory.maxUsed\") are not guaranteed to exist, and edge\u2011case handling (missing security\u2011group IDs, ambiguous error messages) is not fully covered."
     }
   ],
-  "total_score": 106,
+  "total_score": 110,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 44814,
-  "latency_ms": 6198,
+  "grade": "A",
+  "token_count": 44555,
+  "latency_ms": 22474,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1
