@@ -491,16 +491,29 @@ every `NEED_MORE_INFO`/`BLOCKED` gate.
 
 ## Output format
 
+The response is a single block using the literal labels
+`MACIE_JOB:`, `VERDICT:`, `REASON:`, `CHECKLIST:`,
+`ESTIMATED_SAVINGS:`, `MIGRATION_STEPS:`, and `CONFIRM:`. The
+CHECKLIST rows show current scan config vs recommended for every
+optimization dimension (automated vs targeted, sampling rate,
+bucket exclusion, identifier scope, suppression, delegation,
+export pipeline). See "STRICT output contract" below for the
+enforced shape and full worked examples.
+
 ```text
-TARGET: <macie-deployment-or-job-id>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+MACIE_JOB: <macie-deployment-or-job-id>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE | NEED_MORE_INFO | BLOCKED
 REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <discovery mode>, <frequency>, <bucket count>, <identifier scope>, <delegation>
-  Proposed: <discovery mode>, <frequency>, <bucket count>, <identifier scope>, <delegation>
-  Dimensions changed: <mode | frequency | buckets | sampling | identifiers | suppression | delegation | export>
-  Dimensions checked: <list ALL eight, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+CHECKLIST:
+  [→|✓] Discovery mode        current: <targeted SCHEDULED | ONE_TIME | automated>   recommended: <...>
+  [→|✓] Scan frequency        current: <daily | weekly | monthly>                    recommended: <...>
+  [→|✓] Bucket selection      current: <N buckets in scope>                          recommended: <M buckets (exclude <names>)>
+  [→|✓] Object sampling       current: <default | deep/full>                         recommended: <...>
+  [→|✓] Managed identifiers   current: <ALL | INCLUDE [...] >                        recommended: <...>
+  [→|✓] Custom identifiers    current: <N configured, regex audited>                 recommended: <...>
+  [→|✓] Suppression rules     current: <0 | N rules>                                 recommended: <...>
+  [→|✓] Multi-account deleg.  current: <standalone | delegated admin (acct)>         recommended: <...>
+  [→|✓] Export pipeline       current: <none | S3+Athena>                            recommended: <...>
 ESTIMATED_SAVINGS:
   Current monthly: $<amount>
     assessment: <GB × runs × $/GB>
@@ -534,17 +547,24 @@ before returning the response.
 
 Every response MUST be a single block using these literal labels, in this
 order. Do NOT substitute markdown headings, camelCase, or bold variants.
+The CHECKLIST rows surface the current scan config vs recommended for
+every optimization dimension so the operator can see the full posture
+in one read.
 
 ```text
-TARGET: <macie-deployment-or-job-id>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+MACIE_JOB: <macie-deployment-or-job-id>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE | NEED_MORE_INFO | BLOCKED
 REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <discovery mode>, <frequency>, <bucket count>, <identifier scope>, <delegation>
-  Proposed: <discovery mode>, <frequency>, <bucket count>, <identifier scope>, <delegation>
-  Dimensions changed: <mode | frequency | buckets | sampling | identifiers | suppression | delegation | export>
-  Dimensions checked: <list ALL eight, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+CHECKLIST:
+  [→|✓]  Discovery mode        current: <targeted SCHEDULED | ONE_TIME | automated>   recommended: <...>
+  [→|✓]  Scan frequency        current: <daily | weekly | monthly>                    recommended: <...>
+  [→|✓]  Bucket selection      current: <N buckets in scope>                          recommended: <M buckets (exclude <names>)>
+  [→|✓]  Object sampling       current: <default | deep/full>                         recommended: <...>
+  [→|✓]  Managed identifiers   current: <ALL | INCLUDE [...] >                        recommended: <...>
+  [→|✓]  Custom identifiers    current: <N configured, regex audited>                 recommended: <...>
+  [→|✓]  Suppression rules     current: <0 | N rules>                                 recommended: <...>
+  [→|✓]  Multi-account deleg.  current: <standalone | delegated admin (acct)>         recommended: <...>
+  [→|✓]  Export pipeline       current: <none | S3+Athena>                            recommended: <...>
 ESTIMATED_SAVINGS:
   Current monthly: $<amount>    ← MUST show assessment + per-bucket + finding-storage subtotals
   Projected monthly: $<amount>
@@ -573,12 +593,13 @@ CONFIRM: <confirmation prompt text>
    configuration evidence.** The REASON MUST name the job type, run
    frequency, and scope evidence.
 
-5. **NEVER omit a dimension from the RECOMMENDATION block.** The
-   `Dimensions checked` line MUST list all eight dimensions, each marked
-   ✓ (no finding) or → (finding).
+5. **NEVER omit a dimension from the CHECKLIST.** All nine rows MUST
+   appear, each marked `→` (finding, change recommended) or `✓`
+   (verified, no change). Inventing a 10th row or collapsing rows
+   together is a contract violation.
 
 6. **NEVER present a cost-neutral reconfiguration as "cost savings."**
-   Surface the coverage/latency improvement explicitly and set
+   Surface the coverage/latency improvement explicitly in REASON and set
    `Monthly saving: $0.00` with verdict `OPTIMIZED` (or
    `FURTHER_OPTIMIZATION_AVAILABLE` ONLY if a different dimension has
    positive saving).
@@ -586,73 +607,113 @@ CONFIRM: <confirmation prompt text>
 7. **NEVER round intermediate formula steps differently from the final
    figure.** Compute at full precision, round only the displayed result.
 
+8. **NEVER substitute markdown headings, bold, or camelCase variants
+   for the literal labels** (`## Verdict`, `**VERDICT:**`, `verdict =`
+   are all invalid). The labels are parser-anchored.
+
+9. **NEVER emit a `→` row in CHECKLIST without a corresponding
+   MIGRATION_STEPS entry.** Every finding dimension MUST have a CLI
+   action that resolves it.
+
 ### Perfect example output — FURTHER_OPTIMIZATION_AVAILABLE with verified math
 
-Every field below is internally consistent. Copy this shape exactly.
+Every field below is internally consistent and shows concrete monthly
+USD figures. Copy this shape exactly.
 
 ```text
-TARGET: macie-targeted-pci-scan-prod
+MACIE_JOB: macie-targeted-pci-scan-prod
 VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
-REASON: Recurring daily targeted job covers a stable data lake that
-  automated discovery could manage incrementally. At 12.4 TB per run ×
-  30 runs/month × $0.10/GB assessed, the recurring job is the dominant
-  Macie line item. Migrating coverage to automated discovery (5%
-  monthly churn) projects 95% reduction in assessment spend.
-  Additionally, 4 log/archive buckets are in scope and should be
-  excluded (Step 3), and managedDataIdentifierSelector: ALL is
-  overbroad for a PCI-only compliance scope (Step 5).
-RECOMMENDATION:
-  Current: targeted SCHEDULED job, daily, 18 buckets, ALL identifiers, delegated admin
-  Proposed: automated discovery, service cadence, 14 buckets, INCLUDE (PCI categories), delegated admin
-  Dimensions changed: mode (Step 1) + buckets (Step 3) + identifiers (Step 5)
-  Dimensions checked: mode → (targeted to automated)  frequency → (daily to service)
-    buckets → (18 to 14, exclude 4 logs)  sampling ✓ (default sampling retained)
-    identifiers → (ALL to INCLUDE PCI)  suppression ✓ (none needed)
-    delegation ✓ (already delegated)  export ✓ (Athena pipeline in place)
-  Confidence: HIGH — job configuration cited; Cost Explorer cross-check
-    agrees; automated discovery already enabled but underutilised.
+REASON: Recurring daily targeted job covers a stable 12.4 TB data lake
+  that automated discovery could manage incrementally. 4 log/archive
+  buckets are in scope and add per-GB cost with no security value.
+  managedDataIdentifierSelector: ALL is overbroad for a PCI-only
+  compliance scope. Cost Explorer cross-check agrees with job stats.
+CHECKLIST:
+  [→] Discovery mode        current: targeted SCHEDULED job (nightly)           recommended: automated data discovery (incremental)
+  [→] Scan frequency        current: daily (30 runs/month)                      recommended: service-managed cadence
+  [→] Bucket selection      current: 18 buckets in scope (4 logs/archive)       recommended: 14 buckets (exclude access-logs-prod, cloudtrail-archive, alb-logs, public-assets)
+  [✓] Object sampling       current: default sampling                           recommended: default (no change)
+  [→] Managed identifiers   current: ALL (every managed ID per object)          recommended: INCLUDE [AWSManagedFinancialUS, AWSManagedCredentialsKeywords]
+  [✓] Custom identifiers    current: 3 configured, regex audited                recommended: keep (no change)
+  [→] Suppression rules     current: 0 rules                                    recommended: add 1 rule (ARCHIVE known-safe log prefixes)
+  [✓] Multi-account deleg.  current: delegated admin (org-management)           recommended: keep (no change)
+  [✓] Export pipeline       current: S3 + Athena                                recommended: keep (no change)
 ESTIMATED_SAVINGS:
   Current monthly: $37,210.00
-    assessment: 12,400 GB × 30 runs × $0.10 = $37,200.00
+    assessment: 12,400 GB × 30 runs × $0.10/GB = $37,200.00
     per-bucket fees: 18 buckets × $0.50 = $9.00
     finding storage: $1.00
   Projected monthly: $629.00
-    assessment: 620 GB (5% churn) × $0.10 = $62.00
+    assessment: 620 GB (5% monthly churn) × $0.10 = $62.00
     per-bucket fees: 14 buckets × $0.50 = $7.00
-    automated discovery overhead + finding storage: $560.00 (account-level
-      monthly automated discovery + data processing)
-    finding storage: $0.00 (suppression applied to known-safe)
-  Monthly saving: $36,581.00
-    ($37,210.00 − $629.00 = $36,581.00 ✓)
-  Annual saving: $438,972.00
+    automated discovery overhead + finding storage: $560.00
+  Monthly saving: $36,581.00    ($37,210.00 − $629.00 = $36,581.00 ✓)
+  Annual saving: $438,972.00    ($36,581.00 × 12 = $438,972.00 ✓)
+  Assumptions: 12,400 GB in scope per run, 30 runs/month, us-east-1 pricing,
+    5% monthly object churn for automated discovery, PCI-only identifier scope
 MIGRATION_STEPS:
   1. Verify automated discovery coverage includes the data lake buckets:
      aws macie2 get-automated-discovery-configuration
-     aws macie2 get-classification-scope --name <scope>
+     aws macie2 get-classification-scope --name default-scope
   2. Exclude log/archive buckets from the classification scope:
-     aws macie2 update-classification-scope --name <scope> \
+     aws macie2 update-classification-scope --name default-scope \
        --s3 '{"excludes":{"bucketNames":["access-logs-prod","cloudtrail-archive","alb-logs","public-assets"]}}'
   3. Narrow managed identifier scope on any remaining targeted jobs:
-     aws macie2 update-classification-job --job-id <id> \
+     aws macie2 update-classification-job --job-id job-targeted-pci-scan \
        --managed-data-identifier-selector INCLUDE \
-       --managed-data-identifier-ids "AWSManagedFinancialUS"
-  4. Disable the recurring targeted job once automated discovery is
+       --managed-data-identifier-ids "AWSManagedFinancialUS,AWSManagedCredentialsKeywords"
+  4. Add a suppression rule for known-safe log prefixes:
+     aws macie2 create-findings-filter --name suppress-known-safe-logs \
+       --action ARCHIVE \
+       --finding-criteria '{"criterion":{"s3Bucket.name":{"eq":["access-logs-prod","cloudtrail-archive"]}}}'
+  5. Disable the recurring targeted job once automated discovery is
      confirmed covering the same buckets:
-     aws macie2 update-classification-job --job-id <id> --status DISABLED
-  5. Monitor Cost Explorer (Service=Macie) for 7 days post-change:
+     aws macie2 update-classification-job --job-id job-targeted-pci-scan --status DISABLED
+  6. Monitor Cost Explorer (Service=Macie) for 7 days post-change:
      aws ce get-cost-and-usage --filter '{"Dimensions":{"Key":"SERVICE","Values":["Macie"]}}'
 CONFIRM: About to migrate macie-targeted-pci-scan-prod from recurring
   daily targeted job to automated discovery, exclude 4 log/archive
-  buckets, and narrow identifier scope to PCI categories. Monthly saving
-  $36,581.00 (98.3% reduction). Proceed? (yes/no)
+  buckets, narrow identifier scope to PCI categories, and add 1
+  suppression rule. Monthly saving $36,581.00 (98.3% reduction).
+  Proceed? (yes/no)
+```
+
+### Perfect example output — OPTIMIZED (no change recommended)
+
+```text
+MACIE_JOB: macie-automated-discovery-prod
+VERDICT: OPTIMIZED
+REASON: Automated discovery is enabled and incremental, sampling is at
+  service default, all log/archive buckets excluded, identifier scope
+  narrowed to PCI categories, suppression rules cover known-safe
+  prefixes, delegated administrator is in place, and classification
+  export feeds Athena for batch analysis. No dimension has a finding.
+CHECKLIST:
+  [✓] Discovery mode        current: automated data discovery               recommended: keep
+  [✓] Scan frequency        current: service-managed cadence                recommended: keep
+  [✓] Bucket selection      current: 14 buckets in scope (no logs/archive)  recommended: keep
+  [✓] Object sampling       current: default sampling                       recommended: keep
+  [✓] Managed identifiers   current: INCLUDE [PCI categories]               recommended: keep
+  [✓] Custom identifiers    current: 2 configured, regex audited            recommended: keep
+  [✓] Suppression rules     current: 3 rules (known-safe prefixes)          recommended: keep
+  [✓] Multi-account deleg.  current: delegated admin (org-management)       recommended: keep
+  [✓] Export pipeline       current: S3 + Athena                            recommended: keep
+ESTIMATED_SAVINGS:
+  Current monthly: $629.00
+  Projected monthly: $629.00
+  Monthly saving: $0.00
+  Annual saving: $0.00
+MIGRATION_STEPS: (none — no dimension has a finding)
+CONFIRM: (none — no state-changing action proposed)
 ```
 
 **Self-check before emit:**
 - [ ] `Current monthly − Projected monthly == Monthly saving` (2 decimals)?
 - [ ] `Monthly saving × 12 == Annual saving`?
-- [ ] All eight dimensions listed in `Dimensions checked`?
+- [ ] All nine dimensions listed in CHECKLIST with `→` or `✓`?
 - [ ] Every `→` dimension has a corresponding MIGRATION_STEPS entry?
 - [ ] No scratch/recompute text in the block?
+- [ ] All labels are literal all-caps (no markdown, bold, or camelCase)?
 
 ## Verdict semantics
 

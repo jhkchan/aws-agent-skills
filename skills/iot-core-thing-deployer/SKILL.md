@@ -138,6 +138,49 @@ If any prerequisite is missing, the verdict is `PREREQUISITES_MISSING`
 with a specific gap citation in the checklist (marked `[✗]`), and
 `READY_TO_DEPLOY` MUST NOT also appear.
 
+### Decision tree leading to the output
+
+```text
+1. Does the thing exist (create-thing returned a thingArn)?
+   ├─ YES → go to 2
+   └─ NO  → VERDICT: PREREQ_MISSING ([✗] Thing: not created)
+2. Does the certificate exist AND is it ACTIVE?
+   ├─ YES → go to 3
+   └─ NO  → VERDICT: PREREQ_MISSING ([✗] Certificate: missing or not ACTIVE)
+3. Is the certificate ATTACHED to the thing (attach-thing-principal)?
+   ├─ YES → go to 4
+   └─ NO  → VERDICT: PREREQ_MISSING ([✗] Certificate attached to thing: NO)
+4. Is the IoT policy ATTACHED to the CERTIFICATE (attach-policy,
+        NOT attach-thing-principal)?
+   ├─ YES → go to 5
+   └─ NO  → VERDICT: PREREQ_MISSING ([✗] Policy attached to certificate: NO)
+5. If a topic rule is requested, does the IAM role exist with trust
+   policy for iot.amazonaws.com AND downstream action perms?
+   ├─ YES → go to 6
+   └─ NO  → VERDICT: PREREQ_MISSING ([✗] Topic rule IAM role: missing)
+6. Emit CHECKLIST with [✓] on every line + VERIFICATION_COMMANDS.
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER preface the block with prose, greetings, or "Here is...".**
+   The first line of the response MUST be `IOT_THING:`.
+2. **NEVER emit `VERDICT: READY_TO_DEPLOY` when any CHECKLIST line is
+   `[✗]`.** A single `[✗]` forces `VERDICT: PREREQUISITES_MISSING`.
+3. **NEVER use placeholder text** (`<thing-name>`, `<cert-id>`, `XXX`)
+   in a worked example. Use real thing names, real certificate ARNs,
+   real policy names, and real SQL statements.
+4. **NEVER list the policy as "attached to thing".** IoT policies attach
+   to the CERTIFICATE (principal), not the thing. The CHECKLIST line
+   MUST read `Policy attached to certificate: YES`.
+5. **NEVER show a topic rule SQL without quoting the topic filter.**
+   SQL MUST use real MQTT topic filters with `+`/`#` wildcards, e.g.
+   `SELECT temperature FROM 'device/+/telemetry' WHERE temperature > 30`.
+6. **NEVER omit the certificate ARN.** A bare cert-id without the full
+   `arn:aws:iot:region:account:cert/<id>` ARN is unresolvable downstream.
+7. **NEVER list a topic rule action without the IAM role ARN.** Every
+   action (Timestream, Lambda, S3, republish) needs a role ARN.
+
 ## Quick navigation
 
 | Section | When to read |
@@ -636,7 +679,7 @@ VERIFICATION_COMMANDS:
   aws iot get-topic-rule --rule-name <rule-name> --region <region>
 ```
 
-### Worked example — sensor thing with policy, rule, and shadow
+### Worked example — sensor thing with cert, policy, Timestream rule, shadow
 
 ```text
 IOT_THING: sensor-001 (arn:aws:iot:us-east-1:123456789012:thing/sensor-001)
@@ -645,25 +688,47 @@ CHECKLIST:
   [✓] Thing: sensor-001 — created
   [✓] Thing type: temperature-sensor
   [✓] Thing group: factory-floor-sensors
-  [✓] Certificate (X.509): a1b2c3d4 — ACTIVE
-  [✓] Certificate attached to thing: YES
+  [✓] Certificate (X.509): arn:aws:iot:us-east-1:123456789012:cert/a1b2c3d4e5f6g7h8i9j0 — ACTIVE
+  [✓] Certificate attached to thing: YES (attach-thing-principal verified)
   [✓] IoT policy: sensor-publish-policy — created
-  [✓] Policy attached to certificate: YES
-  [✓] Topic rule: telemetry-to-timestream — SQL: SELECT temperature FROM 'device/+/telemetry'
+      Policy JSON:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {"Effect":"Allow","Action":["iot:Connect"],
+             "Resource":"arn:aws:iot:us-east-1:123456789012:client/sensor-*"},
+            {"Effect":"Allow","Action":["iot:Publish"],
+             "Resource":"arn:aws:iot:us-east-1:123456789012:topic/device/+/telemetry"},
+            {"Effect":"Allow","Action":["iot:Subscribe"],
+             "Resource":"arn:aws:iot:us-east-1:123456789012:topicfilter/device/+/commands"},
+            {"Effect":"Allow","Action":["iot:Receive"],
+             "Resource":"arn:aws:iot:us-east-1:123456789012:topic/device/+/commands"}
+          ]
+        }
+  [✓] Policy attached to certificate: YES (attach-policy target=cert ARN)
+  [✓] Topic rule: telemetry-to-timestream
+      SQL: SELECT temperature, humidity, device_id FROM 'device/+/telemetry'
+             WHERE temperature > 30
   [✓] Topic rule IAM role: arn:aws:iam::123456789012:role/IoTTopicRuleRole
-  [✓] Topic rule actions: Timestream, Republish
+      (trust: iot.amazonaws.com; perms: timestream:WriteRecords, iot:Publish)
+  [✓] Topic rule actions: Timestream (database=sensors, table=telemetry),
+        Republish (topic=device/alerts, qos=1); errorAction: Republish
+        (topic=device/errors)
   [✓] Device shadow: classic
+      (topics: $aws/things/sensor-001/shadow/update | /get | /delete)
   [✓] IoT job: none
-  [✓] Fleet indexing: REGISTRY_AND_SHADOW
+  [✓] Fleet indexing: REGISTRY_AND_SHADOW (connectivity=STATUS, namedShadow=ON)
   [✓] Custom authorizer: none
-  [✓] Protocol: MQTT (port 8883)
+  [✓] Protocol: MQTT over TLS (port 8883), QoS 1 for telemetry
   [✓] Greengrass: none
-  [✓] Tags: Environment=production, DeviceType=sensor
+  [✓] Tags: Environment=production, DeviceType=sensor, Site=factory-floor
 VERIFICATION_COMMANDS:
   aws iot describe-thing --thing-name sensor-001 --region us-east-1
   aws iot list-thing-principals --thing-name sensor-001 --region us-east-1
-  aws iot describe-certificate --certificate-id a1b2c3d4 --region us-east-1
+  aws iot describe-certificate --certificate-id a1b2c3d4e5f6g7h8i9j0 --region us-east-1
+  aws iot list-principal-policies --principal arn:aws:iot:us-east-1:123456789012:cert/a1b2c3d4e5f6g7h8i9j0 --region us-east-1
   aws iot get-topic-rule --rule-name telemetry-to-timestream --region us-east-1
+  aws iot-data get-thing-shadow --thing-name sensor-001 --region us-east-1
 ```
 
 ## Error handling

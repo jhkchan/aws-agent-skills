@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Adds several non\u2011obvious expert details (e.g., Config required\u2011tags limit of 5 keys, default case_sensitive:true, enforced_for overrides, need to redeclare all parent keys in child OU policies, eventual\u2011consistency delay of Resource Groups Tagging API, 24\u2011hour cost\u2011allocation tag activation, child\u2011resource propagation requirement). However, much of the content restates publicly documented behavior, so it does not reach the full 20."
+      "justification": "Adds several non\u2011obvious expert details (TagPolicy overrides vs merges, default case_sensitive true, Config required\u2011tags limit of 5 keys, allowed\u2011tag-values one\u2011key rule, eventual consistency of Resource Groups Tagging API, EventBridge handling of assumed\u2011role sessions, 24\u2011hour cost\u2011allocation propagation delay, Config CI events only for recorded types). However, much of the content restates publicly documented behavior, so it does not reach the absolute maximum."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific end\u2011to\u2011end procedure (four\u2011layer pipeline, pre\u2011flight data checks, exact CLI order, confirmation gate, backup of existing policies). However, rollback/recovery steps are only hinted at and permission checks are described generically rather than with precise IAM policy snippets. Missing explicit testing or dry\u2011run validation before flipping a policy from advisory to enforced."
+      "justification": "Defines a clear AWS\u2011specific pipeline and step\u2011by\u2011step CLI procedures (enable policy type, create/attach policy, Config rule deployment, EventBridge rule, Lambda role, SSM document). One deduction because the procedure for verifying the Lambda execution role permissions before attaching the EventBridge target is only mentioned in anti\u2011patterns, not as an explicit prerequisite step."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never omit enforced_for, never assume required\u2011tags >5 keys, never forget idempotency, never ignore IAM permissions for child resources). Missing are a few common pitfalls such as IAM permission boundaries, cross\u2011account role trust issues, and forgetting to set the Billing console IAM access for cost\u2011allocation tags."
+      "justification": "Contains a solid NEVER list with concrete reasons (missing enforced_for, 5\u2011key limit, idempotency, missing ENI permissions, cost\u2011allocation delay, etc.). Missing several common pitfalls such as tag\u2011key length limits (128\u202fchars), tag\u2011value size limits (256\u202fchars), and the overall size limit of an Organizations TagPolicy JSON, which reduces the completeness of the anti\u2011pattern coverage."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT the skill does, WHEN to invoke, and provides a rich keyword list and activation triggers. The invocation_schema explains input types but is written in free\u2011form prose rather than a strict JSON schema, leaving slight ambiguity for an agent."
+      "justification": "Frontmatter is complete, description and activation triggers are clear, but the invocation_schema is a free\u2011form paragraph rather than a strict schema, which could hinder reliable activation by an agent."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections: high\u2011level Mindset, quick navigation table, then detailed step\u2011by\u2011step instructions and appendices. The initial sections are dense, which could cause cognitive overload, but critical rules are highlighted early and deeper details are deferred to later steps."
+      "justification": "Information is layered with quick\u2011navigation and sections, yet the document front\u2011loads a large amount of detail before the concise overview, creating potential cognitive overload for an agent seeking the most critical rules first."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom well: destructive actions (policy creation, StackSet deployment) are gated by a CONFIRM prompt and backup commands; creative design steps are open. Slight deduction because some destructive commands (e.g., attaching a policy) lack an explicit dry\u2011run or validation flag."
+      "justification": "Calibration is strong: includes mandatory confirmation gate, backup steps, and ordering constraints for destructive actions. The only shortfall is that the confirmation prompt is described narratively, not tied to a concrete automation guardrail."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick navigation \u2192 Stepwise Process \u2192 Anti\u2011Patterns \u2192 Appendices \u2192 Decision tree). Structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable structure (Mindset \u2192 Navigation \u2192 Steps \u2192 Output \u2192 Anti\u2011Patterns \u2192 Appendices). The pattern is mostly coherent but includes some ad\u2011hoc sections (e.g., multiple worked examples interleaved with anti\u2011patterns) that slightly break a clean, reusable template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, example output blocks, error\u2011handling tips, and a decision tree. However, several placeholders (e.g., `<see Step 2>`, `<reference>` files) require external lookup, and edge\u2011case handling (pagination failures, partial tag failures, IAM permission errors) is only briefly mentioned. This limits an agent\u2019s ability to execute the skill cold without additional context."
+      "justification": "Provides working CLI snippets, decision trees, error\u2011handling notes (DLQ, FailedResourcesMap), and full output format, enabling an agent to execute end\u2011to\u2011end. Missing explicit rollback procedures for failed StackSet deployments and no concrete example of handling partial failures from the Resource Groups Tagging API, which limits robustness."
     }
   ],
-  "total_score": 104,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44445,
-  "latency_ms": 14239,
+  "token_count": 44574,
+  "latency_ms": 9258,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

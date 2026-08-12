@@ -566,6 +566,40 @@ misclassification or an arithmetic contradiction that breaks downstream
 FinOps automation. Self-check EVERY emitted block against these rules
 before returning the response.
 
+### Decision tree (determines VERDICT)
+
+Walk this tree top-to-bottom. The FIRST matching leaf sets the VERDICT.
+Cite the evidence (CloudWatch consumed vs provisioned, GSI projection
+size, TTL status) in the REASON field.
+
+```text
+Is there >= 14 days of CloudWatch ConsumedReadCapacityUnits / ConsumedWriteCapacityUnits data?
+├── NO  → VERDICT: NEED_MORE_INFO             (data gate failed; emit no savings)
+└── YES → Hard blocker present (Global Table replication conflict, IAM denies DescribeTable)?
+          ├── YES → VERDICT: BLOCKED
+          └── NO  → Walk the 7 optimization dimensions in priority order:
+                    D1 Capacity mode crossover (provisioned consumed < 30% of provisioned)?
+                    ├── YES → leaf: capacity-mode    → FURTHER_OPTIMIZATION_AVAILABLE
+                    └── NO  → D2 RCU/WCU sizing (consumed 30-60% AND provisioned > 1.4 × consumed)?
+                              ├── YES → leaf: rcu-wcu-sizing  → FURTHER_OPTIMIZATION_AVAILABLE
+                              └── NO  → D3 Auto-scaling (target > 80% AND ThrottledRequests > 0)?
+                                        ├── YES → leaf: autoscaling       → FURTHER_OPTIMIZATION_AVAILABLE
+                                        └── NO  → D4 Partition skew (ThrottledRequests > 0 with consumed < provisioned)?
+                                                  ├── YES → leaf: partition-key    → FURTHER_OPTIMIZATION_AVAILABLE
+                                                  └── NO  → D5 GSI bloat (ALL projection AND item > 2× KEYS_ONLY size)?
+                                                            ├── YES → leaf: gsi             → FURTHER_OPTIMIZATION_AVAILABLE
+                                                            └── NO  → D6 Table class (Standard AND avg RCU < 50/s AND storage > 50 GB)?
+                                                                      ├── YES → leaf: table-class    → FURTHER_OPTIMIZATION_AVAILABLE
+                                                                      └── NO  → D7 TTL/Streams (churn > 50% AND no TTL, OR Streams unused)?
+                                                                                ├── YES → leaf: ttl-streams    → FURTHER_OPTIMIZATION_AVAILABLE
+                                                                                └── NO  → Was a change applied AND verified THIS session?
+                                                                                          ├── YES → VERDICT: OPTIMIZED
+                                                                                          └── NO  → VERDICT: ALREADY_OPTIMAL
+```
+
+**Zero-savings rule:** if every dimension nets $0.00, the verdict MUST
+be `ALREADY_OPTIMAL` — never `FURTHER_OPTIMIZATION_AVAILABLE`.
+
 ### Required output structure
 
 Every response MUST be a single block using these literal labels, in
@@ -684,6 +718,40 @@ CONFIRM: About to reduce capacity (5000→1200 RCU, 2000→600 WCU), swap GSI,
 - [ ] Every `→` dimension has a corresponding MIGRATION_STEPS entry?
 - [ ] On-demand vs provisioned crossover math verified before recommending switch?
 - [ ] No scratch/recompute text in the block?
+
+### Perfect example output — OPTIMIZED (post-apply verification)
+
+This is the shape emitted AFTER the operator approves and the change is
+applied. VERDICT is `OPTIMIZED` (not FURTHER_OPTIMIZATION_AVAILABLE).
+The "before → after" capacity numbers and dollar savings are preserved
+so downstream FinOps can close the loop.
+
+```text
+TARGET: user-events-prod
+VERDICT: OPTIMIZED
+REASON: Capacity reduced from 5000/2000 to 1200/600 RCU/WCU with
+  autoscaling; GSI recreated with INCLUDE projection (120 GB → 30 GB);
+  TTL enabled on expires_at; Streams disabled. CloudWatch confirms zero
+  ThrottledRequests over the 7-day post-apply window.
+RECOMMENDATION:
+  Current: PROVISIONED 1200 RCU / 600 WCU (autoscaled, target 70%), 2 GSIs (INCLUDE, 30 GB), TTL on (expires_at), Streams off
+  Proposed: same as Current — no further action
+  Dimensions changed: capacity-mode ✓  rcu-wcu-sizing ✓ (applied)  autoscaling ✓ (applied)
+    partition-key ✓ (no skew)  gsi ✓ (applied)  table-class ✓ (Standard, high traffic)  ttl-streams ✓ (applied)
+  Confidence: HIGH — 7-day post-apply CloudWatch shows ConsumedReadCapacityUnits avg 820/s, max 1190/s; zero ThrottledRequests.
+ESTIMATED_SAVINGS:
+  Pre-apply monthly: $2,137.80
+  Post-apply monthly: $571.45
+  Monthly saving: $1,566.35 ($2,137.80 − $571.45 ✓)
+  Annual saving: $18,796.20
+MIGRATION_STEPS:
+  1. Completed: autoscaling min reduced (5000→1200 RCU, 2000→600 WCU) on 2026-08-04.
+  2. Completed: GSI recreated with INCLUDE projection (by-type-v2 live, by-type-v1 deleted).
+  3. Completed: TTL enabled on expires_at; first deletes observed within 38 hours.
+  4. Completed: Streams disabled after confirming no Lambda consumers.
+  5. Monitor ThrottledRequests and ConsumedCapacity for 7 more days.
+CONFIRM: Change applied and verified. No further approval needed.
+```
 
 ## Verdict semantics
 

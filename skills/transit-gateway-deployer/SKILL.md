@@ -557,131 +557,160 @@ ones.
   segments (prod, non-prod, shared). Cloud WAN creates managed route
   tables; cutover by re-associating attachments.
 
-## Output format
+## Output format — MANDATORY literal labels
+
+Every response MUST begin with the block below — no preamble, no
+conversational opening. The labels are **case-sensitive all-caps
+keywords** — write them EXACTLY as shown. Do NOT write a preamble.
+Start with `TGW:` and stop after `NOTES:`.
 
 ```text
-TGW_SPEC: <name>
-VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-ARCHITECTURE:
-  TGW: <id> ASN <asn> region <region> (DNS <enabled|disabled>, multicast <enabled|disabled>)
-  VPC attachments: <count> (subnets per AZ consistent <yes|no>, appliance mode <list>)
-  Route tables: <count> (associations <per attachment>, propagations <list>)
-  Peering: <count> connections (inter-region <list>)
-  Connect attachments: <count> (GRE peers <list>, BGP ASNs <list>)
-  Multicast domains: <count>
-  Network Manager: <registered|not registered> global-network <id>
-  RAM share: <count> principals (auto-accept <enabled|disabled>)
-  Cloud WAN: <attached|not attached> core-network <id>
-CHECKLIST:
-  [x] TGW ASN unique within peering pairs
-  [x] DNS support enabled
-  [x] VPC attachment subnets available, /28+, one per AZ
-  [x] VPC attachment AZ scope consistent across topology
-  [x] Route table associations explicit (one per attachment)
-  [x] Route table propagations explicit (per segmentation tier)
-  [x] Peering attachments accepted in peer region
-  [x] Connect attachments backed by transport attachment
-  [x] Connect peer BGP ASN differs from TGW ASN
-  [x] Multicast domain members in same TGW (if applicable)
-  [x] Network Manager global network contains TGW
-  [x] RAM share accepted by consumer principals
-  [x] AutoAcceptSharedAttachments=false for production
-FINDINGS:
-  - [INFO] Estimated monthly cost: $36.50 base per TGW + $0.05/hour per attachment + $0.02/GB data processed
-  - [WARN] Cross-AZ traffic between attachment A (us-east-1a/b/c) and attachment B (us-east-1a/b/d) incurs cross-AZ charges
-DEPLOY_COMMANDS:
-  <ordered list of aws ec2 create-transit-gateway* commands and prerequisite IAM/RAM setup>
-```
-
-## STRICT output contract
-
-### Required output structure
-
-Every response MUST begin with this block — no preamble, no
-conversational opening:
-
-```text
-TGW: <tgw-name-or-id>
+TGW: <tgw-name>
 VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
 TARGET: <tgw-name> (tgw-id: <id> for updates)
 PRE_CHECKS:
   - [PASS] <check description>
   - [FAIL] <check description> — <reason>
+CHECKLIST:
+  TGW_CONFIG:
+    ASN: <64512-65535>
+    DNS support: <enabled|disabled>
+    Multicast: <enabled|disabled>
+    AutoAcceptSharedAttachments: <enabled|disabled>
+  VPC_ATTACHMENTS:
+    - Name: <name> | VPC: <vpc-id> | Subnets: <subnet-id list> | AZs: <az list> | Appliance mode: <enabled|disabled>
+  ROUTE_TABLES:
+    - Name: <rtb-name> | Associations: <attachment-name list> | Propagations: <attachment-name list>
+  ROUTE_ENTRIES:
+    - Route table: <rtb-name> | Destination: <cidr> | Target: <attachment-name|blackhole>
+  RAM_SHARE: <count> principals (auto-accept <enabled|disabled>)
+  NETWORK_MANAGER: <registered|not registered> global-network <id>
+  CLOUD_WAN: <attached|not attached> core-network <id>
 STEPS:
   1. CONFIRM: About to <operation> TGW <name> in account <account> region <region>. This will <consequence>. Estimated monthly cost: <$X>. Proceed? (yes/no)
   2. <exact CLI command — no placeholders>
 POST_VERIFY:
   - [PASS] <verification description>
   - [FAIL] <verification description> — <reason>
-TGW_OPTIONS: ASN <asn> DNS <enabled|disabled> multicast <enabled|disabled> auto-accept <enabled|disabled>
-ATTACHMENTS: <count> VPC + <count> peering + <count> connect
-ROUTE_TABLES: <count> with <count> associations and <count> propagations
-RAM_SHARE: <count> principals (auto-accept <enabled|disabled>)
-CLOUD_WAN: <attached|not attached> core-network <id>
 NOTES: <segmentation model, peering direction, cost posture>
 ```
 
+**Status marker semantics:**
+- `[PASS]` — check passed.
+- `[FAIL]` — check failed; cite the reason.
+
+**PREREQUISITES_MISSING verdict:** if any pre-check fails, verdict
+is `PREREQUISITES_MISSING` with each gap listed. Do NOT also emit
+`READY_TO_DEPLOY`.
+
+## STRICT output contract
+
+### Required output structure
+
+Every response MUST begin with the block from "Output format" —
+no preamble, no conversational opening. The `TGW:` and `VERDICT:`
+lines are always the first two lines.
+
 ### FORBIDDEN output patterns
 
-- NEVER start with "Let me analyze…" or "I'll create…" — the VERDICT
-  block is the FIRST line, always. No conversational preamble.
-- NEVER use lowercase verdict values — emit `READY_TO_DEPLOY` or
-  `PREREQUISITES_MISSING` (not `ready`, `prerequisites`).
-- NEVER omit PRE_CHECKS — every pre-check run must appear with
+- **NEVER start with "Let me analyze…" or "I'll create…"** — the
+  `TGW:` line is always the FIRST line. No conversational preamble.
+- **NEVER use lowercase verdict values** — emit `READY_TO_DEPLOY`
+  or `PREREQUISITES_MISSING` (not `ready`, `prerequisites`).
+- **NEVER omit PRE_CHECKS** — every pre-check run must appear with
   `[PASS]` or `[FAIL]` and a specific reason for each failure. An
   empty PRE_CHECKS block is non-compliant.
-- NEVER emit a plan with placeholder values (e.g., `<tgw-id>`,
+- **NEVER conflate route table association with propagation** — emit
+  both as separate ROUTE_TABLES entries. Association = which route
+  table an attachment LOOKS UP routes in; propagation = which route
+  tables an attachment INJECTS its routes into.
+- **NEVER emit a plan with placeholder values** (e.g., `<tgw-id>`,
   `<vpc-id>`) in a READY_TO_DEPLOY plan — every field must be
   populated with actual values from the input.
-- NEVER omit the CONFIRM gate as the first STEPS entry for any
+- **NEVER omit the CONFIRM gate** as the first STEPS entry for any
   state-changing operation.
-- NEVER claim success without verifying each attachment is `available`
-  via `describe-transit-gateway-vpc-attachments` — attachments in
-  `pendingAcceptance` are non-functional.
-- NEVER conflate route table association with propagation — emit
-  both as separate PRE_CHECKS rows.
-- NEVER deploy a peering attachment without verifying acceptance in
-  the peer region — a `pendingAcceptance` peering is non-functional.
+- **NEVER deploy cross-account attachments without RAM share steps** —
+  the owner creates the RAM share; the consumer creates the VPC
+  attachment; the owner accepts the attachment (when
+  `AutoAcceptSharedAttachments=false`). Missing either side leaves
+  the attachment in `pendingAcceptance`.
+- **NEVER claim success without verifying each attachment is
+  `available`** via `describe-transit-gateway-vpc-attachments` —
+  attachments in `pendingAcceptance` are non-functional.
+- **NEVER deploy a peering attachment without verifying acceptance
+  in the peer region** — a `pendingAcceptance` peering is
+  non-functional.
 
-### Perfect example output
+### Worked example — TGW with 3 VPC attachments + cross-account RAM sharing
 
 ```text
 TGW: prod-tgw-us-east-1
 VERDICT: READY_TO_DEPLOY
-TARGET: prod-tgw-us-east-1
+TARGET: prod-tgw-us-east-1 (tgw-id: tgw-0abc123def)
 PRE_CHECKS:
   - [PASS] TGW ASN 64512 unique within peering pair (peer TGW us-west-2 uses 64513)
   - [PASS] DNS support enabled, DNS propagation enabled
-  - [PASS] VPC vpc-0app1 / vpc-0app2 / vpc-shared subnets all available, /28+
+  - [PASS] VPC vpc-0app1 subnets subnet-0a1, subnet-0b1, subnet-0c1 all available, /28+
+  - [PASS] VPC vpc-0app2 subnets subnet-0a2, subnet-0b2, subnet-0c2 all available, /28+
+  - [PASS] VPC vpc-shared (account 222222222222) subnets subnet-0x1, subnet-0x2, subnet-0x3 all available, /28+
   - [PASS] AZ scope us-east-1a/b/c consistent across all three VPC attachments
-  - [PASS] Route table prod-rtb associations: app1, app2 (one per attachment)
-  - [PASS] Route table shared-rtb associations: shared (one per attachment)
-  - [PASS] Route table prod-rtb propagations: app1, app2, shared (shared reaches prod)
-  - [PASS] Route table shared-rtb propagations: shared only (reverse isolation)
+  - [PASS] RAM share to 222222222222 is ACTIVE and accepted by consumer
+  - [PASS] IAM principal holds ec2:CreateTransitGateway*, AssociateTransitGatewayRouteTable, EnableTransitGatewayRouteTablePropagation, ram:CreateResourceShare
   - [PASS] AutoAcceptSharedAttachments=false for production topology
-  - [PASS] IAM principal holds ec2:CreateTransitGateway*, AssociateTransitGatewayRouteTable, EnableTransitGatewayRouteTablePropagation
+CHECKLIST:
+  TGW_CONFIG:
+    ASN: 64512
+    DNS support: enabled
+    Multicast: disabled
+    AutoAcceptSharedAttachments: disabled
+    Default route table association: disabled
+    Default route table propagation: disabled
+  VPC_ATTACHMENTS:
+    - Name: app1-tgw-attach | VPC: vpc-0app1 | Subnets: subnet-0a1, subnet-0b1, subnet-0c1 | AZs: us-east-1a/b/c | Appliance mode: disabled
+    - Name: app2-tgw-attach | VPC: vpc-0app2 | Subnets: subnet-0a2, subnet-0b2, subnet-0c2 | AZs: us-east-1a/b/c | Appliance mode: disabled
+    - Name: shared-tgw-attach | VPC: vpc-shared (acct 222222222222) | Subnets: subnet-0x1, subnet-0x2, subnet-0x3 | AZs: us-east-1a/b/c | Appliance mode: disabled
+  ROUTE_TABLES:
+    - Name: prod-rtb | Associations: app1-tgw-attach, app2-tgw-attach | Propagations: app1-tgw-attach, app2-tgw-attach, shared-tgw-attach
+    - Name: shared-rtb | Associations: shared-tgw-attach | Propagations: shared-tgw-attach
+  ROUTE_ENTRIES:
+    - Route table: prod-rtb | Destination: 0.0.0.0/0 | Target: shared-tgw-attach
+    - Route table: shared-rtb | Destination: 10.0.0.0/8 | Target: blackhole
+  RAM_SHARE: 1 principal (account 222222222222, auto-accept disabled)
+  NETWORK_MANAGER: registered global-network global-network-0abc
+  CLOUD_WAN: not attached
 STEPS:
-  1. CONFIRM: About to create-tgw prod-tgw-us-east-1 in account 111111111111 region us-east-1. Creates TGW with ASN 64512, three VPC attachments, two route tables, four propagations. Estimated cost: $36.50/mo base + $0.05/hr per attachment (~$108/mo) + $0.02/GB processed. Proceed? (yes/no)
+  1. CONFIRM: About to create TGW prod-tgw-us-east-1 in account 111111111111 region us-east-1. Creates TGW (ASN 64512), 3 VPC attachments (2 in-owner, 1 cross-account via RAM), 2 route tables, 4 propagations, 2 static routes, 1 RAM share to 222222222222. Estimated cost: $36.50/mo base + $109.50/mo attachments + $0.02/GB processed. Proceed? (yes/no)
   2. aws ec2 create-transit-gateway --description "prod-tgw-us-east-1" --options AmazonSideAsn=64512,AutoAcceptSharedAttachments=disable,DefaultRouteTableAssociation=disable,DefaultRouteTablePropagation=disable,VpnEcmpSupport=enable,DnsSupport=enable,MulticastSupport=disable --tag-specifications "ResourceType=transit-gateway,Tags=[{Key=Name,Value=prod-tgw-us-east-1}]"
-  3. aws ec2 create-transit-gateway-route-table --transit-gateway-id <tgw-id> --tag-specifications "ResourceType=transit-gateway-route-table,Tags=[{Key=Name,Value=prod-rtb}]"   # also create shared-rtb
-  4. aws ec2 create-transit-gateway-vpc-attachment --transit-gateway-id <tgw-id> --vpc-id vpc-0app1 --subnet-ids subnet-0a1 subnet-0b1 subnet-0c1 --options ApplianceModeSupport=disable,DnsSupport=enable   # repeat for vpc-0app2 and vpc-shared
-  5. aws ec2 associate-transit-gateway-route-table --transit-gateway-route-table-id tgw-rtb-0prod --transit-gateway-attachment-id tgw-attach-0app1   # also app2 to prod-rtb; shared to shared-rtb
-  6. aws ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id tgw-rtb-0prod --transit-gateway-attachment-id tgw-attach-0app1   # also app2, shared propagate to prod-rtb; shared propagates to shared-rtb
+  3. aws ec2 create-transit-gateway-route-table --transit-gateway-id tgw-0abc123def --tag-specifications "ResourceType=transit-gateway-route-table,Tags=[{Key=Name,Value=prod-rtb}]"
+  4. aws ec2 create-transit-gateway-route-table --transit-gateway-id tgw-0abc123def --tag-specifications "ResourceType=transit-gateway-route-table,Tags=[{Key=Name,Value=shared-rtb}]"
+  5. aws ec2 create-transit-gateway-vpc-attachment --transit-gateway-id tgw-0abc123def --vpc-id vpc-0app1 --subnet-ids subnet-0a1 subnet-0b1 subnet-0c1 --options ApplianceModeSupport=disable,DnsSupport=enable --tag-specifications "ResourceType=transit-gateway-attachment,Tags=[{Key=Name,Value=app1-tgw-attach}]"
+  6. aws ec2 create-transit-gateway-vpc-attachment --transit-gateway-id tgw-0abc123def --vpc-id vpc-0app2 --subnet-ids subnet-0a2 subnet-0b2 subnet-0c2 --options ApplianceModeSupport=disable,DnsSupport=enable --tag-specifications "ResourceType=transit-gateway-attachment,Tags=[{Key=Name,Value=app2-tgw-attach}]"
+  7. aws ram create-resource-share --name prod-tgw-share --resource-arns arn:aws:ec2:us-east-1:111111111111:transit-gateway/tgw-0abc123def --principals 222222222222
+  8. # CONSUMER ACCOUNT 222222222222: aws ram accept-resource-share-invitation --resource-share-invitation-arn <invitation-arn>
+  9. # CONSUMER ACCOUNT 222222222222: aws ec2 create-transit-gateway-vpc-attachment --transit-gateway-id tgw-0abc123def --vpc-id vpc-shared --subnet-ids subnet-0x1 subnet-0x2 subnet-0x3 --tag-specifications "ResourceType=transit-gateway-attachment,Tags=[{Key=Name,Value=shared-tgw-attach}]"
+  10. # OWNER ACCOUNT 111111111111: aws ec2 accept-transit-gateway-vpc-attachment --transit-gateway-vpc-attachment-id tgw-attach-0shared
+  11. aws ec2 associate-transit-gateway-route-table --transit-gateway-route-table-id tgw-rtb-0prod --transit-gateway-attachment-id tgw-attach-0app1
+  12. aws ec2 associate-transit-gateway-route-table --transit-gateway-route-table-id tgw-rtb-0prod --transit-gateway-attachment-id tgw-attach-0app2
+  13. aws ec2 associate-transit-gateway-route-table --transit-gateway-route-table-id tgw-rtb-0shared --transit-gateway-attachment-id tgw-attach-0shared
+  14. aws ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id tgw-rtb-0prod --transit-gateway-attachment-id tgw-attach-0app1
+  15. aws ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id tgw-rtb-0prod --transit-gateway-attachment-id tgw-attach-0app2
+  16. aws ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id tgw-rtb-0prod --transit-gateway-attachment-id tgw-attach-0shared
+  17. aws ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id tgw-rtb-0shared --transit-gateway-attachment-id tgw-attach-0shared
+  18. aws ec2 create-transit-gateway-route --transit-gateway-route-table-id tgw-rtb-0prod --destination-cidr-block 0.0.0.0/0 --transit-gateway-attachment-id tgw-attach-0shared --blackhole false
+  19. aws ec2 create-transit-gateway-route --transit-gateway-route-table-id tgw-rtb-0shared --destination-cidr-block 10.0.0.0/8 --blackhole
 POST_VERIFY:
   - (pending execution)
-  - describe-transit-gateways returns State=available
-  - describe-transit-gateway-vpc-attachments returns 3 attachments all State=available
-  - describe-transit-gateway-route-tables returns 2 non-default route tables
-  - Each attachment associated with one route table; prod-rtb has 3 propagations; shared-rtb has 1
-  - EC2 in vpc-0app1 reaches EC2 in vpc-shared and EC2 in vpc-0app2 (traceroute via TGW)
-TGW_OPTIONS: ASN 64512 DNS enabled multicast disabled auto-accept disabled
-ATTACHMENTS: 3 VPC + 0 peering + 0 connect
-ROUTE_TABLES: 2 with 3 associations and 4 propagations
-RAM_SHARE: 0 principals (no cross-account attachments in this topology)
-CLOUD_WAN: not attached
+  - describe-transit-gateways returns State=available for tgw-0abc123def
+  - describe-transit-gateway-vpc-attachments returns 3 attachments all State=available (cross-account shared-tgw-attach accepted)
+  - describe-transit-gateway-route-tables returns 2 route tables (prod-rtb, shared-rtb)
+  - prod-rtb has 3 propagations (app1, app2, shared) and 1 static route (0.0.0.0/0 -> shared)
+  - shared-rtb has 1 propagation (shared) and 1 blackhole route (10.0.0.0/8)
+  - EC2 in vpc-0app1 reaches EC2 in vpc-shared and vpc-0app2 (traceroute via TGW)
 NOTES:
-  - Segmentation: prod-rtb for app1+app2; shared-rtb for shared-services. Shared reaches prod (egress inspection); prod reaches shared (DNS, AD).
-  - Reverse isolation: prod-rtb does NOT propagate to shared-rtb; shared-rtb only sees its own routes plus static defaults.
+  - Segmentation: prod-rtb for app1+app2; shared-rtb for shared-services VPC (cross-account 222222222222).
+  - Shared reaches prod (propagation enabled to prod-rtb); prod reaches shared (default route 0.0.0.0/0 -> shared-tgw-attach for egress).
+  - Reverse isolation: prod-rtb does NOT propagate to shared-rtb; shared-rtb only sees its own routes plus the 10.0.0.0/8 blackhole.
+  - Cross-account flow: owner (111111111111) shared TGW via RAM -> consumer (222222222222) accepted share -> consumer created VPC attachment -> owner accepted attachment (AutoAcceptSharedAttachments=false).
   - Cost: $36.50/mo TGW base + 3 * $0.05/hr * 730 hr = $109.50/mo for attachments + ~$0.02/GB processed.
 ```
 

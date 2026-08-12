@@ -126,6 +126,57 @@ CONFIRM: Before executing any state-changing CLI, emit and await operator
 A block missing VERDICT, RECOMMENDATION, ESTIMATED_SAVINGS, or
 MIGRATION_STEPS is a contract violation — re-emit the full block.
 
+### Decision tree leading to the output
+
+```text
+1. Cost Explorer access available AND ≥14 days of data?
+   ├─ NO  → VERDICT: NEED_MORE_INFO (emit the Step 1 template)
+   └─ YES → go to 2
+2. Aurora:IOUsage > 30% of total Aurora bill AND on Standard tier?
+   ├─ YES → flag I/O-Optimized tier (Step 6); compute break-even
+   └─ NO  → I/O tier ✓ — continue
+3. Serverless v2 MinCapacity > 2 ACU AND avg CPU < 10%?
+   ├─ YES → flag ACU floor tuning (Step 5)
+   └─ NO  → ACU ✓ — continue
+4. Writer CPU avg < 20% on db.r6g.2xlarge+ OR reader CPU avg < 10%
+   on the writer's class?
+   ├─ YES → flag right-sizing (Step 4); cross-check PI DBLoad
+   └─ NO  → right-size ✓ — continue
+5. Cluster On-Demand, uptime > 6 months, no RI?
+   ├─ YES → flag RI evaluation (Step 11)
+   └─ NO  → RI ✓ — continue
+6. Manual snapshots > 90 days old OR backtrack window > 24h?
+   ├─ YES → flag storage / backtrack cleanup (Step 7)
+   └─ NO  → storage ✓ — continue
+7. Any flag set?
+   ├─ YES → VERDICT: OPPORTUNITY_FOUND; emit per-dimension $ savings
+   └─ NO  → VERDICT: ALREADY_OPTIMAL
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER preface the block with prose, greetings, or "Here is...".**
+   The first line of the response MUST be `TARGET:`.
+2. **NEVER emit `VERDICT: OPPORTUNITY_FOUND` with `Annual total: $0`.**
+   If no dimension produces a savings line > $0, the verdict MUST be
+   `ALREADY_OPTIMAL`.
+3. **NEVER show savings math that does not balance.** Right-sizing +
+   ACU + I/O + storage + Global DB + backtrack + RI subtotals MUST
+   sum to the displayed annual total (×12 of monthly sum).
+4. **NEVER recommend Aurora I/O-Optimized without computing the
+   break-even I/O count.** Always cite `break-even = storage_GB × 0.4`
+   million I/O/month and the actual measured I/O.
+5. **NEVER recommend an RI without stating the term (1-yr/3-yr), the
+   offering class (No Upfront/Partial/All), and the exact instance
+   class.** A bare "buy an RI" recommendation is not actionable.
+6. **NEVER recommend right-sizing the writer based on CPU alone.** The
+   recommendation MUST cite Performance Insights DBLoad OR explicitly
+   state "PI not enabled — recommendation based on CPU only, MEDIUM
+   confidence."
+7. **NEVER round intermediate formula steps differently from the final
+   figure.** Compute at full precision (e.g., $0.12/ACU-h × 730h =
+   $87.60, not $88), round only the displayed result.
+
 ## Quick start
 
 - **Aurora I/O-Optimized is the highest-leverage 2024+ feature for
@@ -509,7 +560,7 @@ seven dimensions:
 
 ## Output format
 
-### Worked example — multi-dimension opportunity
+### Worked example — multi-dimension opportunity with explicit cost breakdown
 
 ```text
 TARGET: orders-prod-cluster
@@ -519,32 +570,74 @@ REASON: CE shows I/O 35% of Aurora bill ($420/month on 600M I/O
   / max 28% on db.r6g.2xlarge, readers mirrored at avg 8% CPU,
   and no RI on a cluster running 14 months steady-state. Four
   dimensions have actionable opportunities.
+
+CURRENT MONTHLY COST BREAKDOWN (us-east-1, 730h/month):
+  Compute (instance right-size):
+    Writer  db.r6g.2xlarge  8 vCPU/64 GB  $1.00/h × 730h = $730.00
+    Reader1 db.r6g.2xlarge  8 vCPU/64 GB  $1.00/h × 730h = $730.00
+    Reader2 db.r6g.2xlarge  8 vCPU/64 GB  $1.00/h × 730h = $730.00
+                                                          ──────────
+    Compute subtotal:                                    $2,190.00
+  Storage (Standard tier):
+    1,000 GB × $0.10/GB-month                            = $100.00
+  I/O (Standard tier):
+    600M requests × $0.20/million                        = $120.00
+  Backup (automated snapshots + backtrack):
+    800 GB snapshot storage × $0.095/GB-month            = $76.00
+    Backtrack change log 120 GB × $0.095/GB-month        = $11.40
+    Backup subtotal:                                      = $87.40
+  Global DB:  not in use                                  = $0.00
+  Reserved Instance discount: none (On-Demand)            = $0.00
+                                                          ════════
+  CURRENT MONTHLY TOTAL:                                $2,497.40
+
 RECOMMENDATION:
   Current:
     Compute: writer db.r6g.2xlarge ($730), 2 readers db.r6g.2xlarge
       each ($730 each)
     Storage: Standard, 1,000 GB × $0.10 = $100/month
     I/O: 600M × $0.20 = $120/month (CE shows $420 incl. overhead)
-    Pricing: On-Demand (no RI); Global DB: not in use; backtrack: off
+    Backup: 800 GB automated snapshots + 120 GB backtrack = $87.40/month
+    Pricing: On-Demand (no RI); Global DB: not in use; backtrack: on
   Proposed:
     - Right-sizing: writer → db.r6g.xlarge ($0.50/h) per CPU 15/28%;
       readers → db.r6g.large ($0.25/h) per CPU 8/18%.
     - I/O tier: I/O-Optimized — 600M I/O exceeds the 400M break-even
-      for 1,000 GB storage.
+      for 1,000 GB storage (break-even = 1000 × 0.4 = 400M I/O/mo).
+    - Backup: reduce backtrack window 72h → 24h (cuts 90 GB → 30 GB
+      change log); tier manual snapshots to 30/60/90-day cleanup.
     - RI: 1-yr No Upfront RI on the new writer class once right-size
       is applied; hold on reader RI until reader count stabilises.
     - Performance Insights: top-SQL = orders_join_by_customer at 38%
       of DBLoad (missing index on orders.customer_id). DBA ticket.
   Confidence: HIGH — CE confirms I/O share; CloudWatch confirms CPU
     headroom; PI confirms top-SQL dominance.
+
 ESTIMATED_SAVINGS:
-  Monthly (right-sizing): $1,095  (writer $365 + 2 readers $730)
-  Monthly (I/O-Optimized): $40    ($220 Standard → $180 I/O-Optimized)
-  Monthly (RI on writer): $146    (40% off db.r6g.xlarge $365)
-  Monthly (Global DB / backtrack): $0
-  Annual total: $15,372
+  Monthly (right-sizing): $1,460.00
+    writer: ($1.00 − $0.50) × 730h = $365.00
+    2 readers: ($1.00 − $0.25) × 730h × 2 = $1,095.00
+    Combined: $365.00 + $1,095.00 = $1,460.00
+  Monthly (I/O-Optimized tier): $40.00
+    Standard: $100 storage + $120 I/O = $220.00
+    I/O-Optimized: $180 storage + $0 I/O = $180.00
+    Saving: $220.00 − $180.00 = $40.00
+  Monthly (backup/backtrack): $24.70
+    Backtrack: 90 GB → 30 GB = 60 GB × $0.095 = $5.70
+    Snapshots: 30/60/90 cleanup removes ~200 GB × $0.095 = $19.00
+    Backup subtotal saving: $5.70 + $19.00 = $24.70
+  Monthly (Global DB): $0.00 (Global DB not in use)
+  Monthly (RI on writer): $146.00
+    db.r6g.xlarge On-Demand $365/mo; 1-yr No-Upfront RI ≈ $219/mo
+    Saving: $365 − $219 = $146/mo (40% off)
+  ─────────────────────────────────
+  Monthly total: $1,460.00 + $40.00 + $24.70 + $146.00 = $1,670.70
+  Annual total: $1,670.70 × 12 = $20,048.40
   Assumptions: us-east-1 pricing, 730h/month, right-size occurs
     before RI purchase so RI matches the new instance class.
+
+PROJECTED MONTHLY COST: $2,497.40 − $1,670.70 = $826.70
+
 MIGRATION_STEPS:
   1. Snapshot the cluster before any change:
      aws rds create-db-cluster-snapshot \
@@ -563,14 +656,46 @@ MIGRATION_STEPS:
      aws rds modify-db-cluster \
        --db-cluster-identifier orders-prod-cluster \
        --storage-type aurora-iopt1 --apply-immediately
-  5. After right-size settles (7 days), purchase RI on writer:
+  5. Reduce backtrack window to 24h:
+     aws rds modify-db-cluster \
+       --db-cluster-identifier orders-prod-cluster \
+       --backtrack-window 86400 --apply-immediately
+  6. Delete manual snapshots older than 90 days (tiered cleanup):
+     aws rds describe-db-snapshots --snapshot-type manual \
+       --output json | jq -r '.DBSnapshots[] | select(.SnapshotCreateTime < "2026-05-12") | .DBSnapshotIdentifier'
+     # Review list, then: aws rds delete-db-snapshot --db-snapshot-identifier <id>
+  7. After right-size settles (7 days), purchase RI on writer:
      aws rds purchase-reserved-db-instances-offering \
        --reserved-db-instances-offering-id <offering-id> \
        --reserved-db-instance-id orders-writer-ri-1yr
-  6. File DBA ticket for the missing index on orders.customer_id.
+  8. File DBA ticket for the missing index on orders.customer_id.
 CONFIRM: Before each state-changing CLI, emit and await operator
   approval. Stage changes one dimension per window; never batch
   the writer right-size + I/O tier switch.
+```
+
+### Worked example — already optimal
+
+```text
+TARGET: reporting-cluster-prod
+VERDICT: ALREADY_OPTIMAL
+REASON: All seven dimensions verified at cost-optimal config:
+  Aurora I/O-Optimized enabled; Serverless v2 Min=2/Max=16 with
+  steady ACU 6-10; writer and readers rightsized to CPU avg 45%;
+  1-yr RI on writer and primary reader; no Global DB waste; no
+  backtrack; Performance Insights top-SQL evenly distributed.
+RECOMMENDATION:
+  Current: All dimensions optimal
+  Proposed: no change
+  Confidence: HIGH — CE confirms 30-day spending pattern stable;
+    Performance Insights shows no dominant SQL.
+ESTIMATED_SAVINGS:
+  Monthly (all dimensions): $0
+  Annual total: $0
+MIGRATION_STEPS:
+  - None required. Continue monthly CE review.
+  - Re-evaluate at next growth forecast — Serverless v2 Max may
+    need to scale if reader count doubles.
 ```
 
 ### Worked example — already optimal

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert details not usually known by a generic model: Karpenter v1 API migration (Provisioner \u2192 NodePool, AWSNodeTemplate \u2192 EC2NodeClass), disruption budget syntax, spot\u2011diversification families, VPA mode side\u2011effects, exact helm chart versions, specific thresholds (e.g., Cluster Autoscaler scaleDownUtilizationThreshold 0.5), decision\u2011tree for Karpenter vs CA, and nuanced failure\u2011detection alarms. Some content merely restates common knowledge, hence a small deduction."
+      "justification": "Provides several concrete, non\u2011obvious details (Karpenter v1 API migration, consolidationPolicy budgets, specific spot\u2011diversification families, VPA mode pitfalls, descheduler safety caps) that a generic model would not enumerate, but much of the content restates publicly documented best\u2011practices, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Offers a clear AWS\u2011specific workflow: helm installs, aws eks CLI commands, migration steps, pre\u2011flight checks, and safety gates. Missing explicit procedures for validating the interruption SQS queue, setting required IAM policies, and verifying node health after Karpenter install."
+      "justification": "Encodes AWS\u2011specific reasoning (choose Karpenter vs CA, migration steps, wave\u2011enable pattern, pre\u2011flight confirmation gate) and concrete CLI/helm commands. Only minor generic phrasing (e.g., \"check security\") prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with specific reasoning (e.g., never run Karpenter and CA together, never use WhenEmptyOrUnderutilized without a disruption budget, never rely on a single spot instance family, never run NTH alongside Karpenter, never set HPA scaleDown.stabilizationWindowSeconds to 0, never use VPA Auto on single\u2011replica Deployments). Missing a few niche pitfalls (e.g., IAM role mis\u2011configurations) leads to a modest deduction."
+      "justification": "Contains a thorough NEVER list with concrete reasons (conflict between Karpenter and CA, disruption budget necessity, spot\u2011family diversification, HPA/VPA conflict, zero scale\u2011down window, etc.). One small omission: no explicit warning about using outdated Karpenter versions beyond v1."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete and well\u2011structured; description clearly states WHAT the skill does, WHEN to invoke, and provides extensive keywords, activation triggers, and an invocation schema. No missing elements."
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers and invocation schema are present. Slight vagueness in \"deterministic AUTOSCALING block\" wording could cause ambiguous activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill is layered (Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Step\u2011by\u2011step process \u2192 Output format \u2192 Anti\u2011patterns \u2192 Appendices), but critical rules are presented early and the document front\u2011loads many details, causing some cognitive overload. Hence a deduction."
+      "justification": "Top\u2011level sections give a high\u2011level mindset and quick navigation before deep manifests, but the document front\u2011loads many detailed tables and code snippets that could overwhelm a first\u2011pass reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates specificity to task fragility: mandatory confirmation gate before state\u2011changing ops, safety\u2011check wave\u2011enabling pattern, explicit limits on disruptive actions (disruption budgets, dry\u2011run for descheduler). The invocation schema could be tighter, so one point is deducted."
+      "justification": "Destructive actions are gated by a mandatory confirmation step and pre\u2011flight checks; creative tasks have generous freedom. The only shortfall is the lack of an explicit \u201cdry\u2011run only\u201d mode for the initial deployment."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset, Navigation table, Process steps, Output format, Anti\u2011patterns, Appendices). Minor inconsistency in ordering of some sections prevents a perfect score."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Steps \u2192 Output \u2192 Anti\u2011patterns \u2192 Appendices). Minor inconsistency in ordering of some sections prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 12,
       "max": 15,
-      "justification": "Provides concrete commands, manifests, decision trees, and output templates that an agent could execute. Gaps include missing IAM role creation steps, validation of SQS interruption queue, and the contradictory HPA stabilization setting, which could cause mis\u2011deployment."
+      "justification": "The skill supplies working manifests and a clear output format, yet the model\u2019s generated example violates an anti\u2011pattern (HPA scaleUp stabilizationWindowSeconds set to 0 despite guidance to avoid zero windows). This shows the skill does not enforce its own safety rules, reducing reliability."
     }
   ],
-  "total_score": 104,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40133,
-  "latency_ms": 15034,
+  "token_count": 40822,
+  "latency_ms": 10823,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

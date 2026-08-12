@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill aggregates many documented limits (3000\u2011page async cap, KMS policy needs, SNS role trust) and presents a useful dependency graph, but almost all of this information is already available in AWS documentation; the added value is a modest synthesis rather than brand\u2011new expert insight."
+      "justification": "The skill provides many expert details (3000\u2011page limit, dependency graph, specific never\u2011list items, exact IAM role trust requirements). However, a large portion restates information a capable model already knows (basic Textract API names, generic pagination limits) and omits deeper delta such as cost\u2011optimization tips, detailed quota\u2011increase procedures, or version\u2011specific feature deprecations."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific decision flow: sync vs async based on page count, feature\u2011type selection, required S3/Input/OutputConfig, SNS role, KMS policy, Lambda limits, and document\u2011splitting logic. The only shortfall is a missing explicit step for quota\u2011increase request when ProvisionedThroughputExceeded occurs."
+      "justification": "Procedures are AWS\u2011specific and ordered (feature selection \u2192 sync/async decision \u2192 S3 config \u2192 KMS \u2192 SNS \u2192 Lambda). The only shortfall is that the IAM policy examples are described in prose rather than providing a concrete JSON snippet for each required permission, and the SNS notification role trust relationship is mentioned but not spelled out step\u2011by\u2011step."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with reasons (e.g., never use DetectDocumentText for forms, never call sync API on multipage PDFs, never cross\u2011region S3). Lacks a few common pitfalls such as cost\u2011explosion from large async jobs and pagination\u2011related memory pressure."
+      "justification": "Contains a detailed \"NEVER\" list with concrete reasons (e.g., never use DetectDocumentText for forms). Missing a few common pitfalls such as runaway S3 storage costs from large JSON outputs and forgetting to set concurrency limits, but overall the anti\u2011pattern coverage is strong."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, dependencies, metadata). The description clearly states WHAT the skill does, WHEN to invoke, and provides activation keywords. No missing fields."
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, dependencies, metadata). The description clearly states WHAT the skill does, WHEN to invoke, and provides activation keywords, satisfying specification requirements."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers high\u2011level mindset, quick\u2011navigation table, then deep sections (heuristics, step\u2011by\u2011step, error handling). However the initial sections are dense, forcing the reader to parse many details before reaching the concise checklist."
+      "justification": "The skill layers information (quick navigation, high\u2011level mindset, then step\u2011by\u2011step details). Some critical rules (e.g., exact KMS key\u2011policy JSON) are buried in large reference blocks, which could cause cognitive overload for a fast\u2011acting agent."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates tightly for fragile async jobs (page limits, region constraints, KMS policy) and leaves generous freedom for creative feature combos. Missing explicit safeguards for destructive actions (e.g., accidental re\u2011deployment or resource deletion) and no explicit \u201cdry\u2011run\u201d mode for high\u2011risk changes."
+      "justification": "Calibrates freedom appropriately: destructive actions (e.g., creating roles) are tightly constrained by explicit prerequisites; creative choices (feature selection) are left open. Lacks guidance on throttling async job submissions to respect service quotas, a minor gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Stepwise Process \u2192 NEVER list \u2192 Output format). The structure is consistent with other CloudOps skills, though the ordering of sections is a bit ad\u2011hoc (e.g., error handling appears after the checklist)."
+      "justification": "Follows a recognizable CloudOps skill pattern (Mindset, Expert heuristics, Step list, NEVER list, Output format). Section headings are slightly ad\u2011hoc (e.g., \"Expert heuristic\" vs \"Step X\"), but overall the structure is coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides ready\u2011to\u2011copy CLI commands, a checklist that an agent can emit verbatim, and error\u2011handling guidance. Missing edge\u2011case handling for pagination of GetDocumentAnalysis results and for quota\u2011limit throttling, which could cause execution failures."
+      "justification": "Provides ready\u2011to\u2011use CLI commands, checklist, and verification steps, enabling an agent to act. Missing explicit guidance on capturing the <job-id> from the start command, handling Get* pagination, and sample IAM policy JSON for the notification role, which could cause execution failures."
     }
   ],
-  "total_score": 106,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44660,
-  "latency_ms": 12291,
+  "token_count": 45747,
+  "latency_ms": 13635,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

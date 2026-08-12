@@ -3,23 +3,20 @@ name: connect-instance-deployer
 description: >-
   Provisions Amazon Connect instances, contact flows, queues, routing
   profiles, phone numbers, and integrations with production defaults.
-  Instance creation with three identity modes (SAML-based federation,
-  Amazon Connect directory, existing AWS Directory Service directory).
-  Contact flows authored as JSON specs with AWS Lambda invoke blocks
-  (InvokeLambda), SetAttributes, branching, queue transfers, and Lex
-  bot integration (InvokeAmazonLex). Queues with quick-connect lists,
-  hold-flow, outbound caller ID. Routing profiles with skill
-  requirements (skill name + proficiency level), queue associations,
-  agent hierarchy. Phone number claim (toll-free, DID, toll-free-DID)
-  and porting. Real-time and historical metrics. Amazon Connect Voice
-  ID (speaker enrollment, fraud risk). Contact Lens (sentiment,
-  transcription, redaction). Chat, voice, task channels. S3 recording
-  storage with KMS encryption. Amazon Lex V2 bot integration for IVR.
-  Emits READY_TO_DEPLOY with verification commands. Use when creating
-  a Connect instance, authoring a contact flow with Lambda invoke
-  blocks, configuring routing profile skill requirements, claiming a
-  phone number, integrating a Lex bot for IVR, enabling Voice ID,
-  configuring Contact Lens, setting up S3 recording storage.
+  Instance creation with three identity modes (SAML federation,
+  Connect directory, existing AWS Directory Service directory). Contact
+  flows authored as JSON specs with Lambda invoke blocks (InvokeLambda),
+  branching, queue transfers, and Lex bot integration (InvokeAmazonLex).
+  Routing profiles with skill requirements (skill name + proficiency),
+  queue associations, agent hierarchy. Phone number claim (toll-free,
+  DID). Voice ID (speaker enrollment, fraud risk). Contact Lens
+  (sentiment, transcription, redaction). Chat, voice, task channels.
+  S3 recording storage with KMS encryption. Lex V2 for IVR.
+  Real-time/historical metrics. Emits READY_TO_DEPLOY with verification
+  commands. Use when creating a Connect instance, authoring a contact
+  flow, configuring routing skills, claiming a phone number, integrating
+  Lex for IVR, enabling Voice ID or Contact Lens, or setting up
+  recording storage.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -152,17 +149,184 @@ quick-connect, agent hierarchy, real-time metrics.
 ## STRICT output contract
 
 When invoked with a Connect-provisioning request, the agent MUST
-respond with the READY_TO_DEPLOY checklist defined in the "Output
-format" section using the literal all-caps labels
-`CONNECT_INSTANCE:`, `VERDICT:`, `CHECKLIST:`, and
-`VERIFICATION_COMMANDS:`. Do NOT preface with prose, headings, or
-disclaimers — emit the block first. This contract is what
-assertion-based evals and downstream pipelines rely on; deviating
-breaks automation silently.
+respond with the READY_TO_DEPLOY checklist defined below. This
+contract is what assertion-based evals and downstream pipelines rely
+on; deviating breaks automation silently.
 
-If any prerequisite is missing, the verdict is
-`PREREQUISITES_MISSING` with a specific gap citation (marked
-`[✗]`), and `READY_TO_DEPLOY` MUST NOT also appear.
+### Required output structure
+
+The model MUST emit output using these literal labels, in this order,
+as the FIRST lines of the response (no prose, headings, or disclaimers
+before them):
+
+- `CONNECT_INSTANCE: <instance-id> (<alias>, <identity-mode>)` — first line
+- `VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING` — second line
+- `CHECKLIST:` followed by `- [✓]` or `- [✗]` items (one row per dimension below)
+- `CONTACT_FLOW_SNIPPET:` followed by a fenced JSON block (the actual flow, not a placeholder)
+- `VERIFICATION_COMMANDS:` followed by a fenced block of copy-pasteable CLI
+
+The CHECKLIST MUST cover every dimension, in this order: instance +
+identity mode (SAML / CONNECT_MANAGED / EXISTING_DIRECTORY), directory
+ID (or N/A), contact flow (flow ID + name + type + "all referenced
+resources verified"), Lambda integration (function ARN + resource
+policy grants `connect.amazonaws.com`), queues (queue IDs), routing
+profile (profile ID + queues + skills + concurrency), skill
+requirements (skill name + proficiency threshold), user hierarchy,
+phone number (E.164 + toll-free/DID + region), Lex bot (bot alias ARN
++ V2 + published + locale), Voice ID (domain ID + consent disclosure),
+Contact Lens (real-time / post-call / both), channels (VOICE / CHAT /
+TASK), recording storage (S3 bucket + KMS key ID), and tags.
+
+The CONTACT_FLOW_SNIPPET MUST be a real, runnable JSON block (not a
+placeholder, not pseudocode) showing at minimum: Start, a CheckHoursOfOperation
+branch, an InvokeLambda Action with Exception transitions, an
+InvokeAmazonLex Action, a TransferToQueue Terminal, and a Disconnect
+Terminal. Use concrete Identifier values and real ARNs consistent with
+the CHECKLIST rows.
+
+### Decision tree (determines VERDICT)
+
+```text
+Is the instance alias unique (no existing instance with same alias)?
+├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] Instance alias collision)
+└── YES → Is the identity mode decided (SAML / CONNECT_MANAGED / EXISTING_DIRECTORY)?
+          ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] Identity mode)
+          └── YES → If SAML, is the IdP metadata document available?
+                    ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] SAML metadata)
+                    └── YES → Does every contact-flow reference resolve (queue, Lambda, Lex)?
+                              ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] Dangling flow reference — name it)
+                              └── YES → Does every Lambda have a resource policy granting connect.amazonaws.com?
+                                        ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] Lambda resource policy)
+                                        └── YES → Is the Lex bot a published V2 alias (not DRAFT) with matching locale?
+                                                  ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] Lex bot alias)
+                                                  └── YES → All prerequisites satisfied
+                                                            → VERDICT: READY_TO_DEPLOY
+```
+
+### FORBIDDEN patterns (NEVER)
+
+1. **NEVER preface the CHECKLIST** with prose, headings, or disclaimers — emit the block as the first lines of the response.
+2. **NEVER omit the VERIFICATION_COMMANDS section**, even when every checklist item passes.
+3. **NEVER use generic placeholders** (`<instance-id>`, `<your-flow>`, `<region>`) in a worked example — always use concrete instance IDs, real ARNs, actual queue/profile IDs, and specific CLI commands.
+4. **NEVER mix verdict shapes** — if any prerequisite is `[✗]`, VERDICT MUST be `PREREQUISITES_MISSING` and `READY_TO_DEPLOY` MUST NOT also appear.
+5. **NEVER skip a CHECKLIST row** — every dimension (instance, identity, directory, flow, Lambda, queues, routing profile, skills, hierarchy, phone number, Lex, Voice ID, Contact Lens, channels, recording, tags) gets a `[✓]` or `[✗]` line.
+6. **NEVER emit a CONTACT_FLOW_SNIPPET that is pseudocode or a placeholder** — it MUST be valid JSON that `create-contact-flow --content` would accept.
+7. **NEVER list a Lambda integration as `[✓]` without confirming the resource policy** grants `connect.amazonaws.com` invoke with the instance ARN as `SourceArn` — otherwise InvokeLambda returns AccessDenied at run time.
+8. **NEVER list a Lex bot as `[✓]` if the alias is DRAFT** — Connect invokes published aliases only; DRAFT changes break the flow silently.
+9. **NEVER list a routing profile as `[✓]` without skill requirements** if the scenario calls for skills-based routing — without skills, routing silently degrades to queue-priority.
+
+### Perfect example — SAML instance with Lambda-driven flow and Lex V2 IVR
+
+This is the EXACT shape the model emits for a positive scenario. The
+CONTACT_FLOW_SNIPPET is a real JSON block (Start → CheckHours →
+InvokeLambda → InvokeAmazonLex → branch → TransferToQueue / Disconnect).
+Replace the concrete values with the scenario's values; do not
+genericise them into placeholders.
+
+```text
+CONNECT_INSTANCE: inst-abc123def456 (my-connect-cc, SAML)
+VERDICT: READY_TO_DEPLOY
+CHECKLIST:
+  [✓] Instance: inst-abc123def456 (alias my-connect-cc, us-east-1)
+  [✓] Identity mode: SAML (Okta IdP, metadata document loaded)
+  [✓] Directory: N/A (SAML federation, no Connect-managed directory)
+  [✓] Contact flow: flow-def456789 (inbound-main-flow, CONTACT_FLOW, all referenced resources verified)
+  [✓] Lambda integration: arn:aws:lambda:us-east-1:123456789012:function:lookup-customer (resource policy grants connect.amazonaws.com, SourceArn inst-abc123def456)
+  [✓] Queues: sales-queue-id-111, support-queue-id-222, default-queue-id-333
+  [✓] Routing profile: rp-xyz998877 (sales queue P1, support queue P2, VOICE concurrency 1)
+  [✓] Skill requirements: Sales (proficiency ≥ 4), Support (proficiency ≥ 4)
+  [✓] User hierarchy: Sales - North America (hg-sales-na)
+  [✓] Phone number: +18005551234 (toll-free, us-east-1, claimed via pn-456789)
+  [✓] Lex bot: arn:aws:lex:us-east-1:123456789012:bot-alias/CustomerService:Prod (V2, published alias Prod, locale en_US matches instance)
+  [✓] Voice ID: disabled (consent disclosure not yet added to flow)
+  [✓] Contact Lens: post-call (transcription + sentiment + redaction)
+  [✓] Channels: VOICE, CHAT, TASK
+  [✓] Recording storage: S3 connect-recordings-123456789012 (KMS key arn:aws:kms:us-east-1:123456789012:key/abc-123-def-456)
+  [✓] Tags: Environment=production, Project=sales-cc, Owner=cc-ops
+CONTACT_FLOW_SNIPPET:
+{
+  "Version": "1",
+  "StartAction": "check-hours",
+  "Actions": [
+    {
+      "Identifier": "check-hours",
+      "Type": "CheckHoursOfOperation",
+      "Transitions": {
+        "NextAction": "invoke-lookup-customer",
+        "Conditions": [
+          {"NextAction": "play-closed", "Condition": {"Operator": "Equals", "Operand": "False"}}
+        ]
+      }
+    },
+    {
+      "Identifier": "invoke-lookup-customer",
+      "Type": "InvokeLambda",
+      "Parameters": {
+        "FunctionARN": "arn:aws:lambda:us-east-1:123456789012:function:lookup-customer",
+        "InvocationTimeLimitSeconds": 5
+      },
+      "Transitions": {
+        "NextAction": "play-greeting",
+        "Exceptions": [
+          {"NextAction": "transfer-default", "Error": "Lambda.AccessDenied"},
+          {"NextAction": "transfer-default", "Error": "Lambda.Timeout"}
+        ]
+      }
+    },
+    {
+      "Identifier": "play-greeting",
+      "Type": "PlayPrompt",
+      "Parameters": {"Text": "Thanks for calling. How can I help you today?"},
+      "Transitions": {"NextAction": "invoke-lex-router"}
+    },
+    {
+      "Identifier": "invoke-lex-router",
+      "Type": "InvokeAmazonLex",
+      "Parameters": {
+        "BotAliasArn": "arn:aws:lex:us-east-1:123456789012:bot-alias/CustomerService:Prod",
+        "Intent": "RouteCall",
+        "Slots": {"department": null},
+        "SessionAttributes": {"caller_id": "$.CustomerEndpoint.Address"}
+      },
+      "Transitions": {
+        "NextAction": "branch-on-department",
+        "Exceptions": [{"NextAction": "transfer-default", "Error": "Lex.Timeout"}]
+      }
+    },
+    {
+      "Identifier": "branch-on-department",
+      "Type": "Branch",
+      "Transitions": {
+        "Conditions": [
+          {"NextAction": "transfer-sales",    "Condition": {"Operator": "Equals", "Operand": "Sales",   "Reference": "$.Lex.Slots.department"}},
+          {"NextAction": "transfer-support",  "Condition": {"Operator": "Equals", "Operand": "Support", "Reference": "$.Lex.Slots.department"}}
+        ]
+      }
+    },
+    {"Identifier": "transfer-sales",   "Type": "TransferToQueue", "Parameters": {"QueueId": "sales-queue-id-111"},   "Transitions": {}},
+    {"Identifier": "transfer-support", "Type": "TransferToQueue", "Parameters": {"QueueId": "support-queue-id-222"}, "Transitions": {}},
+    {"Identifier": "transfer-default", "Type": "TransferToQueue", "Parameters": {"QueueId": "default-queue-id-333"}, "Transitions": {}},
+    {"Identifier": "play-closed",      "Type": "PlayPrompt",      "Parameters": {"Text": "We are closed. Please call back during business hours."}, "Transitions": {"NextAction": "disconnect"}},
+    {"Identifier": "disconnect",       "Type": "Disconnect",      "Parameters": {}, "Transitions": {}}
+  ]
+}
+VERIFICATION_COMMANDS:
+  aws connect describe-instance --instance-id inst-abc123def456
+  aws connect describe-contact-flow --instance-id inst-abc123def456 --contact-flow-id flow-def456789
+  aws connect describe-routing-profile --instance-id inst-abc123def456 --routing-profile-id rp-xyz998877
+  aws connect describe-phone-number --instance-id inst-abc123def456 --phone-number-id pn-456789
+  aws lambda get-policy --function-name lookup-customer --query 'Policy' --output text | grep connect.amazonaws.com
+  aws lexv2-models describe-bot-alias --bot-alias-id Prod --bot-id CustomerService
+  aws connect list-instance-storage-configs --instance-id inst-abc123def456
+```
+
+If any prerequisite fails, emit the SAME shape with
+`VERDICT: PREREQUISITES_MISSING`, the failing row marked `[✗]` with a
+specific gap citation (e.g. `[✗] Lex bot alias: DRAFT alias is not
+publishable — create a published alias`), the passing rows still listed,
+the CONTACT_FLOW_SNIPPET still emitted (so the operator can see the
+dangling reference), and VERIFICATION_COMMANDS showing the command that
+would confirm the gap.
 
 ## Quick navigation
 

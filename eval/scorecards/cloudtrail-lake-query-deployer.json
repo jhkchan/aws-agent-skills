@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 18,
       "max": 20,
-      "justification": "Provides several expert\u2011level details not in a baseline model (EDS\u2011type immutability, dual per\u2011GB billing, raw\u2011JSON scan behavior, data\u2011protection masking at store level). However, a portion restates standard documentation without new insight, so full 20 is not earned."
+      "justification": "Adds genuine expert details not in a baseline model: EDS\u2011type immutability, exact retention limits (7\u20113653 days), per\u2011GB ingestion vs scan cost rates, the organization\u2011enabled flag behavior, and that data\u2011protection policies mask PII at storage level. These concrete thresholds and exceptions constitute real delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides detailed AWS\u2011specific CLI procedures for creating EDS, configuring selectors, applying data\u2011protection policies, enabling organization\u2011wide ingestion, and setting up CloudWatch alarms. However it omits steps for required IAM permissions and Lake Formation grants needed for Athena federation, leaving the procedure incomplete."
+      "justification": "Encodes AWS\u2011specific step order (create EDS \u2192 set advanced selectors \u2192 enable org ingestion \u2192 apply data\u2011protection \u2192 register Lake Formation \u2192 configure Athena workgroup). Some procedures are phrased generically (e.g., \u201cVerify IAM permissions\u201d) and lack explicit command sequences for every branch, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasoning (e.g., never create EDS without deciding event type, never query without time range). Missing a few additional pitfalls such as forgetting to create the service\u2011linked role for CloudTrail Lake, so a small deduction."
+      "justification": "Contains a detailed NEVER list (10 items) with specific reasons (e.g., immutable EDS type, cost of unrestricted selectors, full\u2011scan queries). Lacks a few additional pitfalls (e.g., KMS encryption, cross\u2011region limits), so not perfect."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, triggers, and a strict output contract are all present, enabling reliable activation. Minor issue: activation keyword list repeats terms, but does not prevent correct triggering."
+      "justification": "Frontmatter is complete, description, keywords, triggers, and a precise output contract with required literal labels are present. The only shortfall is the lack of a concrete example showing the ARN in the CLOUDTRAIL_LAKE line within the skill description, which could cause activation ambiguity."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011navigation table, high\u2011level mindset, then detailed step sections, and separates NEVER list and output format. Some sections (e.g., full CLI blocks) are dense, but overall layering is appropriate."
+      "justification": "Top\u2011level overview, quick navigation, then deep dive sections, heuristics, and finally the checklist. Some information (full CLI examples) appears early, causing slight cognitive overload, but overall layering is adequate."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (EDS creation) are gated by a prerequisite checklist and verification commands, limiting accidental execution. Creative tasks (forensic queries) are left flexible. No over\u2011constraining of creative parts, but the prerequisite list could be more exhaustive (e.g., budget check)."
+      "justification": "Destructive actions (EDS creation) are gated by a prerequisite checklist; creative query patterns are left open. The only shortfall is that the output contract still allows ambiguous placeholders (e.g., <eds-id>) without enforcing concrete values."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable skill pattern: metadata, mindset, stepwise process, output format, and anti\u2011pattern list. Section ordering is slightly ad\u2011hoc (e.g., heuristics interleaved with steps), preventing a perfect score."
+      "justification": "Follows a clear, reusable pattern: Mindset \u2192 Step\u2011by\u2011step procedure \u2192 NEVER list \u2192 Output format \u2192 Error handling. The structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 6,
       "max": 15,
-      "justification": "Provides working CLI snippets, checklist, and verification commands, enabling an agent to execute the skill. However the example outputs use the store name instead of the ARN in query commands, which would cause API errors, and the IAM role / service\u2011linked role creation steps are missing. These gaps reduce practical usability."
+      "justification": "Model output violates the strict output contract: multiple checklist blocks separated by \u2018---\u2019, missing required ARN in CLOUDTRAIL_LAKE line, placeholders not replaced, and verification commands use store names instead of ARNs. These errors would cause automation failures, indicating low practical usability."
     }
   ],
-  "total_score": 106,
+  "total_score": 99,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40580,
-  "latency_ms": 8299,
+  "token_count": 40842,
+  "latency_ms": 17047,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

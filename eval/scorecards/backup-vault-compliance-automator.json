@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 14,
       "max": 20,
-      "justification": "Adds concrete, senior\u2011engineer level details that are not generic: the mandatory 3\u2011day cool\u2011off for Vault Lock, the regulatory\u2011driven 90\u2011day minimum and 2557\u2011day maximum retention, a decision\u2011tree for choosing COMPLIANCE vs GOVERNANCE mode, and a curated list of 2024\u20112026 AWS Backup features. The bulk of the content restates known concepts, so it falls short of a perfect 20."
+      "justification": "Adds several non\u2011obvious expert details (Vault Lock cool\u2011off period, governance vs compliance mode regulatory impact, recent 2024\u20112026 Backup Framework features, cross\u2011account policy condition, decision\u2011tree for mode selection). However, most of the content restates information a senior CloudOps engineer could already retrieve from AWS docs, so the delta is significant but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific, ordered procedure (inventory \u2192 policy \u2192 lock \u2192 encryption \u2192 coverage \u2192 replication \u2192 frequency \u2192 Config rules \u2192 reporting \u2192 multi\u2011account rollout) with exact CLI commands and required parameters. Only a small amount of advice is generic (e.g., \u201ccheck coverage\u201d) which prevents a full score."
+      "justification": "Provides an AWS\u2011specific procedural flow (inventory \u2192 policy \u2192 lock \u2192 encryption \u2192 coverage \u2192 replication \u2192 frequency \u2192 Config rules \u2192 reporting \u2192 multi\u2011account) with concrete CLI commands and JSON templates. Some steps are generic (\"run list\u2011backup\u2011vaults\") and lack explicit error\u2011handling procedures, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Lists a solid set of NEVER rules with concrete reasons (e.g., irreversible compliance\u2011mode lock, missing KMS condition, cross\u2011account trust), but omits a few common pitfalls such as IAM policy precedence conflicts and stale Config rule drift."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., irreversible compliance\u2011mode lock, governance mode not meeting SEC 17a\u20114, missing cross\u2011account vault policy). Missing a few common pitfalls such as forgetting CloudTrail logging for audit trails, so not full credit."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and an invocation schema are all present, enabling reliable activation. The trigger list is extensive but some entries are phrased loosely (e.g., \u201cbackup compliance report\u201d), costing one point."
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present and fairly precise. The \"when_to_use\" paragraph is verbose and some activation triggers overlap, making reliable invocation slightly less crisp."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Uses a navigation table and step\u2011by\u2011step sections, exposing high\u2011level intent before details. However, the initial Mindset and Quick navigation sections are dense and contain many details that could overload the reader, leading to a modest deduction."
+      "justification": "The skill layers information (Mindset \u2192 Quick navigation \u2192 Step\u2011by\u2011step \u2192 Anti\u2011patterns \u2192 Appendices). However, critical rules are repeated in multiple places and the initial sections are dense, causing some cognitive overload before reaching actionable details."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (Vault Lock, policy changes) are guarded by a mandatory confirmation gate and explicit cool\u2011off guidance; however, cross\u2011region replication steps could be tighter about required IAM conditions, leaving a small freedom gap."
+      "justification": "Destructive actions (Vault Lock) are guarded by a mandatory confirmation gate and explicit cool\u2011off warnings. Creative tasks (report generation) are left flexible. Minor issue: placeholders like <vault> remain unbound, leaving a small amount of unrestricted freedom."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset, Process steps, Output format, Anti\u2011Patterns, Appendices) that aids comprehension, but some sections (e.g., the anti\u2011pattern list) are inserted ad\u2011hoc rather than as a dedicated, consistently styled block."
+      "justification": "Follows a recognizable pattern (Mindset, Navigation table, numbered steps, anti\u2011patterns, appendices). The structure is coherent and aids comprehension, missing only a formalized header hierarchy that would make it perfectly aligned."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides working CLI snippets, decision trees, and example outputs, enabling an agent to execute the skill. Nonetheless, placeholders like <plan-id>, lack of explicit error handling for API failures, and missing pagination details reduce immediate, error\u2011free usability."
+      "justification": "Provides working CLI snippets, output format, and decision trees, enabling an agent to execute the automation. Some commands lack region flags, placeholders (<vault>, <approved_kms_key_arn>) are not resolved, and error handling for API failures is absent, reducing practical reliability."
     }
   ],
-  "total_score": 105,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42560,
-  "latency_ms": 18030,
+  "token_count": 41019,
+  "latency_ms": 9708,
   "assertions_passed": false,
-  "assertions_passed_count": 0,
-  "assertions_failed_count": 5
+  "assertions_passed_count": 1,
+  "assertions_failed_count": 4
 }

@@ -542,12 +542,114 @@ Full worked examples (long polling enablement, batch migration, FIFO
 high-throughput enablement, already-optimal, NEED_MORE_INFO, end-to-end
 walkthrough) are in `references/worked-examples.md`.
 
+### Worked example — Standard queue optimized to long-polling + batch (before/after table)
+
+```text
+TARGET: order-events-queue
+VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
+REASON: Standard queue with ReceiveMessageWaitTimeSeconds=0 generating
+  85M empty receives/month (85% of total ReceiveMessage calls).
+  Consumer uses DeleteMessage one-at-a-time. Enabling long polling
+  (WaitTimeSeconds=20) + DeleteMessageBatch reduces total API requests
+  by 74%.
+
+BEFORE/AFTER CONFIG COMPARISON:
+  ┌─────────────────────────────┬──────────────────────────┬──────────────────────────────┐
+  │ Dimension                   │ CURRENT                  │ RECOMMENDED                  │
+  ├─────────────────────────────┼──────────────────────────┼──────────────────────────────┤
+  │ Queue type                  │ Standard                 │ Standard (unchanged)         │
+  │ Polling mode                │ Short (WaitTimeSeconds=0)│ Long (WaitTimeSeconds=20)    │
+  │ Consumer batch size         │ 1 (single-message API)   │ 10 (DeleteMessageBatch)      │
+  │ Visibility timeout          │ 30s                      │ 30s (consumer p95=200ms ✓)   │
+  │ Message retention           │ 4 days (345600s)         │ 4 days (unchanged)           │
+  │ DLQ redrive                 │ maxReceiveCount=3, ok    │ unchanged                    │
+  │ FIFO mode                   │ N/A (Standard)           │ N/A (Standard)               │
+  └─────────────────────────────┴──────────────────────────┴──────────────────────────────┘
+
+RECOMMENDATION:
+  Current: short polling (WaitTimeSeconds=0), single-message delete,
+           VisibilityTimeout=30s, Standard
+  Proposed: long polling (WaitTimeSeconds=20), batch delete (size 10),
+            VisibilityTimeout=30s, Standard
+  Dimensions changed: polling (Step 1) + batching (Step 2)
+  Dimensions checked: polling → (enable long)  batching → (batch delete)
+    visibility ✓ (30s > consumer p95 200ms)  retention ✓ (4 days, healthy)
+    redrive ✓ (maxReceiveCount=3, DLQ depth < 50)  queue-type ✓ (Standard)
+    fifo-mode ✓ (N/A — Standard queue)
+  Confidence: HIGH — CloudWatch NumberOfEmptyReceives directly measured;
+    batch delete is a code-level change with no infrastructure risk.
+
+ESTIMATED_SAVINGS:
+  Current monthly: $40.00
+    Request breakdown: 100M total API requests / 1M × $0.40 = $40.00
+      (15M SendMessage + 85M ReceiveMessage [85% empty] +
+       15M DeleteMessage one-at-a-time ≈ 15M send + 100M receive + 15M delete)
+  Projected monthly: $10.40
+    Request breakdown: 26M total API requests / 1M × $0.40 = $10.40
+      (15M SendMessage + 8.5M ReceiveMessage [90% empty reduction] +
+       1.5M DeleteMessageBatch [10 messages per call])
+  Monthly saving: $29.60   ($40.00 − $10.40 = $29.60 ✓)
+  Annual saving: $355.20   ($29.60 × 12 = $355.20 ✓)
+
+MIGRATION_STEPS:
+  1. Enable long polling on the queue:
+     aws sqs set-queue-attributes \
+       --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/order-events-queue \
+       --attributes ReceiveMessageWaitTimeSeconds=20
+  2. Update consumer to use DeleteMessageBatch (replace per-message DeleteMessage):
+     aws sqs delete-message-batch \
+       --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/order-events-queue \
+       --entries file://delete-batch.json
+  3. Monitor NumberOfEmptyReceives for 7 days post-change (expect 90% drop):
+     aws cloudwatch get-metric-statistics --namespace AWS/SQS \
+       --metric-name NumberOfEmptyReceives \
+       --dimensions Name=QueueName,Value=order-events-queue \
+       --start-time 2026-08-05T00:00:00Z --end-time 2026-08-12T00:00:00Z \
+       --period 86400 --statistics Sum
+  4. Verify ApproximateAgeOfOldestMessage stays under 60s (no consumer backlog).
+
+CONFIRM: About to set-queue-attributes on order-events-queue
+  (WaitTimeSeconds 0 → 20) and switch consumer to batch delete. Monthly
+  saving $29.60 (74% request reduction). Proceed? (yes/no)
+```
+
 ## STRICT output contract
 
 The rules below are hard constraints. Violating any one produces a
 misclassification or an arithmetic contradiction that breaks downstream
 FinOps automation. Self-check EVERY emitted block against these rules
 before returning the response.
+
+### Decision tree leading to the output
+
+```text
+1. Is there ≥14 days of CloudWatch data AND queue attributes?
+   ├─ NO  → VERDICT: NEED_MORE_INFO (data gate failed)
+   └─ YES → go to 2
+2. NumberOfEmptyReceives > 50% of total AND WaitTimeSeconds = 0?
+   ├─ YES → flag polling (Step 1); propose WaitTimeSeconds=20
+   └─ NO  → polling ✓
+3. Consumer uses single-message APIs (batch size 1 / no batch delete)
+   AND volume > 1M msgs/month?
+   ├─ YES → flag batching (Step 2); propose batch APIs (size 10)
+   └─ NO  → batching ✓
+4. VisibilityTimeout < consumer p95 AND re-delivery rate > 5%?
+   ├─ YES → flag visibility (Step 3); propose 6× processing p95
+   └─ NO  → visibility ✓
+5. MessageRetentionPeriod > 7 days AND queue depth < 100 sustained?
+   ├─ YES → flag retention (Step 4)
+   └─ NO  → retention ✓
+6. DLQ depth > 1000 sustained OR no redrive configured?
+   ├─ YES → flag redrive (Step 5); propose StartMessageMoveTask
+   └─ NO  → redrive ✓
+7. FIFO queue at 300 TX/s AND ThroughputLimit not PerMessageGroupId?
+   ├─ YES → flag FIFO mode (Step 6)
+   └─ NO  → fifo-mode ✓ (or N/A for Standard)
+8. Any flag set?
+   ├─ YES → VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
+   │        compute savings, emit all 7 dimensions in "Dimensions checked"
+   └─ NO  → VERDICT: OPTIMIZED
+```
 
 ### Required output structure
 

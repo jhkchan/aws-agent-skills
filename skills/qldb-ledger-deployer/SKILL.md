@@ -137,9 +137,9 @@ When this skill is invoked with a QLDB-provisioning request (create a
 ledger, configure permissions mode, set up journal export, configure
 Kinesis streaming, verify data integrity, create tables and indexes, or
 a partial configuration), the agent MUST respond with the
-READY_TO_DEPLOY checklist defined in the "Output format" section using
-the literal all-caps labels `QLDB_LEDGER:`, `VERDICT:`, `CHECKLIST:`,
-and `VERIFICATION_COMMANDS:`. Do NOT preface the checklist with prose,
+`LEDGER:` / `VERDICT:` / `CHECKLIST:` / `PARTIQL:` / `JOURNAL_EXPORT:` /
+`STREAM:` / `VERIFICATION_COMMANDS:` block defined in "Output format"
+using the literal all-caps labels. Do NOT preface the block with prose,
 headings, or disclaimers — emit the block as the first lines of the
 response. This contract is what assertion-based evals and downstream
 provisioning pipelines rely on; deviating from the literal labels breaks
@@ -148,6 +148,30 @@ automation silently.
 If any prerequisite is missing, the verdict is `PREREQUISITES_MISSING`
 with a specific gap citation in the checklist (marked `[✗]`), and
 `READY_TO_DEPLOY` MUST NOT also appear.
+
+### FORBIDDEN output patterns
+
+- **NEVER preface the block with prose** — `LEDGER:` is the FIRST
+  line, always. No greetings, no "I'll set up…", no disclaimers.
+- **NEVER use ALLOW_ALL for a production ledger** — ALWAYS use
+  STANDARD permissions mode. ALLOW_ALL grants full CRUD to any
+  principal with `qldb:SendCommand`.
+- **NEVER omit deletion protection in a READY_TO_DEPLOY plan** —
+  a production ledger without deletion protection is a data-loss
+  risk.
+- **NEVER emit placeholder KMS key IDs** — use the full key ARN
+  (e.g., `arn:aws:kms:us-east-1:123456789012:key/abc123`) or
+  state `aws-owned` explicitly.
+- **NEVER omit the PARTIQL block** — concrete `CREATE TABLE`,
+  `CREATE INDEX`, and `INSERT` statements must appear with real
+  table and field names.
+- **NEVER claim READY_TO_DEPLOY with empty JOURNAL_EXPORT or
+  STREAM sections** — if not configured, write `none` with a
+  reason; do not silently omit.
+- **NEVER swap verdict tokens** — exactly `READY_TO_DEPLOY` or
+  `PREREQUISITES_MISSING`, not "ready", "done", "ok".
+- **NEVER emit compound indexes** — QLDB supports only
+  single-field indexes; one `CREATE INDEX` per field.
 
 ## Quick navigation
 
@@ -627,48 +651,97 @@ concurrent writes to the same document. Redesign the workload.
 10. **NEVER delete a ledger without disabling deletion protection
     first.**
 
-## Output format
+## Output format — MANDATORY literal labels
+
+When invoked with a QLDB provisioning request, your ENTIRE
+response MUST be the block below. The labels are **case-sensitive
+all-caps keywords** — write them EXACTLY as shown. Do NOT write a
+preamble. Start with `LEDGER:` and stop after
+`VERIFICATION_COMMANDS:`.
 
 ```text
-QLDB_LEDGER: <ledger-name>
+LEDGER: <ledger-name>
 VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
 CHECKLIST:
-  [✓|✗] Ledger name: <name>
   [✓|✗] Permissions mode: STANDARD | ALLOW_ALL
   [✓|✗] Deletion protection: enabled | disabled
-  [✓|✗] KMS encryption: <customer-managed|aws-owned> (<key-id>)
-  [✓|✗] Tables: <list>
+  [✓|✗] KMS encryption: <customer-managed|aws-owned> (<key-arn>)
+  [✓|✗] Tables: <list of table names>
   [✓|✗] Indexes: <field list per table>
-  [✓|✗] Journal export to S3: <configured|none> (bucket: <name>)
-  [✓|✗] Stream to Kinesis: <configured|none> (stream: <name>)
+  [✓|✗] Journal export: <configured|none> (bucket: <name>, role: <arn>)
+  [✓|✗] Kinesis stream: <configured|none> (stream: <name>, role: <arn>)
   [✓|✗] Cryptographic verification: digest + proof workflow documented
-  [✓|✗] Revision hash chain: SHA-256 chained blocks
   [✓|✗] CloudWatch alerts: <metrics list>
   [✓|✗] Tags: <key=value list>
+PARTIQL:
+  CREATE TABLE <table-name>;
+  CREATE INDEX ON <table-name> (<field>);
+  INSERT INTO <table-name> { ... };
+JOURNAL_EXPORT:
+  Role: <IAM role ARN>
+  Bucket: s3://<bucket>/<prefix>
+  Time range: <start> to <end>
+STREAM:
+  Kinesis stream: <stream-name>
+  Role: <IAM role ARN>
+  Time range: <start> to <end>
+  Aggregation: enabled | disabled
 VERIFICATION_COMMANDS:
   aws qldb describe-ledger --name <ledger-name> --region <region>
   aws qldb list-journal-kinesis-streams-for-ledger --ledger-name <ledger-name> --region <region>
   aws qldb get-digest --name <ledger-name> --region <region>
 ```
 
-### Worked example — production audit ledger with STANDARD mode and verification
+**Status marker semantics:**
+- `[✓]` — requirement met.
+- `[✗]` — requirement missing; cite the gap.
+
+**PREREQUISITES_MISSING verdict:** if any checklist item fails,
+output `VERDICT: PREREQUISITES_MISSING` with each gap marked `[✗]`
+and a reason. Do NOT also emit `READY_TO_DEPLOY`.
+
+### Worked example — STANDARD-mode audit ledger with KMS + Kinesis stream
 
 ```text
-QLDB_LEDGER: audit-ledger
+LEDGER: audit-ledger
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
-  [✓] Ledger name: audit-ledger
   [✓] Permissions mode: STANDARD
   [✓] Deletion protection: enabled
   [✓] KMS encryption: customer-managed (arn:aws:kms:us-east-1:123456789012:key/abc123)
   [✓] Tables: transactions, accounts, audit_log
-  [✓] Indexes: transactions(transactionId, fromAccount), accounts(accountId)
-  [✓] Journal export to S3: configured (bucket: qldb-audit-export)
-  [✓] Stream to Kinesis: configured (stream: qldb-audit-stream)
+  [✓] Indexes: transactions(transactionId, fromAccount), accounts(accountId), audit_log(eventType)
+  [✓] Journal export: configured (bucket: s3://qldb-audit-export/audit-ledger/2026-08/, role: arn:aws:iam::123456789012:role/QLDBExportRole)
+  [✓] Kinesis stream: configured (stream: qldb-audit-stream, role: arn:aws:iam::123456789012:role/QLDBStreamRole)
   [✓] Cryptographic verification: digest + proof workflow documented
-  [✓] Revision hash chain: SHA-256 chained blocks
-  [✓] CloudWatch alerts: CommandExecutionLatency, OccConflictExceptions, JournalStorage
-  [✓] Tags: Environment=production, Application=audit, Compliance=SOX
+  [✓] CloudWatch alerts: CommandExecutionLatency >1000ms, OccConflictExceptions >5%, JournalStorage trending up
+  [✓] Tags: Environment=production, Application=audit, Compliance=SOX, Owner=finance-platform
+PARTIQL:
+  CREATE TABLE transactions;
+  CREATE TABLE accounts;
+  CREATE TABLE audit_log;
+  CREATE INDEX ON transactions (transactionId);
+  CREATE INDEX ON transactions (fromAccount);
+  CREATE INDEX ON accounts (accountId);
+  CREATE INDEX ON audit_log (eventType);
+  INSERT INTO transactions {
+    transactionId: 'txn-001',
+    amount: 1500.00,
+    currency: 'USD',
+    fromAccount: 'acc-aaa',
+    toAccount: 'acc-bbb',
+    timestamp: `2026-08-05T12:00:00Z`,
+    metadata: { source: 'mobile-app', notes: 'Transfer for invoice #12345' }
+  };
+JOURNAL_EXPORT:
+  Role: arn:aws:iam::123456789012:role/QLDBExportRole
+  Bucket: s3://qldb-audit-export/audit-ledger/2026-08/
+  Time range: 2026-08-01T00:00:00Z to 2026-08-31T23:59:59Z
+STREAM:
+  Kinesis stream: qldb-audit-stream
+  Role: arn:aws:iam::123456789012:role/QLDBStreamRole
+  Time range: 2026-08-05T00:00:00Z to 2026-12-31T23:59:59Z
+  Aggregation: enabled
 VERIFICATION_COMMANDS:
   aws qldb describe-ledger --name audit-ledger --region us-east-1
   aws qldb list-journal-kinesis-streams-for-ledger --ledger-name audit-ledger --region us-east-1

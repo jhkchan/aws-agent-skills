@@ -137,62 +137,152 @@ prerequisite.
 When this skill is invoked with a CloudWatch RUM enablement request
 (domain, application name, sample rate, integration type, or a
 partial existing configuration), the agent MUST respond with the
-READY_TO_DEPLOY checklist defined in "Output format" using the
-literal all-caps labels `APPLICATION:`, `VERDICT:`, `CHECKLIST:`,
-and `VERIFICATION_COMMANDS:`. Do NOT preface the checklist with
-prose, headings, or disclaimers — emit the block as the first lines
-of the response.
+READY_TO_DEPLOY checklist using the literal all-caps labels
+`RUM_APP:`, `VERDICT:`, `CHECKLIST:`, `JS_SNIPPET:`, and
+`VERIFICATION_COMMANDS:`. Do NOT preface the checklist with prose,
+headings, or disclaimers — emit the block as the first lines of the
+response.
 
 ### Required output structure
 
-1. `APPLICATION: <application-name>` — the web app being monitored.
+1. `RUM_APP: <application-name>` — the web app being monitored
+   (matches the `--name` / `applicationId` on the app monitor).
 2. `VERDICT: READY_TO_DEPLOY` OR `VERDICT: PREREQUISITES_MISSING`.
-3. `CHECKLIST:` followed by indented lines with status markers
-   (`[✓]`, `[✗]`, `[OPTIONAL]`, `[INPUT NEEDED]`).
-4. `VERIFICATION_COMMANDS:` followed by indented `aws ...` commands.
+3. `CHECKLIST:` followed by indented rows. Every row uses a status
+   marker (`[✓]`, `[✗]`, `[OPTIONAL]`, `[INPUT NEEDED]`) and shows
+   `current: <value>  recommended: <value>` so the operator can see
+   the app monitor config at a glance: domain, sampling rate,
+   telemetries (errors / performance / http), cookie domain, guest
+   role ARN, X-Ray toggle, Application Signals correlation.
+4. `JS_SNIPPET:` followed by a fenced code block containing the
+   copy-pasteable CDN `<script>` tag (or npm import) with every
+   placeholder resolved to real values from CHECKLIST. This is what
+   the operator inserts into the page template.
+5. `VERIFICATION_COMMANDS:` followed by indented `aws ...` commands.
 
 ### FORBIDDEN output patterns
 
-- **No prose preamble before `APPLICATION:`** — the first non-empty
-  line MUST be `APPLICATION:`.
-- **No markdown variants of labels** — write `VERDICT:`, not
-  `**VERDICT:**`, `### Verdict`, `Verdict =`, or `` `VERDICT` ``.
-- **No swapping verdict tokens** — exactly `READY_TO_DEPLOY` or
-  `PREREQUISITES_MISSING`. Not "ready", "missing", "BLOCKED", "OK".
-- **No omitting `VERIFICATION_COMMANDS:`** — include even when
-  PREREQUISITES_MISSING; the operator needs commands to verify gaps.
-- **No extra sections after `VERIFICATION_COMMANDS:`** — the
-  checklist block is the entire response. Put deeper explanation in
-  `references/`.
-- **No status marker drift** — use only `[✓]`, `[✗]`, `[OPTIONAL]`,
-  `[INPUT NEEDED]`. Do not invent `[?]`, `[!]`, `[WARN]`, or emoji.
+1. **NEVER start with prose preamble** ("Let me analyze…", "Looking
+   at your setup…"). The first non-empty line MUST be `RUM_APP:`. No
+   greetings, no headings, no disclaimers before it.
 
-### Perfect example (copy the shape exactly)
+2. **NEVER use markdown variants of the labels.** Write `VERDICT:`,
+   not `**VERDICT:**`, `### Verdict`, `Verdict =`, or `` `VERDICT` ``.
+   The labels are parser-anchored; bold or heading variants break
+   downstream automation.
+
+3. **NEVER swap verdict tokens.** Exactly `READY_TO_DEPLOY` or
+   `PREREQUISITES_MISSING`. Not "ready", "missing", "BLOCKED", "OK",
+   "PARTIAL", or any invented token.
+
+4. **NEVER omit `JS_SNIPPET:` or emit it with placeholder values.**
+   The snippet MUST show real values for `applicationId`,
+   `guestRoleArn`, `identityPoolId`, `cookieDomain`, and
+   `sessionSampleRate` resolved from CHECKLIST. A snippet with
+   `<your-app-monitor-name>` is a FORBIDDEN placeholder leak.
+
+5. **NEVER omit `VERIFICATION_COMMANDS:`** — include even when
+   PREREQUISITES_MISSING; the operator needs commands to verify gaps.
+
+6. **NEVER append extra sections after `VERIFICATION_COMMANDS:`.**
+   The checklist block IS the entire response. Put deeper explanation
+   in `references/`.
+
+7. **NEVER invent status markers.** Use only `[✓]`, `[✗]`,
+   `[OPTIONAL]`, `[INPUT NEEDED]`. Do not emit `[?]`, `[!]`, `[WARN]`,
+   or emoji.
+
+8. **NEVER set `cookieDomain` to a public suffix** (`.com`, `.app`,
+   `.io`, `.dev`) in JS_SNIPPET or CHECKLIST — emit `[✗]` and cite
+   the leak risk if the operator requested one.
+
+### Perfect example — READY_TO_DEPLOY with XSS sanitization + X-Ray tracing
+
+Every field below has real values. Copy this shape exactly and swap
+in the operator's values. The CHECKLIST rows surface the app monitor
+config (domain, sampling rate, telemetries, cookie domain, guest
+role, X-Ray, Application Signals) as `current:` vs `recommended:`
+pairs. The JS_SNIPPET is the copy-pasteable CDN script tag with XSS
+sanitization (SRI `integrity` attribute + `crossorigin="anonymous"`)
+and `enableXRay:true` for client-to-server trace correlation.
 
 ```text
-APPLICATION: checkout-web
+RUM_APP: checkout-web
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
-  [✓]      Domain — checkout.example.com (validated against app monitor allow-list)
-  [✓]      App monitor — arn:aws:rum:us-east-1:111122223333:appmonitor/checkout-web-prod
-  [✓]      Sample rate — 1.0 (100% of sessions; 0.1 for high-traffic sites)
-  [✓]      Cookie domain — .example.com (cross-subdomain session stitching)
-  [✓]      Telemetries — errors, performance, http
-  [✓]      IAM auth — guest role with rum:PutRumEvents on the app monitor
-  [✓]      SDK integration — CDN script tag with cwr('init', {...}); cwr('load')
-  [✓]      Custom events — cwr('recordEvent', { type: 'checkout_complete', ... })
-  [✓]      Custom metrics — AWS/RUM namespace, dimensions ApplicationName, RumEventName
-  [✓]      X-Ray tracing — traceId sent in PutRumEvents; server-side trace joined
-  [✓]      Application Signals correlation — AWS/ApplicationSignalsClient namespace populated
+  [✓]      App monitor name — checkout-web-prod (arn:aws:rum:us-east-1:111122223333:appmonitor/checkout-web-prod)
+  [✓]      Domain (AllowedOrigins) — https://checkout.example.com  (scheme+host+port; wildcard NOT supported)
+  [✓]      Sampling rate — current: 1.0   recommended: 1.0 (raise traffic <100k sessions/day; drop to 0.1 above 1M)
+  [✓]      Cookie domain — current: .example.com   recommended: .example.com (NOT .com — TLD leak)
+  [✓]      Telemetries — current: errors, performance, http   recommended: errors, performance, http (declare ALL at init)
+  [✓]      Guest role — arn:aws:iam::111122223333:role/checkout-web-rum-guest (rum:PutRumEvents scoped to app monitor ARN)
+  [✓]      Identity pool — us-east-1:abcd1234-efgh-5678 (Cognito unauth pool backing the guest role)
+  [✓]      X-Ray tracing — current: enableXRay=true   recommended: true (server sampling rule FixedRate 0.05 verified > 0)
+  [✓]      Application Signals correlation — AWS/ApplicationSignalsClient namespace (auto-populated when server enabled)
+  [✓]      XSS sanitization — CDN script loaded with SRI integrity="sha384-<hash>" + crossorigin="anonymous"; no inline eval
+  [✓]      Custom metrics — AWS/RUM, dimensions ApplicationName=checkout-web-prod + RumEventName (up to 100 definitions)
+  [✓]      CloudWatch metrics emitted — AWS/RUM: Errors, JsErrorCount, SessionCount, WebVitalsLCP, WebVitalsINP, Http4xx, Http5xx
   [OPTIONAL] Session sampling override — 0.05 for traffic > 1M daily sessions
   [OPTIONAL] Sub-resource timing — PerformanceNavigationTiming details enabled
+JS_SNIPPET:
+  <!-- Insert before </head> on every page template. integrity attr =
+       Subresource Integrity (SRI); prevents CDN-tampered XSS. crossorigin
+       required for SRI enforcement. Pin the SDK version; never auto-upgrade. -->
+  <script>
+    (function(n,i,v,r,s,c,x,z,h){var p=function(){var a=
+    Array.prototype.slice.call(arguments);return new (Function.
+    prototype.bind.apply(cwr,(a).concat(p.args)))},q=p.args=
+    Array.prototype.slice.call(arguments);(cwr=a=cwr||function(){
+    (cwr.q=cwr.q||[]).push(arguments)}).l=+new Date;cwr('init',
+    {clientConfig:{applicationId:'checkout-web-prod',
+    region:'us-east-1',version:'1.0.0',
+    guestRoleArn:'arn:aws:iam::111122223333:role/checkout-web-rum-guest',
+    identityPoolId:'us-east-1:abcd1234-efgh-5678'},
+    telemetries:['errors','performance','http'],
+    sessionSampleRate:1.0,
+    sessionEventUrl:'https://dataplane.rum.us-east-1.amazonaws.com',
+    cookieDomain:'.example.com',
+    enableXRay:true,
+    allowCookies:true,
+    disableXsrfCookie:false});cwr('load')})()
+  </script>
+  <script async src="https://client.rum.us-east-1.amazonaws.com/1.18.0/aws-rum-web.min.js"
+          integrity="sha384-<compute-sha384-of-the-file-and-insert-here>"
+          crossorigin="anonymous"></script>
 VERIFICATION_COMMANDS:
   aws rum list-app-monitors --region us-east-1
   aws rum get-app-monitor --name checkout-web-prod --region us-east-1
-  aws cloudwatch list-metrics --namespace AWS/RUM --dimensions Name=ApplicationName,Value=checkout-web-prod
+  aws cloudwatch list-metrics --namespace AWS/RUM --dimensions Name=ApplicationName,Value=checkout-web-prod --region us-east-1
   aws cloudwatch list-metrics --namespace AWS/ApplicationSignalsClient --region us-east-1
   aws xray get-sampling-rules --region us-east-1
   aws iam list-attached-role-policies --role-name checkout-web-rum-guest
+  aws logs describe-log-streams --log-group-name /aws/rum/checkout-web-prod --limit 1 --order-by LastEventTime --descending --region us-east-1
+```
+
+### Perfect example — PREREQUISITES_MISSING
+
+```text
+RUM_APP: checkout-web
+VERDICT: PREREQUISITES_MISSING
+CHECKLIST:
+  [✓]      App monitor name — checkout-web-prod (created in us-east-1)
+  [✓]      Domain (AllowedOrigins) — https://checkout.example.com
+  [✓]      Sampling rate — current: 1.0   recommended: 1.0
+  [✗]      Cookie domain — current: .com   recommended: .example.com (REJECT TLD; cookie leaks across all .com sites)
+  [✓]      Telemetries — current: errors, performance, http   recommended: errors, performance, http
+  [✗]      Guest role — MISSING: no IAM role with rum:PutRumEvents found (run `aws iam list-roles --query 'Roles[?contains(RoleName,`rum`)]'`)
+  [INPUT NEEDED] Identity pool — operator must provide Cognito unauth pool ID, or skill must create one
+  [✗]      X-Ray tracing — current: enableXRay=true   BLOCKED: server sampling rule FixedRate=0.0; raise to >=0.01 (aws xray update-sampling-rule)
+  [✗]      Application Signals correlation — BLOCKED on X-Ray sampling rule above
+  [✗]      XSS sanitization — JS_SNIPPET withheld: SRI hash missing until SDK version pinned
+  [✗]      Custom metrics — BLOCKED: no put-metrics-destination configured
+  [✗]      CloudWatch metrics emitted — none yet (deployment not live)
+JS_SNIPPET: (withheld — resolve the 4 BLOCKED rows above, then re-invoke)
+VERIFICATION_COMMANDS:
+  aws iam list-roles --query 'Roles[?contains(RoleName,`rum`)]' --output text
+  aws xray get-sampling-rules --region us-east-1
+  aws cognito-identity list-identity-pools --max-results 10 --region us-east-1
+  aws rum get-app-monitor --name checkout-web-prod --region us-east-1
 ```
 
 ## Reasoning framework (why the provisioning order matters)
@@ -727,36 +817,17 @@ Vitals (LCP, FID, CLS, INP) populated.
 ## Output format — MANDATORY literal labels
 
 When invoked with a CloudWatch RUM enablement request, your
-ENTIRE response MUST be the checklist block below. The labels are
+ENTIRE response MUST be the checklist block defined in
+"STRICT output contract" earlier in this document. The labels are
 **case-sensitive all-caps keywords** — write them EXACTLY as
-shown. Do NOT write a preamble. Start with `APPLICATION:` and
-stop after the `VERIFICATION_COMMANDS:` block.
-
-```text
-APPLICATION: <application-name>
-VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-CHECKLIST:
-  [✓]      Domain — <page domain> (validated against AllowedOrigins)
-  [✓]      App monitor — <app-monitor-arn>
-  [✓]      Sample rate — <0.0-1.0>
-  [✓]      Cookie domain — <parent-domain | exact-host>
-  [✓]      Telemetries — <errors | performance | http | combination>
-  [✓]      IAM auth — guest role <role-name> with rum:PutRumEvents on <app-monitor-arn>
-  [✓]      SDK integration — <CDN | npm> with cwr('init', {...})
-  [✓]      Custom events — cwr('recordEvent', { type: '<event-type>', data: {...} })
-  [✓]      Custom metrics — AWS/RUM namespace, dimensions ApplicationName + RumEventName
-  [✓]      X-Ray tracing — <enabled | disabled>; server-side sampling rule <FixedRate>
-  [✓]      Application Signals correlation — <enabled | disabled>; AWS/ApplicationSignalsClient namespace
-  [OPTIONAL] Session sampling override — <0.0-1.0>
-  [OPTIONAL] Sub-resource timing — PerformanceNavigationTiming details enabled
-VERIFICATION_COMMANDS:
-  aws rum list-app-monitors --region <region>
-  aws rum get-app-monitor --name <app-monitor-name> --region <region>
-  aws cloudwatch list-metrics --namespace AWS/RUM --dimensions Name=ApplicationName,Value=<app-monitor-name>
-  aws cloudwatch list-metrics --namespace AWS/ApplicationSignalsClient --region <region>
-  aws xray get-sampling-rules --region <region>
-  aws iam list-attached-role-policies --role-name <guest-role>
-```
+shown. Do NOT write a preamble. Start with `RUM_APP:` and
+stop after the `VERIFICATION_COMMANDS:` block. The five mandatory
+labels in order are: `RUM_APP:`, `VERDICT:`, `CHECKLIST:`,
+`JS_SNIPPET:`, `VERIFICATION_COMMANDS:`. The full worked example
+shape (READY_TO_DEPLOY and PREREQUISITES_MISSING) lives in the
+"STRICT output contract" / "Perfect example" subsection above —
+copy that shape exactly and resolve every placeholder to a real
+value before emitting.
 
 **Status marker semantics:**
 - `[✓]` — applied and verified.
@@ -769,7 +840,8 @@ VERIFICATION_COMMANDS:
 **PREREQUISITES_MISSING verdict:** if any REQUIRED prerequisite
 is missing (domain not in `AllowedOrigins`, guest role ARN, X-Ray
 sampling rule when correlation enabled), the verdict is
-`PREREQUISITES_MISSING` with each gap listed.
+`PREREQUISITES_MISSING` with each gap listed in CHECKLIST as `[✗]`
+and `JS_SNIPPET:` withheld until every BLOCKED row is resolved.
 
 ## Domain
 

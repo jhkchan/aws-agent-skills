@@ -620,29 +620,127 @@ true`.
 
 ## Output format (per operation)
 
+The response is a single block using the literal labels `OPERATION:`,
+`VAULT:`, `VERDICT:`, `PRE_CHECKS:`, `CHECKLIST:`, `STEPS:`,
+`POST_VERIFY:`, `STATE:`, and `NOTES:`. The CHECKLIST rows surface the
+backup plan config (rule name, schedule, lifecycle, cross-region copy
+action) and the recovery point verification status so the operator
+sees the full posture in one read. See "STRICT output contract" below
+for the enforced shape and worked examples.
+
 ```text
 OPERATION: <create-vault | lock-vault | create-plan | create-selection | start-backup | start-restore | enable-pitr | diagnose>
+VAULT: <vault-name>
 VERDICT: READY | BLOCKED | COMPLETED
-TARGET: <vault-name or resource-arn>
 PRE_CHECKS:
-  - [PASS] <check description>
-  - [FAIL] <check description> — <reason>
+  - [PASS|FAIL] <check description>
+CHECKLIST:
+  [✓|✗]  Vault lock mode        current: <UNLOCKED | COMPLIANCE | GOVERNANCE>   recommended: <...>
+  [✓|✗]  Backup plan rule       current: <rule name, schedule CRON>             recommended: <...>
+  [✓|✗]  Lifecycle              current: <MoveToColdStorageAfterDays / DeleteAfterDays>   recommended: <...>
+  [✓|✗]  Cross-region copy      current: <none | dest region + vault + lifecycle>         recommended: <...>
+  [✓|✗]  KMS encryption         current: <key ARN, KeyState>                                recommended: <...>
+  [✓|✗]  Recovery points        current: <N points, latest Status, latest CompletionDate>  recommended: <...>
+  [✓|✗]  Selection scope        current: <tag-based | resource ARNs | conditions>           recommended: <...>
 STEPS:
-  1. <CLI command with flags populated>
-  2. <wait command>
+  1. CONFIRM: <prompt>
+  2. <CLI command with flags populated>
 POST_VERIFY:
-  - [PASS] <verification description>
-  - [FAIL] <verification description> — <reason>
+  - [PASS|FAIL] <verification description>
 STATE: <vault lock state, recovery point status, restore job status after apply>
 NOTES: <compliance vs governance rationale, retention window, recovery time estimate, cross-region copy caveats>
+```
+
+### Worked example — compliance vault with 7-year retention + cross-region DR copy (READY)
+
+The canonical enterprise compliance pattern: a COMPLIANCE-mode locked
+vault with 7-year retention (2557 days) and a cross-region copy action
+to a DR vault in us-west-2. Copy the shape exactly.
+
+```text
+OPERATION: create-plan
+VAULT: prod-compliance-vault-7yr
+VERDICT: READY
+PRE_CHECKS:
+  - [PASS] Vault prod-compliance-vault-7yr exists in us-east-1 (NumberOfRecoveryPoints 0)
+  - [PASS] Vault currently UNLOCKED (VaultLock.LockState absent) — lock applied in prior step, see NOTES
+  - [PASS] Vault lock COMPLIANCE mode verified: MinRetentionDays 90, MaxRetentionDays 2557, ChangeableForDays 0 (past grace)
+  - [PASS] KMS key arn:aws:kms:us-east-1:111111111111:key/abcd1234-5678-90ef-1234-567890abcdef KeyState Enabled, KeyManager CUSTOMER
+  - [PASS] KMS key policy grants kms:GenerateDataKey, kms:Decrypt to backup.us-east-1.amazonaws.com
+  - [PASS] DR vault dr-compliance-vault exists in us-west-2 with KMS key arn:aws:kms:us-west-2:111111111111:key/efgh5678
+  - [PASS] Caller IAM role holds backup:CreateBackupPlan, backup:CreateBackupSelection
+  - [PASS] No overlapping tag-based selections for backup=compliance-daily
+CHECKLIST:
+  [✓]  Vault lock mode        current: COMPLIANCE (MinRetentionDays 90, MaxRetentionDays 2557)   recommended: keep (regulatory mandate CIS 3.6, SOX, HIPAA)
+  [✓]  Backup plan rule       current: ComplianceDailyRule, cron(0 5 ? * * *) UTC 05:00 daily    recommended: keep
+  [✓]  Lifecycle              current: MoveToColdStorageAfterDays 90, DeleteAfterDays 2557       recommended: keep (7-yr retention: 365.25 × 7 = 2557)
+  [✓]  Cross-region copy      current: dest us-west-2 / dr-compliance-vault, DeleteAfterDays 2557   recommended: keep (DR + regulatory archive)
+  [✓]  KMS encryption         current: arn:aws:kms:us-east-1:111111111111:key/abcd1234, KeyState Enabled   recommended: keep
+  [✗]  Recovery points        current: 0 recovery points (vault newly created)                   recommended: confirm first recovery point COMPLETED within 24h
+  [✓]  Selection scope        current: tag-based backup=compliance-daily, env=prod               recommended: keep (auto-enrolls future tagged resources)
+STEPS:
+  1. CONFIRM: About to create-backup-plan ComplianceDaily-7yr on vault
+     prod-compliance-vault-7yr in account 111111111111 region us-east-1.
+     This creates a daily backup plan with 90-day warm → cold storage
+     transition, 2557-day (7-year) delete, and a cross-region copy to
+     dr-compliance-vault in us-west-2 (also 2557-day retention). The
+     vault is COMPLIANCE-locked so retention can only lengthen. Proceed?
+     (yes/no)
+  2. aws backup create-backup-plan --backup-plan '{
+       "BackupPlanName": "ComplianceDaily-7yr",
+       "Rules": [
+         {
+           "RuleName": "ComplianceDailyRule",
+           "TargetBackupVaultName": "prod-compliance-vault-7yr",
+           "ScheduleExpression": "cron(0 5 ? * * *)",
+           "StartWindowMinutes": 480,
+           "CompletionWindowMinutes": 1440,
+           "Lifecycle": {"MoveToColdStorageAfterDays": 90, "DeleteAfterDays": 2557},
+           "CopyActions": [
+             {
+               "DestinationBackupVaultArn": "arn:aws:backup:us-west-2:111111111111:backup-vault:dr-compliance-vault",
+               "Lifecycle": {"DeleteAfterDays": 2557}
+             }
+           ]
+         }
+       ]
+     }'
+  3. aws backup create-backup-selection \
+       --backup-plan-id "$(aws backup list-backup-plans --query 'BackupPlansList[?BackupPlanName==`ComplianceDaily-7yr`].BackupPlanId' --output text)" \
+       --backup-selection '{
+         "SelectionName": "compliance-tagged-daily",
+         "IamRoleArn": "arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole",
+         "ListOfTags": [{"ConditionType": "STRINGEQUALS", "ConditionKey": "backup", "ConditionValue": "compliance-daily"}],
+         "Conditions": {"StringEquals": {"aws:ResourceTag/env": "prod"}}
+       }'
+POST_VERIFY:
+  - (pending execution)
+  - aws backup describe-backup-plan --backup-plan-id <id> returns Rules[0].RuleName ComplianceDailyRule
+  - aws backup describe-backup-plan --backup-plan-id <id> returns Rules[0].CopyActions[0].DestinationBackupVaultArn referencing dr-compliance-vault in us-west-2
+  - aws backup list-backup-selections --backup-plan-id <id> returns selection compliance-tagged-daily
+  - After first run (~24h): aws backup list-recovery-points-by-backup-vault --backup-vault-name prod-compliance-vault-7yr returns Status COMPLETED, BackupSizeInBytes > 0
+STATE: pending — plan and selection will be CREATED within ~30s; first recovery point within 24h (next cron tick)
+NOTES:
+  - Vault is COMPLIANCE-locked (MaxRetentionDays 2557). The 7-year
+    retention is irreversible past the 3-day grace window (already
+    expired, ChangeableForDays 0). Retention can only lengthen.
+  - Cross-region copy to us-west-2 provides DR; the copy lifecycle also
+    uses DeleteAfterDays 2557 so the DR copy honors the same 7-year
+    retention. Verify the us-west-2 vault has the same COMPLIANCE lock.
+  - Cold storage transition at 90 days: restores from cold take 3-5
+    hours (GLACIER Standard). Document the RTO/RPO matrix — operators
+    frequently assume cold-storage restores are as fast as warm.
+  - Tag-based selection (backup=compliance-daily) auto-enrolls future
+    resources; verify weekly via list-protected-resources that the
+    expected resource set is enrolled.
 ```
 
 ### Worked example — create vault with KMS encryption (READY)
 
 ```text
 OPERATION: create-vault
+VAULT: prod-daily-vault
 VERDICT: READY
-TARGET: prod-daily-vault
 PRE_CHECKS:
   - [PASS] Vault name prod-daily-vault not already in use
   - [PASS] KMS key arn:aws:kms:us-east-1:111111111111:key/abcd1234
@@ -650,6 +748,14 @@ PRE_CHECKS:
   - [PASS] KMS key policy grants kms:GenerateDataKey, kms:Decrypt to
     backup.us-east-1.amazonaws.com
   - [PASS] Caller IAM role holds backup:CreateBackupVault
+CHECKLIST:
+  [✓]  Vault lock mode        current: UNLOCKED (new vault)                       recommended: apply COMPLIANCE lock separately (CIS 3.6) if regulatory
+  [✗]  Backup plan rule       current: none (vault newly created)                 recommended: create plan with daily cron(0 5 ? * * *)
+  [✗]  Lifecycle              current: none                                       recommended: MoveToColdStorageAfterDays 30, DeleteAfterDays 365 (adjust to mandate)
+  [✗]  Cross-region copy      current: none                                       recommended: add CopyAction to dr-vault in us-west-2 if DR required
+  [✓]  KMS encryption         current: arn:aws:kms:us-east-1:111111111111:key/abcd1234, KeyState Enabled   recommended: keep
+  [✗]  Recovery points        current: 0 (new vault)                              recommended: confirm first recovery point COMPLETED within 24h of first plan run
+  [✗]  Selection scope        current: none                                       recommended: tag-based selection backup=daily (auto-enrolls future resources)
 STEPS:
   1. CONFIRM: About to create-backup-vault prod-daily-vault in account
      111111111111 region us-east-1. This will CREATE a new vault
@@ -661,59 +767,23 @@ STEPS:
        --tags Environment=prod,Owner=platform-team
 POST_VERIFY:
   - (pending execution)
-  - describe-backup-vault returns prod-daily-vault with EncryptionKeyArn
-    set and NumberOfRecoveryPoints 0
+  - aws backup describe-backup-vault --backup-vault-name prod-daily-vault returns EncryptionKeyArn set, NumberOfRecoveryPoints 0
 STATE: pending — vault will be CREATED within ~30s
 NOTES:
   - No vault lock applied. For compliance (CIS Benchmark 3.6), apply
     COMPLIANCE mode lock separately with MinRetentionDays >= 30.
   - KMS key is customer-managed — verify rotation is enabled via
-    kms get-key-rotation-status.
+    aws kms get-key-rotation-status --key-id abcd1234.
   - Tags Environment=prod, Owner=platform-team propagate to the vault
     for cost allocation and access control.
-```
-
-### Worked example — vault lock compliance mode (READY)
-
-```text
-OPERATION: lock-vault
-VERDICT: READY
-TARGET: prod-compliance-vault
-PRE_CHECKS:
-  - [PASS] Vault prod-compliance-vault exists in us-east-1
-  - [PASS] Vault currently UNLOCKED (VaultLock.LockState absent)
-  - [PASS] MinRetentionDays 30 >= longest current recovery point age 14d
-  - [PASS] MaxRetentionDays 3650 >= longest plan retention 90d
-  - [PASS] ChangeableForDays 3 <= 3 max grace
-STEPS:
-  1. CONFIRM: About to apply COMPLIANCE-mode lock on prod-compliance-vault
-     in account 111111111111 region us-east-1. This will LOCK the vault
-     in WORM mode with MinRetentionDays 30, MaxRetentionDays 3650,
-     ChangeableForDays 3 (72-hour grace). After the grace window, the
-     lock CANNOT be removed even by root. Proceed? (yes/no)
-  2. aws backup put-backup-vault-lock-configuration --backup-vault-name prod-compliance-vault \
-       --changeable-for-days 3 --min-retention-days 30 --max-retention-days 3650
-POST_VERIFY:
-  - (pending execution)
-  - describe-backup-vault returns VaultLock.LockState LOCKED, Mode COMPLIANCE,
-    MinRetentionDays 30, MaxRetentionDays 3650, ChangeableForDays 3
-STATE: pending — lock will be active within ~30s; grace window starts
-NOTES:
-  - COMPLIANCE mode chosen for regulatory archive (CIS Benchmark 3.6,
-    NIST 800-53 CP-9). Cannot be shortened or removed after the 3-day
-    grace window.
-  - MaxRetentionDays 3650 (10 years) — verify against data-retention
-    policy; cannot be reduced below existing retention after lock.
-  - During ChangeableForDays, a privileged principal can remove the
-    lock; after grace, no one can.
 ```
 
 ### Worked example — diagnose failed backup job (BLOCKED)
 
 ```text
 OPERATION: diagnose
+VAULT: prod-daily-vault
 VERDICT: BLOCKED
-TARGET: backup-job-abc123
 PRE_CHECKS:
   - [PASS] describe-backup-job returns the job (State FAILED,
     ResourceType EC2, BackupSizeInBytes 0)
@@ -724,6 +794,14 @@ PRE_CHECKS:
     ec2:DescribeVolumes but not ec2:CreateTags. AWS Backup requires
     ec2:CreateTags on the snapshot.
   - [PASS] KMS key abcd1234 KeyState Enabled
+CHECKLIST:
+  [✓]  Vault lock mode        current: GOVERNANCE (soft lock)                     recommended: keep (operational policy, not regulatory)
+  [✓]  Backup plan rule       current: DailyBackup, cron(0 5 ? * * *)              recommended: keep
+  [✓]  Lifecycle              current: MoveToColdStorageAfterDays 30, DeleteAfterDays 365   recommended: keep
+  [✗]  Cross-region copy      current: none                                       recommended: add CopyAction to dr-vault (single-region vault is a DR gap)
+  [✓]  KMS encryption         current: arn:aws:kms:us-east-1:111111111111:key/abcd1234, KeyState Enabled   recommended: keep
+  [✗]  Recovery points        current: 14 points, latest FAILED (job abc123)      recommended: remediate IAM, re-run with idempotency token
+  [✓]  Selection scope        current: tag-based backup=daily, env=prod           recommended: keep
 STEPS: (none — pre-checks failed; this is a diagnosis)
 POST_VERIFY: (none)
 STATE: FAILED — IAM role missing ec2:CreateTags permission
@@ -742,15 +820,26 @@ NOTES:
 ### Required output structure
 
 Every response MUST begin with this block — no preamble, no
-conversational opening:
+conversational opening. The CHECKLIST rows surface the backup plan
+config (rule name, schedule, lifecycle, cross-region copy action) and
+recovery point verification so the operator sees the full posture
+in one read.
 
 ```text
 OPERATION: <create-vault | lock-vault | create-plan | create-selection | start-backup | start-restore | enable-pitr | diagnose>
+VAULT: <vault-name>
 VERDICT: READY | BLOCKED | COMPLETED
-TARGET: <vault-name or resource-arn>
 PRE_CHECKS:
   - [PASS] <check description>
   - [FAIL] <check description> — <reason>
+CHECKLIST:
+  [✓|✗]  Vault lock mode        current: <UNLOCKED | COMPLIANCE | GOVERNANCE>   recommended: <...>
+  [✓|✗]  Backup plan rule       current: <rule name, schedule CRON>             recommended: <...>
+  [✓|✗]  Lifecycle              current: <MoveToColdStorageAfterDays / DeleteAfterDays>   recommended: <...>
+  [✓|✗]  Cross-region copy      current: <none | dest region + vault + lifecycle>         recommended: <...>
+  [✓|✗]  KMS encryption         current: <key ARN, KeyState>                                recommended: <...>
+  [✓|✗]  Recovery points        current: <N points, latest Status, latest CompletionDate>  recommended: <...>
+  [✓|✗]  Selection scope        current: <tag-based | resource ARNs | conditions>           recommended: <...>
 STEPS:
   1. CONFIRM: About to <operation> on vault <name> in account <account> region <region>. This will <consequence>. Proceed? (yes/no)
   2. <exact CLI command with every flag populated — no placeholders>
@@ -763,11 +852,44 @@ NOTES: <compliance-vs-governance rationale, retention window rationale, recovery
 
 ### FORBIDDEN output patterns
 
-- NEVER start with conversational preamble ("Let me analyze…") — the VERDICT block is the FIRST line, always. Use uppercase verdict values only (`READY`, `BLOCKED`, `COMPLETED`).
-- NEVER omit PRE_CHECKS — every pre-check must appear with `[PASS]` or `[FAIL]` and a specific reason for each failure.
-- NEVER apply a COMPLIANCE-mode vault lock without surfacing `ChangeableForDays` and the irreversibility caveat in NOTES.
-- NEVER list a CLI command with placeholder flags in a READY plan — every flag must be populated with actual values from the input data.
-- NEVER claim COMPLETED without every POST_VERIFY line showing `[PASS]`, and never omit the CONFIRM gate as the first STEPS entry for state-changing operations.
+1. **NEVER start with conversational preamble** ("Let me analyze…",
+   "Looking at your setup…"). The `OPERATION:` line is the FIRST line,
+   always. Use uppercase verdict values only (`READY`, `BLOCKED`,
+   `COMPLETED`).
+
+2. **NEVER omit PRE_CHECKS.** Every pre-check must appear with `[PASS]`
+   or `[FAIL]` and a specific reason for each failure. A bare
+   "PRE_CHECKS: passed" with no per-check rows is a contract violation.
+
+3. **NEVER apply a COMPLIANCE-mode vault lock without surfacing
+   `ChangeableForDays` and the irreversibility caveat in NOTES.** The
+   CONFIRM gate MUST state the retention window and grace period. After
+   grace, the lock is irreversible even for root — the operator must
+   know before confirming.
+
+4. **NEVER list a CLI command with placeholder flags in a READY plan.**
+   Every flag must be populated with actual values from the input data.
+   `<vault-name>`, `<key-arn>`, `<account>` in a READY block is a
+   placeholder leak — resolve it or emit BLOCKED.
+
+5. **NEVER claim COMPLETED without every POST_VERIFY line showing
+   `[PASS]`.** If any verification fails, emit `VERDICT: ERROR` with the
+   failure reason; do not claim COMPLETED.
+
+6. **NEVER omit the CONFIRM gate as the first STEPS entry** for any
+   state-changing operation (create-vault, lock-vault, create-plan,
+   create-selection, start-backup, start-restore). Executing without
+   CONFIRM is a safety violation.
+
+7. **NEVER omit a CHECKLIST row.** All seven rows MUST appear — vault
+   lock mode, backup plan rule, lifecycle, cross-region copy, KMS
+   encryption, recovery points, selection scope. Use `[✗]` with a reason
+   if the item is not yet configured; do not silently drop rows.
+
+8. **NEVER collapse the COMPLIANCE vs GOVERNANCE distinction.** Always
+   state the exact `Mode` in CHECKLIST and NOTES. Governance mode does
+   NOT meet CIS 3.6, NIST CP-9, or FedRAMP — emitting GOVERNANCE as
+   "compliant" is a regulatory misclassification.
 
 ## Anti-Patterns — NEVER do these things
 

@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Introduces expert\u2011level ordering (cfn\u2011lint before validate\u2011template), detailed ChangeSet replacement interpretation, recent feature list (2023\u20112026), and a four\u2011layer validation pipeline that a baseline model would not provide."
+      "justification": "Provides expert\u2011level ordering (cfn\u2011lint \u2192 validate\u2011template \u2192 cfn\u2011nag \u2192 ChangeSet) and detailed heuristics (replacement semantics, cfn\u2011nag severity mapping, recent feature timeline) that go beyond a baseline model, but repeats many well\u2011known facts and omits deeper nuances (e.g., handling very large templates, region\u2011specific limits)."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific CLI commands, flags, and exact sequencing for each operation. Minor deduction because prerequisite verification is described generically rather than with concrete commands for every item."
+      "justification": "Offers concrete AWS\u2011specific step\u2011by\u2011step CLI commands, dependency graph, and verification checklist, demonstrating expert mindset. Some procedures remain generic (e.g., \"verify prerequisites\") and lack exhaustive error\u2011handling branches."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., stack\u2011policy vs deletion\u2011policy, replacement risks). Misses some common pitfalls such as trust\u2011relationship over\u2011privilege in IAM roles and does not explicitly warn about suppressing cfn\u2011nag findings without justification."
+      "justification": "Contains a thorough \"NEVER\" list with clear reasoning for each pitfall, covering validation, ChangeSet, stack policy, drift, SAM, macros, etc. Missing a few advanced anti\u2011patterns (e.g., cfn\u2011lint false\u2011positive suppression, IAM policy size limits) prevents a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete and the description explains when to invoke and when not to. Activation relies on keyword matching only, which can be ambiguous for agents that use semantic triggers rather than exact keywords."
+      "justification": "Frontmatter is complete and activation keywords are defined. The 'when to invoke' description is embedded in long prose and lacks a concise trigger field, making reliable activation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 12,
       "max": 15,
-      "justification": "Uses quick\u2011navigation table, high\u2011level overview, then detailed step\u2011by\u2011step sections and references. Slight overload in the initial long narrative, but overall layering is effective."
+      "justification": "Uses navigation table and layered sections, but the initial sections are dense with details (dependency graph, multiple heuristics) which can overload the agent before it knows which part is needed."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (ChangeSet, drift detection) are gated by explicit prerequisite checks. The pipeline\u2011integration section is loosely constrained, leaving creative freedom where tighter constraints would be safer."
+      "justification": "Calibrates specificity for fragile operations (ChangeSet, stack policy) and leaves creative tasks (pipeline integration) more open. However, it does not explicitly enforce a review step before executing a ChangeSet, leaving a small safety gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure: Mindset, Heuristics, Stepwise Process, NEVER list, Output contract. Minor deviation in placement of recent\u2011features block, but pattern is clear."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Dependency Graph \u2192 Expert Heuristics \u2192 Stepwise Process \u2192 NEVER list \u2192 Output format). Minor ad\u2011hoc ordering of sections prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides concrete CLI commands, checklist format, error\u2011handling guidance, and worked examples. Lacks explicit handling for missing AWS credentials, region configuration failures, and ChangeSet creation errors, which could impede cold execution."
+      "justification": "Provides concrete CLI commands, decision trees, and worked examples. Missing explicit error\u2011handling paths for failures in validate\u2011template, ChangeSet creation, or prerequisite checks, and no guidance for multi\u2011issue REVIEW_REQUIRED scenarios."
     }
   ],
-  "total_score": 106,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40267,
-  "latency_ms": 13789,
-  "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "token_count": 41156,
+  "latency_ms": 12769,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
 }

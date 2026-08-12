@@ -612,6 +612,64 @@ CONFIRM: About to retire 3 grants, enable rotation, and schedule
   $1.00 ($12.00/year). Key deletion is IRREVERSIBLE. Proceed? (yes/no)
 ```
 
+### Worked example — customer-managed key: rotation enablement + unused replica deletion
+
+This example covers the rotation-enablement dimension specifically: a
+customer-managed multi-region key with rotation `Disabled` and an unused
+eu-west-1 replica. Rotation enablement is free (same key ARN); the
+savings come from the replica deletion. Both actions are paired in a
+single remediation plan.
+
+```text
+TARGET: alias/app-data-encryption
+VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
+REASON: Customer-managed multi-region key with rotation Disabled and an
+  unused eu-west-1 replica (0 API calls in 30 days via CloudTrail).
+  Primary key in us-east-1 has 3,200 Decrypt/GenerateDataKey calls in
+  30 days (active workload). Rotation enablement is free and transparent
+  (same key ARN, compliance improvement). Replica deletion saves
+  $1/month.
+RECOMMENDATION:
+  Current: 1 primary (us-east-1) + 1 replica (eu-west-1), rotation
+    Disabled, 4 active grants, 3,200 API calls/30 days (us-east-1 only)
+  Proposed: 1 primary only, rotation Enabled (annual, automatic)
+  Dimensions changed: rotation (enable) + multi_region (delete replica)
+  Dimensions checked: inventory ✓ (active, 3,200 calls)  rotation → (enable)
+    grants ✓ (4 active, 0 expired)  aliases ✓ (alias/app-data-encryption)
+    cross_account ✓ (none)  multi_region → (delete eu-west-1 replica)
+    deletion ✓ (not applicable)
+  Confidence: HIGH — CloudTrail confirms zero replica usage; rotation
+    has no regulatory prohibition; automatic rotation preserves key ARN.
+ESTIMATED_SAVINGS:
+  Current monthly: $2.01
+    key: 2 × $1.00 = $2.00 (primary + replica)
+    api: 3,200 calls × $0.03/10K = $0.01
+  Projected monthly: $1.01
+    key: 1 × $1.00 = $1.00 (primary only, rotation is free)
+    api: 3,200 calls × $0.03/10K = $0.01
+  Monthly saving: $1.00
+    ($2.01 − $1.01 = $1.00 ✓)
+  Annual saving: $12.00
+REMEDIATION_STEPS:
+  1. Enable automatic annual rotation on the primary key:
+     aws kms enable-key-rotation --key-id alias/app-data-encryption
+  2. Verify rotation status changed to Enabled:
+     aws kms get-key-rotation-status --key-id alias/app-data-encryption
+  3. Confirm key ARN is unchanged (rotation is transparent):
+     aws kms describe-key --key-id alias/app-data-encryption \
+       --query 'KeyMetadata.Arn'
+  4. Verify no encrypted resources in eu-west-1 depend on the replica:
+     aws ec2 describe-volumes --region eu-west-1 \
+       --query 'Volumes[?KmsKeyId==`<replica-key-id>`]'
+  5. Delete the unused eu-west-1 replica (7-day window):
+     aws kms schedule-key-deletion --key-id <replica-key-id> \
+       --pending-window-in-days 7 --region eu-west-1
+CONFIRM: About to enable rotation on alias/app-data-encryption and
+  delete the unused eu-west-1 replica (7-day window). Monthly saving
+  $1.00 ($12.00/year). Replica deletion is IRREVERSIBLE. Proceed?
+  (yes/no)
+```
+
 **Self-check before emit:**
 - [ ] `Current monthly − Projected monthly == Monthly saving` (2 decimals)?
 - [ ] `Monthly saving × 12 == Annual saving`?

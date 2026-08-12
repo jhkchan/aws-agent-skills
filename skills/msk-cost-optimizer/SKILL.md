@@ -111,6 +111,48 @@ CONFIRM: Before executing any state-changing CLI, emit and await operator
 A block missing VERDICT, RECOMMENDATION, ESTIMATED_SAVINGS, or
 MIGRATION_STEPS is a contract violation — re-emit the full block.
 
+### FORBIDDEN output patterns
+
+1. **NEVER emit `VERDICT: OPPORTUNITY_FOUND` with `Annual total: $0`.**
+   If all seven dimensions net zero savings, the verdict MUST be
+   `ALREADY_OPTIMAL`. A cost-neutral operational improvement (e.g.,
+   partition right-sizing) is surfaced in REASON, not as a dollar
+   saving.
+
+2. **NEVER show savings math that does not balance.** The sum of all
+   `Monthly (...)` lines MUST equal the Monthly total, and
+   `Monthly total × 12` MUST equal `Annual total`, rounded to 2 decimal
+   places. Re-verify before emitting.
+
+3. **NEVER recommend Graviton brokers (`kafka.m7g`) without confirming
+   Kafka version 3.x or later.** Kafka 2.x does NOT support Graviton
+   broker types. Recommending Graviton on a Kafka 2.x cluster without
+   first planning the version upgrade will fail at cluster creation.
+
+4. **NEVER recommend reducing MSK broker count below 3.** Kafka requires
+   a minimum of 3 brokers for replication factor=3 and quorum-based
+   fault tolerance. A 2-broker cluster cannot survive a single broker
+   failure without data loss.
+
+5. **NEVER recommend decreasing EBS volume size in-place.** MSK supports
+   online EBS volume increases via `update-broker-storage`, but NOT
+   decreases. EBS reduction requires blue/green cluster migration. Flag
+   it for the next migration window, never as an immediate action.
+
+6. **NEVER recommend MSK Serverless for a workload exceeding 50 MB/s
+   sustained ingress without computing the full 30-day break-even
+   cost.** Serverless per-partition-hour + per-GB data pricing exceeds
+   provisioned broker cost at high sustained throughput.
+
+7. **NEVER omit the `CONFIRM:` gate before any state-changing CLI
+   command.** Every `create-cluster-v2`, `update-cluster-configuration`,
+   `update-broker-storage`, `delete-cluster`, and `kafka-configs --alter`
+   MUST be preceded by a CONFIRM line and operator approval.
+
+8. **NEVER emit scratch or recompute text** ("WAIT", "let me redo",
+   "corrected:") in the output block. Finalize all math before emitting
+   the block.
+
 ## Quick start
 
 - **Graviton brokers (kafka.m7g) on Kafka 3.x are ~20% cheaper than the

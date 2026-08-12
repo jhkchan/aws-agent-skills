@@ -5,20 +5,17 @@ description: >-
   definitions with production defaults: EC2 vs Fargate vs EKS compute
   environment types, launch template integration, allocation strategy
   (BEST_FIT, BEST_FIT_PROGRESSIVE, SPOT_CAPACITY_OPTIMIZED), instance
-  types and instance role, min/max/desired vCPUs, subnet and security
-  group configuration, job queue creation with priority levels, job
-  definition (container image, vCPU/memory requirements, resource
-  requirements, environment variables, mount points), job dependencies
-  (sequential, N-ary), array jobs, scheduling priority, CloudWatch
-  metrics (CPUPct, MemoryPct, jobs in runnable), spot instance
-  integration, and Fargate platform version. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating a Batch
-  compute environment, setting up a Batch job queue, registering a
-  Batch job definition, configuring spot instances for Batch, or
-  running array jobs with dependencies. Triggers: create batch compute
-  environment, batch job queue, register job definition, batch
-  allocation strategy, batch spot capacity, batch fargate, batch array
-  jobs, batch job dependencies.
+  types and role, min/max/desired vCPUs, subnets and security groups,
+  job queue with priority levels, job definition (container image,
+  vCPU/memory, resources, env vars, mount points), job dependencies
+  (sequential, N-ary), array jobs, CloudWatch metrics (CPUPct,
+  MemoryPct, RUNNABLE), spot instance integration, Fargate platform
+  version. Emits a READY_TO_DEPLOY checklist with verification
+  commands. Use when creating a Batch compute environment, setting up
+  a job queue, registering a job definition, configuring spot instances
+  for Batch, or running array jobs with dependencies. Triggers: batch
+  compute environment, job queue, job definition, allocation strategy,
+  spot capacity, batch fargate, array jobs, job dependencies.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -143,6 +140,46 @@ automation silently.
 If any prerequisite is missing, the verdict is `PREREQUISITES_MISSING`
 with a specific gap citation in the checklist (marked `[✗]`), and
 `READY_TO_DEPLOY` MUST NOT also appear.
+
+### Decision tree leading to the output
+
+```text
+1. Is the compute environment type specified?
+   ├─ EC2  → go to 2
+   ├─ Fargate → skip to 3 (no allocation strategy, no launch template)
+   └─ EKS  → go to 2 (also requires EKS cluster ARN)
+2. Is the request spot-based?
+   ├─ YES → allocationStrategy MUST be SPOT_CAPACITY_OPTIMIZED
+   │        type MUST be SPOT; spotIamFleetRole REQUIRED
+   │        → 3+ instance types for pool diversity
+   └─ NO  → allocationStrategy = BEST_FIT_PROGRESSIVE (≥2 types)
+            or BEST_FIT (single type, predictable capacity)
+3. Is the job queue referencing at least one ENABLED CE?
+   ├─ YES → VERDICT: READY_TO_DEPLOY
+   └─ NO  → VERDICT: PREREQUISITES_MISSING ([✗] State: DISABLED)
+4. Does the job definition's vCPU/memory fit the largest instance type?
+   ├─ YES → emit CHECKLIST with [✓] on every line
+   └─ NO  → VERDICT: PREREQUISITES_MISSING ([✗] Job definition: vCPU
+            request exceeds largest instance type capacity)
+5. Emit VERIFICATION_COMMANDS using the actual names from CHECKLIST.
+```
+
+### FORBIDDEN output patterns
+
+1. **NEVER preface the block with prose, greetings, or "Here is your...".**
+   The first line of the response MUST be `BATCH_COMPUTE:`.
+2. **NEVER emit `VERDICT: READY_TO_DEPLOY` when any CHECKLIST line is
+   `[✗]`.** A single `[✗]` forces `VERDICT: PREREQUISITES_MISSING`.
+3. **NEVER use placeholder text** (`<env-name>`, `your-queue`, `XXX`)
+   in a worked example. Use real names, real ARNs, real instance types.
+4. **NEVER omit the `State: ENABLED` line.** Creating a CE does NOT
+   enable it; the #1 Batch failure is a DISABLED CE blocking jobs.
+5. **NEVER list `SPOT_CAPACITY_OPTIMIZED` for an On-Demand environment
+   or `BEST_FIT` for a spot environment.** Strategy MUST match type.
+6. **NEVER emit a job queue without listing its compute environments
+   and priority.** A queue with no ENABLED CE is a silent failure.
+7. **NEVER omit VERIFICATION_COMMANDS.** The block is incomplete
+   without copy-pasteable `aws batch describe-*` commands.
 
 ## Quick navigation
 
@@ -630,6 +667,44 @@ VERIFICATION_COMMANDS:
   aws batch describe-job-queues --job-queues production-queue
   aws batch describe-job-definitions --job-definition-name data-pipeline-v1
 ```
+
+### Worked example — Spot CE with SPOT_CAPACITY_OPTIMIZED + On-Demand fallback
+
+```text
+BATCH_COMPUTE: batch-spot-env (EC2, SPOT_CAPACITY_OPTIMIZED)
+VERDICT: READY_TO_DEPLOY
+CHECKLIST:
+  [✓] Compute environment type: EC2 (SPOT)
+  [✓] Compute environment name: batch-spot-env
+  [✓] State: ENABLED
+  [✓] Allocation strategy: SPOT_CAPACITY_OPTIMIZED
+  [✓] Instance types: m5.large, m5.xlarge, c5.large, c5.xlarge, r5.large
+  [✓] Instance role: arn:aws:iam::123456789012:instance-profile/batch-instance-profile
+  [✓] Launch template: N/A (spot does not require LT)
+  [✓] Min vCPUs: 0, Max vCPUs: 1000, Desired vCPUs: 0
+  [✓] Subnets: subnet-aaa11122, subnet-bbb22233
+  [✓] Security groups: sg-batch111
+  [✓] Spot fleet role: arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet
+  [✓] Job queue: production-queue (priority: 500, compute environments:
+        order 1: batch-spot-env, order 2: batch-ondemand-env)
+  [✓] Job definition: ml-training-v3:7 (image:
+        123456789012.dkr.ecr.us-east-1.amazonaws.com/ml-training:3.7,
+        vCPUs: 8, memory: 16384 MB, GPU: N/A)
+  [✓] Job dependencies: array (size: 100, N_TO_N on completion)
+  [✓] CloudWatch metrics: CPUPct, MemoryPct, RUNNABLE count, SpotInterruption
+  [✓] Tags: Environment=production, Workload=ml-training, SpotOptimized=true
+VERIFICATION_COMMANDS:
+  aws batch describe-compute-environments --compute-environments batch-spot-env batch-ondemand-env
+  aws batch describe-job-queues --job-queues production-queue
+  aws batch describe-job-definitions --job-definition-name ml-training-v3
+  aws batch list-jobs --job-queue production-queue --job-status RUNNABLE
+```
+
+The spot example above demonstrates the production pattern: spot CE at
+order 1 (cost-efficient burst) + On-Demand CE at order 2 (guaranteed
+floor). If spot capacity is exhausted, jobs fall through to On-Demand
+automatically. Jobs MUST be idempotent because spot instances receive
+a 2-minute interruption warning.
 
 ## Error handling
 

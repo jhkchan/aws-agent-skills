@@ -142,16 +142,55 @@ When this skill is invoked with an ElastiCache-provisioning request
 failover, set up encryption, create a Global Datastore, scale a cluster
 online, or a partial configuration), the agent MUST respond with the
 READY_TO_DEPLOY checklist defined in the "Output format" section using
-the literal all-caps labels `ELASTICACHE:`, `VERDICT:`, `CHECKLIST:`,
-and `VERIFICATION_COMMANDS:`. Do NOT preface the checklist with prose,
-headings, or disclaimers — emit the block as the first lines of the
-response. This contract is what assertion-based evals and downstream
-provisioning pipelines rely on; deviating from the literal labels breaks
-automation silently.
+the literal all-caps labels `ELASTICACHE_CLUSTER:`, `VERDICT:`,
+`CHECKLIST:`, and `VERIFICATION_COMMANDS:`. Do NOT preface the checklist
+with prose, headings, or disclaimers — emit the block as the first lines
+of the response. This contract is what assertion-based evals and
+downstream provisioning pipelines rely on; deviating from the literal
+labels breaks automation silently.
 
 If any prerequisite is missing, the verdict is `PREREQUISITES_MISSING`
 with a specific gap citation in the checklist (marked `[✗]`), and
 `READY_TO_DEPLOY` MUST NOT also appear.
+
+### FORBIDDEN output patterns
+
+1. **NEVER emit `VERDICT: READY_TO_DEPLOY` when any CHECKLIST item is
+   `[✗]`.** If even one prerequisite is unmet, the verdict MUST be
+   `PREREQUISITES_MISSING`. A mixed-verdict block is a contract
+   violation.
+
+2. **NEVER omit the `ELASTICACHE_CLUSTER:` header line.** It is the
+   parse anchor for downstream provisioning pipelines. Substituting a
+   markdown heading (`## ElastiCache`) or a lowercase variant breaks
+   automation silently.
+
+3. **NEVER mark encryption as "TBD", "optional", or "post-creation."**
+   At-rest (KMS) and in-transit (TLS) encryption are creation-time-only
+   for Redis replication groups — they CANNOT be toggled on after the
+   cluster exists. The CHECKLIST MUST show an explicit encryption
+   decision (`Enabled` or `Disabled`), never a deferred one.
+
+4. **NEVER show multi-AZ failover as `Enabled` when
+   `replicas-per-node-group` is 0.** Multi-AZ automatic failover requires
+   at least one replica per shard as a promotion target. `Multi-AZ:
+   Enabled` with zero replicas is a silent no-op — failover has no
+   target to promote.
+
+5. **NEVER allow the snapshot window to overlap the maintenance window
+   in the CHECKLIST.** Overlap causes skipped backups or delayed
+   maintenance. The output MUST include both windows and confirm
+   non-overlap with at least 1 hour of separation.
+
+6. **NEVER use `--num-cache-clusters` (non-cluster mode) and
+   `--num-node-groups` (cluster mode) interchangeably in the CHECKLIST.**
+   These are different API paths requiring different client libraries
+   (cluster-aware vs standard Redis client). The topology line MUST
+   explicitly identify which mode is selected.
+
+7. **NEVER omit the `VERIFICATION_COMMANDS:` block.** The copy-pasteable
+   AWS CLI commands are how the operator confirms the deployment
+   succeeded. A checklist without verification commands is incomplete.
 
 ## Quick navigation
 
@@ -672,7 +711,7 @@ groups. Non-cluster mode requires migration to a new cluster.
 ## Output format
 
 ```text
-ELASTICACHE: <cluster-id> (<engine>, <node-type>, <topology>)
+ELASTICACHE_CLUSTER: <cluster-id> (<engine>, <node-type>, <topology>)
 VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
 CHECKLIST:
   [✓|✗] Engine: Redis OSS | Memcached
@@ -697,31 +736,55 @@ VERIFICATION_COMMANDS:
   aws elasticache describe-global-replication-groups --show-global-nodegroups --region <region>
 ```
 
-### Worked example — Redis cluster mode enabled with encryption and multi-AZ
+### Worked example — Redis cluster mode enabled, 3 shards, KMS encryption, multi-AZ
 
 ```text
-ELASTICACHE: my-redis-prod (Redis OSS, cache.r6g.large, cluster mode enabled)
+ELASTICACHE_CLUSTER: session-store-prod (Redis OSS 7.0, cache.r6g.large, cluster mode enabled)
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
-  [✓] Engine: Redis OSS (version 6.x)
-  [✓] Topology: Cluster mode enabled (3 shards x 1 replica = 6 nodes)
-  [✓] Node type: cache.r6g.large
-  [✓] Subnet group: my-cache-subnet-group (3 AZs)
-  [✓] Security group: sg-aaa11122 (port 6379)
-  [✓] Parameter group: my-redis-params (maxmemory-policy=allkeys-lru)
-  [✓] Multi-AZ failover: Enabled (3 AZs)
-  [✓] At-rest encryption (KMS): Enabled (key arn:aws:kms:us-east-1:...:key/aaa11122)
-  [✓] In-transit encryption (TLS): Enabled
-  [✓] AUTH token: Set (Secrets Manager: elasticache/redis-auth-token)
-  [✓] Backup: Automated (retention 7 days, window 03:00-05:00 UTC)
-  [✓] Snapshot window: 03:00-05:00 UTC (no overlap with maintenance mon:05:00-mon:06:00)
+  [✓] Engine: Redis OSS (version 7.0)
+  [✓] Topology: Cluster mode enabled (3 shards x 1 replica = 6 nodes total)
+    Shard 1: slots 0-5460, primary AZ-a, replica AZ-b (priority 100)
+    Shard 2: slots 5461-10922, primary AZ-b, replica AZ-c (priority 100)
+    Shard 3: slots 10923-16383, primary AZ-c, replica AZ-a (priority 100)
+  [✓] Node type: cache.r6g.large (2 vCPU, 12.93 GB RAM per node)
+  [✓] Subnet group: prod-redis-subnet-group (3 AZs: us-east-1a, us-east-1b, us-east-1c)
+  [✓] Security group: sg-0abc123def456 (port 6379, inbound from sg-app-workload only)
+  [✓] Parameter group: prod-redis-params (maxmemory-policy=allkeys-lru, timeout=300)
+  [✓] Multi-AZ failover: Enabled (3 AZs, automatic-failover + multi-az flags set)
+  [✓] At-rest encryption (KMS): Enabled (key arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ef-1234-567890abcdef)
+  [✓] In-transit encryption (TLS): Enabled (creation-time-only — cannot toggle post-creation)
+  [✓] AUTH token: Set (Secrets Manager: elasticache/session-store-prod-auth-token, requires TLS)
+  [✓] Backup: Automated (retention 7 days, snapshot window 01:00-03:00 UTC daily)
+  [✓] Snapshot window: 01:00-03:00 UTC (no overlap with maintenance wed:04:00-wed:05:00 UTC — 1h gap confirmed)
   [✓] Global Datastore: Not configured
-  [✓] Auto-scaling: Target tracking (EngineCPUUtilization, target 60%)
-  [✓] Online resharding: Available (cluster mode enabled)
-  [✓] Tags: Environment=production, Application=session-store
+  [✓] Auto-scaling: Target tracking (EngineCPUUtilization, target 60%, min 3 shards, max 10 shards)
+  [✓] Online resharding: Available (cluster mode enabled — can add/remove shards with zero downtime)
+  [✓] Tags: Environment=production, Application=session-store, Owner=platform-team
 VERIFICATION_COMMANDS:
-  aws elasticache describe-replication-groups --replication-group-id my-redis-prod --region us-east-1
+  aws elasticache describe-replication-groups --replication-group-id session-store-prod --region us-east-1
   aws elasticache describe-cache-clusters --show-cache-node-info --region us-east-1
+  aws kms describe-key --key-id arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ef-1234-567890abcdef --region us-east-1
+```
+
+### Worked example — PREREQUISITES_MISSING (subnet group absent)
+
+```text
+ELASTICACHE_CLUSTER: cache-dev (Redis OSS 7.0, cache.r6g.large, cluster mode enabled)
+VERDICT: PREREQUISITES_MISSING
+CHECKLIST:
+  [✓] Engine: Redis OSS (version 7.0)
+  [✓] Topology: Cluster mode enabled (3 shards x 1 replica = 6 nodes total)
+  [✓] Node type: cache.r6g.large
+  [✗] Subnet group: dev-redis-subnet-group — DOES NOT EXIST. Run `aws elasticache describe-cache-subnet-groups --cache-subnet-group-name dev-redis-subnet-group` returns ResourceNotFound. Create the subnet group with subnets in at least 2 AZs before deploying.
+  [✓] Security group: sg-dev123456 (port 6379, inbound from sg-app-dev)
+  [✓] Multi-AZ failover: Enabled (3 AZs planned)
+  [✓] At-rest encryption (KMS): Enabled (key arn:aws:kms:us-east-1:123456789012:key/b2c3d4e5-6789-01ab-cdef-234567890abc)
+  [✓] In-transit encryption (TLS): Enabled
+  [✓] Snapshot window: 01:00-03:00 UTC (no overlap with maintenance wed:04:00-wed:05:00 UTC)
+VERIFICATION_COMMANDS:
+  aws elasticache describe-cache-subnet-groups --cache-subnet-group-name dev-redis-subnet-group --region us-east-1
+  # Create the subnet group first, then re-invoke this skill
 ```
 
 ## Error handling

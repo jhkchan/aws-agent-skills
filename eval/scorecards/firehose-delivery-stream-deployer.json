@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Introduces concrete expert heuristics not found in generic docs: specific buffering\u2011hint thresholds per destination (e.g., 64\u2011128\u202fMB for Parquet, 5\u202fMB for OpenSearch), the interaction between buffering hints and format conversion, and a novel configuration\u2011dependency graph that orders Lambda before format conversion. These details provide genuine delta, though the bulk of the content still restates standard AWS documentation."
+      "justification": "Introduces specific expert heuristics (e.g., buffering\u2011hints trade\u2011off for Parquet vs OpenSearch, \"NEVER use default buffering for Parquet\", interaction between buffering hints and format conversion) that are not in generic docs, but a large portion of the content restates AWS documentation without novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: exact CloudFormation/CLI snippets, ordering of resources (source \u2192 Lambda \u2192 format conversion \u2192 destination), IAM role trust requirements, and verification commands. Some steps are generic (e.g., \"verify bucket exists\") and lack deeper AWS\u2011specific nuance, preventing a perfect score."
+      "justification": "Provides AWS\u2011specific ordering (source \u2192 Lambda \u2192 format conversion \u2192 destination) and concrete CLI snippets, yet some procedures remain generic (e.g., \"Enable logging\") and the IAM role trust\u2011policy steps are not fully enumerated."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasons (e.g., never use default buffering for Parquet, never use flat S3 prefixes). Could be stronger by adding more edge\u2011case pitfalls (e.g., Kinesis fan\u2011out limits, Redshift COPY idempotency)."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., default buffering for Parquet, flat S3 prefixes, missing backup), but could add more pitfalls for Kinesis source configurations and IAM permission edge cases."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Full frontmatter, clear description, trigger keywords, and explicit output contract; missing a concise \"when to invoke\" bullet point forces the agent to parse a longer paragraph."
+      "justification": "Frontmatter is complete, description and activation keywords are present, and output contract is well defined. The \"when to invoke\" section is slightly vague and could better delineate overlapping scenarios."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011navigation table and layered sections, but the initial skill body is dense, causing some cognitive overload before the agent reaches the checklist."
+      "justification": "Uses layered sections (quick navigation, mindset, heuristics, step\u2011by\u2011step, NEVER, output format) that prevent overload, though the initial quick\u2011navigation table still exposes many details up front."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Appropriately constrains destructive actions (provisioning only) and leaves creative freedom for optional components (Lambda, format conversion). Minor over\u2011flexibility in allowing any IAM role ARN without validation."
+      "justification": "Includes prerequisite verification and PREREQUISITES_MISSING handling, calibrating freedom for a destructive provisioning task, but lacks a final confirmation step or tighter constraints on resource\u2011creation parameters."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 step\u2011by\u2011step \u2192 heuristics \u2192 NEVER \u2192 output format). Structure is consistent with other CloudOps skills."
+      "justification": "Follows a coherent pattern (Mindset \u2192 Heuristics \u2192 Detailed Steps \u2192 NEVER \u2192 Output format) that is recognizable, though it does not map to a formally named pattern template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides ready\u2011to\u2011deploy checklists and verification commands; the model output examples conform to the contract. Missing are explicit handling of partial user requests and detailed error messages beyond missing prerequisites, which could hinder execution in edge cases."
+      "justification": "Provides a ready\u2011to\u2011use checklist, verification commands, and multiple worked examples, but examples sometimes omit fields (e.g., missing retry in one case) and there is no explicit decision tree for source selection or handling of missing IAM role, leaving edge cases under\u2011specified."
     }
   ],
   "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 39617,
-  "latency_ms": 19392,
+  "token_count": 40000,
+  "latency_ms": 23050,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

@@ -141,17 +141,99 @@ When this skill is invoked with a Neptune-provisioning request (create
 a cluster, configure read replicas, enable Neptune ML, set up IAM auth,
 enable encryption, configure Streams, create a Global Database, or a
 partial configuration), the agent MUST respond with the READY_TO_DEPLOY
-checklist defined in the "Output format" section using the literal
-all-caps labels `NEPTUNE:`, `VERDICT:`, `CHECKLIST:`, and
-`VERIFICATION_COMMANDS:`. Do NOT preface the checklist with prose,
-headings, or disclaimers — emit the block as the first lines of the
-response. This contract is what assertion-based evals and downstream
-provisioning pipelines rely on; deviating from the literal labels breaks
-automation silently.
+checklist defined below. This contract is what assertion-based evals
+and downstream provisioning pipelines rely on; deviating from the
+literal labels breaks automation silently.
 
-If any prerequisite is missing, the verdict is `PREREQUISITES_MISSING`
-with a specific gap citation in the checklist (marked `[✗]`), and
-`READY_TO_DEPLOY` MUST NOT also appear.
+### Required output structure
+
+The model MUST emit output using these literal labels, in this order,
+as the FIRST lines of the response (no prose, headings, or disclaimers
+before them):
+
+- `NEPTUNE: <cluster-id> (<instance-type>, <engine-version>)` — first line
+- `VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING` — second line
+- `CHECKLIST:` followed by `- [✓]` or `- [✗]` items (one row per dimension below)
+- `VERIFICATION_COMMANDS:` followed by a fenced block of copy-pasteable CLI
+
+The CHECKLIST MUST cover every dimension, in this order: query language
+(Gremlin/SPARQL/OpenCypher), topology (primary + N read replicas across
+M AZs), instance type + memory + IOPS, subnet group, security group
+(port 8182), parameter group (neptune_enforce_ssl, neptune_query_timeout,
+neptune_streams), IAM database authentication, at-rest encryption (KMS
+key ARN), Neptune Streams (filter pattern), Neptune ML, Global Database,
+auto-scaling, backup retention/window, snapshot window (vs maintenance),
+bulk loader readiness, and tags.
+
+### Decision tree (determines VERDICT)
+
+```text
+Is a subnet group defined with >= 2 AZs in the target VPC?
+├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] Subnet group)
+└── YES → Is the security group allowing TCP 8182 from the app SG?
+          ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] Security group port 8182)
+          └── YES → Is a neptune1.x cluster parameter group created?
+                    ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] Parameter group)
+                    └── YES → Is the at-rest encryption decision made BEFORE create?
+                              ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] Encryption is creation-time-only)
+                              └── YES → Is the IAM auth decision recorded (also creation-time-only)?
+                                        ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] IAM auth)
+                                        └── YES → Is neptune_streams explicitly set in the parameter group?
+                                                  ├── NO  → VERDICT: PREREQUISITES_MISSING  ([✗] neptune_streams not set)
+                                                  └── YES → All prerequisites satisfied
+                                                            → VERDICT: READY_TO_DEPLOY
+```
+
+### FORBIDDEN patterns (NEVER)
+
+1. **NEVER preface the CHECKLIST** with prose, headings, or disclaimers — emit the block as the first lines of the response.
+2. **NEVER omit the VERIFICATION_COMMANDS section**, even when every checklist item passes.
+3. **NEVER use generic placeholders** (`<your-value>`, `<cluster-id>`, `<region>`) in a worked example — always use concrete cluster IDs, real ARNs, and specific CLI commands.
+4. **NEVER mix verdict shapes** — if any prerequisite is `[✗]`, VERDICT MUST be `PREREQUISITES_MISSING` and `READY_TO_DEPLOY` MUST NOT also appear.
+5. **NEVER skip a CHECKLIST row** for a dimension that was evaluated — every dimension gets a `[✓]` or `[✗]` line.
+6. **NEVER suggest toggling encryption, IAM auth, or `neptune_enforce_ssl`** on an existing cluster — they are creation-time-only or require a reboot.
+7. **NEVER use `aws rds` commands** in VERIFICATION_COMMANDS — Neptune uses the `aws neptune` namespace.
+8. **NEVER omit the engine version** from the `NEPTUNE:` header line — Global Database and Streams support depend on it.
+
+### Perfect example — 3-instance cluster with Gremlin, KMS encryption, and Streams
+
+This is the EXACT shape the model emits for a positive scenario.
+Copy the literal labels, the bracket glyphs, and the fenced command
+block. Replace the concrete values with the scenario's values; do not
+genericise them into placeholders.
+
+```text
+NEPTUNE: fraud-graph-prod (db.r5.4xlarge, 1.3.2.1)
+VERDICT: READY_TO_DEPLOY
+CHECKLIST:
+  [✓] Query language: Gremlin (primary), SPARQL (available)
+  [✓] Topology: Primary + 2 read replicas (across 3 AZs: us-east-1a, us-east-1b, us-east-1c)
+  [✓] Instance type: db.r5.4xlarge (128 GB RAM, 8000 baseline IOPS)
+  [✓] Subnet group: neptune-prod-subnet-group (3 AZs)
+  [✓] Security group: sg-0a1b2c3d4e5f6g7h8 (port 8182 inbound from sg-app-111222333)
+  [✓] Parameter group: neptune-prod-params (neptune_enforce_ssl=1, neptune_query_timeout=120000, neptune_streams=1)
+  [✓] IAM database authentication: Enabled (set at cluster creation)
+  [✓] At-rest encryption (KMS): Enabled (key arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-1111-2222-3333-444455556666)
+  [✓] Neptune Streams: Enabled (filter: {"op": ["ADD","UPDATE","REMOVE"]})
+  [✓] Neptune ML: Not configured
+  [✓] Global Database: Not configured
+  [✓] Auto-scaling: Target tracking (EngineCPUUtilization 60%, min 1, max 5 replicas)
+  [✓] Backup: Automated (retention 7 days, window 03:00-04:00 UTC)
+  [✓] Snapshot window: 03:00-04:00 UTC (no overlap with maintenance mon:05:00-mon:06:00)
+  [✓] Bulk loader: Ready (S3 s3://neptune-prod-bulk/graph/, IAM role arn:aws:iam::123456789012:role/NeptuneBulkLoadRole)
+  [✓] Tags: Environment=production, Application=fraud-detection, Owner=data-eng
+VERIFICATION_COMMANDS:
+  aws neptune describe-db-clusters --db-cluster-identifier fraud-graph-prod --region us-east-1
+  aws neptune describe-db-instances --db-instance-identifier fraud-graph-prod-primary --region us-east-1
+  aws neptune describe-db-cluster-parameters --db-cluster-parameter-group-name neptune-prod-params --region us-east-1
+  aws cloudwatch get-metric-statistics --namespace AWS/Neptune --metric-name EngineCPUUtilization --dimensions Name=DBInstanceIdentifier,Value=fraud-graph-prod-primary --start-time 2026-08-11T00:00:00Z --end-time 2026-08-11T01:00:00Z --period 300 --statistics Average --region us-east-1
+```
+
+If any prerequisite fails, emit the SAME shape with
+`VERDICT: PREREQUISITES_MISSING`, the failing row marked `[✗]` with a
+specific gap citation (e.g. `[✗] Subnet group: only 1 AZ — need >= 2`),
+the passing rows still listed, and VERIFICATION_COMMANDS showing the
+command that would confirm the gap.
 
 ## Quick navigation
 

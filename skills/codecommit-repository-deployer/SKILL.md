@@ -152,6 +152,45 @@ If any prerequisite is missing, the verdict is `PREREQUISITES_MISSING`
 with a specific gap citation in the checklist (marked `[✗]`), and
 `READY_TO_DEPLOY` MUST NOT also appear.
 
+### FORBIDDEN output patterns
+
+1. **NEVER emit `VERDICT: READY_TO_DEPLOY` when any CHECKLIST item is
+   `[✗]`.** If even one prerequisite is unmet, the verdict MUST be
+   `PREREQUISITES_MISSING`. A mixed-verdict block is a contract
+   violation.
+
+2. **NEVER show KMS encryption as configured without verifying the key
+   policy grants `codecommit.amazonaws.com`.** The repository creates
+   successfully without the key policy grant — push/pull fails silently
+   with AccessDenied at encryption time. The CHECKLIST MUST state "key
+   policy grants codecommit.amazonaws.com" explicitly.
+
+3. **NEVER show cross-account access as configured without verifying
+   BOTH the repository resource policy AND the KMS key policy.**
+   Granting only one results in AccessDenied. If the repository is
+   KMS-encrypted, the CHECKLIST MUST list both policy grants.
+
+4. **NEVER list an approval rule template without confirming it is
+   ASSOCIATED with the repository.** Creating a template alone does
+   nothing — it must be explicitly associated via
+   `associate-approval-rule-template-with-repository`. The CHECKLIST
+   MUST state "associated" or the item is `[✗]`.
+
+5. **NEVER confuse notification rules (CodeStar Notifications) with
+   repository triggers (Lambda/SNS direct invocation) in the CHECKLIST.**
+   These are separate mechanisms. The CHECKLIST MUST list them as
+   distinct items, not collapse them into a single "notifications" line.
+
+6. **NEVER omit the git-remote-codecommit (GRC) URL from the output.**
+   The GRC clone URL (`codecommit://<region>@<repo-name>`) is the
+   primary verification artifact for IAM-role-based authentication. The
+   CHECKLIST MUST include the auth method and URL.
+
+7. **NEVER substitute lowercase or camelCase labels.** The literal
+   all-caps labels (`CODECOMMIT_REPO:`, `VERDICT:`, `CHECKLIST:`,
+   `VERIFICATION_COMMANDS:`) are parsed by downstream automation.
+   Markdown headings or bold variants break the parser silently.
+
 ## Quick navigation
 
 | Section | When to read |
@@ -612,28 +651,52 @@ VERIFICATION_COMMANDS:
   aws codestar-notifications list-notification-rules --region <region>
 ```
 
-### Worked example — repository with KMS encryption and approval rules
+### Worked example — repository with KMS encryption, approval rules, and cross-account resource policy
 
 ```text
-CODECOMMIT_REPO: my-app-repo (arn:aws:codecommit:us-east-1:123456789012:my-app-repo)
+CODECOMMIT_REPO: shared-platform-repo (arn:aws:codecommit:us-east-1:123456789012:shared-platform-repo)
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
-  [✓] Repository name: my-app-repo (unique in account 123456789012 us-east-1)
+  [✓] Repository name: shared-platform-repo (unique in account 123456789012, us-east-1)
   [✓] Default branch: main (created at first push)
-  [✓] Description: Microservice repository for my-app
-  [✓] KMS encryption: customer-managed key abcd-1234 (policy grants codecommit.amazonaws.com)
-  [✓] KMS key policy cross-account: N/A
-  [✓] Approval rule template: require-two-reviewers (associated, 2 approvals from pool)
-  [✓] Branch protection: IAM policy denies direct push to main
-  [✓] Notification rule: my-app-pr-notifications → SNS (topic policy grants codestar-notifications.amazonaws.com)
+  [✓] Description: Cross-platform shared library repository
+  [✓] KMS encryption: customer-managed key arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ef-1234-567890abcdef (key policy grants codecommit.amazonaws.com: kms:Encrypt, Decrypt, ReEncrypt*, GenerateDataKey*, DescribeKey)
+  [✓] KMS key policy cross-account: granted to arn:aws:iam::999999999999:root (kms:Decrypt, Encrypt, ReEncrypt*, GenerateDataKey*, DescribeKey)
+  [✓] Cross-account resource policy: grants arn:aws:iam::999999999999:root (codecommit:GitPull, GitPush, GetRepository, UploadArchive)
+  [✓] Approval rule template: require-two-reviewers (associated, 2 approvals needed, pool: arn:aws:iam::123456789012:user/alice, arn:aws:iam::123456789012:user/bob)
+  [✓] Branch protection: IAM policy DenyDirectPushToMain denies codecommit:GitPush on refs/heads/main
+  [✓] Notification rule: platform-pr-notifications → SNS arn:aws:sns:us-east-1:123456789012:codecommit-notifications (topic policy grants codestar-notifications.amazonaws.com sns:Publish)
   [✓] Pull request template: .github/PULL_REQUEST_TEMPLATE.md (committed to repo)
-  [✓] Auth method: git-remote-codecommit (GRC) for developers, IAM git credentials for CI
-  [✓] Tags: Environment=production, Team=platform
+  [✓] Repository trigger: lambda-on-push → arn:aws:lambda:us-east-1:123456789012:function:trigger-handler (Lambda policy grants codecommit.amazonaws.com lambda:InvokeFunction)
+  [✓] Auth method: git-remote-codecommit (GRC) — clone URL: codecommit://us-east-1@shared-platform-repo
+  [✓] CodePipeline/CodeBuild: service role has codecommit:GetRepository + GitPull on arn:aws:codecommit:us-east-1:123456789012:shared-platform-repo
+  [✓] Tags: Environment=production, Team=platform, CrossAccount=true
 VERIFICATION_COMMANDS:
-  aws codecommit get-repository --repository-name my-app-repo --region us-east-1
-  aws kms describe-key --key-id abcd-1234 --region us-east-1
+  aws codecommit get-repository --repository-name shared-platform-repo --region us-east-1
+  aws kms describe-key --key-id arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ef-1234-567890abcdef --region us-east-1
+  aws kms get-key-policy --key-id arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ef-1234-567890abcdef --policy-name default --region us-east-1
   aws codecommit list-approval-rule-templates --region us-east-1
   aws codestar-notifications list-notification-rules --region us-east-1
+  # Cross-account verification (run in account 999999999999):
+  git clone codecommit://us-east-1@shared-platform-repo
+```
+
+### Worked example — PREREQUISITES_MISSING (KMS key policy not granted)
+
+```text
+CODECOMMIT_REPO: my-new-repo (arn:aws:codecommit:us-east-1:123456789012:my-new-repo)
+VERDICT: PREREQUISITES_MISSING
+CHECKLIST:
+  [✓] Repository name: my-new-repo (unique in account 123456789012, us-east-1)
+  [✓] Default branch: main (will be created at first push)
+  [✗] KMS encryption: customer-managed key arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4 — KEY POLICY DOES NOT GRANT codecommit.amazonaws.com. Push/pull will fail with AccessDenied. Add kms:Encrypt, Decrypt, ReEncrypt*, GenerateDataKey*, DescribeKey to the key policy for principal codecommit.amazonaws.com before proceeding.
+  [✗] KMS key policy cross-account: blocked by missing CodeCommit grant (fix above first)
+  [✓] Approval rule template: require-two-reviewers (associated, 2 approvals needed)
+  [✓] Branch protection: IAM policy DenyDirectPushToMain configured
+  [✓] Auth method: git-remote-codecommit (GRC) — clone URL: codecommit://us-east-1@my-new-repo
+VERIFICATION_COMMANDS:
+  aws kms get-key-policy --key-id arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4 --policy-name default --region us-east-1
+  # Verify the key policy includes a statement with Principal codecommit.amazonaws.com before deploying
 ```
 
 ## Error handling

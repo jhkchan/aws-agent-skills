@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides useful heuristics (e.g., flexible\u2011window >= rate, immutable group assignment) and a decision matrix, but much of the content restates AWS documentation that a capable model could already retrieve; the novel delta is limited to a few concrete rules."
+      "justification": "Provides several expert heuristics not found in baseline models (e.g., flexible\u2011time\u2011window trade\u2011off matrix, Scheduler\u2011managed IAM role nuance, immutable schedule\u2011group assignment, dependency graph). However, much of the content restates AWS documentation without novel decision thresholds, limiting the delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Lists AWS\u2011specific steps (dependency graph, group creation before schedules) but also includes generic advice like \"verify prerequisites\" without a strict AWS\u2011ordered procedure, leaving some procedural detail vague."
+      "justification": "Offers AWS\u2011specific step\u2011by\u2011step procedures (rate vs cron decision, flexible window sizing, group creation, retry/DLQ wiring). Some steps are generic (\"verify prerequisites\") and could be more tightly tied to Scheduler API ordering."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons, yet omits a common pitfall: cross\u2011account Scheduler usage where the auto\u2011created role needs additional trust policy, reducing completeness."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never pre\u2011create Scheduler IAM role, never use MAXIMUM for time\u2011sensitive jobs). Misses a specific anti\u2011pattern about using MAXIMUM with one\u2011time schedules, hence a small deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter and description are thorough, but the activation condition relies on a long keyword list without a clear, singular trigger rule, which could cause ambiguous skill invocation."
+      "justification": "Frontmatter, description, keywords, and activation contract are present and well\u2011formed. The \u2018when_to_use\u2019 section is a paragraph rather than a crisp rule, making trigger detection slightly vague."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill presents a lot of detailed information early (full tables, heuristics) before the concise checklist, risking cognitive overload for an agent that only needs the top\u2011level contract."
+      "justification": "Uses quick\u2011navigation table, then layered sections (mindset, heuristics, steps, NEVER, output format). Critical rules are not buried, but the initial long description may still overload a first\u2011pass reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Constraints for fragile operations (e.g., window >= rate, DLQ existence) are mentioned, but the output contract does not enforce them, allowing an agent to emit invalid combinations."
+      "justification": "Calibrates freedom appropriately for a provisioning skill: tight constraints on fragile parameters (flexible window >= rate, DLQ existence, immutable group assignment). Could improve by explicitly limiting optional fields for one\u2011time schedules."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (mindset, steps, heuristics, checklist) but lacks explicit section labels for a formal pattern (e.g., missing a distinct \"Process\" heading), making the pattern slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (mindset \u2192 heuristics \u2192 step list \u2192 NEVER \u2192 output format). Structure is consistent with other CloudOps skills."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 9,
       "max": 15,
-      "justification": "Provides working CLI examples and a ready\u2011to\u2011deploy checklist, yet does not describe how to handle API errors (e.g., IAM permission denied) or fallback actions, limiting real\u2011world execution robustness."
+      "justification": "Provides working CLI examples, verification commands, and error\u2011handling guidance. However, several concrete errors appear in the model output: (1) cron expression syntax typo \"0 9? * MON-FRI *\" (missing space before '?'), (2) checklist field \"Retry policy: none\" does not match the required format, (3) inconsistency between auto\u2011created IAM role claim and CLI examples that require a RoleArn, (4) flexible\u2011time\u2011window example uses Mode \"FLEXIBLE\" instead of the documented \"MAXIMUM\". These defects reduce immediate usability."
     }
   ],
-  "total_score": 106,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45373,
-  "latency_ms": 8396,
+  "token_count": 44709,
+  "latency_ms": 11628,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert thresholds (e.g., HeartbeatTimeout 30\u20117200, Spot ASG recommended 30\u2011120, ELB deregistration delay vs. hook timeout) and decision\u2011tree style pre\u2011check priority that a generic model would not enumerate; however, much of the basic hook concept is already known, so not a perfect 20."
+      "justification": "Provides concrete, non\u2011trivial thresholds (HeartbeatTimeout 30\u20117200, Spot\u2011specific 30\u2011120, capacity\u2011rebalance 2\u2011minute window) and recent feature nuances (warm\u2011pool reuse, EventBridge enrichment) that a generic model would not enumerate, but it also restates many standard docs without deeper insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: exact CLI sequence, pagination notes, pre\u2011flight gate, CONFIRM prompt, post\u2011verification steps. The mindset section is solid, but a few steps (e.g., IAM trust\u2011policy verification) are described only at a high level, preventing a full 15."
+      "justification": "Offers an AWS\u2011specific pre\u2011flight sequence, exact CLI commands and ordering, but includes a non\u2011existent command `describe-notification-configurations` and a few generic steps, so the procedure is not flawless."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains an extensive NEVER list with concrete reasons (e.g., never use default 3600\u202fs HeartbeatTimeout, never omit autoscaling:CompleteLifecycleAction permission). One minor gap: no explicit warning about duplicate hook names causing silent failures, but overall very strong."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never use default 3600s HeartbeatTimeout, never omit autoscaling:CompleteLifecycleAction), yet omits a key anti\u2011pattern about missing trust policy on the lifecycle\u2011hook role, reducing completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are present and well\u2011formed. The 'when_to_use' section is detailed, yet the skill lacks a concise 'when NOT to invoke' rule beyond a paragraph, and the activation triggers list is long but not prioritized, making reliable activation slightly ambiguous."
+      "justification": "Frontmatter is complete, activation triggers and invocation schema are present, and when\u2011to\u2011use/when\u2011not\u2011to\u2011use sections are clear. However, it lacks an explicit version\u2011policy note and only a generic malformed\u2011input error handling description, leaving a small gap."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns) so readers can skim or dive deeper. However, the quick reference table mixes verdict thresholds with pre\u2011check priority, which can overload the top layer for a first\u2011time reader."
+      "justification": "Content is layered well (quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns) avoiding overload. Minor issue: some tables are dense, but overall the disclosure hierarchy is effective."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained by a mandatory CONFIRM gate, pre\u2011checks, and post\u2011verification. Creative tasks (e.g., diagnostic read\u2011only) are left open. Slight deduction because the skill does not explicitly limit parameter ranges for schedule cron expressions or scaling\u2011policy numeric fields."
+      "justification": "Destructive operations are gated by a mandatory CONFIRM prompt, pre\u2011checks, and post\u2011verification, while creative tasks are not over\u2011constrained. Slight shortfall: rollback is only manual state capture, not automated reversal."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011patterns). Consistent structure aids comprehension; a single deviation (the \u201cRecent AWS features\u201d block) prevents a perfect 10."
+      "justification": "Follows a recognizable structure (overview, quick nav, mindset, process, output, anti\u2011patterns) that aids comprehension, though the ordering of some subsections feels ad\u2011hoc rather than a strict template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision trees, and worked examples that an agent could execute. Lacks explicit rollback procedures, detailed error\u2011handling for CLI failures, and handling of pagination edge cases, which limits reliability in production."
+      "justification": "Provides actionable CLI commands, verification steps, and worked examples, enabling an agent to execute the skill; however it lacks explicit error\u2011handling paths, pagination handling details, and rollback steps for failed operations."
     }
   ],
-  "total_score": 106,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 37813,
-  "latency_ms": 11847,
+  "token_count": 37738,
+  "latency_ms": 12007,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

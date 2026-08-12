@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides specific expert heuristics (SPICE vs Direct Query decision tree, template multi\u2011tenant flow, RLS dataset mechanics) that a baseline model would not know, but omits deeper nuances such as incremental SPICE ingestion handling, cross\u2011account IAM trust policy details, and limits of QuickSight API pagination."
+      "justification": "Adds expert-level heuristics not in baseline docs: a decision tree for SPICE vs Direct Query, detailed RLS dataset mechanism, multi-tenant template deployment flow, and VPC\u2011connection constraints. Mostly novel, only some restated basics."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Lists AWS\u2011specific provisioning order (account \u2192 data source \u2192 dataset \u2192 analysis \u2192 dashboard) and includes concrete CLI commands, yet some steps are generic (e.g., \"verify connectivity\") and the IAM service\u2011role creation is mentioned only in passing rather than as a required pre\u2011step."
+      "justification": "Procedures are detailed and AWS\u2011specific (dependency graph, exact CLI order), yet some steps are generic (e.g., \"verify connectivity\") and lack deeper QuickSight\u2011only nuances such as handling of incremental SPICE ingestion failures."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with reasons (e.g., never use Direct Query on OLTP for high traffic), but misses other common pitfalls such as forgetting dataset permissions for cross\u2011account sharing, cost\u2011impact of SPICE over\u2011provisioning, and ignoring API throttling limits."
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., never use Direct Query on OLTP, never share without RLS, never attempt VPC in Standard edition). Lacks explicit warnings about IAM role trust\u2011policy misconfiguration and ongoing SPICE cost monitoring."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, triggers, and strict output contract are all present and clear. Slight deduction for the when\u2011to\u2011use paragraph being verbose and for lacking an explicit version\u2011compatibility matrix."
+      "justification": "Full front\u2011matter, clear description, explicit WHEN\u2011TO\u2011USE, complete keyword/trigger list, and a strict output contract with required literal labels. No missing metadata."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers high\u2011level mindset, dependency graph, heuristics, and step\u2011by\u2011step commands, yet the model output presents three full checklist examples back\u2011to\u2011back, overloading the agent with unnecessary detail before the request is known."
+      "justification": "The skill layers information (quick navigation, step\u2011by\u2011step, error handling), yet the initial sections are dense and front\u2011load many details, which can cause cognitive overload before the user reaches the concise checklist."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates tightly for destructive actions (only emits a checklist, no direct resource creation) and allows creative freedom for optional parameters. Slightly lax on VPC\u2011connection prerequisites \u2013 it could enforce edition check before suggesting VPC steps."
+      "justification": "Destructive actions (account creation, VPC connection) are gated by prerequisite checks; creative tasks (parameter selection) are left open. One minor gap: VPC\u2011connection step does not explicitly re\u2011check edition before creation."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset, navigation, heuristics, stepwise procedure, NEVER list, output format). Minor inconsistency in ordering of sections (e.g., error handling appears after examples) prevents a perfect score."
+      "justification": "Follows a recognizable pattern (mindset, navigation, steps, NEVER, output format, examples), yet the overall structure feels ad\u2011hoc rather than adhering to a formalized template used across the skill library."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI examples, decision trees, and error\u2011handling guidance, enabling an agent to execute the skill. However, the model output includes multiple separate checklist blocks (sales, ops, exec) which could confuse downstream automation, and there is no explicit guidance for handling API throttling or retry logic."
+      "justification": "Provides working CLI commands, decision trees, and error handling, but the model output includes extra prose after the required block and occasionally ambiguous checklist entries (e.g., \"Redshift is public\" note, which may mislead when Redshift is private)."
     }
   ],
-  "total_score": 104,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 51223,
-  "latency_ms": 14398,
+  "grade": "A",
+  "token_count": 51718,
+  "latency_ms": 7002,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

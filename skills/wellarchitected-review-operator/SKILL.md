@@ -149,37 +149,57 @@ When this skill is invoked with a Well-Architected review
 operation (create-workload, answer-pillar, generate-report,
 create-milestone, integrate-trusted-advisor, or a partial
 existing workload state), the agent MUST respond with the
-OPERATION / VERDICT / TARGET / PRE_CHECKS / STEPS /
-POST_VERIFY / STATE / NOTES block defined in "Output format"
-using the literal all-caps labels. Do NOT preface the block
-with prose, headings, or disclaimers — emit the block as the
-first lines of the response.
+WORKLOAD / VERDICT / TARGET / PRE_CHECKS / CHECKLIST /
+RISK_COUNTS / IMPROVEMENT_PLAN / STEPS / POST_VERIFY / STATE /
+NOTES block defined in "Output format" using the literal
+all-caps labels. Do NOT preface the block with prose, headings,
+or disclaimers — emit the block as the first lines of the
+response.
 
 ### Required output structure
 
-1. `OPERATION: <create-workload | answer-pillar | generate-report | create-milestone | integrate-trusted-advisor | describe>`
+1. `WORKLOAD: <workload-name>` — the workload display name.
 2. `VERDICT: READY | BLOCKED | COMPLETED`
 3. `TARGET: <workload-id, lens, pillar, region>`
 4. `PRE_CHECKS:` followed by indented `[PASS]` / `[FAIL]` lines.
-5. `STEPS:` followed by indented commands (CONFIRM gate first
+5. `CHECKLIST:` followed by one `PILLAR:` row per pillar
+   (Operational Excellence, Security, Reliability, Performance
+   Efficiency, Cost Optimization, Sustainability), each with
+   risk counts (`HIGH=<n> MEDIUM=<n> NONE=<n>`) and
+   per-question risk-tier lines citing workload evidence.
+6. `RISK_COUNTS:` with aggregate `HIGH:`, `MEDIUM:`, `NONE:`
+   totals across all pillars.
+7. `IMPROVEMENT_PLAN:` followed by numbered items, each tagged
+   `[HIGH]` or `[MEDIUM]`, with gap description, owner, target
+   date, and remediation link.
+8. `STEPS:` followed by indented commands (CONFIRM gate first
    for state-changing operations).
-6. `POST_VERIFY:` followed by indented `[PASS]` / `[FAIL]` lines.
-7. `STATE:` / `NOTES:` with rationale and caveats.
+9. `POST_VERIFY:` followed by indented `[PASS]` / `[FAIL]` lines.
+10. `STATE:` / `NOTES:` with rationale and caveats.
 
 ### FORBIDDEN output patterns
 
-- **No prose preamble before `OPERATION:`** — the VERDICT block
-  is the FIRST line, always. Use uppercase verdict values only
-  (`READY`, `BLOCKED`, `COMPLETED`).
-- **No markdown variants of labels** — write `VERDICT:`, not
-  `**VERDICT:**`, `### Verdict`, or `` `VERDICT` ``.
-- **No swapping verdict tokens** — exactly `READY`, `BLOCKED`,
+- **NEVER preface the block with prose** — `WORKLOAD:` is the
+  FIRST line, always. No greetings, no "Let me analyze…", no
+  disclaimers before the block. Use uppercase verdict values
+  only (`READY`, `BLOCKED`, `COMPLETED`).
+- **NEVER use markdown variants of labels** — write `VERDICT:`,
+  not `**VERDICT:**`, `### Verdict`, or `` `VERDICT` ``.
+- **NEVER swap verdict tokens** — exactly `READY`, `BLOCKED`,
   `COMPLETED`. Not "ok", "done", "pending", "ERROR".
-- **No omitting PRE_CHECKS** — every pre-check must appear with
+- **NEVER omit a pillar from CHECKLIST** — all six pillars
+  (Operational Excellence, Security, Reliability, Performance
+  Efficiency, Cost Optimization, Sustainability) must appear,
+  even if risk counts are zero.
+- **NEVER list a risk without citing workload evidence** —
+  every `HIGH_ISSUE` and `MEDIUM_ISSUE` line must include the
+  specific workload gap that justifies the tier.
+- **NEVER omit PRE_CHECKS** — every pre-check must appear with
   `[PASS]` or `[FAIL]` and a specific reason for each failure.
-- **No CLI command with placeholder flags in a READY plan** —
-  every flag populated with actual values from the input data.
-- **No claiming COMPLETED without every POST_VERIFY line showing
+- **NEVER emit placeholder values in a COMPLETED plan** — every
+  flag, ARN, and question ID populated with actual values from
+  the input data.
+- **NEVER claim COMPLETED without every POST_VERIFY line showing
   `[PASS]`, and never omit the CONFIRM gate as the first STEPS
   entry for state-changing operations.
 
@@ -700,18 +720,41 @@ rationale, and prompts the operator to confirm the risk-tier.
 When invoked with a Well-Architected review operation, your
 ENTIRE response MUST be the block below. The labels are
 **case-sensitive all-caps keywords** — write them EXACTLY as
-shown. Do NOT write a preamble. Start with `OPERATION:` and
-stop after `NOTES:`.
+shown. Do NOT write a preamble. Start with `WORKLOAD:` and stop
+after `NOTES:`.
 
 ```text
-OPERATION: <create-workload | answer-pillar | generate-report | create-milestone | integrate-trusted-advisor | describe>
+WORKLOAD: <workload-name>
 VERDICT: READY | BLOCKED | COMPLETED
 TARGET: <workload-id, lens, pillar, region>
 PRE_CHECKS:
   - [PASS] <check description>
   - [FAIL] <check description> — <reason>
+CHECKLIST:
+  PILLAR: Operational Excellence [risk: HIGH=<n> MEDIUM=<n> NONE=<n>]
+    - [HIGH_ISSUE] <question-id>: <gap description> — evidence: <workload fact>
+    - [MEDIUM_ISSUE] <question-id>: <gap description> — evidence: <workload fact>
+    - [NO_ISSUE] <question-id>: <area satisfied> — evidence: <workload fact>
+  PILLAR: Security [risk: HIGH=<n> MEDIUM=<n> NONE=<n>]
+    - [HIGH_ISSUE] <question-id>: <gap description> — evidence: <workload fact>
+    - [NO_ISSUE] <question-id>: <area satisfied> — evidence: <workload fact>
+  PILLAR: Reliability [risk: HIGH=<n> MEDIUM=<n> NONE=<n>]
+    ...
+  PILLAR: Performance Efficiency [risk: HIGH=<n> MEDIUM=<n> NONE=<n>]
+    ...
+  PILLAR: Cost Optimization [risk: HIGH=<n> MEDIUM=<n> NONE=<n>]
+    ...
+  PILLAR: Sustainability [risk: HIGH=<n> MEDIUM=<n> NONE=<n>]
+    ...
+RISK_COUNTS:
+  HIGH: <aggregate count>
+  MEDIUM: <aggregate count>
+  NONE: <aggregate count>
+IMPROVEMENT_PLAN:
+  1. [HIGH] <gap> — owner: <email>, target: <date>, remediation: <lab URL>
+  2. [MEDIUM] <gap> — owner: <email>, target: <date>, remediation: <lab URL>
 STEPS:
-  1. CONFIRM: About to <operation> on <workload / lens / pillar> in account <account> region <region>. This will <consequence>. Proceed? (yes/no)
+  1. CONFIRM: About to <operation> on <workload> in account <account> region <region>. This will <consequence>. Proceed? (yes/no)
   2. <exact CLI command with every flag populated — no placeholders>
 POST_VERIFY:
   - [PASS] <verification description>
@@ -723,9 +766,66 @@ NOTES: <pillar coverage, lens availability, TA integration caveats>
 **Status marker semantics:**
 - `[PASS]` — check passed.
 - `[FAIL]` — check failed; cite the reason.
+- `[HIGH_ISSUE]` — significant risk gap; top improvement plan priority.
+- `[MEDIUM_ISSUE]` — moderate risk gap; should be addressed.
+- `[NO_ISSUE]` — pillar question satisfied.
 
 **BLOCKED verdict:** if any pre-check fails, verdict is
 `BLOCKED` with each gap listed and remediation guidance.
+
+### Worked example — checkout-service workload with 2 HIGH security risks
+
+```text
+WORKLOAD: checkout-service
+VERDICT: COMPLETED
+TARGET: wlv-abc123def456, lens: wellarchitected, region: us-east-1
+PRE_CHECKS:
+  - [PASS] Workload checkout-service exists (WorkloadId: wlv-abc123def456)
+  - [PASS] Lens wellarchitected associated with workload
+  - [PASS] Environment: PRODUCTION — risk tolerance: strict
+  - [PASS] ReviewOwner: payments-platform@example.com (IsReviewOwnerUpdateAllowed: true)
+  - [PASS] All 6 pillars present in PillarIds
+CHECKLIST:
+  PILLAR: Operational Excellence [risk: HIGH=0 MEDIUM=1 NONE=7]
+    - [MEDIUM_ISSUE] ops-1: No automated rollback for Lambda deployments — evidence: CodeDeploy uses CANARY with no alarm-based rollback configured
+    - [NO_ISSUE] ops-2: Runbooks exist for checkout failures — evidence: 3 runbooks in internal wiki, linked in CloudWatch dashboards
+  PILLAR: Security [risk: HIGH=2 MEDIUM=0 NONE=6]
+    - [HIGH_ISSUE] sec-1: Secrets stored in plaintext Lambda env vars instead of Secrets Manager — evidence: aws lambda get-function-configuration on 4 functions shows API keys in Environment.Variables (confirmed: checkout-auth, checkout-payment, checkout-notify, checkout-inventory)
+    - [HIGH_ISSUE] sec-2: No WAF on the ALB fronting checkout API — evidence: aws wafv2 list-web-acls --region us-east-1 returns empty; ALB arn:aws:elasticloadbalancing:us-east-1:111122223333:load-balancer/app/checkout-alb/abc123 has no associated WebACL
+    - [NO_ISSUE] sec-3: IAM roles follow least privilege — evidence: all 7 Lambda execution roles scoped to specific resource ARNs via aws iam get-role-policy
+  PILLAR: Reliability [risk: HIGH=0 MEDIUM=1 NONE=7]
+    - [MEDIUM_ISSUE] rel-1: SQS DLQ alarm threshold too high — evidence: DLQ alarm set to 1000 messages; SLO breach occurs at 50 messages (CloudWatch alarm CheckoutDLQHighThreshold)
+    - [NO_ISSUE] rel-2: Multi-AZ deployment — evidence: Lambda + ALB across us-east-1a, us-east-1b, us-east-1c; DynamoDB table in 3 AZ with GlobalSecondaryIndexes
+  PILLAR: Performance Efficiency [risk: HIGH=0 MEDIUM=0 NONE=8]
+    - [NO_ISSUE] perf-1: DynamoDB capacity auto-scaled — evidence: ProvisionedWriteCapacityUnits 5000-20000, target utilization 70%; p99 latency 45ms
+  PILLAR: Cost Optimization [risk: HIGH=0 MEDIUM=1 NONE=7]
+    - [MEDIUM_ISSUE] cost-1: Over-provisioned Lambda memory (3 GB for I/O-bound function) — evidence: MemorySize=3072 on checkout-payment; Duration p99=850ms with no CPU throttle (DataPoints from CloudWatch)
+  PILLAR: Sustainability [risk: HIGH=0 MEDIUM=0 NONE=4]
+    - [NO_ISSUE] sus-1: Lambda scales to zero when idle — evidence: InvocationCount=0 outside business hours per CloudWatch metrics
+RISK_COUNTS:
+  HIGH: 2
+  MEDIUM: 3
+  NONE: 39
+IMPROVEMENT_PLAN:
+  1. [HIGH] Secrets in plaintext Lambda env vars (4 functions) — owner: security@example.com, target: 2026-09-01, remediation: migrate to Secrets Manager with IAM rotation policies; Lab: https://www.wellarchitectedlabs.com/security/
+  2. [HIGH] No WAF on checkout ALB — owner: platform@example.com, target: 2026-08-20, remediation: deploy AWS WAF with AWSManagedRulesCommonRuleSet + rate-based rule (2000 req/5min); Lab: https://www.wellarchitectedlabs.com/security/
+  3. [MEDIUM] No automated rollback for Lambda — owner: devops@example.com, target: 2026-09-15, remediation: configure CodeDeploy alarm-based rollback with CloudWatch Alarms on p99 latency >500ms and 5xx rate >1%; Lab: https://www.wellarchitectedlabs.com/operational-excellence/
+  4. [MEDIUM] SQS DLQ alarm threshold too high — owner: devops@example.com, target: 2026-08-30, remediation: lower alarm threshold to 50 messages; add SNS notification to on-call PagerDuty
+  5. [MEDIUM] Over-provisioned Lambda memory — owner: platform@example.com, target: 2026-09-30, remediation: right-size to 1 GB per AWS Compute Optimizer recommendation; Lab: https://www.wellarchitectedlabs.com/cost-optimization/
+STEPS:
+  1. CONFIRM: About to save review for workload checkout-service (wlv-abc123def456) in account 111122223333 region us-east-1. This will persist 44 answers across 6 pillars and generate a consolidated report. Proceed? (yes/no)
+  2. aws wellarchitected update-answer --workload-id wlv-abc123def456 --lens-alias wellarchitected --question-id sec-1-question-id --choice-updates '{"risk-choice-1":{"Status":"SELECTED","Reason":"RISK_GUIDANCE","Notes":"4 Lambda functions (checkout-auth, checkout-payment, checkout-notify, checkout-inventory) have plaintext API keys in Environment.Variables"}}' --region us-east-1
+  3. aws wellarchitected update-answer --workload-id wlv-abc123def456 --lens-alias wellarchitected --question-id sec-2-question-id --choice-updates '{"risk-choice-2":{"Status":"SELECTED","Reason":"RISK_GUIDANCE","Notes":"ALB arn:aws:elasticloadbalancing:us-east-1:111122223333:load-balancer/app/checkout-alb/abc123 has no WAF association"}}' --region us-east-1
+  4. aws wellarchitected get-consolidated-report --workload-id wlv-abc123def456 --format JSON --include-shared-resources --region us-east-1 > /tmp/war-checkout-service-$(date +%s).json
+  5. aws wellarchitected create-milestone --workload-id wlv-abc123def456 --milestone-name "2026-Q3-baseline" --region us-east-1
+POST_VERIFY:
+  - [PASS] list-answers returns 44 answers across all 6 pillars (8+8+8+8+8+4)
+  - [PASS] Consolidated report contains 2 HIGH and 3 MEDIUM improvement plan items
+  - [PASS] Milestone 2026-Q3-baseline created — snapshots current answers
+  - [PASS] No UNANSWERED questions in consolidated report
+STATE: Review complete. Milestone 2026-Q3-baseline captured. Next review cycle: 2026-Q4.
+NOTES: Security pillar has 2 HIGH risks requiring immediate remediation. All improvement plan items have assigned owners and target dates. TA integration surfaced additional cost optimization evidence (LowUtilizationEC2Resources check for the staging NAT gateway — supplemental, not auto-answered).
+```
 
 ## Domain
 
