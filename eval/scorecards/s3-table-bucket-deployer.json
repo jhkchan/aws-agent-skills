@@ -1,0 +1,70 @@
+{
+  "skill": "s3-table-bucket-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many concrete details (namespace\u2011before\u2011table ordering, default compaction target 512\u202fMiB, separate table\u2011bucket policy API, Iceberg REST catalog requirement) that a baseline model would not know, but a large portion of the content simply restates publicly documented S3 Tables steps without novel decision trees or thresholds, so 4 points are deducted."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines an AWS\u2011specific provisioning sequence (bucket \u2192 namespace \u2192 table \u2192 maintenance \u2192 policy \u2192 Athena \u2192 Lake Formation) and includes exact CLI commands, but the IAM\u2011permission check is generic (\u201cverify IAM permissions\u201d) rather than an AWS\u2011specific checklist, costing 1 point."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never use standard S3 APIs on a table bucket, never create a table before its namespace). Deducted 2 points because it omits some common pitfalls such as forgetting to set the region flag on list commands or overlooking cross\u2011account policy nuances."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, and activation triggers are present, and the output contract is clearly defined. However, the trigger list mixes free\u2011text phrases and lacks a strict regex or canonical form, making reliable activation marginally ambiguous, so 2 points are deducted."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick navigation, detailed steps, NEVER list, output format, error handling) well, but the maintenance defaults and partition\u2011strategy heuristics are embedded in long tables that can overwhelm a first\u2011pass read, leading to a 2\u2011point deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "For a provisioning task the skill is appropriately constrained (prerequisite checks, explicit checklist). It does not address destructive actions (e.g., delete\u2011bucket) which could be relevant in a full lifecycle, so 2 points are deducted for over\u2011permissiveness in scope."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (metadata, mindset, heuristics, step\u2011by\u2011step process, NEVER list, output format, error handling). The structure is coherent, losing only 1 point for a minor inconsistency in heading hierarchy."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI examples, a ready\u2011to\u2011deploy checklist, and error\u2011handling guidance. Missing explicit handling for already\u2011existing resources (e.g., idempotent create\u2011table) and no guidance for region mismatches, resulting in a 2\u2011point deduction."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 46317,
+  "latency_ms": 15074,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
