@@ -1,0 +1,181 @@
+# Eval test cases for s3-lifecycle-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: s3-lifecycle-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: standard-tier-transition
+    description: >-
+      Standard lifecycle policy transitioning objects from Standard to IA
+      (30 days) to Glacier IR (90 days) to Deep Archive (365 days) with
+      valid min-days. The skill should produce AUTOMATION_DEPLOYED with
+      the put-bucket-lifecycle-configuration CLI and validated transitions.
+    input: |
+      Design reference: standard-tier-transition
+      Account: 111111111111
+      Region: us-east-1
+
+      Bucket: app-access-logs
+      Versioning: enabled
+      Requirement: transition logs from Standard to IA at 30 days,
+      Glacier IR at 90 days, and Deep Archive at 365 days.
+      Expire non-current versions after 120 days.
+      Abort incomplete multipart uploads after 7 days.
+
+      Emit the standard LIFECYCLE block (POLICY, TRANSITIONS, VERSIONING,
+      VALIDATION, ENFORCEMENT, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "standard-tier-transition"
+        - "STANDARD_IA"
+        - "GLACIER_IR"
+        - "DEEP_ARCHIVE"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: versioning-lifecycle
+    description: >-
+      Versioned bucket with NoncurrentVersionTransition and
+      NoncurrentVersionExpiration. The skill should produce
+      AUTOMATION_DEPLOYED with separate current-version and
+      non-current-version rules.
+    input: |
+      Design reference: versioning-lifecycle
+      Account: 111111111111
+      Region: us-east-1
+
+      Bucket: versioned-data-bucket
+      Versioning: enabled
+      Requirement:
+      - Current versions: Standard to IA at 30 days, Glacier IR at 90 days.
+      - Non-current versions: transition to IA at 30 days, expire at 120 days.
+      - Abort incomplete multipart uploads after 7 days.
+      - Remove expired object delete markers.
+
+      Emit the standard LIFECYCLE block. Include both current-version
+      and non-current-version rules.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "versioning-lifecycle"
+        - "NoncurrentVersionTransition"
+        - "NoncurrentVersionExpiration"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: intelligent-tiering-optin
+    description: >-
+      Intelligent-Tiering opt-in for a bucket with unpredictable access
+      patterns. The skill should produce AUTOMATION_DEPLOYED with the
+      Intelligent-Tiering lifecycle rule and archive tier configuration.
+    input: |
+      Design reference: intelligent-tiering-optin
+      Account: 111111111111
+      Region: us-east-1
+
+      Bucket: data-lake-raw
+      Versioning: enabled
+      Access pattern: unpredictable (mixed frequent and infrequent access).
+      Requirement: enable Intelligent-Tiering for all objects.
+      Archive tier: ARCHIVE_ACCESS at 90 days, DEEP_ARCHIVE_ACCESS at 180 days.
+
+      Emit the standard LIFECYCLE block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "intelligent-tiering-optin"
+        - "INTELLIGENT_TIERING"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: storage-lens-gap
+    description: >-
+      Storage Lens report identifies 15 buckets without lifecycle policies.
+      The skill should produce REVIEW_REQUIRED because the remediation plan
+      requires per-bucket transition-day selection based on object-age
+      distribution, which is not provided.
+    input: |
+      Design reference: storage-lens-gap
+      Account: 111111111111
+      Region: us-east-1
+
+      Storage Lens report shows 15 buckets with LifecycleEnabled=false.
+      Bucket list: logs-prod-1, logs-prod-2, backups-daily, uploads-temp,
+      data-archive, media-assets, report-exports, api-traces, audit-logs,
+      cloudtrail-archive, vpc-flow-logs, config-snapshots, cloudfront-logs,
+      alb-access-logs, rds-snapshots.
+      Object-age distribution: NOT provided per bucket.
+      Access pattern: NOT provided per bucket.
+
+      The operator asks to "deploy lifecycle to all 15 buckets immediately."
+
+      Emit the standard LIFECYCLE block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "storage-lens-gap"
+        - "VERDICT"
+        - "GAP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: min-days-validation-fail
+    description: >-
+      Lifecycle policy with invalid min-days: Standard to IA at 15 days
+      (minimum 30) and Standard-IA to Glacier IR at 60 days (minimum 90).
+      The skill must classify REVIEW_REQUIRED and cite the min-days
+      violations. The API would silently accept these rules but they
+      would never execute.
+    input: |
+      Design reference: min-days-validation-fail
+      Account: 111111111111
+      Region: us-east-1
+
+      Bucket: cost-optimization-target
+      Versioning: disabled
+      Requirement: transition from Standard to IA at 15 days,
+      Standard-IA to Glacier IR at 60 days.
+      NoncurrentVersionExpiration: NOT configured.
+
+      The operator says "we want the fastest possible transition to
+      cheap storage."
+
+      Emit the standard LIFECYCLE block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "min-days-validation-fail"
+        - "VERDICT"
+        - "GAP"
+        - "30"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"

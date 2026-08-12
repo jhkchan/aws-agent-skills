@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ec2-spot-interruption-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EC2 Spot Instance Interruption Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "handle-interruption-graceful-shutdown-completed",
+      "name": "Handle live Spot interruption — pipeline drains, checkpoints, replaces (OPERATION_COMPLETED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/handle-interruption-graceful-shutdown-completed.md",
+      "baseline_file": "baselines/handle-interruption-graceful-shutdown-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "i-0abc123def456", "deregister", "checkpoint", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: REVIEW_REQUIRED", "VERDICT: ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "tune-strategy-lowest-price-review-required",
+      "name": "Tune Spot Fleet from lowestPrice to capacity-optimized with 3x3 diversification (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tune-strategy-lowest-price-review-required.md",
+      "baseline_file": "baselines/tune-strategy-lowest-price-review-required.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "sfr-batch-prod", "capacity-optimized", "c6g", "VERDICT", "arm64"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPERATION_COMPLETED", "VERDICT: ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "lambda-reserved-concurrency-zero-review-required",
+      "name": "Audit interruption pipeline — Lambda reserved concurrency=0 stealth throttle (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/lambda-reserved-concurrency-zero-review-required.md",
+      "baseline_file": "baselines/lambda-reserved-concurrency-zero-review-required.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "ReservedConcurrentExecutions", "put-function-concurrency", "VERDICT", "PRE_CHECKS", "Throttles"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPERATION_COMPLETED", "VERDICT: ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "audit-diversification-single-pool-review-required",
+      "name": "Audit Spot Fleet diversification — single family, 2 AZs, below 3x3 minimum (REVIEW_REQUIRED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/audit-diversification-single-pool-review-required.md",
+      "baseline_file": "baselines/audit-diversification-single-pool-review-required.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "sfr-single-tenant-jobs", "diversification", "capacity-optimized", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPERATION_COMPLETED", "VERDICT: ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "validate-placement-score-good-completed",
+      "name": "Validate Spot placement score 9 for proposed 3x3 fleet config (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/validate-placement-score-good-completed.md",
+      "baseline_file": "baselines/validate-placement-score-good-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "get-spot-placement-scores", "9", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: REVIEW_REQUIRED", "VERDICT: ERROR"]
+        }
+      ]
+    }
+  ]
+}

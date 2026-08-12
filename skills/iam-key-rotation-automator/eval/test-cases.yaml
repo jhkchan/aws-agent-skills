@@ -1,0 +1,184 @@
+# Eval test cases for iam-key-rotation-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: iam-key-rotation-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: standard-90-day-rotation
+    description: >-
+      Standard 90-day-old active access key in regular use. The skill
+      should produce AUTOMATION_DEPLOYED with the full rotation flow
+      (create, verify, overlap, deactivate, delete), notification
+      timeline, and access advisor integration.
+    input: |
+      Design reference: standard-90-day-rotation
+      Account: 111111111111
+      Region: us-east-1
+
+      IAM user: deployment-user
+      Access key: AKIAXYZ123 (Active)
+      Created: 91 days ago
+      Last used: 2 hours ago (S3, CloudFormation per access advisor)
+      Key slots used: 1 of 2 (one slot free)
+      Exception list: user not on break-glass list
+      SNS topic: arn:aws:sns:us-east-1:111111111111:key-rotation-alerts
+
+      Emit the standard ROTATION block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "standard-90-day-rotation"
+        - "OVERLAP"
+        - "VERDICT"
+        - "ROTATION_FLOW"
+        - "DETECTION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: break-glass-exception
+    description: >-
+      Break-glass emergency access account on the exception list. The
+      skill should produce REVIEW_REQUIRED and refuse auto-rotation,
+      citing the exception and recommending manual review.
+    input: |
+      Design reference: break-glass-exception
+      Account: 111111111111
+      Region: us-east-1
+
+      IAM user: break-glass-admin
+      Access key: AKIABREAK789 (Active)
+      Created: 365 days ago
+      Last used: 45 days ago (during a Sev-1 incident, accessed STS + IAM)
+      Exception list: user IS on break-glass list (reason: Emergency access, owner: security-team)
+      SNS topic: arn:aws:sns:us-east-1:111111111111:key-rotation-alerts
+
+      The operator wants this key auto-rotated immediately.
+      Emit the standard ROTATION block including GAP.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "break-glass-exception"
+        - "VERDICT"
+        - "GAP"
+        - "exception"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: overlap-window-rotation
+    description: >-
+      Active key at 95 days, last used 3 days ago. The skill should
+      produce AUTOMATION_DEPLOYED with a detailed overlap window
+      design (7-day active overlap, 24h inactivity check before
+      deactivation, 72h before deletion).
+    input: |
+      Design reference: overlap-window-rotation
+      Account: 111111111111
+      Region: us-east-1
+
+      IAM user: ci-cd-pipeline-user
+      Access key: AKIACICD456 (Active)
+      Created: 95 days ago
+      Last used: 3 days ago (CodeBuild, ECR, S3 per access advisor)
+      Key slots used: 1 of 2
+      Exception list: not on exception list
+      Application: CI/CD pipeline on CodeBuild (reads key from Secrets Manager)
+      SNS topic: arn:aws:sns:us-east-1:111111111111:key-rotation-alerts
+
+      Emit the standard ROTATION block with detailed overlap window design.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "overlap-window-rotation"
+        - "OVERLAP"
+        - "VERDICT"
+        - "deactivate"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: cross-account-key-sync
+    description: >-
+      Access key in Account A used by an application in Account B.
+      The skill should produce AUTOMATION_DEPLOYED with the
+      cross-account key sync flow including STS assume-role for
+      updating the consumer account.
+    input: |
+      Design reference: cross-account-key-sync
+      Account A (issuer): 111111111111
+      Account B (consumer): 222222222222
+      Region: us-east-1
+
+      IAM user (in Account A): cross-account-svc
+      Access key: AKIACROSS111 (Active, in Account A)
+      Created: 92 days ago
+      Last used: 5 hours ago
+      Key slots: 1 of 2 used
+      Consumer: Application in Account B reads key from Secrets Manager
+      Cross-account role in Account B: arn:aws:iam::222222222222:role/key-sync-target
+      SNS topic: arn:aws:sns:us-east-1:111111111111:key-rotation-alerts
+
+      Emit the standard ROTATION block including cross-account sync flow.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "cross-account-key-sync"
+        - "VERDICT"
+        - "cross-account"
+        - "OVERLAP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: sts-migration-required
+    description: >-
+      EC2-based application using a permanent IAM access key. The skill
+      should produce REVIEW_REQUIRED recommending STS migration
+      (instance role) instead of key rotation, since EC2 supports IAM
+      roles natively.
+    input: |
+      Design reference: sts-migration-required
+      Account: 111111111111
+      Region: us-east-1
+
+      IAM user: ec2-app-svc-user
+      Access key: AKIAEC2APP222 (Active)
+      Created: 120 days ago
+      Last used: 1 hour ago (S3, DynamoDB per access advisor)
+      Key slots: 1 of 2 used
+      Consumer: EC2 instance i-0abc123def running a Python app
+      The app reads the access key from environment variables.
+      The EC2 instance currently has no IAM instance profile attached.
+      SNS topic: arn:aws:sns:us-east-1:111111111111:key-rotation-alerts
+
+      The operator wants to rotate the key. Emit the standard ROTATION block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "sts-migration-required"
+        - "VERDICT"
+        - "GAP"
+        - "STS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"

@@ -1,0 +1,183 @@
+# Eval test cases for backup-vault-compliance-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: backup-vault-compliance-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: vault-lock-compliance-mode
+    description: >-
+      Standard Vault Lock deployment in compliance mode for regulatory
+      requirements (SEC 17a-4, 7-year retention). The skill should
+      produce an AUTOMATION_DEPLOYED workflow with the lock
+      configuration, cool-off period management, and verification
+      steps.
+    input: |
+      Design reference: vault-lock-compliance-mode
+      Account: 111111111111
+      Region: us-east-1
+
+      Vault: compliance-vault
+      Requirement: SEC 17a-4 immutable retention, 7 years (2557 days).
+      Current state: vault exists, no lock, 50 recovery points all encrypted.
+      Vault policy: deny-non-encrypted (already deployed).
+      KMS key: arn:aws:kms:us-east-1:111111111111:key/compliance-key
+      Pre-deployment validation: tested governance mode in staging.
+
+      Emit the standard COMPLIANCE block (POLICY, LOCK, COVERAGE,
+      REPLICATION, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "vault-lock-compliance-mode"
+        - "COMPLIANCE"
+        - "2557"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: vault-policy-enforcement
+    description: >-
+      Vault policy enforcement denying non-encrypted backups with KMS
+      key verification. The skill should produce an AUTOMATION_DEPLOYED
+      workflow with the vault policy JSON, KMS enforcement, and TLS
+      requirement.
+    input: |
+      Design reference: vault-policy-enforcement
+      Account: 111111111111
+      Region: us-east-1
+
+      Vault: prod-backup-vault
+      Requirement: deny all non-encrypted backups, enforce approved KMS key.
+      Current policy: default (open access).
+      Approved KMS key: arn:aws:kms:us-east-1:111111111111:key/prod-backup-key
+      Cross-account: source account 222222222222 needs write access.
+
+      Emit the standard COMPLIANCE block. Include the full vault
+      policy JSON with deny-non-encrypted, KMS enforcement, and
+      cross-account allow statements.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "vault-policy-enforcement"
+        - "DenyUnencryptedBackups"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: backup-coverage-audit
+    description: >-
+      Backup plan coverage audit identifying resources without backup.
+      The skill should produce a REVIEW_REQUIRED verdict citing the
+      unprotected resources and recommending a Config rule for
+      continuous coverage detection.
+    input: |
+      Design reference: backup-coverage-audit
+      Account: 111111111111
+      Region: us-east-1
+
+      Total resources: 85 (EC2=40, RDS=15, DynamoDB=20, EFS=10)
+      Backup selections: tag-based (BackupPlan=prod) covering 82.
+      Gap: 3 EC2 instances lack the BackupPlan tag.
+      Existing Config rules: none for backup coverage.
+      Requirement: all production resources must have daily backups.
+
+      Emit the standard COMPLIANCE block. Address the coverage gap,
+      the Config rule recommendation, and the tagging remediation.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "backup-coverage-audit"
+        - "VERDICT"
+        - "GAP"
+        - "coverage"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: cross-region-verification
+    description: >-
+      Cross-region backup replication verification. The skill should
+      produce an AUTOMATION_DEPLOYED workflow with the replication
+      status check, destination vault verification, and KMS key
+      validation in the destination region.
+    input: |
+      Design reference: cross-region-verification
+      Account: 111111111111
+      Source region: us-east-1
+      Destination region: us-west-2
+
+      Source vault: prod-backup-vault (us-east-1)
+      Destination vault: prod-backup-vault-dr (us-west-2)
+      Backup plan: includes copy rule to us-west-2.
+      Last 10 copy jobs: all COMPLETED.
+      KMS: source key us-east-1, destination key us-west-2 (separate).
+
+      Emit the standard COMPLIANCE block. Include the destination
+      region verification commands and the replication checklist.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "cross-region-verification"
+        - "us-west-2"
+        - "VERDICT"
+        - "REPLICATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: config-rule-compliance
+    description: >-
+      Deploy Config rules for continuous backup compliance monitoring
+      across an Organizations fleet. The skill should produce an
+      AUTOMATION_DEPLOYED workflow with managed and custom Config
+      rules, the delegated administrator setup, and the compliance
+      aggregation.
+    input: |
+      Design reference: config-rule-compliance
+      Account: 111111111111 (management account)
+      Region: us-east-1
+
+      Organization: 30 member accounts.
+      Requirement: continuous backup compliance monitoring.
+      Managed rules needed: backup-recovery-point-encrypted,
+        backup-recovery-point-manual-deletion-disabled.
+      Custom rule needed: EC2 must have backup plan tag.
+      Aggregation: management account Config aggregator.
+      Delegated admin: not yet configured.
+
+      Emit the standard COMPLIANCE block. Include the Config rule
+      deployment commands and the aggregator setup.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "config-rule-compliance"
+        - "Config"
+        - "aggregator"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

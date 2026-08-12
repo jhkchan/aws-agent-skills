@@ -1,0 +1,181 @@
+# Eval test cases for guardduty-finding-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: guardduty-finding-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ec2-ssh-bruteforce-auto-isolate
+    description: >-
+      High-severity SSH brute-force finding on an EC2 instance with a
+      clear isolation remediation path. The skill should produce an
+      AUTOMATION_DEPLOYED workflow with EventBridge severity routing
+      (>= 7.0), Lambda EC2 isolation via SG swap, SNS notification,
+      finding ID deduplication, and CloudTrail TTP correlation.
+    input: |
+      Design reference: ec2-ssh-bruteforce-auto-isolate
+      Account: 111111111111
+      Region: us-east-1
+
+      GuardDuty finding type: UnauthorizedAccess:EC2/SSHBruteForce
+      Severity: 7.5 (HIGH)
+      Sample resource: i-0abc123def456 (production web server)
+      Isolation SG exists: sg-isolation-forensics
+      SNS topic: arn:aws:sns:us-east-1:111111111111:guardduty-alerts
+      Lambda remediation function: guardduty-auto-remediation
+      Pre-prod validation: completed (3 test findings, all isolated correctly).
+
+      Emit the standard AUTOMATION block (FINDING_TYPE, SEVERITY, ROUTING,
+      REMEDIATION, NOTIFICATION, INTEGRATION, SAFETY, AUDIT, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "ec2-ssh-bruteforce-auto-isolate"
+        - "SSHBruteForce"
+        - "VERDICT"
+        - "ROUTING"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: cryptocurrency-ec2-auto-isolate
+    description: >-
+      Critical-severity crypto mining finding on an EC2 instance. The
+      skill should produce AUTOMATION_DEPLOYED with immediate isolation,
+      EBS snapshot for forensics, IAM key revocation (no last-used check
+      for Critical), and on-call paging.
+    input: |
+      Design reference: cryptocurrency-ec2-auto-isolate
+      Account: 111111111111
+      Region: us-east-1
+
+      GuardDuty finding type: CryptoCurrency:EC2/BitcoinTool
+      Severity: 9.0 (CRITICAL)
+      Sample resource: i-0compromised789
+      Isolation SG: sg-isolation-forensics
+      SNS topic: arn:aws:sns:us-east-1:111111111111:guardduty-alerts
+      Lambda: guardduty-auto-remediation
+      Malware Protection: enabled
+      Pre-prod validation: completed.
+
+      Emit the standard AUTOMATION block. Include snapshot for forensics
+      and immediate IAM key revocation (Critical severity — no last-used check).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "cryptocurrency-ec2-auto-isolate"
+        - "BitcoinTool"
+        - "VERDICT"
+        - "snapshot"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: recon-low-no-auto-action
+    description: >-
+      Low-severity recon finding. The skill should produce REVIEW_REQUIRED
+      because Low-severity findings do not warrant auto-response. The skill
+      should recommend suppression filters for authorized scanners and
+      CloudTrail correlation for trend analysis.
+    input: |
+      Design reference: recon-low-no-auto-action
+      Account: 111111111111
+      Region: us-east-1
+
+      GuardDuty finding type: Recon:EC2/PortProbeUnprotectedPort
+      Severity: 2.0 (LOW)
+      Sample resource: i-0webfrontend01 (port 22 probed from 198.51.100.50)
+      Authorized scanner: 198.51.100.50 (internal vulnerability scanner)
+
+      Emit the standard AUTOMATION block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "recon-low-no-auto-action"
+        - "VERDICT"
+        - "suppression"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: iam-persistence-revoke-keys
+    description: >-
+      High-severity IAM persistence finding where an attacker created a
+      new access key. The skill should produce AUTOMATION_DEPLOYED with
+      IAM key revocation, Security Hub custom finding, and CloudTrail
+      correlation to detect the TTP chain (Initial Access → Persistence).
+    input: |
+      Design reference: iam-persistence-revoke-keys
+      Account: 111111111111
+      Region: us-east-1
+
+      GuardDuty finding type: Persistence:IAMUser/AccessKeyCreated
+      Severity: 8.0 (HIGH)
+      Sample resource: AIDACKCEVSQ6C2EXAMPLE (compromised IAM user)
+      New key created: AKIAIOSFODNN7EXAMPLE (attacker-created)
+      The key was last used 3 hours ago.
+      SNS topic: arn:aws:sns:us-east-1:111111111111:guardduty-alerts
+      Lambda: guardduty-auto-remediation
+      Security Hub: enabled
+      Pre-prod validation: completed.
+
+      Emit the standard AUTOMATION block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "iam-persistence-revoke-keys"
+        - "Persistence:IAMUser"
+        - "VERDICT"
+        - "revoke"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: multi-account-org-deployment
+    description: >-
+      Multi-account GuardDuty automation via Organizations delegated
+      administrator. The skill should produce AUTOMATION_DEPLOYED with
+      cross-account EventBridge forwarding, StackSet deployment, and
+      auto-enable for new accounts. Covers the full Organizations pipeline.
+    input: |
+      Design reference: multi-account-org-deployment
+      Delegated admin account: 111111111111
+      Member accounts: 222222222222, 333333333333, 444444444444
+      Regions: us-east-1, us-west-2, eu-west-1
+      GuardDuty: enabled in all member accounts via delegated admin
+      Lambda remediation: guardduty-auto-remediation (deployed via StackSet)
+      Isolation SG: deployed to all VPCs via StackSet
+      SNS topic (centralized): arn:aws:sns:us-east-1:111111111111:guardduty-alerts
+      Pre-prod validation: completed in sandbox OU.
+
+      Emit the standard AUTOMATION block. Include the cross-account
+      EventBridge forwarding rule and the StackSet deployment pattern.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "multi-account-org-deployment"
+        - "StackSet"
+        - "VERDICT"
+        - "delegated"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

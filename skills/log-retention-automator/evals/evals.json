@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "log-retention-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Log Retention Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "tag-based-retention-prod",
+      "name": "Tag-based retention deployment — Environment tags on all groups, AUTOMATION_DEPLOYED",
+      "difficulty": "easy",
+      "prompt_file": "prompts/tag-based-retention-prod.md",
+      "baseline_file": "baselines/tag-based-retention-prod.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "tag-based-retention-prod", "put-retention-policy", "VERDICT", "TRIGGER", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "eventbridge-auto-retention",
+      "name": "EventBridge CreateLogGroup auto-retention — Lambda + DLQ + default-first",
+      "difficulty": "medium",
+      "prompt_file": "prompts/eventbridge-auto-retention.md",
+      "baseline_file": "baselines/eventbridge-auto-retention.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "eventbridge-auto-retention", "CreateLogGroup", "EventBridge", "VERDICT", "TRIGGER"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "s3-archive-pipeline",
+      "name": "S3 Firehose archival for compliance logs — 90d hot + indefinite cold",
+      "difficulty": "hard",
+      "prompt_file": "prompts/s3-archive-pipeline.md",
+      "baseline_file": "baselines/s3-archive-pipeline.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "s3-archive-pipeline", "Firehose", "subscription", "VERDICT", "ARCHIVAL"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "subscription-filter-cleanup",
+      "name": "Subscription filter cleanup + metric filter preservation — REVIEW_REQUIRED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/subscription-filter-cleanup.md",
+      "baseline_file": "baselines/subscription-filter-cleanup.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "subscription-filter-cleanup", "VERDICT", "subscription", "GAP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "multi-account-org-retention",
+      "name": "Multi-account Organizations rollout via CloudFormation StackSet",
+      "difficulty": "hard",
+      "prompt_file": "prompts/multi-account-org-retention.md",
+      "baseline_file": "baselines/multi-account-org-retention.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "multi-account-org-retention", "StackSet", "Organizations", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

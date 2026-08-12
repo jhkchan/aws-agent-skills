@@ -1,0 +1,43 @@
+# Eval configuration for certificate-renewal-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: certificate-renewal-automator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: acm-dns-alb-auto-renewal
+    difficulty: easy
+    prompt_file: prompts/acm-dns-alb-auto-renewal.md
+    baseline_file: baselines/acm-dns-alb-auto-renewal.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: cloudfront-cert-rotation
+    difficulty: medium
+    prompt_file: prompts/cloudfront-cert-rotation.md
+    baseline_file: baselines/cloudfront-cert-rotation.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: orphaned-imported-cert
+    difficulty: medium
+    prompt_file: prompts/orphaned-imported-cert.md
+    baseline_file: baselines/orphaned-imported-cert.md
+    expected_verdict: REVIEW_REQUIRED
+  - id: pca-private-ca-pipeline
+    difficulty: hard
+    prompt_file: prompts/pca-private-ca-pipeline.md
+    baseline_file: baselines/pca-private-ca-pipeline.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: san-validation-gap
+    difficulty: hard
+    prompt_file: prompts/san-validation-gap.md
+    baseline_file: baselines/san-validation-gap.md
+    expected_verdict: REVIEW_REQUIRED

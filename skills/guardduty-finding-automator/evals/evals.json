@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "guardduty-finding-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the GuardDuty Finding Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "ec2-ssh-bruteforce-auto-isolate",
+      "name": "High-severity SSH brute force on EC2 — isolate via SG swap, AUTOMATION_DEPLOYED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ec2-ssh-bruteforce-auto-isolate.md",
+      "baseline_file": "baselines/ec2-ssh-bruteforce-auto-isolate.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "ec2-ssh-bruteforce-auto-isolate", "SSHBruteForce", "VERDICT", "ROUTING", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "cryptocurrency-ec2-auto-isolate",
+      "name": "Critical crypto mining on EC2 — immediate isolate + snapshot + key revoke",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cryptocurrency-ec2-auto-isolate.md",
+      "baseline_file": "baselines/cryptocurrency-ec2-auto-isolate.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "cryptocurrency-ec2-auto-isolate", "BitcoinTool", "VERDICT", "snapshot"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "recon-low-no-auto-action",
+      "name": "Low-severity recon — REVIEW_REQUIRED, suppression recommended",
+      "difficulty": "easy",
+      "prompt_file": "prompts/recon-low-no-auto-action.md",
+      "baseline_file": "baselines/recon-low-no-auto-action.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "recon-low-no-auto-action", "VERDICT", "suppression"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "iam-persistence-revoke-keys",
+      "name": "High-severity IAM persistence — revoke attacker-created key, Security Hub correlation",
+      "difficulty": "hard",
+      "prompt_file": "prompts/iam-persistence-revoke-keys.md",
+      "baseline_file": "baselines/iam-persistence-revoke-keys.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "iam-persistence-revoke-keys", "Persistence:IAMUser", "VERDICT", "revoke"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "multi-account-org-deployment",
+      "name": "Multi-account GuardDuty automation via Organizations delegated admin + StackSets",
+      "difficulty": "hard",
+      "prompt_file": "prompts/multi-account-org-deployment.md",
+      "baseline_file": "baselines/multi-account-org-deployment.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "multi-account-org-deployment", "StackSet", "VERDICT", "delegated"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

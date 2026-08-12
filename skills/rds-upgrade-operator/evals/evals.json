@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "rds-upgrade-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the RDS and Aurora Engine Upgrade Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "minor-upgrade-postgres-inplace-completed",
+      "name": "Minor upgrade Aurora PostgreSQL 14.10 to 14.11 — all pre-checks pass (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/minor-upgrade-postgres-inplace-completed.md",
+      "baseline_file": "baselines/minor-upgrade-postgres-inplace-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "prod-orders-cluster", "modify-db-cluster", "14.11", "VERDICT", "PRE_CHECKS", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: REVIEW_REQUIRED", "VERDICT: ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "major-upgrade-blue-green-review-required",
+      "name": "Major upgrade Aurora MySQL 5.7 to 8.0 via blue/green — driver compatibility review (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/major-upgrade-blue-green-review-required.md",
+      "baseline_file": "baselines/major-upgrade-blue-green-review-required.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "prod-payments-cluster", "create-blue-green-deployment", "8.0", "VERDICT", "PRE_CHECKS", "caching_sha2_password"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPERATION_COMPLETED", "VERDICT: ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "param-group-missing-review-required",
+      "name": "Major upgrade PG 13 to 14 — missing custom parameter group for target family (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/param-group-missing-review-required.md",
+      "baseline_file": "baselines/param-group-missing-review-required.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "prod-analytics-cluster", "parameter group", "aurora-postgresql14", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPERATION_COMPLETED", "VERDICT: ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "global-database-upgrade-review-required",
+      "name": "Global database Aurora MySQL 5.7 to 8.0 — multi-Region sequencing review (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/global-database-upgrade-review-required.md",
+      "baseline_file": "baselines/global-database-upgrade-review-required.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "global-payments-cluster", "us-east-1", "eu-west-1", "ap-southeast-1", "VERDICT", "sequencing"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPERATION_COMPLETED", "VERDICT: ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "rollback-via-pitr-review-required",
+      "name": "Rollback via PITR after query regression — endpoint change and data-loss review (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/rollback-via-pitr-review-required.md",
+      "baseline_file": "baselines/rollback-via-pitr-review-required.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "prod-orders-db", "restore-db-instance-to-point-in-time", "2026-08-04", "VERDICT", "endpoint"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPERATION_COMPLETED", "VERDICT: ERROR"]
+        }
+      ]
+    }
+  ]
+}

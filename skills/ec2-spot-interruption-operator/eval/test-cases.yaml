@@ -1,0 +1,254 @@
+# Eval test cases for ec2-spot-interruption-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ec2-spot-interruption-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: handle-interruption-graceful-shutdown-completed
+    description: >-
+      A live Spot Instance Interruption Warning fires for an instance in a
+      Spot Fleet + ASG with a fully-wired graceful-shutdown pipeline
+      (EventBridge -> SQS -> Lambda). The Lambda drains from ELB, writes a
+      checkpoint to S3, and the ASG launches a replacement. All post-
+      verification checks pass. Plan should produce OPERATION_COMPLETED.
+    input: |
+      Operation: handle-interruption
+      Event: EC2 Spot Instance Interruption Warning
+      Instance: i-0abc123def456
+      Instance action: terminate
+      Event time: 2026-08-11T14:23:00Z (105 seconds remaining)
+
+      Instance metadata:
+        InstanceType: m6a.large
+        AvailabilityZone: us-east-1a
+        SpotInstanceRequestId: sir-abc123
+
+      Spot Fleet: sfr-prod-web (AllocationStrategy: capacity-optimized)
+      ASG: prod-web-asg (CapacityRebalance: true)
+      Target group: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/prod-web-tg/...
+
+      Graceful-shutdown Lambda: prod-spot-shutdown
+        State: Active, Timeout: 90, ReservedConcurrentExecutions: 10
+
+      ELB deregistration_delay.timeout_seconds: 45
+
+      ASG lifecycle hook: spot-termination-hook (HeartbeatTimeout: 120)
+
+      Execution results:
+        Lambda invoked at 14:23:01Z — SUCCESS
+        Instance deregistered from ELB at 14:23:03Z
+        Checkpoint written to s3://prod-checkpoints/i-0abc123def456/state.json at 14:23:38Z
+        ELB target "unused" at 14:23:48Z
+        Instance terminated by Spot at 14:25:00Z
+        Replacement i-0new456 launched (m6a.large, us-east-1b) at 14:25:15Z
+        Replacement "running" at 14:27:45Z
+        Replacement healthy in target group at 14:28:30Z
+
+      Post-verification:
+        Spot Fleet FulfilledCapacity: 10 (matches TargetCapacity)
+        ELB HTTPCode_ELB_5XX_Count: no spike
+        Application resumed from checkpoint on replacement
+
+      Emit the standard VERDICT block.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "i-0abc123def456"
+        - "deregister"
+        - "checkpoint"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: REVIEW_REQUIRED"
+        - "VERDICT: ERROR"
+
+  - id: tune-strategy-lowest-price-review-required
+    description: >-
+      Operator wants to switch a Spot Fleet from lowestPrice (single pool)
+      to capacity-optimized with 3x3 diversification. The change increases
+      Spot spend 5-8% and requires Graviton (arm64) support confirmation.
+      Plan should produce REVIEW_REQUIRED with cost and arm64 review items.
+    input: |
+      Operation: tune-replacement-strategy
+      Spot Fleet: sfr-batch-prod
+
+      Current config:
+        AllocationStrategy: lowestPrice
+        InstancePoolsToUseCount: 1
+        TargetCapacity: 50
+        FulfilledCapacity: 47 (3 recently interrupted)
+        Instance types: c5.large, m5.large
+        AZs: us-east-1a, us-east-1b
+
+      Proposed config:
+        AllocationStrategy: capacity-optimized
+        Instance types: c5.large, m5.large, c6g.large (Graviton)
+        AZs: us-east-1a, us-east-1b, us-east-1c
+
+      Batch workload: containerized Python jobs. arm64 support: unverified.
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "sfr-batch-prod"
+        - "capacity-optimized"
+        - "c6g"
+        - "VERDICT"
+        - "arm64"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPERATION_COMPLETED"
+        - "VERDICT: ERROR"
+
+  - id: lambda-reserved-concurrency-zero-review-required
+    description: >-
+      Operator wants to audit the interruption pipeline. The graceful-
+      shutdown Lambda has ReservedConcurrentExecutions=0 — a stealth kill
+      switch. Every interruption is a hard termination. Audit should
+      produce REVIEW_REQUIRED surfacing the concurrency fix.
+    input: |
+      Operation: audit-pipeline-health
+      ASG: prod-api-asg
+
+      EventBridge rule: spot-interruption-warning (State: ENABLED)
+      Target: SQS queue spot-interruption-queue
+
+      SQS queue health:
+        ApproximateNumberOfMessagesVisible: 14 (climbing)
+        ApproximateAgeOfOldestMessage: 340 seconds (stale — past 2-min window)
+        DLQ: spot-interruption-dlq (3 messages)
+
+      Lambda: prod-spot-graceful-shutdown
+        State: Active
+        Timeout: 90
+        Runtime: python3.12
+
+      Lambda concurrency (aws lambda get-function-concurrency):
+        ReservedConcurrentExecutions: 0
+
+      Lambda CloudWatch metrics (last 7 days):
+        Throttles: 42 spikes (correlating with interruption events)
+        Errors: 0
+        Invocations: 0
+
+      ALB target group deregistration_delay: 300 (default — NOT tuned for Spot)
+
+      ASG lifecycle hook: none configured
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "ReservedConcurrentExecutions"
+        - "put-function-concurrency"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "Throttles"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPERATION_COMPLETED"
+        - "VERDICT: ERROR"
+
+  - id: audit-diversification-single-pool-review-required
+    description: >-
+      Operator wants to audit a Spot Fleet's diversification. The fleet
+      uses a single instance family (c5) across 2 AZs — below the 3x3
+      minimum for 99.9% availability. Audit should produce REVIEW_REQUIRED
+      with the diversification gap.
+    input: |
+      Operation: audit-diversification
+      Spot Fleet: sfr-single-tenant-jobs
+
+      Spot Fleet config:
+        AllocationStrategy: lowestPrice
+        InstancePoolsToUseCount: 1
+        TargetCapacity: 20
+        FulfilledCapacity: 12 (40% unfulfilled — capacity constraints)
+
+      LaunchTemplate Overrides:
+        - InstanceType: c5.large, AvailabilityZone: us-east-1a
+        - InstanceType: c5.large, AvailabilityZone: us-east-1b
+        - InstanceType: c5.xlarge, AvailabilityZone: us-east-1a
+        - InstanceType: c5.xlarge, AvailabilityZone: us-east-1b
+
+      Unique instance families: 1 (c5)
+      Unique AZs: 2 (us-east-1a, us-east-1b)
+      Graviton families: 0
+
+      Interruption history (last 30 days):
+        Total interruptions: 38
+        Most interrupted pool: c5.large/us-east-1a (14 interruptions)
+
+      Spot placement score for current config:
+        Score: 3 (marginal — high risk)
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "sfr-single-tenant-jobs"
+        - "diversification"
+        - "capacity-optimized"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPERATION_COMPLETED"
+        - "VERDICT: ERROR"
+
+  - id: validate-placement-score-good-completed
+    description: >-
+      Operator wants to validate the Spot placement score before launching
+      a new fleet. The score is 9 (out of 10) for the proposed 3x3 config
+      in us-east-1. All pre-checks pass. Plan should produce
+      OPERATION_COMPLETED with the validation results.
+    input: |
+      Operation: validate-placement-score
+      Target capacity: 100 Spot Instances
+      Region: us-east-1
+
+      Proposed configuration:
+        Instance types: m6a.large, m6i.large, c6g.large
+        AZs: us-east-1a, us-east-1b, us-east-1c
+        Total pools: 9 (3 families x 3 AZs)
+
+      Spot placement score result (aws ec2 get-spot-placement-scores):
+        Score: 9
+        Context: "Highly recommended — sufficient capacity for the
+                  requested 100 instances across the diversified pools"
+
+      Fleet launch readiness:
+        LaunchTemplate lt-web-prod version 3 exists
+        AMI validation: passed (ami-0webprod, Amazon Linux 2023)
+        IAM instance profile: prod-web-profile (has SSM + S3 checkpoint perms)
+        Security group: sg-web-prod (ingress 443 from ALB)
+        Key pair: none (SSM Session Manager only)
+
+      Emit the standard VERDICT block.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "get-spot-placement-scores"
+        - "9"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: REVIEW_REQUIRED"
+        - "VERDICT: ERROR"

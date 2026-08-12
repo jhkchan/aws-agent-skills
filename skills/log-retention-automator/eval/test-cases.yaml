@@ -1,0 +1,180 @@
+# Eval test cases for log-retention-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: log-retention-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: tag-based-retention-prod
+    description: >-
+      Standard tag-based retention deployment with Environment tags on
+      all log groups. The skill should produce an AUTOMATION_DEPLOYED
+      workflow with the tag-to-tier map (prod=90d, staging=30d, dev=7d),
+      put-retention-policy CLI, and verification steps.
+    input: |
+      Design reference: tag-based-retention-prod
+      Account: 111111111111
+      Region: us-east-1
+
+      Log groups: 150 total, all tagged with Environment (prod=60, staging=40, dev=50)
+      Current state: all Never Expire
+      Desired retention: prod=90d, staging=30d, dev=7d
+      Tags are consistent — no untagged groups.
+      Pre-deployment validation: completed (5 groups tested per env).
+
+      Emit the standard RETENTION block (POLICY, TRIGGER, ARCHIVAL,
+      VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "tag-based-retention-prod"
+        - "put-retention-policy"
+        - "VERDICT"
+        - "TRIGGER"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: eventbridge-auto-retention
+    description: >-
+      EventBridge CreateLogGroup auto-retention deployment. The skill
+      should produce an AUTOMATION_DEPLOYED workflow with the
+      EventBridge rule pattern, Lambda target, DLQ, and account-level
+      default for untagged groups.
+    input: |
+      Design reference: eventbridge-auto-retention
+      Account: 111111111111
+      Region: us-east-1
+
+      Requirement: auto-apply retention to every new CloudWatch Logs
+      group at creation time. Default for untagged: 14 days.
+      Existing log groups: 200 total, 120 Never Expire.
+      Lambda runtime: Python 3.12.
+      DLQ: SQS.
+
+      Emit the standard RETENTION block. Include the EventBridge rule
+      pattern, Lambda handler, and the default-first strategy.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "eventbridge-auto-retention"
+        - "CreateLogGroup"
+        - "EventBridge"
+        - "VERDICT"
+        - "TRIGGER"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: s3-archive-pipeline
+    description: >-
+      S3 Firehose archival pipeline for compliance logs needing
+      retention beyond CloudWatch's 90-day hot window. The skill
+      should produce an AUTOMATION_DEPLOYED workflow with Firehose
+      delivery stream config, subscription filter, S3 lifecycle
+      policy, and cost comparison.
+    input: |
+      Design reference: s3-archive-pipeline
+      Account: 111111111111
+      Region: us-east-1
+
+      Compliance log groups: /aws/lambda/audit-logger (5 GB/day),
+      /aws/cloudtrail/management-events (20 GB/day)
+      Required: 7-year retention for compliance.
+      Hot query window: 90 days in CloudWatch.
+      Cold storage: S3 with Glacier lifecycle after 90d.
+      Firehose buffer: 5MB / 300s, GZIP compression.
+      S3 bucket: com-company-log-archive-compliance
+
+      Emit the standard RETENTION block. Include Firehose delivery
+      stream config, subscription filter, and S3 lifecycle policy.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "s3-archive-pipeline"
+        - "Firehose"
+        - "subscription"
+        - "VERDICT"
+        - "ARCHIVAL"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: subscription-filter-cleanup
+    description: >-
+      Log group decommission requiring subscription filter cleanup,
+      metric filter preservation, and S3 export before retention
+      shortening. The skill should produce a REVIEW_REQUIRED verdict
+      citing the dependencies that must be handled first.
+    input: |
+      Design reference: subscription-filter-cleanup
+      Account: 111111111111
+      Region: us-east-1
+
+      Log group: /aws/lambda/legacy-processor
+      Current retention: Never Expire (800 GB stored).
+      Has: 1 subscription filter (to OpenSearch), 2 metric filters
+      (powering CloudWatch alarms for Error and Duration).
+      Desired: set retention to 7 days, keep metric filters alive.
+      Compliance: export 30-day window to S3 before shortening.
+
+      Emit the standard RETENTION block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "subscription-filter-cleanup"
+        - "VERDICT"
+        - "subscription"
+        - "GAP"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: multi-account-org-retention
+    description: >-
+      Multi-account retention rollout via AWS Organizations. The skill
+      should produce an AUTOMATION_DEPLOYED workflow with CloudFormation
+      StackSet, cross-account IAM role, and centralized audit Lambda.
+    input: |
+      Design reference: multi-account-org-retention
+      Account: 111111111111 (management account)
+      Region: us-east-1
+
+      Organization: 45 member accounts across 3 OUs.
+      Requirement: deploy auto-retention to all accounts.
+      Standard tier: prod=90d, staging=30d, dev=7d, default=14d.
+      StackSet: SERVICE_MANAGED permission model.
+      Centralized audit: management account Lambda sweeps daily.
+
+      Emit the standard RETENTION block. Include the StackSet create
+      command and the cross-account role trust policy.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "multi-account-org-retention"
+        - "StackSet"
+        - "Organizations"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

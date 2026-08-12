@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cost-anomaly-detection-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Cost Anomaly Detection Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "service-monitor-auto",
+      "name": "EC2 service-level Cost Anomaly Monitor with SNS subscription — AUTOMATION_DEPLOYED",
+      "difficulty": "easy",
+      "prompt_file": "prompts/service-monitor-auto.md",
+      "baseline_file": "baselines/service-monitor-auto.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "service-monitor-auto", "create-anomaly-monitor", "create-anomaly-subscription", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "severity-routing-lambda",
+      "name": "Severity-based anomaly routing with Lambda router (Critical=page, High=Slack, Low=log)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/severity-routing-lambda.md",
+      "baseline_file": "baselines/severity-routing-lambda.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "severity-routing-lambda", "Critical", "High", "Low", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "org-payer-coverage-gap",
+      "name": "Organizations Payer monitor ACTIVE but zero subscriptions — REVIEW_REQUIRED",
+      "difficulty": "medium",
+      "prompt_file": "prompts/org-payer-coverage-gap.md",
+      "baseline_file": "baselines/org-payer-coverage-gap.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "org-payer-coverage-gap", "VERDICT", "GAP", "subscription"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "budgets-integration-hard-limit",
+      "name": "AWS Budgets integration with hard spend limits and Budget Actions",
+      "difficulty": "hard",
+      "prompt_file": "prompts/budgets-integration-hard-limit.md",
+      "baseline_file": "baselines/budgets-integration-hard-limit.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "budgets-integration-hard-limit", "create-budget", "VERDICT", "complementary"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "auto-remediation-prod-impact",
+      "name": "Auto-remediation Lambda targeting production EC2 — REVIEW_REQUIRED (destructive)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/auto-remediation-prod-impact.md",
+      "baseline_file": "baselines/auto-remediation-prod-impact.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "auto-remediation-prod-impact", "VERDICT", "GAP", "production"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    }
+  ]
+}

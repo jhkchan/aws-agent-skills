@@ -1,0 +1,43 @@
+# Eval configuration for log-retention-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: log-retention-automator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: tag-based-retention-prod
+    difficulty: easy
+    prompt_file: prompts/tag-based-retention-prod.md
+    baseline_file: baselines/tag-based-retention-prod.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: eventbridge-auto-retention
+    difficulty: medium
+    prompt_file: prompts/eventbridge-auto-retention.md
+    baseline_file: baselines/eventbridge-auto-retention.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: s3-archive-pipeline
+    difficulty: hard
+    prompt_file: prompts/s3-archive-pipeline.md
+    baseline_file: baselines/s3-archive-pipeline.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: subscription-filter-cleanup
+    difficulty: medium
+    prompt_file: prompts/subscription-filter-cleanup.md
+    baseline_file: baselines/subscription-filter-cleanup.md
+    expected_verdict: REVIEW_REQUIRED
+  - id: multi-account-org-retention
+    difficulty: hard
+    prompt_file: prompts/multi-account-org-retention.md
+    baseline_file: baselines/multi-account-org-retention.md
+    expected_verdict: AUTOMATION_DEPLOYED

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-lifecycle-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Lifecycle Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "standard-tier-transition",
+      "name": "Standard→IA→Glacier IR→Deep Archive lifecycle with valid min-days — AUTOMATION_DEPLOYED",
+      "difficulty": "easy",
+      "prompt_file": "prompts/standard-tier-transition.md",
+      "baseline_file": "baselines/standard-tier-transition.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "standard-tier-transition", "STANDARD_IA", "GLACIER_IR", "DEEP_ARCHIVE", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "versioning-lifecycle",
+      "name": "Versioned bucket with NoncurrentVersionTransition and Expiration",
+      "difficulty": "medium",
+      "prompt_file": "prompts/versioning-lifecycle.md",
+      "baseline_file": "baselines/versioning-lifecycle.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "versioning-lifecycle", "NoncurrentVersionTransition", "NoncurrentVersionExpiration", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "intelligent-tiering-optin",
+      "name": "Intelligent-Tiering opt-in with archive tier configuration",
+      "difficulty": "medium",
+      "prompt_file": "prompts/intelligent-tiering-optin.md",
+      "baseline_file": "baselines/intelligent-tiering-optin.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "intelligent-tiering-optin", "INTELLIGENT_TIERING", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "storage-lens-gap",
+      "name": "Storage Lens identifies 15 buckets without lifecycle — REVIEW_REQUIRED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/storage-lens-gap.md",
+      "baseline_file": "baselines/storage-lens-gap.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "storage-lens-gap", "VERDICT", "GAP"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "min-days-validation-fail",
+      "name": "Lifecycle with invalid min-days (15 for IA, 60 for Glacier IR) — REVIEW_REQUIRED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/min-days-validation-fail.md",
+      "baseline_file": "baselines/min-days-validation-fail.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "min-days-validation-fail", "VERDICT", "GAP", "30"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    }
+  ]
+}

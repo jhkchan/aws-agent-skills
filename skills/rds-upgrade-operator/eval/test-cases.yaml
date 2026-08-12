@@ -1,0 +1,243 @@
+# Eval test cases for rds-upgrade-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: rds-upgrade-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: minor-upgrade-postgres-inplace-completed
+    description: >-
+      Operator wants to apply a minor version upgrade (PostgreSQL 14.10 to
+      14.11) on an Aurora PostgreSQL cluster. All pre-checks pass: cluster
+      available, no pending modifications, snapshot exists, storage headroom
+      44%, Performance Insights enabled. Plan should produce
+      OPERATION_COMPLETED with the modify-db-cluster CLI and a CONFIRM gate.
+    input: |
+      Operation: minor-upgrade
+      Cluster: prod-orders-cluster
+      Target engine version: 14.11
+
+      Cluster metadata (aws rds describe-db-clusters):
+        DBClusterIdentifier: prod-orders-cluster
+        Status: available
+        Engine: aurora-postgresql
+        EngineVersion: 14.10
+        DBClusterParameterGroup: default.aurora-postgresql14
+        MultiAZ: false
+        StorageEncrypted: true
+
+      Instance metadata:
+        DBInstanceClass: db.r6g.large
+        AllocatedStorage: 800 (Aurora — cluster volume)
+        PerformanceInsightsEnabled: true
+        AutoMinorVersionUpgrade: false
+
+      Engine version check (aws rds describe-db-engine-versions):
+        aurora-postgresql 14.11 is a valid upgrade target from 14.10
+
+      Pending modifications: none
+
+      Pre-upgrade snapshot:
+        prod-orders-pre-14-11: available (taken 2026-08-10 02:50 UTC)
+
+      Application driver: PostgreSQL JDBC 42.7.2 (supports PG 14.x)
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "prod-orders-cluster"
+        - "modify-db-cluster"
+        - "14.11"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: REVIEW_REQUIRED"
+        - "VERDICT: ERROR"
+
+  - id: major-upgrade-blue-green-review-required
+    description: >-
+      Operator wants to upgrade Aurora MySQL 5.7 to 8.0 using blue/green.
+      Parameter and option groups for 8.0 exist. Application driver
+      (Connector/J 5.1.49) does NOT support caching_sha2_password — this
+      needs human review. Blue/green provisioning window and rollback plan
+      also need sign-off.
+    input: |
+      Operation: blue-green-upgrade
+      Cluster: prod-payments-cluster
+      Target engine version: 8.0.mysql_aurora.3.04.0
+
+      Cluster metadata:
+        DBClusterIdentifier: prod-payments-cluster
+        Status: available
+        Engine: aurora-mysql
+        EngineVersion: 5.7.mysql_aurora.2.11.4
+        DBClusterParameterGroup: aurora-mysql5.7-payments-custom
+
+      Target parameter group: aurora-mysql8.0-payments-custom (exists, diffed)
+      Target option group: aurora-mysql8.0-payments-opts (exists; MEMCACHED removed)
+
+      Pre-upgrade snapshot: prod-payments-pre-8-0 (available)
+
+      Application driver: MySQL Connector/J 5.1.49
+
+      Blue/green deployment target: aurora-mysql 8.0.mysql_aurora.3.04.0
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "prod-payments-cluster"
+        - "create-blue-green-deployment"
+        - "8.0"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "caching_sha2_password"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPERATION_COMPLETED"
+        - "VERDICT: ERROR"
+
+  - id: param-group-missing-review-required
+    description: >-
+      Operator wants an in-place major upgrade (PostgreSQL 13 to 14) but
+      has NOT created a parameter group for the aurora-postgresql14 family.
+      The default.aurora-postgresql14 group is the only 14-family group
+      available. Plan must REVIEW_REQUIRED with the missing custom param
+      group flagged.
+    input: |
+      Operation: major-upgrade
+      Cluster: prod-analytics-cluster
+      Target engine version: 14.9
+
+      Cluster metadata:
+        DBClusterIdentifier: prod-analytics-cluster
+        Status: available
+        Engine: aurora-postgresql
+        EngineVersion: 13.8
+        DBClusterParameterGroup: aurora-postgresql13-analytics-custom
+          (has 15 custom parameters including shared_preload_libraries,
+           max_connections, work_mem)
+
+      Parameter group check:
+        No custom aurora-postgresql14 parameter group found.
+        Only default.aurora-postgresql14 exists (cannot reproduce
+        the 15 custom parameters from the 13-family group).
+
+      Option group: default.aurora-postgresql14 (compatible)
+
+      Pre-upgrade snapshot: prod-analytics-pre-14 (available)
+
+      Application driver: psycopg2 2.9.9 (supports PG 14)
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "prod-analytics-cluster"
+        - "parameter group"
+        - "aurora-postgresql14"
+        - "VERDICT"
+        - "PRE_CHECKS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPERATION_COMPLETED"
+        - "VERDICT: ERROR"
+
+  - id: global-database-upgrade-review-required
+    description: >-
+      Operator wants to upgrade a global Aurora MySQL cluster from 5.7 to
+      8.0. Primary in us-east-1, secondaries in eu-west-1 and
+      ap-southeast-1. The secondary rebuild takes 2-6 hours each. Sequencing
+      and secondary Region downtime need human review.
+    input: |
+      Operation: global-upgrade
+      Global cluster: global-payments-cluster
+      Target engine version: 8.0.mysql_aurora.3.04.0
+
+      Global cluster metadata:
+        GlobalClusterIdentifier: global-payments-cluster
+        Engine: aurora-mysql
+        EngineVersion: 5.7.mysql_aurora.2.11.4
+        Primary: us-east-1 (prod-payments-cluster)
+        Secondaries: eu-west-1 (prod-payments-eu), ap-southeast-1 (prod-payments-apac)
+
+      All clusters Status: available
+      SupportsGlobalDatabases for 8.0: true
+
+      Target parameter groups exist in all three Regions:
+        aurora-mysql8.0-global-payments
+
+      Data size per Region: ~500 GB
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "global-payments-cluster"
+        - "us-east-1"
+        - "eu-west-1"
+        - "ap-southeast-1"
+        - "VERDICT"
+        - "sequencing"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPERATION_COMPLETED"
+        - "VERDICT: ERROR"
+
+  - id: rollback-via-pitr-review-required
+    description: >-
+      A major upgrade caused a query performance regression. Operator wants
+      to roll back via PITR to the pre-upgrade state. The PITR window is
+      valid (within 35-day retention). Rollback creates a NEW instance —
+      endpoint changes. Data-loss window and connection-string cutover
+      need human review.
+    input: |
+      Operation: rollback
+      Instance: prod-orders-db
+      Current engine version: 15.4 (upgraded from 14.11)
+      Restore target: PostgreSQL 14.11 state at 2026-08-04 02:50 UTC
+
+      Pre-upgrade snapshot:
+        prod-orders-db-pre-15-4: available (taken 2026-08-04 02:55 UTC)
+
+      PITR window check:
+        2026-08-04 02:50 UTC is within the 35-day backup retention period
+        (current date: 2026-08-11)
+
+      Post-upgrade regression:
+        Top-3 queries show 8x latency increase (Performance Insights).
+        Root cause: pg_upgrade rebuilt planner statistics; ANALYZE did
+        not resolve the regression.
+
+      Data size: ~500 GB (estimated restore time: 45 minutes)
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "prod-orders-db"
+        - "restore-db-instance-to-point-in-time"
+        - "2026-08-04"
+        - "VERDICT"
+        - "endpoint"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPERATION_COMPLETED"
+        - "VERDICT: ERROR"

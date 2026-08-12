@@ -1,0 +1,177 @@
+# Eval test cases for certificate-renewal-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: certificate-renewal-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: acm-dns-alb-auto-renewal
+    description: >-
+      Standard DNS-validated ACM cert attached to an ALB. ACM managed
+      renewal is active. The skill should produce AUTOMATION_DEPLOYED
+      with a CloudWatch alarm on DaysToExpiry and the daily scan Lambda.
+    input: |
+      Design reference: acm-dns-alb-auto-renewal
+      Account: 111111111111
+      Region: us-east-1
+
+      Certificate: www.example.com (arn:aws:acm:us-east-1:111111111111:certificate/abc-123)
+      Validation method: DNS (Route 53 CNAME _abc123.www.example.com -> _xyz789.acm-validations.aws.)
+      Status: ISSUED, RenewalEligibility: ELIGIBLE
+      Attached to: ALB listener arn:aws:elasticloadbalancing:us-east-1:111111111111:listener/app/prod-alb/xyz/lst-001
+      SAN domains: www.example.com, example.com
+      DaysToExpiry: 58
+      Route 53 hosted zone: Z1ABCDEF23456
+
+      Emit the standard RENEWAL block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "acm-dns-alb-auto-renewal"
+        - "DaysToExpiry"
+        - "VERDICT"
+        - "DETECTION"
+        - "RENEWAL_FLOW"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: cloudfront-cert-rotation
+    description: >-
+      CloudFront distribution cert in us-east-1 requiring rotation.
+      The skill should produce AUTOMATION_DEPLOYED with the correct
+      update-distribution flow, ETag handling, and SNI verification.
+    input: |
+      Design reference: cloudfront-cert-rotation
+      Account: 111111111111
+      Region: us-east-1
+
+      Certificate: cdn.example.com (arn:aws:acm:us-east-1:111111111111:certificate/cf-789)
+      Validation method: DNS
+      Status: ISSUED, RenewalEligibility: ELIGIBLE
+      Attached to: CloudFront distribution E1ABCDEF23456
+      SAN domains: cdn.example.com, assets.example.com
+      DaysToExpiry: 42
+      Current MinimumProtocolVersion: TLSv1.2_2021
+
+      Emit the standard RENEWAL block. Include the CloudFront update-distribution
+      flow with ETag verification and SNI check.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "cloudfront-cert-rotation"
+        - "us-east-1"
+        - "VERDICT"
+        - "SNI"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: orphaned-imported-cert
+    description: >-
+      Imported private-key certificate that is orphaned (not attached
+      to any resource). ACM cannot renew imported certs. The skill
+      should produce REVIEW_REQUIRED citing the manual renewal gap.
+    input: |
+      Design reference: orphaned-imported-cert
+      Account: 111111111111
+      Region: us-east-1
+
+      Certificate: api.internal.example.com (arn:aws:acm:us-east-1:111111111111:certificate/def-456)
+      Validation method: IMPORTED (private key from external DigiCert CA)
+      Status: ISSUED, RenewalEligibility: INELIGIBLE
+      InUseBy: [] (orphaned)
+      DaysToExpiry: 18
+
+      Emit the standard RENEWAL block including GAP.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "orphaned-imported-cert"
+        - "VERDICT"
+        - "GAP"
+        - "imported"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: pca-private-ca-pipeline
+    description: >-
+      PCA-issued private certificate on an ALB. The skill should
+      produce AUTOMATION_DEPLOYED with the PCA lifecycle pipeline
+      including CA health monitoring and end-cert renewal.
+    input: |
+      Design reference: pca-private-ca-pipeline
+      Account: 111111111111
+      Region: us-east-1
+
+      PCA CA: arn:aws:acm-pca:us-east-1:111111111111:certificate-authority/pca-abc
+      CA Status: ACTIVE, CA NotAfter: 2028-06-15
+      End-certificate: internal-api.example.com (arn:aws:acm:us-east-1:111111111111:certificate/pca-cert-001)
+      Validation method: DNS
+      Status: ISSUED
+      Attached to: ALB listener
+      DaysToExpiry: 55
+      CA remaining validity: ~2 years
+
+      Emit the standard RENEWAL block including PCA lifecycle monitoring.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "pca-private-ca-pipeline"
+        - "PCA"
+        - "VERDICT"
+        - "DETECTION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: san-validation-gap
+    description: >-
+      SAN certificate where one domain's DNS validation CNAME is missing.
+      RenewalEligibility is INELIGIBLE. The skill should produce
+      REVIEW_REQUIRED citing the missing SAN validation CNAME.
+    input: |
+      Design reference: san-validation-gap
+      Account: 111111111111
+      Region: us-east-1
+
+      Certificate: multi.example.com (arn:aws:acm:us-east-1:111111111111:certificate/san-001)
+      Validation method: DNS
+      SAN domains: multi.example.com, api.example.com, cdn.example.com
+      Status: ISSUED, RenewalEligibility: INELIGIBLE
+      Attached to: ALB listener
+      DaysToExpiry: 25
+      Note: The DNS validation CNAME for cdn.example.com was deleted
+      during a Route 53 zone cleanup. CNAMEs for multi.example.com and
+      api.example.com are present.
+
+      Emit the standard RENEWAL block including GAP.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "san-validation-gap"
+        - "VERDICT"
+        - "GAP"
+        - "INELIGIBLE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"

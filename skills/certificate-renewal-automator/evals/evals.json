@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "certificate-renewal-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Certificate Renewal Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "acm-dns-alb-auto-renewal",
+      "name": "DNS-validated ACM cert on ALB — AUTOMATION_DEPLOYED, managed renewal active",
+      "difficulty": "easy",
+      "prompt_file": "prompts/acm-dns-alb-auto-renewal.md",
+      "baseline_file": "baselines/acm-dns-alb-auto-renewal.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "acm-dns-alb-auto-renewal", "DaysToExpiry", "VERDICT", "DETECTION", "RENEWAL_FLOW"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "cloudfront-cert-rotation",
+      "name": "CloudFront distribution cert in us-east-1 — AUTOMATION_DEPLOYED with SNI verification",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cloudfront-cert-rotation.md",
+      "baseline_file": "baselines/cloudfront-cert-rotation.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "cloudfront-cert-rotation", "us-east-1", "VERDICT", "SNI"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "orphaned-imported-cert",
+      "name": "Imported private-key cert, orphaned — REVIEW_REQUIRED, manual renewal gap",
+      "difficulty": "medium",
+      "prompt_file": "prompts/orphaned-imported-cert.md",
+      "baseline_file": "baselines/orphaned-imported-cert.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "orphaned-imported-cert", "VERDICT", "GAP", "imported"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "pca-private-ca-pipeline",
+      "name": "PCA-issued private cert on ALB — AUTOMATION_DEPLOYED with CA lifecycle monitoring",
+      "difficulty": "hard",
+      "prompt_file": "prompts/pca-private-ca-pipeline.md",
+      "baseline_file": "baselines/pca-private-ca-pipeline.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "pca-private-ca-pipeline", "PCA", "VERDICT", "DETECTION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "san-validation-gap",
+      "name": "SAN cert with missing validation CNAME — REVIEW_REQUIRED, INELIGIBLE renewal",
+      "difficulty": "hard",
+      "prompt_file": "prompts/san-validation-gap.md",
+      "baseline_file": "baselines/san-validation-gap.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "san-validation-gap", "VERDICT", "GAP", "INELIGIBLE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+# Eval configuration for s3-lifecycle-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: s3-lifecycle-automator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: standard-tier-transition
+    difficulty: easy
+    prompt_file: prompts/standard-tier-transition.md
+    baseline_file: baselines/standard-tier-transition.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: versioning-lifecycle
+    difficulty: medium
+    prompt_file: prompts/versioning-lifecycle.md
+    baseline_file: baselines/versioning-lifecycle.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: intelligent-tiering-optin
+    difficulty: medium
+    prompt_file: prompts/intelligent-tiering-optin.md
+    baseline_file: baselines/intelligent-tiering-optin.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: storage-lens-gap
+    difficulty: hard
+    prompt_file: prompts/storage-lens-gap.md
+    baseline_file: baselines/storage-lens-gap.md
+    expected_verdict: REVIEW_REQUIRED
+  - id: min-days-validation-fail
+    difficulty: hard
+    prompt_file: prompts/min-days-validation-fail.md
+    baseline_file: baselines/min-days-validation-fail.md
+    expected_verdict: REVIEW_REQUIRED

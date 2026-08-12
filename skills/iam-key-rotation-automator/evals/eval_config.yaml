@@ -1,0 +1,43 @@
+# Eval configuration for iam-key-rotation-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: iam-key-rotation-automator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: standard-90-day-rotation
+    difficulty: easy
+    prompt_file: prompts/standard-90-day-rotation.md
+    baseline_file: baselines/standard-90-day-rotation.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: break-glass-exception
+    difficulty: medium
+    prompt_file: prompts/break-glass-exception.md
+    baseline_file: baselines/break-glass-exception.md
+    expected_verdict: REVIEW_REQUIRED
+  - id: overlap-window-rotation
+    difficulty: medium
+    prompt_file: prompts/overlap-window-rotation.md
+    baseline_file: baselines/overlap-window-rotation.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: cross-account-key-sync
+    difficulty: hard
+    prompt_file: prompts/cross-account-key-sync.md
+    baseline_file: baselines/cross-account-key-sync.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: sts-migration-required
+    difficulty: hard
+    prompt_file: prompts/sts-migration-required.md
+    baseline_file: baselines/sts-migration-required.md
+    expected_verdict: REVIEW_REQUIRED

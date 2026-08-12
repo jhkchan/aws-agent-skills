@@ -1,0 +1,175 @@
+# Eval test cases for drift-detection-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: drift-detection-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: staging-daily-drift-auto-remediate
+    description: >-
+      Staging CloudFormation stack with daily drift detection and
+      auto-remediation. The skill should produce AUTOMATION_DEPLOYED with
+      EventBridge scheduled detection, Lambda comparison with severity
+      classification, SNS notification, and SSM Automation remediation
+      (no approval gate for non-production).
+    input: |
+      Design reference: staging-daily-drift-auto-remediate
+      Account: 111111111111
+      Region: us-east-1
+
+      Stack: staging-web-app (CloudFormation, 15 resources)
+      Environment: staging (non-production)
+      Detection cadence: daily (02:00 UTC)
+      SNS topic: arn:aws:sns:us-east-1:111111111111:drift-alerts
+      SSM Automation: Custom-DriftRemediation (tested in sandbox)
+      Suppression rules needed: ASG DesiredCapacity, Lambda RoutingConfig
+      Config Aggregator: enabled
+      Pre-prod validation: completed (3 deliberate drift tests, all remediated).
+
+      Emit the standard DRIFT_AUTOMATION block (DETECTION, COMPARISON,
+      NOTIFICATION, REMEDIATION, INTEGRATION, SAFETY, AUDIT, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "staging-daily-drift-auto-remediate"
+        - "detect-stack-drift"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: prod-drift-notify-only
+    description: >-
+      Production CloudFormation stack with drift detection and notify-only
+      mode. The skill should produce REVIEW_REQUIRED because production
+      stacks must NOT auto-remediate. The skill must cite the production
+      protection gate and recommend human-approved change-set remediation.
+    input: |
+      Design reference: prod-drift-notify-only
+      Account: 111111111111
+      Region: us-east-1
+
+      Stack: prod-payment-service (CloudFormation, 42 resources)
+      Environment: production (critical)
+      Detection cadence: daily (02:00 UTC)
+      SNS topic: arn:aws:sns:us-east-1:111111111111:drift-alerts-critical
+      3 resources drifted: SecurityGroups (modified), IAM policy (changed),
+        ALB listener rule (modified)
+
+      Emit the standard DRIFT_AUTOMATION block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "prod-drift-notify-only"
+        - "VERDICT"
+        - "approval"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: multi-account-stackset-drift
+    description: >-
+      Multi-account drift detection via CloudFormation StackSets deployed
+      across an OU. The skill should produce AUTOMATION_DEPLOYED with the
+      StackSet deployment pattern, per-instance drift detection iteration,
+      and Config Aggregator for cross-account visibility.
+    input: |
+      Design reference: multi-account-stackset-drift
+      Delegated admin: 111111111111
+      Target OU: ou-abc1-1234abcd (20 member accounts)
+      Regions: us-east-1, us-west-2, eu-west-1
+      StackSet: drift-detection-pipeline (Lambda + EventBridge rule)
+      Stack instances: ~60 (20 accounts x 3 regions)
+      Config Aggregator: drift-visibility-aggregator
+      Auto-deployment: enabled for new accounts
+      SNS topic (centralized): arn:aws:sns:us-east-1:111111111111:drift-alerts
+
+      Emit the standard DRIFT_AUTOMATION block. Include the StackSet
+      deployment pattern and per-instance drift detection iteration.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "multi-account-stackset-drift"
+        - "StackSet"
+        - "VERDICT"
+        - "Config Aggregator"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: terraform-plan-drift-check
+    description: >-
+      Terraform-managed infrastructure drift detection via terraform plan
+      -detailed-exitcode in a CI/CD pipeline. The skill should produce
+      AUTOMATION_DEPLOYED with the GitHub Actions pipeline, SNS notification
+      on exit code 2, and drift report export to S3.
+    input: |
+      Design reference: terraform-plan-drift-check
+      IaC tool: Terraform (not CloudFormation)
+      Pipeline: GitHub Actions
+      Schedule: daily at 02:00 UTC
+      S3 bucket for reports: drift-reports
+      SNS topic: arn:aws:sns:us-east-1:111111111111:terraform-drift-alerts
+
+      Emit the standard DRIFT_AUTOMATION block. Include the GitHub Actions
+      workflow YAML and the terraform plan exit-code logic.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "terraform-plan-drift-check"
+        - "detailed-exitcode"
+        - "VERDICT"
+        - "plan"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: drift-suppression-asg-capacity
+    description: >-
+      Drift detection with suppression rules for known-acceptable ASG
+      capacity changes. The skill should produce AUTOMATION_DEPLOYED with
+      the suppression rules stored in SSM Parameter Store, severity
+      classification that ignores suppressed properties, and quarterly
+      review guidance.
+    input: |
+      Design reference: drift-suppression-asg-capacity
+      Account: 111111111111
+      Region: us-east-1
+
+      Stack: prod-api-service (CloudFormation, 28 resources)
+      Environment: production
+      Known-acceptable drift: ASG DesiredCapacity changes (scheduled scaling),
+        Lambda alias RoutingConfig (canary deployments)
+      These should be suppressed from CRITICAL severity classification.
+      All other drift should be classified normally.
+
+      Emit the standard DRIFT_AUTOMATION block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "drift-suppression-asg-capacity"
+        - "suppression"
+        - "VERDICT"
+        - "DesiredCapacity"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

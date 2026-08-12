@@ -1,0 +1,180 @@
+# Eval test cases for cost-anomaly-detection-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cost-anomaly-detection-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: service-monitor-auto
+    description: >-
+      Standard EC2 service-level Cost Anomaly Monitor with SNS subscription
+      and IMMEDIATE frequency. The skill should produce an AUTOMATION_DEPLOYED
+      pipeline with the monitor creation CLI, subscription wiring, and the
+      standard audit steps (Budgets, feedback, baseline).
+    input: |
+      Design reference: service-monitor-auto
+      Account: 111111111111
+      Region: us-east-1
+
+      Requirement: alert on EC2 spend spikes.
+      Monitor type: DIMENSION (SERVICE=Amazon Elastic Compute Cloud - Compute)
+      SNS topic: arn:aws:sns:us-east-1:111111111111:critical-cost-alerts
+      Threshold: 50% deviation, IMMEDIATE frequency.
+      Pre-prod validation: completed (synthetic spike confirmed in 18 hours).
+
+      Emit the standard ANOMALY block (MONITOR, SUBSCRIPTION, ROUTING,
+      REMEDIATION, AUDIT, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "service-monitor-auto"
+        - "create-anomaly-monitor"
+        - "create-anomaly-subscription"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: severity-routing-lambda
+    description: >-
+      Severity-based anomaly routing with a Lambda router that pages for
+      Critical, notifies Slack for High, and logs for Low. The skill should
+      produce AUTOMATION_DEPLOYED with the Lambda skeleton and SNS fan-out.
+    input: |
+      Design reference: severity-routing-lambda
+      Account: 111111111111
+      Region: us-east-1
+
+      Requirement: route anomalies by severity.
+      Critical (>=50%): page on-call via PagerDuty.
+      High (20-50%): notify Slack #finops-alerts.
+      Low (<20%): log to CloudWatch dashboard.
+      Lambda router: arn:aws:lambda:us-east-1:111111111111:function:cost-anomaly-router
+      Slack webhook: configured via Lambda env var.
+      Feedback: auto-submit true positive for impact >= $200.
+
+      Emit the standard ANOMALY block. Include the Lambda severity routing
+      logic and SNS fan-out wiring.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "severity-routing-lambda"
+        - "Critical"
+        - "High"
+        - "Low"
+        - "VERDICT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: org-payer-coverage-gap
+    description: >-
+      Organizations Payer monitor is ACTIVE but has zero subscriptions.
+      Anomalies are detected silently. The skill should classify
+      REVIEW_REQUIRED and cite the missing subscriptions, SNS fan-out,
+      and Lambda router.
+    input: |
+      Design reference: org-payer-coverage-gap
+      Payer account: 111111111111
+      Region: us-east-1
+
+      Existing monitor: org-payer-anomaly-monitor (ACTIVE, DIMENSION SERVICE)
+      Existing subscriptions: NONE
+      Lambda router: NOT deployed.
+      SNS topic: NOT created.
+      Slack webhook: NOT configured.
+      Linked accounts: 222222222222, 333333333333.
+
+      Emit the standard ANOMALY block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "org-payer-coverage-gap"
+        - "VERDICT"
+        - "GAP"
+        - "subscription"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: budgets-integration-hard-limit
+    description: >-
+      AWS Budgets integration with hard spend limits and Budget Actions.
+      The skill should produce AUTOMATION_DEPLOYED with the Budget creation
+      CLI, threshold alerts, and the complementary relationship to Cost
+      Anomaly Detection.
+    input: |
+      Design reference: budgets-integration-hard-limit
+      Account: 111111111111
+      Region: us-east-1
+
+      Requirement: set up a monthly cost budget of $10,000 with threshold
+      alerts at 80% actual and 100% forecast. Also keep the existing Cost
+      Anomaly Detection monitor for pattern-based anomalies.
+      Existing anomaly monitor: ec2-spend-anomaly-monitor (ACTIVE).
+      SNS topic for budget alerts: arn:aws:sns:us-east-1:111111111111:budget-alerts.
+
+      Emit the standard ANOMALY block. Include the Budget creation CLI
+      and explain the complementary relationship.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "budgets-integration-hard-limit"
+        - "create-budget"
+        - "VERDICT"
+        - "complementary"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: auto-remediation-prod-impact
+    description: >-
+      Auto-remediation Lambda that would shut down production EC2 instances
+      on a Critical anomaly. The skill must classify REVIEW_REQUIRED and cite
+      the production-impact risk. Auto-remediation must NOT be deployed for
+      production resources without an impact assessment.
+    input: |
+      Design reference: auto-remediation-prod-impact
+      Account: 111111111111
+      Region: us-east-1
+
+      Requirement: auto-remediate Critical cost anomalies by stopping ALL
+      running EC2 instances (including production).
+      Existing monitor: ec2-spend-anomaly-monitor (ACTIVE).
+      Lambda: would call ec2:StopInstances on all running instances regardless
+      of Environment tag.
+      Pre-prod validation: NOT completed.
+      Production-impact assessment: NOT done.
+
+      The operator asked for "fully automatic shutdown on all instances."
+
+      Emit the standard ANOMALY block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "auto-remediation-prod-impact"
+        - "VERDICT"
+        - "GAP"
+        - "production"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"

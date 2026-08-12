@@ -1,0 +1,43 @@
+# Eval configuration for guardduty-finding-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: guardduty-finding-automator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: ec2-ssh-bruteforce-auto-isolate
+    difficulty: medium
+    prompt_file: prompts/ec2-ssh-bruteforce-auto-isolate.md
+    baseline_file: baselines/ec2-ssh-bruteforce-auto-isolate.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: cryptocurrency-ec2-auto-isolate
+    difficulty: hard
+    prompt_file: prompts/cryptocurrency-ec2-auto-isolate.md
+    baseline_file: baselines/cryptocurrency-ec2-auto-isolate.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: recon-low-no-auto-action
+    difficulty: easy
+    prompt_file: prompts/recon-low-no-auto-action.md
+    baseline_file: baselines/recon-low-no-auto-action.md
+    expected_verdict: REVIEW_REQUIRED
+  - id: iam-persistence-revoke-keys
+    difficulty: hard
+    prompt_file: prompts/iam-persistence-revoke-keys.md
+    baseline_file: baselines/iam-persistence-revoke-keys.md
+    expected_verdict: AUTOMATION_DEPLOYED
+  - id: multi-account-org-deployment
+    difficulty: hard
+    prompt_file: prompts/multi-account-org-deployment.md
+    baseline_file: baselines/multi-account-org-deployment.md
+    expected_verdict: AUTOMATION_DEPLOYED
