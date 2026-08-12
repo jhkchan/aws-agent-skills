@@ -130,16 +130,16 @@ metadata:
 
 # OpenSearch Alerting Deployer
 
-An AWS CloudOps agent skill that provisions Amazon OpenSearch
-Service alerting configurations with correct defaults. The skill
-walks the operator through monitor type selection (per-query, per-
-cluster-metrics, per-document), trigger configuration (threshold,
-anomaly detection with Random Cut Forest), action and destination
-setup (Slack, SNS, Chime, custom webhook), message templating,
-scheduling (cron vs interval), severity assignment, and alert
-acknowledgment, captures requirements, explains why each default
-matters, and emits a READY_TO_DEPLOY checklist with copy-pasteable
-verification commands.
+An AWS CloudOps agent skill that provisions Amazon OpenSearch Service
+alerting configurations with correct defaults. The skill walks the
+operator through monitor type selection (per-query, per-cluster-
+metrics, per-document), trigger configuration (threshold, anomaly
+detection with Random Cut Forest), action and destination setup
+(Slack, SNS, Chime, custom webhook), message templating, scheduling
+(cron vs interval), severity assignment, and alert acknowledgment,
+captures requirements, explains why each default matters, and emits
+a READY_TO_DEPLOY checklist with copy-pasteable verification
+commands.
 
 ## Activation keywords
 
@@ -281,37 +281,24 @@ scheduled interval, and the cost depends on the query complexity.
 
 ```text
 Per-query monitor cost factors:
-  1. Query complexity:
-     - Simple count (match_all + count)         → low cost
-     - Term/range query                         → low-medium cost
-     - Aggregation (terms, avg, sum)            → medium cost
-     - Multi-index search                       → medium-high cost
-     - Large time range (e.g., 24h window)      → high cost
-     - Nested or parent-child aggregation       → high cost
+  Query complexity:
+    - Simple count (match_all + count)   → low cost
+    - Aggregation (terms, avg, sum)      → medium cost
+    - Multi-index, nested aggregation    → high cost
+    - Large time range (24h window)      → high cost
 
-  2. Frequency:
-     - Every 1 minute                           → 1440 executions/day
-     - Every 5 minutes                          → 288 executions/day
-     - Every 15 minutes                         → 96 executions/day
-     - Every 1 hour                             → 24 executions/day
+  Frequency:
+    - Every 1 min  → 1440 executions/day
+    - Every 5 min  → 288 executions/day
+    - Every 15 min → 96 executions/day
 
-  3. Index size:
-     - 1 GB index                               → fast query
-     - 100 GB index                             → slower; needs more shards
-     - 1 TB index                               → consider warm/cold tiering
-
-  Example cost optimization:
-    BAD:  Complex aggregation every 1 minute on a 500 GB index
-          → 1440 heavy queries/day; can degrade cluster performance
-
-    GOOD: Rollup or transform pre-aggregates data; monitor queries
-          the rollup index (much smaller) every 5 minutes
-          → 288 lightweight queries/day; minimal impact
+  BAD:  Complex aggregation every 1 min on 500 GB index → 1440 heavy/day
+  GOOD: Rollup pre-aggregates; monitor queries rollup every 5 min → 288 light/day
 ```
 
-**Key implication:** for expensive monitors, use OpenSearch
-rollups or transforms to pre-aggregate data into a smaller index,
-then monitor the rollup. This reduces query cost by 10-100x.
+**Key implication:** for expensive monitors, use OpenSearch rollups
+or transforms to pre-aggregate data into a smaller index, then
+monitor the rollup. This reduces query cost by 10-100x.
 
 ## Expert heuristic: destination must be configured before monitor
 
@@ -435,12 +422,12 @@ aggregation result (e.g., `ctx.results[0].aggregations.error_count.value > 100`)
 
 Cluster metrics monitors poll the OpenSearch cluster health API.
 
-| Metric | API endpoint | Typical threshold |
+| Metric | API | Threshold |
 |---|---|---|
-| JVM heap usage | `_nodes/stats/jvm` | > 85% (GC pressure) |
-| CPU usage | `_nodes/stats/process` | > 90% sustained |
-| Disk usage | `_cat/allocation` | > 80% (low watermark) |
-| Cluster status | `_cluster/health` | `red` (immediate action) |
+| JVM heap | `_nodes/stats/jvm` | > 85% (GC pressure) |
+| CPU | `_nodes/stats/process` | > 90% sustained |
+| Disk | `_cat/allocation` | > 80% (low watermark) |
+| Status | `_cluster/health` | `red` (immediate action) |
 | Unassigned shards | `_cluster/health` | > 0 |
 | Pending tasks | `_cluster/pending_tasks` | > 50 |
 
@@ -789,19 +776,15 @@ VERIFICATION_COMMANDS:
 
 ## Domain
 
-AWS CloudOps / Amazon OpenSearch Service Alerting & Operational
-Monitoring.
+AWS CloudOps / Amazon OpenSearch Service Alerting & Operational Monitoring.
 
 ## AWS documentation
 
 - **OpenSearch Alerting Plugin** — https://docs.aws.amazon.com/opensearch-service/latest/developerguide/alerting.html
-- **Alerting API reference** — https://opensearch.org/docs/latest/observing-your-data/alerting/api/
+- **Alerting API** — https://opensearch.org/docs/latest/observing-your-data/alerting/api/
 - **Monitors and triggers** — https://opensearch.org/docs/latest/observing-your-data/alerting/monitors/
 - **Destinations and actions** — https://opensearch.org/docs/latest/observing-your-data/alerting/destinations/
 - **Anomaly detection** — https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ad.html
 - **Notification plugin** — https://opensearch.org/docs/latest/observing-your-data/notifications/
-- **Per-query monitors** — https://opensearch.org/docs/latest/observing-your-data/alerting/monitors/#create-query-level-monitors
-- **Cluster metrics monitors** — https://opensearch.org/docs/latest/observing-your-data/alerting/monitors/#create-cluster-metrics-monitors
-- **Per-document monitors** — https://opensearch.org/docs/latest/observing-your-data/alerting/monitors/#create-document-level-monitors
 - **Alert acknowledgment** — https://opensearch.org/docs/latest/observing-your-data/alerting/alerts/
 - **Cron expressions** — https://opensearch.org/docs/latest/observing-your-data/alerting/monitors/#cron-expressions

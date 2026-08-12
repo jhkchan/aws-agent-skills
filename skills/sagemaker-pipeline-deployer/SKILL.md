@@ -128,11 +128,10 @@ copy-pasteable verification commands.
 
 ## Activation keywords
 
-create SageMaker Pipeline, SageMaker Pipeline steps, SageMaker Pipeline
-caching, SageMaker Tuning Step, SageMaker Model Register Step, SageMaker
-Condition Step, SageMaker Transform Step, StartPipelineExecution,
-SageMaker Pipeline parallelism, SageMaker Pipeline EventBridge,
-SageMaker Pipeline as Code.
+create SageMaker Pipeline, SageMaker Pipeline steps, caching, Tuning
+Step, Model Register Step, Condition Step, Transform Step,
+StartPipelineExecution, Pipeline parallelism, Pipeline EventBridge,
+Pipeline as Code.
 
 ## STRICT output contract
 
@@ -142,11 +141,11 @@ EventBridge, branch on metrics, register a model version, or wire up a
 partial pipeline), the agent MUST respond with the READY_TO_DEPLOY
 checklist defined in the "Output format" section using the literal
 all-caps labels `PIPELINE:`, `VERDICT:`, `CHECKLIST:`, and
-`VERIFICATION_COMMANDS:`. Do NOT preface the checklist with prose,
-headings, or disclaimers — emit the block as the first lines of the
-response. This contract is what assertion-based evals and downstream
-provisioning pipelines rely on; deviating from the literal labels breaks
-automation silently.
+`VERIFICATION_COMMANDS:`. Do NOT preface with prose, headings, or
+disclaimers — emit the block as the first lines of the response. This
+contract is what assertion-based evals and downstream provisioning
+pipelines rely on; deviating from the literal labels breaks automation
+silently.
 
 If any prerequisite is missing, the verdict is `PREREQUISITES_MISSING`
 with a specific gap citation in the checklist (marked `[✗]`), and
@@ -198,10 +197,10 @@ Three misconceptions dominate SageMaker Pipeline misdesign:
 
 ## Configuration dependency graph (novel heuristic)
 
-Pipeline configurations are NOT independent. A step that consumes a
-property from an upstream step depends on that step. The Model Registry
-depends on a model artifact from Training or Tuning. EventBridge
-triggers operate at the pipeline level, not per-step.
+Pipeline configurations are NOT independent. A step consuming a property
+from an upstream step depends on that step. The Model Registry depends
+on a model artifact from Training/Tuning. EventBridge triggers operate
+at the pipeline level, not per-step.
 
 | Configuration | Hard dependencies | Silent failure / immutability | Enables downstream |
 |---|---|---|---|
@@ -228,10 +227,9 @@ creation succeeds but execution fails on the first job-launching step.
 - A property reference is the ONLY way to chain an upstream output into
   a downstream input without an explicit `DependsOn`. Without either,
   steps run in undeclared order.
-- The TuningStep's `BestTrainingJob` is available only AFTER tuning
+- TuningStep's `BestTrainingJob` is available only AFTER tuning
   completes; downstream CreateModel must reference it via
-  `tuning_step.get_top_model_s3_uri()` (Python SDK), NOT a hardcoded S3
-  path.
+  `tuning_step.get_top_model_s3_uri()`, NOT a hardcoded S3 path.
 - `ParallelismConfiguration` caps concurrency PER pipeline execution.
   Account-level quotas cap concurrency ACROSS all executions — hitting
   the account quota serializes steps even with parallelism=5.
@@ -505,21 +503,18 @@ quotas cap concurrency across all pipelines.
 from sagemaker.model import Model
 from sagemaker.workflow.step_collections import CreateModelStep
 
-model = Model(
-    image_uri=xgb_image,
-    model_data=train.properties.ModelArtifacts.S3ModelArtifacts,
-    role=execution_role,
-)
+model = Model(image_uri=xgb_image,
+              model_data=train.properties.ModelArtifacts.S3ModelArtifacts,
+              role=execution_role)
 create_model = CreateModelStep(
-    name="CreateModel",
-    model=model,
+    name="CreateModel", model=model,
     inputs=sagemaker.model.ModelInputs(instance_type="ml.m5.large"),
 )
 ```
 
 **Note:** the model image URI must match the training image (built-ins)
-or be a compatible serving image (custom). A mismatch is a runtime
-failure at first transform/inference.
+or be a compatible serving image (custom) — a mismatch is a runtime
+failure at first inference.
 
 ## Step 8 — ConditionStep (branching based on metrics)
 
@@ -548,20 +543,18 @@ from sagemaker.workflow.steps import TransformStep
 
 transformer = Transformer(
     model_name=create_model.properties.ModelName,
-    instance_type="ml.m5.large",
-    instance_count=1,
+    instance_type="ml.m5.large", instance_count=1,
     output_path=f"s3://{bucket}/batch-output",
 )
 transform = TransformStep(
-    name="BatchScore",
-    transformer=transformer,
+    name="BatchScore", transformer=transformer,
     inputs=sagemaker.inputs.TransformInput(data=f"s3://{bucket}/batch-input"),
 )
 ```
 
 **Gotcha:** `model_name` references the CreateModelStep property. If
-CreateModelStep is in the `if_steps` of a ConditionStep, TransformStep
-must also be there — referencing a step that didn't run is a DAG error.
+CreateModelStep is in a ConditionStep's `if_steps`, TransformStep must
+also be there — referencing a skipped step is a DAG error.
 
 ## Step 10 — RegisterModelStep (Model Registry integration)
 
@@ -724,15 +717,14 @@ CHECKLIST:
   [✓|✗] Execution role: <role-arn> (trusts sagemaker.amazonaws.com, iam:PassRole for child roles)
   [✓|✗] Pipeline parameters: <name=list>
   [✓|✗] Steps DAG: <step=list> (edges via property refs / DependsOn)
-  [✓|✗] ProcessingStep: <name> (container: sklearn|spark|custom, instance=<type>)
-  [✓|✗] TrainingStep: <name> (algorithm: <built-in|custom-ecr>, instance=<type>x<count>)
+  [✓|✗] ProcessingStep: <name> (sklearn|spark|custom, instance=<type>)
+  [✓|✗] TrainingStep: <name> (built-in|custom-ecr, instance=<type>x<count>)
   [✓|✗] TuningStep: <name> (max_jobs=<n>, max_parallel=<n>) | Not used
   [✓|✗] CreateModelStep: <name> (model_data via property ref)
   [✓|✗] ConditionStep: <name> (branch on <metric> <op> <threshold>; if_steps/else_steps)
   [✓|✗] TransformStep: <name> (batch input: s3://...) | Not used
-  [✓|✗] RegisterModelStep: <name> (group: <group-name>, status: PendingManualApproval|Approved)
-  [✓|✗] Caching: enabled (window: P30D) | disabled
-  [✓|✗] ParallelismConfiguration: MaxParallelExecutionSteps=<n>
+  [✓|✗] RegisterModelStep: <name> (group: <group-name>, PendingManualApproval|Approved)
+  [✓|✗] Caching: enabled (P30D) | disabled | ParallelismConfiguration: MaxParallelExecutionSteps=<n>
   [✓|✗] Trigger: manual | EventBridge rule <rule-name> (schedule|S3|CodeCommit)
   [✓|✗] Model Registry gate: enforced (PendingManualApproval) | bypassed (auto-approve)
 VERIFICATION_COMMANDS:

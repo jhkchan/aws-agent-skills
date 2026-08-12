@@ -1,0 +1,70 @@
+{
+  "skill": "autoscaling-lifecycle-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds concrete expert details not usually known to a generic model: exact HeartbeatTimeout bounds (30\u20117200s), Spot\u2011specific recommended 30\u2011120s window, interaction of ELB deregistration delay with terminate\u2011hook timeout, warm\u2011pool state nuances, recent 2024\u20112026 feature changes, and a decision\u2011tree style pre\u2011check priority list. No major missing expert facts."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides AWS\u2011specific procedures: ordered pre\u2011flight CLI calls, exact flag sets for put\u2011lifecycle\u2011hook, record\u2011lifecycle\u2011action\u2011heartbeat, warm\u2011pool configuration, and capacity\u2011rebalance enablement. The mindset section explains why hooks are timers, not gates. Lacks a formal rollback procedure for destructive actions (e.g., delete\u2011hook), hence a small deduction."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Robust NEVER list with concrete pitfalls and reasons (e.g., never use default 3600s timeout, never omit autoscaling:CompleteLifecycleAction permission, never delete a hook while instances are in wait). Missing a few niche anti\u2011patterns such as forgetting to set the Lambda\u2019s trust policy for autoscaling.amazonaws.com, so not perfect."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Complete frontmatter, clear description, extensive keywords, activation_triggers, and a well\u2011defined invocation_schema. The only shortfall is that activation triggers are a long list that could cause false positives, but overall the spec is solid."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns). However, some critical rules (e.g., the NEVER list) are buried deep, and the initial sections are dense, causing potential cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive operations are gated by a mandatory CONFIRM prompt and extensive pre\u2011checks; creative tasks are given freedom. Missing explicit guidance on how to abort or roll back after a CONFIRM \u2018yes\u2019 if a CLI call fails, leading to a minor deduction."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns) that aligns with other CloudOps skills. Slight deviation in ordering of sections (quick reference before mindset) prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, verification steps, and worked examples that an agent could execute. Lacks explicit error\u2011handling for CLI failures, pagination edge\u2011cases, and rollback steps for failed operations, which could cause execution gaps."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 37760,
+  "latency_ms": 30276,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}
