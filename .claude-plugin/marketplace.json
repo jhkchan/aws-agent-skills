@@ -1,267 +1,18 @@
 {
-  "name": "aws-agent-skills",
-  "owner": {
-    "name": "Jacky Chan",
-    "url": "https://github.com/jhkchan/aws-agent-skills"
-  },
-  "metadata": {
-    "description": "Eval-backed AWS CloudOps agent skills \u2014 240 skills across 6 task types",
-    "version": "2.1.0"
-  },
-  "plugins": [
-    {
-      "name": "aws-agent-skills",
-      "description": "79 eval-backed AWS CloudOps auditor skills across all 12 CloudOps families",
-      "source": "./",
-      "skills": [
-        "./skills/accessanalyzer-finding-triage",
-        "./skills/acm-certificate-expiry-auditor",
-        "./skills/apigateway-resource-policy-auditor",
-        "./skills/athena-workgroup-auditor",
-        "./skills/auditmanager-assessment-auditor",
-        "./skills/autoscaling-group-auditor",
-        "./skills/aws-orchestrator",
-        "./skills/backup-plan-auditor",
-        "./skills/bedrock-guardrail-coverage-auditor",
-        "./skills/bedrock-model-access-inventory",
-        "./skills/billing-account-auditor",
-        "./skills/budgets-auditor",
-        "./skills/ce-cost-anomaly-auditor",
-        "./skills/cleanrooms-collaboration-auditor",
-        "./skills/cloudfront-distribution-auditor",
-        "./skills/cloudhsm-cluster-posture-auditor",
-        "./skills/cloudtrail-org-trail-auditor",
-        "./skills/cloudwatch-alarm-auditor",
-        "./skills/cloudwatch-logs-retention-auditor",
-        "./skills/codebuild-project-auditor",
-        "./skills/codecommit-repository-auditor",
-        "./skills/codedeploy-deployment-group-auditor",
-        "./skills/codepipeline-pipeline-auditor",
-        "./skills/cognito-idp-user-pool-auditor",
-        "./skills/compute-optimizer-findings-auditor",
-        "./skills/config-recorder-coverage-auditor",
-        "./skills/controltower-control-auditor",
-        "./skills/cost-optimization-hub-recommendations-auditor",
-        "./skills/cur-cost-usage-report-auditor",
-        "./skills/detective-investigation-coverage-auditor",
-        "./skills/directconnect-auditor",
-        "./skills/dlm-lifecycle-policy-auditor",
-        "./skills/dms-replication-task-auditor",
-        "./skills/dynamodb-table-auditor",
-        "./skills/ebs-volume-auditor",
-        "./skills/ec2-security-group-auditor",
-        "./skills/ecr-repository-auditor",
-        "./skills/ecs-task-definition-auditor",
-        "./skills/efs-filesystem-auditor",
-        "./skills/eks-cluster-auditor",
-        "./skills/elbv2-load-balancer-auditor",
-        "./skills/emr-cluster-auditor",
-        "./skills/eventbridge-bus-policy-auditor",
-        "./skills/firehose-delivery-stream-auditor",
-        "./skills/firewall-manager-compliance-auditor",
-        "./skills/glue-crawler-job-auditor",
-        "./skills/guardduty-finding-severity-triage",
-        "./skills/health-event-auditor",
-        "./skills/iam-least-privilege-advisor",
-        "./skills/inspector2-coverage-finding-auditor",
-        "./skills/kinesis-stream-auditor",
-        "./skills/kms-key-policy-auditor",
-        "./skills/lakeformation-data-lake-auditor",
-        "./skills/lambda-runtime-deprecation-auditor",
-        "./skills/macie-data-classification-auditor",
-        "./skills/msk-cluster-auditor",
-        "./skills/network-firewall-rule-auditor",
-        "./skills/networkmanager-core-network-auditor",
-        "./skills/opensearch-domain-auditor",
-        "./skills/organizations-scp-auditor",
-        "./skills/rds-instance-auditor",
-        "./skills/redshift-cluster-auditor",
-        "./skills/resiliencehub-app-assessment-auditor",
-        "./skills/route53-record-auditor",
-        "./skills/s3-public-access-auditor",
-        "./skills/sagemaker-endpoint-auditor",
-        "./skills/secretsmanager-rotation-auditor",
-        "./skills/securityhub-control-compliance-auditor",
-        "./skills/service-quotas-usage-auditor",
-        "./skills/shield-advanced-coverage-auditor",
-        "./skills/sns-topic-public-subscription-auditor",
-        "./skills/sqs-dlq-policy-auditor",
-        "./skills/ssm-managed-instance-auditor",
-        "./skills/stepfunctions-statemachine-auditor",
-        "./skills/sts-cross-account-role-auditor",
-        "./skills/trustedadvisor-check-auditor",
-        "./skills/verified-permissions-policy-auditor",
-        "./skills/vpc-lattice-auth-auditor",
-        "./skills/wafv2-web-acl-auditor",
-        "./skills/wellarchitected-workload-auditor",
-        "./skills/ec2-rightsizing-optimizer",
-        "./skills/ecs-task-troubleshooter",
-        "./skills/iam-permission-troubleshooter",
-        "./skills/iam-role-deployer",
-        "./skills/lambda-function-deployer",
-        "./skills/rds-backup-restore-operator",
-        "./skills/rds-connectivity-troubleshooter",
-        "./skills/s3-lifecycle-optimizer",
-        "./skills/s3-secure-bucket-deployer",
-        "./skills/vpc-network-deployer",
-        "./skills/apigateway-rest-deployer",
-        "./skills/cloudfront-cache-troubleshooter",
-        "./skills/cloudfront-distribution-deployer",
-        "./skills/dynamodb-table-deployer",
-        "./skills/dynamodb-throttling-troubleshooter",
-        "./skills/lambda-invocation-troubleshooter",
-        "./skills/nat-gateway-cost-optimizer",
-        "./skills/rds-cost-optimizer",
-        "./skills/rds-instance-deployer",
-        "./skills/vpc-connectivity-troubleshooter",
-        "./skills/auto-remediation-automator",
-        "./skills/cicd-pipeline-automator",
-        "./skills/cloudwatch-alarm-operator",
-        "./skills/ec2-backup-operator",
-        "./skills/eks-upgrade-operator",
-        "./skills/event-driven-automator",
-        "./skills/iac-template-automator",
-        "./skills/incident-response-automator",
-        "./skills/secrets-rotation-operator",
-        "./skills/ssm-patch-operator",
-        "./skills/alb-5xx-troubleshooter",
-        "./skills/apigateway-5xx-troubleshooter",
-        "./skills/dynamodb-backup-operator",
-        "./skills/lambda-cost-optimizer",
-        "./skills/s3-access-troubleshooter",
-        "./skills/s3-version-cleanup-operator",
-        "./skills/sns-topic-deployer",
-        "./skills/sqs-queue-deployer",
-        "./skills/stepfunctions-statemachine-deployer",
-        "./skills/ebs-volume-optimizer",
-        "./skills/cloudfront-cost-optimizer",
-        "./skills/cloudtrail-gap-troubleshooter",
-        "./skills/data-transfer-optimizer",
-        "./skills/eks-pod-troubleshooter",
-        "./skills/elasticache-cache-deployer",
-        "./skills/eventbridge-rule-deployer",
-        "./skills/kms-key-rotation-operator",
-        "./skills/opensearch-domain-deployer",
-        "./skills/route53-failover-operator",
-        "./skills/ssm-association-troubleshooter",
-        "./skills/aurora-failover-operator",
-        "./skills/cloudwatch-dashboard-deployer",
-        "./skills/cloudwatch-metrics-troubleshooter",
-        "./skills/config-rule-deployer",
-        "./skills/ecs-fargate-deployer",
-        "./skills/eks-cost-optimizer",
-        "./skills/kms-key-deployer",
-        "./skills/s3-replication-operator",
-        "./skills/stepfunctions-execution-troubleshooter",
-        "./skills/tag-governance-automator",
-        "./skills/aurora-cost-optimizer",
-        "./skills/cloudformation-stack-troubleshooter",
-        "./skills/codepipeline-failure-troubleshooter",
-        "./skills/dr-failover-automator",
-        "./skills/ec2-instance-recovery-operator",
-        "./skills/glue-job-troubleshooter",
-        "./skills/multi-account-governance-automator",
-        "./skills/rds-parameter-group-deployer",
-        "./skills/s3-batch-operations-operator",
-        "./skills/wafv2-web-acl-deployer",
-        "./skills/appmesh-deployer",
-        "./skills/athena-query-optimizer",
-        "./skills/backup-vault-operator",
-        "./skills/cognito-user-pool-deployer",
-        "./skills/cost-anomaly-response-automator",
-        "./skills/guardduty-finding-investigator",
-        "./skills/kafka-connect-troubleshooter",
-        "./skills/kafka-msk-troubleshooter",
-        "./skills/transfer-family-deployer",
-        "./skills/securityhub-finding-troubleshooter",
-        "./skills/amazon-mq-broker-deployer",
-        "./skills/grafana-dashboard-deployer",
-        "./skills/kinesis-firehose-troubshooter",
-        "./skills/macie-data-discovery-operator",
-        "./skills/opensearch-migration-operator",
-        "./skills/redshift-cluster-optimizer",
-        "./skills/route53-routing-policy-deployer",
-        "./skills/s3-access-points-deployer",
-        "./skills/sagemaker-endpoint-deployer",
-        "./skills/ssm-session-manager-troubshooter",
-        "./skills/budget-deployer",
-        "./skills/cloudwatch-application-signals-deployer",
-        "./skills/cloudwatch-synthetics-troubleshooter",
-        "./skills/codeartifact-repository-deployer",
-        "./skills/dynamodb-global-tables-operator",
-        "./skills/fis-experiment-deployer",
-        "./skills/organizations-scp-deployer",
-        "./skills/s3-glacier-restore-operator",
-        "./skills/service-catalog-portfolio-deployer",
-        "./skills/devops-guru-troubleshooter",
-        "./skills/amplify-app-deployer",
-        "./skills/apprunner-service-deployer",
-        "./skills/autoscaling-policy-deployer",
-        "./skills/backup-compliance-automator",
-        "./skills/cloudtrail-lake-operator",
-        "./skills/datasync-task-operator",
-        "./skills/health-event-automator",
-        "./skills/inspector2-finding-troubleshooter",
-        "./skills/s3-object-lambda-deployer",
-        "./skills/xray-tracing-deployer",
-        "./skills/cloudformation-drift-troubleshooter",
-        "./skills/cloudfront-response-headers-deployer",
-        "./skills/cur-automation-automator",
-        "./skills/elasticache-cost-optimizer",
-        "./skills/globalaccelerator-deployer",
-        "./skills/lightsail-instance-deployer",
-        "./skills/msk-cost-optimizer",
-        "./skills/opensearch-serverless-deployer",
-        "./skills/pinpoint-campaign-deployer",
-        "./skills/sagemaker-training-job-operator",
-        "./skills/clb-to-alb-migration-operator",
-        "./skills/cloudfront-invalidation-operator",
-        "./skills/config-aggregator-deployer",
-        "./skills/dms-task-troubleshooter",
-        "./skills/memorydb-cluster-deployer",
-        "./skills/neptune-db-cluster-deployer",
-        "./skills/ram-resource-share-deployer",
-        "./skills/route53-resolver-deployer",
-        "./skills/s3-transfer-acceleration-operator",
-        "./skills/ssm-patch-baseline-deployer",
-        "./skills/acm-certificate-deployer",
-        "./skills/appconfig-deployment-operator",
-        "./skills/cloudwatch-logs-insights-troubshooter",
-        "./skills/eventbridge-pipe-deployer",
-        "./skills/fargate-cost-optimizer",
-        "./skills/lambda-layer-deployer",
-        "./skills/organizations-account-deployer",
-        "./skills/sagemaker-model-registry-operator",
-        "./skills/transit-gateway-deployer",
-        "./skills/cloudformation-stackset-deployer",
-        "./skills/cloudwatch-alarm-notification-automator",
-        "./skills/dynamodb-autoscaling-deployer",
-        "./skills/ec2-spot-fleet-deployer",
-        "./skills/inspector2-coverage-operator",
-        "./skills/lambda-alias-deployer",
-        "./skills/managed-blockchain-deployer",
-        "./skills/s3-intelligent-tiering-optimizer",
-        "./skills/sns-subscription-operator",
-        "./skills/sqs-dlq-operator",
-        "./skills/apigateway-http-api-deployer",
-        "./skills/backup-cross-region-operator",
-        "./skills/cloudwatch-rum-deployer",
-        "./skills/codepipeline-v2-deployer",
-        "./skills/ec2-launch-template-deployer",
-        "./skills/efs-access-point-deployer",
-        "./skills/emr-serverless-deployer",
-        "./skills/redshift-serverless-deployer",
-        "./skills/s3-bucket-policy-deployer",
-        "./skills/stepfunctions-express-deployer",
-        "./skills/wellarchitected-review-operator"
-      ],
-      "skill_count": 90
-    }
-  ],
+  "name": "AWS CloudOps Agent Skills",
+  "description": "405 eval-backed AWS CloudOps agent skills across 13 service families and 6 task types",
+  "version": "1.0.0",
+  "author": "Jacky Chan \u2014 AWS Community Builder",
+  "license": "Apache-2.0",
+  "skill_count": 406,
   "skills": [
     {
       "name": "accessanalyzer-finding-triage",
       "description": "Triages IAM Access Analyzer findings (external access + unused access) into risk verdicts with remed"
+    },
+    {
+      "name": "account-factory-deployer",
+      "description": "Deploys AWS Control Tower Account Factory accounts with production defaults: account creation via Se"
     },
     {
       "name": "acm-certificate-deployer",
@@ -272,8 +23,16 @@
       "description": "Audits AWS Certificate Manager (ACM) certificates for expiry risk, renewal health, validation method"
     },
     {
+      "name": "acm-private-ca-deployer",
+      "description": "Provisions AWS Private Certificate Authority (ACM PCA) with production defaults: CA creation (root v"
+    },
+    {
       "name": "alb-5xx-troubleshooter",
       "description": "Diagnoses ALB and NLB 5xx errors (500 InternalServerError, 502 BadGateway, 503 ServiceUnavailable, 5"
+    },
+    {
+      "name": "alb-unhealthy-target-troubleshooter",
+      "description": "Diagnoses ALB target health check failures through a ten-category diagnostic tree: health check path"
     },
     {
       "name": "amazon-mq-broker-deployer",
@@ -282,6 +41,10 @@
     {
       "name": "amplify-app-deployer",
       "description": "Provisions AWS Amplify applications with production defaults: Git-based deployments (CodeCommit, Git"
+    },
+    {
+      "name": "amplify-branch-deployer",
+      "description": "Configures AWS Amplify branch deployments with production defaults: app creation from a Git reposito"
     },
     {
       "name": "apigateway-5xx-troubleshooter",
@@ -304,6 +67,14 @@
       "description": "Provisions production-grade API Gateway REST APIs with correct resource/method models, AWS_PROXY Lam"
     },
     {
+      "name": "apigateway-throttle-optimizer",
+      "description": "Optimises AWS API Gateway throttle and cost across seven dimensions: API type selection (REST $3.50/"
+    },
+    {
+      "name": "apigateway-websocket-deployer",
+      "description": "Provisions Amazon API Gateway WebSocket APIs with production defaults: route selection expression ($"
+    },
+    {
       "name": "appconfig-deployer",
       "description": "Provisions AWS AppConfig resources with production defaults: application creation, environments, con"
     },
@@ -316,8 +87,20 @@
       "description": "Provisions production-grade AWS App Mesh service meshes \u2014 mesh with egress filter (DROP_ALL vs ALLOW"
     },
     {
+      "name": "appmesh-virtual-service-deployer",
+      "description": "Provisions AWS App Mesh virtual service layer resources with production defaults: service mesh creat"
+    },
+    {
+      "name": "apprunner-autoscaling-optimizer",
+      "description": "Optimises AWS App Runner autoscaling configuration for cost and performance \u2014 auto-scaling configura"
+    },
+    {
       "name": "apprunner-service-deployer",
-      "description": ""
+      "description": "Deploys AWS App Runner services with production-grade configuration: source selection (ECR image vs "
+    },
+    {
+      "name": "athena-query-failure-troubleshooter",
+      "description": "Diagnoses Amazon Athena query failures through a thirteen-category diagnostic tree: S3 bucket access"
     },
     {
       "name": "athena-query-optimizer",
@@ -333,7 +116,7 @@
     },
     {
       "name": "aurora-cost-optimizer",
-      "description": ""
+      "description": "Optimises Amazon Aurora cluster cost across seven dimensions \u2014 instance-class right-sizing for Auror"
     },
     {
       "name": "aurora-failover-operator",
@@ -348,8 +131,16 @@
       "description": "Audits AWS Auto Scaling Groups for launch-template health (legacy launch configuration, IMDSv2), ELB"
     },
     {
+      "name": "autoscaling-lifecycle-operator",
+      "description": "Operates EC2 Auto Scaling lifecycle hook workflows end-to-end \u2014 launch lifecycle hook management (pe"
+    },
+    {
       "name": "autoscaling-policy-deployer",
       "description": "Provisions Amazon EC2 Auto Scaling policies and surrounding primitives with production defaults: tar"
+    },
+    {
+      "name": "backup-audit-automator",
+      "description": "Automates AWS Backup audit and compliance reporting with production defaults: backup report plan cre"
     },
     {
       "name": "backup-compliance-automator",
@@ -362,6 +153,14 @@
     {
       "name": "backup-plan-auditor",
       "description": "Audits AWS Backup plans for coverage gaps (empty or missing resource selections), vault risks (missi"
+    },
+    {
+      "name": "backup-schedule-automator",
+      "description": "Designs and implements automated AWS Backup scheduling workflows using backup plans, tag-based resou"
+    },
+    {
+      "name": "backup-vault-compliance-automator",
+      "description": "Designs and implements AWS Backup vault compliance automation workflows. Enforces vault policies (de"
     },
     {
       "name": "backup-vault-deployer",
@@ -388,8 +187,16 @@
       "description": "Audits Amazon Bedrock model access posture \u2014 invocation logging coverage (S3/CloudWatch/DataFirehose"
     },
     {
+      "name": "bedrock-model-cost-optimizer",
+      "description": "Optimises Amazon Bedrock inference cost across seven dimensions: model selection (Claude Haiku is ~6"
+    },
+    {
       "name": "billing-account-auditor",
       "description": "Audits AWS account billing posture across five dimensions \u2014 root account security (MFA + access keys"
+    },
+    {
+      "name": "budget-action-automator",
+      "description": "Designs and deploys AWS Budgets automated actions \u2014 cost, usage, RI coverage, and RI utilization bud"
     },
     {
       "name": "budget-deployer",
@@ -404,8 +211,12 @@
       "description": "Audits AWS Cost Explorer (CE) anomaly-detection subscriptions, Savings Plan/RI coverage gaps, idle-r"
     },
     {
+      "name": "certificate-renewal-automator",
+      "description": "Designs and implements ACM certificate renewal automation pipelines. Detects expiring certificates v"
+    },
+    {
       "name": "cicd-pipeline-automator",
-      "description": ""
+      "description": "Designs and implements AWS-native CI/CD pipelines end-to-end using CodePipeline, CodeBuild, CodeDepl"
     },
     {
       "name": "clb-to-alb-migration-operator",
@@ -416,8 +227,24 @@
       "description": "Audits AWS Clean Rooms collaborations for membership-status gaps (INVITED or REMOVED members), priva"
     },
     {
+      "name": "client-vpn-endpoint-deployer",
+      "description": "Provisions AWS Client VPN endpoints with production defaults: mutual TLS certificate auth via ACM, A"
+    },
+    {
+      "name": "cloud9-environment-deployer",
+      "description": "Provisions AWS Cloud9 environments with production defaults: EC2 instance type selection, platform ("
+    },
+    {
+      "name": "cloudformation-cfn-lint-operator",
+      "description": "Operates CloudFormation template linting and validation with production defaults: cfn-lint integrati"
+    },
+    {
       "name": "cloudformation-drift-troubleshooter",
       "description": "Diagnoses AWS CloudFormation stack drift \u2014 resources whose actual configuration diverged from the te"
+    },
+    {
+      "name": "cloudformation-stack-rollback-troubleshooter",
+      "description": "Diagnoses AWS CloudFormation stack rollback failures through a rollback-focused decision tree: UPDAT"
     },
     {
       "name": "cloudformation-stack-troubleshooter",
@@ -428,12 +255,16 @@
       "description": "Provisions AWS CloudFormation StackSets with production defaults: StackSet creation (template, param"
     },
     {
+      "name": "cloudfront-502-troubleshooter",
+      "description": "Diagnoses CloudFront 502 and 504 errors via a fourteen-layer decision tree covering origin connectio"
+    },
+    {
       "name": "cloudfront-cache-troubleshooter",
       "description": "Diagnoses CloudFront caching issues via a symptom-to-cause decision tree covering cache misses on ev"
     },
     {
       "name": "cloudfront-cost-optimizer",
-      "description": ""
+      "description": "Optimizes CloudFront distribution costs across nine cost dimensions \u2014 Price Class (PriceClass_100 vs"
     },
     {
       "name": "cloudfront-distribution-auditor",
@@ -452,12 +283,28 @@
       "description": "Provisions CloudFront KeyValueStore (KVS) with production defaults: KVS creation and key-value pair "
     },
     {
+      "name": "cloudfront-origin-access-control-deployer",
+      "description": "Provisions Amazon CloudFront Origin Access Control (OAC) with production defaults: OAC creation (cre"
+    },
+    {
       "name": "cloudfront-response-headers-deployer",
       "description": "Provisions CloudFront response headers policies with secure defaults: security headers (Content-Secu"
     },
     {
+      "name": "cloudhsm-cluster-deployer",
+      "description": "Provisions AWS CloudHSM clusters with production defaults: cluster creation in a VPC with subnets ac"
+    },
+    {
       "name": "cloudhsm-cluster-posture-auditor",
       "description": "Audits AWS CloudHSM clusters for high-availability posture (HSM count and cross-AZ distribution), ba"
+    },
+    {
+      "name": "cloudtrail-alert-automator",
+      "description": "Designs and deploys CloudTrail alerting automation across an AWS estate. Builds EventBridge rules fo"
+    },
+    {
+      "name": "cloudtrail-cost-optimizer",
+      "description": "Optimises AWS CloudTrail cost across seven dimensions: trail consolidation (single organization trai"
     },
     {
       "name": "cloudtrail-gap-troubleshooter",
@@ -466,6 +313,14 @@
     {
       "name": "cloudtrail-lake-operator",
       "description": "Operates AWS CloudTrail Lake end-to-end \u2014 Event Data Store (EDS) creation with the full ingestion su"
+    },
+    {
+      "name": "cloudtrail-lake-query-deployer",
+      "description": "Provisions AWS CloudTrail Lake with production defaults: event data store (EDS) creation, ingestion "
+    },
+    {
+      "name": "cloudtrail-missing-events-troubleshooter",
+      "description": "Diagnoses AWS CloudTrail missing-events incidents across eleven failure categories: trail logging in"
     },
     {
       "name": "cloudtrail-org-trail-auditor",
@@ -484,8 +339,20 @@
       "description": "Operates CloudWatch alarm lifecycles safely \u2014 creates static-threshold, metric-math, anomaly-detecti"
     },
     {
+      "name": "cloudwatch-alarm-troubleshooter",
+      "description": "Diagnoses CloudWatch alarm issues through a nine-category diagnostic tree: alarm stuck in INSUFFICIE"
+    },
+    {
+      "name": "cloudwatch-anomaly-detector-deployer",
+      "description": "Deploys Amazon CloudWatch Anomaly Detection models on AWS metrics with production defaults: anomaly "
+    },
+    {
       "name": "cloudwatch-application-signals-deployer",
-      "description": ""
+      "description": "Enables CloudWatch Application Signals on ECS / EKS / EC2 / Lambda with auto-instrumentation (Java, "
+    },
+    {
+      "name": "cloudwatch-application-signals-operator",
+      "description": "Operates AWS CloudWatch Application Signals with production defaults: enablement via OpenTelemetry ("
     },
     {
       "name": "cloudwatch-cross-account-observability-deployer",
@@ -496,12 +363,28 @@
       "description": "Provisions CloudWatch dashboards with widget layouts, metric selections, and sharing models. Covers "
     },
     {
+      "name": "cloudwatch-dashboards-operator",
+      "description": "Operates Amazon CloudWatch dashboards end-to-end \u2014 dashboard creation and update via JSON model (Put"
+    },
+    {
+      "name": "cloudwatch-logs-cost-optimizer",
+      "description": "Optimises Amazon CloudWatch Logs cost across six dimensions: log group retention (Never expire is th"
+    },
+    {
       "name": "cloudwatch-logs-insights-troubshooter",
       "description": "Diagnoses CloudWatch Logs Insights problems across six categories: query returns no results (wrong l"
     },
     {
+      "name": "cloudwatch-logs-not-ingesting-troubleshooter",
+      "description": "Diagnoses CloudWatch Logs not-ingesting scenarios through a thirteen-category diagnostic tree: log g"
+    },
+    {
       "name": "cloudwatch-logs-retention-auditor",
       "description": "Audits CloudWatch Logs log groups for Never-expire retention (silent infinite-cost accumulation), mi"
+    },
+    {
+      "name": "cloudwatch-metric-stream-deployer",
+      "description": "Deploys Amazon CloudWatch Metric Streams with production defaults: stream creation (name, output for"
     },
     {
       "name": "cloudwatch-metrics-troubleshooter",
@@ -516,8 +399,16 @@
       "description": "Diagnoses CloudWatch Synthetics canary failures via a symptom-to-cause decision tree covering all fi"
     },
     {
+      "name": "codeartifact-domain-deployer",
+      "description": "Provisions AWS CodeArtifact domains with production defaults: domain creation (create-domain), repos"
+    },
+    {
       "name": "codeartifact-repository-deployer",
-      "description": ""
+      "description": "Provisions AWS CodeArtifact repositories: domain creation, repository creation across package format"
+    },
+    {
+      "name": "codebuild-build-troubleshooter",
+      "description": "Diagnoses AWS CodeBuild build failures through a stopped-phase-first diagnostic tree: BUILD_CONTAINE"
     },
     {
       "name": "codebuild-project-auditor",
@@ -548,6 +439,14 @@
       "description": "Provisions production-grade CodePipeline V2-type pipelines with event-driven triggers (no polling), "
     },
     {
+      "name": "cognito-auth-troubleshooter",
+      "description": "Diagnoses Amazon Cognito authentication failures through a twelve-category diagnostic tree: User Poo"
+    },
+    {
+      "name": "cognito-identity-pool-deployer",
+      "description": "Provisions Amazon Cognito Identity Pools (federated identities) with production defaults: identity p"
+    },
+    {
       "name": "cognito-idp-user-pool-auditor",
       "description": "Audits Amazon Cognito user pools for security posture \u2014 MFA enforcement, password policy strength, a"
     },
@@ -556,24 +455,40 @@
       "description": "Provisions Amazon Cognito user pools with secure defaults \u2014 user pool attributes (standard and custo"
     },
     {
+      "name": "comprehend-classifier-deployer",
+      "description": "Provisions Amazon Comprehend custom document classifiers with production defaults: multi-class vs mu"
+    },
+    {
       "name": "compute-optimizer-findings-auditor",
       "description": "Audits AWS Compute Optimizer findings for EC2, EBS, Lambda, Auto Scaling Group, and ECS resources \u2014 "
     },
     {
       "name": "config-aggregator-deployer",
-      "description": ""
+      "description": "Provisions AWS Config aggregators with correct production defaults: organization aggregator (AWS Org"
     },
     {
       "name": "config-recorder-coverage-auditor",
       "description": "Audits AWS Config posture across all four coverage layers \u2014 configuration recorder (existence, statu"
     },
     {
+      "name": "config-rule-compliance-automator",
+      "description": "Designs and deploys AWS Config rule compliance automation across an AWS estate. Selects from 80+ man"
+    },
+    {
       "name": "config-rule-deployer",
       "description": "Provisions AWS Config rules with compliance coverage: managed rules (100+ AWS-managed like s3-bucket"
     },
     {
+      "name": "connect-instance-deployer",
+      "description": "Provisions Amazon Connect instances, contact flows, queues, routing profiles, phone numbers, and int"
+    },
+    {
       "name": "controltower-control-auditor",
       "description": "Audits AWS Control Tower landing-zone state, enabled controls (preventive, detective, proactive), gu"
+    },
+    {
+      "name": "cost-anomaly-detection-automator",
+      "description": "Designs and implements automated AWS Cost Anomaly Detection workflows spanning Cost Anomaly Monitor "
     },
     {
       "name": "cost-anomaly-response-automator",
@@ -593,11 +508,19 @@
     },
     {
       "name": "data-transfer-optimizer",
-      "description": ""
+      "description": "Optimizes AWS data transfer costs across seven dimensions \u2014 cross-AZ transfer ($0.01/GB each directi"
+    },
+    {
+      "name": "dataexchange-dataset-deployer",
+      "description": "Deploys AWS Data Exchange data sets with production defaults: subscription creation (data product fr"
     },
     {
       "name": "datasync-task-operator",
-      "description": ""
+      "description": "Operates AWS DataSync task end-to-end \u2014 agent deployment (on-prem VM, EC2), location configuration f"
+    },
+    {
+      "name": "datazone-domain-deployer",
+      "description": "Provisions Amazon DataZone data domains with production defaults: domain creation (create-datazone-d"
     },
     {
       "name": "detective-investigation-coverage-auditor",
@@ -612,8 +535,16 @@
       "description": "Audits AWS Direct Connect (DX) topology for resilience and security posture \u2014 physical-layer redunda"
     },
     {
+      "name": "directory-service-deployer",
+      "description": "Provisions AWS Directory Service with production defaults: directory type selection (Managed Microso"
+    },
+    {
       "name": "dlm-lifecycle-policy-auditor",
       "description": "Audits AWS Data Lifecycle Manager (DLM) EBS snapshot lifecycle policies for coverage gaps and silent"
+    },
+    {
+      "name": "dms-endpoint-deployer",
+      "description": "Provisions AWS DMS endpoints with production defaults: source endpoint (Oracle, MySQL, PostgreSQL, S"
     },
     {
       "name": "dms-replication-task-auditor",
@@ -624,8 +555,16 @@
       "description": "Diagnoses AWS Database Migration Service (DMS) replication task failures through a systematic diagno"
     },
     {
+      "name": "documentdb-cluster-deployer",
+      "description": "Provisions Amazon DocumentDB (MongoDB compatibility) clusters with production defaults: cluster crea"
+    },
+    {
       "name": "dr-failover-automator",
       "description": "Designs AWS disaster recovery failover automation across the four DR strategies (backup & restore, p"
+    },
+    {
+      "name": "drift-detection-automator",
+      "description": "Designs and implements automated CloudFormation drift detection workflows across single-account and "
     },
     {
       "name": "dynamodb-autoscaling-deployer",
@@ -634,6 +573,10 @@
     {
       "name": "dynamodb-backup-operator",
       "description": "Operates DynamoDB backup and restore workflows safely \u2014 on-demand backups via create-backup, point-i"
+    },
+    {
+      "name": "dynamodb-capacity-optimizer",
+      "description": "Optimises DynamoDB table cost across seven dimensions: on-demand vs provisioned capacity mode crosso"
     },
     {
       "name": "dynamodb-global-tables-operator",
@@ -646,6 +589,10 @@
     {
       "name": "dynamodb-table-deployer",
       "description": "Provisions DynamoDB tables with production-grade defaults: partition key design (random suffix, comp"
+    },
+    {
+      "name": "dynamodb-throttling-optimizer",
+      "description": "Optimises DynamoDB throttling prevention across eight dimensions: partition key design (hot partitio"
     },
     {
       "name": "dynamodb-throttling-troubleshooter",
@@ -668,8 +615,16 @@
       "description": "Operates EC2 instance recovery \u2014 system status check failure (hardware degradation, stop/start, EC2 "
     },
     {
+      "name": "ec2-instance-rightsizer",
+      "description": "Right-sizes EC2 instances for cost optimization using a utilization-driven decision matrix across CP"
+    },
+    {
       "name": "ec2-launch-template-deployer",
       "description": "Provisions EC2 Launch Templates with production defaults: AMI and architecture validation (x86_64 / "
+    },
+    {
+      "name": "ec2-reserved-capacity-optimizer",
+      "description": "Optimizes EC2 Reserved Instance and Savings Plans commitments across seven dimensions: RI utilizatio"
     },
     {
       "name": "ec2-rightsizing-optimizer",
@@ -684,12 +639,32 @@
       "description": "Provisions EC2 Spot Fleets with production defaults: launch template configuration, Spot Fleet reque"
     },
     {
+      "name": "ec2-spot-interruption-operator",
+      "description": "Operates Amazon EC2 Spot Instance interruption handling workflows end-to-end \u2014 EventBridge Instance "
+    },
+    {
+      "name": "ecr-push-pull-troubleshooter",
+      "description": "Diagnoses Amazon ECR push and pull failures through a fourteen-category diagnostic tree: authenticat"
+    },
+    {
+      "name": "ecr-replication-deployer",
+      "description": "Provisions Amazon ECR cross-region and cross-account replication with production defaults: registry-"
+    },
+    {
       "name": "ecr-repository-auditor",
       "description": "Audits AWS ECR private repositories for public-access exposure via repositoryPolicy, image-scan conf"
     },
     {
+      "name": "ecs-cluster-autoscaling-optimizer",
+      "description": "Optimises Amazon ECS cluster autoscaling across eleven dimensions: capacity provider strategy (spot "
+    },
+    {
       "name": "ecs-fargate-deployer",
-      "description": ""
+      "description": "Deploys AWS ECS Fargate services with production-grade configuration: right-sized task definition (C"
+    },
+    {
+      "name": "ecs-task-cost-optimizer",
+      "description": "Optimises Amazon ECS task cost across seven dimensions: launch type selection (Fargate per-second pr"
     },
     {
       "name": "ecs-task-definition-auditor",
@@ -697,7 +672,7 @@
     },
     {
       "name": "ecs-task-troubleshooter",
-      "description": "Diagnoses why AWS ECS tasks fail to start, transition to STOPPED immediately, fail health checks, cr"
+      "description": "Diagnoses AWS ECS task failures via a stoppedReason-first decision tree covering ResourceInitializat"
     },
     {
       "name": "efs-access-point-deployer",
@@ -712,6 +687,10 @@
       "description": "Provisions Amazon EKS add-ons with production defaults: add-on types (vpc-cni, coredns, kube-proxy, "
     },
     {
+      "name": "eks-autoscaling-automator",
+      "description": "Designs and implements EKS cluster autoscaling automation. Compares and deploys Cluster Autoscaler v"
+    },
+    {
       "name": "eks-cluster-auditor",
       "description": "Audits AWS EKS cluster configurations for public API endpoint exposure, disabled control-plane loggi"
     },
@@ -720,12 +699,28 @@
       "description": "Optimizes EKS cluster costs via a layered analysis framework \u2014 right-sizes EC2 managed node groups f"
     },
     {
+      "name": "eks-hybrid-node-deployer",
+      "description": "Provisions Amazon EKS Hybrid Nodes with production defaults: hybrid node IAM role creation, activati"
+    },
+    {
+      "name": "eks-nodegroup-troubleshooter",
+      "description": "Diagnoses Amazon EKS managed node group issues through a node-state- driven diagnostic tree: nodes s"
+    },
+    {
       "name": "eks-pod-troubleshooter",
       "description": "Diagnoses why Kubernetes pods fail on Amazon EKS \u2014 CrashLoopBackOff, ImagePullBackOff / ErrImagePull"
     },
     {
+      "name": "eks-security-optimizer",
+      "description": "Optimises Amazon EKS cluster security posture across eight dimensions: pod security standards (Pod S"
+    },
+    {
       "name": "eks-upgrade-operator",
       "description": "Operates EKS cluster and node group upgrade workflows safely \u2014 pre- upgrade checks (current Kubernet"
+    },
+    {
+      "name": "elastic-beanstalk-deployer",
+      "description": "Provisions AWS Elastic Beanstalk environments with production defaults: application creation, enviro"
     },
     {
       "name": "elasticache-cache-deployer",
@@ -737,7 +732,11 @@
     },
     {
       "name": "elasticache-cost-optimizer",
-      "description": ""
+      "description": "Optimises Amazon ElastiCache cost across seven dimensions \u2014 node-type right-sizing (CloudWatch Engin"
+    },
+    {
+      "name": "elb-cost-optimizer",
+      "description": "Optimizes Elastic Load Balancer cost across seven dimensions: ALB vs NLB vs CLB cost comparison and "
     },
     {
       "name": "elbv2-load-balancer-auditor",
@@ -749,7 +748,7 @@
     },
     {
       "name": "emr-serverless-deployer",
-      "description": ""
+      "description": "Deploys Amazon EMR Serverless applications with production-grade configuration: application creation"
     },
     {
       "name": "event-driven-automator",
@@ -768,12 +767,24 @@
       "description": "Provisions Amazon EventBridge rules and targets correctly the first time. Covers event-pattern rules"
     },
     {
+      "name": "eventbridge-rule-not-firing-troubleshooter",
+      "description": "Diagnoses Amazon EventBridge rules that fail to fire through a ten-category diagnostic tree: event p"
+    },
+    {
+      "name": "eventbridge-scheduler-deployer",
+      "description": "Provisions Amazon EventBridge Scheduler schedules with production defaults: schedule creation (rate-"
+    },
+    {
       "name": "fargate-cost-optimizer",
       "description": "Optimises AWS Fargate cost across seven dimensions: task right-sizing (CPU/memory from 28 allowed co"
     },
     {
       "name": "firehose-delivery-stream-auditor",
       "description": "Audits Amazon Kinesis Data Firehose (firehose) delivery streams for encryption-at-rest gaps (explici"
+    },
+    {
+      "name": "firehose-delivery-stream-deployer",
+      "description": "Provisions Kinesis Data Firehose delivery streams with production defaults: source selection (Direct"
     },
     {
       "name": "firewall-manager-compliance-auditor",
@@ -788,12 +799,32 @@
       "description": "Provisions AWS Fault Injection Service (FIS) experiment templates with production-safe defaults: act"
     },
     {
+      "name": "fis-template-deployer",
+      "description": "Provisions AWS Fault Injection Simulator (FIS) experiment templates with production defaults: experi"
+    },
+    {
+      "name": "fsx-filesystem-deployer",
+      "description": "Provisions Amazon FSx file systems with production defaults: FSx for Windows (storage type SSD/HDD, "
+    },
+    {
+      "name": "global-accelerator-endpoint-deployer",
+      "description": "Provisions AWS Global Accelerator with production defaults: accelerator creation with two static any"
+    },
+    {
       "name": "globalaccelerator-deployer",
       "description": "Provisions production-grade AWS Global Accelerator deployments with secure defaults: anycast static "
     },
     {
+      "name": "glue-crawler-deployer",
+      "description": "Provisions AWS Glue Crawlers with production defaults: data source configuration (S3, DynamoDB, JDBC"
+    },
+    {
       "name": "glue-crawler-job-auditor",
       "description": "Audits AWS Glue crawlers and jobs (plus their data-catalog encryption, JDBC connections, IAM executi"
+    },
+    {
+      "name": "glue-job-failure-troubleshooter",
+      "description": "Diagnoses AWS Glue job failures through a fifteen-layer diagnostic tree: ETL script errors (PySpark/"
     },
     {
       "name": "glue-job-troubleshooter",
@@ -802,6 +833,18 @@
     {
       "name": "grafana-dashboard-deployer",
       "description": "Provisions Amazon Managed Grafana workspaces and dashboards with production defaults: workspace crea"
+    },
+    {
+      "name": "grafana-data-source-deployer",
+      "description": "Provisions Amazon Managed Grafana workspaces with production defaults: workspace creation, SAML/SSO "
+    },
+    {
+      "name": "greengrass-component-deployer",
+      "description": "Deploys AWS IoT Greengrass v2 components with production defaults: component recipe YAML (lifecycle "
+    },
+    {
+      "name": "guardduty-finding-automator",
+      "description": "Designs and implements automated response workflows for Amazon GuardDuty findings. Wires EventBridge"
     },
     {
       "name": "guardduty-finding-investigator",
@@ -824,6 +867,10 @@
       "description": "Generates and validates Infrastructure-as-Code templates for common AWS patterns across CloudFormati"
     },
     {
+      "name": "iam-key-rotation-automator",
+      "description": "Designs and implements IAM access key rotation automation pipelines. Detects aged access keys via ge"
+    },
+    {
       "name": "iam-least-privilege-advisor",
       "description": "Analyzes AWS IAM policies to identify over-permissive grants \u2014 wildcard actions, wildcard resources,"
     },
@@ -837,7 +884,11 @@
     },
     {
       "name": "incident-response-automator",
-      "description": ""
+      "description": "Designs automated AWS incident response workflows across detection (GuardDuty, Security Hub, CloudWa"
+    },
+    {
+      "name": "inspector2-automation-automator",
+      "description": "Designs and deploys Amazon Inspector v2 automation workflows \u2014 enabling Inspector across EC2, ECR, a"
     },
     {
       "name": "inspector2-coverage-finding-auditor",
@@ -852,16 +903,28 @@
       "description": "Diagnoses Amazon Inspector v2 vulnerability findings through a finding-type-driven diagnostic tree c"
     },
     {
+      "name": "iot-core-thing-deployer",
+      "description": "Provisions AWS IoT Core things and device pipelines: thing creation, thing type, thing group, device"
+    },
+    {
       "name": "kafka-connect-troubleshooter",
       "description": "Diagnoses Kafka Connect and Amazon MSK Connect issues through a nine-category diagnostic tree \u2014 task"
+    },
+    {
+      "name": "kafka-msk-lag-troubleshooter",
+      "description": "Diagnoses Amazon MSK consumer lag through a ten-category diagnostic tree: consumer-group lag (Record"
     },
     {
       "name": "kafka-msk-troubleshooter",
       "description": "Diagnoses Amazon MSK (Managed Streaming for Apache Kafka) cluster issues via a symptom-to-cause deci"
     },
     {
+      "name": "keyspaces-keyspace-deployer",
+      "description": "Provisions Amazon Keyspaces (Cassandra-compatible) keyspaces and tables with production defaults: ke"
+    },
+    {
       "name": "kinesis-analytics-deployer",
-      "description": ""
+      "description": "Deploys Amazon Kinesis Data Analytics applications (Managed Service for Apache Flink and Studio SQL)"
     },
     {
       "name": "kinesis-firehose-troubshooter",
@@ -877,7 +940,7 @@
     },
     {
       "name": "kms-key-deployer",
-      "description": ""
+      "description": "Provisions AWS KMS keys correctly: key type selection (symmetric AES-256, asymmetric RSA/ECDSA, HMAC"
     },
     {
       "name": "kms-key-policy-auditor",
@@ -888,24 +951,36 @@
       "description": "Operates AWS KMS key rotation workflows end-to-end \u2014 key type classification (AWS-managed, customer-"
     },
     {
+      "name": "kms-key-rotation-optimizer",
+      "description": "Optimises AWS KMS key rotation and lifecycle cost across seven dimensions: key inventory audit (orph"
+    },
+    {
       "name": "lakeformation-data-lake-auditor",
       "description": "Audits AWS Lake Formation data-lake posture for catalog-level super-grants, cross-account principals"
     },
     {
       "name": "lakeformation-permissions-deployer",
-      "description": ""
+      "description": "Deploys AWS Lake Formation permissions with production-grade config: LF-tag based access control (ta"
     },
     {
       "name": "lambda-alias-deployer",
       "description": "Provisions Lambda aliases with production defaults: alias creation pointing to a specific published "
     },
     {
+      "name": "lambda-cold-start-optimizer",
+      "description": "Optimises AWS Lambda cold-start latency across seven dimensions: memory allocation vs initialization"
+    },
+    {
       "name": "lambda-cost-optimizer",
-      "description": ""
+      "description": "Optimises AWS Lambda function cost across six dimensions: memory tuning (CPU scales with memory at 1"
     },
     {
       "name": "lambda-function-deployer",
-      "description": ""
+      "description": "Deploys AWS Lambda functions with production-grade configuration: least-privilege execution IAM role"
+    },
+    {
+      "name": "lambda-function-url-deployer",
+      "description": "Provisions AWS Lambda Function URLs with production defaults: auth mode (AWS_IAM vs NONE), CORS conf"
     },
     {
       "name": "lambda-invocation-troubleshooter",
@@ -916,12 +991,40 @@
       "description": "Provisions AWS Lambda Layers with production defaults: layer creation (zip with dependencies), compa"
     },
     {
+      "name": "lambda-memory-optimizer",
+      "description": "Optimises AWS Lambda memory configuration across six dimensions: memory-to-CPU proportional allocati"
+    },
+    {
       "name": "lambda-runtime-deprecation-auditor",
       "description": "Audits AWS Lambda functions for deprecated/EOL runtimes (python3.9, nodejs16.x, etc.), over-permissi"
     },
     {
+      "name": "lambda-timeout-troubleshooter",
+      "description": "Diagnoses AWS Lambda TaskTimeoutException through a focused timeout decision tree: configured timeou"
+    },
+    {
+      "name": "lex-bot-deployer",
+      "description": "Provisions Amazon Lex V2 conversational bots with production defaults: bot creation (create-bot), lo"
+    },
+    {
+      "name": "license-manager-deployer",
+      "description": "Provisions AWS License Manager configurations with production defaults: license configurations (lice"
+    },
+    {
+      "name": "lightsail-container-deployer",
+      "description": "Provisions Amazon Lightsail Container Services with production defaults: container service creation "
+    },
+    {
       "name": "lightsail-instance-deployer",
       "description": "Provisions production-grade Amazon Lightsail instances with secure defaults: blueprint selection (OS"
+    },
+    {
+      "name": "log-retention-automator",
+      "description": "Designs and implements CloudWatch Logs retention automation workflows. Maps tag-based retention poli"
+    },
+    {
+      "name": "macie-cost-optimizer",
+      "description": "Optimises Amazon Macie cost across seven dimensions: discovery mode selection (automated data discov"
     },
     {
       "name": "macie-data-classification-auditor",
@@ -940,20 +1043,32 @@
       "description": "Provisions Amazon MemoryDB for Redis clusters with production defaults: cluster creation (node type,"
     },
     {
+      "name": "migration-hub-strategy-deployer",
+      "description": "Deploys AWS Migration Hub Strategy Recommendations assessments: assessment creation and group-by-app"
+    },
+    {
       "name": "msk-cluster-auditor",
       "description": "Audits Amazon MSK (Managed Streaming for Kafka) clusters for encryption in-transit (TLS between clie"
     },
     {
       "name": "msk-cost-optimizer",
-      "description": ""
+      "description": "Optimises Amazon MSK cost across seven dimensions \u2014 broker type right-sizing (CloudWatch BytesInPerS"
     },
     {
       "name": "multi-account-governance-automator",
       "description": "Designs AWS multi-account governance automation spanning Organizations (OU hierarchy, account creati"
     },
     {
+      "name": "mwaa-environment-deployer",
+      "description": "Provisions Amazon Managed Workflows for Apache Airflow (MWAA) environments with production defaults:"
+    },
+    {
       "name": "nat-gateway-cost-optimizer",
       "description": "Optimises NAT Gateway cost through traffic analysis, VPC endpoint design, and architecture selection"
+    },
+    {
+      "name": "nat-gateway-traffic-optimizer",
+      "description": "Optimises NAT Gateway cost through traffic analysis (BytesOutToDestination vs BytesInFromDestination"
     },
     {
       "name": "neptune-db-cluster-deployer",
@@ -972,12 +1087,24 @@
       "description": "Audits AWS Network Manager (Cloud WAN) core networks for detached attachments, permissive resource a"
     },
     {
+      "name": "opensearch-alerting-deployer",
+      "description": "Provisions Amazon OpenSearch Service alerting configurations with production defaults: monitor creat"
+    },
+    {
+      "name": "opensearch-cluster-troubleshooter",
+      "description": "Diagnoses Amazon OpenSearch Service cluster incidents across eleven failure categories: ClusterBlock"
+    },
+    {
       "name": "opensearch-domain-auditor",
       "description": "Audits Amazon OpenSearch Service (provisioned, not Serverless) domains for encryption-at-rest (KMS),"
     },
     {
       "name": "opensearch-domain-deployer",
       "description": "Provisions Amazon OpenSearch Service domains with production defaults: deployment type (managed clus"
+    },
+    {
+      "name": "opensearch-index-deployer",
+      "description": "Provisions Amazon OpenSearch Service indices with production defaults: index creation with explicit "
     },
     {
       "name": "opensearch-migration-operator",
@@ -988,36 +1115,68 @@
       "description": "Provisions Amazon OpenSearch Serverless collections with secure defaults \u2014 collection type selection"
     },
     {
+      "name": "opensearch-snapshot-troubleshooter",
+      "description": "Diagnoses Amazon OpenSearch Service snapshot failures through a thirteen-category diagnostic tree: S"
+    },
+    {
       "name": "organizations-account-deployer",
       "description": "Provisions AWS Organizations member accounts with production defaults: account creation (create-acco"
+    },
+    {
+      "name": "organizations-policy-deployer",
+      "description": "Deploys AWS Organizations policy artifacts with production defaults: Service Control Policy (SCP) cr"
     },
     {
       "name": "organizations-scp-auditor",
       "description": "Audits AWS Organizations Service Control Policies (SCPs) for effective permission boundaries across "
     },
     {
-      "name": "organizations-scp-deployer",
-      "description": "Provisions AWS Organizations Service Control Policies (SCPs) with safe defaults: SCP statement struc"
+      "name": "personalize-campaign-deployer",
+      "description": "Deploys Amazon Personalize recommendation pipelines with production defaults: dataset group creation"
     },
     {
       "name": "pinpoint-campaign-deployer",
       "description": "Provisions Amazon Pinpoint campaigns and engagement workflows \u2014 project creation, channels (email, S"
     },
     {
+      "name": "pinpoint-journey-deployer",
+      "description": "Provisions Amazon Pinpoint journeys with production defaults: journey creation (activity-based vs se"
+    },
+    {
+      "name": "polly-voice-deployer",
+      "description": "Deploys Amazon Polly text-to-speech configurations with production defaults: engine selection (stand"
+    },
+    {
+      "name": "qldb-ledger-deployer",
+      "description": "Provisions Amazon QLDB (Quantum Ledger Database) ledgers with production defaults: ledger creation ("
+    },
+    {
+      "name": "quicksight-dashboard-deployer",
+      "description": "Provisions Amazon QuickSight dashboards with production defaults: account creation (Standard/Enterpr"
+    },
+    {
       "name": "ram-resource-share-deployer",
-      "description": ""
+      "description": "Provisions AWS RAM (Resource Access Manager) resource shares with correct production defaults: resou"
     },
     {
       "name": "rds-backup-restore-operator",
       "description": "Operates RDS and Aurora backup and restore workflows safely \u2014 automated backup window configuration,"
     },
     {
+      "name": "rds-bluegreen-deployer",
+      "description": "Deploys Amazon RDS Blue/Green Deployments with production defaults: blue/green creation (create-blue"
+    },
+    {
       "name": "rds-connectivity-troubleshooter",
-      "description": "Diagnoses RDS and Aurora connection failures through a systematic seven-layer diagnostic tree \u2014 conn"
+      "description": "Diagnoses RDS and Aurora connection failures through a bidirectional- SG-first decision tree coverin"
     },
     {
       "name": "rds-cost-optimizer",
       "description": "Optimises RDS and Aurora database cost through instance-class right-sizing (CloudWatch CPUUtilizatio"
+    },
+    {
+      "name": "rds-failover-troubleshooter",
+      "description": "Diagnoses RDS and Aurora failover issues through a thirteen-category diagnostic tree: Multi-AZ failo"
     },
     {
       "name": "rds-instance-auditor",
@@ -1029,11 +1188,19 @@
     },
     {
       "name": "rds-parameter-group-deployer",
-      "description": ""
+      "description": "Provisions RDS DB parameter groups with correct production defaults: family selection (postgres15, m"
     },
     {
       "name": "rds-proxy-deployer",
       "description": "Provisions Amazon RDS Proxy connections with production defaults: connection pooling (create-db-prox"
+    },
+    {
+      "name": "rds-snapshot-operator",
+      "description": "Operates Amazon RDS and Aurora snapshot workflows end-to-end \u2014 automated backup retention (1-35 days"
+    },
+    {
+      "name": "rds-upgrade-operator",
+      "description": "Operates Amazon RDS and Aurora engine upgrade workflows end-to-end \u2014 major version upgrades (explici"
     },
     {
       "name": "redshift-cluster-auditor",
@@ -1044,12 +1211,44 @@
       "description": "Optimises Amazon Redshift cluster cost and performance through node-type selection (RA3 managed-stor"
     },
     {
+      "name": "redshift-data-api-deployer",
+      "description": "Deploys AWS Redshift Data API configurations with production defaults: query execution without persi"
+    },
+    {
+      "name": "redshift-query-troubleshooter",
+      "description": "Diagnoses Amazon Redshift query failures through a twelve-category diagnostic tree: WLM queue timeou"
+    },
+    {
       "name": "redshift-serverless-deployer",
-      "description": ""
+      "description": "Deploys Amazon Redshift Serverless with production-grade configuration: namespace creation (DB name,"
+    },
+    {
+      "name": "redshift-wlm-optimizer",
+      "description": "Optimises Amazon Redshift Workload Management (WLM) across eleven dimensions: WLM queue configuratio"
+    },
+    {
+      "name": "rekognition-collection-deployer",
+      "description": "Provisions Amazon Rekognition face collections and detection pipelines: collection creation with KMS"
     },
     {
       "name": "resiliencehub-app-assessment-auditor",
       "description": "Audits AWS Resilience Hub application assessments for assessment staleness (older than 90 days), res"
+    },
+    {
+      "name": "rolesanywhere-trust-deployer",
+      "description": "Provisions IAM Roles Anywhere trust infrastructure with production defaults: trust anchor creation ("
+    },
+    {
+      "name": "route53-application-recovery-controller-deployer",
+      "description": "Provisions Route 53 Application Recovery Controller (ARC) with production defaults: recovery cluster"
+    },
+    {
+      "name": "route53-cost-optimizer",
+      "description": "Optimises Amazon Route 53 DNS cost across seven dimensions: hosted zone cost reduction (consolidatin"
+    },
+    {
+      "name": "route53-dns-troubleshooter",
+      "description": "Diagnoses Amazon Route 53 DNS resolution failures through a twelve-category diagnostic tree: NS dele"
     },
     {
       "name": "route53-failover-operator",
@@ -1069,7 +1268,11 @@
     },
     {
       "name": "route53-routing-policy-deployer",
-      "description": ""
+      "description": "Provisions Route 53 routing policies and dependent primitives with production defaults: simple, weig"
+    },
+    {
+      "name": "s3-access-denied-troubleshooter",
+      "description": "Diagnoses Amazon S3 Access Denied errors through a thirteen-category diagnostic tree: explicit deny "
     },
     {
       "name": "s3-access-points-deployer",
@@ -1077,7 +1280,7 @@
     },
     {
       "name": "s3-access-troubleshooter",
-      "description": ""
+      "description": "Diagnoses AWS S3 access failures via a systematic six-symptom diagnostic decision tree covering 403 "
     },
     {
       "name": "s3-batch-operations-operator",
@@ -1100,6 +1303,10 @@
       "description": "Optimises S3 storage cost with Intelligent-Tiering: enables bucket-level IntelligentTieringConfigura"
     },
     {
+      "name": "s3-lifecycle-automator",
+      "description": "Designs and implements automated S3 lifecycle policy deployment across single and multi-account envi"
+    },
+    {
       "name": "s3-lifecycle-optimizer",
       "description": "Optimises S3 storage cost through lifecycle-policy design, storage-class selection, and access-patte"
     },
@@ -1108,8 +1315,16 @@
       "description": "Provisions S3 Object Lambda Access Points and the supporting transform Lambda function with producti"
     },
     {
+      "name": "s3-outposts-deployer",
+      "description": "Provisions Amazon S3 on Outposts with production defaults: S3 outpost bucket creation, endpoint (req"
+    },
+    {
+      "name": "s3-performance-optimizer",
+      "description": "Optimises Amazon S3 performance across eleven dimensions: prefix distribution for partition allocati"
+    },
+    {
       "name": "s3-public-access-auditor",
-      "description": ""
+      "description": "Audits S3 bucket configurations (Block Public Access settings, ACLs, bucket policies, Access Points,"
     },
     {
       "name": "s3-replication-operator",
@@ -1117,7 +1332,15 @@
     },
     {
       "name": "s3-secure-bucket-deployer",
-      "description": ""
+      "description": "Provisions S3 buckets with production-grade security defaults: Block Public Access (account + bucket"
+    },
+    {
+      "name": "s3-storage-class-optimizer",
+      "description": "Optimises S3 storage cost across six dimensions: lifecycle policy configuration (Standard to Standar"
+    },
+    {
+      "name": "s3-table-bucket-deployer",
+      "description": "Provisions Amazon S3 Tables (table buckets) with production defaults: table bucket creation (create-"
     },
     {
       "name": "s3-transfer-acceleration-operator",
@@ -1140,8 +1363,16 @@
       "description": "Operates SageMaker Model Registry lifecycles safely \u2014 creates model package groups; registers versio"
     },
     {
+      "name": "sagemaker-pipeline-deployer",
+      "description": "Defines Amazon SageMaker Pipelines for ML workflows with production defaults: step collection (Proce"
+    },
+    {
       "name": "sagemaker-training-job-operator",
       "description": "Operates Amazon SageMaker training jobs end-to-end \u2014 job creation (algorithm spec, input data S3 cha"
+    },
+    {
+      "name": "secrets-manager-rotation-troubleshooter",
+      "description": "Diagnoses AWS Secrets Manager rotation failures through a ten-category diagnostic tree: rotation Lam"
     },
     {
       "name": "secrets-rotation-operator",
@@ -1160,6 +1391,14 @@
       "description": "Diagnoses and resolves AWS Security Hub findings through a standard-driven decision tree covering CI"
     },
     {
+      "name": "securityhub-remediation-automator",
+      "description": "Designs automated remediation workflows for AWS Security Hub findings using EventBridge rules, SSM A"
+    },
+    {
+      "name": "serverlessrepo-application-deployer",
+      "description": "Provisions AWS Serverless Application Repository (SAR) applications with production defaults: SAM te"
+    },
+    {
       "name": "service-catalog-portfolio-deployer",
       "description": "Provisions AWS Service Catalog portfolios and products with production-safe defaults: portfolio crea"
     },
@@ -1176,6 +1415,22 @@
       "description": "Audits AWS Shield Advanced coverage posture \u2014 protected-resource coverage (CloudFront/Route 53 auto-"
     },
     {
+      "name": "signer-signing-profile-deployer",
+      "description": "Provisions AWS Signer signing profiles with production defaults: platform selection (AWSLambda-SHA38"
+    },
+    {
+      "name": "sitewise-asset-deployer",
+      "description": "Deploys AWS IoT SiteWise industrial data infrastructure with production defaults: asset model creati"
+    },
+    {
+      "name": "snowball-edge-deployer",
+      "description": "Deploys AWS Snowball Edge with production defaults: job creation (import vs export), device type sel"
+    },
+    {
+      "name": "sns-delivery-troubleshooter",
+      "description": "Diagnoses SNS delivery failures through a twelve-category diagnostic tree: HTTP/HTTPS endpoint deliv"
+    },
+    {
       "name": "sns-subscription-operator",
       "description": "Operates AWS SNS subscription workflows end-to-end \u2014 subscription creation (HTTP/HTTPS/SQS/Lambda/em"
     },
@@ -1186,6 +1441,10 @@
     {
       "name": "sns-topic-public-subscription-auditor",
       "description": "Audits AWS SNS topics for public subscription exposure (Principal:\"*\" with sns:Subscribe or sns:Publ"
+    },
+    {
+      "name": "sqs-dead-letter-troubleshooter",
+      "description": "Diagnoses Amazon SQS messages accumulating in dead-letter queues through a ten-category diagnostic t"
     },
     {
       "name": "sqs-dlq-operator",
@@ -1204,6 +1463,14 @@
       "description": "Provisions AWS SQS queues with production-grade configuration: correct queue type (Standard vs FIFO)"
     },
     {
+      "name": "sqs-throughput-optimizer",
+      "description": "Optimises AWS SQS queue throughput and cost across seven dimensions: queue type selection (Standard "
+    },
+    {
+      "name": "ssm-association-operator",
+      "description": "Operates AWS Systems Manager (SSM) State Manager associations with production defaults: association "
+    },
+    {
       "name": "ssm-association-troubleshooter",
       "description": "Diagnoses AWS Systems Manager (SSM) association failures via a systematic 5-symptom decision tree: a"
     },
@@ -1220,12 +1487,20 @@
       "description": "Provisions SSM Patch Baselines with secure patch-management defaults \u2014 baseline creation (OS, produc"
     },
     {
+      "name": "ssm-patch-compliance-automator",
+      "description": "Designs and implements SSM Patch Manager automation workflows for EC2 fleets. Creates OS-specific pa"
+    },
+    {
       "name": "ssm-patch-operator",
       "description": "Operates SSM Patch Manager workflows safely \u2014 patch baseline authoring (AWS-managed and custom), pat"
     },
     {
       "name": "ssm-session-manager-troubshooter",
       "description": "Diagnoses AWS Systems Manager (SSM) Session Manager failures via a systematic 7-symptom decision tre"
+    },
+    {
+      "name": "ssm-session-troubleshooter",
+      "description": "Diagnoses AWS Systems Manager Session Manager failures through a thirteen-category diagnostic tree: "
     },
     {
       "name": "stepfunctions-execution-troubleshooter",
@@ -1236,32 +1511,64 @@
       "description": "Provisions Step Functions Express Workflows with production defaults: Express-vs-Standard decision ("
     },
     {
+      "name": "stepfunctions-map-state-deployer",
+      "description": "Deploys AWS Step Functions Map state configurations with production defaults: Inline Map (synchronou"
+    },
+    {
       "name": "stepfunctions-statemachine-auditor",
       "description": "Audits AWS Step Functions state machines for execution logging coverage (level ALL + includeExecutio"
     },
     {
       "name": "stepfunctions-statemachine-deployer",
-      "description": ""
+      "description": "Provisions production-grade AWS Step Functions state machines with correct type selection (Standard "
+    },
+    {
+      "name": "storage-gateway-deployer",
+      "description": "Deploys AWS Storage Gateway with production defaults: gateway types (S3 File Gateway, FSx File Gatew"
     },
     {
       "name": "sts-cross-account-role-auditor",
       "description": "Audits IAM role trust policies (AssumeRolePolicyDocument) for cross-account exposure, wildcard Princ"
     },
     {
+      "name": "tag-compliance-automator",
+      "description": "Automates AWS tag compliance end-to-end: Organizations tag policies with case-sensitive key/value va"
+    },
+    {
       "name": "tag-governance-automator",
       "description": "Designs and implements AWS tag governance automation across Organizations TagPolicy JSON (allowed_va"
+    },
+    {
+      "name": "textract-document-deployer",
+      "description": "Deploys Amazon Textract document-analysis pipelines with production defaults: synchronous APIs (Dete"
     },
     {
       "name": "timestream-database-deployer",
       "description": "Provisions Amazon Timestream databases and tables with production defaults: database creation (creat"
     },
     {
+      "name": "transcribe-job-deployer",
+      "description": "Deploys Amazon Transcribe configurations with production defaults: transcription job types (batch fr"
+    },
+    {
+      "name": "transfer-cost-optimizer",
+      "description": "Optimises AWS Transfer Family cost across eight dimensions: server endpoint type (PUBLIC vs VPC vs V"
+    },
+    {
       "name": "transfer-family-deployer",
       "description": "Provisions AWS Transfer Family servers with secure defaults \u2014 SFTP, FTPS, and FTP protocols, server "
     },
     {
+      "name": "transfer-family-workflow-deployer",
+      "description": "Provisions AWS Transfer Family servers and managed workflows with production defaults: SFTP/FTPS/FTP"
+    },
+    {
       "name": "transit-gateway-deployer",
       "description": "Provisions production-grade AWS Transit Gateway topologies with secure defaults: TGW creation (Amazo"
+    },
+    {
+      "name": "transit-gateway-routing-troubleshooter",
+      "description": "Diagnoses AWS Transit Gateway routing failures through a fourteen-layer diagnostic tree: TGW route t"
     },
     {
       "name": "trustedadvisor-check-auditor",
@@ -1276,6 +1583,10 @@
       "description": "Diagnoses AWS VPC network connectivity issues through a systematic OSI-layered diagnostic tree: Laye"
     },
     {
+      "name": "vpc-endpoint-policy-troubleshooter",
+      "description": "Diagnoses Amazon VPC endpoint policy and connectivity failures across interface endpoints (PrivateLi"
+    },
+    {
       "name": "vpc-lattice-auth-auditor",
       "description": "Audits VPC Lattice service networks for auth-policy absence (default-open posture), public Principal"
     },
@@ -1288,8 +1599,16 @@
       "description": "Provisions Amazon VPC peering connections with production defaults: requester/accepter model (create"
     },
     {
+      "name": "vpclattice-service-deployer",
+      "description": "Provisions Amazon VPC Lattice services with production defaults: service network creation (top-level"
+    },
+    {
       "name": "vpn-connection-deployer",
       "description": "Provisions AWS Site-to-Site VPN connections with production defaults: customer gateway (CGW), virtua"
+    },
+    {
+      "name": "waf-rule-deployer",
+      "description": "Provisions AWS WAFv2 rule sets with production defaults: Web ACL creation (CloudFront scope in us-ea"
     },
     {
       "name": "wafv2-web-acl-auditor",
@@ -1297,7 +1616,7 @@
     },
     {
       "name": "wafv2-web-acl-deployer",
-      "description": ""
+      "description": "Provisions AWS WAFv2 Web ACLs with correct production defaults: scope selection (CLOUDFRONT vs REGIO"
     },
     {
       "name": "wellarchitected-review-operator",
@@ -1309,34 +1628,7 @@
     },
     {
       "name": "xray-tracing-deployer",
-      "description": ""
+      "description": "Deploys AWS X-Ray distributed tracing with production-grade configuration: X-Ray daemon deployment ("
     }
-  ],
-  "skill_count": 263,
-  "family_coverage": [
-    "Migration",
-    "Management",
-    "Governance",
-    "AppIntegration",
-    "DevTools",
-    "Security",
-    "Compute",
-    "Databases",
-    "Storage",
-    "FinOps",
-    "Dev",
-    "AI/ML",
-    "Developer",
-    "Analytics",
-    "Networking",
-    "App"
-  ],
-  "task_type_coverage": [
-    "deploy",
-    "automate",
-    "operate",
-    "audit",
-    "troubleshoot",
-    "optimize"
   ]
 }
