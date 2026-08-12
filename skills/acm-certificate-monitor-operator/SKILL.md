@@ -308,42 +308,6 @@ DaysToExpiry alarm fires but the renewal does not complete because the
 CAA record blocks ACM. This is the #1 renewal failure cause and is
 invisible without an explicit DNS check.
 
-## Expert heuristic: auto-renewal eligibility checklist
-
-Not all certificates auto-renew. Use this checklist to determine
-whether a certificate is eligible for ACM auto-renewal.
-
-```text
-Auto-renewal eligibility:
-  ├── [1] Validation method = DNS-validated?
-  │     ├── YES → continue
-  │     └── NO (email-validated) → requires manual email approval for renewal
-  │
-  ├── [2] Certificate status = ISSUED?
-  │     ├── YES → continue
-  │     └── NO (PENDING_VALIDATION) → not yet issued, cannot renew
-  │
-  ├── [3] Certificate attached to a supported service?
-  │     ├── YES (ALB, NLB, CloudFront, API Gateway, AppSync, etc.) → continue
-  │     └── NO (not attached) → ACM does NOT auto-renew unattached certificates
-  │
-  ├── [4] DNS validation CNAME records still present?
-  │     ├── YES → continue
-  │     └── NO (records deleted) → renewal fails; ACM shows VALIDATION_TIMED_OUT
-  │
-  ├── [5] CAA records permit amazon.com?
-  │     ├── YES (or no CAA records) → continue
-  │     └── NO → renewal silently blocked
-  │
-  └── ALL YES → certificate auto-renews (ACM attempts ~60 days before expiry)
-```
-
-**Key implication:** a certificate that was auto-renewing can stop
-renewing if any of these conditions change (service detachment, DNS
-record deletion, CAA record addition). DaysToExpiry monitoring catches
-this, but the root cause requires investigating each eligibility
-factor.
-
 ## Prerequisites (verify before operating)
 
 Before emitting monitoring commands, verify these prerequisites. If
@@ -812,40 +776,14 @@ aws sns subscribe \
   --region us-east-1
 ```
 
-**Slack integration via SNS + Lambda:**
-
-```bash
-# Create a Lambda that forwards SNS to Slack
-# Subscribe the Lambda to the SNS topic
-aws sns subscribe \
-  --topic-arn "$CRITICAL_TOPIC" \
-  --protocol lambda \
-  --notification-endpoint "arn:aws:lambda:us-east-1:123456789012:function:sns-to-slack" \
-  --region us-east-1
-```
+**Slack integration:** subscribe a Lambda function
+(`sns-to-slack`) to the critical SNS topic to forward alerts to Slack.
 
 ## Step 11 — Wildcard vs SAN coverage audit
 
 ACM certificates can cover multiple domains via wildcard (`*.example.com`)
 and Subject Alternative Names (SANs). Audit coverage to ensure all
 subdomains are protected.
-
-```bash
-# List all domains covered by each certificate
-for CERT_ARN in $(aws acm list-certificates \
-  --certificate-statuses ISSUED \
-  --query 'CertificateSummaryList[*].CertificateArn' \
-  --output text --region us-east-1); do
-
-  echo "=== Certificate: $(echo $CERT_ARN | cut -d'/' -f2) ==="
-  aws acm describe-certificate \
-    --certificate-arn "$CERT_ARN" \
-    --query 'Certificate.{PrimaryDomain:DomainName,SANs:SubjectAlternativeNames,Wildcard:DomainValidationOptions[0].ValidationMethod}' \
-    --output table --region us-east-1
-done
-```
-
-**Coverage analysis:**
 
 | Certificate type | Coverage | Example |
 |---|---|---|
@@ -906,37 +844,20 @@ echo "PCA CA cert days remaining: $DAYS_REMAINING"
 
 **Recent AWS features (2023-2026):**
 
-- **ACM multi-region certificates (2023-2024):** ACM introduced
-  multi-region certificates that are managed across multiple regions
-  for global applications using Route53 latency-based routing. These
-  certs appear in multiple regions simultaneously.
-
-- **Enhanced renewal visibility (2023-2024):** ACM improved the
-  renewal summary in the API to include detailed failure reasons,
-  making it easier to diagnose why renewal failed without checking DNS
-  or CAA separately.
-
-- **PCA short-lived certificate support (2023-2024):** ACM PCA added
-  support for short-lived certificates (hours to days), requiring more
-  frequent monitoring and renewal automation.
-
-- **CloudTrail integration for certificate events (2023-2024):**
-  Enhanced CloudTrail events for ACM certificate lifecycle changes,
-  including renewal attempts, validation status changes, and CAA
-  conflict detection events.
-
-- **EventBridge renewal failure events (2024-2025):** ACM now emits
-  EventBridge events when renewal fails, enabling automated response
-  (e.g., Lambda to fix CAA records or notify the team).
-
-- **ACM certificate transparency logging controls (2024-2025):**
-  Added support for disabling certificate transparency logging for
-  private certificates, with monitoring for compliance.
-
-- **Cross-account certificate sharing via RAM (2025-2026):** ACM
-  certificates can now be shared across accounts via AWS RAM, with
-  monitoring for shared certificate usage and renewal status in both
-  the owning and consuming accounts.
+- **ACM multi-region certificates (2023-2024):** Managed across
+  multiple regions for global applications using Route53 latency-based
+  routing.
+- **Enhanced renewal visibility (2023-2024):** API renewal summary now
+  includes detailed failure reasons.
+- **PCA short-lived certificate support (2023-2024):** Short-lived
+  certs (hours to days) requiring more frequent renewal automation.
+- **CloudTrail certificate events (2023-2024):** Enhanced events for
+  lifecycle changes, renewal attempts, and CAA conflict detection.
+- **EventBridge renewal failure events (2024-2025):** ACM emits
+  EventBridge events on renewal failure for automated response.
+- **Cross-account certificate sharing via RAM (2025-2026):**
+  Certificates shared across accounts with monitoring for usage and
+  renewal status.
 
 ## NEVER do these things
 

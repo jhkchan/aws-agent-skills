@@ -303,7 +303,6 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | controltower-control-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 23.1s | 33282 |
 | cost-anomaly-detection-automator | amazon.nova-pro-v1:0 | 105/120 | B | 1/5 | 9.6s | 46802 |
 | cost-anomaly-response-automator | amazon.nova-pro-v1:0 | 103/120 | B | 0/5 | 11.5s | 43135 |
-| cost-optimization-hub-optimizer | amazon.nova-pro-v1:0 | 102/120 | B | 3/5 | 11.7s | 38575 |
 | cost-optimization-hub-recommendations-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.3s | 37941 |
 | cur-automation-automator | amazon.nova-pro-v1:0 | 104/120 | B | 2/5 | 8.6s | 42620 |
 | cur-cost-usage-report-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 7.0s | 38402 |
@@ -460,11 +459,9 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | organizations-account-deployer | amazon.nova-pro-v1:0 | 101/120 | B | 3/5 | 4.8s | 48350 |
 | organizations-policy-deployer | amazon.nova-pro-v1:0 | 106/120 | B | 3/5 | 8.7s | 45993 |
 | organizations-scp-auditor | amazon.nova-pro-v1:0 | 110/120 | A | 6/6 | 12.7s | 33467 |
-| organizations-scp-deployer | amazon.nova-pro-v1:0 | 104/120 | B | 2/5 | 10.8s | 38513 |
 | personalize-campaign-deployer | amazon.nova-pro-v1:0 | 100/120 | B | 2/5 | 8.5s | 38991 |
 | pinpoint-campaign-deployer | amazon.nova-pro-v1:0 | 104/120 | B | 0/5 | 11.7s | 37828 |
 | pinpoint-journey-deployer | amazon.nova-pro-v1:0 | 104/120 | B | 1/5 | 15.4s | 45659 |
-| pinpoint-segment-deployer | amazon.nova-pro-v1:0 | 103/120 | B | 4/5 | 17.6s | 55186 |
 | polly-voice-deployer | amazon.nova-pro-v1:0 | 105/120 | B | 5/5 | 21.3s | 45047 |
 | qldb-ledger-deployer | amazon.nova-pro-v1:0 | 98/120 | B | 3/5 | 20.7s | 38942 |
 | quicksight-dashboard-deployer | amazon.nova-pro-v1:0 | 104/120 | B | 3/5 | 14.4s | 51223 |
