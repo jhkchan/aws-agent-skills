@@ -1,0 +1,49 @@
+# Eval configuration for pinpoint-journey-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: pinpoint-journey-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: event-based-cart-recovery
+    difficulty: hard
+    prompt_file: prompts/event-based-cart-recovery.md
+    baseline_file: baselines/event-based-cart-recovery.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: segment-based-multivariate-holdout
+    difficulty: hard
+    prompt_file: prompts/segment-based-multivariate-holdout.md
+    baseline_file: baselines/segment-based-multivariate-holdout.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: onboarding-custom-channel
+    difficulty: medium
+    prompt_file: prompts/onboarding-custom-channel.md
+    baseline_file: baselines/onboarding-custom-channel.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: wait-activities-journey-limits
+    difficulty: medium
+    prompt_file: prompts/wait-activities-journey-limits.md
+    baseline_file: baselines/wait-activities-journey-limits.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-email-channel
+    difficulty: easy
+    prompt_file: prompts/missing-email-channel.md
+    baseline_file: baselines/missing-email-channel.md
+    expected_verdict: PREREQUISITES_MISSING

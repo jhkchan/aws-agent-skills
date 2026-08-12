@@ -1,0 +1,151 @@
+# Eval test cases for personalize-campaign-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Personalize deployment
+# topologies (CUSTOM User-Personalization with HPO + event tracker,
+# ECOMMERCE DOMAIN recommender, batch inference from S3, real-time
+# event tracker with PutEvents, missing Interactions schema
+# prerequisite failure).
+skill: personalize-campaign-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: user-personalization-campaign
+    description: >-
+      Deploy a CUSTOM Personalize pipeline with the User-Personalization
+      recipe, HPO training, a campaign at minProvisionedTPS=1, and an
+      event tracker for real-time updates. Expects READY_TO_DEPLOY with
+      User-Personalization recipe, HPO, minProvisionedTPS=1, event
+      tracker enabled, and the cost-floor implication noted.
+    input: |
+      Build a Personalize recommendation system for a retail site in
+      us-east-1. CUSTOM dataset group named retail-recs. Interactions
+      data at s3://training-data/interactions.csv (USER_ID, ITEM_ID,
+      TIMESTAMP, EVENT_TYPE). Use the User-Personalization recipe with
+      HPO. Campaign minProvisionedTPS=1 (dev). Enable an event tracker
+      for real-time updates. Role
+      arn:aws:iam::123456789012:role/PersonalizeServiceRole. Account
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws-user-personalization"
+        - "minProvisionedTPS"
+        - "event tracker"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: domain-ecommerce-recommender
+    description: >-
+      Deploy an ECOMMERCE DOMAIN Personalize pipeline with the
+      Recommended For You recommender. Expects READY_TO_DEPLOY with
+      DOMAIN dataset group, recommender (not solution+campaign), and
+      minRecommendationRequestsPerSecond cited.
+    input: |
+      Build a Personalize recommendation system for an e-commerce site
+      in us-east-1. Use an ECOMMERCE DOMAIN dataset group named
+      shop-recs. Interactions at s3://training-data/interactions.csv.
+      Use the Recommended For You recommender recipe
+      (aws-ecomm-recommended-for-you) with
+      minRecommendationRequestsPerSecond=1. Role
+      arn:aws:iam::123456789012:role/PersonalizeServiceRole. Account
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ECOMMERCE"
+        - "recommender"
+        - "aws-ecomm-recommended-for-you"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: batch-inference-s3
+    description: >-
+      Deploy a Personalize batch inference job that scores a user list
+      from S3 and writes recommendations to S3. Expects READY_TO_DEPLOY
+      with batch inference job, S3 input, S3 output, and solution
+      version reference.
+    input: |
+      Set up a Personalize batch inference job in us-east-1 for the
+      user-personalization-solution solution version
+      arn:aws:personalize:us-east-1:123456789012:solution-version/abc123.
+      Score the user list at s3://batch-input/users.json (JSON Lines).
+      Write 25 recommendations per user to s3://batch-output/recs/.
+      Role arn:aws:iam::123456789012:role/PersonalizeBatchRole.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "batch inference"
+        - "s3://batch-input/users.json"
+        - "s3://batch-output/recs/"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: event-tracker-realtime
+    description: >-
+      Deploy a Personalize event tracker with a Lambda handler that
+      calls PutEvents for real-time recommendation updates. Expects
+      READY_TO_DEPLOY with event tracker, tracking-id, PutEvents
+      integration, and the one-tracker-per-group constraint noted.
+    input: |
+      Deploy an event tracker for the retail-recs dataset group in
+      us-east-1 (arn:aws:personalize:us-east-1:123456789012:dataset-group/retail).
+      I need a Lambda that calls PutEvents for click events on item
+      pages. Role
+      arn:aws:iam::123456789012:role/PersonalizeEventLambdaRole.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "event tracker"
+        - "PutEvents"
+        - "tracking"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-interactions-schema
+    description: >-
+      Operator requests a Personalize pipeline but provides only a
+      Users dataset (no Interactions dataset). This is a prerequisite
+      failure because Interactions is the REQUIRED minimum dataset.
+      Expects PREREQUISITES_MISSING with the missing Interactions
+      dataset cited.
+    input: |
+      Build a Personalize recommendation system in us-east-1. CUSTOM
+      dataset group named retail-recs. I have a Users dataset at
+      s3://training-data/users.csv (USER_ID, AGE, GENDER) but no
+      Interactions data yet. Use User-Personalization with HPO. Campaign
+      minProvisionedTPS=1.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Interactions"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "required"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

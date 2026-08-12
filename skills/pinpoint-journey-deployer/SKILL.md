@@ -453,85 +453,48 @@ percentage. Percentages MUST sum to 100.
   "MultivariateSplit": {
     "Tests": [{
       "Branches": [
-        {
-          "Percentage": 50,
-          "NextActivity": "SendVariantA"
-        },
-        {
-          "Percentage": 50,
-          "NextActivity": "SendVariantB"
-        }
+        {"Percentage": 50, "NextActivity": "SendVariantA"},
+        {"Percentage": 50, "NextActivity": "SendVariantB"}
       ]
     }]
   }
 }
 ```
 
-**For A/B testing:** use multivariate split to test message variants.
-Pair with a holdout (Step 6) to measure lift against a control group.
-
-**Common mistake:** confusing multivariate split (random) with
-conditional split (event-based). If you want to branch based on user
-behavior, use conditional. If you want to randomly assign for testing,
-use multivariate.
+**For A/B testing:** pair with a holdout (Step 6) to measure lift
+against a control group. **Common mistake:** confusing multivariate
+split (random) with conditional split (event-based). Use conditional
+for behavioral branching; multivariate for random A/B assignment.
 
 ## Step 5 — Wait activity
 
 A wait activity holds the participant for a duration or until an
 absolute time.
 
-**Duration-based wait:**
-
 ```json
-{
-  "Wait": {
-    "WaitTime": {
-      "WaitDuration": "24",
-      "WaitDurationUnit": "HOURS"
-    },
-    "NextActivity": "SendFollowUpSMS"
-  }
-}
-```
+// Duration-based
+{"Wait": {"WaitTime": {"WaitDuration": "24", "WaitDurationUnit": "HOURS"}, "NextActivity": "SendFollowUp"}}
 
-**Absolute-time wait:**
-
-```json
-{
-  "Wait": {
-    "WaitTime": {
-      "Until": "2026-08-15T09:00:00Z"
-    },
-    "NextActivity": "SendMorningEmail"
-  }
-}
+// Absolute-time
+{"Wait": {"WaitTime": {"Until": "2026-08-15T09:00:00Z"}, "NextActivity": "SendMorningEmail"}}
 ```
 
 **Critical:** wait interacts with quiet time. If a wait ends during a
-quiet period, the subsequent send is held until the quiet window
-closes. Use absolute-time waits for precise cadence control.
+quiet period, the subsequent send is held. Use absolute-time waits for
+precise cadence control.
 
 ## Step 6 — Holdout
 
-A holdout suppresses a percentage of participants at entry. They never
+A holdout suppresses a percentage of participants at entry — they never
 start the journey. This is the control group for A/B lift measurement.
 
 ```json
-{
-  "Holdout": {
-    "Percentage": 10,
-    "NextActivity": "ExitHoldout"
-  }
-}
+{"Holdout": {"Percentage": 10, "NextActivity": "ExitHoldout"}}
 ```
 
-**Holdout vs multivariate branch that sends nothing:**
-- Holdout: participant never enters the journey (suppressed at entry)
-- Multivariate branch with no send: participant enters the journey but
-  receives no message on that branch (may receive later messages)
-
-For A/B lift measurement, use holdout. The holdout group is a true
-control — they receive zero journey messages.
+**Holdout vs multivariate branch with no send:** holdout = participant
+never enters the journey. Multivariate no-send = participant enters but
+receives no message on that branch. For true A/B lift, use holdout.
 
 ## Step 7 — Journey schedule
 
@@ -582,24 +545,17 @@ precise control.
 Journey limits cap total participation and per-participant messaging.
 
 ```json
-{
-  "Limits": {
-    "DailyCap": 100000,
-    "MaximumEndpointSend": 5,
-    "TotalParticipantCap": 500000
-  }
-}
+{"Limits": {"DailyCap": 100000, "MaximumEndpointSend": 5, "TotalParticipantCap": 500000}}
 ```
 
 | Limit | Purpose |
 |---|---|
-| `DailyCap` | Max messages per day across all journey participants |
-| `MaximumEndpointSend` | Max messages to a single endpoint (device) per journey |
-| `TotalParticipantCap` | Max total participants across the journey lifetime |
+| `DailyCap` | Max messages per day across all participants |
+| `MaximumEndpointSend` | Max messages to a single endpoint per journey |
+| `TotalParticipantCap` | Max total participants across journey lifetime |
 
-**Critical:** limits are evaluated at entry. Once a participant is in
-the journey, they traverse all activities regardless of caps. Caps
-prevent runaway costs but do not retroactively remove participants.
+**Critical:** limits are evaluated at entry. Once in the journey,
+participants traverse all activities regardless of caps.
 
 ## Step 10 — Rate limits
 
@@ -684,29 +640,18 @@ journey. Use this to measure lift against the holdout group.
 
 ## Step 13 — Recent features
 
-- **Journey-run API (2023-2024):** New `create-journey-run` API allows
-  triggering a segment-based journey run on-demand without modifying
-  the schedule. Useful for ad-hoc broadcasts.
-
-- **In-app message channel in journeys (2024):** Send message activity
-  now supports in-app messages via the Mobile SDK, enabling multi-
-  channel journey paths (email → push → in-app).
-
-- **Cross-channel journey analytics (2024-2025):** Unified analytics
-  dashboard aggregating email, SMS, push, and in-app metrics per
-  journey, with conversion attribution across channels.
-
-- **Journey state management improvements (2024-2025):** Enhanced
-  pause/resume/restart APIs allow pausing a live journey, modifying
-  activities, and resuming without losing participant state.
-
-- **ML-powered send-time optimization (2025):** Pinpoint can now
-  optimize send times per participant based on historical engagement
-  patterns, replacing fixed wait activities with ML-predicted optimal
-  delivery windows.
-
-- **Journeys on Amazon Q Business integration (2025):** Pre-built
-  journey templates for Q Business-powered customer service workflows.
+- **Journey-run API (2023-2024):** `create-journey-run` triggers a
+  segment-based run on-demand without modifying the schedule.
+- **In-app message channel in journeys (2024):** Send activity supports
+  in-app messages via Mobile SDK, enabling multi-channel paths.
+- **Cross-channel journey analytics (2024-2025):** Unified dashboard
+  aggregating email, SMS, push, and in-app metrics per journey.
+- **Journey state management (2024-2025):** Enhanced pause/resume/restart
+  APIs allow modifying activities without losing participant state.
+- **ML-powered send-time optimization (2025):** Optimizes send times per
+  participant based on engagement patterns, replacing fixed waits.
+- **Amazon Q Business integration (2025):** Pre-built journey templates
+  for Q Business-powered customer service workflows.
 
 ## NEVER do these things
 
@@ -841,9 +786,7 @@ Engagement Workflow Deployment.
 
 - **Pinpoint Developer Guide (Journeys)** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/journeys.html
 - **create-journey** — https://docs.aws.amazon.com/pinpoint/latest/apireference/apps-application-id-journeys.html
-- **Journey activities** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/journeys-activities.html
-- **Conditional splits** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/journeys-conditional.html
-- **Multivariate splits** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/journeys-multivariate.html
+- **Journey activities / Conditional splits / Multivariate splits** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/journeys-activities.html
 - **Quiet time** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/journeys-quiettime.html
 - **Holdout** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/journeys-holdout.html
 - **Custom channel** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/journeys-custom.html

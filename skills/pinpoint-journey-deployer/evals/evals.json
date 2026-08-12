@@ -1,0 +1,184 @@
+{
+  "skill": "pinpoint-journey-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Pinpoint Journey Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across journey topologies (event-based abandoned cart with conditional split and quiet time, segment-based multivariate A/B test with holdout, multi-step onboarding with custom Lambda channel, event-based with wait activities and journey limits, missing email channel prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "event-based-cart-recovery",
+      "name": "Event-based abandoned cart recovery journey with conditional split and quiet time",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — event-based entry, conditional split evaluating purchase_completed event, wait activities, quiet time (holds not cancels), journey limits",
+      "prompt": "Create a Pinpoint journey named AbandonedCartRecovery in project app-xyz789 (us-east-1, account 123456789012). Entry: event-based on cart_abandoned event. Activities: SendReminderEmail, Wait1Hour, ConditionalSplit (check if purchase_completed event recorded — YES→ExitConverted, NO→SendReminderSMS), Wait24Hours. Email channel configured. SMS channel configured. Quiet time 22:00-08:00 UTC Mon-Fri. Journey limits: dailyCap 50000, maxEndpointSend 3. Schedule start 2026-08-15T09:00:00Z.",
+      "prompt_file": "prompts/event-based-cart-recovery.md",
+      "baseline_file": "baselines/event-based-cart-recovery.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PINPOINT_JOURNEY: AbandonedCartRecovery (journey-abc123) | project: app-xyz789\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Entry strategy: Event-based (event: cart_abandoned)\n  [✓] Conditional splits: CheckPurchase evaluating purchase_completed\n  [✓] Quiet time: 22:00–08:00 MON-FRI (HOLDS, not cancels)\n  [✓] Journey limits: dailyCap=50000, maxEndpointSend=3",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AbandonedCartRecovery",
+            "event-based",
+            "cart_abandoned",
+            "conditional",
+            "quiet",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "segment-based-multivariate-holdout",
+      "name": "Segment-based A/B test journey with multivariate split and holdout",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — segment-based entry, multivariate split 50/50, holdout 10% for control group, scheduled start/end",
+      "prompt": "Create a Pinpoint journey named WeeklyPromoABTest in project app-xyz789 (us-east-1, account 123456789012). Entry: segment-based on segment seg-active-users-456. Activities: Holdout 10%, MultivariateSplit (50% → SendVariantA email, 50% → SendVariantB email). Email channel configured with templates promo-variant-a and promo-variant-b. Schedule start 2026-08-20T09:00:00Z, end 2026-08-27T09:00:00Z, timezone America/New_York.",
+      "prompt_file": "prompts/segment-based-multivariate-holdout.md",
+      "baseline_file": "baselines/segment-based-multivariate-holdout.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PINPOINT_JOURNEY: WeeklyPromoABTest (journey-def456) | project: app-xyz789\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Entry strategy: Segment-based (segment: seg-active-users-456)\n  [✓] Multivariate splits: 50/50 — sums to 100\n  [✓] Holdout: 10% suppressed at entry",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "WeeklyPromoABTest",
+            "segment-based",
+            "multivariate",
+            "holdout",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "onboarding-custom-channel",
+      "name": "Multi-step onboarding journey with custom Lambda channel",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — event-based entry, multiple wait activities, custom Lambda channel for CRM webhook, push and email channels",
+      "prompt": "Create a Pinpoint journey named UserOnboarding in project app-xyz789 (us-east-1, account 123456789012). Entry: event-based on user_signup event. Activities: SendWelcomeEmail, Wait24Hours, SendTipsEmail, Wait48Hours, Custom (Lambda function OnboardingWebhook for CRM integration), Wait24Hours, SendCheckinPush. Email and push channels configured. Lambda OnboardingWebhook deployed. No quiet time. Journey limits: dailyCap 10000, maxEndpointSend 5.",
+      "prompt_file": "prompts/onboarding-custom-channel.md",
+      "baseline_file": "baselines/onboarding-custom-channel.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PINPOINT_JOURNEY: UserOnboarding (journey-ghi789) | project: app-xyz789\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Custom channel: Lambda=OnboardingWebhook (resource-based permission granted)\n  [✓] Send channels: email=on, push=on",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "UserOnboarding",
+            "custom",
+            "Lambda",
+            "OnboardingWebhook",
+            "pinpoint.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wait-activities-journey-limits",
+      "name": "Event-based journey with duration and absolute waits, limits, and quiet time",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — segment-based entry, duration and absolute-time waits, totalParticipantCap, daily quiet time",
+      "prompt": "Create a Pinpoint journey named ReengagementCampaign in project app-xyz789 (us-east-1, account 123456789012). Entry: segment-based on segment seg-inactive-30d-789. Activities: SendReengagementEmail, Wait 3 days (duration), SendReengagementSMS, Wait until 2026-09-01T10:00:00Z (absolute), SendFinalPush. Email, SMS, and push channels configured. Quiet time 20:00-07:00 America/Los_Angeles every day. Journey limits: dailyCap 20000, maxEndpointSend 3, totalParticipantCap 100000.",
+      "prompt_file": "prompts/wait-activities-journey-limits.md",
+      "baseline_file": "baselines/wait-activities-journey-limits.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PINPOINT_JOURNEY: ReengagementCampaign (journey-jkl012) | project: app-xyz789\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Wait activities: Wait3Days (3 DAYS), WaitUntil (absolute 2026-09-01T10:00:00Z)\n  [✓] Journey limits: dailyCap=20000, maxEndpointSend=3, totalParticipantCap=100000\n  [✓] Quiet time: 20:00–07:00 daily America/Los_Angeles",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ReengagementCampaign",
+            "Wait",
+            "limits",
+            "quiet",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-email-channel",
+      "name": "Journey with email activities but email channel not configured (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — project app-broken456 does not have email channel configured (no SES verified identity); send email activities will fail",
+      "prompt": "Create a Pinpoint journey named NewsletterJourney in project app-broken456 (us-east-1, account 123456789012). Entry: segment-based on segment seg-subscribers-999. Activities: SendNewsletterEmail, Wait7Days, SendFollowUpEmail. The email channel is NOT configured on project app-broken456 (no SES verified identity). Schedule start 2026-08-15T09:00:00Z.",
+      "prompt_file": "prompts/missing-email-channel.md",
+      "baseline_file": "baselines/missing-email-channel.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "PINPOINT_JOURNEY: NewsletterJourney\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Email channel: NOT CONFIGURED on project app-broken456 — send email activities will fail",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "email channel",
+            "VERDICT",
+            "CHECKLIST",
+            "app-broken456"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

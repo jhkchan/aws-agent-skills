@@ -1,0 +1,169 @@
+{
+  "skill": "personalize-campaign-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Personalize Campaign Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Personalize deployment topologies (CUSTOM User-Personalization with HPO + event tracker, ECOMMERCE DOMAIN recommender, batch inference from S3, real-time event tracker with PutEvents, missing Interactions dataset prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "user-personalization-campaign",
+      "name": "CUSTOM User-Personalization campaign with HPO and event tracker",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — CUSTOM dataset group, aws-user-personalization recipe, HPO training, campaign minProvisionedTPS=1, event tracker enabled",
+      "prompt": "Build a Personalize recommendation system for a retail site in us-east-1. CUSTOM dataset group named retail-recs. Interactions data at s3://training-data/interactions.csv (USER_ID, ITEM_ID, TIMESTAMP, EVENT_TYPE). Use the User-Personalization recipe with HPO. Campaign minProvisionedTPS=1 (dev). Enable an event tracker for real-time updates. Role arn:aws:iam::123456789012:role/PersonalizeServiceRole. Account 123456789012.",
+      "prompt_file": "prompts/user-personalization-campaign.md",
+      "baseline_file": "baselines/user-personalization-campaign.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PERSONALIZE_PIPELINE: retail-recs → aws-user-personalization → retail-campaign\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Dataset group: retail-recs (CUSTOM)\n  [✓] Interactions dataset: schema (USER_ID, ITEM_ID, TIMESTAMP, EVENT_TYPE)\n  [✓] Bulk import: s3://training-data/interactions.csv → interactions (ACTIVE)\n  [✓] Recipe: aws-user-personalization (CUSTOM)\n  [✓] Solution version: HPO\n  [✓] Campaign: retail-campaign — minProvisionedTPS=1\n  [✓] Event tracker: enabled",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws-user-personalization",
+            "minProvisionedTPS",
+            "event tracker"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "domain-ecommerce-recommender",
+      "name": "ECOMMERCE DOMAIN recommender (Recommended For You)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — ECOMMERCE DOMAIN dataset group, aws-ecomm-recommended-for-you recommender, minRecommendationRequestsPerSecond=1 (not solution+campaign)",
+      "prompt": "Build a Personalize recommendation system for an e-commerce site in us-east-1. Use an ECOMMERCE DOMAIN dataset group named shop-recs. Interactions at s3://training-data/interactions.csv. Use the Recommended For You recommender recipe (aws-ecomm-recommended-for-you) with minRecommendationRequestsPerSecond=1. Role arn:aws:iam::123456789012:role/PersonalizeServiceRole. Account 123456789012.",
+      "prompt_file": "prompts/domain-ecommerce-recommender.md",
+      "baseline_file": "baselines/domain-ecommerce-recommender.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PERSONALIZE_PIPELINE: shop-recs → aws-ecomm-recommended-for-you → shop-recommender\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Dataset group: shop-recs (ECOMMERCE)\n  [✓] Interactions dataset\n  [✓] Recommender: aws-ecomm-recommended-for-you — minRecommendationRequestsPerSecond=1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ECOMMERCE",
+            "recommender",
+            "aws-ecomm-recommended-for-you"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "batch-inference-s3",
+      "name": "Batch inference job scoring user list from S3",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — batch inference job, S3 JSON Lines input, S3 output, numResults=25",
+      "prompt": "Set up a Personalize batch inference job in us-east-1 for the user-personalization-solution solution version arn:aws:personalize:us-east-1:123456789012:solution-version/abc123. Score the user list at s3://batch-input/users.json (JSON Lines). Write 25 recommendations per user to s3://batch-output/recs/. Role arn:aws:iam::123456789012:role/PersonalizeBatchRole.",
+      "prompt_file": "prompts/batch-inference-s3.md",
+      "baseline_file": "baselines/batch-inference-s3.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PERSONALIZE_PIPELINE: batch-inference → s3://batch-output/recs/\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Solution version: arn:aws:personalize:us-east-1:123456789012:solution-version/abc123\n  [✓] Batch input: s3://batch-input/users.json (JSON Lines)\n  [✓] Batch output: s3://batch-output/recs/\n  [✓] numResults: 25",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "batch inference",
+            "s3://batch-input/users.json",
+            "s3://batch-output/recs/"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "event-tracker-realtime",
+      "name": "Event tracker with Lambda PutEvents for real-time updates",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — event tracker created, tracking-id, Lambda PutEvents handler, one-tracker-per-group constraint noted",
+      "prompt": "Deploy an event tracker for the retail-recs dataset group in us-east-1 (arn:aws:personalize:us-east-1:123456789012:dataset-group/retail). I need a Lambda that calls PutEvents for click events on item pages. Role arn:aws:iam::123456789012:role/PersonalizeEventLambdaRole.",
+      "prompt_file": "prompts/event-tracker-realtime.md",
+      "baseline_file": "baselines/event-tracker-realtime.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PERSONALIZE_PIPELINE: retail-recs → event-tracker → PutEvents\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Event tracker: enabled — tracking-id assigned\n  [✓] Lambda PutEvents handler: configured\n  [✓] Constraint: ONE active tracker per dataset group",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "event tracker",
+            "PutEvents",
+            "tracking"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-interactions-schema",
+      "name": "Missing Interactions dataset (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — operator provided Users dataset but no Interactions dataset; Interactions is the REQUIRED minimum",
+      "prompt": "Build a Personalize recommendation system in us-east-1. CUSTOM dataset group named retail-recs. I have a Users dataset at s3://training-data/users.csv (USER_ID, AGE, GENDER) but no Interactions data yet. Use User-Personalization with HPO. Campaign minProvisionedTPS=1.",
+      "prompt_file": "prompts/missing-interactions-schema.md",
+      "baseline_file": "baselines/missing-interactions-schema.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "PERSONALIZE_PIPELINE: retail-recs → (cannot train)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Interactions dataset: MISSING — Interactions is the REQUIRED minimum dataset; Users alone is insufficient",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "Interactions",
+            "VERDICT",
+            "CHECKLIST",
+            "required"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -381,25 +381,14 @@ and cite the specific gap.
 
 ## Step 1 — Dataset group (CUSTOM vs DOMAIN)
 
-Create a dataset group first. The type (CUSTOM or DOMAIN) determines
-the downstream flow.
-
-**CUSTOM dataset group (full control):**
+Create a dataset group first. The type determines the downstream flow.
 
 ```bash
-aws personalize create-dataset-group \
-  --name retail-recommendations \
-  --domain CUSTOM \
-  --region us-east-1
-```
+# CUSTOM (full control — solutions + campaigns)
+aws personalize create-dataset-group --name retail-recs --domain CUSTOM --region us-east-1
 
-**DOMAIN dataset group (ECOMMERCE example):**
-
-```bash
-aws personalize create-dataset-group \
-  --name ecommerce-recommendations \
-  --domain ECOMMERCE \
-  --region us-east-1
+# DOMAIN (pre-built recommenders — ECOMMERCE / VIDEO / MUSIC)
+aws personalize create-dataset-group --name ecommerce-recs --domain ECOMMERCE --region us-east-1
 ```
 
 Available domains: `ECOMMERCE`, `VIDEO`, `MUSIC`. DOMAIN groups use
@@ -458,19 +447,11 @@ or another import job.
 ## Step 4 — Recipe selection (CUSTOM groups)
 
 For CUSTOM dataset groups, choose a recipe. The recipe ARN format is
-`arn:aws:personalize:::recipe/aws-<recipe-name>`.
-
-| Recipe | Use case | Real-time events |
-|---|---|---|
-| aws-user-personalization | Personalized recs (90% of cases) | Yes (event tracker) |
-| aws-sims | Item-to-item similarity | No |
-| aws-popularity-counting | Most-popular baseline | No |
-| aws-personalized-ranking | Re-rank a candidate list | Yes |
-| aws-item-attribute-affinity | Item affinity by attribute | No |
-
-**Default recommendation:** use `aws-user-personalization` unless you
-have a specific reason. It handles cold-start, supports event tracker,
-and produces personalized results.
+`arn:aws:personalize:::recipe/aws-<recipe-name>`. See the
+"Expert heuristic: recipe selection" section above for the full
+matrix. **Default: `aws-user-personalization`** unless you have a
+specific reason — it handles cold-start, supports event tracker, and
+produces personalized results.
 
 ## Step 5 — Solution and solution version (HPO vs manual)
 
@@ -516,33 +497,25 @@ aws personalize create-campaign \
   --min-provisioned-tps 1 \
   --campaign-config '{"itemExplorationConfig":{"coldItemRelativeWeight":0.1,"enableMetadataWithRecommendations":true}}' \
   --region us-east-1
-```
 
-**minProvisionedTPS sets the cost floor.** Start at 1 for dev/staging.
-For production, set to your median TPS. Update without recreating:
-
-```bash
+# Update minProvisionedTPS without recreating
 aws personalize update-campaign \
   --campaign-arn <campaign-arn> \
-  --solution-version-arn <new-solution-version-arn> \
-  --min-provisioned-tps 5 \
-  --region us-east-1
-```
+  --min-provisioned-tps 5 --region us-east-1
 
-**GetRecommendations (real-time serving):**
-
-```bash
+# GetRecommendations (real-time serving)
 aws personalize-runtime get-recommendations \
-  --campaign-arn <campaign-arn> \
-  --user-id user-123 \
-  --num-results 10 \
-  --region us-east-1
+  --campaign-arn <campaign-arn> --user-id user-123 --num-results 10 --region us-east-1
 ```
+
+**minProvisionedTPS sets the cost floor.** Start at 1 for dev/staging;
+set to your median TPS for production.
 
 ## Step 7 — Event tracker (PutEvents real-time updates)
 
 An event tracker enables real-time recommendation updates without full
-retraining.
+retraining. Create the tracker; the returned `tracking-id` is used in
+PutEvents calls.
 
 ```bash
 aws personalize create-event-tracker \
@@ -551,34 +524,30 @@ aws personalize create-event-tracker \
   --region us-east-1
 ```
 
-The returned `tracking-id` is used in PutEvents calls from your
-application or Lambda.
-
 **PutEvents (Python SDK):**
 
 ```python
 import boto3
-
 personalize_events = boto3.client("personalize-events")
 
 personalize_events.put_events(
     trackingId="abc123-tracking-id",
     userId="user-123",
     sessionId="session-456",
-    eventList=[
-        {
-            "eventId": "event-001",
-            "eventType": "click",
-            "itemId": "item-789",
-            "sentAt": 1722816000,
-            "properties": '{"eventValue": 1.0}'
-        }
-    ]
+    eventList=[{
+        "eventId": "event-001",
+        "eventType": "click",
+        "itemId": "item-789",
+        "sentAt": 1722816000,
+        "properties": '{"eventValue": 1.0}'
+    }]
 )
 ```
 
 **Critical:** only ONE active event tracker per dataset group.
-Recreating the tracker invalidates the previous tracking ID.
+Recreating the tracker invalidates the previous tracking ID. Full
+PutEvents integration patterns are in
+`references/campaigns-and-events.md`.
 
 ## Step 8 — Batch inference jobs
 
@@ -652,34 +621,20 @@ syntax in the Personalize docs before creating.
 Each solution version has offline metrics (computed during training)
 that indicate recommendation quality.
 
-**Get solution metrics:**
-
 ```bash
 aws personalize get-solution-metrics \
-  --solution-version-arn <solution-version-arn> \
-  --region us-east-1
-```
+  --solution-version-arn <solution-version-arn> --region us-east-1
+# Returns: coverage, mean_reciprocal_rank, normalized_discounted_cumulative_gain,
+# precision_at_k, recall_at_k. Higher is better.
 
-Returns: `coverage`, `mean_reciprocal_rank`, `normalized_discounted_cumulative_gain`,
-`precision_at_k`, `recall_at_k`. Higher is better for all.
-
-**Update campaign (new solution version):**
-
-```bash
+# Update campaign to a new solution version (~15 min; UPDATE_PENDING)
 aws personalize update-campaign \
   --campaign-arn <campaign-arn> \
-  --solution-version-arn <new-solution-version-arn> \
-  --region us-east-1
-```
+  --solution-version-arn <new-solution-version-arn> --region us-east-1
 
-Update takes ~15 minutes; the campaign is briefly in UPDATE_PENDING.
-
-**AutoTraining (2023+):** enable automatic retraining on a schedule.
-
-```bash
+# AutoTraining (2023+): automatic retraining on a schedule
 aws personalize update-solution \
-  --solution-arn <solution-arn> \
-  --perform-auto-training \
+  --solution-arn <solution-arn> --perform-auto-training \
   --solution-update-config '{"autoTrainingConfig":{"schedulingExpression":"rate(7 days)"}}' \
   --region us-east-1
 ```
@@ -807,35 +762,22 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Solution version CREATE_FAILED
-- Insufficient training data (fewer than ~1000 interactions). Add more
-  data and re-import. Check the error message for specifics.
-
-### Campaign CREATE_PENDING
-- The solution version is not yet ACTIVE. Wait for training to complete
-  (check `describe-solution-version`), then create the campaign.
-
-### InvalidInputException on import job
-- The CSV headers do not match the schema, or a column has the wrong
-  type. Validate the CSV against the schema before importing.
-
-### ResourceNotFoundException on PutEvents
-- The tracking ID is wrong, or the event tracker was recreated. Update
-  the client with the new tracking ID.
-
-### Filter InvalidFilterExpression
-- The filter expression has a syntax error or references a column not
-  in the dataset. Review the Personalize filter-expression syntax.
-
-### Campaign UPDATE_PENDING
-- The campaign is updating to a new solution version. Wait ~15 minutes
-  for the update to complete. GetRecommendations continues to work
-  (serving the previous version) during the update.
-
-### High cost on the bill
-- minProvisionedTPS is set higher than needed. Reduce it via
-  `update-campaign --min-provisioned-tps`. Auto-scaling handles spikes
-  above the floor.
+- **Solution version CREATE_FAILED:** insufficient training data (fewer
+  than ~1000 interactions). Add more data and re-import. Check the
+  error message for specifics.
+- **Campaign CREATE_PENDING:** the solution version is not yet ACTIVE.
+  Wait for training (`describe-solution-version`), then create.
+- **InvalidInputException on import job:** CSV headers do not match the
+  schema, or a column has the wrong type. Validate before importing.
+- **ResourceNotFoundException on PutEvents:** the tracking ID is wrong,
+  or the event tracker was recreated. Update the client.
+- **Filter InvalidFilterExpression:** the expression has a syntax error
+  or references a column not in the dataset.
+- **Campaign UPDATE_PENDING:** the campaign is updating to a new
+  solution version. Wait ~15 minutes; GetRecommendations continues
+  serving the previous version during the update.
+- **High bill:** minProvisionedTPS is set higher than needed. Reduce
+  via `update-campaign --min-provisioned-tps`.
 
 ## Domain
 
@@ -847,11 +789,9 @@ AWS CloudOps / Amazon Personalize Recommendation System Provisioning.
 - **Dataset groups** — https://docs.aws.amazon.com/personalize/latest/dg/dataset-groups.html
 - **Schemas and datasets** — https://docs.aws.amazon.com/personalize/latest/dg/data-prep-formatting.html
 - **Recipes** — https://docs.aws.amazon.com/personalize/latest/dg/working-with-predefined-recipes.html
-- **User-Personalization recipe** — https://docs.aws.amazon.com/personalize/latest/dg/native-recipe-new-item-USER_PERSONALIZATION.html
 - **Campaigns** — https://docs.aws.amazon.com/personalize/latest/dg/campaigns.html
-- **Event tracker and PutEvents** — https://docs.aws.amazon.com/personalize/latest/dg/recording-events.html
+- **Event tracker** — https://docs.aws.amazon.com/personalize/latest/dg/recording-events.html
 - **Batch inference jobs** — https://docs.aws.amazon.com/personalize/latest/dg/getting-batch-recommendations.html
 - **Domain recommenders** — https://docs.aws.amazon.com/personalize/latest/dg/domain-recommenders.html
 - **Filters** — https://docs.aws.amazon.com/personalize/latest/dg/filter.html
-- **Solution metrics** — https://docs.aws.amazon.com/personalize/latest/dg/working-with-training-metrics.html
 - **Pricing (minProvisionedTPS)** — https://aws.amazon.com/personalize/pricing/

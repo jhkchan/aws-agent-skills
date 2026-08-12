@@ -180,8 +180,8 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 **One-line takeaway:** IAM Roles Anywhere lets external workloads
 (on-prem servers, CI runners, edge devices) assume IAM roles using
 X.509 certificates from your own PKI instead of long-lived AWS access
-keys. The trust anchor binds your external CA to AWS IAM. The profile
-maps external certificates to IAM roles. The credential helper signs
+keys. The trust anchor binds your external CA to AWS IAM; the profile
+maps external certificates to IAM roles; the credential helper signs
 AWS API requests with the certificate and obtains STS temporary
 credentials. Without the trust anchor, AWS does not trust your CA.
 Without the profile, AWS does not know which role to assume. Without
@@ -203,22 +203,21 @@ time:
   The profile's `roleArns` list (or role-passthrough mode) determines
   which IAM roles the certificate can assume. Even if the certificate
   is valid and signed by a trusted CA, the profile must explicitly
-  list the role ARN. An over-permissive profile (listing many roles)
-  violates least privilege. An under-permissive profile (listing no
-  roles) results in `AccessDenied` at assume time.
+  list the role ARN. An over-permissive profile violates least
+  privilege; an under-permissive one results in `AccessDenied`.
 
 - **"Revocation is automatic."** It is not. By default, a certificate
-  remains valid until its expiration date. To revoke a certificate
-  before expiration, you must configure a Certificate Revocation List
-  (CRL) or OCSP in Roles Anywhere. Without revocation, a compromised
-  certificate remains usable until it expires. This is the #1 cause of
-  "we revoked the cert in the CA but AWS still accepts it" incidents.
+  remains valid until its expiration date. To revoke before expiration,
+  you must configure a Certificate Revocation List (CRL). Without
+  revocation, a compromised certificate remains usable until it
+  expires. This is the #1 cause of "we revoked the cert in the CA but
+  AWS still accepts it" incidents.
 
 ## Configuration dependency graph (novel heuristic)
 
 Roles Anywhere configurations are NOT independent. The trust anchor
-must bind the CA before the profile can map certificates. The IAM
-role's trust policy must allow Roles Anywhere before assume works. The
+must bind the CA before the profile can map certificates; the IAM
+role's trust policy must allow Roles Anywhere before assume works; the
 credential helper must reference the correct profile and certificate
 before the workload can authenticate. Use this graph to sequence
 provisioning.
@@ -238,27 +237,23 @@ provisioning.
 **The trust-policy-on-the-IAM-role row is the one a baseline model
 misses.** A baseline says "create a trust anchor and profile." The
 correct heuristic recognizes that the IAM role's trust policy must
-explicitly allow `sts:AssumeRole` from `rolesanywhere.amazonaws.com`
-(or include the Roles Anywhere service principal for AssumeRoot).
+explicitly allow `sts:AssumeRole` from `rolesanywhere.amazonaws.com`.
 Without this trust policy, the credential helper returns
 `AccessDenied` even with a valid certificate, trust anchor, and
-profile. The procedure below forces an explicit decision on each.
+profile.
 
 **Cross-dependency gotchas:**
-- The IAM role's trust policy must allow Roles Anywhere as a principal.
-  A role that trusts only `ec2.amazonaws.com` (EC2 instance profile)
-  CANNOT be assumed via Roles Anywhere.
+- A role that trusts only `ec2.amazonaws.com` (EC2 instance profile)
+  CANNOT be assumed via Roles Anywhere — it must trust
+  `rolesanywhere.amazonaws.com`.
 - The profile's `roleArns` must match the IAM role ARN exactly. A
-  mismatch (e.g., wrong path or wrong role name) causes assume to fail.
-- The credential helper requires the certificate AND the private key.
-  The certificate alone is insufficient — the helper signs the request
-  with the private key to prove possession.
+  mismatch (wrong path or wrong role name) causes assume to fail.
+- The credential helper requires the certificate AND the private key —
+  the helper signs the request with the private key to prove possession.
 - Session policies RESTRICT permissions; they never expand them. A
-  session policy cannot grant more than the IAM role's identity-based
-  policies allow.
-- Revocation (CRL) must be configured at the trust anchor level, not
-  the profile level. A CRL applies to ALL certificates issued by the
-  CA bound to that trust anchor.
+  session policy cannot grant more than the IAM role's policies allow.
+- Revocation (CRL) must be configured at the trust anchor level. A CRL
+  applies to ALL certificates issued by the CA bound to that anchor.
 
 ## Expert heuristic: the three-legged trust stool
 
@@ -269,19 +264,18 @@ recognizes that Roles Anywhere requires three components to function:
 Three-legged trust stool:
   1. Trust anchor (binds external CA to AWS IAM)
      → "AWS trusts certificates signed by this CA"
-     → Without this: AWS rejects all certificates from your PKI
+     → Without: AWS rejects all certificates from your PKI
 
   2. Profile (maps external certificate to IAM role)
      → "A certificate from this CA can assume these IAM roles"
-     → Without this: AWS does not know which role to assume
+     → Without: AWS does not know which role to assume
 
   3. IAM role (with trust policy for rolesanywhere.amazonaws.com)
      → "This role can be assumed by Roles Anywhere"
-     → Without this: assume fails with AccessDenied
+     → Without: assume fails with AccessDenied
 
-All three must exist and be correctly configured. Missing any one
-results in failure. The failure mode is opaque — the credential helper
-returns AccessDenied without indicating which component is wrong.
+All three must exist. Missing any one results in opaque failure — the
+credential helper returns AccessDenied without indicating which is wrong.
 ```
 
 **Key implication:** the #1 cause of "Roles Anywhere doesn't work" is a
@@ -292,9 +286,9 @@ principal.
 ## Expert heuristic: the credential helper signs requests with the certificate
 
 The AWS signing helper (`aws_signing_helper`) is the client-side tool
-that exchanges an X.509 certificate for STS temporary credentials. It
-signs the AssumeRole request with the certificate's private key,
-proving possession.
+that exchanges an X.509 certificate for STS temporary credentials,
+signing the AssumeRole request with the certificate's private key to
+prove possession.
 
 ```text
 Credential helper workflow:
@@ -324,15 +318,12 @@ the workload cannot sign requests with the certificate.
 
 A session policy is an optional inline or managed policy attached to
 the profile. It further restricts the IAM role's permissions for
-sessions assumed via that profile.
-
-```text
-Effective permissions = IAM role permissions ∩ Session policy
-  → If IAM role allows s3:* and session policy allows s3:GetObject only,
-    effective permission is s3:GetObject only.
-  → If IAM role allows s3:GetObject and session policy allows s3:PutObject,
-    effective permission is NOTHING (intersection is empty).
-```
+sessions assumed via that profile. Effective permissions = IAM role
+permissions intersected with the session policy. If the IAM role
+allows `s3:*` and the session policy allows `s3:GetObject` only, the
+effective permission is `s3:GetObject` only. If the IAM role allows
+`s3:GetObject` and the session policy allows `s3:PutObject` only, the
+effective permission is NOTHING (empty intersection).
 
 **Key implication:** use session policies to scope down a shared IAM
 role for different profiles. For example, a "ci-runner" role with
@@ -522,14 +513,10 @@ the session policy.
 The AWS signing helper (`aws_signing_helper`) is a client-side binary
 that exchanges an X.509 certificate for STS temporary credentials.
 
-**Download the signing helper:**
-
-```bash
-# Download the binary for your platform
-curl -o aws_signing_helper \
-  https://rolesanywhere-helper-tool.s3.us-west-2.amazonaws.com/latest/aws_signing_helper_darwin_arm64
-chmod +x aws_signing_helper
-```
+**Download the signing helper** for your platform from the AWS Roles
+Anywhere helper tool S3 bucket (e.g.,
+`https://rolesanywhere-helper-tool.s3.us-west-2.amazonaws.com/latest/aws_signing_helper_darwin_arm64`),
+then `chmod +x aws_signing_helper`.
 
 **Exchange certificate for temporary credentials:**
 
@@ -781,17 +768,12 @@ VERIFICATION_COMMANDS:
 
 ### Certificate rejected: not signed by trusted CA
 - The certificate is not signed by the CA bound to the trust anchor.
-  Verify the certificate chain: `openssl verify -CAfile ca-cert.pem
-  client-cert.pem`. Also verify the trust anchor's CA cert matches.
+  Verify the chain: `openssl verify -CAfile ca-cert.pem client-cert.pem`.
+  Also verify the trust anchor's CA cert matches.
 
-### Certificate rejected: expired
-- The certificate has passed its expiration date. Generate a new
-  certificate from the CA and update the client.
-
-### Certificate rejected: revoked
-- The certificate is on the CRL. If the revocation was accidental,
-  remove it from the CRL and update. Otherwise, generate a new
-  certificate.
+### Certificate rejected: expired or revoked
+- The certificate has passed its expiration date (generate a new one)
+  or is on the CRL (remove from the CRL and update if accidental).
 
 ### Credential helper not found
 - The `aws_signing_helper` binary is not on the client machine.
@@ -800,8 +782,7 @@ VERIFICATION_COMMANDS:
 ### Session expires too quickly
 - The session duration is too short. Update the profile's
   `durationSeconds` (max: 43200 seconds = 12 hours). The credential
-  helper will re-run automatically if configured as a credential
-  process.
+  helper re-runs automatically if configured as a credential process.
 
 ## Domain
 

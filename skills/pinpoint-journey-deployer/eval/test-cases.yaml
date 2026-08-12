@@ -1,0 +1,173 @@
+# Eval test cases for pinpoint-journey-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Pinpoint journey
+# topologies (event-based abandoned cart with conditional split and
+# quiet time, segment-based weekly digest with multivariate A/B test
+# and holdout, multi-step onboarding with custom Lambda channel,
+# event-based with wait activities and journey limits, missing email
+# channel prerequisite failure).
+skill: pinpoint-journey-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: event-based-cart-recovery
+    description: >-
+      Provision an event-based Pinpoint journey for abandoned cart
+      recovery with a conditional split (checking purchase_completed
+      event), wait activities, quiet time, and journey limits.
+      Expects READY_TO_DEPLOY with event-based entry noted, conditional
+      split evaluating event attributes, quiet time holding (not
+      cancelling), and limits configured.
+    input: |
+      Create a Pinpoint journey named AbandonedCartRecovery in project
+      app-xyz789 (us-east-1, account 123456789012). Entry: event-based
+      on cart_abandoned event. Activities: SendReminderEmail, Wait1Hour,
+      ConditionalSplit (check if purchase_completed event recorded —
+      YES→ExitConverted, NO→SendReminderSMS), Wait24Hours. Email channel
+      configured. SMS channel configured. Quiet time 22:00-08:00 UTC
+      Mon-Fri. Journey limits: dailyCap 50000, maxEndpointSend 3.
+      Schedule start 2026-08-15T09:00:00Z.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AbandonedCartRecovery"
+        - "event-based"
+        - "cart_abandoned"
+        - "conditional"
+        - "quiet"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: segment-based-multivariate-holdout
+    description: >-
+      Provision a segment-based Pinpoint journey with multivariate A/B
+      split (two variants), holdout for control group measurement, and
+      journey schedule. Expects READY_TO_DEPLOY with segment-based entry,
+      multivariate percentages summing to 100, and holdout percentage
+      noted.
+    input: |
+      Create a Pinpoint journey named WeeklyPromoABTest in project
+      app-xyz789 (us-east-1, account 123456789012). Entry: segment-based
+      on segment seg-active-users-456. Activities: Holdout 10%,
+      MultivariateSplit (50% → SendVariantA email, 50% → SendVariantB
+      email). Email channel configured with templates promo-variant-a
+      and promo-variant-b. Schedule start 2026-08-20T09:00:00Z, end
+      2026-08-27T09:00:00Z, timezone America/New_York.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "WeeklyPromoABTest"
+        - "segment-based"
+        - "multivariate"
+        - "holdout"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: onboarding-custom-channel
+    description: >-
+      Provision a multi-step onboarding journey with a custom Lambda
+      channel for webhook integration. Expects READY_TO_DEPLOY with
+      custom channel Lambda noted and resource-based permission granted
+      to pinpoint.amazonaws.com.
+    input: |
+      Create a Pinpoint journey named UserOnboarding in project
+      app-xyz789 (us-east-1, account 123456789012). Entry: event-based
+      on user_signup event. Activities: SendWelcomeEmail, Wait24Hours,
+      SendTipsEmail, Wait48Hours, Custom (Lambda function
+      OnboardingWebhook for CRM integration), Wait24Hours,
+      SendCheckinPush. Email and push channels configured. Lambda
+      OnboardingWebhook deployed. No quiet time. Journey limits:
+      dailyCap 10000, maxEndpointSend 5.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "UserOnboarding"
+        - "custom"
+        - "Lambda"
+        - "OnboardingWebhook"
+        - "pinpoint.amazonaws.com"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: wait-activities-journey-limits
+    description: >-
+      Provision an event-based journey with multiple wait activities
+      (duration and absolute-time), journey limits, and rate control.
+      Expects READY_TO_DEPLOY with wait types noted, limits configured,
+      and quiet time interaction explained.
+    input: |
+      Create a Pinpoint journey named ReengagementCampaign in project
+      app-xyz789 (us-east-1, account 123456789012). Entry: segment-based
+      on segment seg-inactive-30d-789. Activities: SendReengagementEmail,
+      Wait 3 days (duration), SendReengagementSMS, Wait until
+      2026-09-01T10:00:00Z (absolute), SendFinalPush. Email, SMS, and
+      push channels configured. Quiet time 20:00-07:00 America/Los_Angeles
+      every day. Journey limits: dailyCap 20000, maxEndpointSend 3,
+      totalParticipantCap 100000.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ReengagementCampaign"
+        - "Wait"
+        - "limits"
+        - "quiet"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-email-channel
+    description: >-
+      Operator requests a Pinpoint journey with email send activities
+      but the Pinpoint project does not have the email channel
+      configured. This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING with the email channel gap cited.
+    input: |
+      Create a Pinpoint journey named NewsletterJourney in project
+      app-broken456 (us-east-1, account 123456789012). Entry:
+      segment-based on segment seg-subscribers-999. Activities:
+      SendNewsletterEmail, Wait7Days, SendFollowUpEmail. The email
+      channel is NOT configured on project app-broken456 (no SES
+      verified identity). Schedule start 2026-08-15T09:00:00Z.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "email channel"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "app-broken456"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
