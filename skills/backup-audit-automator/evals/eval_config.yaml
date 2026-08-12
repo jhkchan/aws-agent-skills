@@ -1,0 +1,49 @@
+# Eval configuration for backup-audit-automator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: backup-audit-automator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: daily-compliance-report-sns-alerting
+    difficulty: hard
+    prompt_file: prompts/daily-compliance-report-sns-alerting.md
+    baseline_file: baselines/daily-compliance-report-sns-alerting.md
+    expected_verdict: AUTOMATION_DEPLOYED
+
+  - id: vault-lock-compliance-mode-verification
+    difficulty: hard
+    prompt_file: prompts/vault-lock-compliance-mode-verification.md
+    baseline_file: baselines/vault-lock-compliance-mode-verification.md
+    expected_verdict: AUTOMATION_DEPLOYED
+
+  - id: encryption-audit-kms-coverage
+    difficulty: medium
+    prompt_file: prompts/encryption-audit-kms-coverage.md
+    baseline_file: baselines/encryption-audit-kms-coverage.md
+    expected_verdict: AUTOMATION_DEPLOYED
+
+  - id: multi-account-organizations-report
+    difficulty: hard
+    prompt_file: prompts/multi-account-organizations-report.md
+    baseline_file: baselines/multi-account-organizations-report.md
+    expected_verdict: AUTOMATION_DEPLOYED
+
+  - id: missing-s3-destination
+    difficulty: easy
+    prompt_file: prompts/missing-s3-destination.md
+    baseline_file: baselines/missing-s3-destination.md
+    expected_verdict: REVIEW_REQUIRED

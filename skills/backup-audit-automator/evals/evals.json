@@ -1,0 +1,178 @@
+{
+  "skill": "backup-audit-automator",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Backup Audit Automator. Five-case proven set exercising the AUTOMATION_DEPLOYED / REVIEW_REQUIRED classification across backup audit topologies (daily compliance report with SNS alerting, Vault Lock compliance mode verification, encryption audit for KMS coverage, multi-account Organizations report, missing S3 destination prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "daily-compliance-report-sns-alerting",
+      "name": "Daily backup compliance audit with SNS alerting and all report templates",
+      "difficulty": "hard",
+      "branch": "AUTOMATION_DEPLOYED — three report templates, S3 delivery, CIS/NIST frameworks, SNS failure alerts",
+      "prompt": "Set up a daily backup compliance audit for my account 123456789012. I need all three report templates (BACKUP_JOB_REPORT, COMPLIANCE_REPORT, RECOVERY_POINT_REPORT) delivered to s3://backup-reports-bucket/reports/. Frameworks: CIS_AWS_1.4 and NIST_800_53. SNS alerts for backup failures to arn:aws:sns:us-east-1:123456789012:backup-alerts.",
+      "prompt_file": "prompts/daily-compliance-report-sns-alerting.md",
+      "baseline_file": "baselines/daily-compliance-report-sns-alerting.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "expected_output": "BACKUP_AUDIT: daily-compliance-report\nVERDICT: AUTOMATION_DEPLOYED\nCHECKLIST:\n  [✓] Report templates: BACKUP_JOB_REPORT, COMPLIANCE_REPORT, RECOVERY_POINT_REPORT\n  [✓] S3 destination: s3://backup-reports-bucket/reports/\n  [✓] Compliance framework: CIS_AWS_1.4, NIST_800_53\n  [✓] SNS alerting: arn:aws:sns:us-east-1:123456789012:backup-alerts\nVERIFICATION_COMMANDS:\n  aws backup list-report-plans",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "AUTOMATION_DEPLOYED",
+            "COMPLIANCE_REPORT",
+            "RECOVERY_POINT_REPORT",
+            "SNS",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vault-lock-compliance-mode-verification",
+      "name": "Vault Lock compliance mode verification with immutability check",
+      "difficulty": "hard",
+      "branch": "AUTOMATION_DEPLOYED — compliance mode (immutable) verified, 365-day retention, KMS encryption check",
+      "prompt": "Audit my backup vault named compliant-vault. I need to verify it has Vault Lock in COMPLIANCE mode with 365-day retention. The vault must be immutable. Also check that all recovery points in this vault have KMS encryption.",
+      "prompt_file": "prompts/vault-lock-compliance-mode-verification.md",
+      "baseline_file": "baselines/vault-lock-compliance-mode-verification.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "expected_output": "BACKUP_AUDIT: vault-lock-verification\nVERDICT: AUTOMATION_DEPLOYED\nCHECKLIST:\n  [✓] Vault Lock: compliant-vault — COMPLIANCE (immutable)\n  [✓] Retention: 365 days\nVERIFICATION_COMMANDS:\n  aws backup describe-backup-vault --backup-vault-name compliant-vault",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "AUTOMATION_DEPLOYED",
+            "COMPLIANCE",
+            "immutable",
+            "Vault Lock",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "encryption-audit-kms-coverage",
+      "name": "Backup encryption audit for KMS coverage across all vaults",
+      "difficulty": "medium",
+      "branch": "AUTOMATION_DEPLOYED — encryption audit verifying KMS key on all recovery points",
+      "prompt": "Run a backup encryption audit across all my backup vaults. I need to verify that every recovery point has KMS encryption. If any recovery points are unencrypted, flag them. S3 report delivery to s3://backup-audit-bucket/encryption/.",
+      "prompt_file": "prompts/encryption-audit-kms-coverage.md",
+      "baseline_file": "baselines/encryption-audit-kms-coverage.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "expected_output": "BACKUP_AUDIT: encryption-audit\nVERDICT: AUTOMATION_DEPLOYED\nCHECKLIST:\n  [✓] Encryption audit: recovery points checked for KMS\nVERIFICATION_COMMANDS:\n  aws backup list-recovery-points-by-backup-vault --backup-vault-name <vault>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "AUTOMATION_DEPLOYED",
+            "encryption",
+            "KMS",
+            "recovery point",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-account-organizations-report",
+      "name": "Multi-account backup compliance report via AWS Organizations",
+      "difficulty": "hard",
+      "branch": "AUTOMATION_DEPLOYED — all accounts in Org, all regions, CIS framework, SNS alerts",
+      "prompt": "Create an organization-wide backup compliance report. I need COMPLIANCE_REPORT delivered daily to s3://org-backup-reports/compliance/ covering ALL accounts in my Organization (5 accounts) and ALL regions. Framework: CIS_AWS_1.4. SNS alerts to arn:aws:sns:us-east-1:123456789012:org-backup-alerts.",
+      "prompt_file": "prompts/multi-account-organizations-report.md",
+      "baseline_file": "baselines/multi-account-organizations-report.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "expected_output": "BACKUP_AUDIT: org-compliance-report\nVERDICT: AUTOMATION_DEPLOYED\nCHECKLIST:\n  [✓] Multi-account: ALL_ACCOUNTS_IN_ORG (5 accounts)\n  [✓] Compliance framework: CIS_AWS_1.4\nVERIFICATION_COMMANDS:\n  aws backup list-report-plans",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "AUTOMATION_DEPLOYED",
+            "multi-account",
+            "COMPLIANCE_REPORT",
+            "CIS_AWS_1.4",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-s3-destination",
+      "name": "Backup report plan without S3 destination (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "REVIEW_REQUIRED — no S3 bucket for report delivery; report plans require S3 destination",
+      "prompt": "Set up backup compliance reports. I do not have an S3 bucket for report delivery. Just create the report plan and figure out delivery later. Account: 123456789012.",
+      "prompt_file": "prompts/missing-s3-destination.md",
+      "baseline_file": "baselines/missing-s3-destination.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_output": "BACKUP_AUDIT: pending-report-plan\nVERDICT: REVIEW_REQUIRED\nCHECKLIST:\n  [✗] S3 destination: MISSING — no S3 bucket for report delivery; report plans require an S3 destination with backup.amazonaws.com write permission",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "REVIEW_REQUIRED",
+            "S3",
+            "destination",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: AUTOMATION_DEPLOYED"
+          ]
+        }
+      ]
+    }
+  ]
+}

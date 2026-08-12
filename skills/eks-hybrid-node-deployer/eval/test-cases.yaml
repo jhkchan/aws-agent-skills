@@ -1,0 +1,147 @@
+# Eval test cases for eks-hybrid-node-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across EKS Hybrid Nodes topologies
+# (basic on-prem registration via activation code, Direct Connect
+# networking with security group mapping, pod identity for hybrid
+# workloads, SSM Session Manager with CloudWatch monitoring, and missing
+# network path to EKS control plane).
+skill: eks-hybrid-node-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: hybrid-node-basic-registration
+    description: >-
+      Provision EKS hybrid nodes with basic on-prem registration using
+      activation code (not IAM access keys). Expects READY_TO_DEPLOY
+      with activation code/ID as bootstrap credential, hybrid node IAM
+      role created, and nodeadm connector agent noted.
+    input: |
+      Register 3 on-prem Ubuntu servers as EKS hybrid nodes to cluster
+      prod-cluster in us-east-1. Hybrid node IAM role EKSHybridNodeRole.
+      Kubernetes v1.30. Container runtime containerd already installed.
+      Create the activation entry and nodeadm bootstrap commands.
+      Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "activation"
+        - "EKS_HYBRID"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "nodeadm"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+        - "access key"
+
+  - id: direct-connect-networking
+    description: >-
+      Configure Direct Connect networking for EKS hybrid nodes with
+      security group mapping. Expects READY_TO_DEPLOY with network path
+      noted (Direct Connect), latency requirement cited, and on-prem
+      firewall rules (not VPC security groups).
+    input: |
+      Set up networking for EKS hybrid nodes on prod-cluster. The
+      on-prem data center connects to AWS via Direct Connect
+      (dxcon-aaa111, private VIF). EKS API endpoint is
+      https://XXXX.gr7.us-east-1.eks.amazonaws.com. On-prem nodes are
+      in 10.0.0.0/16. Configure firewall rules. us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Direct Connect"
+        - "network path"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: pod-identity-hybrid-workloads
+    description: >-
+      Configure pod identity for hybrid workloads on EKS hybrid nodes.
+      Expects READY_TO_DEPLOY with pod identity agent noted as required
+      on hybrid nodes (no IMDS, no EC2 instance profile), and pod
+      identity association configured in EKS API.
+    input: |
+      Configure pod identity for workloads running on EKS hybrid nodes
+      in cluster prod-cluster. Service account my-app-sa in namespace
+      production should map to IAM role
+      arn:aws:iam::123456789012:role/MyAppPodRole. Nodes are on-prem
+      hybrid nodes (no IMDS available). us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "pod identity"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ssm-session-manager-cloudwatch
+    description: >-
+      Enable SSM Session Manager for hybrid node access and CloudWatch
+      agent for health monitoring. Expects READY_TO_DEPLOY with SSM
+      noted as recommended (not SSH), CloudWatch agent manually
+      installed, and both requiring on-prem installation.
+    input: |
+      Enable SSM Session Manager for remote access to 3 EKS hybrid
+      nodes on prod-cluster. Also install CloudWatch agent for health
+      monitoring. Hybrid node IAM role EKSHybridNodeRole with SSM and
+      CloudWatch permissions. us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SSM"
+        - "CloudWatch"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-network-path
+    description: >-
+      Operator requests EKS hybrid node registration but there is no
+      network path from on-prem to the EKS control plane. This is a
+      prerequisite failure.
+      Expects PREREQUISITES_MISSING with the network path gap cited.
+    input: |
+      Register 2 on-prem servers as EKS hybrid nodes to cluster
+      prod-cluster in us-east-1. The on-prem data center does NOT have
+      Direct Connect or VPN configured. The servers have internet
+      access but cannot reach the EKS API endpoint (private endpoint
+      only). Hybrid node IAM role EKSHybridNodeRole.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "network path"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "control plane"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

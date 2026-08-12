@@ -1,0 +1,159 @@
+# Eval test cases for cloudwatch-application-signals-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the OPERATION_COMPLETED /
+# REVIEW_REQUIRED classification across Application Signals
+# topologies (SLO creation with MWMBR burn rate alerts, SLI
+# metrics for latency and availability, service map with X-Ray
+# correlation, multi-service SLO tracking, missing OTel
+# instrumentation).
+skill: cloudwatch-application-signals-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: enable-slos-burn-rate
+    description: >-
+      Enable Application Signals SLOs with MWMBR burn rate alerts for
+      a critical payments service. Expects OPERATION_COMPLETED with
+      fast burn (5m/1h, 14.4x → page) and slow burn (30m/6h, 6.0x →
+      ticket), SNS topics, warning threshold, and auto-derived SLI
+      metrics noted.
+    input: |
+      Enable Application Signals for service payments-api, operation
+      POST /charge. Create an SLO with 99.9% availability target over
+      30-day rolling interval. Warning threshold 99.95%. Configure
+      MWMBR burn rate alerts: fast burn (5m/1h, 14.4x) pages SNS topic
+      critical-alerts, slow burn (30m/6h, 6.0x) tickets SNS topic
+      warning-tickets. OTel SDK instrumentation already enabled.
+      Tags: Environment=production, Team=payments, Tier=critical.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "burn rate"
+        - "payments-api"
+        - "99.9"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "MWMBR"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: sli-latency-availability
+    description: >-
+      Verify SLI metrics for latency and availability are auto-derived
+      from traces for a service. Expects OPERATION_COMPLETED with SLI
+      auto-derivation noted (no manual metrics), operation-level SLI
+      targets, and anomaly detection on latency.
+    input: |
+      Verify SLI metrics for service checkout-api. Operations:
+      GET /cart, POST /checkout, GET /order-status. Need latency SLI
+      (P99 < 500ms for POST /checkout, P99 < 200ms for GET endpoints)
+      and availability SLI (99.95% all operations). Enable anomaly
+      detection on latency P99. OTel auto-instrumentation via CloudWatch
+      Agent is configured. Tags: Environment=production, Team=checkout.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "latency"
+        - "availability"
+        - "auto-derived"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: service-map-correlation
+    description: >-
+      Verify service map visualization with X-Ray trace correlation and
+      RUM integration. Expects OPERATION_COMPLETED with service map
+      auto-generated, X-Ray drill-down enabled, and RUM correlated via
+      trace IDs.
+    input: |
+      Verify service map and trace correlation for the microservices
+      architecture: frontend (RUM enabled), api-gateway, orders-api,
+      inventory-api, payments-api. Need X-Ray drill-down from SLO
+      status to individual traces. RUM app monitor storefront-rum
+      with EnableXRay true. All services have OTel SDK instrumentation.
+      Tags: Environment=production, Team=platform.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "service map"
+        - "X-Ray"
+        - "RUM"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: multi-service-slo-tracking
+    description: >-
+      Set up multi-service SLO tracking with a fleet dashboard across
+      5 services. Expects OPERATION_COMPLETED with per-service SLOs,
+      aggregated dashboard, canary alarms, and burn rate alerts per
+      service.
+    input: |
+      Create multi-service SLO tracking for 5 services: orders-api,
+      inventory-api, payments-api, shipping-api, notification-api.
+      Each needs a 99.9% availability SLO over 30-day rolling interval.
+      Create a CloudWatch dashboard aggregating all SLO statuses.
+      Configure fast-burn burn rate alerts for each service to SNS topic
+      critical-alerts. Add canary alarms for each service endpoint.
+      All services have OTel instrumentation. Tags: Environment=production.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "multi-service"
+        - "dashboard"
+        - "burn rate"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: missing-otel-instrumentation
+    description: >-
+      Operator requests Application Signals enablement but the services
+      have NO OTel instrumentation (neither SDK nor CloudWatch Agent
+      auto-instrumentation). This is a prerequisite gap. Expects
+      REVIEW_REQUIRED with the missing instrumentation cited.
+    input: |
+      Enable Application Signals for service legacy-api. Create an SLO
+      with 99.5% availability target. Configure burn rate alerts. The
+      service has no OTel SDK instrumentation and CloudWatch Agent is
+      not configured for auto-instrumentation. Tags: Environment=staging.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "OTel"
+        - "instrumentation"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "traces"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPERATION_COMPLETED"

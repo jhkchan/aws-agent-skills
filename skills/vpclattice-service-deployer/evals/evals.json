@@ -1,0 +1,176 @@
+{
+  "skill": "vpclattice-service-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the VPC Lattice Service Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Lattice topologies (service network with HTTP service and path-based routing, weighted canary traffic splitting, IAM auth policy at service level not rule level, Lambda target group with custom domain and access logs, missing VPC association prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "service-network-http-service",
+      "name": "Service network with HTTP service, instance target group, path-based routing, and health checks",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — service network (top-level routing plane), HTTP service, INSTANCE target group with health check determining routing eligibility, path-based listener rules",
+      "prompt": "Create a VPC Lattice service network named prod-network with auth type AWS_IAM in us-east-1. Create an HTTP service payments-svc. Target group tg-stable (INSTANCE type, port 8080, VPC vpc-aaa11122, health check path /health). Listener on port 80. Path-based rule: /v2/* routes to tg-stable. Default action routes to tg-stable. Tags: Environment=production.",
+      "prompt_file": "prompts/service-network-http-service.md",
+      "baseline_file": "baselines/service-network-http-service.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "VPC_LATTICE: sni-aaa111 → svc-bbb222 (payments-svc-xxx.example.com)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Service network: sni-aaa111 (auth type: AWS_IAM)\n  [✓] Target group: tgc-stable (type: INSTANCE, port: 8080)\n  [✓] Health check: path /health, interval 30s — targets healthy\n  [✓] Service: svc-bbb222 (protocol: HTTP)\n  [✓] Listener: lstn-ccc333 (port 80, protocol HTTP)\n  [✓] Listener rules: path /v2/* → tg-stable; default → tg-stable\n  [✓] Auth policy: IAM auth at SERVICE level (covers ALL rules)\nVERIFICATION_COMMANDS:\n  aws vpc-lattice get-service-network --service-network-identifier sni-aaa111\n  aws vpc-lattice list-targets --target-group-identifier tgc-stable",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "service network",
+            "VPC_LATTICE",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "health check"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weighted-canary-traffic-split",
+      "name": "Weighted canary traffic splitting with two target groups",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — weighted forwarding to canary TG (20%) and stable TG (80%), weights are relative not percentage, health checks on both target groups",
+      "prompt": "Configure traffic splitting on Lattice service payments-svc (svc-bbb222) listener lstn-ccc333. Create canary target group tg-canary (INSTANCE, port 8080, VPC vpc-aaa11122, health path /health). Rule for /api/* path: route 20% to tg-canary and 80% to tg-stable (tgc-stable). us-east-1.",
+      "prompt_file": "prompts/weighted-canary-traffic-split.md",
+      "baseline_file": "baselines/weighted-canary-traffic-split.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "VPC_LATTICE: sni-aaa111 → svc-bbb222 (canary traffic split)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Target group: tg-canary (type: INSTANCE, port: 8080)\n  [✓] Health check: path /health, interval 30s\n  [✓] Traffic splitting: canary 20% / stable 80%\n  [✓] Weights are relative (not percentage; sum need not be 100)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "traffic splitting",
+            "canary",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "iam-auth-policy-service-level",
+      "name": "IAM auth policy applied at SERVICE level covering all listener rules",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — IAM auth policy attaches to the SERVICE not individual rules; covers ALL paths including /api/* and /admin/*",
+      "prompt": "Apply IAM auth policy to Lattice service payments-svc (svc-bbb222) in us-east-1. Allow role arn:aws:iam::123456789012:role/PaymentsCaller to invoke the service. The service has listener rules for /api/* and /admin/* paths. Auth should apply to ALL paths on the service.",
+      "prompt_file": "prompts/iam-auth-policy-service-level.md",
+      "baseline_file": "baselines/iam-auth-policy-service-level.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "VPC_LATTICE: svc-bbb222 (IAM auth policy at SERVICE level)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Auth policy: IAM auth at SERVICE level (covers ALL rules)\n  [✓] Auth policy scope: service-level — NOT rule-level\n  [✓] Paths covered: /api/* AND /admin/* (all paths on service)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SERVICE",
+            "auth policy",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lambda-target-with-domain-and-logs",
+      "name": "Lambda target group with custom domain and CloudWatch access logs",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — LAMBDA target group, custom domain with ACM cert in us-east-1, access logs to CloudWatch",
+      "prompt": "Create a Lambda target group tg-processor for function arn:aws:lambda:us-east-1:123456789012:function:processor. Attach to service events-svc (svc-eee555). Custom domain events.internal.example.com with ACM cert arn:aws:acm:us-east-1:123456789012:certificate/aaa-bbb-ccc. Enable access logs to CloudWatch log group /aws/vpc-lattice. us-east-1.",
+      "prompt_file": "prompts/lambda-target-with-domain-and-logs.md",
+      "baseline_file": "baselines/lambda-target-with-domain-and-logs.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "VPC_LATTICE: svc-eee555 (Lambda TG + custom domain + access logs)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Target group: tg-processor (type: LAMBDA)\n  [✓] Custom domain: events.internal.example.com (ACM cert in us-east-1)\n  [✓] Access logs: CloudWatch (/aws/vpc-lattice)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Lambda",
+            "us-east-1",
+            "CloudWatch",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-vpc-association",
+      "name": "VPC not associated with service network (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — VPC vpc-ccc33333 is NOT associated with service network sni-aaa111; instances cannot resolve Lattice DNS or reach services",
+      "prompt": "Create a Lattice service payments-svc on service network prod-network (sni-aaa111). VPC vpc-ccc33333 needs to access the service. The VPC is NOT currently associated with the service network. us-east-1.",
+      "prompt_file": "prompts/missing-vpc-association.md",
+      "baseline_file": "baselines/missing-vpc-association.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "VPC_LATTICE: sni-aaa111 → payments-svc\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] VPC association: vpc-ccc33333 NOT associated with sni-aaa111 — instances cannot resolve Lattice DNS or reach services",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "VPC association",
+            "VERDICT",
+            "CHECKLIST",
+            "vpc-ccc33333"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

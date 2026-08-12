@@ -1,0 +1,178 @@
+{
+  "skill": "cloudfront-origin-access-control-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the CloudFront Origin Access Control Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across OAC topologies (basic S3 origin with OAC, SSE-KMS-encrypted bucket with sigv4 signing and KMS key policy, OAI-to-OAC zero-downtime migration, multi-distribution to single shared bucket with SourceArn list, Website Endpoint prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "basic-s3-oac",
+      "name": "Basic CloudFront OAC for S3 origin",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — standard OAC with S3 origin, always-sign signing, bucket policy with cloudfront.amazonaws.com and AWS:SourceArn",
+      "prompt": "Create a CloudFront Origin Access Control for distribution EDFDVBD6EXAMPLE serving S3 bucket my-assets-bucket in us-east-1. Account 111122223333. The bucket is private (no website hosting). Use sigv4 signing with always-sign behavior. Tags: Environment=production, Team=platform.",
+      "prompt_file": "prompts/basic-s3-oac.md",
+      "baseline_file": "baselines/basic-s3-oac.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUDFRONT_OAC: EDFDVBD6EXAMPLE → my-assets-bucket (E2QWRUOACID123)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] S3 bucket: my-assets-bucket (region: us-east-1)\n  [✓] Origin type: S3 (not Website Endpoint)\n  [✓] OAC created: E2QWRUOACID123 (SigningBehavior: always-sign)\n  [✓] Distribution origin: EDFDVBD6EXAMPLE → OriginAccessControlId=E2QWRUOACID123\n  [✓] S3 bucket policy: cloudfront.amazonaws.com s3:GetObject with AWS:SourceArn=arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE\n  [✓] Bucket public access: blocked (OAC only)\nVERIFICATION_COMMANDS:\n  aws cloudfront get-origin-access-control --id E2QWRUOACID123\n  aws cloudfront get-distribution-config --id EDFDVBD6EXAMPLE\n  aws s3api get-bucket-policy --bucket my-assets-bucket",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EDFDVBD6EXAMPLE",
+            "my-assets-bucket",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "cloudfront.amazonaws.com"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "oac-sse-kms",
+      "name": "CloudFront OAC with SSE-KMS-encrypted S3 bucket",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SSE-KMS bucket requires sigv4 always-sign, S3 bucket policy, AND KMS key policy granting cloudfront.amazonaws.com kms:Decrypt",
+      "prompt": "Create a CloudFront OAC for distribution E2QWRUEXAMPLE2 serving S3 bucket my-secure-data-bucket in us-east-1, account 111122223333. The bucket is encrypted with SSE-KMS using key arn:aws:kms:us-east-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab. No website hosting. Tags: Environment=production, Encryption=sse-kms.",
+      "prompt_file": "prompts/oac-sse-kms.md",
+      "baseline_file": "baselines/oac-sse-kms.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUDFRONT_OAC: E2QWRUEXAMPLE2 → my-secure-data-bucket (E3KMSOACID456)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] S3 bucket: my-secure-data-bucket (region: us-east-1)\n  [✓] Origin type: S3 (not Website Endpoint)\n  [✓] OAC created: E3KMSOACID456 (SigningBehavior: always-sign)\n  [✓] S3 bucket policy: cloudfront.amazonaws.com s3:GetObject with AWS:SourceArn\n  [✓] SSE-KMS: enabled (KMS key policy grants cloudfront.amazonaws.com kms:Decrypt)\nVERIFICATION_COMMANDS:\n  aws cloudfront get-origin-access-control --id E3KMSOACID456\n  aws s3api get-bucket-encryption --bucket my-secure-data-bucket\n  aws kms get-key-policy --key-id 1234abcd-12ab-34cd-56ef-1234567890ab --policy-name default",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "always-sign",
+            "kms:Decrypt",
+            "cloudfront.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "oai-to-oac-migration",
+      "name": "Zero-downtime migration from OAI to OAC",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — add OAC alongside OAI, update bucket policy with both grants, update distribution, verify, then remove OAI",
+      "prompt": "Migrate distribution E3EXAMPLE3XXX from Origin Access Identity (OAI E3OAIID1234) to Origin Access Control. S3 bucket is my-legacy-bucket in us-east-1, account 111122223333. The OAI canonical user ID is 1a2b3c4d5e6f7g8h9i0j. Need zero downtime. Tags: Environment=production, Migration=oai-to-oac.",
+      "prompt_file": "prompts/oai-to-oac-migration.md",
+      "baseline_file": "baselines/oai-to-oac-migration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUDFRONT_OAC: E3EXAMPLE3XXX → my-legacy-bucket (E4MIGOACID789)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] S3 bucket: my-legacy-bucket (region: us-east-1)\n  [✓] OAC created: E4MIGOACID789 (SigningBehavior: always-sign)\n  [✓] OAI migration: zero-downtime flow (add OAC → both active → verify → remove OAI)\n  [✓] S3 bucket policy: cloudfront.amazonaws.com grant added (OAI grant retained during transition)\nVERIFICATION_COMMANDS:\n  aws cloudfront get-origin-access-control --id E4MIGOACID789\n  aws cloudfront get-distribution-config --id E3EXAMPLE3XXX\n  aws s3api get-bucket-policy --bucket my-legacy-bucket",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "migration",
+            "zero downtime",
+            "cloudfront.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-distribution-shared-bucket",
+      "name": "Multiple CloudFront distributions serving one S3 bucket via OAC",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — three distributions each with own OAC, bucket policy lists all distribution ARNs in AWS:SourceArn condition",
+      "prompt": "Create OACs for three CloudFront distributions (EDFDVBD6EXAMPLE, E2QWRUEXAMPLE2, E3EXAMPLE3XXX) all serving from S3 bucket shared-content-bucket in us-east-1, account 111122223333. Each distribution needs its own OAC. The bucket is private, no SSE-KMS. Tags: Environment=production, Pattern=multi-distribution.",
+      "prompt_file": "prompts/multi-distribution-shared-bucket.md",
+      "baseline_file": "baselines/multi-distribution-shared-bucket.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUDFRONT_OAC: EDFDVBD6EXAMPLE + E2QWRUEXAMPLE2 + E3EXAMPLE3XXX → shared-content-bucket\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] S3 bucket: shared-content-bucket (region: us-east-1)\n  [✓] Multi-distribution: 3 distributions in bucket policy SourceArn list\n  [✓] S3 bucket policy: cloudfront.amazonaws.com s3:GetObject with AWS:SourceArn list (3 ARNs)\nVERIFICATION_COMMANDS:\n  aws s3api get-bucket-policy --bucket shared-content-bucket\n  aws cloudfront list-distributions",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-content-bucket",
+            "AWS:SourceArn",
+            "multi-distribution",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "website-endpoint-mismatch",
+      "name": "OAC requested for S3 bucket with website hosting enabled (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — bucket has static website hosting enabled; OAC only supports the S3 origin type, not Website Endpoint",
+      "prompt": "Create a CloudFront OAC for distribution E4EXAMPLE4XXX serving S3 bucket my-website-bucket in us-east-1, account 111122223333. The bucket has static website hosting enabled with index.html as the index document. Tags: Environment=production.",
+      "prompt_file": "prompts/website-endpoint-mismatch.md",
+      "baseline_file": "baselines/website-endpoint-mismatch.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "CLOUDFRONT_OAC: E4EXAMPLE4XXX → my-website-bucket\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Origin type: FAIL (bucket has website hosting enabled — OAC only supports S3 origin type, not Website Endpoint)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "Website Endpoint",
+            "VERDICT",
+            "CHECKLIST",
+            "website hosting"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+# Eval test cases for vpclattice-service-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across VPC Lattice topologies
+# (service network with HTTP service and path-based routing, weighted
+# canary traffic splitting, IAM auth policy at service level, Lambda
+# target group with custom domain and access logs, missing VPC
+# association prerequisite failure).
+skill: vpclattice-service-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: service-network-http-service
+    description: >-
+      Provision a VPC Lattice service network with an HTTP service,
+      instance target group, path-based listener rules, and health
+      checks. Expects READY_TO_DEPLOY with service network as top-level
+      routing plane, health check determining routing eligibility, and
+      both target group and listener created.
+    input: |
+      Create a VPC Lattice service network named prod-network with
+      auth type AWS_IAM in us-east-1. Create an HTTP service
+      payments-svc. Target group tg-stable (INSTANCE type, port 8080,
+      VPC vpc-aaa11122, health check path /health). Listener on port
+      80. Path-based rule: /v2/* routes to tg-stable. Default action
+      routes to tg-stable. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "service network"
+        - "VPC_LATTICE"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "health check"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: weighted-canary-traffic-split
+    description: >-
+      Configure weighted traffic splitting for a canary deployment with
+      two target groups. Expects READY_TO_DEPLOY with canary/stable
+      weights noted, weights relative (not summing to 100), and health
+      checks on both target groups.
+    input: |
+      Configure traffic splitting on Lattice service payments-svc
+      (svc-bbb222) listener lstn-ccc333. Create canary target group
+      tg-canary (INSTANCE, port 8080, VPC vpc-aaa11122, health path
+      /health). Rule for /api/* path: route 20% to tg-canary and 80% to
+      tg-stable (tgc-stable). us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "traffic splitting"
+        - "canary"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: iam-auth-policy-service-level
+    description: >-
+      Apply an IAM auth policy at the service level. Expects
+      READY_TO_DEPLOY with auth policy noted as SERVICE-level (not
+      rule-level), covering all listener rules on the service.
+    input: |
+      Apply IAM auth policy to Lattice service payments-svc (svc-bbb222)
+      in us-east-1. Allow role arn:aws:iam::123456789012:role/PaymentsCaller
+      to invoke the service. The service has listener rules for /api/*
+      and /admin/* paths. Auth should apply to ALL paths on the service.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SERVICE"
+        - "auth policy"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: lambda-target-with-domain-and-logs
+    description: >-
+      Provision a Lambda target group with custom domain mapping and
+      access log delivery to CloudWatch. Expects READY_TO_DEPLOY with
+      Lambda TG noted, ACM cert in us-east-1, and access logs configured.
+    input: |
+      Create a Lambda target group tg-processor for function
+      arn:aws:lambda:us-east-1:123456789012:function:processor. Attach
+      to service events-svc (svc-eee555). Custom domain
+      events.internal.example.com with ACM cert
+      arn:aws:acm:us-east-1:123456789012:certificate/aaa-bbb-ccc.
+      Enable access logs to CloudWatch log group /aws/vpc-lattice.
+      us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Lambda"
+        - "us-east-1"
+        - "CloudWatch"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-vpc-association
+    description: >-
+      Operator requests Lattice service access from a VPC but the VPC is
+      not associated with the service network. This is a prerequisite
+      failure.
+      Expects PREREQUISITES_MISSING with the VPC association gap cited.
+    input: |
+      Create a Lattice service payments-svc on service network
+      prod-network (sni-aaa111). VPC vpc-ccc33333 needs to access the
+      service. The VPC is NOT currently associated with the service
+      network. us-east-1.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "VPC association"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "vpc-ccc33333"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

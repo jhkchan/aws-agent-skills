@@ -1,0 +1,154 @@
+# Eval test cases for ecr-replication-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across ECR replication
+# topologies (cross-region same-account replication for DR,
+# cross-account replication with destination registry ID,
+# pull-through cache for docker.io upstream, multi-region DR with
+# lifecycle and cost awareness, missing destination registry ID
+# prerequisite failure).
+skill: ecr-replication-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cross-region-replication
+    description: >-
+      Configure cross-region ECR replication from us-east-1 to
+      us-west-2 and eu-west-1 within the same account. Expects
+      READY_TO_DEPLOY with registry-level scope noted, read-only
+      replicas flagged, and storage cost doubling mentioned.
+    input: |
+      Configure ECR cross-region replication for account
+      111122223333. Source region us-east-1. Destination regions
+      us-west-2 and eu-west-1. We need DR coverage across three
+      regions. All repos should replicate. Tags:
+      Environment=production, Pattern=dr.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-region"
+        - "us-west-2"
+        - "eu-west-1"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "registry-level"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-replication
+    description: >-
+      Configure cross-account ECR replication from account
+      111122223333 to account 999999999999. Expects READY_TO_DEPLOY
+      with destination registry ID cited, cross-account flagged, and
+      read-only replicas noted.
+    input: |
+      Configure ECR cross-account replication. Source account
+      111122223333 in us-east-1. Destination account 999999999999
+      in us-east-1. We are sharing our container images with a
+      partner account. All repos should replicate. Tags:
+      Environment=production, Pattern=cross-account.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-account"
+        - "999999999999"
+        - "111122223333"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: pull-through-cache-docker-hub
+    description: >-
+      Configure an ECR pull-through cache rule for docker.io to
+      reduce external dependency latency. Expects READY_TO_DEPLOY
+      with upstream registry URL registry-1.docker.io, ECR prefix
+      noted, and cache behavior explained.
+    input: |
+      Create an ECR pull-through cache rule for Docker Hub images.
+      Use the prefix docker-hub/. Upstream registry is docker.io.
+      We want Lambda and ECS to pull from the cached copy instead
+      of hitting Docker Hub directly to avoid rate limits. Region
+      us-east-1, account 111122223333. Tags: Environment=production,
+      Upstream=docker-hub.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "pull-through cache"
+        - "registry-1.docker.io"
+        - "docker-hub/"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: multi-region-dr-with-lifecycle
+    description: >-
+      Configure multi-region ECR replication with lifecycle policies
+      applied to both source and destinations for cost control.
+      Expects READY_TO_DEPLOY with storage cost tripled noted,
+      lifecycle policies in all regions, and replication lag
+      awareness.
+    input: |
+      Configure ECR replication from us-east-1 (account
+      111122223333) to us-west-2 and ap-southeast-2. We have
+      large images (2-5GB) and need cost control. Apply lifecycle
+      policies to retain only the last 30 images per repo in all
+      regions. Tags: Environment=production, Pattern=multi-region-dr.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "lifecycle"
+        - "us-west-2"
+        - "ap-southeast-2"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-destination-registry-id
+    description: >-
+      Operator requests cross-account ECR replication but does not
+      know the destination account's registry ID. Cross-account
+      replication requires the 12-digit destination registry ID.
+      This is a prerequisite failure.
+    input: |
+      Configure ECR cross-account replication from account
+      111122223333 in us-east-1 to a partner account. I don't know
+      the partner's AWS account ID. Just set it up. Tags:
+      Environment=production.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "registry ID"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "account ID"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

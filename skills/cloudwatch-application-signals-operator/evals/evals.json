@@ -1,0 +1,180 @@
+{
+  "skill": "cloudwatch-application-signals-operator",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the CloudWatch Application Signals Operator. Five-case proven set exercising the OPERATION_COMPLETED / REVIEW_REQUIRED classification across Application Signals topologies (SLO creation with MWMBR burn rate alerts, SLI metrics for latency/availability auto-derived from traces, service map with X-Ray correlation and RUM integration, multi-service SLO tracking with fleet dashboard, missing OTel instrumentation). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "enable-slos-burn-rate",
+      "name": "Enable SLOs with MWMBR burn rate alerts for a critical payments service",
+      "difficulty": "hard",
+      "branch": "OPERATION_COMPLETED — 99.9% availability SLO, 30-day rolling interval, MWMBR fast burn (5m/1h, 14.4x → page) + slow burn (30m/6h, 6.0x → ticket), auto-derived SLI metrics",
+      "prompt": "Enable Application Signals for service payments-api, operation POST /charge. Create an SLO with 99.9% availability target over 30-day rolling interval. Warning threshold 99.95%. Configure MWMBR burn rate alerts: fast burn (5m/1h, 14.4x) pages SNS topic critical-alerts, slow burn (30m/6h, 6.0x) tickets SNS topic warning-tickets. OTel SDK instrumentation already enabled. Tags: Environment=production, Team=payments, Tier=critical.",
+      "prompt_file": "prompts/enable-slos-burn-rate.md",
+      "baseline_file": "baselines/enable-slos-burn-rate.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "APP_SIGNALS: payments-api (POST-/charge)\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] OTel instrumentation: enabled (SDK)\n  [✓] Service discovered: payments-api\n  [✓] SLI metrics: availability + latency (auto-derived)\n  [✓] SLO: payments-api-charge-availability (target 99.9%, interval 30 days rolling)\n  [✓] Burn rate alerts: fast burn (5m/1h, 14.4x → page) + slow burn (30m/6h, 6.0x → ticket)\nVERIFICATION_COMMANDS:\n  aws application-signals list-service-level-objectives",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "burn rate",
+            "payments-api",
+            "99.9",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "MWMBR"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sli-latency-availability",
+      "name": "Verify auto-derived SLI metrics for latency and availability with anomaly detection",
+      "difficulty": "hard",
+      "branch": "OPERATION_COMPLETED — SLI auto-derivation from traces, operation-level latency targets (P99), anomaly detection on latency, availability SLI",
+      "prompt": "Verify SLI metrics for service checkout-api. Operations: GET /cart, POST /checkout, GET /order-status. Need latency SLI (P99 < 500ms for POST /checkout, P99 < 200ms for GET endpoints) and availability SLI (99.95% all operations). Enable anomaly detection on latency P99. OTel auto-instrumentation via CloudWatch Agent is configured. Tags: Environment=production, Team=checkout.",
+      "prompt_file": "prompts/sli-latency-availability.md",
+      "baseline_file": "baselines/sli-latency-availability.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "APP_SIGNALS: checkout-api (service-level)\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] SLI metrics: availability + latency (auto-derived from traces)\n  [✓] Operation-level targets: POST /checkout P99 < 500ms, GET P99 < 200ms\n  [✓] Anomaly detection: enabled on latency P99",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "latency",
+            "availability",
+            "auto-derived",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "service-map-correlation",
+      "name": "Service map visualization with X-Ray correlation and RUM integration",
+      "difficulty": "hard",
+      "branch": "OPERATION_COMPLETED — service map auto-generated from traces, X-Ray drill-down enabled, RUM correlated via trace IDs, end-to-end observability",
+      "prompt": "Verify service map and trace correlation for the microservices architecture: frontend (RUM enabled), api-gateway, orders-api, inventory-api, payments-api. Need X-Ray drill-down from SLO status to individual traces. RUM app monitor storefront-rum with EnableXRay true. All services have OTel SDK instrumentation. Tags: Environment=production, Team=platform.",
+      "prompt_file": "prompts/service-map-correlation.md",
+      "baseline_file": "baselines/service-map-correlation.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "APP_SIGNALS: storefront (service-level)\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Service map: auto-generated (5 services, edges from trace context)\n  [✓] X-Ray correlation: drill-down enabled from SLO to traces\n  [✓] RUM integration: storefront-rum (EnableXRay: true)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "service map",
+            "X-Ray",
+            "RUM",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-service-slo-tracking",
+      "name": "Multi-service SLO tracking with fleet dashboard and canary alarms",
+      "difficulty": "hard",
+      "branch": "OPERATION_COMPLETED — 5 services with per-service SLOs, aggregated CloudWatch dashboard, canary alarms, fast-burn alerts per service",
+      "prompt": "Create multi-service SLO tracking for 5 services: orders-api, inventory-api, payments-api, shipping-api, notification-api. Each needs a 99.9% availability SLO over 30-day rolling interval. Create a CloudWatch dashboard aggregating all SLO statuses. Configure fast-burn burn rate alerts for each service to SNS topic critical-alerts. Add canary alarms for each service endpoint. All services have OTel instrumentation. Tags: Environment=production.",
+      "prompt_file": "prompts/multi-service-slo-tracking.md",
+      "baseline_file": "baselines/multi-service-slo-tracking.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "APP_SIGNALS: multi-service (5 services)\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Per-service SLOs: 5 SLOs (99.9% availability, 30-day rolling)\n  [✓] Fleet dashboard: CloudWatch dashboard aggregating all SLO statuses\n  [✓] Burn rate alerts: fast burn per service → SNS critical-alerts\n  [✓] Canary alarms: per-service endpoint canaries",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "multi-service",
+            "dashboard",
+            "burn rate",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-otel-instrumentation",
+      "name": "Application Signals requested without OTel instrumentation",
+      "difficulty": "easy",
+      "branch": "REVIEW_REQUIRED — service has no OTel SDK instrumentation and CloudWatch Agent not configured; Application Signals cannot discover services without traces",
+      "prompt": "Enable Application Signals for service legacy-api. Create an SLO with 99.5% availability target. Configure burn rate alerts. The service has no OTel SDK instrumentation and CloudWatch Agent is not configured for auto-instrumentation. Tags: Environment=staging.",
+      "prompt_file": "prompts/missing-otel-instrumentation.md",
+      "baseline_file": "baselines/missing-otel-instrumentation.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_output": "APP_SIGNALS: legacy-api (service-level)\nVERDICT: REVIEW_REQUIRED\nCHECKLIST:\n  [✗] OTel instrumentation: MISSING — no SDK instrumentation and CloudWatch Agent not configured; Application Signals cannot discover services or derive SLI metrics without traces",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "REVIEW_REQUIRED",
+            "OTel",
+            "instrumentation",
+            "VERDICT",
+            "CHECKLIST",
+            "traces"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: OPERATION_COMPLETED"
+          ]
+        }
+      ]
+    }
+  ]
+}

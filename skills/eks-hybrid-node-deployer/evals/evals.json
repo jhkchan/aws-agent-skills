@@ -1,0 +1,175 @@
+{
+  "skill": "eks-hybrid-node-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the EKS Hybrid Node Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across hybrid node topologies (basic on-prem registration via activation code not IAM access keys, Direct Connect networking with on-prem firewall rules, pod identity for hybrid workloads with no IMDS, SSM Session Manager with CloudWatch monitoring, missing network path to EKS control plane). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "hybrid-node-basic-registration",
+      "name": "Basic on-prem registration via activation code (not IAM access keys)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — activation code/ID as bootstrap credential, hybrid node IAM role, nodeadm connector agent, kubelet connects to control plane",
+      "prompt": "Register 3 on-prem Ubuntu servers as EKS hybrid nodes to cluster prod-cluster in us-east-1. Hybrid node IAM role EKSHybridNodeRole. Kubernetes v1.30. Container runtime containerd already installed. Create the activation entry and nodeadm bootstrap commands. Tags: Environment=production.",
+      "prompt_file": "prompts/hybrid-node-basic-registration.md",
+      "baseline_file": "baselines/hybrid-node-basic-registration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EKS_HYBRID: prod-cluster ← on-prem-node-01 (EKSHybridNodeRole)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] EKS cluster: prod-cluster — ACTIVE\n  [✓] Hybrid node IAM role: EKSHybridNodeRole\n  [✓] Activation code/ID: generated (type: HYBRID_LINUX, TTL: 7 days)\n  [✓] Connector agent (nodeadm): installed on 3 node(s)\nVERIFICATION_COMMANDS:\n  aws eks describe-cluster --name prod-cluster\n  kubectl get nodes --show-labels",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "activation",
+            "EKS_HYBRID",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "nodeadm"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING",
+            "access key"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "direct-connect-networking",
+      "name": "Direct Connect networking with on-prem firewall rules (not VPC security groups)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Direct Connect network path to EKS API, latency requirement for kubelet heartbeats, on-prem firewall rules replace VPC security groups",
+      "prompt": "Set up networking for EKS hybrid nodes on prod-cluster. The on-prem data center connects to AWS via Direct Connect (dxcon-aaa111, private VIF). EKS API endpoint is https://XXXX.gr7.us-east-1.eks.amazonaws.com. On-prem nodes are in 10.0.0.0/16. Configure firewall rules. us-east-1.",
+      "prompt_file": "prompts/direct-connect-networking.md",
+      "baseline_file": "baselines/direct-connect-networking.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EKS_HYBRID: prod-cluster (Direct Connect networking)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Network path: Direct Connect (latency requirement met)\n  [✓] Security group mapping: on-prem firewall rules (no VPC SG)\nVERIFICATION_COMMANDS:\n  aws directconnect describe-connections",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Direct Connect",
+            "network path",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pod-identity-hybrid-workloads",
+      "name": "Pod identity for hybrid workloads (no IMDS, no EC2 instance profile)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — pod identity agent must run on hybrid nodes (no IMDS), pod identity association configured in EKS API, differs from managed node groups",
+      "prompt": "Configure pod identity for workloads running on EKS hybrid nodes in cluster prod-cluster. Service account my-app-sa in namespace production should map to IAM role arn:aws:iam::123456789012:role/MyAppPodRole. Nodes are on-prem hybrid nodes (no IMDS available). us-east-1.",
+      "prompt_file": "prompts/pod-identity-hybrid-workloads.md",
+      "baseline_file": "baselines/pod-identity-hybrid-workloads.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EKS_HYBRID: prod-cluster (pod identity for hybrid workloads)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Pod identity: agent running on hybrid nodes (no IMDS)\n  [✓] Pod identity association: my-app-sa → MyAppPodRole\nVERIFICATION_COMMANDS:\n  aws eks list-pod-identity-associations --cluster-name prod-cluster",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "pod identity",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ssm-session-manager-cloudwatch",
+      "name": "SSM Session Manager access and CloudWatch health monitoring for hybrid nodes",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — SSM Session Manager as recommended access method (not SSH), CloudWatch agent manually installed on each on-prem node",
+      "prompt": "Enable SSM Session Manager for remote access to 3 EKS hybrid nodes on prod-cluster. Also install CloudWatch agent for health monitoring. Hybrid node IAM role EKSHybridNodeRole with SSM and CloudWatch permissions. us-east-1.",
+      "prompt_file": "prompts/ssm-session-manager-cloudwatch.md",
+      "baseline_file": "baselines/ssm-session-manager-cloudwatch.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "EKS_HYBRID: prod-cluster (SSM Session Manager + CloudWatch)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] SSM Session Manager: enabled (keyless, audited access)\n  [✓] CloudWatch agent: installed on 3/3 node(s)\nVERIFICATION_COMMANDS:\n  aws ssm describe-instance-information\n  aws cloudwatch describe-alarms --alarm-name-prefix eks-hybrid",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SSM",
+            "CloudWatch",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-network-path",
+      "name": "No network path from on-prem to EKS control plane (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no Direct Connect or VPN; on-prem servers cannot reach the EKS API endpoint (private endpoint only); nodes cannot register or maintain heartbeats",
+      "prompt": "Register 2 on-prem servers as EKS hybrid nodes to cluster prod-cluster in us-east-1. The on-prem data center does NOT have Direct Connect or VPN configured. The servers have internet access but cannot reach the EKS API endpoint (private endpoint only). Hybrid node IAM role EKSHybridNodeRole.",
+      "prompt_file": "prompts/missing-network-path.md",
+      "baseline_file": "baselines/missing-network-path.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "EKS_HYBRID: prod-cluster ← on-prem (no network path)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Network path: no Direct Connect or VPN — on-prem cannot reach EKS control plane API (private endpoint only)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "network path",
+            "VERDICT",
+            "CHECKLIST",
+            "control plane"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

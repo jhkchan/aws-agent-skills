@@ -1,0 +1,49 @@
+# Eval configuration for redshift-data-api-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: redshift-data-api-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: secrets-manager-auth-query
+    difficulty: hard
+    prompt_file: prompts/secrets-manager-auth-query.md
+    baseline_file: baselines/secrets-manager-auth-query.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: temp-credentials-batch-execute
+    difficulty: hard
+    prompt_file: prompts/temp-credentials-batch-execute.md
+    baseline_file: baselines/temp-credentials-batch-execute.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: lambda-poll-lifecycle
+    difficulty: hard
+    prompt_file: prompts/lambda-poll-lifecycle.md
+    baseline_file: baselines/lambda-poll-lifecycle.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: statement-result-pagination
+    difficulty: medium
+    prompt_file: prompts/statement-result-pagination.md
+    baseline_file: baselines/statement-result-pagination.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-secret-access
+    difficulty: easy
+    prompt_file: prompts/missing-secret-access.md
+    baseline_file: baselines/missing-secret-access.md
+    expected_verdict: PREREQUISITES_MISSING

@@ -1,0 +1,49 @@
+# Eval configuration for stepfunctions-map-state-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: stepfunctions-map-state-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: distributed-map-s3-csv
+    difficulty: hard
+    prompt_file: prompts/distributed-map-s3-csv.md
+    baseline_file: baselines/distributed-map-s3-csv.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: inline-map-batch-processing
+    difficulty: medium
+    prompt_file: prompts/inline-map-batch-processing.md
+    baseline_file: baselines/inline-map-batch-processing.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: max-concurrency-tuning
+    difficulty: hard
+    prompt_file: prompts/max-concurrency-tuning.md
+    baseline_file: baselines/max-concurrency-tuning.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: distributed-map-10k-items
+    difficulty: hard
+    prompt_file: prompts/distributed-map-10k-items.md
+    baseline_file: baselines/distributed-map-10k-items.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-tolerated-failures
+    difficulty: easy
+    prompt_file: prompts/missing-tolerated-failures.md
+    baseline_file: baselines/missing-tolerated-failures.md
+    expected_verdict: PREREQUISITES_MISSING

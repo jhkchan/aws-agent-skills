@@ -1,0 +1,179 @@
+{
+  "skill": "stepfunctions-map-state-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Step Functions Map State Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Map state topologies (Distributed Map with S3 CSV input and ItemBatchSize, Inline Map with synchronous processing, MaxConcurrency tuning for high throughput, Distributed Map at 10K item limit, missing ToleratedFailures for fault-tolerant workflows). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "distributed-map-s3-csv",
+      "name": "Distributed Map reading CSV from S3 with batch processing and partial failure tolerance",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Distributed Map, S3 CSV input via ItemReader/ReaderConfig, ItemBatchSize 100, MaxConcurrency 50, ToleratedFailurePercentage 5, s3:GetObject IAM permission",
+      "prompt": "Create a Step Functions Distributed Map state named ProcessRecords that reads a CSV file from s3://my-data-bucket/datasets/records.csv (first row is headers). Process in batches of 100 items with MaxConcurrency 50. Allow up to 5% batch failures. The Lambda function process-row handles each row. State machine role needs S3 read access. Max 10000 items. Tags: Environment=production.",
+      "prompt_file": "prompts/distributed-map-s3-csv.md",
+      "baseline_file": "baselines/distributed-map-s3-csv.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MAP_STATE: ProcessRecords (DISTRIBUTED)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Map type: Distributed\n  [✓] ItemProcessor: defined (Mode: DISTRIBUTED)\n  [✓] S3 input: s3://my-data-bucket/datasets/records.csv (CSV, FIRST_ROW headers)\n  [✓] MaxConcurrency: 50\n  [✓] ItemBatchSize: 100\n  [✓] ToleratedFailurePercentage: 5\n  [✓] IAM role: has s3:GetObject on my-data-bucket\nVERIFICATION_COMMANDS:\n  aws stepfunctions describe-state-machine --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:DataPipeline",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "DISTRIBUTED",
+            "ItemBatchSize",
+            "s3://my-data-bucket/datasets/records.csv",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "ToleratedFailurePercentage"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inline-map-batch-processing",
+      "name": "Inline Map for synchronous processing of up to 5000 items",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Inline Map, ItemProcessor Mode INLINE, ItemsPath $.items, MaxConcurrency 40 (Inline max), no ItemBatchSize",
+      "prompt": "Create a Step Functions Inline Map state named ProcessItems that iterates over $.items array (max 5000 items). Each item calls Lambda function process-item. MaxConcurrency 40. Use ItemProcessor with Mode INLINE. ItemsPath: $.items. Tags: Environment=staging.",
+      "prompt_file": "prompts/inline-map-batch-processing.md",
+      "baseline_file": "baselines/inline-map-batch-processing.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MAP_STATE: ProcessItems (INLINE)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Map type: Inline\n  [✓] ItemProcessor: defined (Mode: INLINE)\n  [✓] ItemsPath: $.items\n  [✓] MaxConcurrency: 40\n  [✓] Item count: ≤5000 (within Inline limit)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "INLINE",
+            "ItemProcessor",
+            "ItemsPath",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "max-concurrency-tuning",
+      "name": "Distributed Map with high-throughput MaxConcurrency tuning",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Distributed Map, MaxConcurrency 1000 (Distributed max), ItemBatchSize 500, ToleratedFailureCount 100, child execution quota verified",
+      "prompt": "Create a Distributed Map state named HighThroughputProcess for processing 8000 items from a JSON array. Need maximum throughput. MaxConcurrency 1000. ItemBatchSize 500. Lambda function batch-handler handles each batch. ToleratedFailureCount 100. Account has 100000 concurrent execution quota. Tags: Environment=production, Profile=high-throughput.",
+      "prompt_file": "prompts/max-concurrency-tuning.md",
+      "baseline_file": "baselines/max-concurrency-tuning.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MAP_STATE: HighThroughputProcess (DISTRIBUTED)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Map type: Distributed\n  [✓] MaxConcurrency: 1000\n  [✓] ItemBatchSize: 500\n  [✓] ToleratedFailureCount: 100\n  [✓] Child executions: 16 (8000/500) within quota",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "DISTRIBUTED",
+            "MaxConcurrency",
+            "ItemBatchSize",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "distributed-map-10k-items",
+      "name": "Distributed Map at the 10000-item hard limit",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Distributed Map, exactly 10000 items, MaxItems 10000, ItemBatchSize 200, ToleratedFailurePercentage 10, 50 child executions",
+      "prompt": "Create a Distributed Map state named ProcessLargeDataset for exactly 10000 items in a JSON array at $.records. Each batch of 200 items processed by Lambda function process-batch. MaxConcurrency 50. ToleratedFailurePercentage 10. MaxItems 10000. Tags: Environment=production, Scale=large.",
+      "prompt_file": "prompts/distributed-map-10k-items.md",
+      "baseline_file": "baselines/distributed-map-10k-items.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "MAP_STATE: ProcessLargeDataset (DISTRIBUTED)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Map type: Distributed\n  [✓] MaxItems: 10000\n  [✓] ItemBatchSize: 200\n  [✓] MaxConcurrency: 50\n  [✓] ToleratedFailurePercentage: 10\n  [✓] Item count: 10000 (within Distributed limit)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "DISTRIBUTED",
+            "10000",
+            "ItemBatchSize",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-tolerated-failures",
+      "name": "Distributed Map fault-tolerant workflow missing ToleratedFailure configuration",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — fault-tolerant workflow without ToleratedFailureCount/Percentage; single batch failure would fail entire Map state",
+      "prompt": "Create a Distributed Map state named FaultTolerantProcess for processing 3000 items. Each item calls Lambda function unreliable-api. This is a fault-tolerant workflow — some items are expected to fail. No ToleratedFailureCount or ToleratedFailurePercentage specified. Tags: Environment=production.",
+      "prompt_file": "prompts/missing-tolerated-failures.md",
+      "baseline_file": "baselines/missing-tolerated-failures.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "MAP_STATE: FaultTolerantProcess (DISTRIBUTED)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] ToleratedFailureCount/Percentage: MISSING — fault-tolerant workflow requires partial failure tolerance; without it, a single batch failure fails the entire Map state",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "ToleratedFailure",
+            "VERDICT",
+            "CHECKLIST",
+            "fault-tolerant"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+# Eval test cases for cloudfront-origin-access-control-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across CloudFront OAC
+# topologies (basic S3 origin with OAC, SSE-KMS encrypted bucket
+# with sigv4 signing, OAI-to-OAC zero-downtime migration,
+# multi-distribution to single shared bucket, Website Endpoint
+# prerequisite failure).
+skill: cloudfront-origin-access-control-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: basic-s3-oac
+    description: >-
+      Provision a CloudFront Origin Access Control for a standard S3
+      origin. Expects READY_TO_DEPLOY with OAC created (always-sign),
+      bucket policy granting cloudfront.amazonaws.com s3:GetObject with
+      AWS:SourceArn condition, and S3 origin type (not Website Endpoint).
+    input: |
+      Create a CloudFront Origin Access Control for distribution
+      EDFDVBD6EXAMPLE serving S3 bucket my-assets-bucket in us-east-1.
+      Account 111122223333. The bucket is private (no website hosting).
+      Use sigv4 signing with always-sign behavior. Tags:
+      Environment=production, Team=platform.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "EDFDVBD6EXAMPLE"
+        - "my-assets-bucket"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "cloudfront.amazonaws.com"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: oac-sse-kms
+    description: >-
+      Provision a CloudFront OAC for an SSE-KMS-encrypted S3 bucket.
+      Expects READY_TO_DEPLOY with sigv4 always-sign signing behavior,
+      S3 bucket policy with cloudfront.amazonaws.com, and KMS key
+      policy granting cloudfront.amazonaws.com kms:Decrypt.
+    input: |
+      Create a CloudFront OAC for distribution E2QWRUEXAMPLE2 serving
+      S3 bucket my-secure-data-bucket in us-east-1, account
+      111122223333. The bucket is encrypted with SSE-KMS using key
+      arn:aws:kms:us-east-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab.
+      No website hosting. Tags: Environment=production, Encryption=sse-kms.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "always-sign"
+        - "kms:Decrypt"
+        - "cloudfront.amazonaws.com"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: oai-to-oac-migration
+    description: >-
+      Migrate an existing CloudFront distribution from OAI to OAC with
+      zero downtime. Expects READY_TO_DEPLOY with migration steps noted
+      (add OAC alongside OAI, update bucket policy with both grants,
+      verify, then remove OAI).
+    input: |
+      Migrate distribution E3EXAMPLE3XXX from Origin Access Identity
+      (OAI E3OAIID1234) to Origin Access Control. S3 bucket is
+      my-legacy-bucket in us-east-1, account 111122223333. The OAI
+      canonical user ID is 1a2b3c4d5e6f7g8h9i0j. Need zero downtime.
+      Tags: Environment=production, Migration=oai-to-oac.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "migration"
+        - "zero downtime"
+        - "cloudfront.amazonaws.com"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: multi-distribution-shared-bucket
+    description: >-
+      Configure multiple CloudFront distributions serving from a single
+      S3 bucket via OAC. Expects READY_TO_DEPLOY with bucket policy
+      listing all distribution ARNs in the AWS:SourceArn condition.
+    input: |
+      Create OACs for three CloudFront distributions
+      (EDFDVBD6EXAMPLE, E2QWRUEXAMPLE2, E3EXAMPLE3XXX) all serving
+      from S3 bucket shared-content-bucket in us-east-1, account
+      111122223333. Each distribution needs its own OAC. The bucket
+      is private, no SSE-KMS. Tags: Environment=production,
+      Pattern=multi-distribution.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-content-bucket"
+        - "AWS:SourceArn"
+        - "multi-distribution"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: website-endpoint-mismatch
+    description: >-
+      Operator requests OAC for an S3 bucket configured for static
+      website hosting. OAC only supports the S3 origin type, not the
+      Website Endpoint. This is a prerequisite failure.
+    input: |
+      Create a CloudFront OAC for distribution E4EXAMPLE4XXX serving
+      S3 bucket my-website-bucket in us-east-1, account 111122223333.
+      The bucket has static website hosting enabled with index.html
+      as the index document. Tags: Environment=production.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Website Endpoint"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "website hosting"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

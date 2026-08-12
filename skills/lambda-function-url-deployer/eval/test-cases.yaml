@@ -1,0 +1,150 @@
+# Eval test cases for lambda-function-url-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across function URL
+# configurations (BUFFERED + IAM auth + CORS, RESPONSE_STREAM +
+# NONE auth, CloudFront custom domain, CORS update on existing
+# URL, missing Lambda function prerequisite failure).
+skill: lambda-function-url-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: buffered-iam-cors
+    description: >-
+      Provision a Lambda Function URL with AWS_IAM auth, BUFFERED
+      invoke mode, and full CORS configuration. Expects
+      READY_TO_DEPLOY with auth mode, invoke mode, CORS fields,
+      resource-based policy, and CloudWatch metrics noted.
+    input: |
+      Create a Lambda function URL for function my-api-handler
+      (runtime nodejs20.x) in us-east-1. Use AWS_IAM auth and
+      BUFFERED invoke mode. Configure CORS to allow origins
+      https://app.example.com, methods GET and POST, headers
+      content-type and authorization, expose headers x-request-id,
+      max age 86400. The function timeout is 10 seconds. Allow
+      user alice (arn:aws:iam::111122223333:user/alice) to invoke.
+      Tags: Environment=production, Service=api.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AWS_IAM"
+        - "BUFFERED"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "AllowOrigins"
+        - "app.example.com"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: response-stream-none
+    description: >-
+      Provision a Lambda Function URL with NONE auth and
+      RESPONSE_STREAM invoke mode for public streaming responses.
+      Expects READY_TO_DEPLOY with RESPONSE_STREAM noted, NONE auth
+      flagged as public, and CORS allowing all origins.
+    input: |
+      Create a Lambda function URL for function
+      my-streaming-handler (runtime nodejs20.x) in us-east-1.
+      Use NONE auth and RESPONSE_STREAM invoke mode for public
+      LLM token streaming. CORS should allow all origins, methods
+      GET and POST, header content-type, max age 3600. The handler
+      uses awslambda.streamifyResponse. Function timeout 15s.
+      Tags: Environment=production, Service=streaming-api.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "RESPONSE_STREAM"
+        - "NONE"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cloudfront-custom-domain
+    description: >-
+      Provision a Lambda Function URL with a CloudFront custom
+      domain in front for api.example.com. Expects READY_TO_DEPLOY
+      with CloudFront origin noted, custom domain cited, and
+      DefaultTTL=0 for no caching.
+    input: |
+      Create a Lambda function URL for function
+      my-edge-handler (runtime nodejs20.x) in us-east-1. Use
+      NONE auth and BUFFERED invoke mode. I need a CloudFront
+      custom domain at api.example.com pointing to the function
+      URL. No caching (DefaultTTL=0). Forward query strings. CORS
+      allow origins https://api.example.com, methods GET POST PUT
+      DELETE. Tags: Environment=production, Service=edge-api.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "CloudFront"
+        - "api.example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cors-update-existing
+    description: >-
+      Update CORS configuration on an existing Lambda Function URL
+      to add a new origin and method. Expects READY_TO_DEPLOY with
+      updated CORS fields cited and update-function-url-config used.
+    input: |
+      Update the function URL for my-api-handler in us-east-1.
+      Current CORS allows https://app.example.com. Add
+      https://staging.example.com as an allowed origin. Add PUT
+      and DELETE to allowed methods. Add x-api-key to allowed
+      headers. Set max age to 3600. The URL uses AWS_IAM auth
+      and BUFFERED invoke mode.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "staging.example.com"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-function-exists
+    description: >-
+      Operator requests a function URL for a function that does not
+      exist. This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING with the missing function cited.
+    input: |
+      Create a Lambda function URL for function
+      nonexistent-function in us-east-1. Use AWS_IAM auth and
+      BUFFERED invoke mode. CORS allow origins https://example.com.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "nonexistent-function"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

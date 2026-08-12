@@ -1,0 +1,179 @@
+{
+  "skill": "s3-outposts-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the S3 Outposts Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across S3 on Outposts topologies (bucket with endpoint and replication, object lock WORM at creation, access point with lifecycle, capacity monitoring, missing endpoint prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "outpost-bucket-with-endpoint-replication",
+      "name": "S3 Outposts bucket with endpoint, access point, and one-way replication to cloud",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — outpost bucket with endpoint, access point, replication, SSE-S3, versioning",
+      "prompt": "Create an S3 bucket on Outpost op-0abc123def456. Bucket name: my-outpost-bucket. I need a VPC endpoint in subnet subnet-abc123 with security group sg-outpost-s3. Access point my-ap in VPC vpc-abc123. Replicate to cloud bucket s3://cloud-dr-bucket for DR. Versioning enabled. Account: 123456789012. Region us-east-1.",
+      "prompt_file": "prompts/outpost-bucket-with-endpoint-replication.md",
+      "baseline_file": "baselines/outpost-bucket-with-endpoint-replication.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "S3_OUTPOST: my-outpost-bucket on op-0abc123def456\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Endpoint: arn:...:endpoint/abc-123 — Available\n  [✓] Bucket: my-outpost-bucket\n  [✓] Storage class: STANDARD\n  [✓] Encryption: SSE-S3\n  [✓] Replication: Outpost → cloud (s3://cloud-dr-bucket)\nVERIFICATION_COMMANDS:\n  aws s3control list-regional-buckets --account-id 123456789012",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "endpoint",
+            "STANDARD",
+            "SSE-S3",
+            "replication",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "object-lock-worm-creation",
+      "name": "S3 Outposts bucket with object lock COMPLIANCE mode at creation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — object lock enabled at creation, COMPLIANCE mode, WORM",
+      "prompt": "Create an S3 bucket on Outpost op-0xyz789abc with object lock enabled in COMPLIANCE mode. Bucket name: worm-outpost-bucket. I need the endpoint in subnet subnet-xyz789 with SG sg-worm-s3. Default retention 365 days. Account: 123456789012. Region us-east-1.",
+      "prompt_file": "prompts/object-lock-worm-creation.md",
+      "baseline_file": "baselines/object-lock-worm-creation.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "S3_OUTPOST: worm-outpost-bucket on op-0xyz789abc\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Object lock: COMPLIANCE (365 days default retention)\n  [✓] Endpoint: Available\nVERIFICATION_COMMANDS:\n  aws s3control get-bucket-versioning --account-id 123456789012 --bucket <arn>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "object lock",
+            "COMPLIANCE",
+            "endpoint",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "access-point-and-lifecycle",
+      "name": "S3 Outposts bucket with access point and lifecycle expiration",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — access point, lifecycle expiration (no Glacier on Outpost), versioning",
+      "prompt": "Create an S3 bucket on Outpost op-0def456ghi. Bucket name: lifecycle-bucket. Access point lifecycle-ap in VPC vpc-def456. Endpoint in subnet subnet-def456 with SG sg-lifecycle-s3. I need a lifecycle rule to expire objects after 90 days. Versioning enabled.",
+      "prompt_file": "prompts/access-point-and-lifecycle.md",
+      "baseline_file": "baselines/access-point-and-lifecycle.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "S3_OUTPOST: lifecycle-bucket on op-0def456ghi\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Access point: lifecycle-ap\n  [✓] Lifecycle: expire after 90 days\nVERIFICATION_COMMANDS:\n  aws s3control get-access-point --account-id 123456789012 --name lifecycle-ap",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "access point",
+            "lifecycle",
+            "expire",
+            "STANDARD",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "capacity-monitoring-setup",
+      "name": "S3 Outposts bucket with CloudWatch capacity monitoring and alerting",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — capacity alarm at 80% of 1TB, SNS alerting, finite storage noted",
+      "prompt": "Create an S3 bucket on Outpost op-0cap123mon. Bucket name: monitored-bucket. Endpoint in subnet subnet-cap123 with SG sg-cap-s3. I need CloudWatch capacity monitoring with an alarm at 80 percent of 1TB. SNS topic arn:aws:sns:us-east-1:123456789012:outpost-alerts. Versioning enabled.",
+      "prompt_file": "prompts/capacity-monitoring-setup.md",
+      "baseline_file": "baselines/capacity-monitoring-setup.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "S3_OUTPOST: monitored-bucket on op-0cap123mon\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Capacity alarm: outpost-s3-capacity-80pct\nVERIFICATION_COMMANDS:\n  aws cloudwatch describe-alarms --alarm-names outpost-s3-capacity-80pct",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "capacity",
+            "CloudWatch",
+            "alarm",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-endpoint",
+      "name": "S3 Outposts bucket without endpoint (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no endpoint or subnet on Outpost; bucket would be inaccessible",
+      "prompt": "Create an S3 bucket on Outpost op-0noendpoint. Bucket name: inaccessible-bucket. I do not have a VPC endpoint or a subnet on the Outpost yet. Just create the bucket for now.",
+      "prompt_file": "prompts/missing-endpoint.md",
+      "baseline_file": "baselines/missing-endpoint.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "S3_OUTPOST: inaccessible-bucket on op-0noendpoint\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Endpoint: MISSING — no VPC endpoint or subnet on Outpost; without endpoint, the bucket is completely inaccessible",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "endpoint",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

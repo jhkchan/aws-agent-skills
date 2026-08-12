@@ -1,0 +1,175 @@
+{
+  "skill": "apigateway-websocket-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the API Gateway WebSocket Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across WebSocket API configurations ($connect/$disconnect with DynamoDB connection management, custom routes with route selection expression, Lambda authorizer + WAF integration, route response bidirectional with keepalive, missing route selection expression prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "basic-connect-disconnect",
+      "name": "WebSocket API with $connect/$disconnect routes and DynamoDB connection management",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — $connect/$disconnect routes with Lambda, DynamoDB ConnectionId storage, route selection expression, auto-deploy stage, PostToConnection via ApiGatewayManagementApi",
+      "prompt": "Create a WebSocket API named my-chat-api in us-east-1. Route selection expression $request.body.action. $connect route invokes Lambda ws-connect-handler (stores ConnectionId in DynamoDB table WebSocketConnections). $disconnect route invokes Lambda ws-disconnect-handler (deletes ConnectionId). Auto-deploy stage prod. Tags: Environment=production, Service=chat.",
+      "prompt_file": "prompts/basic-connect-disconnect.md",
+      "baseline_file": "baselines/basic-connect-disconnect.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WEBSOCKET_API: my-chat-api (abc123def4)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] WebSocket API: abc123def4 (my-chat-api)\n  [✓] Route selection expression: $request.body.action\n  [✓] $connect route: conn-route → Lambda: ws-connect-handler (stores ConnectionId)\n  [✓] $disconnect route: disc-route → Lambda: ws-disconnect-handler (deletes ConnectionId)\n  [✓] Integration type: Lambda (AWS_PROXY)\n  [✓] Deployment: auto-deploy on stage prod\n  [✓] Connection management: DynamoDB WebSocketConnections (store on $connect, delete on $disconnect)\n  [✓] Lambda resource-based policy: grants lambda:InvokeFunction to apigateway.amazonaws.com\n  [✓] Message size limit: 128 KB\nVERIFICATION_COMMANDS:\n  aws apigatewayv2 get-api --api-id abc123def4 --region us-east-1\n  aws apigatewayv2 get-routes --api-id abc123def4 --region us-east-1\n  aws dynamodb describe-table --table-name WebSocketConnections --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "$connect",
+            "$disconnect",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "connectionId",
+            "DynamoDB"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-routes-selection",
+      "name": "WebSocket API with custom routes and route selection expression",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — custom routes (sendMessage, joinRoom, leaveRoom), $default route, route selection expression matching message format, DynamoDB connection management",
+      "prompt": "Create a WebSocket API named my-collab-api in us-east-1. Route selection expression $request.body.action. Custom routes: sendMessage (Lambda ws-message-handler), joinRoom (Lambda ws-room-handler), leaveRoom (Lambda ws-room-handler). $connect stores ConnectionId in DynamoDB CollaboratorConnections. $default route for unmatched messages. Auto-deploy stage prod. Tags: Environment=production, Service=collab.",
+      "prompt_file": "prompts/custom-routes-selection.md",
+      "baseline_file": "baselines/custom-routes-selection.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WEBSOCKET_API: my-collab-api (def456ghi7)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] WebSocket API: def456ghi7 (my-collab-api)\n  [✓] Route selection expression: $request.body.action\n  [✓] Custom routes: sendMessage, joinRoom, leaveRoom, $default\n  [✓] Integration type: Lambda (AWS_PROXY)\n  [✓] Connection management: DynamoDB CollaboratorConnections",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "sendMessage",
+            "joinRoom",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lambda-authorizer-waf",
+      "name": "WebSocket API with Lambda custom authorizer and WAF integration",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Lambda authorizer ws-auth on $connect (identity source: query string token), WAF Web ACL for IP rate limiting, DynamoDB connection management",
+      "prompt": "Create a WebSocket API named my-secure-ws-api in us-east-1. Route selection expression $request.body.action. Lambda custom authorizer ws-auth on $connect (identity source: query string token). WAF Web ACL ws-waf for IP rate limiting on stage prod. $connect stores ConnectionId in DynamoDB SecureConnections. Routes: sendMessage, broadcast. Auto-deploy stage prod. Tags: Environment=production, Service=secure-realtime.",
+      "prompt_file": "prompts/lambda-authorizer-waf.md",
+      "baseline_file": "baselines/lambda-authorizer-waf.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WEBSOCKET_API: my-secure-ws-api (ghi789jkl0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Custom authorizer: ws-auth on $connect (identity source: $request.querystring.token)\n  [✓] WAF: ws-waf on stage prod (IP rate limiting)\n  [✓] Connection management: DynamoDB SecureConnections\n  [✓] Routes: sendMessage, broadcast",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "authorizer",
+            "WAF",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "route-response-keepalive",
+      "name": "WebSocket API with route responses for bidirectional communication and keepalive",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — route response on sendMessage for bidirectional, ping route for client heartbeat (60s interval), 128 KB message limit noted",
+      "prompt": "Create a WebSocket API named my-bidirectional-api in us-east-1. Route selection expression $request.body.action. Enable route response on sendMessage route for bidirectional communication. Add ping route for client heartbeat (interval 60s). $connect and $disconnect manage ConnectionId in DynamoDB BidirectionalConnections. Auto-deploy stage prod. Tags: Environment=production, Service=realtime-bidirectional.",
+      "prompt_file": "prompts/route-response-keepalive.md",
+      "baseline_file": "baselines/route-response-keepalive.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "WEBSOCKET_API: my-bidirectional-api (jkl012mno3)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Route responses (bidirectional): enabled on sendMessage\n  [✓] Keepalive: client-side application heartbeat (interval: 60s)\n  [✓] ping route for heartbeat\n  [✓] Message size limit: 128 KB",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "route response",
+            "keepalive",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-route-selection",
+      "name": "WebSocket API without route selection expression (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — route selection expression not provided; custom routes cannot fire without it",
+      "prompt": "Create a WebSocket API named my-incomplete-api in us-east-1. I want custom routes sendMessage and joinRoom but I don't know what route selection expression to use. Just create it.",
+      "prompt_file": "prompts/missing-route-selection.md",
+      "baseline_file": "baselines/missing-route-selection.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "WEBSOCKET_API: N/A\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Route selection expression: not provided — required for custom routes (sendMessage, joinRoom) to fire",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "route selection expression",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

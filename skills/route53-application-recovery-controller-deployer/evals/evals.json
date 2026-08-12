@@ -1,0 +1,178 @@
+{
+  "skill": "route53-application-recovery-controller-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Route 53 ARC Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across ARC topologies (active-standby with OR safety rule, active-active three-cell cross-region readiness, resource set type mapping for multiple types, AND+OR safety rule design, missing safety rule prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "active-standby-with-safety-rule",
+      "name": "Active-standby ARC with OR safety rule preventing total outage",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — two-cell active-standby with OR safety rule, readiness checks, NLB and ASG resource sets",
+      "prompt": "Create a Route 53 ARC setup for my application. Two cells: Cell-A in us-east-1 and Cell-B in us-west-2. Active-standby topology with Cell-A as primary. Recovery cluster name app-recovery-cluster. Resource sets: NLB (AWS::ElasticLoadBalancingV2::LoadBalancer) and ASG (AWS::AutoScaling::AutoScalingGroup). Need a safety rule to prevent total outage. Tags: Environment=production, Application=app.",
+      "prompt_file": "prompts/active-standby-with-safety-rule.md",
+      "baseline_file": "baselines/active-standby-with-safety-rule.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ARC: app-recovery-cluster\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Recovery cluster: app-recovery-cluster — ACTIVE\n  [✓] Cells: Cell-A (us-east-1), Cell-B (us-west-2)\n  [✓] Resource sets: app-nlb (AWS::ElasticLoadBalancingV2::LoadBalancer), app-asg (AWS::AutoScaling::AutoScalingGroup)\n  [✓] Routing controls: cell-a-traffic, cell-b-traffic\n  [✓] Safety rule: prevent-total-outage (OR, threshold 1)\n  [✓] Topology: Active-Standby\nVERIFICATION_COMMANDS:\n  aws route53-recovery-control-config describe-cluster --cluster-arn <arn>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "routing control",
+            "safety rule",
+            "Cell-A",
+            "Cell-B",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "active-active-cross-region-readiness",
+      "name": "Active-active three-region ARC with cross-region readiness and OR threshold 2",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — three-cell active-active with OR safety rule threshold 2, cross-region readiness, DynamoDB resource set",
+      "prompt": "Create a Route 53 ARC setup for a three-region active-active application. Cells: Cell-A in us-east-1, Cell-B in us-east-2, Cell-C in us-west-2. Active-active topology. Recovery cluster name global-app-cluster. Need at least two cells ON at all times. Resource set for DynamoDB tables.",
+      "prompt_file": "prompts/active-active-cross-region-readiness.md",
+      "baseline_file": "baselines/active-active-cross-region-readiness.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ARC: global-app-cluster\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cells: Cell-A (us-east-1), Cell-B (us-east-2), Cell-C (us-west-2)\n  [✓] Resource sets: app-ddb (AWS::DynamoDB::Table)\n  [✓] Safety rule: min-cells-on (OR, threshold 2)\n  [✓] Topology: Active-Active\nVERIFICATION_COMMANDS:\n  aws route53-recovery-readiness get-cell-readiness --cell-name Cell-C",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "active-active",
+            "Cell-C",
+            "safety rule",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resource-set-type-mapping",
+      "name": "ARC with multiple resource set types (NLB, Aurora, DynamoDB)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — correct resource type mapping for NLB, Aurora cluster, and DynamoDB table with readiness checks per set",
+      "prompt": "Create ARC readiness checks for my application. Cell-A in us-east-1, Cell-B in us-west-2. Recovery cluster app-cluster-2. I need readiness checks for NLB (AWS::ElasticLoadBalancingV2::LoadBalancer), Aurora cluster (AWS::RDS::DBCluster), and DynamoDB table (AWS::DynamoDB::Table). Active-standby topology. Safety rule to prevent total outage.",
+      "prompt_file": "prompts/resource-set-type-mapping.md",
+      "baseline_file": "baselines/resource-set-type-mapping.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ARC: app-cluster-2\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Resource sets: app-nlb (AWS::ElasticLoadBalancingV2::LoadBalancer), app-aurora (AWS::RDS::DBCluster), app-ddb (AWS::DynamoDB::Table)\n  [✓] Readiness checks: app-nlb-check, app-aurora-check, app-ddb-check\n  [✓] Safety rule: prevent-total-outage (OR, threshold 1)\nVERIFICATION_COMMANDS:\n  aws route53-recovery-readiness get-cell-readiness --cell-name Cell-B",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AWS::RDS::DBCluster",
+            "AWS::DynamoDB::Table",
+            "readiness check",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "safety-rule-design-and-or",
+      "name": "ARC with both AND and OR safety rules for strict active-standby",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — strict active-standby with AND rule (prevent both ON) and OR rule (prevent all OFF)",
+      "prompt": "Create ARC routing controls for a strict active-standby application where both cells must NEVER be ON simultaneously (data consistency requirement). Cell-A in us-east-1, Cell-B in us-west-2. Cluster: strict-app-cluster. I need both a rule to prevent total outage AND a rule to prevent both cells ON at the same time.",
+      "prompt_file": "prompts/safety-rule-design-and-or.md",
+      "baseline_file": "baselines/safety-rule-design-and-or.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ARC: strict-app-cluster\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Routing controls: cell-a-traffic, cell-b-traffic\n  [✓] Safety rule: prevent-total-outage (OR, threshold 1)\n  [✓] Safety rule: prevent-split-brain (AND, threshold 1)\n  [✓] Topology: Active-Standby (strict, no simultaneous ON)\nVERIFICATION_COMMANDS:\n  aws route53-recovery-cluster get-routing-control-state --routing-control-arn <arn>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AND",
+            "OR",
+            "safety rule",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-safety-rule",
+      "name": "ARC routing controls without safety rules (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no safety rule provided; safety rules are mandatory for production failover",
+      "prompt": "Create ARC routing controls for my application. Cell-A in us-east-1, Cell-B in us-west-2. Cluster: unsafe-cluster. I want two routing controls but do not want any safety rules. The failover should just toggle freely without any guardrails.",
+      "prompt_file": "prompts/missing-safety-rule.md",
+      "baseline_file": "baselines/missing-safety-rule.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ARC: unsafe-cluster\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Safety rule: MISSING — no safety rule provided; every control panel MUST have at least one safety rule to prevent unsafe failover",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "safety rule",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

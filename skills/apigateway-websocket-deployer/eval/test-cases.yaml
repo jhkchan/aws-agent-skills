@@ -1,0 +1,158 @@
+# Eval test cases for apigateway-websocket-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across WebSocket API
+# configurations ($connect/$disconnect with DynamoDB connection
+# management, custom routes with route selection expression,
+# Lambda authorizer + WAF, route response bidirectional with
+# keepalive, missing route selection expression prerequisite
+# failure).
+skill: apigateway-websocket-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: basic-connect-disconnect
+    description: >-
+      Provision a WebSocket API with $connect and $disconnect routes
+      backed by Lambda, DynamoDB connection management table, and
+      route selection expression. Expects READY_TO_DEPLOY with
+      ConnectionId storage noted, route selection expression cited,
+      and PostToConnection via ApiGatewayManagementApi.
+    input: |
+      Create a WebSocket API named my-chat-api in us-east-1.
+      Route selection expression $request.body.action. $connect
+      route invokes Lambda ws-connect-handler (stores ConnectionId
+      in DynamoDB table WebSocketConnections). $disconnect route
+      invokes Lambda ws-disconnect-handler (deletes ConnectionId).
+      Auto-deploy stage prod. Tags: Environment=production,
+      Service=chat.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "$connect"
+        - "$disconnect"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "connectionId"
+        - "DynamoDB"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: custom-routes-selection
+    description: >-
+      Provision a WebSocket API with custom routes (sendMessage,
+      joinRoom, leaveRoom) using a route selection expression.
+      Expects READY_TO_DEPLOY with route keys cited, integration
+      type noted, and route selection expression matching message
+      format.
+    input: |
+      Create a WebSocket API named my-collab-api in us-east-1.
+      Route selection expression $request.body.action. Custom
+      routes: sendMessage (Lambda ws-message-handler), joinRoom
+      (Lambda ws-room-handler), leaveRoom (Lambda ws-room-handler).
+      $connect stores ConnectionId in DynamoDB CollaboratorConnections.
+      $default route for unmatched messages. Auto-deploy stage prod.
+      Tags: Environment=production, Service=collab.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        -sendMessage
+        - "joinRoom"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: lambda-authorizer-waf
+    description: >-
+      Provision a WebSocket API with a Lambda custom authorizer on
+      $connect and WAF Web ACL for connection filtering. Expects
+      READY_TO_DEPLOY with authorizer on $connect noted, WAF
+      integration cited, and identity source identified.
+    input: |
+      Create a WebSocket API named my-secure-ws-api in us-east-1.
+      Route selection expression $request.body.action. Lambda
+      custom authorizer ws-auth on $connect (identity source:
+      query string token). WAF Web ACL ws-waf for IP rate limiting
+      on stage prod. $connect stores ConnectionId in DynamoDB
+      SecureConnections. Routes: sendMessage, broadcast.
+      Auto-deploy stage prod. Tags: Environment=production,
+      Service=secure-realtime.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "authorizer"
+        - "WAF"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: route-response-keepalive
+    description: >-
+      Provision a WebSocket API with route responses for
+      bidirectional communication and ping/pong keepalive strategy.
+      Expects READY_TO_DEPLOY with route response enabled, keepalive
+      strategy noted, and 128 KB message limit cited.
+    input: |
+      Create a WebSocket API named my-bidirectional-api in
+      us-east-1. Route selection expression $request.body.action.
+      Enable route response on sendMessage route for bidirectional
+      communication. Add ping route for client heartbeat (interval
+      60s). $connect and $disconnect manage ConnectionId in
+      DynamoDB BidirectionalConnections. Auto-deploy stage prod.
+      Tags: Environment=production, Service=realtime-bidirectional.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "route response"
+        - "keepalive"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-route-selection
+    description: >-
+      Operator requests a WebSocket API but does not provide a route
+      selection expression. Without it, custom routes cannot fire.
+      This is a prerequisite failure. Expects PREREQUISITES_MISSING
+      with the missing route selection expression cited.
+    input: |
+      Create a WebSocket API named my-incomplete-api in us-east-1.
+      I want custom routes sendMessage and joinRoom but I don't know
+      what route selection expression to use. Just create it.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "route selection expression"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

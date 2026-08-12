@@ -1,0 +1,148 @@
+# Eval test cases for backup-audit-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the AUTOMATION_DEPLOYED /
+# REVIEW_REQUIRED classification across backup audit topologies
+# (daily compliance report with SNS alerting, Vault Lock compliance
+# mode verification, encryption audit for KMS coverage, multi-account
+# Organizations report, missing S3 destination prerequisite failure).
+skill: backup-audit-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: daily-compliance-report-sns-alerting
+    description: >-
+      Automate a daily backup compliance audit with all three report
+      templates, S3 delivery, CIS/NIST framework mapping, and SNS
+      alerting for backup job failures. Expects AUTOMATION_DEPLOYED
+      with report templates cited and SNS alerting configured.
+    input: |
+      Set up a daily backup compliance audit for my account
+      123456789012. I need all three report templates
+      (BACKUP_JOB_REPORT, COMPLIANCE_REPORT, RECOVERY_POINT_REPORT)
+      delivered to s3://backup-reports-bucket/reports/. Frameworks:
+      CIS_AWS_1.4 and NIST_800_53. SNS alerts for backup failures to
+      arn:aws:sns:us-east-1:123456789012:backup-alerts. Region
+      us-east-1. Tags: Environment=production, Compliance=CIS.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "COMPLIANCE_REPORT"
+        - "RECOVERY_POINT_REPORT"
+        - "SNS"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: vault-lock-compliance-mode-verification
+    description: >-
+      Verify that a backup vault has Vault Lock in compliance mode
+      (immutable) with a 365-day retention period. Expects
+      AUTOMATION_DEPLOYED with COMPLIANCE mode cited and immutability
+      noted.
+    input: |
+      Audit my backup vault named compliant-vault. I need to verify
+      it has Vault Lock in COMPLIANCE mode with 365-day retention.
+      The vault must be immutable. Also check that all recovery points
+      in this vault have KMS encryption. Account: 123456789012.
+      Region us-east-1.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "COMPLIANCE"
+        - "immutable"
+        - "Vault Lock"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: encryption-audit-kms-coverage
+    description: >-
+      Run an encryption audit across all backup vaults to verify KMS
+      key presence on every recovery point. Expects AUTOMATION_DEPLOYED
+      with encryption audit results cited.
+    input: |
+      Run a backup encryption audit across all my backup vaults. I
+      need to verify that every recovery point has KMS encryption.
+      If any recovery points are unencrypted, flag them. S3 report
+      delivery to s3://backup-audit-bucket/encryption/. Account:
+      123456789012. Region us-east-1.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "encryption"
+        - "KMS"
+        - "recovery point"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: multi-account-organizations-report
+    description: >-
+      Set up a multi-account backup compliance report across all
+      accounts in the Organization. Expects AUTOMATION_DEPLOYED with
+      multi-account coverage cited.
+    input: |
+      Create an organization-wide backup compliance report. I need
+      COMPLIANCE_REPORT delivered daily to
+      s3://org-backup-reports/compliance/ covering ALL accounts in my
+      Organization (5 accounts) and ALL regions. Framework: CIS_AWS_1.4.
+      SNS alerts to arn:aws:sns:us-east-1:123456789012:org-backup-alerts.
+      Management account: 123456789012. Region us-east-1.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "multi-account"
+        - "COMPLIANCE_REPORT"
+        - "CIS_AWS_1.4"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: missing-s3-destination
+    description: >-
+      Operator requests backup reports but has no S3 bucket for report
+      delivery. This is a prerequisite failure — S3 destination is
+      mandatory for report plans.
+    input: |
+      Set up backup compliance reports. I do not have an S3 bucket for
+      report delivery. Just create the report plan and figure out
+      delivery later. Account: 123456789012. Region us-east-1.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "S3"
+        - "destination"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"

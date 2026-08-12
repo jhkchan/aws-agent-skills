@@ -1,0 +1,161 @@
+# Eval test cases for route53-application-recovery-controller-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across ARC topologies
+# (active-standby with OR safety rule, active-active with
+# cross-region readiness, resource set type mapping, safety rule
+# design, missing safety rule prerequisite failure).
+skill: route53-application-recovery-controller-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: active-standby-with-safety-rule
+    description: >-
+      Provision an active-standby ARC setup with two cells, an OR
+      safety rule (prevent total outage), readiness checks, and
+      routing controls for both cells. Expects READY_TO_DEPLOY with
+      safety rule cited and both routing controls listed.
+    input: |
+      Create a Route 53 ARC setup for my application. Two cells:
+      Cell-A in us-east-1 and Cell-B in us-west-2. Active-standby
+      topology with Cell-A as primary. Recovery cluster name
+      app-recovery-cluster. Resource sets: NLB
+      (AWS::ElasticLoadBalancingV2::LoadBalancer) with ARNs
+      arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/app-nlb-a/50dc6c495c0c9188
+      and
+      arn:aws:elasticloadbalancing:us-west-2:123456789012:loadbalancer/net/app-nlb-b/60dc6c495c0c9189.
+      ASG (AWS::AutoScaling::AutoScalingGroup) with ARNs
+      arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:...:asg-a
+      and
+      arn:aws:autoscaling:us-west-2:123456789012:autoScalingGroup:...:asg-b.
+      Need a safety rule to prevent total outage. Tags:
+      Environment=production, Application=app.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "routing control"
+        - "safety rule"
+        - "Cell-A"
+        - "Cell-B"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: active-active-cross-region-readiness
+    description: >-
+      Provision an active-active ARC setup with cross-region readiness
+      assessment across three cells. Expects READY_TO_DEPLOY with OR
+      safety rule threshold 2 (at least two cells must stay ON).
+    input: |
+      Create a Route 53 ARC setup for a three-region active-active
+      application. Cells: Cell-A in us-east-1, Cell-B in us-east-2,
+      Cell-C in us-west-2. Active-active topology. Recovery cluster
+      name global-app-cluster. Need at least two cells ON at all
+      times. Resource set for DynamoDB tables
+      (AWS::DynamoDB::Table) with one table per cell. Tags:
+      Environment=production, Topology=active-active-3cell.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "active-active"
+        - "Cell-C"
+        - "safety rule"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: resource-set-type-mapping
+    description: >-
+      Provision an ARC setup focusing on correct resource set type
+      mapping for multiple resource types (NLB, ASG, Aurora cluster,
+      DynamoDB table). Expects READY_TO_DEPLOY with all resource
+      sets mapped to correct types.
+    input: |
+      Create ARC readiness checks for my application. Cell-A in
+      us-east-1, Cell-B in us-west-2. Recovery cluster
+      app-cluster-2. I need readiness checks for these resource
+      types: NLB (AWS::ElasticLoadBalancingV2::LoadBalancer), Aurora
+      cluster (AWS::RDS::DBCluster), and DynamoDB table
+      (AWS::DynamoDB::Table). Active-standby topology. Safety rule to
+      prevent total outage. Tags: Application=multi-tier.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AWS::RDS::DBCluster"
+        - "AWS::DynamoDB::Table"
+        - "readiness check"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: safety-rule-design-and-or
+    description: >-
+      Provision an ARC setup that needs both an OR safety rule (prevent
+      total outage) and an AND safety rule (prevent split-brain, i.e.,
+      both cells ON simultaneously). Expects READY_TO_DEPLOY with both
+      safety rule types cited.
+    input: |
+      Create ARC routing controls for a strict active-standby
+      application where both cells must NEVER be ON simultaneously
+      (data consistency requirement). Cell-A in us-east-1, Cell-B in
+      us-west-2. Cluster: strict-app-cluster. I need both a rule to
+      prevent total outage AND a rule to prevent both cells ON at the
+      same time. Tags: Application=strict-standby.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AND"
+        - "OR"
+        - "safety rule"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-safety-rule
+    description: >-
+      Operator requests ARC routing controls without any safety rule.
+      This is a prerequisite failure — safety rules are mandatory for
+      production failover. Expects PREREQUISITES_MISSING.
+    input: |
+      Create ARC routing controls for my application. Cell-A in
+      us-east-1, Cell-B in us-west-2. Cluster: unsafe-cluster. I want
+      two routing controls but do not want any safety rules. The
+      failover should just toggle freely without any guardrails.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "safety rule"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

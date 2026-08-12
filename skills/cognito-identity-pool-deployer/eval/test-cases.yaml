@@ -1,0 +1,150 @@
+# Eval test cases for cognito-identity-pool-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across identity pool topologies
+# (Cognito User Pool provider with rules-based mapping, social provider
+# federation with guest access, SAML federation with cross-account roles,
+# principal tag ABAC mapping, missing authenticated role prerequisite).
+skill: cognito-identity-pool-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: user-pool-provider-rules-mapping
+    description: >-
+      Provision a Cognito Identity Pool federating from a Cognito User
+      Pool with rules-based role mapping (admins and readers groups).
+      Expects READY_TO_DEPLOY with two mapping rules cited and the
+      authenticated/unauthenticated roles listed.
+    input: |
+      Create a Cognito Identity Pool for my application. Federate
+      from Cognito User Pool us-east-1_AbCdEf123 with client ID
+      abc123def456. Pool name: app-identity-pool. I need guest access
+      enabled. Use rules-based role mapping: cognito:groups containing
+      "admins" should get AdminRole, "readers" should get ReaderRole.
+      Default authenticated role: AppAuthenticatedRole. Unauthenticated
+      role: AppUnauthenticatedRole. Account: 123456789012. Region
+      us-east-1. Tags: Environment=production, Application=app.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cognito:groups"
+        - "rules"
+        - "AdminRole"
+        - "ReaderRole"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: social-provider-guest-access
+    description: >-
+      Provision a Cognito Identity Pool with Google and Facebook
+      providers and guest access enabled. Expects READY_TO_DEPLOY with
+      both providers cited and the unauthenticated role listed.
+    input: |
+      Create a Cognito Identity Pool with Google and Facebook
+      providers. Google client ID: 1234567890-abc.apps.googleusercontent.com.
+      Facebook app ID: 9876543210. Pool name: social-app-pool. Guest
+      access enabled. Authenticated role: SocialAuthRole.
+      Unauthenticated role: SocialGuestRole. ServerSideTokenCheck
+      enabled. Account: 123456789012. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "accounts.google.com"
+        - "graph.facebook.com"
+        - "unauthenticated"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: saml-federation-cross-account
+    description: >-
+      Provision a Cognito Identity Pool with SAML federation and
+      cross-account role assumption. Expects READY_TO_DEPLOY with SAML
+      provider ARN cited and cross-account role noted.
+    input: |
+      Create a Cognito Identity Pool federating from SAML provider
+      arn:aws:iam::123456789012:saml-provider/CorpIdP. Pool name:
+      corp-saml-pool. The authenticated role is in account
+      999999999999: arn:aws:iam::999999999999:role/SAMLAuthRole.
+      No guest access. Identity pool is in account 123456789012.
+      Region us-east-1. Tags: Environment=enterprise.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        "SAML"
+        - "999999999999"
+        - "cross-account"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: principal-tag-abac-mapping
+    description: >-
+      Provision a Cognito Identity Pool with principal tag attribute
+      mapping for ABAC. Expects READY_TO_DEPLOY with tag mappings
+      (Department from cognito:groups) cited.
+    input: |
+      Create a Cognito Identity Pool with Cognito User Pool provider
+      (us-east-1_XyZ456, client: myclient789). Pool name: abac-pool.
+      I need principal tag mapping for ABAC: map the cognito:groups
+      claim to the Department session tag, and the custom:division
+      claim to the Division tag. Authenticated role: ABACRole. No
+      guest access. Account: 123456789012. Region us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "principal tag"
+        - "Department"
+        - "cognito:groups"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-authenticated-role
+    description: >-
+      Operator requests an identity pool but has not designed the
+      authenticated IAM role or its trust policy. This is a
+      prerequisite failure.
+    input: |
+      Create a Cognito Identity Pool for my app. Federate from Google.
+      I do not have any IAM roles set up yet. Just create the pool and
+      it should work. Pool name: quick-pool. Account: 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "authenticated role"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

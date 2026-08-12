@@ -1,0 +1,179 @@
+{
+  "skill": "ecr-replication-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the ECR Replication Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across ECR replication topologies (cross-region same-account replication for DR, cross-account replication with destination registry ID, pull-through cache for docker.io upstream, multi-region DR with lifecycle policies and cost awareness, missing destination registry ID prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "cross-region-replication",
+      "name": "Cross-region ECR replication for DR (us-east-1 to us-west-2 and eu-west-1)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — registry-level cross-region replication, ALL repos replicate, read-only replicas, 3x storage cost noted",
+      "prompt": "Configure ECR cross-region replication for account 111122223333. Source region us-east-1. Destination regions us-west-2 and eu-west-1. We need DR coverage across three regions. All repos should replicate. Tags: Environment=production, Pattern=dr.",
+      "prompt_file": "prompts/cross-region-replication.md",
+      "baseline_file": "baselines/cross-region-replication.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ECR_REPLICATION: 111122223333 (region: us-east-1) → us-west-2:111122223333, eu-west-1:111122223333\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source registry: 111122223333 (region: us-east-1)\n  [✓] Replication type: Cross-region (same account)\n  [✓] Destinations: us-west-2:111122223333, eu-west-1:111122223333\n  [✓] Registry scope: ALL repositories (registry-level)\n  [✓] Replicated images: READ-ONLY in destination\n  [✓] Storage cost: 3 regions (source + 2 destinations = 3x storage)\nVERIFICATION_COMMANDS:\n  aws ecr describe-registry --region us-east-1\n  aws ecr describe-repositories --region us-west-2\n  aws ecr describe-repositories --region eu-west-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cross-region",
+            "us-west-2",
+            "eu-west-1",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "registry-level"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-replication",
+      "name": "Cross-account ECR replication with destination registry ID",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — cross-account replication, destination registry 999999999999, read-only replicas, destination must allow replication",
+      "prompt": "Configure ECR cross-account replication. Source account 111122223333 in us-east-1. Destination account 999999999999 in us-east-1. We are sharing our container images with a partner account. All repos should replicate. Tags: Environment=production, Pattern=cross-account.",
+      "prompt_file": "prompts/cross-account-replication.md",
+      "baseline_file": "baselines/cross-account-replication.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ECR_REPLICATION: 111122223333 (region: us-east-1) → us-east-1:999999999999\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source registry: 111122223333 (region: us-east-1)\n  [✓] Replication type: Cross-account\n  [✓] Destinations: us-east-1:999999999999\n  [✓] Registry scope: ALL repositories (registry-level)\n  [✓] Replicated images: READ-ONLY in destination\nVERIFICATION_COMMANDS:\n  aws ecr describe-registry --region us-east-1\n  aws ecr describe-repositories --registry-id 999999999999 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cross-account",
+            "999999999999",
+            "111122223333",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pull-through-cache-docker-hub",
+      "name": "ECR pull-through cache rule for Docker Hub",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — pull-through cache for docker.io (registry-1.docker.io), prefix docker-hub/, reduces external rate limits and latency",
+      "prompt": "Create an ECR pull-through cache rule for Docker Hub images. Use the prefix docker-hub/. Upstream registry is docker.io. We want Lambda and ECS to pull from the cached copy instead of hitting Docker Hub directly to avoid rate limits. Region us-east-1, account 111122223333. Tags: Environment=production, Upstream=docker-hub.",
+      "prompt_file": "prompts/pull-through-cache-docker-hub.md",
+      "baseline_file": "baselines/pull-through-cache-docker-hub.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ECR_REPLICATION: 111122223333 (region: us-east-1) → pull-through cache\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source registry: 111122223333 (region: us-east-1)\n  [✓] Replication type: Pull-through cache\n  [✓] Pull-through cache rules: docker-hub/ → registry-1.docker.io\nVERIFICATION_COMMANDS:\n  aws ecr describe-pull-through-cache-rules --region us-east-1\n  aws ecr describe-registry --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "pull-through cache",
+            "registry-1.docker.io",
+            "docker-hub/",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-region-dr-with-lifecycle",
+      "name": "Multi-region ECR replication for DR with lifecycle policies and cost control",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — replication to us-west-2 and ap-southeast-2, lifecycle policies in all regions, 3x storage cost noted, replication lag awareness for large images",
+      "prompt": "Configure ECR replication from us-east-1 (account 111122223333) to us-west-2 and ap-southeast-2. We have large images (2-5GB) and need cost control. Apply lifecycle policies to retain only the last 30 images per repo in all regions. Tags: Environment=production, Pattern=multi-region-dr.",
+      "prompt_file": "prompts/multi-region-dr-with-lifecycle.md",
+      "baseline_file": "baselines/multi-region-dr-with-lifecycle.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ECR_REPLICATION: 111122223333 (region: us-east-1) → us-west-2:111122223333, ap-southeast-2:111122223333\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source registry: 111122223333 (region: us-east-1)\n  [✓] Replication type: Cross-region (same account)\n  [✓] Destinations: us-west-2:111122223333, ap-southeast-2:111122223333\n  [✓] Storage cost: 3 regions (source + 2 destinations = 3x storage)\n  [✓] Lifecycle policies: applied in source AND destinations\n  [✓] Replication lag: expected 2-5 minutes for large images\nVERIFICATION_COMMANDS:\n  aws ecr describe-registry --region us-east-1\n  aws ecr describe-repositories --region us-west-2\n  aws ecr describe-repositories --region ap-southeast-2",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "lifecycle",
+            "us-west-2",
+            "ap-southeast-2",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-destination-registry-id",
+      "name": "Cross-account ECR replication without destination registry ID (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — cross-account replication requires the 12-digit destination account ID; operator does not know it",
+      "prompt": "Configure ECR cross-account replication from account 111122223333 in us-east-1 to a partner account. I don't know the partner's AWS account ID. Just set it up. Tags: Environment=production.",
+      "prompt_file": "prompts/missing-destination-registry-id.md",
+      "baseline_file": "baselines/missing-destination-registry-id.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ECR_REPLICATION: 111122223333 (region: us-east-1) → unknown destination\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Destination registry ID: MISSING — cross-account replication requires the 12-digit destination account ID",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "registry ID",
+            "VERDICT",
+            "CHECKLIST",
+            "account ID"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

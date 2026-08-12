@@ -1,0 +1,49 @@
+# Eval configuration for cognito-identity-pool-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cognito-identity-pool-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: user-pool-provider-rules-mapping
+    difficulty: hard
+    prompt_file: prompts/user-pool-provider-rules-mapping.md
+    baseline_file: baselines/user-pool-provider-rules-mapping.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: social-provider-guest-access
+    difficulty: medium
+    prompt_file: prompts/social-provider-guest-access.md
+    baseline_file: baselines/social-provider-guest-access.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: saml-federation-cross-account
+    difficulty: hard
+    prompt_file: prompts/saml-federation-cross-account.md
+    baseline_file: baselines/saml-federation-cross-account.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: principal-tag-abac-mapping
+    difficulty: hard
+    prompt_file: prompts/principal-tag-abac-mapping.md
+    baseline_file: baselines/principal-tag-abac-mapping.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-authenticated-role
+    difficulty: easy
+    prompt_file: prompts/missing-authenticated-role.md
+    baseline_file: baselines/missing-authenticated-role.md
+    expected_verdict: PREREQUISITES_MISSING

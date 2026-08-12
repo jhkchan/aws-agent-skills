@@ -1,0 +1,49 @@
+# Eval configuration for vpclattice-service-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: vpclattice-service-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: service-network-http-service
+    difficulty: hard
+    prompt_file: prompts/service-network-http-service.md
+    baseline_file: baselines/service-network-http-service.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: weighted-canary-traffic-split
+    difficulty: hard
+    prompt_file: prompts/weighted-canary-traffic-split.md
+    baseline_file: baselines/weighted-canary-traffic-split.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: iam-auth-policy-service-level
+    difficulty: hard
+    prompt_file: prompts/iam-auth-policy-service-level.md
+    baseline_file: baselines/iam-auth-policy-service-level.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: lambda-target-with-domain-and-logs
+    difficulty: medium
+    prompt_file: prompts/lambda-target-with-domain-and-logs.md
+    baseline_file: baselines/lambda-target-with-domain-and-logs.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-vpc-association
+    difficulty: easy
+    prompt_file: prompts/missing-vpc-association.md
+    baseline_file: baselines/missing-vpc-association.md
+    expected_verdict: PREREQUISITES_MISSING

@@ -1,0 +1,158 @@
+# Eval test cases for redshift-data-api-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Data API topologies
+# (Secrets Manager auth query, temp credentials batch execute,
+# Lambda poll lifecycle, statement result pagination, missing
+# Secrets Manager access).
+skill: redshift-data-api-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: secrets-manager-auth-query
+    description: >-
+      Deploy a Data API query configuration using Secrets Manager
+      authentication for a production Lambda function. Expects
+      READY_TO_DEPLOY with SecretArn auth, IAM permissions for
+      redshift-data and secretsmanager:GetSecretValue, result
+      persistence plan, and Lambda poll pattern.
+    input: |
+      Create a Redshift Data API configuration for querying the sales
+      table on cluster my-redshift-cluster, database dev. Use Secrets
+      Manager secret arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx
+      for authentication. Lambda function sales-query will execute:
+      SELECT COUNT(*) FROM sales WHERE sale_date >= '2026-01-01'.
+      Poll every 2 seconds. Persist results to DynamoDB immediately.
+      Tags: Environment=production, Workflow=sales-counter.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SecretArn"
+        - "my-redshift-cluster"
+        - "redshift-data"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "secretsmanager:GetSecretValue"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: temp-credentials-batch-execute
+    description: >-
+      Deploy a BatchExecuteStatement configuration using temporary
+      credentials (GetClusterCredentials) for IAM-federated access.
+      Expects READY_TO_DEPLOY with temp creds auth, AutoCreate option,
+      and sequential batch execution noted.
+    input: |
+      Create a Redshift Data API batch execution configuration for
+      cluster analytics-cluster, database reports. Use temporary
+      credentials via GetClusterCredentials with DbUser
+      iam_report_user, DurationSeconds 3600, AutoCreate true. Batch
+      contains: CREATE TEMP TABLE temp_sales AS SELECT * FROM sales,
+      SELECT COUNT(*) FROM temp_sales, DROP TABLE temp_sales.
+      Tags: Environment=production, Workflow=batch-reports.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "TEMP_CREDS"
+        - "BatchExecuteStatement"
+        - "GetClusterCredentials"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: lambda-poll-lifecycle
+    description: >-
+      Deploy a Lambda-to-Data-API integration with polling pattern for
+      statement lifecycle management. Expects READY_TO_DEPLOY with
+      poll interval, 24-hour result expiry handling, and abort plan.
+    input: |
+      Create a Lambda function integration with the Redshift Data API
+      for cluster data-warehouse, database production. Use SecretArn
+      auth with secret arn:aws:secretsmanager:us-east-1:123456789012:secret:dw-creds.
+      Lambda function etl-runner executes a long-running aggregation
+      query. Poll DescribeStatement every 3 seconds, max 200 iterations.
+      If timeout, abort via AbortStatement. Results must be persisted
+      to S3 before 24-hour expiry. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "DescribeStatement"
+        - "AbortStatement"
+        - "24-hour"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: statement-result-pagination
+    description: >-
+      Deploy a GetStatementResult configuration with pagination
+      (NextToken) for a large result set. Expects READY_TO_DEPLOY with
+      pagination loop and 100 MB per-call limit noted.
+    input: |
+      Create a Data API configuration for querying the customers table
+      on cluster my-redshift-cluster, database dev. Use SecretArn auth
+      with secret arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx.
+      Query: SELECT * FROM customers WHERE region = 'APAC' — expected
+      ~500K rows. Need pagination via NextToken. Results written to
+      S3 via UNLOAD to avoid GetStatementResult payload limit.
+      Tags: Environment=production, Workflow=customer-export.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "NextToken"
+        - "UNLOAD"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-secret-access
+    description: >-
+      Operator requests a Data API query via Secrets Manager but the
+      Lambda execution role lacks secretsmanager:GetSecretValue on the
+      target secret. This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING with the IAM gap cited.
+    input: |
+      Create a Redshift Data API query for cluster my-redshift-cluster,
+      database dev. Use SecretArn auth with secret
+      arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx.
+      Lambda function query-runner executes the query. The Lambda
+      execution role has redshift-data:ExecuteStatement but does NOT
+      have secretsmanager:GetSecretValue permission.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "secretsmanager:GetSecretValue"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "IAM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

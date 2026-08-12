@@ -1,0 +1,178 @@
+{
+  "skill": "redshift-data-api-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Redshift Data API Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Data API topologies (Secrets Manager auth single query, temp credentials batch execute, Lambda poll lifecycle with abort plan, statement result pagination with UNLOAD, missing Secrets Manager IAM access). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "secrets-manager-auth-query",
+      "name": "Data API query with Secrets Manager authentication from Lambda",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — SecretArn auth, redshift-data + secretsmanager:GetSecretValue IAM permissions, Lambda poll pattern, result persistence to DynamoDB",
+      "prompt": "Create a Redshift Data API configuration for querying the sales table on cluster my-redshift-cluster, database dev. Use Secrets Manager secret arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx for authentication. Lambda function sales-query will execute: SELECT COUNT(*) FROM sales WHERE sale_date >= '2026-01-01'. Poll every 2 seconds. Persist results to DynamoDB immediately. Tags: Environment=production, Workflow=sales-counter.",
+      "prompt_file": "prompts/secrets-manager-auth-query.md",
+      "baseline_file": "baselines/secrets-manager-auth-query.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DATA_API: my-redshift-cluster (SECRET_ARN)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster: my-redshift-cluster (exists)\n  [✓] Database: dev\n  [✓] Authentication: SecretArn\n  [✓] Secret ARN: arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx\n  [✓] IAM role: redshift-data:ExecuteStatement, DescribeStatement, GetStatementResult\n  [✓] IAM role: secretsmanager:GetSecretValue\n  [✓] Polling pattern: Lambda poll (interval 2s)\nVERIFICATION_COMMANDS:\n  aws redshift-data describe-statement --id <statement-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SecretArn",
+            "my-redshift-cluster",
+            "redshift-data",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "secretsmanager:GetSecretValue"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "temp-credentials-batch-execute",
+      "name": "BatchExecuteStatement with temporary credentials and AutoCreate",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — temp creds via GetClusterCredentials, AutoCreate true, DurationSeconds 3600, sequential batch execution",
+      "prompt": "Create a Redshift Data API batch execution configuration for cluster analytics-cluster, database reports. Use temporary credentials via GetClusterCredentials with DbUser iam_report_user, DurationSeconds 3600, AutoCreate true. Batch contains: CREATE TEMP TABLE temp_sales AS SELECT * FROM sales, SELECT COUNT(*) FROM temp_sales, DROP TABLE temp_sales. Tags: Environment=production, Workflow=batch-reports.",
+      "prompt_file": "prompts/temp-credentials-batch-execute.md",
+      "baseline_file": "baselines/temp-credentials-batch-execute.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DATA_API: analytics-cluster (TEMP_CREDS)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Cluster: analytics-cluster\n  [✓] Database: reports\n  [✓] Authentication: TempCredentials (GetClusterCredentials)\n  [✓] DbUser: iam_report_user, DurationSeconds 3600, AutoCreate true\n  [✓] BatchExecuteStatement: 3 SQL statements (sequential)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "TEMP_CREDS",
+            "BatchExecuteStatement",
+            "GetClusterCredentials",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lambda-poll-lifecycle",
+      "name": "Lambda integration with polling pattern, abort plan, and 24-hour result persistence",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Lambda poll DescribeStatement every 3s, AbortStatement for timeout, UNLOAD to S3 for 24-hour expiry handling",
+      "prompt": "Create a Lambda function integration with the Redshift Data API for cluster data-warehouse, database production. Use SecretArn auth with secret arn:aws:secretsmanager:us-east-1:123456789012:secret:dw-creds. Lambda function etl-runner executes a long-running aggregation query. Poll DescribeStatement every 3 seconds, max 200 iterations. If timeout, abort via AbortStatement. Results must be persisted to S3 before 24-hour expiry. Tags: Environment=production.",
+      "prompt_file": "prompts/lambda-poll-lifecycle.md",
+      "baseline_file": "baselines/lambda-poll-lifecycle.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DATA_API: data-warehouse (SECRET_ARN)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Polling pattern: Lambda poll (interval 3s, max 200 iterations)\n  [✓] Abort plan: AbortStatement on timeout\n  [✓] 24-hour result expiry: UNLOAD to S3 for persistence",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "DescribeStatement",
+            "AbortStatement",
+            "24-hour",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "statement-result-pagination",
+      "name": "Large result set pagination with UNLOAD to S3",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — GetStatementResult pagination via NextToken, UNLOAD to S3 to bypass 100MB payload limit, 500K rows",
+      "prompt": "Create a Data API configuration for querying the customers table on cluster my-redshift-cluster, database dev. Use SecretArn auth with secret arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx. Query: SELECT * FROM customers WHERE region = 'APAC' — expected ~500K rows. Need pagination via NextToken. Results written to S3 via UNLOAD to avoid GetStatementResult payload limit. Tags: Environment=production, Workflow=customer-export.",
+      "prompt_file": "prompts/statement-result-pagination.md",
+      "baseline_file": "baselines/statement-result-pagination.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DATA_API: my-redshift-cluster (SECRET_ARN)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Pagination: NextToken loop on GetStatementResult\n  [✓] Large result strategy: UNLOAD to S3 (bypasses 100MB limit)\n  [✓] 24-hour expiry: UNLOAD writes to S3 (no expiry concern)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "NextToken",
+            "UNLOAD",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-secret-access",
+      "name": "Data API query missing secretsmanager:GetSecretValue IAM permission",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Lambda role has redshift-data:ExecuteStatement but lacks secretsmanager:GetSecretValue on the target secret",
+      "prompt": "Create a Redshift Data API query for cluster my-redshift-cluster, database dev. Use SecretArn auth with secret arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx. Lambda function query-runner executes the query. The Lambda execution role has redshift-data:ExecuteStatement but does NOT have secretsmanager:GetSecretValue permission.",
+      "prompt_file": "prompts/missing-secret-access.md",
+      "baseline_file": "baselines/missing-secret-access.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "DATA_API: my-redshift-cluster (SECRET_ARN)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] IAM role: MISSING secretsmanager:GetSecretValue — Lambda execution role cannot read the secret; ExecuteStatement will fail with AccessDenied",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "secretsmanager:GetSecretValue",
+            "VERDICT",
+            "CHECKLIST",
+            "IAM"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

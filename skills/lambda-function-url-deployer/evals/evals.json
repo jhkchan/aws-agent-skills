@@ -1,0 +1,174 @@
+{
+  "skill": "lambda-function-url-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Lambda Function URL Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across function URL configurations (BUFFERED + IAM auth + full CORS, RESPONSE_STREAM + NONE auth for streaming, CloudFront custom domain, CORS update on existing URL, missing Lambda function prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "buffered-iam-cors",
+      "name": "BUFFERED invoke mode with AWS_IAM auth and full CORS configuration",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — BUFFERED + AWS_IAM auth, full CORS (allowOrigins, allowMethods, allowHeaders, exposeHeaders, maxAgeSeconds), resource-based policy for caller, CloudWatch metrics",
+      "prompt": "Create a Lambda function URL for function my-api-handler (runtime nodejs20.x) in us-east-1. Use AWS_IAM auth and BUFFERED invoke mode. Configure CORS to allow origins https://app.example.com, methods GET and POST, headers content-type and authorization, expose headers x-request-id, max age 86400. The function timeout is 10 seconds. Allow user alice (arn:aws:iam::111122223333:user/alice) to invoke. Tags: Environment=production, Service=api.",
+      "prompt_file": "prompts/buffered-iam-cors.md",
+      "baseline_file": "baselines/buffered-iam-cors.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_FUNCTION_URL: https://abc123def456.lambda-url.us-east-1.on.aws/\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Lambda function: my-api-handler (exists, runtime: nodejs20.x)\n  [✓] Auth mode: AWS_IAM\n  [✓] Invoke mode: BUFFERED\n  [✓] CORS: AllowOrigins=[\"https://app.example.com\"], AllowMethods=[\"GET\",\"POST\"], AllowHeaders=[\"content-type\",\"authorization\"], ExposeHeaders=[\"x-request-id\"], MaxAgeSeconds=86400\n  [✓] Timeout check: function timeout 10s (within 15s function URL cap)\n  [✓] Dual-stack: IPv4 + IPv6 (automatic)\n  [✓] Resource-based policy: grants lambda:InvokeFunctionUrl to arn:aws:iam::111122223333:user/alice\n  [✓] CloudWatch metrics: UrlRequests, Url4xx, Url5xx, UrlLatency (automatic)\nVERIFICATION_COMMANDS:\n  aws lambda get-function-url-config --function-name my-api-handler --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AWS_IAM",
+            "BUFFERED",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "AllowOrigins",
+            "app.example.com"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "response-stream-none",
+      "name": "RESPONSE_STREAM invoke mode with NONE auth for public LLM token streaming",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — RESPONSE_STREAM + NONE auth, public streaming endpoint, CORS allow all origins, handler uses awslambda.streamifyResponse",
+      "prompt": "Create a Lambda function URL for function my-streaming-handler (runtime nodejs20.x) in us-east-1. Use NONE auth and RESPONSE_STREAM invoke mode for public LLM token streaming. CORS should allow all origins, methods GET and POST, header content-type, max age 3600. The handler uses awslambda.streamifyResponse. Function timeout 15s. Tags: Environment=production, Service=streaming-api.",
+      "prompt_file": "prompts/response-stream-none.md",
+      "baseline_file": "baselines/response-stream-none.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_FUNCTION_URL: https://xyz789abc012.lambda-url.us-east-1.on.aws/\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Lambda function: my-streaming-handler (exists, runtime: nodejs20.x)\n  [✓] Auth mode: NONE (public endpoint — no IAM auth)\n  [✓] Invoke mode: RESPONSE_STREAM\n  [✓] CORS: AllowOrigins=[\"*\"], AllowMethods=[\"GET\",\"POST\"], AllowHeaders=[\"content-type\"], MaxAgeSeconds=3600\n  [✓] Timeout check: function timeout 15s (at function URL cap)\n  [✓] Dual-stack: IPv4 + IPv6 (automatic)\nVERIFICATION_COMMANDS:\n  aws lambda get-function-url-config --function-name my-streaming-handler --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "RESPONSE_STREAM",
+            "NONE",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cloudfront-custom-domain",
+      "name": "Lambda Function URL with CloudFront custom domain for api.example.com",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — CloudFront distribution in front of function URL, custom domain api.example.com, DefaultTTL=0, query string forwarding, NONE auth for CloudFront compatibility",
+      "prompt": "Create a Lambda function URL for function my-edge-handler (runtime nodejs20.x) in us-east-1. Use NONE auth and BUFFERED invoke mode. I need a CloudFront custom domain at api.example.com pointing to the function URL. No caching (DefaultTTL=0). Forward query strings. CORS allow origins https://api.example.com, methods GET POST PUT DELETE. Tags: Environment=production, Service=edge-api.",
+      "prompt_file": "prompts/cloudfront-custom-domain.md",
+      "baseline_file": "baselines/cloudfront-custom-domain.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_FUNCTION_URL: https://def456ghi789.lambda-url.us-east-1.on.aws/\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Lambda function: my-edge-handler (exists, runtime: nodejs20.x)\n  [✓] Auth mode: NONE\n  [✓] Invoke mode: BUFFERED\n  [✓] CloudFront custom domain: api.example.com → function URL origin\n  [✓] DefaultTTL=0 (no caching), query string forwarding enabled\n  [✓] CORS: AllowOrigins=[\"https://api.example.com\"], AllowMethods=[\"GET\",\"POST\",\"PUT\",\"DELETE\"]",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "CloudFront",
+            "api.example.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cors-update-existing",
+      "name": "Update CORS on existing Lambda Function URL to add origin and methods",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — update-function-url-config with expanded CORS (add staging origin, PUT/DELETE methods, x-api-key header), preserves existing auth and invoke mode",
+      "prompt": "Update the function URL for my-api-handler in us-east-1. Current CORS allows https://app.example.com. Add https://staging.example.com as an allowed origin. Add PUT and DELETE to allowed methods. Add x-api-key to allowed headers. Set max age to 3600. The URL uses AWS_IAM auth and BUFFERED invoke mode.",
+      "prompt_file": "prompts/cors-update-existing.md",
+      "baseline_file": "baselines/cors-update-existing.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LAMBDA_FUNCTION_URL: https://abc123def456.lambda-url.us-east-1.on.aws/\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Lambda function: my-api-handler (exists)\n  [✓] Auth mode: AWS_IAM (unchanged)\n  [✓] Invoke mode: BUFFERED (unchanged)\n  [✓] CORS updated: AllowOrigins=[\"https://app.example.com\",\"https://staging.example.com\"], AllowMethods=[\"GET\",\"POST\",\"PUT\",\"DELETE\"], AllowHeaders=[\"content-type\",\"authorization\",\"x-api-key\"], MaxAgeSeconds=3600",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "staging.example.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-function-exists",
+      "name": "Function URL for nonexistent function (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Lambda function does not exist; cannot create a function URL without an existing function",
+      "prompt": "Create a Lambda function URL for function nonexistent-function in us-east-1. Use AWS_IAM auth and BUFFERED invoke mode. CORS allow origins https://example.com.",
+      "prompt_file": "prompts/missing-function-exists.md",
+      "baseline_file": "baselines/missing-function-exists.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "LAMBDA_FUNCTION_URL: N/A\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Lambda function: nonexistent-function does not exist — verify with aws lambda get-function",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "nonexistent-function",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}
