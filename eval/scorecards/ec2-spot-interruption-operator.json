@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert thresholds (3 families\u202f\u00d7\u202f3 AZs, 90\u2011second design window, lambda timeout\u202f\u2265\u202f60\u202fs, spot\u2011placement\u2011score categories, capacity\u2011optimized vs lowest\u2011price trade\u2011offs, recent features like capacity\u2011rebalance GA and Graviton4) that a generic model would not enumerate, but omits deeper cost\u2011impact calculations and cross\u2011region considerations, so not a perfect 20."
+      "justification": "The skill aggregates many known Spot\u2011Instance best\u2011practices (2\u2011minute warning, capacity\u2011optimized vs lowest\u2011price, 3\u2011family/3\u2011AZ diversification, placement\u2011score thresholds) but does not introduce truly novel decision trees or proprietary thresholds that a senior CloudOps engineer would not already know. The added value is mostly consolidation rather than new expert insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedure order (pre\u2011checks, confirm gate, CLI commands) and embeds expert mindset (2\u2011minute window, diversification math). However it lacks an explicit rollback/recovery procedure for failed state\u2011changing commands, leaving the process slightly incomplete."
+      "justification": "Provides an AWS\u2011specific procedural flow: ordered pre\u2011flight checks, CONFIRM gate before any state\u2011changing CLI, exact CLI commands with flags, and a structured output template. The procedure is detailed and domain\u2011specific, but a few steps (e.g., pagination handling) are only mentioned in a footnote rather than integrated into the core process."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete NEVER list with specific reasons (e.g., never set ELB delay >\u202f2\u202fmin, never use lowest\u2011price with a single pool), but misses a few pitfalls such as forgetting the EventBridge resource\u2011based policy and could give more rationale for some items, so two points are deducted."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never set ELB deregistration delay > 2\u202fmin, never rely on Spot without a pipeline). However, it omits some common pitfalls such as missing EventBridge\u2011to\u2011Lambda resource\u2011based policies, IMDSv2 enforcement, and lack of rollback steps for strategy changes, reducing the completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and an invocation schema are all present and clear. The only shortfall is the absence of a formal JSON schema for the input payload, which prevents strict validation."
+      "justification": "Frontmatter is complete and includes description, when_to_use, activation_triggers, and invocation_schema. The activation triggers are overly broad (e.g., \"Spot graceful shutdown pipeline\"), and the invocation_schema describes input types in prose rather than a strict JSON schema, which could hinder reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns) which aids progressive disclosure, but the initial \u201cWhat this skill does\u201d paragraph is dense and mixes many details, causing slight cognitive overload."
+      "justification": "The document layers information (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output format). Critical anti\u2011pattern warnings are placed later in the document, which could cause a user to miss them on first read, so a slight penalty is applied."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a mandatory CONFIRM prompt and extensive pre\u2011checks, showing good calibration. However the skill permits bulk modifications (e.g., modify Spot Fleet overrides) without explicit limits on scope or safety nets for partial failures."
+      "justification": "Destructive operations are tightly constrained with a mandatory CONFIRM gate and extensive pre\u2011checks. Creative tasks (e.g., audit\u2011diversification) have appropriate freedom. The only shortfall is the lack of explicit rollback or undo guidance for changes like modifying allocation strategy."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns) that aids comprehension, but the inclusion of an ad\u2011hoc \"Quick navigation\" table and occasional inconsistent heading levels slightly break the uniform pattern."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Safety). The structure is coherent and aids comprehension, though the naming of sections varies slightly (e.g., \"Quick navigation\" vs. \"Quick reference\"), preventing a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision trees, and worked examples that an agent could execute. Lacks explicit error\u2011handling/retry guidance for AWS CLI failures, partial rollbacks, and multi\u2011region considerations, which could cause execution gaps."
+      "justification": "Provides actionable CLI commands, decision trees, and verification steps that an agent could execute. Gaps remain: error handling for API failures is not detailed, pagination is only noted in a side comment, and some example operations (audit\u2011pipeline\u2011health) stop at review without concrete remediation steps. These omissions limit full practical usability."
     }
   ],
-  "total_score": 106,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49611,
-  "latency_ms": 16458,
+  "token_count": 49472,
+  "latency_ms": 11716,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 13,
       "max": 20,
-      "justification": "The skill supplies concrete, non\u2011trivial expert details not usually known by a generic model: exact minimum\u2011day tables for each storage\u2011class transition, the silent\u2011accept behavior of the S3 API, recent 2024\u20112026 feature updates (Intelligent\u2011Tiering Archive Instant, Storage Lens metric extensions), and a ready\u2011to\u2011run Python validator. These constitute genuine delta knowledge."
+      "justification": "The skill largely restates publicly documented S3 lifecycle constraints (min\u2011days tables, silent\u2011accept behavior, standard transition sequences). It compiles known facts but does not introduce novel decision trees, undocumented edge\u2011cases, or proprietary heuristics that a competent CloudOps model would not already know."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes a clear four\u2011stage pipeline (inventory \u2192 design \u2192 validate \u2192 deploy) and AWS\u2011specific procedures: get\u2011merge\u2011put lifecycle, StackSet creation flags, Batch Operations job definition, EventBridge rule JSON. Some steps (e.g., backing up config) are generic, preventing a perfect score."
+      "justification": "The four\u2011stage pipeline (inventory \u2192 design \u2192 validate \u2192 deploy) and the detailed get\u2011merge\u2011put, StackSet, and Lambda tag\u2011based flows are AWS\u2011specific, yet some procedural steps remain generic (e.g., \"validate\" is not broken into concrete checks beyond min\u2011days). The mindset is solid but not exhaustively AWS\u2011tailored."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., silent min\u2011day violations, full replacement on PUT, missing NoncurrentVersionExpiration). Lacks a few advanced pitfalls (IAM permission edge cases, interaction with Object Lock), so not a perfect 15."
+      "justification": "A thorough NEVER list covers the most common pitfalls with clear reasoning (silent min\u2011day violations, full\u2011replace PUT, missing NoncurrentVersionExpiration, etc.). One minor omission is the lack of a warning about lifecycle rules interacting with cross\u2011region replication, preventing a perfect score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description explains WHAT, WHEN, and includes rich keywords, activation triggers, and an invocation schema. Slight weakness: the activation triggers are phrased as free\u2011text strings rather than a deterministic pattern, which could cause occasional false matches."
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. Triggers such as \"put-bucket-lifecycle-configuration\" are overly broad and could fire on unrelated manual puts, reducing reliability of automatic activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Content is layered via Mindset, Quick navigation, step\u2011by\u2011step process, and appendices, allowing depth\u2011on\u2011demand. However, the opening sections contain a dense amount of critical rules, forcing the reader to parse many details before reaching the actionable steps."
+      "justification": "The skill layers information (Mindset \u2192 Quick navigation \u2192 Steps \u2192 Anti\u2011patterns \u2192 Appendices), but critical rules and tables appear early, creating a cognitive load before the agent knows which part is needed. A more staged reveal of the validation rules would improve progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by explicit CONFIRM prompts, backup commands, and pre\u2011deployment validation. Creative design steps remain flexible. Minor gap: Batch Operations section suggests a test run but does not enforce a mandatory safety gate."
+      "justification": "Destructive actions are guarded by a confirmation gate, backup commands, and pre\u2011flight checks, while creative design steps remain flexible. The only shortfall is that the confirmation gate is textual rather than enforced by the skill runtime, leaving a tiny gap in calibration."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset \u2192 Quick navigation \u2192 Process steps \u2192 Anti\u2011patterns \u2192 Appendices). The pattern is coherent but not labeled as a known framework, making it slightly less immediately recognizable."
+      "justification": "The document follows a recognizable structure (Mindset \u2192 Steps \u2192 Anti\u2011Patterns \u2192 Appendices) that aligns with common CloudOps skill patterns, but it does not explicitly label the pattern (e.g., \u201cLifecycle Automation Blueprint\u201d), making it slightly less immediately recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, validation code, decision tree, and example outputs that an agent could execute. Missing handling for some edge cases (e.g., IAM errors, object\u2011lock constraints) and a few minor syntax ambiguities (EventBridge target ARN format) keep it from full marks."
+      "justification": "Provides working CLI snippets, a Python validator, and example outputs, enabling an agent to act. Missing are handling of pagination for list\u2011operations, explicit error\u2011code branches, region selection logic, and a small test harness, which limits full practical reliability."
     }
   ],
-  "total_score": 107,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 37946,
-  "latency_ms": 15070,
+  "token_count": 38387,
+  "latency_ms": 14873,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3
