@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ecs-task-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ECS Task Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "fargate-to-ec2-crossover",
+      "name": "Always-on Fargate service at 65% steady utilization, 20 tasks — migrate to EC2-backed capacity provider",
+      "difficulty": "hard",
+      "prompt_file": "prompts/fargate-to-ec2-crossover.md",
+      "baseline_file": "baselines/fargate-to-ec2-crossover.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "fargate-to-ec2-crossover", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "EC2"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "graviton2-migration",
+      "name": "Fargate x86_64 Node.js service with no native deps — Graviton2 arm64 migration for 20% discount",
+      "difficulty": "medium",
+      "prompt_file": "prompts/graviton2-migration.md",
+      "baseline_file": "baselines/graviton2-migration.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "graviton2-migration", "RECOMMENDATION", "ESTIMATED_SAVINGS", "arm64"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "task-rightsizing",
+      "name": "Fargate service at 1024 CPU / 2048 MB with 12% avg CPU and 18% avg memory — right-size to 512 / 1024",
+      "difficulty": "medium",
+      "prompt_file": "prompts/task-rightsizing.md",
+      "baseline_file": "baselines/task-rightsizing.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "task-rightsizing", "RECOMMENDATION", "ESTIMATED_SAVINGS", "512"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "capacity-provider-spot",
+      "name": "EC2-backed ECS service on 100% on-demand with stateless workload — add spot capacity provider",
+      "difficulty": "hard",
+      "prompt_file": "prompts/capacity-provider-spot.md",
+      "baseline_file": "baselines/capacity-provider-spot.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "capacity-provider-spot", "RECOMMENDATION", "ESTIMATED_SAVINGS", "spot"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized",
+      "name": "Fargate arm64 service, right-sized, SP-covered, spot capacity — already optimal across all dimensions",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized.md",
+      "baseline_file": "baselines/already-optimized.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

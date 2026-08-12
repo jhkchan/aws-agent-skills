@@ -1,0 +1,70 @@
+{
+  "skill": "eks-autoscaling-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Adds concrete expert details not usually known by a generic model: Karpenter v1 API migration (Provisioner \u2192 NodePool, AWSNodeTemplate \u2192 EC2NodeClass), disruption budget syntax, spot\u2011diversification families, VPA mode side\u2011effects, exact helm chart versions, specific thresholds (e.g., Cluster Autoscaler scaleDownUtilizationThreshold 0.5), decision\u2011tree for Karpenter vs CA, and nuanced failure\u2011detection alarms. Some content merely restates common knowledge, hence a small deduction."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Offers a clear AWS\u2011specific workflow: helm installs, aws eks CLI commands, migration steps, pre\u2011flight checks, and safety gates. Missing explicit procedures for validating the interruption SQS queue, setting required IAM policies, and verifying node health after Karpenter install."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with specific reasoning (e.g., never run Karpenter and CA together, never use WhenEmptyOrUnderutilized without a disruption budget, never rely on a single spot instance family, never run NTH alongside Karpenter, never set HPA scaleDown.stabilizationWindowSeconds to 0, never use VPA Auto on single\u2011replica Deployments). Missing a few niche pitfalls (e.g., IAM role mis\u2011configurations) leads to a modest deduction."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete and well\u2011structured; description clearly states WHAT the skill does, WHEN to invoke, and provides extensive keywords, activation triggers, and an invocation schema. No missing elements."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill is layered (Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Step\u2011by\u2011step process \u2192 Output format \u2192 Anti\u2011patterns \u2192 Appendices), but critical rules are presented early and the document front\u2011loads many details, causing some cognitive overload. Hence a deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates specificity to task fragility: mandatory confirmation gate before state\u2011changing ops, safety\u2011check wave\u2011enabling pattern, explicit limits on disruptive actions (disruption budgets, dry\u2011run for descheduler). The invocation schema could be tighter, so one point is deducted."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset, Navigation table, Process steps, Output format, Anti\u2011patterns, Appendices). Minor inconsistency in ordering of some sections prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides concrete commands, manifests, decision trees, and output templates that an agent could execute. Gaps include missing IAM role creation steps, validation of SQS interruption queue, and the contradictory HPA stabilization setting, which could cause mis\u2011deployment."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 40133,
+  "latency_ms": 15034,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

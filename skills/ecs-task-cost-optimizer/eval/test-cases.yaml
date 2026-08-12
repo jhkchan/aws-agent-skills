@@ -1,0 +1,264 @@
+# Eval test cases for ecs-task-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# ServiceName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: ecs-task-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: fargate-to-ec2-crossover
+    description: >-
+      Always-on Fargate service at 65% steady CPU utilization with 20
+      running tasks. Past the 30% crossover — EC2 backing with binpack
+      placement is cheaper. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE
+      with launch type migration.
+    input: |
+      ServiceName: svc-fargate-to-ec2-crossover
+      Cluster: prod-cluster
+      LaunchType: FARGATE
+      TaskDefinition: web-api:15
+      CPU: 1024 (1 vCPU)
+      Memory: 2048 MB
+      Architecture: x86_64
+      Region: us-east-1
+      DesiredCount: 20
+      Capacity provider: FARGATE (on-demand)
+
+      Metrics (last 30 days, Container Insights):
+        - CPUUtilization avg: 65%, p95: 78%
+        - MemoryUtilization avg: 58%, p95: 70%
+        - RunningTaskCount avg: 20
+
+      Workload context: customer-facing web API. Always-on 24/7 with
+      steady traffic. Team manages EC2 ASGs and is willing to adopt
+      capacity providers. No spot compatibility (stateful session cache
+      per task — cannot tolerate interruption).
+
+      Cost Explorer (last month):
+        - Fargate compute: $720.80/month (20 tasks × $0.04937/hr × 730 hr)
+        - No Savings Plan coverage.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "fargate-to-ec2-crossover"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "EC2"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: graviton2-migration
+    description: >-
+      Fargate service on x86_64 running Node.js with no native deps.
+      ARM-compatible — Graviton2 migration yields 20% discount. Expected
+      verdict: FURTHER_OPTIMIZATION_AVAILABLE with arm64 migration.
+    input: |
+      ServiceName: svc-graviton2-migration
+      Cluster: prod-cluster
+      LaunchType: FARGATE
+      TaskDefinition: order-api:42
+      CPU: 512 (0.5 vCPU)
+      Memory: 1024 MB
+      Architecture: x86_64
+      Region: us-east-1
+      DesiredCount: 8
+      Capacity provider: FARGATE (on-demand)
+
+      Metrics (last 30 days, Container Insights):
+        - CPUUtilization avg: 35%, p95: 52%
+        - MemoryUtilization avg: 40%, p95: 55%
+        - RunningTaskCount avg: 8
+
+      Workload context: Node.js 20 REST API. Pure JavaScript with
+      no native C/C++ dependencies (no node-gyp, no ffi-napi). Container
+      image uses node:20-alpine base. All npm packages are pure JS.
+
+      Cost Explorer (last month):
+        - Fargate compute: $144.44/month (8 × 0.5 × $0.04048 × 730 + 8 × 1.0 × $0.004445 × 730)
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "graviton2-migration"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "arm64"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: task-rightsizing
+    description: >-
+      Fargate service with 1024 CPU / 2048 MB allocated but avg CPU 12%
+      and memory 18%. Significantly over-provisioned. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with right-sizing.
+    input: |
+      ServiceName: svc-task-rightsizing
+      Cluster: prod-cluster
+      LaunchType: FARGATE
+      TaskDefinition: data-processor:7
+      CPU: 1024 (1 vCPU)
+      Memory: 2048 MB
+      Architecture: x86_64
+      Region: us-east-1
+      DesiredCount: 8
+      Capacity provider: FARGATE (on-demand)
+
+      Metrics (last 30 days, Container Insights):
+        - CPUUtilization avg: 12%, p95: 25%
+        - MemoryUtilization avg: 18%, p95: 30%
+        - RunningTaskCount avg: 8
+
+      Workload context: data enrichment service processing SQS messages.
+      Low CPU and memory utilization indicates over-provisioning. No
+      native dependencies (Python 3.12). No compliance or latency
+      constraints that require high headroom.
+
+      Cost Explorer (last month):
+        - Fargate compute: $288.32/month
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "task-rightsizing"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "512"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: capacity-provider-spot
+    description: >-
+      EC2-backed ECS service using 100% on-demand capacity provider.
+      Stateless web service that can tolerate interruption — spot base
+      capacity is appropriate. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE
+      with spot capacity provider.
+    input: |
+      ServiceName: svc-capacity-provider-spot
+      Cluster: prod-cluster
+      LaunchType: EC2
+      TaskDefinition: frontend-web:30
+      CPU: 512 (0.5 vCPU)
+      Memory: 1024 MB
+      Architecture: x86_64
+      Region: us-east-1
+      DesiredCount: 12
+      Capacity provider: on-demand-cap-provider (100% on-demand)
+
+      Metrics (last 30 days, Container Insights):
+        - CPUUtilization avg: 45%, p95: 60%
+        - MemoryUtilization avg: 50%, p95: 65%
+        - RunningTaskCount avg: 12
+
+      Cluster details:
+        - EC2 instances: 4x m5.large (2 vCPU, 8 GB each)
+        - Average instance utilization: 55% CPU, 50% memory
+        - Placement strategy: spread (default)
+
+      Workload context: stateless React SSR web frontend. No session
+      state (using Redis ElastiCache for sessions). Can tolerate spot
+      interruption with graceful shutdown (SIGTERM handler, 30s
+      stopTimeout). Traffic is bursty but fault-tolerant behind ALB.
+
+      Cost Explorer (last month):
+        - EC2 compute: $280.32/month (4 × $0.096 × 730)
+        - No Savings Plan coverage.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "capacity-provider-spot"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "spot"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimized
+    description: >-
+      Fargate service on arm64, right-sized (CPU 28% avg, memory 40%
+      avg), covered by 1-year Compute SP at 65% discount. All dimensions
+      pass. Expected verdict: OPTIMIZED.
+    input: |
+      ServiceName: svc-already-optimized
+      Cluster: prod-cluster
+      LaunchType: FARGATE
+      TaskDefinition: payment-api:50
+      CPU: 512 (0.5 vCPU)
+      Memory: 1024 MB
+      Architecture: arm64
+      Region: us-east-1
+      DesiredCount: 6
+      Capacity provider: FARGATE_SPOT (70% spot base + 30% on-demand top)
+
+      Metrics (last 30 days, Container Insights):
+        - CPUUtilization avg: 28%, p95: 42%
+        - MemoryUtilization avg: 40%, p95: 55%
+        - RunningTaskCount avg: 6
+
+      Savings Plan coverage:
+        - 1-year Compute SP covering $200/month ECS spend
+        - Discount: 52% (blended Fargate rate after SP)
+        - Utilization: 98% (fully utilized)
+
+      Workload context: payment processing API. Stateless, horizontally
+      scalable. Already on arm64 (Node.js 20). Already right-sized.
+      Capacity provider strategy: Fargate Spot 70% base + on-demand 30%.
+      Auto-scaling: target tracking at 60% CPUUtilization. Well-managed
+      service — all optimization dimensions addressed.
+
+      Cost Explorer (last month):
+        - Fargate compute (pre-SP): $104.33
+        - SP discount: -$54.25
+        - Net compute: $50.08/month
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"

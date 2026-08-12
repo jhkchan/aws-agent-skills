@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "nat-gateway-traffic-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the NAT Gateway Traffic Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "missing-s3-gateway-endpoint",
+      "name": "Production VPC with S3 traffic through NAT and no Gateway Endpoint — create S3 Gateway Endpoint (FREE)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-s3-gateway-endpoint.md",
+      "baseline_file": "baselines/missing-s3-gateway-endpoint.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "missing-s3-gateway-endpoint", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "Gateway"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "redundant-multi-az-nat-nonprod",
+      "name": "Staging VPC with 3 NAT Gateways processing 200 GB/mo — consolidate to single NAT Gateway",
+      "difficulty": "hard",
+      "prompt_file": "prompts/redundant-multi-az-nat-nonprod.md",
+      "baseline_file": "baselines/redundant-multi-az-nat-nonprod.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "redundant-multi-az-nat-nonprod", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "nat-instance-devtest-substitution",
+      "name": "Dev VPC with 1 NAT Gateway processing 30 GB/mo — substitute with NAT Instance (t3.micro)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/nat-instance-devtest-substitution.md",
+      "baseline_file": "baselines/nat-instance-devtest-substitution.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "nat-instance-devtest-substitution", "RECOMMENDATION", "ESTIMATED_SAVINGS", "NAT Instance"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized-endpoints",
+      "name": "Production VPC with all endpoints in place, multi-AZ HA — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized-endpoints.md",
+      "baseline_file": "baselines/already-optimized-endpoints.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized-endpoints", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "flow-logs-not-enabled",
+      "name": "VPC with NAT Gateways but no VPC Flow Logs — cannot determine per-service traffic",
+      "difficulty": "medium",
+      "prompt_file": "prompts/flow-logs-not-enabled.md",
+      "baseline_file": "baselines/flow-logs-not-enabled.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "flow-logs-not-enabled", "Flow Logs"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}

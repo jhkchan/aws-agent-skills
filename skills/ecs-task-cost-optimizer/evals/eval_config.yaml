@@ -1,0 +1,43 @@
+# Eval configuration for ecs-task-cost-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ecs-task-cost-optimizer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: fargate-to-ec2-crossover
+    difficulty: hard
+    prompt_file: prompts/fargate-to-ec2-crossover.md
+    baseline_file: baselines/fargate-to-ec2-crossover.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: graviton2-migration
+    difficulty: medium
+    prompt_file: prompts/graviton2-migration.md
+    baseline_file: baselines/graviton2-migration.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: task-rightsizing
+    difficulty: medium
+    prompt_file: prompts/task-rightsizing.md
+    baseline_file: baselines/task-rightsizing.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: capacity-provider-spot
+    difficulty: hard
+    prompt_file: prompts/capacity-provider-spot.md
+    baseline_file: baselines/capacity-provider-spot.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: already-optimized
+    difficulty: easy
+    prompt_file: prompts/already-optimized.md
+    baseline_file: baselines/already-optimized.md
+    expected_verdict: OPTIMIZED

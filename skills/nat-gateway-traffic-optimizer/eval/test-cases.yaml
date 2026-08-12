@@ -1,0 +1,240 @@
+# Eval test cases for nat-gateway-traffic-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# VPC ID embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: nat-gateway-traffic-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: missing-s3-gateway-endpoint
+    description: >-
+      Production VPC with 2 multi-AZ NAT Gateways processing 800 GB/month,
+      of which 300 GB is S3 traffic. No S3 Gateway Endpoint exists.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with S3 Gateway
+      Endpoint creation (FREE).
+    input: |
+      VPC: vpc-missing-s3-gateway-endpoint
+      Environment: production
+      Region: us-east-1
+      NAT Gateways: 2 (us-east-1a, us-east-1b)
+
+      NAT Monthly Spend:
+        - Hourly: 2 × $0.045 × 730 = $65.70
+        - Data processing: 800 GB × $0.045 = $36.00
+        - Total: $101.70/month
+
+      Existing VPC Endpoints: none
+
+      VPC Flow Logs (last 7 days, monthly projection):
+        - S3 traffic: 300 GB (37.5% of total)
+        - DynamoDB traffic: 50 GB (6.25% of total)
+        - ECR traffic: 100 GB (12.5% of total)
+        - SSM traffic: 30 GB (3.75% of total)
+        - Other: 320 GB (40% of total)
+
+      Workload context: Production multi-AZ VPC serving a web application.
+      EC2 fleet in private subnets reads from S3 (config files, assets)
+      and DynamoDB (session data). Multi-AZ NAT required for HA.
+
+      Emit the standard optimization block (VPC, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "missing-s3-gateway-endpoint"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "Gateway"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: redundant-multi-az-nat-nonprod
+    description: >-
+      Staging VPC with 3 NAT Gateways (one per AZ) processing only 200
+      GB/month. Non-production, so multi-AZ HA is not required.
+      Consolidating to 1 NAT Gateway saves $63/month in hourly charges.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with topology
+      consolidation.
+    input: |
+      VPC: vpc-redundant-multi-az-nat-nonprod
+      Environment: staging (non-production)
+      Region: us-east-1
+      NAT Gateways: 3 (us-east-1a, us-east-1b, us-east-1c)
+
+      NAT Monthly Spend:
+        - Hourly: 3 × $0.045 × 730 = $98.55
+        - Data processing: 200 GB × $0.045 = $9.00
+        - Total: $107.55/month
+
+      Existing VPC Endpoints: S3 Gateway Endpoint (already created)
+
+      VPC Flow Logs (last 7 days, monthly projection):
+        - S3 traffic: 0 GB (already through Gateway Endpoint)
+        - DynamoDB traffic: 20 GB
+        - Other: 180 GB
+
+      Workload context: Staging environment for QA testing. No 24/7
+      availability requirement. Single-AZ egress failure is tolerable
+      (staging can be down for short periods during AZ outages).
+
+      Emit the standard optimization block (VPC, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "redundant-multi-az-nat-nonprod"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: nat-instance-devtest-substitution
+    description: >-
+      Dev VPC with 1 NAT Gateway processing only 30 GB/month. No HA
+      requirement. NAT Instance (t3.micro) would be 78% cheaper.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with NAT Instance
+      substitution.
+    input: |
+      VPC: vpc-nat-instance-devtest-substitution
+      Environment: dev (non-production)
+      Region: us-east-1
+      NAT Gateways: 1 (us-east-1a)
+
+      NAT Monthly Spend:
+        - Hourly: 1 × $0.045 × 730 = $32.85
+        - Data processing: 30 GB × $0.045 = $1.35
+        - Total: $34.20/month
+
+      Existing VPC Endpoints: none
+
+      VPC Flow Logs (last 7 days, monthly projection):
+        - Total traffic: 30 GB (mixed: S3, API calls, package downloads)
+
+      Workload context: Dev environment used by 3 developers. EC2
+      instances in private subnets download packages and run tests.
+      No production traffic. No availability requirement. If the NAT
+      Instance is down, developers can wait for a reboot.
+
+      Emit the standard optimization block (VPC, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "nat-instance-devtest-substitution"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "NAT Instance"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimized-endpoints
+    description: >-
+      Production VPC with 2 multi-AZ NAT Gateways, S3+DynamoDB Gateway
+      Endpoints, ECR Interface Endpoints (above break-even). No topology
+      savings (production HA). All dimensions pass. Expected verdict:
+      OPTIMIZED.
+    input: |
+      VPC: vpc-already-optimized-endpoints
+      Environment: production
+      Region: us-east-1
+      NAT Gateways: 2 (us-east-1a, us-east-1b)
+
+      NAT Monthly Spend:
+        - Hourly: 2 × $0.045 × 730 = $65.70
+        - Data processing: 500 GB × $0.045 = $22.50
+        - Total: $88.20/month
+
+      Existing VPC Endpoints:
+        - S3 Gateway Endpoint (active)
+        - DynamoDB Gateway Endpoint (active)
+        - ECR Interface Endpoint api + dkr (active, 3-AZ)
+
+      VPC Flow Logs (last 7 days, monthly projection):
+        - S3 traffic: 0 GB (through Gateway Endpoint)
+        - DynamoDB traffic: 0 GB (through Gateway Endpoint)
+        - ECR traffic: 0 GB (through Interface Endpoint)
+        - Remaining through NAT: 500 GB (third-party APIs, downloads)
+
+      Workload context: Production multi-AZ VPC. S3, DynamoDB, and ECR
+      traffic already routed through VPC endpoints. Remaining NAT
+      traffic is to third-party APIs and internet downloads that cannot
+      be eliminated by endpoints.
+
+      Emit the standard optimization block (VPC, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized-endpoints"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: flow-logs-not-enabled
+    description: >-
+      VPC with 2 NAT Gateways but no VPC Flow Logs enabled. Cannot
+      determine per-service traffic patterns to make endpoint
+      recommendations. Expected verdict: NEED_MORE_INFO.
+    input: |
+      VPC: vpc-flow-logs-not-enabled
+      Environment: production
+      Region: us-east-1
+      NAT Gateways: 2 (us-east-1a, us-east-1b)
+
+      NAT Monthly Spend (from Cost Explorer):
+        - Hourly: 2 × $0.045 × 730 = $65.70
+        - Data processing: 600 GB × $0.045 = $27.00
+        - Total: $92.70/month
+
+      VPC Flow Logs: NOT ENABLED
+
+      Existing VPC Endpoints: none
+
+      Workload context: Recently inherited from another team. No
+      documentation on what traffic flows through the NAT Gateways.
+      Cannot determine which AWS services are being accessed without
+      per-service traffic breakdown.
+
+      Emit the standard optimization block (VPC, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "flow-logs-not-enabled"
+        - "Flow Logs"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: OPTIMIZED"
