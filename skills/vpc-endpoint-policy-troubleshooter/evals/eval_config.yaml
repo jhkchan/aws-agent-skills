@@ -1,0 +1,49 @@
+# Eval configuration for vpc-endpoint-policy-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: vpc-endpoint-policy-troubleshooter
+snapshot_date: "2026-08-12"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: interface-endpoint-sg-missing
+    difficulty: hard
+    prompt_file: prompts/interface-endpoint-sg-missing.md
+    baseline_file: baselines/interface-endpoint-sg-missing.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+
+  - id: gateway-endpoint-missing-route
+    difficulty: hard
+    prompt_file: prompts/gateway-endpoint-missing-route.md
+    baseline_file: baselines/gateway-endpoint-missing-route.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+
+  - id: endpoint-policy-deny
+    difficulty: medium
+    prompt_file: prompts/endpoint-policy-deny.md
+    baseline_file: baselines/endpoint-policy-deny.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+
+  - id: dns-resolution-failure
+    difficulty: medium
+    prompt_file: prompts/dns-resolution-failure.md
+    baseline_file: baselines/dns-resolution-failure.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+
+  - id: insufficient-data-endpoint
+    difficulty: easy
+    prompt_file: prompts/insufficient-data-endpoint.md
+    baseline_file: baselines/insufficient-data-endpoint.md
+    expected_verdict: INSUFFICIENT_DATA

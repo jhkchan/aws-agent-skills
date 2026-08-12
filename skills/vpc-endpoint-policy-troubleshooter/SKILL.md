@@ -1,26 +1,22 @@
 ---
 name: vpc-endpoint-policy-troubleshooter
 description: >-
-  Diagnoses Amazon VPC endpoint policy and connectivity failures across
-  interface endpoints (PrivateLink), Gateway endpoints (S3/DynamoDB),
-  and endpoint services (NLB-backed). Covers endpoint policy evaluation
-  (default full access vs custom policy), security group on interface
+  Diagnoses Amazon VPC endpoint policy and connectivity failures
+  across interface endpoints (PrivateLink), Gateway endpoints
+  (S3/DynamoDB), and endpoint services (NLB-backed). Covers endpoint
+  policy evaluation (default vs custom), security group on interface
   endpoint ENIs (inbound from client subnet on service port), DNS
-  resolution (private hosted zone for endpoint DNS name, interface
-  endpoint private DNS), cross-account endpoint access (resource policy
-  plus IAM), Gateway endpoint routing (must be in route table), endpoint
-  service connection timeouts (health check from endpoint service),
-  endpoint DNS name resolution failures, endpoint policy JSON syntax
-  errors, and PrivateLink endpoint service availability. Emits a
-  ROOT_CAUSE_IDENTIFIED diagnosis with specific evidence citations and
-  remediation commands, or INSUFFICIENT_DATA when more diagnostics are
-  needed. Use when troubleshooting VPC endpoint connection failures,
-  PrivateLink connection timeouts, endpoint policy access denied, S3 or
-  DynamoDB Gateway endpoint routing, endpoint DNS resolution, or
-  cross-account PrivateLink access. Triggers - vpc endpoint connection
-  failure, privatelink timeout, endpoint policy denied, gateway endpoint
-  route table, endpoint dns resolution, cross-account endpoint, nlb
-  endpoint service, endpoint security group.
+  resolution (private DNS, private hosted zone), cross-account
+  access (resource policy plus IAM), Gateway endpoint routing (must
+  be in route table), endpoint service timeouts, and policy JSON
+  syntax errors. Emits ROOT_CAUSE_IDENTIFIED with remediation
+  commands, or INSUFFICIENT_DATA when more diagnostics are needed.
+  Use when troubleshooting endpoint connection failures, PrivateLink
+  timeouts, endpoint policy access denied, S3 or DynamoDB Gateway
+  routing, endpoint DNS resolution, or cross-account PrivateLink.
+  Triggers - vpc endpoint failure, privatelink timeout, endpoint
+  policy denied, gateway endpoint route, endpoint dns, cross-account
+  endpoint, nlb endpoint service.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

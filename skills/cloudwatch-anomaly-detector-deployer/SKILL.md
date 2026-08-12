@@ -285,30 +285,6 @@ real anomalies, tune up if too many false positives.
 after deployment. It is not set-and-forget; plan for a tuning cycle
 after initial deployment.
 
-## Expert heuristic: anomaly detection vs static threshold decision
-
-Anomaly detection and static thresholds serve different purposes. The
-decision depends on the metric's behavior pattern.
-
-```text
-Metric pattern → Detection method:
-  ├── Regular/diurnal pattern (e.g., traffic follows day/night cycle)
-  │     → Anomaly detection (learns the pattern, adapts to time-of-day)
-  ├── Steadily trending (e.g., disk usage growing over time)
-  │     → Static threshold (anomaly detection may not catch gradual drift)
-  ├── Mostly zero with occasional spikes (e.g., error count)
-  │     → Static threshold > 0 (anomaly detection struggles with sparse data)
-  ├── Highly variable with no pattern (e.g., test environment metrics)
-  │     → Static threshold (anomaly detection cannot learn a reliable baseline)
-  └── Multi-modal (e.g., batch processing: high during batch, low otherwise)
-        → Anomaly detection (learns the multi-modal pattern)
-```
-
-**Key implication:** use anomaly detection for metrics with predictable
-patterns that vary over time. Use static thresholds for hard limits and
-sparse metrics. Combine both with composite alarms for comprehensive
-coverage.
-
 ## Prerequisites (verify before provisioning)
 
 Before emitting provisioning commands, verify these prerequisites. If
@@ -773,78 +749,28 @@ primary signal and static thresholds as backstop coverage.
 
 Anomaly detection works on BOTH built-in AWS metrics and custom metrics.
 The configuration is identical; only the namespace and metric name
-differ.
-
-| Metric type | Namespace example | Anomaly detection support | Notes |
-|---|---|---|---|
-| Built-in AWS | `AWS/EC2`, `AWS/RDS`, `AWS/ApplicationELB` | Yes (most metrics) | Check compatibility; some sparse metrics fail |
-| Custom (standard resolution) | `MyApp`, `Company/Metrics` | Yes | Must report at 1-min or 5-min resolution |
-| Custom (high resolution) | `MyApp` with StorageResolution=1 | Yes | 1-second resolution; needs more historical data points (but accumulates faster) |
-| Container Insights | `ContainerInsights/Prometheus` | Yes | Check dimension compatibility |
-| Lambda Insights | `LambdaInsights` | Yes | Check for sparse data on low-traffic functions |
-
-**Custom metric anomaly detection example:**
-
-```bash
-# Custom metric: MyApp/RequestLatency
-aws cloudwatch put-metric-anomaly-detector \
-  --namespace "MyApp" \
-  --metric-name "RequestLatency" \
-  --dimensions Name=ServiceName,Value=checkout-service \
-  --stat "p99" \
-  --period 60 \
-  --configuration '{"StandardDeviation": 2}'
-```
-
-**Built-in metric anomaly detection example:**
-
-```bash
-# Built-in: AWS/RDS DatabaseConnections
-aws cloudwatch put-metric-anomaly-detector \
-  --namespace "AWS/RDS" \
-  --metric-name "DatabaseConnections" \
-  --dimensions Name=DBInstanceIdentifier,Value=prod-db-001 \
-  --stat "Average" \
-  --period 300 \
-  --configuration '{"StandardDeviation": 3}'
-```
+differ. Built-in AWS metrics (`AWS/EC2`, `AWS/RDS`, `AWS/ApplicationELB`)
+are well-tested. Custom metrics work if they report regularly at 1-min
+or 5-min resolution. High-resolution custom metrics (1-second) also
+work but accumulate training data faster. Container Insights and Lambda
+Insights metrics are supported — check for sparse data on low-traffic
+functions.
 
 ## Step 12 — Recent features
 
 **Recent AWS features (2023-2026):**
 
-- **Cross-account observability GA (2023-2024):** CloudWatch cross-
-  account observability reached general availability, enabling anomaly
-  detectors and alarms in a central monitoring account that evaluate
-  metrics from multiple member accounts.
-
-- **Anomaly detector on high-resolution metrics (2023-2024):** Support
-  for high-resolution custom metrics (1-second resolution) with anomaly
-  detection. Requires more data points for training but detects
-  anomalies faster.
-
-- **Composite alarm enhancements (2023-2024):** Extended composite
-  alarm rule syntax with support for NOT, nested AND/OR, and
-  INSUFFICIENT_DATA state references. Enables more sophisticated
-  alerting logic.
-
-- **Metric math ANOMALY_DETECTION_BAND improvements (2023-2024):**
-  Enhanced band rendering in the console, including band confidence
-  intervals and anomaly event annotations.
-
-- **Anomaly detection for Logs Insights (2024-2025):** CloudWatch Logs
-  Insights added anomaly detection for log-based metrics, extending
-  anomaly detection beyond standard CloudWatch metrics.
-
-- **Natural language query for anomaly detection (2024-2025):**
-  CloudWatch added natural language query generation that can suggest
-  anomaly detection configurations based on metric descriptions.
-
-- **Anomaly detection contributor insights integration (2025-2026):**
-  Integration between anomaly detection alarms and Contributor
-  Insights, automatically surfacing the top contributors when an
-  anomaly is detected (e.g., which IP addresses are driving a traffic
-  anomaly).
+- **Cross-account observability GA (2023-2024):** Anomaly detectors
+  and alarms in a central monitoring account evaluating metrics from
+  multiple member accounts.
+- **High-resolution metric support (2023-2024):** 1-second resolution
+  custom metrics with anomaly detection.
+- **Composite alarm enhancements (2023-2024):** Extended rule syntax
+  with NOT, nested AND/OR, INSUFFICIENT_DATA state references.
+- **Logs Insights anomaly detection (2024-2025):** Anomaly detection
+  for log-based metrics.
+- **Contributor Insights integration (2025-2026):** Automatically
+  surfaces top contributors when an anomaly is detected.
 
 ## NEVER do these things
 

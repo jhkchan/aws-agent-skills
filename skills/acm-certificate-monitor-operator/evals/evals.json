@@ -1,0 +1,179 @@
+{
+  "skill": "acm-certificate-monitor-operator",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-12",
+  "description": "Structured eval definitions for the ACM Certificate Monitor Operator. Five-case proven set exercising the OPERATION_COMPLETED / REVIEW_REQUIRED classification across ACM certificate monitoring scenarios (standard DaysToExpiry tiered alarm setup, critical <7 day expiry investigation, multi-region certificate inventory with attachment mapping, CAA record conflict detection blocking renewal, multi-account certificate audit via Organizations with assume-role). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "standard-expiry-monitoring",
+      "name": "Standard ACM certificate expiry monitoring with tiered DaysToExpiry alarms",
+      "difficulty": "medium",
+      "branch": "OPERATION_COMPLETED — 5 issued certs, warning (<30d) and critical (<7d) alarms, SNS topics, renewal eligibility and DNS validation checked",
+      "prompt": "Set up certificate expiry monitoring for my ACM certificates in us-east-1, account 123456789012. I have 5 issued certificates. Create DaysToExpiry alarms with warning at 30 days and critical at 7 days. Warning SNS topic arn:aws:sns:us-east-1:123456789012:cert-warning-notifications, critical SNS topic arn:aws:sns:us-east-1:123456789012:cert-critical-escalation. Check renewal eligibility and DNS validation status.",
+      "prompt_file": "prompts/standard-expiry-monitoring.md",
+      "baseline_file": "baselines/standard-expiry-monitoring.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "ACM_MONITORING: 123456789012 (us-east-1) — 5 certificates\nVERDICT: OPERATION_COMPLETED\nFINDINGS:\n  [info] All 5 certificates have DaysToExpiry alarms configured (warning + critical)\n  [info] All 5 certificates are DNS-validated and attached to supported services\n  [info] No CAA conflicts detected\n  [info] No renewal failures detected\nCHECKLIST:\n  [✓] Certificate inventory: 5 certs across us-east-1\n  [✓] DaysToExpiry alarms: warning (<30d) and critical (<7d) configured for 5 certs\n  [✓] SNS notification: warning → arn:aws:sns:us-east-1:123456789012:cert-warning-notifications, critical → arn:aws:sns:us-east-1:123456789012:cert-critical-escalation\n  [✓] Renewal status: 3 ELIGIBLE, 2 INELIGIBLE (not yet in renewal window), 0 FAILED\n  [✓] DNS validation: 5 verified, 0 missing records\n  [✓] CAA records: 5 OK, 0 conflicts\nVERIFICATION_COMMANDS:\n  aws acm list-certificates --certificate-statuses ISSUED --region us-east-1\n  aws cloudwatch describe-alarms --alarm-name-prefix acm-cert- --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "DaysToExpiry",
+            "VERDICT",
+            "FINDINGS",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "critical-expiry-escalation",
+      "name": "Critical certificate expiry investigation at 5 days remaining",
+      "difficulty": "hard",
+      "branch": "OPERATION_COMPLETED — cert 5 days from expiry, critical alarm fired, renewal status verified, DNS validation checked, CAA records checked, no conflict found",
+      "prompt": "One of my ACM certificates (arn:aws:acm:us-east-1:123456789012:certificate/crit-001) for api.example.com is only 5 days from expiry. The critical alarm has fired. Check the renewal status, verify DNS validation records are present, check CAA records for example.com, and determine if renewal is blocked. SNS critical topic arn:aws:sns:us-east-1:123456789012:cert-critical-escalation. Account 123456789012, us-east-1.",
+      "prompt_file": "prompts/critical-expiry-escalation.md",
+      "baseline_file": "baselines/critical-expiry-escalation.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "ACM_MONITORING: 123456789012 (us-east-1) — certificate/crit-001 (api.example.com)\nVERDICT: OPERATION_COMPLETED\nFINDINGS:\n  [critical] Certificate api.example.com expires in 5 days\n  [info] Renewal status: PENDING_AUTO_RENEWAL (ACM is attempting renewal)\n  [info] DNS validation: records present and verified\n  [info] CAA records: no conflict (amazon.com authorized)\n  [info] Certificate attached to ALB — auto-renewal eligible\nCHECKLIST:\n  [✓] Critical alarm: acm-cert-critical-crit-001 (ALARM state)\n  [✓] Renewal status: PENDING_AUTO_RENEWAL\n  [✓] DNS validation: present\n  [✓] CAA records: OK (no conflict)\n  [✓] Service attachment: ALB attached\nVERIFICATION_COMMANDS:\n  aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/crit-001 --region us-east-1\n  dig example.com CAA +short",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "api.example.com",
+            "VERDICT",
+            "FINDINGS",
+            "CHECKLIST",
+            "CAA"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-region-inventory",
+      "name": "Multi-region ACM certificate inventory across 4 regions",
+      "difficulty": "medium",
+      "branch": "OPERATION_COMPLETED — inventory of all ACM certs across us-east-1, us-west-2, eu-west-1, ap-southeast-1, with attachment mapping",
+      "prompt": "Inventory all ACM certificates across my active regions: us-east-1, us-west-2, eu-west-1, and ap-southeast-1. Account 123456789012. List all certificates with their status, type, and domain. Also check which certificates are attached to load balancers or CloudFront distributions vs unattached.",
+      "prompt_file": "prompts/multi-region-inventory.md",
+      "baseline_file": "baselines/multi-region-inventory.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "ACM_MONITORING: 123456789012 (us-east-1, us-west-2, eu-west-1, ap-southeast-1) — N certificates\nVERDICT: OPERATION_COMPLETED\nFINDINGS:\n  [info] Multi-region inventory complete across 4 regions\n  [warning] N unattached certificates detected (at risk of not auto-renewing)\nCHECKLIST:\n  [✓] Certificate inventory: N certs across 4 regions\n  [✓] Service attachment: M attached, K unattached\n  [✓] Regional breakdown: us-east-1 (A), us-west-2 (B), eu-west-1 (C), ap-southeast-1 (D)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "multi-region",
+            "us-east-1",
+            "us-west-2",
+            "eu-west-1",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "caa-record-conflict",
+      "name": "CAA record conflict blocking ACM certificate renewal",
+      "difficulty": "hard",
+      "branch": "REVIEW_REQUIRED — renewal FAILED, CAA records only authorize letsencrypt.org not amazon.com, fix is to add amazon.com CAA record",
+      "prompt": "My ACM certificate for www.example.com (arn:aws:acm:us-east-1:123456789012:certificate/caa-conflict-001) is 45 days from expiry but renewal status shows FAILED. The certificate is DNS-validated and attached to an ALB. DNS validation records are present. Check CAA records for example.com — I recently switched my DNS provider and they may have added CAA records. Account 123456789012, us-east-1.",
+      "prompt_file": "prompts/caa-record-conflict.md",
+      "baseline_file": "baselines/caa-record-conflict.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_output": "ACM_MONITORING: 123456789012 (us-east-1) — certificate/caa-conflict-001 (www.example.com)\nVERDICT: REVIEW_REQUIRED\nFINDINGS:\n  [critical] CAA record conflict detected: example.com has CAA record authorizing letsencrypt.org only — amazon.com NOT authorized\n  [critical] ACM renewal is BLOCKED by CAA records\n  [action] Add CAA record: 0 issue \"amazon.com\" to the example.com DNS zone\nCHECKLIST:\n  [✓] Renewal status: FAILED (blocked by CAA)\n  [✓] DNS validation: records present and verified\n  [✗] CAA records: CONFLICT — amazon.com not authorized (only letsencrypt.org)\n  [✓] Service attachment: ALB attached\nVERIFICATION_COMMANDS:\n  dig example.com CAA +short\n  aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/caa-conflict-001 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "REVIEW_REQUIRED",
+            "CAA",
+            "example.com",
+            "VERDICT",
+            "FINDINGS",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: OPERATION_COMPLETED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-account-org-audit",
+      "name": "Multi-account ACM certificate audit via Organizations across 5 accounts",
+      "difficulty": "hard",
+      "branch": "OPERATION_COMPLETED — audit of all ACM certs across 5 Organization accounts using assume-role, scanning us-east-1 and eu-west-1",
+      "prompt": "Audit all ACM certificates across my Organization. I have 5 accounts: 111111111111 (audit account), 222222222222 (prod), 333333333333 (staging), 444444444444 (dev), 555555555555 (shared). Use the ACMMonitoringRole in each member account to assume access. Scan us-east-1 and eu-west-1. List all certificates with status, renewal eligibility, and flag any unattached certificates or renewal failures. The audit account (111111111111) runs the audit.",
+      "prompt_file": "prompts/multi-account-org-audit.md",
+      "baseline_file": "baselines/multi-account-org-audit.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "ACM_MONITORING: 111111111111 (audit) — 5 accounts, 2 regions\nVERDICT: OPERATION_COMPLETED\nFINDINGS:\n  [info] Multi-account audit complete across 5 accounts and 2 regions\n  [info] Total certificates inventoried: N\n  [warning] M unattached certificates detected across accounts\nCHECKLIST:\n  [✓] Multi-account audit: 5 accounts scanned (111111111111, 222222222222, 333333333333, 444444444444, 555555555555)\n  [✓] Regions scanned: us-east-1, eu-west-1\n  [✓] Assume-role: ACMMonitoringRole used in each member account\n  [✓] Renewal failures flagged: 0 FAILED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "multi-account",
+            "111111111111",
+            "222222222222",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    }
+  ]
+}

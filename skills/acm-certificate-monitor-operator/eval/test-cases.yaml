@@ -1,0 +1,163 @@
+# Eval test cases for acm-certificate-monitor-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the OPERATION_COMPLETED /
+# REVIEW_REQUIRED classification across ACM certificate monitoring
+# scenarios (standard DaysToExpiry alarm setup, critical <7 day
+# expiry escalation, multi-region certificate inventory, CAA record
+# conflict detection blocking renewal, multi-account audit via
+# Organizations).
+skill: acm-certificate-monitor-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: standard-expiry-monitoring
+    description: >-
+      Set up standard ACM certificate expiry monitoring with tiered
+      DaysToExpiry alarms (warning <30 days, critical <7 days) and SNS
+      notifications. Expects OPERATION_COMPLETED with all certificates
+      having alarms configured, renewal eligibility checked, and DNS
+      validation verified.
+    input: |
+      Set up certificate expiry monitoring for my ACM certificates
+      in us-east-1, account 123456789012. I have 5 issued
+      certificates. Create DaysToExpiry alarms with warning at 30
+      days and critical at 7 days. Warning SNS topic
+      arn:aws:sns:us-east-1:123456789012:cert-warning-notifications,
+      critical SNS topic
+      arn:aws:sns:us-east-1:123456789012:cert-critical-escalation.
+      Check renewal eligibility and DNS validation status.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "DaysToExpiry"
+        - "VERDICT"
+        - "FINDINGS"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: critical-expiry-escalation
+    description: >-
+      An ACM certificate is 5 days from expiry. The monitoring should
+      detect this as critical, verify renewal status, check CAA records,
+      and escalate. Expects OPERATION_COMPLETED with the critical
+      certificate identified and remediation steps noted.
+    input: |
+      One of my ACM certificates (arn:aws:acm:us-east-1:123456789012:certificate/crit-001)
+      for api.example.com is only 5 days from expiry. The critical
+      alarm has fired. Check the renewal status, verify DNS validation
+      records are present, check CAA records for example.com, and
+      determine if renewal is blocked. SNS critical topic
+      arn:aws:sns:us-east-1:123456789012:cert-critical-escalation.
+      Account 123456789012, us-east-1.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "api.example.com"
+        - "VERDICT"
+        - "FINDINGS"
+        - "CHECKLIST"
+        - "CAA"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: multi-region-inventory
+    description: >-
+      Perform a multi-region ACM certificate inventory across us-east-1,
+      us-west-2, eu-west-1, and ap-southeast-1. Expects
+      OPERATION_COMPLETED with all regions scanned and certificates
+      listed per region.
+    input: |
+      Inventory all ACM certificates across my active regions:
+      us-east-1, us-west-2, eu-west-1, and ap-southeast-1. Account
+      123456789012. List all certificates with their status, type,
+      and domain. Also check which certificates are attached to load
+      balancers or CloudFront distributions vs unattached.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "multi-region"
+        - "us-east-1"
+        - "us-west-2"
+        - "eu-west-1"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: caa-record-conflict
+    description: >-
+      ACM certificate renewal is failing because CAA records for the
+      domain only authorize letsencrypt.org, not amazon.com. Expects
+      REVIEW_REQUIRED with the CAA conflict identified and the fix
+      documented.
+    input: |
+      My ACM certificate for www.example.com
+      (arn:aws:acm:us-east-1:123456789012:certificate/caa-conflict-001)
+      is 45 days from expiry but renewal status shows FAILED. The
+      certificate is DNS-validated and attached to an ALB. DNS
+      validation records are present. Check CAA records for
+      example.com — I recently switched my DNS provider and they may
+      have added CAA records. Account 123456789012, us-east-1.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "CAA"
+        - "example.com"
+        - "VERDICT"
+        - "FINDINGS"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPERATION_COMPLETED"
+
+  - id: multi-account-org-audit
+    description: >-
+      Perform a multi-account ACM certificate audit across an
+      Organization with 5 accounts using Organizations and assume-role.
+      Expects OPERATION_COMPLETED with all accounts scanned,
+      certificates inventoried, and a summary of at-risk certificates.
+    input: |
+      Audit all ACM certificates across my Organization. I have 5
+      accounts: 111111111111 (audit account), 222222222222 (prod),
+      333333333333 (staging), 444444444444 (dev), 555555555555 (shared).
+      Use the ACMMonitoringRole in each member account to assume
+      access. Scan us-east-1 and eu-west-1. List all certificates
+      with status, renewal eligibility, and flag any unattached
+      certificates or renewal failures. The audit account
+      (111111111111) runs the audit.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "multi-account"
+        - "111111111111"
+        - "222222222222"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

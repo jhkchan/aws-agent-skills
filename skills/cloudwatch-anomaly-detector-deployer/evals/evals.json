@@ -1,0 +1,179 @@
+{
+  "skill": "cloudwatch-anomaly-detector-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-12",
+  "description": "Structured eval definitions for the CloudWatch Anomaly Detection Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across anomaly detection scenarios (built-in CPU metric with band-breach alarm, custom metric p99 latency anomaly detection, insufficient training data prerequisite failure, cross-account anomaly detection via monitoring/source account model, std dev sensitivity tuning with composite alarm integration). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "builtin-cpu-anomaly-alarm",
+      "name": "Built-in EC2 CPUUtilization anomaly detection with band-breach alarm",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — built-in AWS/EC2 CPUUtilization, 30 days of data, std dev 3, band-breach alarm with evaluation-periods 3, SNS notification",
+      "prompt": "Create a CloudWatch Anomaly Detection model for the CPUUtilization metric on EC2 instance i-abc1234567890 in us-east-1. Namespace AWS/EC2. Stat Average, period 300 seconds. The metric has been reporting for 30 days. Standard deviation multiplier 3. Create a band-breach alarm that fires when CPU goes above the upper band for 3 consecutive evaluation periods. SNS topic arn arn:aws:sns:us-east-1:123456789012:anomaly-alerts. Tags: Environment=production, Service=web-app.",
+      "prompt_file": "prompts/builtin-cpu-anomaly-alarm.md",
+      "baseline_file": "baselines/builtin-cpu-anomaly-alarm.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ANOMALY_DETECTION: AWS/EC2/CPUUtilization [InstanceId=i-abc1234567890] (TRAINED)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Metric: AWS/EC2/CPUUtilization [InstanceId=i-abc1234567890]\n  [✓] Historical data: 8640 data points at 300s (need >= 15)\n  [✓] Metric compatibility: PASS (regular data, diurnal pattern)\n  [✓] Stat: Average\n  [✓] Period: 300 seconds\n  [✓] Std dev multiplier: 3 (default — balanced)\n  [✓] Band breach alarm: cpu-anomaly-breach-i-abc123 (upper, evaluation-periods=3)\n  [✓] SNS notification: arn:aws:sns:us-east-1:123456789012:anomaly-alerts\n  [✓] Recovery to OK: enabled (ok-actions configured)\n  [✓] Metric type: built-in (AWS/EC2)\nVERIFICATION_COMMANDS:\n  aws cloudwatch describe-anomaly-detectors --namespace AWS/EC2 --region us-east-1\n  aws cloudwatch describe-alarms --alarm-names cpu-anomaly-breach-i-abc123 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "CPUUtilization",
+            "i-abc1234567890",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "ANOMALY_DETECTION_BAND"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-metric-anomaly",
+      "name": "Custom metric MyApp/RequestLatency p99 anomaly detection",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — custom namespace MyApp, RequestLatency metric, p99 stat, 1-min period, std dev 2 (more sensitive for volatile latency), upper band breach alarm",
+      "prompt": "Create a CloudWatch Anomaly Detection model for the RequestLatency custom metric in namespace MyApp, dimension ServiceName=checkout-service, in us-east-1. Stat p99, period 60 seconds. The custom metric has been reporting for 45 days at 1-minute resolution. Standard deviation multiplier 2 (latency is volatile, want more sensitivity). Band-breach alarm on upper band breach with 2 evaluation periods. SNS topic arn:aws:sns:us-east-1:123456789012:latency-alerts.",
+      "prompt_file": "prompts/custom-metric-anomaly.md",
+      "baseline_file": "baselines/custom-metric-anomaly.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ANOMALY_DETECTION: MyApp/RequestLatency [ServiceName=checkout-service] (TRAINED)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Metric: MyApp/RequestLatency [ServiceName=checkout-service]\n  [✓] Historical data: 64800 data points at 60s (need >= 15)\n  [✓] Metric compatibility: PASS (regular data, custom metric)\n  [✓] Stat: p99\n  [✓] Period: 60 seconds (1 min)\n  [✓] Std dev multiplier: 2 (more sensitive for volatile latency)\n  [✓] Band breach alarm: latency-anomaly-breach-checkout (upper, evaluation-periods=2)\n  [✓] SNS notification: arn:aws:sns:us-east-1:123456789012:latency-alerts\n  [✓] Metric type: custom (MyApp)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "MyApp",
+            "RequestLatency",
+            "p99",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-training-data",
+      "name": "Anomaly detection on metric with only 3 days of data (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — only 3 days of historical data; ML model needs >= 15 data points at configured period (roughly 2 weeks at 5-min resolution for reliable baseline)",
+      "prompt": "Create a CloudWatch Anomaly Detection model for the CPUUtilization metric on EC2 instance i-newinstance999 in us-east-1. Namespace AWS/EC2. Stat Average, period 300. The instance was launched 3 days ago so the metric only has about 800 data points at 5-min resolution. Standard deviation 3. Create a band-breach alarm with SNS topic arn:aws:sns:us-east-1:123456789012:anomaly-alerts.",
+      "prompt_file": "prompts/insufficient-training-data.md",
+      "baseline_file": "baselines/insufficient-training-data.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ANOMALY_DETECTION: AWS/EC2/CPUUtilization [InstanceId=i-newinstance999]\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Historical data: 800 data points at 300s — INSUFFICIENT for reliable ML baseline (need >= 2 weeks / ~4032 points at 5-min period for diurnal/weekly pattern learning)\n  [✗] Detector state: would remain LEARNING (insufficient training data)\n  [✗] Band breach alarm: cannot fire until detector reaches TRAINED state",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "training data",
+            "VERDICT",
+            "CHECKLIST",
+            "LEARNING"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-anomaly",
+      "name": "Cross-account CloudWatch Anomaly Detection on RDS DatabaseConnections",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — central monitoring account 111111111111 creates detector on source account 222222222222 RDS metric, resource policy for sharing noted, detector and alarm in monitoring account",
+      "prompt": "Create a cross-account CloudWatch Anomaly Detection model. The monitoring account is 111111111111, the source account is 222222222222. The metric is AWS/RDS DatabaseConnections for DBInstanceIdentifier prod-db-001 in us-east-1. The metric has been reporting for 60 days. Stat Average, period 300. Std dev 3. The source account has a resource policy allowing the monitoring account to read metrics. Create a band-breach alarm in the monitoring account with SNS arn:aws:sns:us-east-1:111111111111:central-alerts.",
+      "prompt_file": "prompts/cross-account-anomaly.md",
+      "baseline_file": "baselines/cross-account-anomaly.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ANOMALY_DETECTION: AWS/RDS/DatabaseConnections [DBInstanceIdentifier=prod-db-001] (TRAINED)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Metric: AWS/RDS/DatabaseConnections [DBInstanceIdentifier=prod-db-001]\n  [✓] Historical data: 17280 data points at 300s (need >= 15)\n  [✓] Std dev multiplier: 3\n  [✓] Cross-account: monitoring account 111111111111, source account 222222222222\n  [✓] Resource policy: source account shares metrics to monitoring account\n  [✓] Band breach alarm: rds-anomaly-breach-prod-db-001 (in monitoring account)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cross-account",
+            "111111111111",
+            "222222222222",
+            "DatabaseConnections",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "std-dev-sensitivity-tuning",
+      "name": "Std dev sensitivity tuning with composite alarm for volatile ApplicationELB latency metric",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — AWS/ApplicationELB TargetResponseTime, p99, std dev 2 (more sensitive for volatile latency), composite alarm combining anomaly breach AND static threshold",
+      "prompt": "Create a CloudWatch Anomaly Detection model for the TargetResponseTime metric in namespace AWS/ApplicationELB, dimension LoadBalancer=app/prod-alb/1234567890, TargetGroup tg/prod-tg/9876543210, in us-east-1. Stat p99, period 60. The metric has 90 days of data. Standard deviation multiplier 2 (latency is volatile, want earlier detection). Create a band-breach alarm. Also create a composite alarm that fires when BOTH the anomaly alarm AND a static threshold alarm (latency-high-threshold, p99 > 500ms) are in ALARM. SNS topic arn:aws:sns:us-east-1:123456789012:critical-alerts.",
+      "prompt_file": "prompts/std-dev-sensitivity-tuning.md",
+      "baseline_file": "baselines/std-dev-sensitivity-tuning.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ANOMALY_DETECTION: AWS/ApplicationELB/TargetResponseTime [LoadBalancer=app/prod-alb/1234567890, TargetGroup=tg/prod-tg/9876543210] (TRAINED)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Metric: AWS/ApplicationELB/TargetResponseTime\n  [✓] Historical data: 129600 data points at 60s (need >= 15)\n  [✓] Stat: p99\n  [✓] Std dev multiplier: 2 (more sensitive for volatile latency)\n  [✓] Band breach alarm: latency-anomaly-breach-prod-alb (upper, evaluation-periods=2)\n  [✓] Composite alarm: latency-composite-critical (ALARM(anomaly) AND ALARM(threshold))\n  [✓] SNS notification: arn:aws:sns:us-east-1:123456789012:critical-alerts",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "TargetResponseTime",
+            "composite",
+            "StandardDeviation",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    }
+  ]
+}

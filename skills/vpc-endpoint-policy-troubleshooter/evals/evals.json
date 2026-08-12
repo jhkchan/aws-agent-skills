@@ -1,0 +1,179 @@
+{
+  "skill": "vpc-endpoint-policy-troubleshooter",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-12",
+  "description": "Structured eval definitions for the VPC Endpoint Policy Troubleshooter. Five-case proven set exercising the ROOT_CAUSE_IDENTIFIED / INSUFFICIENT_DATA classification across endpoint failure modes (interface endpoint SG missing inbound rule causing timeout, Gateway endpoint missing from route table, custom endpoint policy denying s3:PutObject, interface endpoint private DNS disabled causing resolution to public IP, insufficient diagnostic data to determine root cause). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "interface-endpoint-sg-missing",
+      "name": "Interface endpoint connection timeout from missing SG inbound rule",
+      "difficulty": "hard",
+      "branch": "ROOT_CAUSE_IDENTIFIED — interface endpoint SG allows port 443 from 10.0.0.0/16 and 10.0.1.0/24 but NOT 10.0.2.0/24; clients in 10.0.2.0/24 get connection timeout",
+      "prompt": "Troubleshoot a VPC interface endpoint vpce-aaa111222 for the SSM service (com.amazonaws.us-east-1.ssm). Clients in subnet 10.0.2.0/24 are getting connection timeouts. The endpoint's security group sg-vpce123 currently allows inbound TCP 443 from 10.0.0.0/16 and 10.0.1.0/24 only. Private DNS is enabled. Endpoint policy is default (full access). Endpoint state is available.",
+      "prompt_file": "prompts/interface-endpoint-sg-missing.md",
+      "baseline_file": "baselines/interface-endpoint-sg-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_output": "VPC_ENDPOINT: vpce-aaa111222 (Interface — com.amazonaws.us-east-1.ssm)\nVERDICT: ROOT_CAUSE_IDENTIFIED\nDIAGNOSIS:\n  ROOT CAUSE: Security group sg-vpce123 does not allow inbound on port 443 from client subnet 10.0.2.0/24\n  FAILURE LAYER: Security Group\nEVIDENCE:\n  [✗] Security group (interface): sg-vpce123 MISSING inbound rule for 10.0.2.0/24\n  [✓] Endpoint policy: default (full access)\n  [✓] DNS resolution: private DNS enabled\n  [✓] Endpoint state: available\nREMEDIATION_COMMANDS:\n  aws ec2 authorize-security-group-ingress --group-id sg-vpce123 --protocol tcp --port 443 --cidr 10.0.2.0/24 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_IDENTIFIED",
+            "Security Group",
+            "sg-vpce123",
+            "10.0.2.0/24",
+            "VERDICT",
+            "DIAGNOSIS",
+            "REMEDIATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: INSUFFICIENT_DATA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gateway-endpoint-missing-route",
+      "name": "Gateway endpoint S3 traffic via NAT due to missing route table entry",
+      "difficulty": "hard",
+      "branch": "ROOT_CAUSE_IDENTIFIED — Gateway endpoint vpce-s3gw456 is in rtb-private-1 but NOT rtb-private-2; S3 traffic from subnet-private-2 goes via NAT Gateway",
+      "prompt": "Diagnose a Gateway VPC endpoint vpce-s3gw456 for S3 (com.amazonaws.us-east-1.s3). The endpoint is available and in route table rtb-private-1, but NOT in route table rtb-private-2. Clients in subnet-private-2 report S3 traffic going through the NAT Gateway instead of the endpoint. Endpoint policy is default.",
+      "prompt_file": "prompts/gateway-endpoint-missing-route.md",
+      "baseline_file": "baselines/gateway-endpoint-missing-route.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_output": "VPC_ENDPOINT: vpce-s3gw456 (Gateway — com.amazonaws.us-east-1.s3)\nVERDICT: ROOT_CAUSE_IDENTIFIED\nDIAGNOSIS:\n  ROOT CAUSE: Gateway endpoint vpce-s3gw456 is NOT in route table rtb-private-2; S3 traffic goes via NAT Gateway\n  FAILURE LAYER: Route Table\nEVIDENCE:\n  [✗] Route table (gateway): endpoint NOT in rtb-private-2; only in rtb-private-1\n  [✓] Endpoint policy: default (full access)\n  [✓] Endpoint state: available\nREMEDIATION_COMMANDS:\n  aws ec2 modify-vpc-endpoint --vpc-endpoint-id vpce-s3gw456 --add-route-table-ids rtb-private-2 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_IDENTIFIED",
+            "Route Table",
+            "vpce-s3gw456",
+            "rtb-private-2",
+            "VERDICT",
+            "DIAGNOSIS",
+            "REMEDIATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: INSUFFICIENT_DATA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "endpoint-policy-deny",
+      "name": "Endpoint policy denying s3:PutObject while IAM allows it",
+      "difficulty": "medium",
+      "branch": "ROOT_CAUSE_IDENTIFIED — custom endpoint policy allows only s3:GetObject and s3:ListBucket; s3:PutObject is denied at the endpoint policy layer despite IAM allowing it",
+      "prompt": "Diagnose a Gateway VPC endpoint vpce-s3policy789 for S3. Clients are getting HTTP 403 Access Denied when trying to upload objects (s3:PutObject) to bucket my-data-bucket. The endpoint policy only allows s3:GetObject and s3:ListBucket on arn:aws:s3:::my-data-bucket. The IAM policy allows s3:PutObject. The endpoint is available and in the correct route table.",
+      "prompt_file": "prompts/endpoint-policy-deny.md",
+      "baseline_file": "baselines/endpoint-policy-deny.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_output": "VPC_ENDPOINT: vpce-s3policy789 (Gateway — com.amazonaws.us-east-1.s3)\nVERDICT: ROOT_CAUSE_IDENTIFIED\nDIAGNOSIS:\n  ROOT CAUSE: Endpoint policy allows only s3:GetObject and s3:ListBucket; s3:PutObject is denied\n  FAILURE LAYER: Endpoint Policy\nEVIDENCE:\n  [✗] Endpoint policy: custom policy denies s3:PutObject for bucket my-data-bucket\n  [✓] Route table (gateway): endpoint in correct route table\n  [✓] Endpoint state: available\nREMEDIATION_COMMANDS:\n  # Update endpoint policy to include s3:PutObject\n  aws ec2 modify-vpc-endpoint --vpc-endpoint-id vpce-s3policy789 --policy-document file://updated-policy.json --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_IDENTIFIED",
+            "Endpoint Policy",
+            "s3:PutObject",
+            "vpce-s3policy789",
+            "VERDICT",
+            "DIAGNOSIS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: INSUFFICIENT_DATA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dns-resolution-failure",
+      "name": "Interface endpoint DNS resolving to public IP due to private DNS disabled",
+      "difficulty": "medium",
+      "branch": "ROOT_CAUSE_IDENTIFIED — private DNS is disabled on the interface endpoint; ec2.us-east-1.amazonaws.com resolves to public IP instead of endpoint ENI",
+      "prompt": "Diagnose an interface VPC endpoint vpce-ec2dns111 for the EC2 service (com.amazonaws.us-east-1.ec2). The endpoint's security group sg-ec2ep allows inbound TCP 443 from the full VPC CIDR. Private DNS is disabled. Clients report that ec2.us-east-1.amazonaws.com resolves to a public IP instead of the endpoint. Endpoint policy is default. Endpoint state is available.",
+      "prompt_file": "prompts/dns-resolution-failure.md",
+      "baseline_file": "baselines/dns-resolution-failure.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_output": "VPC_ENDPOINT: vpce-ec2dns111 (Interface — com.amazonaws.us-east-1.ec2)\nVERDICT: ROOT_CAUSE_IDENTIFIED\nDIAGNOSIS:\n  ROOT CAUSE: Private DNS is disabled; ec2.us-east-1.amazonaws.com resolves to public IP bypassing the endpoint\n  FAILURE LAYER: DNS Resolution\nEVIDENCE:\n  [✓] Security group (interface): sg-ec2ep allows inbound on port 443 from full VPC CIDR\n  [✗] DNS resolution: private DNS disabled\n  [✓] Endpoint policy: default (full access)\n  [✓] Endpoint state: available\nREMEDIATION_COMMANDS:\n  aws ec2 modify-vpc-endpoint --vpc-endpoint-id vpce-ec2dns111 --private-dns-enabled --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "ROOT_CAUSE_IDENTIFIED",
+            "DNS",
+            "private DNS",
+            "vpce-ec2dns111",
+            "VERDICT",
+            "DIAGNOSIS",
+            "REMEDIATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: INSUFFICIENT_DATA"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "insufficient-data-endpoint",
+      "name": "Insufficient diagnostic data to determine endpoint failure root cause",
+      "difficulty": "easy",
+      "branch": "INSUFFICIENT_DATA — no endpoint type, service name, SG details, endpoint policy, DNS configuration, or error symptom provided",
+      "prompt": "Troubleshoot a VPC endpoint vpce-unknown999. Clients are getting connection errors. We do not have the endpoint type, service name, security group details, endpoint policy, DNS configuration, or the specific error message (timeout vs 403 vs NXDOMAIN).",
+      "prompt_file": "prompts/insufficient-data-endpoint.md",
+      "baseline_file": "baselines/insufficient-data-endpoint.md",
+      "expected_verdict": "INSUFFICIENT_DATA",
+      "expected_output": "VPC_ENDPOINT: vpce-unknown999 (unknown type — unknown service)\nVERDICT: INSUFFICIENT_DATA\nDIAGNOSIS:\n  INSUFFICIENT DATA: Cannot determine root cause without endpoint type, service name, security group, endpoint policy, DNS configuration, and error symptom\n  EVIDENCE GAPS:\n    [?] Endpoint type: not provided (interface vs gateway determines which layers to check)\n    [?] Security group: not provided\n    [?] Endpoint policy: not provided\n    [?] DNS configuration: not provided\n    [?] Error symptom: not provided (timeout vs 403 vs NXDOMAIN narrows the layer)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "INSUFFICIENT_DATA",
+            "VERDICT",
+            "DIAGNOSIS",
+            "vpce-unknown999"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: ROOT_CAUSE_IDENTIFIED"
+          ]
+        }
+      ]
+    }
+  ]
+}

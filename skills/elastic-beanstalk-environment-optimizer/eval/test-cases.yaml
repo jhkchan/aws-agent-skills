@@ -1,0 +1,158 @@
+# Eval test cases for elastic-beanstalk-environment-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the OPTIMIZED /
+# FURTHER_OPTIMIZATION_AVAILABLE classification across optimization
+# scenarios (dev environment single-instance migration, production
+# deployment policy cost, NAT Gateway elimination, managed update
+# scheduling, RDS shared cost optimization).
+skill: elastic-beanstalk-environment-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: dev-single-instance-migration
+    description: >-
+      Optimize a dev Elastic Beanstalk environment by migrating from
+      load-balanced (2x t3.medium + ELB + NAT) to single-instance
+      (1x t3.small). Expects OPTIMIZED with approximately 85% savings
+      and topology change cited.
+    input: |
+      Optimize a dev Elastic Beanstalk environment my-dev-app
+      (e-abc123def). Currently load-balanced with 2x t3.medium
+      instances, an Application Load Balancer, and a NAT Gateway in
+      us-east-1. Average CPU utilization is 12% over the past 14 days.
+      Deployment policy is Immutable. The environment is for
+      development only, brief downtime is acceptable.
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "Single-instance"
+        - "t3.small"
+        - "my-dev-app"
+        - "VERDICT"
+        - "OPTIMIZATIONS"
+        - "COST_IMPACT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+
+  - id: prod-immutable-deploy-cost
+    description: >-
+      Optimize a production Elastic Beanstalk environment where
+      Immutable deployment is used but could remain (correct for prod)
+      while instances are right-sized. Expects FURTHER_OPTIMIZATION
+      AVAILABLE with instance right-sizing and managed update
+      scheduling recommendations.
+    input: |
+      Optimize a production Elastic Beanstalk environment my-prod-app
+      (e-xyz789abc). Load-balanced with 3x m5.xlarge across 2 AZs.
+      Average CPU is 28%. Deployment policy is Immutable (zero
+      downtime required for production). NAT Gateway present in
+      private subnets. Managed platform updates are disabled.
+      Termination protection is enabled.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "m5.xlarge"
+        - "managed"
+        - "my-prod-app"
+        - "VERDICT"
+        - "OPTIMIZATIONS"
+        - "COST_IMPACT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: nat-gateway-elimination
+    description: >-
+      Optimize a staging Elastic Beanstalk single-instance environment
+      by eliminating the unnecessary NAT Gateway. The instance has a
+      public IP and can use the IGW. Expects OPTIMIZED with NAT
+      Gateway elimination cited.
+    input: |
+      Optimize a staging Elastic Beanstalk environment my-staging-app
+      (e-stg456ghi). Single-instance with 1x t3.medium. The instance
+      has a public IP (54.210.x.x). A NAT Gateway is present in the
+      VPC costing about $32/mo. Average CPU is 18%. The instance is
+      in a public subnet with IGW access.
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "NAT Gateway"
+        - "eliminat"
+        - "my-staging-app"
+        - "VERDICT"
+        - "OPTIMIZATIONS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+
+  - id: managed-update-schedule
+    description: >-
+      Optimize a production Elastic Beanstalk environment by enabling
+      and scheduling managed platform updates during off-peak hours.
+      Expects FURTHER_OPTIMIZATION_AVAILABLE with managed update
+      scheduling recommendation.
+    input: |
+      Optimize a production Elastic Beanstalk environment
+      my-api-prod (e-api789jkl). Load-balanced with 2x c5.large.
+      Managed platform updates are currently disabled. The
+      environment runs a Node.js application with peak traffic
+      during business hours 09:00-18:00 UTC. Deployment policy is
+      Rolling. Termination protection enabled. Average CPU is 45%.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "managed"
+        - "off-peak"
+        - "my-api-prod"
+        - "VERDICT"
+        - "OPTIMIZATIONS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+
+  - id: rds-shared-cost
+    description: >-
+      Optimize Elastic Beanstalk RDS cost by recommending external
+      shared RDS with Graviton instances across multiple environments.
+      Expects FURTHER_OPTIMIZATION_AVAILABLE with RDS optimization
+      recommendation.
+    input: |
+      Optimize RDS cost for three Elastic Beanstalk dev environments
+      (my-dev-app-1, my-dev-app-2, my-dev-app-3). Each has its own
+      db.t3.medium RDS instance attached to the environment
+      ($61/mo each, total $183/mo). Recommend a shared external RDS
+      approach using Graviton (db.t4g.medium) with separate databases
+      per environment.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "RDS"
+        - "shared"
+        - "Graviton"
+        - "VERDICT"
+        - "OPTIMIZATIONS"
+        - "COST_IMPACT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"

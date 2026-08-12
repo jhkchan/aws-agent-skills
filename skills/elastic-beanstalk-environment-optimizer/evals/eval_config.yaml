@@ -1,0 +1,49 @@
+# Eval configuration for elastic-beanstalk-environment-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: elastic-beanstalk-environment-optimizer
+snapshot_date: "2026-08-12"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: dev-single-instance-migration
+    difficulty: hard
+    prompt_file: prompts/dev-single-instance-migration.md
+    baseline_file: baselines/dev-single-instance-migration.md
+    expected_verdict: OPTIMIZED
+
+  - id: prod-immutable-deploy-cost
+    difficulty: hard
+    prompt_file: prompts/prod-immutable-deploy-cost.md
+    baseline_file: baselines/prod-immutable-deploy-cost.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+
+  - id: nat-gateway-elimination
+    difficulty: medium
+    prompt_file: prompts/nat-gateway-elimination.md
+    baseline_file: baselines/nat-gateway-elimination.md
+    expected_verdict: OPTIMIZED
+
+  - id: managed-update-schedule
+    difficulty: medium
+    prompt_file: prompts/managed-update-schedule.md
+    baseline_file: baselines/managed-update-schedule.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+
+  - id: rds-shared-cost
+    difficulty: medium
+    prompt_file: prompts/rds-shared-cost.md
+    baseline_file: baselines/rds-shared-cost.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE

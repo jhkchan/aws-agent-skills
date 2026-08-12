@@ -1,0 +1,181 @@
+{
+  "skill": "elastic-beanstalk-environment-optimizer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-12",
+  "description": "Structured eval definitions for the Elastic Beanstalk Environment Optimizer. Five-case proven set exercising the OPTIMIZED / FURTHER_OPTIMIZATION_AVAILABLE classification across optimization scenarios (dev environment single-instance migration saving ~85%, production immutable deploy with further instance right-sizing, NAT Gateway elimination for staging, managed platform update scheduling, RDS shared cost with Graviton across multiple environments). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "dev-single-instance-migration",
+      "name": "Dev environment single-instance migration saving ~85%",
+      "difficulty": "hard",
+      "branch": "OPTIMIZED — dev environment migrated from load-balanced (2x t3.medium + ELB + NAT) to single-instance (1x t3.small), Immutable changed to All at Once",
+      "prompt": "Optimize a dev Elastic Beanstalk environment my-dev-app (e-abc123def). Currently load-balanced with 2x t3.medium instances, an Application Load Balancer, and a NAT Gateway in us-east-1. Average CPU utilization is 12% over the past 14 days. Deployment policy is Immutable. The environment is for development only, brief downtime is acceptable.",
+      "prompt_file": "prompts/dev-single-instance-migration.md",
+      "baseline_file": "baselines/dev-single-instance-migration.md",
+      "expected_verdict": "OPTIMIZED",
+      "expected_output": "EB_ENV: my-dev-app (e-abc123def)\nVERDICT: OPTIMIZED\nOPTIMIZATIONS:\n  [✓] Topology: switched from Load-balanced to Single-instance (instance count: 2 → 1)\n  [✓] Instance type: t3.medium → t3.small (avg CPU 12%, well within t3.small capacity)\n  [✓] Deployment policy: Immutable → All at Once (dev downtime acceptable, saves 2x deploy cost)\n  [✓] NAT Gateway: eliminated (instance has public IP, uses IGW)\n  [✓] Auto-scaling: min=2 max=4 desired=2 → min=1 max=1 desired=1\nCOST_IMPACT:\n  Current estimated cost: ~$98.73/mo\n  Optimized estimated cost: ~$15.18/mo\n  Estimated savings: ~$83.55/mo (85%)\nVERIFICATION_COMMANDS:\n  aws elasticbeanstalk describe-configuration-settings --environment-name my-dev-app --region us-east-1\n  aws ec2 describe-nat-gateways --filter Name=state,Values=available --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPTIMIZED",
+            "Single-instance",
+            "t3.small",
+            "my-dev-app",
+            "VERDICT",
+            "OPTIMIZATIONS",
+            "COST_IMPACT"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prod-immutable-deploy-cost",
+      "name": "Production environment further optimization with instance right-sizing",
+      "difficulty": "hard",
+      "branch": "FURTHER_OPTIMIZATION_AVAILABLE — prod keeps load-balanced + Immutable (correct for prod) but instances can be right-sized, managed updates enabled, RDS externalized",
+      "prompt": "Optimize a production Elastic Beanstalk environment my-prod-app (e-xyz789abc). Load-balanced with 3x m5.xlarge across 2 AZs. Average CPU is 28%. Deployment policy is Immutable (zero downtime required for production). NAT Gateway present in private subnets. Managed platform updates are disabled. Termination protection is enabled.",
+      "prompt_file": "prompts/prod-immutable-deploy-cost.md",
+      "baseline_file": "baselines/prod-immutable-deploy-cost.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_output": "EB_ENV: my-prod-app (e-xyz789abc)\nVERDICT: FURTHER_OPTIMIZATION_AVAILABLE\nOPTIMIZATIONS:\n  [✓] Topology: Load-balanced (correct for production, 3 instances across 2 AZs)\n  [✓] Deployment policy: Immutable (correct for zero-downtime production)\n  [✓] NAT Gateway: present (correct for production private subnets)\n  [~] Instance type: m5.xlarge → t3.large (avg CPU 28%, t3.large sufficient)\n  [~] Managed updates: disabled → enable minor weekly Sun:04:00\n  [~] Auto-scaling: min=3 max=10 → min=2 max=6\nCOST_IMPACT:\n  Current estimated cost: ~$412.00/mo\n  Optimized estimated cost: ~$324.00/mo\n  Estimated savings: ~$88.00/mo (21%)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "FURTHER_OPTIMIZATION_AVAILABLE",
+            "m5.xlarge",
+            "managed",
+            "my-prod-app",
+            "VERDICT",
+            "OPTIMIZATIONS",
+            "COST_IMPACT"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: OPTIMIZED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nat-gateway-elimination",
+      "name": "Staging NAT Gateway elimination for single-instance",
+      "difficulty": "medium",
+      "branch": "OPTIMIZED — staging single-instance with public IP, NAT Gateway eliminated (~$32/mo savings), uses IGW",
+      "prompt": "Optimize a staging Elastic Beanstalk environment my-staging-app (e-stg456ghi). Single-instance with 1x t3.medium. The instance has a public IP (54.210.x.x). A NAT Gateway is present in the VPC costing about $32/mo. Average CPU is 18%. The instance is in a public subnet with IGW access.",
+      "prompt_file": "prompts/nat-gateway-elimination.md",
+      "baseline_file": "baselines/nat-gateway-elimination.md",
+      "expected_verdict": "OPTIMIZED",
+      "expected_output": "EB_ENV: my-staging-app (e-stg456ghi)\nVERDICT: OPTIMIZED\nOPTIMIZATIONS:\n  [✓] NAT Gateway: eliminated (instance has public IP 54.210.x.x, uses IGW)\n  [✓] Instance type: t3.medium → t3.small (avg CPU 18%, t3.small sufficient)\nCOST_IMPACT:\n  Current estimated cost: ~$62.37/mo\n  Optimized estimated cost: ~$15.18/mo\n  Estimated savings: ~$47.19/mo (76%)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPTIMIZED",
+            "NAT Gateway",
+            "eliminat",
+            "my-staging-app",
+            "VERDICT",
+            "OPTIMIZATIONS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-update-schedule",
+      "name": "Production managed platform update scheduling",
+      "difficulty": "medium",
+      "branch": "FURTHER_OPTIMIZATION_AVAILABLE — managed platform updates disabled, recommend enabling with off-peak schedule (Sun:04:00)",
+      "prompt": "Optimize a production Elastic Beanstalk environment my-api-prod (e-api789jkl). Load-balanced with 2x c5.large. Managed platform updates are currently disabled. The environment runs a Node.js application with peak traffic during business hours 09:00-18:00 UTC. Deployment policy is Rolling. Termination protection enabled. Average CPU is 45%.",
+      "prompt_file": "prompts/managed-update-schedule.md",
+      "baseline_file": "baselines/managed-update-schedule.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_output": "EB_ENV: my-api-prod (e-api789jkl)\nVERDICT: FURTHER_OPTIMIZATION_AVAILABLE\nOPTIMIZATIONS:\n  [✓] Topology: Load-balanced (correct for production)\n  [✓] Deployment policy: Rolling (acceptable for production)\n  [~] Managed updates: disabled → enable minor weekly off-peak (Sun:04:00 UTC, outside 09:00-18:00 peak)\n  [~] Instance type: c5.large (avg CPU 45%, well-provisioned, keep)\nCOST_IMPACT:\n  Current estimated cost: ~$170.00/mo\n  Optimized estimated cost: ~$170.00/mo\n  Estimated savings: $0/mo (operational improvement — prevents surprise updates during peak)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "FURTHER_OPTIMIZATION_AVAILABLE",
+            "managed",
+            "off-peak",
+            "my-api-prod",
+            "VERDICT",
+            "OPTIMIZATIONS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: OPTIMIZED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rds-shared-cost",
+      "name": "RDS shared external cost optimization with Graviton across multiple environments",
+      "difficulty": "medium",
+      "branch": "FURTHER_OPTIMIZATION_AVAILABLE — 3 separate RDS db.t3.medium ($183/mo total) → shared external db.t4g.medium with separate databases (~$57/mo)",
+      "prompt": "Optimize RDS cost for three Elastic Beanstalk dev environments (my-dev-app-1, my-dev-app-2, my-dev-app-3). Each has its own db.t3.medium RDS instance attached to the environment ($61/mo each, total $183/mo). Recommend a shared external RDS approach using Graviton (db.t4g.medium) with separate databases per environment.",
+      "prompt_file": "prompts/rds-shared-cost.md",
+      "baseline_file": "baselines/rds-shared-cost.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_output": "EB_ENV: my-dev-app-1, my-dev-app-2, my-dev-app-3 (multiple environments)\nVERDICT: FURTHER_OPTIMIZATION_AVAILABLE\nOPTIMIZATIONS:\n  [~] RDS: 3x db.t3.medium attached ($183/mo) → 1x db.t4g.medium external shared ($57/mo) with separate databases per environment\n  [~] RDS lifecycle: decouple from environment (prevents accidental deletion on environment termination)\nCOST_IMPACT:\n  Current estimated cost: ~$183.00/mo (3x db.t3.medium)\n  Optimized estimated cost: ~$57.00/mo (1x db.t4g.medium shared)\n  Estimated savings: ~$126.00/mo (69%)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "FURTHER_OPTIMIZATION_AVAILABLE",
+            "RDS",
+            "shared",
+            "Graviton",
+            "VERDICT",
+            "OPTIMIZATIONS",
+            "COST_IMPACT"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: OPTIMIZED"
+          ]
+        }
+      ]
+    }
+  ]
+}
