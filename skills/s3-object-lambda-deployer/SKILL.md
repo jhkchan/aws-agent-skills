@@ -859,6 +859,7 @@ VERIFICATION_COMMANDS:
 - [ ] Reserved concurrency has a specific number?
 - [ ] TransformationConfiguration lists explicit operations?
 - [ ] Supporting AP policy allows the Lambda role?
+- [ ] CloudFront cache behavior accounts for transform output variance (if deployed behind CF)?
 - [ ] Every `[✗]` cites the specific gap and what the operator must provide?
 
 ## Recent AWS features

@@ -883,6 +883,7 @@ VERIFICATION_COMMANDS:
 - [ ] Logging row cites log group name + level (ALL or ERROR) + includeExecutionData?
 - [ ] Sync caller timeout ≤ 29s verified (if sync mode)?
 - [ ] Idempotency row cites the key source for each side-effecting integration?
+- [ ] Express-vs-Standard row cites the cost-model comparison ($1/M vs $25/M)?
 - [ ] Every `[✗]` cites the specific gap and what the operator must provide?
 
 ## Recent AWS features
