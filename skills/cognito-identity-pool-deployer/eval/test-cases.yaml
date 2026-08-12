@@ -89,7 +89,7 @@ test_cases:
     assertions:
       must_contain:
         - "READY_TO_DEPLOY"
-        "SAML"
+        - "SAML"
         - "999999999999"
         - "cross-account"
         - "VERDICT"

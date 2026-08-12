@@ -93,7 +93,7 @@ test_cases:
     assertions:
       must_contain:
         - "READY_TO_DEPLOY"
-        "API"
+        - "API"
         - "ds-api456"
         - "live"
         - "VERDICT"

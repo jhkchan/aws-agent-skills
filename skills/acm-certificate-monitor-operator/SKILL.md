@@ -509,26 +509,10 @@ aws acm describe-certificate \
 **Verify the CNAME exists in DNS:**
 
 ```bash
-# Check if the validation CNAME resolves
+# Verify the CNAME exists and resolves
 dig _abc123.example.com.example.com CNAME +short
-# Expected: the CNAME value from ACM
-
-# Or using nslookup
 nslookup -type=CNAME _abc123.example.com.example.com
-```
-
-**Verify via Route53 (if DNS is in Route53):**
-
-```bash
-# Check Route53 for the validation record
-HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name \
-  --dns-name example.com \
-  --query 'HostedZones[0].Id' --output text | sed 's|/hostedzone/||')
-
-aws route53 list-resource-record-sets \
-  --hosted-zone-id "$HOSTED_ZONE_ID" \
-  --query "ResourceRecordSets[?Type=='CNAME' && starts_with(Name, '_acm-challenge')]" \
-  --output table
+# Or via Route53 API: list-resource-record-sets filtered by CNAME type
 ```
 
 **Critical:** if the validation CNAME is missing from DNS, renewal
@@ -544,13 +528,7 @@ renewing the certificate.
 **Check CAA records for the domain:**
 
 ```bash
-# Query CAA records for the domain
 dig example.com CAA +short
-
-# Or for a specific subdomain
-dig www.example.com CAA +short
-
-# Using nslookup
 nslookup -type=CAA example.com
 ```
 
@@ -558,29 +536,13 @@ nslookup -type=CAA example.com
 
 | CAA record | Effect on ACM renewal |
 |---|---|
-| No CAA records (empty output) | No restriction — ACM renewal OK |
-| `0 issue "amazon.com"` | ACM is authorized — renewal OK |
-| `0 issue "amazon.com"; 0 issue "letsencrypt.org"` | ACM is authorized — renewal OK |
-| `0 issue "letsencrypt.org"` (no amazon.com) | ACM BLOCKED — add amazon.com or remove restrictive CAA |
-| `0 issuewild "amazon.com"` | Wildcard certs OK; non-wildcard needs separate `issue` record |
-| `0 issue ";"` | No CA is authorized — ALL renewal blocked |
+| No CAA records (empty) | No restriction — ACM OK |
+| `0 issue "amazon.com"` | ACM authorized — OK |
+| `0 issue "letsencrypt.org"` (no amazon.com) | ACM BLOCKED |
+| `0 issue ";"` | All renewal blocked |
 
-**Fix CAA conflict (Route53):**
-
-```bash
-# Add amazon.com to the CAA records
-ZONE_ID=$(aws route53 list-hosted-zones-by-name \
-  --dns-name example.com \
-  --query 'HostedZones[0].Id' --output text | sed 's|/hostedzone/||')
-
-aws route53 change-resource-record-sets \
-  --hosted-zone-id "$ZONE_ID" \
-  --change-batch '{
-    "Changes": [
-      {"Action":"UPSERT","ResourceRecordSet":{"Name":"example.com","Type":"CAA","TTL":300,"ResourceRecords":[{"Value":"0 issue \"amazon.com\""}]}}
-    ]
-  }'
-```
+**Fix CAA conflict (Route53):** add `0 issue "amazon.com"` CAA record
+via `aws route53 change-resource-record-sets` UPSERT.
 
 **Key implication:** CAA records can be modified by anyone with DNS
 access. A CAA conflict can appear at any time, even for certificates
@@ -595,61 +557,26 @@ renewal. The most common attachment is to load balancers (ALB/NLB).
 **Find certificates attached to ALBs/NLBs:**
 
 ```bash
-aws elbv2 describe-load-balancers \
-  --query 'LoadBalancers[*].{Name:LoadBalancerName,ARN:LoadBalancerArn,DNS:DNSName}' \
-  --region us-east-1 --output table
-
-# Get listeners with certificate details
+# List listeners with cert details for each LB
 for LB_ARN in $(aws elbv2 describe-load-balancers \
   --query 'LoadBalancers[*].LoadBalancerArn' --output text --region us-east-1); do
-  echo "=== LB: $LB_ARN ==="
-  aws elbv2 describe-listeners \
-    --load-balancer-arn "$LB_ARN" \
-    --query 'Listeners[*].{Protocol:Protocol,Port:Port,Certificates:Certificates[*].CertificateArn}' \
-    --region us-east-1 --output table
+  aws elbv2 describe-listeners --load-balancer-arn "$LB_ARN" \
+    --query 'Listeners[*].{Protocol:Protocol,Certs:Certificates[*].CertificateArn}' \
+    --output table --region us-east-1
 done
 ```
 
-**Find certificates attached to CloudFront distributions:**
-
-```bash
-aws cloudfront list-distributions \
-  --query 'DistributionList.Items[*].{Domain:DomainName,ViewerCert:ViewerCertificate.ACMCertificateArn}' \
-  --output table --region us-east-1
-```
-
-**Find certificates attached to API Gateway (custom domains):**
-
-```bash
-aws apigateway get-domain-names \
-  --query 'items[*].{Domain:domainName,Cert:certificateName,Arn:certificateArn}' \
-  --output table --region us-east-1
-```
+**CloudFront and API Gateway:** CloudFront cert ARNs are in
+`aws cloudfront list-distributions --query 'DistributionList.Items[*].ViewerCertificate.ACMCertificateArn'`.
+API Gateway custom domain certs are in
+`aws apigateway get-domain-names --query 'items[*].certificateArn'`.
 
 **Identify unattached certificates (at risk of not auto-renewing):**
 
 ```bash
-# List all certs, then cross-reference with attached certs
-ALL_CERTS=$(aws acm list-certificates \
-  --certificate-statuses ISSUED \
-  --query 'CertificateSummaryList[*].CertificateArn' \
-  --output text --region us-east-1)
-
-ATTACHED_CERTS=$(aws elbv2 describe-listeners \
-  --query 'Listeners[*].Certificates[*].CertificateArn' \
-  --output text --region us-east-1 | tr '\t' '\n' | sort -u)
-
-# Also check CloudFront (uses us-east-1 certs)
-CF_CERTS=$(aws cloudfront list-distributions \
-  --query 'DistributionList.Items[*].ViewerCertificate.ACMCertificateArn' \
-  --output text --region us-east-1 | tr '\t' '\n' | sort -u)
-
-echo "Unattached certificates (not on any ALB/NLB or CloudFront):"
-for CERT in $ALL_CERTS; do
-  if ! echo "$ATTACHED_CERTS $CF_CERTS" | grep -q "$CERT"; then
-    echo "  $CERT"
-  fi
-done
+# Cross-reference all ISSUED certs with ALB/NLB/CloudFront/API GW attached certs
+# Any cert in the full list not found in attached lists is unattached
+```
 ```
 
 **Critical:** unattached certificates are NOT auto-renewed by ACM.
@@ -658,79 +585,45 @@ Either re-attach them or delete them if no longer needed.
 ## Step 8 — Multi-account audit via Organizations
 
 For organizations with multiple AWS accounts, use Organizations to
-audit certificates across all member accounts.
-
-**Prerequisites:**
-- Organizations all-features enabled.
-- A monitoring role in each member account with ACM read access.
-- The audit account can assume the monitoring role in each member.
-
-**List all accounts in the organization:**
-
-```bash
-aws organizations list-accounts \
-  --query 'Accounts[*].{Id:Id,Name:Name,Status:Status}' \
-  --output table
-```
+audit certificates across all member accounts. Prerequisites:
+Organizations all-features enabled, a monitoring role (e.g.
+`ACMMonitoringRole`) in each member account with ACM read access,
+and the audit account can assume the monitoring role in each member.
 
 **Audit certificates in each account:**
 
 ```bash
 for ACCT_ID in $(aws organizations list-accounts \
   --query 'Accounts[?Status==`ACTIVE`].Id' --output text | tr '\t' '\n'); do
-  echo "=== Account: $ACCT_ID ==="
-
-  # Assume the monitoring role in the member account
   CREDS=$(aws sts assume-role \
     --role-arn "arn:aws:iam::$ACCT_ID:role/ACMMonitoringRole" \
-    --role-session-name "acm-audit" \
-    --query 'Credentials' --output json)
-
+    --role-session-name "acm-audit" --query 'Credentials' --output json)
   export AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.AccessKeyId')
   export AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.SecretAccessKey')
   export AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.SessionToken')
-
   for REGION in us-east-1 us-west-2 eu-west-1; do
-    echo "  Region: $REGION"
+    echo "  $ACCT_ID / $REGION:"
     aws acm list-certificates --region "$REGION" \
-      --query 'CertificateSummaryList[*].{Domain:DomainName,Status:Status}' \
-      --output table
+      --query 'CertificateSummaryList[*].{Domain:DomainName,Status:Status}' --output table
   done
-
   unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 done
 ```
-
-**Aggregate report:** collect all certificates across accounts and
-regions into a single inventory with status, expiry, and renewal
-eligibility.
 
 ## Step 9 — Automated renewal failure detection
 
 ACM attempts auto-renewal starting 60 days before expiry. Renewal
 failures are not always immediately visible in the console. Detect
-them via API.
-
-**Check renewal status for all ISSUED certificates:**
+them via API by checking `RenewalSummary.RenewalStatus` for all
+ISSUED certificates — if `FAILED`, investigate CAA records, DNS
+validation records, and service attachment.
 
 ```bash
-for CERT_ARN in $(aws acm list-certificates \
-  --certificate-statuses ISSUED \
-  --query 'CertificateSummaryList[*].CertificateArn' \
-  --output text --region us-east-1); do
-
-  RENEWAL_STATUS=$(aws acm describe-certificate \
-    --certificate-arn "$CERT_ARN" \
-    --query 'Certificate.RenewalSummary.RenewalStatus' \
-    --output text --region us-east-1 2>/dev/null)
-
-  if [ "$RENEWAL_STATUS" = "FAILED" ]; then
-    echo "RENEWAL FAILED: $CERT_ARN"
-    aws acm describe-certificate \
-      --certificate-arn "$CERT_ARN" \
-      --query 'Certificate.{Domain:DomainName,RenewalSummary:RenewalSummary}' \
-      --output table --region us-east-1
-  fi
+for CERT_ARN in $(aws acm list-certificates --certificate-statuses ISSUED \
+  --query 'CertificateSummaryList[*].CertificateArn' --output text --region us-east-1); do
+  STATUS=$(aws acm describe-certificate --certificate-arn "$CERT_ARN" \
+    --query 'Certificate.RenewalSummary.RenewalStatus' --output text --region us-east-1 2>/dev/null)
+  [ "$STATUS" = "FAILED" ] && echo "RENEWAL FAILED: $CERT_ARN"
 done
 ```
 
@@ -749,32 +642,11 @@ done
 Each DaysToExpiry alarm should route to an SNS topic for notification.
 Use different topics for warning vs critical severity.
 
-**Create SNS topics:**
-
-```bash
-# Warning topic (30-day notifications)
-WARNING_TOPIC=$(aws sns create-topic \
-  --name "acm-cert-warning-notifications" \
-  --query 'TopicArn' --output text --region us-east-1)
-
-# Critical topic (7-day escalation)
-CRITICAL_TOPIC=$(aws sns create-topic \
-  --name "acm-cert-critical-escalation" \
-  --query 'TopicArn' --output text --region us-east-1)
-
-# Subscribe email endpoints
-aws sns subscribe \
-  --topic-arn "$WARNING_TOPIC" \
-  --protocol email \
-  --notification-endpoint "devops-team@example.com" \
-  --region us-east-1
-
-aws sns subscribe \
-  --topic-arn "$CRITICAL_TOPIC" \
-  --protocol email \
-  --notification-endpoint "oncall@example.com" \
-  --region us-east-1
-```
+**Create SNS topics:** use `aws sns create-topic` for
+`acm-cert-warning-notifications` and `acm-cert-critical-escalation`,
+then `aws sns subscribe` with `--protocol email` to register email
+endpoints (e.g., devops-team@example.com for warnings,
+oncall@example.com for critical).
 
 **Slack integration:** subscribe a Lambda function
 (`sns-to-slack`) to the critical SNS topic to forward alerts to Slack.
@@ -800,45 +672,25 @@ wildcard certs.
 
 ACM Private Certificate Authority (ACM PCA) issues private
 certificates for internal use. These have separate monitoring
-considerations.
-
-**Monitor PCA CA certificate expiry:**
+considerations: private certs do NOT auto-renew via ACM, must be
+renewed manually or via API, and the PCA CA certificate itself
+(10-year default validity) must be monitored for expiry — if the CA
+cert expires, all private certs issued by it become invalid.
 
 ```bash
-# List private CAs
+# List private CAs and check expiry
 aws acm-pca list-certificate-authorities \
-  --query 'CertificateAuthorities[*].{Arn:Arn,Status:Status,Type:Type,NotAfter:NotAfter,CommonName:CertificateAuthorityConfiguration.Subject.CommonName}' \
+  --query 'CertificateAuthorities[*].{Arn:Arn,Status:Status,NotAfter:NotAfter}' \
   --output table --region us-east-1
 
-# Check PCA CA certificate details
-aws acm-pa describe-certificate-authority \
-  --certificate-authority-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc123-def456 \
-  --query 'CertificateAuthority.{Status:Status,NotBefore:NotBefore,NotAfter:NotAfter}' \
-  --region us-east-1 --output table
-```
-
-**Create alarm on PCA CA certificate expiry (days to expiry computed from NotAfter):**
-
-```bash
 # PCA CA certs don't have a built-in DaysToExpiry metric.
-# Compute days remaining and alarm via a custom metric or EventBridge rule.
-
-# Get the CA cert NotAfter date and compute days remaining
+# Compute days remaining from NotAfter:
 NOT_AFTER=$(aws acm-pca describe-certificate-authority \
-  --certificate-authority-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc123-def456 \
+  --certificate-authority-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc123 \
   --query 'CertificateAuthority.NotAfter' --output text --region us-east-1)
-
 DAYS_REMAINING=$(( ( $(date -d "$NOT_AFTER" +%s) - $(date +%s) ) / 86400 ))
 echo "PCA CA cert days remaining: $DAYS_REMAINING"
 ```
-
-**Private cert monitoring considerations:**
-- Private certificates issued by ACM PCA do NOT auto-renew via ACM.
-- Private certificates must be renewed manually or via API calls.
-- The PCA CA certificate itself has a long validity period (10 years
-  by default) but must be monitored for eventual expiry.
-- If the PCA CA certificate expires, all private certs issued by that
-  CA become invalid.
 
 ## Step 13 — Recent features
 

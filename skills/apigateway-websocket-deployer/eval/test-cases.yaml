@@ -67,7 +67,7 @@ test_cases:
     assertions:
       must_contain:
         - "READY_TO_DEPLOY"
-        -sendMessage
+        - sendMessage
         - "joinRoom"
         - "VERDICT"
         - "CHECKLIST"

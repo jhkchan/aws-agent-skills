@@ -62,7 +62,7 @@ test_cases:
     assertions:
       must_contain:
         - "READY_TO_DEPLOY"
-        "Prometheus"
+        - "Prometheus"
         - "aps:QueryMetrics"
         - "sigV4Auth"
         - "VERDICT"

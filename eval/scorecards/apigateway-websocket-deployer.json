@@ -1,0 +1,70 @@
+{
+  "skill": "apigateway-websocket-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill compiles many known AWS WebSocket API details (limits, default expressions, connection management) but largely restates public documentation; it lacks a truly novel decision tree or threshold that a senior engineer would not already know."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific and ordered correctly (create API \u2192 routes \u2192 integrations \u2192 permissions \u2192 deployment), but the early \u201cverify prerequisites\u201d step is generic and not tied to a concrete AWS checklist."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER list is thorough and explains why each pitfall matters, yet it omits warnings about unintentionally enabling auto\u2011deploy when manual control is required and about using default VPC for private integrations."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and a precise output contract are all present and well\u2011formed, enabling reliable skill activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill includes a quick\u2011navigation table and layered sections, but the initial document is dense and front\u2011loads many details (e.g., full tables of limits, recent features) which can cause cognitive overload before the agent requests deeper information."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (create\u2011api, create\u2011table) are given with placeholders (<api-id>) that could be mis\u2011filled; the skill does not enforce safety checks (e.g., confirm before creating resources) for fragile operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The document follows a recognizable CloudOps skill pattern (metadata, mindset, steps, NEVER, output format) but mixes narrative tables and code blocks in an ad\u2011hoc way rather than a strict template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "The checklist, verification commands, and worked example enable an agent to execute the deployment, yet the examples sometimes omit optional fields (authorizer, WAF) without clear markers, and there is no guidance for handling CLI command failures."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 53425,
+  "latency_ms": 15653,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
