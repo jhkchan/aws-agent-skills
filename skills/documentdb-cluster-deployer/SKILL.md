@@ -303,6 +303,108 @@ Change stream flow:
     Always checkpoint resume tokens in a durable store.
 ```
 
+**Resume-token invalidation gotcha:** the change stream resume token
+encodes the cluster timestamp and log sequence number. If the change
+stream log retention period expires (e.g., the consumer was offline
+longer than `change_streams_log_retention_duration`), the token
+becomes invalid — `resumeAfter` throws a `ChangeStreamHistoryLost`
+error. The consumer must restart with `startAtOperationTime` set to
+a timestamp within the current retention window. Expert rule: set
+retention to 3 days (maximum) for critical CDC pipelines, and
+checkpoint tokens to a durable store (DynamoDB, SQS) after each
+batch, not in memory.
+
+## Expert heuristic: index build blocking writes (foreground vs background)
+
+A baseline model says "just create indexes." The expert knows that
+DocumentDB index builds behave differently from MongoDB and can lock
+a production cluster.
+
+```text
+DocumentDB index build behavior:
+  ├── Foreground (default for createIndex):
+  │     └── Blocks ALL writes to the collection for the duration
+  │         of the build. On a 10M-document collection, this can
+  │         be 5-20 minutes of write lockout.
+  ├── Background ("background: true" option):
+  │     └── NON-blocking — allows concurrent reads and writes.
+  │         DocumentDB supports background builds on 4.0+.
+  └── DocumentDB does NOT support the MongoDB "createIndexes"
+        shell helper's automatic background detection.
+
+Expert rule:
+  1. ALWAYS use { background: true } for production index creation
+  2. Schedule large index builds during low-traffic windows
+  3. Monitor DatabaseCpuUtilization during build (> 80% = throttle)
+  4. For compound indexes on > 5M docs, build on a replica first,
+     then failover — the index replicates to the primary
+```
+
+**Key implication:** A foreground index build on a large collection
+silently blocks all writes. Always pass `{ background: true }` and
+monitor the build progress via `db.currentOp()`.
+
+## Expert heuristic: MongoDB API compatibility gaps
+
+DocumentDB implements the MongoDB wire protocol but does NOT support
+100% of MongoDB's API surface. A baseline model assumes "MongoDB
+compatible = drop-in replacement." The expert knows the gaps.
+
+```text
+Unsupported aggregation pipeline stages (DocumentDB 5.0):
+  ├── $graphLookup — NOT supported (no graph traversal)
+  ├── $merge — NOT supported (use $out for materialization)
+  ├── $facet — limited support (no nested $facet)
+  └── $bucket / $bucketAuto — NOT supported
+
+Unsupported features:
+  ├── Transactions — supported on 4.0+ but with constraints:
+  │     cross-shard transactions NOT supported (single-shard only)
+  ├── Retryable writes — NOT supported (retryWrites=false always)
+  ├── Change stream $lookup stage — NOT supported in pipeline
+  └── Collation in indexes — NOT supported
+
+Expert rule:
+  1. Audit aggregation pipelines BEFORE migrating from MongoDB
+  2. Replace $graphLookup with application-side traversal
+  3. Replace $merge with a two-step $out + application merge
+  4. Test with the actual driver version, not just the shell
+```
+
+**Key implication:** "MongoDB-compatible" means wire-protocol-level
+compatibility, not feature parity. Unmapped aggregation stages cause
+runtime errors, not syntax errors — they fail at execution time, not
+parse time.
+
+## Expert heuristic: TLS certificate rotation downtime
+
+DocumentDB clusters use a cluster certificate for TLS connections.
+A baseline model assumes certificates rotate transparently. The
+expert knows the rotation can cause connectivity blips.
+
+```text
+DocumentDB TLS certificate lifecycle:
+  ├── Certificate is managed by AWS RDS/DocumentDB infrastructure
+  ├── Rotation is automatic but NOT instant — the cluster endpoint
+  │     gets a new cert, and existing connections using the old
+  │     cert's fingerprint break on next TLS handshake
+  ├── The rds-combined-ca-bundle.pem contains BOTH the old and
+  │     new CA certs — clients using this bundle survive rotation
+  └── Clients pinning a SPECIFIC certificate fingerprint break
+
+Expert rule:
+  1. NEVER pin a specific certificate fingerprint in the client
+  2. ALWAYS use rds-combined-ca-bundle.pem (contains all CAs)
+  3. When AWS announces CA rotation, update the CA bundle in
+     application containers BEFORE the rotation date
+  4. Use connection pooling with health checks — pools that don't
+     validate TLS on reconnect will mask rotation failures
+```
+
+**Key implication:** TLS certificate rotation is transparent ONLY
+if clients use the combined CA bundle. Pinned certificates or stale
+CA bundles cause silent connection failures during rotation.
+
 ## Prerequisites (verify before provisioning)
 
 Before emitting provisioning commands, verify these prerequisites. If
