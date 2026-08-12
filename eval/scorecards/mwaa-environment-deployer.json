@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides concrete expert heuristics not in a baseline model: exact VPC subnet AZ requirement, execution\u2011class sizing rule based on concurrent task count, strict exact\u2011pin requirements.txt guidance, and KMS encryption scope. These are specific decision thresholds a senior CloudOps engineer would learn."
+      "justification": "Provides many expert\u2011level heuristics (exact 2\u2011private\u2011subnet requirement, AZ distribution, NAT vs VPC endpoint, exact version\u2011pinning for requirements.txt, execution\u2011class sizing thresholds, KMS encryption scope). Missing deeper IAM policy details (full list of required permissions) and limits on Airflow config overrides, which prevents it from being a complete senior\u2011engineer knowledge source."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Defines an AWS\u2011specific provisioning workflow (VPC check \u2192 security group \u2192 S3 bucket \u2192 IAM role \u2192 KMS key \u2192 create\u2011environment) with exact CLI commands and verification steps. Procedure is thorough but could include a brief step for post\u2011creation validation of environment status beyond the basic get\u2011environment call."
+      "justification": "Outlines an AWS\u2011specific procedural flow (VPC readiness check, bucket creation, IAM role, create\u2011environment CLI command, verification steps). One deduction because the ordering is partly generic (e.g., \"verify prerequisites\" before specifying that the IAM role must be created before the bucket is referenced) rather than a strict AWS\u2011first procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never use a single subnet, never leave requirements.txt unpinned). Missing a few common pitfalls such as over\u2011permissive IAM roles and cross\u2011region bucket issues, so not a perfect anti\u2011pattern catalogue."
+      "justification": "Contains a concrete NEVER list with specific reasons (e.g., never use a single subnet, never leave requirements.txt unpinned, never omit CloudWatch logs). Lacks a warning about using a public S3 bucket for DAGs, which is a common security anti\u2011pattern."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete and well\u2011structured; description clearly states WHAT the skill does, WHEN to invoke, and includes a rich keyword list. Activation keywords and strict output contract are explicitly defined."
+      "justification": "Full front\u2011matter, clear description, explicit WHEN\u2011to\u2011invoke, comprehensive keyword list, activation keywords, and a strict output contract with literal labels. An agent can reliably decide when to fire this skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (summary, quick navigation, detailed steps, heuristics, NEVER list). However, the initial sections are dense, which can overload an agent before it knows which part to use."
+      "justification": "The document is well\u2011sectioned (Mindset, Heuristics, Steps, NEVER, Output format) but front\u2011loads a large amount of detail before the user knows they need it, causing some cognitive overload. Could have separated high\u2011level checklist from deep technical references more cleanly."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates well for fragile operations by enforcing a strict output contract and prerequisite checks, but it leaves some parameters (e.g., min/max workers range) loosely specified, allowing unsafe values."
+      "justification": "Calibrates freedom appropriately for a destructive provisioning task: requires prerequisite verification, emits a checklist, and does not auto\u2011execute commands. Slight deduction because it does not enforce sensible limits on max\u2011workers for the smallest class (e.g., allowing 5 workers for mw1.small without a hard guard)."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset, Heuristics, Step\u2011by\u2011step process, NEVER list, and explicit output format. Structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). Minor deduction for a slightly ad\u2011hoc ordering of sections (e.g., mixing quick\u2011navigation table with mindset before the detailed heuristics)."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI examples, decision trees, and error\u2011handling guidance. Missing explicit handling for region mismatches, S3 bucket naming constraints, and detailed IAM trust\u2011policy JSON, which could cause execution failures in edge cases."
+      "justification": "Provides working CLI examples, a ready\u2011to\u2011copy checklist, and verification commands, enabling an agent to act. Deductions for missing guidance on update\u2011scenario handling, limited error\u2011handling examples (e.g., IAM permission failures), and no explicit fallback when a prerequisite check fails beyond the checklist."
     }
   ],
-  "total_score": 108,
+  "total_score": 109,
   "max_score": 120,
   "grade": "A",
-  "token_count": 43981,
-  "latency_ms": 13897,
+  "token_count": 43806,
+  "latency_ms": 5523,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

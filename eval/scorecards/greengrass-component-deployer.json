@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge: version\u2011bump mapping table, deep\u2011merge semantics of configuration merge, token\u2011exchange role (not presigned URLs) requirement, explicit dependency types (hard vs soft), Docker artifact type handling, recent Greengrass feature list. Missing: detailed IAM policy beyond s3:GetObject, guidance for multi\u2011arch images, component deletion/deprecation, and role trust for token exchange."
+      "justification": "Adds concrete expert heuristics not usually restated by a baseline model: explicit version\u2011bump rules, deep\u2011merge semantics of configuration merge, prohibition of presigned URLs, hard vs soft dependency behavior, token\u2011exchange role policy details, and Docker artifact type handling. Missing only a few niche edge\u2011cases (e.g., multi\u2011arch component platforms, region\u2011specific defaults)."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow (recipe \u2192 S3 upload \u2192 component version \u2192 thing\u2011group \u2192 deployment) with exact CLI commands and policy snippets. A small portion is generic (e.g., \u201ccheck security\u201d) which prevents a full score."
+      "justification": "Provides an AWS\u2011specific end\u2011to\u2011end procedure: ordered CLI commands, prerequisite verification, dependency graph sequencing, and deployment policy settings. Procedure is detailed and domain\u2011specific. Slight deduction for occasional generic phrasing (e.g., \"verify core device is healthy\") without a concrete command checklist."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Comprehensive NEVER list with specific reasons (e.g., never deploy to individual device, never skip version bump, never use presigned URLs, never make startup a one\u2011shot script, never forget hard dependencies). Lacks a few edge\u2011case warnings such as forgetting IAM trust for token\u2011exchange role or neglecting pagination in list commands."
+      "justification": "Contains a detailed \"NEVER\" list (10 items) with concrete reasoning for each pitfall (e.g., never use presigned URLs, never deploy to individual devices). Missing a couple of niche anti\u2011patterns such as forgetting IAM policy for Secrets Manager, so one point is deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description, keywords, triggers, and when\u2011to\u2011use are present. The \u2018when to invoke\u2019 paragraph is somewhat vague and could be tighter for reliable activation, leading to a minor deduction."
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, dependencies, metadata). Description clearly states WHAT the skill does, WHEN to invoke, and provides exhaustive activation keywords. No missing fields."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick navigation, high\u2011level mindset, detailed heuristics, step\u2011by\u2011step sections, NEVER list, and output format. However, early sections (configuration\u2011dependency graph, expert heuristics) are dense and may overload the reader before they need that depth."
+      "justification": "The document layers information (quick navigation, mindset, detailed steps, never list, output format, examples). However, the top\u2011level contains a large amount of detail, which can cause cognitive overload before the agent reaches the concise checklist, so it falls short of optimal progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom appropriately: requires prerequisite verification before any deployment, tight constraints on destructive actions (e.g., version bump enforcement, never use presigned URLs). Could improve by explicitly restricting creation of duplicate component versions and by providing safeguards for accidental deletions."
+      "justification": "Calibrates freedom appropriately: destructive actions (actual deployment) are limited to checklist output; creative tasks (recipe authoring) are guided but not auto\u2011executed. Deducted one point for not explicitly constraining optional advanced scenarios (e.g., private registry login) which could be risky if mis\u2011used."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (metadata, activation, mindset, heuristics, steps, never list, output format). Minor ad\u2011hoc ordering of sections (e.g., \u2018Recent features\u2019 appears after core steps) stops it from being flawless."
+      "justification": "Follows a recognizable structure (frontmatter, quick navigation, mindset, stepwise process, never list, output format, examples). The pattern is consistent but not explicitly labeled as a known framework, making it marginally less than perfect."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working AWS CLI commands, checklist template, verification commands, and decision trees that an agent can execute. Missing: detailed error\u2011handling guidance (e.g., handling CLI failures, pagination, region fallback) and some edge\u2011case coverage (component deletion, updating existing deployments, handling of large fleets)."
+      "justification": "Provides a ready\u2011to\u2011use checklist, exact AWS CLI commands, verification steps, and worked examples that an agent can execute cold. Missing some edge\u2011case handling (e.g., private Docker registry authentication, IAM least\u2011privilege policy validation, multi\u2011region bucket naming) and limited guidance on troubleshooting failed deployments, leading to a modest deduction."
     }
   ],
-  "total_score": 107,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 52462,
-  "latency_ms": 18594,
+  "grade": "A",
+  "token_count": 52282,
+  "latency_ms": 7472,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

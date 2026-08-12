@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 15,
+      "score": 16,
       "max": 20,
-      "justification": "Adds concrete, up\u2011to\u2011date expert knowledge (2024\u20112026 feature changes, specific NEVER rules like \"NEVER create more than 5\u20117 tag keys\", exact ordering of admin\u2011before\u2011grants, and a decision matrix). However much of the content restates standard Lake Formation concepts that a senior CloudOps engineer would already know, so the delta is strong but not maximal."
+      "justification": "The skill provides many concrete AWS Lake Formation details (admin\u2011before\u2011grants order, specific CLI syntax, recent feature timeline, tag\u2011key limit guidance). However, much of this information is already known to a capable model and the decision\u2011tree for LF\u2011tag design is only hinted at, not fully fleshed out. The lack of a concrete, novel decision matrix reduces the delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow (register admin \u2192 create LF\u2011tags \u2192 attach tags \u2192 grant permissions \u2192 column security \u2192 resource links \u2192 data\u2011cells filter) and pre\u2011flight safety checks. Some steps (e.g., \"verify existence of resources\") are generic and not uniquely AWS\u2011centric, costing a couple of points."
+      "justification": "Provides an AWS\u2011specific, step\u2011by\u2011step procedure (admin registration, LF\u2011tag lifecycle, grant ordering, column\u2011level security, resource links, data\u2011cells filter, Identity Center, DataZone). Lacks explicit rollback or error\u2011recovery steps, hence a small deduction."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with reasons (e.g., avoid AdministratorAccess role, never grant without LF\u2011tags, never mix IAM and Identity Center principals). Only the top 5 are shown; the full 12\u2011item list is hidden in a reference file, reducing immediate usefulness."
+      "justification": "Contains a concrete NEVER list with reasons (e.g., never grant without admin, never use AdministratorAccess role, never grant table\u2011level SELECT for PII). Only the top\u20115 are shown in\u2011line; the full 12\u2011item list is relegated to a reference, so some anti\u2011patterns are not directly visible."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Complete front\u2011matter, clear description, trigger keywords, when_to_use guidance, and a strict output contract with literal labels. Missing a concise \u201cactivation condition\u201d clause that would make invocation deterministic in ambiguous user queries."
+      "justification": "Frontmatter is complete, description, triggers, and when_to_use are present, and the output contract is rigorously defined. The when_to_use paragraph is a bit verbose and could be tighter, leading to a minor deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "Information is layered with a navigation table and separate sections, but the skill front\u2011loads a large amount of detail (full CLI, recent features, full NEVER list) before the core checklist, which could overload the agent."
+      "justification": "The skill layers information (quick navigation, high\u2011level contract, detailed procedures, deep references). However, the main body still contains a large amount of dense detail that may overload the agent before it knows which parts to request, leading to some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Imposes many safety checks and NEVER rules for destructive actions, yet the CLI steps for creating tags, grants, and resource links lack explicit idempotency or confirmation guards, leaving room for accidental re\u2011creation or over\u2011granting."
+      "justification": "Destructive operations (e.g., put-data-lake-settings, grant-permissions) are guarded by pre\u2011flight safety checks and NEVER rules, showing good calibration. Yet the skill does not explicitly restrict repeated execution or idempotency concerns, leaving a small freedom gap for fragile actions."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: frontmatter \u2192 quick navigation \u2192 strict contract \u2192 reasoning \u2192 prerequisites \u2192 step\u2011by\u2011step procedure \u2192 recent features \u2192 matrix \u2192 NEVER \u2192 heuristics \u2192 edge\u2011case handling \u2192 references. The structure aids comprehension."
+      "justification": "Follows a recognizable pattern (metadata, navigation, contract, reasoning, prerequisites, procedure, NEVER, matrix, recent features, edge cases). Section ordering is slightly ad\u2011hoc, costing one point."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a ready\u2011to\u2011use checklist, exact CLI commands, and examples. However the model output examples include extra sections (deployment steps) after the VERIFICATION_COMMANDS block, violating the strict output contract and indicating ambiguity in the skill's enforcement rules."
+      "justification": "Provides a ready\u2011to\u2011use checklist, exact CLI commands, verification steps, and examples that an agent can execute. Missing explicit handling of CLI failures or idempotency, so two points are deducted."
     }
   ],
-  "total_score": 99,
+  "total_score": 102,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42091,
-  "latency_ms": 5911,
+  "token_count": 41551,
+  "latency_ms": 12450,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5
