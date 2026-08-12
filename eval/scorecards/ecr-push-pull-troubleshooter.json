@@ -1,0 +1,70 @@
+{
+  "skill": "ecr-push-pull-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill consolidates senior\u2011level ECR expertise (token 12\u2011hour expiry, first\u2011match\u2011wins lifecycle, cross\u2011account policy combination, registry\u2011alias differences, 10\u202fGB size cap, KMS permissions, architecture mismatch handling). However it omits newer nuances such as ECR Public token retrieval differences and the impact of image\u2011scan latency on push pipelines, so it does not achieve a perfect delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific diagnostic flow with exact CLI probes, IAM simulation ordering, and repository\u2011policy checks. The only shortfall is a minor generic phrasing (\u201ccheck security\u201d) in the quick\u2011start table that could be replaced with the precise IAM\u2011simulation step."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never emit ROOT_CAUSE without a failing probe, never assume same\u2011account pulls need a repository policy). Missing are explicit warnings about ignoring ThrottlingExceptions and about not consulting AWS Health for replication\u2011lag investigations."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present and well\u2011written. The output format is described in prose but lacks a formal machine\u2011readable schema, which could affect reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Content is layered (Quick start \u2192 detailed tables \u2192 step\u2011by\u2011step process), but the Quick start packs many mappings and rules that may overload the initial view, reducing optimal progressive disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and all diagnostic probes are read\u2011only, matching the fragility of ECR state\u2011changing operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (quick start \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 anti\u2011patterns \u2192 safety checks). Slight deviation from a canonical template (e.g., missing a dedicated \"Process\" header) prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a complete decision tree, concrete CLI commands, output format, and worked examples, enabling an agent to act. Lacks explicit guidance for ambiguous error strings that could map to multiple layers and does not detail error handling for failed CLI calls, which could cause execution gaps."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 48492,
+  "latency_ms": 11799,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

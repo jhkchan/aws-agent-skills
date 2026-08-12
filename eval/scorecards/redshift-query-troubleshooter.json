@@ -1,0 +1,70 @@
+{
+  "skill": "redshift-query-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete expert knowledge: a twelve\u2011category diagnostic tree, exact probe SQL statements, thresholds (e.g., unsorted >5%), recent 2024\u20112026 features (AUTO DISTSTYLE, concurrency scaling). Most of this detail is not in a generic model\u2019s baseline knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides AWS\u2011specific procedures (exact system\u2011table probes, order of WLM \u2192 lock \u2192 COPY \u2192 distribution \u2192 sort key checks) and embeds senior\u2011engineer mindset. Deducted 1 point because it does not explicitly cover the impact of concurrency scaling on WLM diagnostics, a relevant AWS\u2011specific nuance."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never emit ROOT_CAUSE_IDENTIFIED without a failing probe, never use DISTSTYLE ALL on large tables). Deducted 2 points for omitting a few common pitfalls such as ignoring Automatic WLM behavior and concurrency\u2011scaling side\u2011effects."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, when_to_use/when_not_to_use, activation_triggers, invocation_schema, and examples are all present and well\u2011formed. The activation_triggers list is very long, which could cause over\u2011matching, but the spec is otherwise complete."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document starts with a quick\u2011start table and then dives into deep sections, but a large amount of detailed information (philosophy, anti\u2011patterns, full SQL probes) is presented early, risking cognitive overload before the agent knows which layer is relevant."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (ALTER TABLE, pg_terminate_backend, WLM changes) are gated behind explicit CONFIRM prompts, showing good calibration. However, remediation steps do not always qualify the operation size (e.g., ALTER DISTSTYLE on a huge fact table) which could be risky if invoked without additional safeguards."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (quick start \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 output format \u2192 anti\u2011patterns), making it easy to navigate. No major structural anomalies."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete decision\u2011tree steps, ready\u2011to\u2011run SQL probes, and formatted output examples, enabling an agent to act. Missing are explicit error\u2011handling branches for probe failures (e.g., permission errors on system tables) and guidance when multiple layers appear plausible."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 53994,
+  "latency_ms": 14732,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

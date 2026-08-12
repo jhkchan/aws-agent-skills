@@ -1,0 +1,28 @@
+skill: cloudtrail-missing-events-troubleshooter
+model_id: amazon.nova-pro-v1:0
+cases:
+- id: trail-logging-disabled
+  must_contain:
+  - ROOT_CAUSE_IDENTIFIED
+  must_not_contain:
+  - INSUFFICIENT_DATA
+- id: s3-bucket-policy-missing
+  must_contain:
+  - ROOT_CAUSE_IDENTIFIED
+  must_not_contain:
+  - INSUFFICIENT_DATA
+- id: data-events-not-enabled
+  must_contain:
+  - ROOT_CAUSE_IDENTIFIED
+  must_not_contain:
+  - INSUFFICIENT_DATA
+- id: read-only-filter
+  must_contain:
+  - ROOT_CAUSE_IDENTIFIED
+  must_not_contain:
+  - INSUFFICIENT_DATA
+- id: org-trail-shadowing
+  must_contain:
+  - INSUFFICIENT_DATA
+  must_not_contain:
+  - ROOT_CAUSE_IDENTIFIED

@@ -1,0 +1,39 @@
+{
+  "evals": [
+    {
+      "id": "trail-logging-disabled",
+      "verdict": "ROOT_CAUSE_IDENTIFIED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/trail-logging-disabled.md",
+      "baseline_file": "baselines/trail-logging-disabled.md"
+    },
+    {
+      "id": "s3-bucket-policy-missing",
+      "verdict": "ROOT_CAUSE_IDENTIFIED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/s3-bucket-policy-missing.md",
+      "baseline_file": "baselines/s3-bucket-policy-missing.md"
+    },
+    {
+      "id": "data-events-not-enabled",
+      "verdict": "ROOT_CAUSE_IDENTIFIED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/data-events-not-enabled.md",
+      "baseline_file": "baselines/data-events-not-enabled.md"
+    },
+    {
+      "id": "read-only-filter",
+      "verdict": "ROOT_CAUSE_IDENTIFIED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/read-only-filter.md",
+      "baseline_file": "baselines/read-only-filter.md"
+    },
+    {
+      "id": "org-trail-shadowing",
+      "verdict": "INSUFFICIENT_DATA",
+      "difficulty": "medium",
+      "prompt_file": "prompts/org-trail-shadowing.md",
+      "baseline_file": "baselines/org-trail-shadowing.md"
+    }
+  ]
+}
