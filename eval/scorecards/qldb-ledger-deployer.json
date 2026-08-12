@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides expert\u2011level heuristics not in baseline docs (e.g., explicit dependency graph, decision tree for permissions mode vs deletion protection, recent feature timeline, and concrete IAM policy snippets). Adds concrete thresholds (e.g., OccConflictExceptions >5%) and nuanced verification workflow that a generic model would not enumerate."
+      "justification": "Provides several expert\u2011level heuristics not found in baseline knowledge: a dependency graph linking ledger, tables, indexes, export/stream; explicit recommendation to always use STANDARD permissions mode; immutable KMS\u2011key warning; detailed digest\u2011proof verification flow; clear distinction between export (compliance) vs stream (CDC)."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and ordered (ledger \u2192 permissions \u2192 deletion protection \u2192 KMS \u2192 tables \u2192 indexes \u2192 export/stream). The only shortfall is the absence of an explicit decision\u2011tree for post\u2011creation updates (e.g., when to run update\u2011ledger vs recreate), leaving a minor generic gap."
+      "justification": "Encodes AWS\u2011specific ordering (create ledger \u2192 set permissions \u2192 enable deletion protection \u2192 attach KMS key \u2192 create tables \u2192 indexes) and concrete CLI/IAM policy snippets. Some procedures are generic phrasing (e.g., \"verify prerequisites\") which prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "A concrete NEVER list is present with specific reasons (e.g., ALLOW_ALL, missing deletion protection, no indexes). One item (compound indexes) is listed without an explicit why beyond \u201cQLDB does not support them,\u201d missing deeper experiential reasoning, so a small deduction."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never use ALLOW_ALL in production, never omit deletion protection, never assume KMS key can change). Only minor deduction for lack of explicit mitigation steps for each anti\u2011pattern."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and a strict output contract are all present. Slight gap: the \"when to invoke\" clause is embedded in free\u2011form text rather than a concise trigger rule, which could affect reliable activation."
+      "justification": "Frontmatter, description, keywords, triggers, and strict output contract are present. However the \"when to invoke\" description is a long paragraph rather than a concise trigger list, making activation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "The document is well\u2011sectioned with quick navigation and layered detail, but the core checklist and anti\u2011pattern rules are buried deep among long narrative blocks, creating cognitive overload for an agent that needs only the checklist first. This results in three points loss."
+      "justification": "The document is well\u2011sectioned with quick\u2011navigation, but the initial sections already contain dense technical detail, which can overload the agent before it knows which parts are needed."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (ledger creation, deletion protection) are guarded by explicit checklist items and prerequisite verification. However the skill does not enforce constraints programmatically (e.g., it does not block ALLOW_ALL or missing deletion protection), leaving some freedom where tighter calibration would be safer."
+      "justification": "Destructive actions (ledger creation) are gated by a prerequisite checklist and explicit VERDICT handling. Slight over\u2011freedom remains because the skill does not enforce validation of KMS key existence or IAM role existence before emitting commands."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (frontmatter \u2192 mindset \u2192 heuristics \u2192 step\u2011by\u2011step \u2192 NEVER \u2192 output format). A few ad\u2011hoc sections (e.g., \u201cRecent features\u201d) break the strict flow, costing one point."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Steps \u2192 Heuristics \u2192 NEVER list \u2192 Output format. Minor inconsistency in ordering of sections (e.g., error handling appears after output format) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 7,
       "max": 15,
-      "justification": "Provides working CLI examples, IAM policy JSON, verification commands, and error\u2011handling guidance, enabling an agent to execute end\u2011to\u2011end. Misses a few edge cases (e.g., handling of regional endpoint variations, pagination for list\u2011commands) and does not include a fallback when export fails due to IAM policy mis\u2011match."
+      "justification": "Model output shows several mismatches: checklist items marked \u2713 even when not configured (e.g., cryptographic verification), missing journal export/stream details, and extra prose after the required literal block, which would break downstream automation. These indicate the skill does not reliably guide an agent to a correct, executable result."
     }
   ],
-  "total_score": 106,
+  "total_score": 98,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47269,
-  "latency_ms": 10119,
+  "token_count": 38942,
+  "latency_ms": 20744,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2
