@@ -1,0 +1,246 @@
+# Eval test cases for ecs-cluster-autoscaling-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# ClusterName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: ecs-cluster-autoscaling-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: managed-scaling-migration
+    description: >-
+      ECS cluster using legacy cluster-autoscaler instead of managed EC2
+      capacity provider. All on-demand, spread placement, 300 s cooldown.
+      8 of 20 container instances have 0 running tasks. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with managed scaling migration +
+      spot strategy + binpack.
+    input: |
+      ClusterName: ecs-managed-scaling-migration
+      Launch type: EC2 (1 capacity provider: on-demand)
+      Capacity provider strategy: on-demand weight=1, base=0
+      Managed scaling: disabled (using legacy cluster-autoscaler)
+      Placement strategy: spread by host
+      Scale-in cooldown: 300 s (default)
+      Target tracking: ECSServiceAverageCPUUtilization = 60%
+
+      Metrics (last 30 days):
+        - CPUUtilization avg: 35%, p95: 55%
+        - MemoryUtilization avg: 28%, p95: 45%
+        - RunningEC2Tasks avg: 40, DesiredTasks avg: 40
+        - Container instances: 20 total, 8 with runningTasksCount=0 (40% empty)
+        - CapacityProviderReservation: not configured (managed scaling off)
+
+      EC2 instances: m5.2xlarge, 20 instances, avg age 45 days
+      Services: 6 (all stateless microservices, burst-tolerant)
+
+      Workload context: stateless microservices (API, worker, scheduler).
+      No stateful workloads. Traffic is bursty during business hours.
+      Legacy cluster-autoscaler has known scale-out lag of 3-5 minutes.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "managed-scaling-migration"
+        - "RECOMMENDATION"
+        - "ESTIMATED_IMPACT"
+        - "MIGRATION_STEPS"
+        - "managed scaling"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: spot-capacity-provider-strategy
+    description: >-
+      ECS cluster with all on-demand capacity, no spot. Stateless
+      microservices that are burst-tolerant. CPU utilization 35%.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with spot
+      capacity provider addition (on-demand base=2, spot weight=4).
+    input: |
+      ClusterName: ecs-spot-capacity-provider-strategy
+      Launch type: EC2 (1 capacity provider: on-demand)
+      Capacity provider strategy: on-demand weight=1, base=1
+      Managed scaling: enabled
+      Placement strategy: binpack by memory + spread by az
+      Scale-in cooldown: 120 s
+      Target tracking: ECSServiceAverageCPUUtilization = 65%
+
+      Metrics (last 30 days):
+        - CPUUtilization avg: 35%, p95: 50%
+        - MemoryUtilization avg: 42%, p95: 60%
+        - RunningEC2Tasks avg: 25, DesiredTasks avg: 25
+        - Container instances: 10 total, 1 with runningTasksCount=0
+        - CapacityProviderReservation avg: 55%
+
+      EC2 instances: m5.xlarge, 10 instances
+      Services: 4 (stateless API services, horizontally scalable)
+
+      Workload context: stateless REST API services behind ALB.
+      No databases, no caches, no long-lived connections. Tasks
+      complete in < 500 ms average. Burst-tolerant for spot.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "spot-capacity-provider-strategy"
+        - "RECOMMENDATION"
+        - "ESTIMATED_IMPACT"
+        - "spot"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: binpack-placement-efficiency
+    description: >-
+      ECS cluster using spread-by-host placement strategy. CPU
+      utilization 30%, 6 of 15 hosts empty. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with binpack placement switch.
+    input: |
+      ClusterName: ecs-binpack-placement-efficiency
+      Launch type: EC2 (1 capacity provider: on-demand)
+      Capacity provider strategy: on-demand weight=1, base=1
+      Managed scaling: enabled
+      Placement strategy: spread by host
+      Scale-in cooldown: 120 s
+      Target tracking: ECSServiceAverageCPUUtilization = 60%
+
+      Metrics (last 30 days):
+        - CPUUtilization avg: 30%, p95: 45%
+        - MemoryUtilization avg: 25%, p95: 38%
+        - RunningEC2Tasks avg: 15 (1 per host), DesiredTasks avg: 15
+        - Container instances: 15 total, 6 with runningTasksCount=0 (40% empty)
+        - CapacityProviderReservation avg: 65%
+
+      EC2 instances: m5.2xlarge, 15 instances (8 vCPU, 32 GB each)
+      Services: 3 (worker processes, each task uses 1 vCPU + 4 GB)
+
+      Workload context: batch worker cluster. Each worker task uses
+      1 vCPU and 4 GB memory. With spread-by-host, only 1 task runs
+      per 8-vCPU/32-GB host. 7 vCPUs and 28 GB wasted per host.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "binpack-placement-efficiency"
+        - "RECOMMENDATION"
+        - "ESTIMATED_IMPACT"
+        - "binpack"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: target-tracking-metric-selection
+    description: >-
+      ECS cluster with CPU-only target tracking on a memory-bound
+      workload. CPU stays at 35% but memory hits 85% causing OOM kills.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with memory or
+      dual-metric target tracking.
+    input: |
+      ClusterName: ecs-target-tracking-metric-selection
+      Launch type: EC2 (1 capacity provider: on-demand)
+      Capacity provider strategy: on-demand weight=1, base=2
+      Managed scaling: enabled
+      Placement strategy: binpack by memory + spread by az
+      Scale-in cooldown: 120 s
+      Target tracking: ECSServiceAverageCPUUtilization = 60%
+
+      Metrics (last 30 days):
+        - CPUUtilization avg: 35%, p95: 48%
+        - MemoryUtilization avg: 78%, p95: 92%
+        - RunningEC2Tasks avg: 30, DesiredTasks avg: 30
+        - OOMKilled task count: 145 in last 7 days (memory pressure)
+        - Container instances: 12 total, 0 empty
+        - CapacityProviderReservation avg: 70%
+
+      EC2 instances: m5.xlarge, 12 instances (4 vCPU, 16 GB each)
+      Services: 2 (Java Spring Boot JVM services with 8 GB heap each)
+
+      Workload context: Java Spring Boot services with large JVM heaps.
+      Each task allocates 8 GB heap. CPU is low (I/O-bound API) but
+      memory is the bottleneck. CPU-only scaling never triggers scale-out
+      even when memory is at 92%. OOM kills occurring daily.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_IMPACT, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "target-tracking-metric-selection"
+        - "RECOMMENDATION"
+        - "ESTIMATED_IMPACT"
+        - "memory"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimal-autoscaling
+    description: >-
+      ECS cluster with managed scaling, spot base + on-demand burst
+      pattern, binpack + AZ spread, tuned cooldown, correct target
+      tracking. All dimensions verified. Expected verdict: OPTIMIZED.
+    input: |
+      ClusterName: ecs-already-optimal-autoscaling
+      Launch type: EC2 (2 capacity providers: on-demand, spot)
+      Capacity provider strategy: on-demand weight=1, base=2; spot weight=4, base=0
+      Managed scaling: enabled (targetCapacity=100)
+      Placement strategy: binpack by memory + spread by az
+      Scale-in cooldown: 120 s
+      Target tracking: ECSServiceAverageCPUUtilization = 65% (CPU-bound workload)
+
+      Metrics (last 30 days):
+        - CPUUtilization avg: 62%, p95: 70%
+        - MemoryUtilization avg: 55%, p95: 65%
+        - RunningEC2Tasks avg: 28, DesiredTasks avg: 28
+        - Container instances: 8 total, 0 empty
+        - CapacityProviderReservation avg: 95%
+        - Spot instance interruptions: 3 in last 30 days (handled gracefully)
+
+      EC2 instances: m5.xlarge, 6 on-demand + 2 spot
+      Services: 3 (stateless microservices, CPU-bound, burst-tolerant)
+
+      Workload context: well-managed production cluster. Managed scaling
+      active, spot capacity provider with on-demand base, binpack for
+      density + AZ spread for availability. Cooldown tuned for spiky
+      traffic. No optimization dimension has positive improvement.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_IMPACT, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimal-autoscaling"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ssm-session-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SSM Session Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "instance-not-registered-agent-stopped",
+      "name": "EC2 instance absent from describe-instance-information — SSM Agent service stopped on-instance",
+      "difficulty": "medium",
+      "prompt_file": "prompts/instance-not-registered-agent-stopped.md",
+      "baseline_file": "baselines/instance-not-registered-agent-stopped.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "INSTANCE_NOT_REGISTERED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "instance-not-registered-agent-stopped", "INSTANCE_NOT_REGISTERED", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: VPC_ENDPOINT_MISSING", "LAYER: AGENT_OUTDATED"]
+        }
+      ]
+    },
+    {
+      "id": "vpc-endpoint-ssmmessages-missing",
+      "name": "Private-subnet instance Online but sessions time out — ssmmessages VPC endpoint missing",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpc-endpoint-ssmmessages-missing.md",
+      "baseline_file": "baselines/vpc-endpoint-ssmmessages-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "VPC_ENDPOINT_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "vpc-endpoint-ssmmessages-missing", "VPC_ENDPOINT_MISSING", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: SESSION_CONNECTION_TIMEOUT", "LAYER: IAM_PERMISSION_MISSING"]
+        }
+      ]
+    },
+    {
+      "id": "iam-role-missing-ssmmessages-permissions",
+      "name": "Session starts then data channel fails — instance role missing ssmmessages:OpenDataChannel",
+      "difficulty": "hard",
+      "prompt_file": "prompts/iam-role-missing-ssmmessages-permissions.md",
+      "baseline_file": "baselines/iam-role-missing-ssmmessages-permissions.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "IAM_PERMISSION_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "iam-role-missing-ssmmessages-permissions", "IAM_PERMISSION_MISSING", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: VPC_ENDPOINT_MISSING", "LAYER: SESSION_CONNECTION_TIMEOUT"]
+        }
+      ]
+    },
+    {
+      "id": "agent-outdated-port-forwarding-fails",
+      "name": "Port forwarding returns NotSupported — SSM Agent 2.3.x below 3.0.196 minimum for port forwarding",
+      "difficulty": "medium",
+      "prompt_file": "prompts/agent-outdated-port-forwarding-fails.md",
+      "baseline_file": "baselines/agent-outdated-port-forwarding-fails.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "AGENT_OUTDATED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "agent-outdated-port-forwarding-fails", "AGENT_OUTDATED", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: PORT_FORWARDING_FAILURE", "LAYER: INSTANCE_NOT_REGISTERED"]
+        }
+      ]
+    },
+    {
+      "id": "session-document-s3-bucket-empty",
+      "name": "Sessions work but no JSON audit in S3 — SSM-SessionManagerRunShell document s3BucketName is empty",
+      "difficulty": "medium",
+      "prompt_file": "prompts/session-document-s3-bucket-empty.md",
+      "baseline_file": "baselines/session-document-s3-bucket-empty.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "AUDIT_LOG_S3_MISSING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "session-document-s3-bucket-empty", "AUDIT_LOG_S3_MISSING", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: SESSION_RECORDING_S3", "LAYER: CLOUDWATCH_LOGS_MISSING"]
+        }
+      ]
+    }
+  ]
+}

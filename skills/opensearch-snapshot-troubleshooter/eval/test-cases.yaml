@@ -1,0 +1,358 @@
+# Eval test cases for opensearch-snapshot-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each
+# case's TARGET embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The diagnostic ordering in
+# SKILL.md produces exactly the expected verdicts below.
+skill: opensearch-snapshot-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: iam-role-bucket-policy-missing-s3-actions
+    description: >-
+      Managed OpenSearch domain prod-logs-cluster fails every manual
+      snapshot with repository_verification_exception. The IAM role
+      arn:aws:iam::111111111111:role/opensearch-snapshot-role has
+      s3:PutObject in its identity policy but the S3 bucket policy
+      on prod-os-snapshots-us-east-1 lists the OpenSearch SERVICE
+      PRINCIPAL (opensearchservice.amazonaws.com) instead of the
+      role ARN. Verification writes the verification file but the
+      read-back fails. Expected layer: IAM_ROLE_S3_ACCESS.
+    input: |
+      Symptom: prod-logs-cluster fails every manual snapshot attempt
+      with repository_verification_exception. The repository
+      s3-backups is registered, the IAM role trust policy is
+      correct, but the bucket policy is keyed to the wrong
+      principal. PUT _snapshot/s3-backups returned 200 at
+      registration, but the first snapshot failed.
+
+      DomainName: prod-logs-cluster
+      EngineVersion: OpenSearch_2.13
+      Repository: s3-backups
+      Bucket: prod-os-snapshots-us-east-1
+      BucketRegion: us-east-1
+      SnapshotRoleArn: arn:aws:iam::111111111111:role/opensearch-snapshot-role
+      SnapshotRoleTrustPolicy: lists
+        "Service": "opensearchservice.amazonaws.com"
+        with aws:SourceAccount condition — CORRECT
+      SnapshotRoleIdentityPolicy: grants s3:PutObject, s3:GetObject,
+        s3:DeleteObject, s3:ListBucket on the bucket ARN — CORRECT
+      BucketPolicy:
+        {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "opensearchservice.amazonaws.com"},
+              "Action": ["s3:PutObject", "s3:GetObject", "s3:ListBucket"],
+              "Resource": ["arn:aws:s3:::prod-os-snapshots-us-east-1",
+                "arn:aws:s3:::prod-os-snapshots-us-east-1/*"]
+            }
+          ]
+        }
+      Note: Bucket policy principal is the SERVICE PRINCIPAL, not the
+        snapshot role ARN. The role's session ARN does not match the
+        service principal.
+
+      Last log line: "repository_verification_exception:
+        [[s3-backups]] verification failed"
+
+      Verification-file check:
+        s3 ls s3://prod-os-snapshots-us-east-1/s3-backups/verification-file-*
+        returns one object (write succeeded), but the read-back by
+        the OpenSearch S3 client fails with AccessDenied.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "iam-role-bucket-policy-missing-s3-actions"
+        - "IAM_ROLE_S3_ACCESS"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: REPOSITORY_REGISTRATION"
+        - "LAYER: MANIFEST_CORRUPTION"
+
+  - id: repository-verification-bucket-region-mismatch
+    description: >-
+      Cross-Region snapshot repository registration. The S3 bucket
+      is in us-west-2 but the PUT _snapshot body omits the "region"
+      field, so the OpenSearch S3 client defaults to the domain's
+      Region (us-east-1) and cannot resolve the bucket. Registration
+      succeeds (the bucket name is valid) but verification fails on
+      the first PUT. Expected layer: REPOSITORY_REGISTRATION.
+    input: |
+      Symptom: cross-region-dr-repo registration returns 200 on
+      PUT _snapshot but the first verification call returns
+      repository_verification_exception. The bucket is in us-west-2;
+      the domain is in us-east-1.
+
+      DomainName: prod-logs-cluster
+      EngineVersion: OpenSearch_2.13
+      DomainRegion: us-east-1
+      Repository: cross-region-dr-repo
+      Bucket: prod-os-snapshots-us-west-2
+      BucketRegion: us-west-2 (verified via s3 get-bucket-location)
+      SnapshotRoleArn: arn:aws:iam::111111111111:role/opensearch-snapshot-role
+
+      PUT _snapshot body used:
+        {
+          "type": "s3",
+          "settings": {
+            "bucket": "prod-os-snapshots-us-west-2",
+            "base_path": "dr-repo",
+            "iam_role_arn": "arn:aws:iam::111111111111:role/opensearch-snapshot-role",
+            "compress": true
+          }
+        }
+      Note: the "region" field is OMITTED. The OpenSearch S3 client
+        defaults to the domain's Region (us-east-1) and tries to
+        resolve prod-os-snapshots-us-west-2 in us-east-1, which
+        fails.
+
+      Snapshot role trust policy: CORRECT (lists
+        opensearchservice.amazonaws.com with aws:SourceAccount).
+      Snapshot role identity policy: CORRECT (full S3 access on the
+        bucket ARN).
+      Bucket policy: CORRECT (grants the snapshot role ARN full S3
+        access).
+
+      Last log line: "repository_verification_exception:
+        [[cross-region-dr-repo]] verification failed
+        (S3Exception: Forbidden / bucket region does not match
+        endpoint region)"
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "repository-verification-bucket-region-mismatch"
+        - "REPOSITORY_REGISTRATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: IAM_ROLE_S3_ACCESS"
+
+  - id: restore-version-mismatch-target-lower
+    description: >-
+      Snapshot taken on OpenSearch 2.13 source domain; restore
+      attempted into a 2.11 target domain. Restore returns 400
+      version_not_supported on the first shard. Expected layer:
+      RESTORE_VERSION_CONFLICT.
+    input: |
+      Symptom: restore of snapshot snap-2026-08-05 from repository
+      dr-repo into dev-logs-cluster returns 400 with
+      "version_not_supported: The snapshot was created with version
+      [2.13.0] which is higher than this version [2.11.0]".
+
+      Source domain: prod-logs-cluster (OpenSearch_2.13)
+      Target domain: dev-logs-cluster (OpenSearch_2.11)
+      Repository: dr-repo (registered on both domains, same S3
+        bucket, same snapshot role)
+      Snapshot: snap-2026-08-05
+      Snapshot engine_version: 2.13.0 (read via
+        _snapshot/dr-repo/snap-2026-08-05)
+
+      Restore command issued:
+        curl -X POST
+          "https://$DEV_ENDPOINT/_snapshot/dr-repo/snap-2026-08-05/_restore"
+          -d '{"indices": "logs-*"}'
+
+      Restore response (400):
+        {
+          "error": {
+            "type": "snapshot_restore_failure_exception",
+            "reason": "version_not_supported: The snapshot was
+              created with version [2.13.0] which is higher than
+              this version [2.11.0]"
+          }
+        }
+
+      Target cluster state: green, has free disk space, no alias
+        conflicts on logs-* indices.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "restore-version-mismatch-target-lower"
+        - "RESTORE_VERSION_CONFLICT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: RESTORE_ALIAS_CONFLICT"
+
+  - id: s3-lifecycle-deleting-snapshot-blobs
+    description: >-
+      Manual snapshot repository on a shared S3 bucket. The bucket
+      has a lifecycle rule that expires ALL objects after 30 days.
+      Snapshots taken > 30 days ago fail to restore with
+      SnapshotMissingException because the index-* segment blobs
+      were expired. Repository metadata still lists the snapshots
+      (snap-*.dat not expired yet due to recent write) but the
+      referenced segments are gone. Expected layer:
+      S3_LIFECYCLE_DELETION.
+    input: |
+      Symptom: snapshots taken before 2026-07-05 fail to restore
+      with SnapshotMissingException. Recent snapshots (last 30
+      days) restore fine. No IAM change, no cluster change.
+
+      DomainName: prod-logs-cluster
+      EngineVersion: OpenSearch_2.13
+      Repository: manual-backups
+      Bucket: shared-os-backups-useast1
+      BucketRegion: us-east-1
+      Failing snapshot: snap-2026-06-15 (taken 51 days ago)
+      Working snapshot: snap-2026-08-01 (taken 4 days ago)
+
+      Bucket lifecycle configuration:
+        {
+          "Rules": [
+            {
+              "Id": "expire-all-30d",
+              "Status": "Enabled",
+              "Filter": {"Prefix": ""},
+              "Expiration": {"Days": 30}
+            }
+          ]
+        }
+      Note: Filter Prefix is empty — the rule matches ALL objects in
+        the bucket, including snapshot segment blobs.
+
+      _snapshot/manual-backups/snap-2026-06-15/_status response:
+        "state": "SUCCESS" (the snapshot metadata is intact — the
+        snap-*.dat manifest was written recently and is < 30 days
+        old)
+
+      Restore failure:
+        curl -X POST
+          "$ENDPOINT/_snapshot/manual-backups/snap-2026-06-15/_restore"
+        Response (500):
+          {
+            "error": {
+              "type": "snapshot_restore_failure_exception",
+              "reason": "SnapshotMissingException[snap-2026-06-15]
+                snapshot does not exist"
+            }
+          }
+
+      s3 ls s3://shared-os-backups-useast1/manual-backups/indices/0/0/index-1
+        returns NoSuchKey (the blob was expired).
+
+      CloudTrail DeleteObject events on the bucket: lifecycle
+        actions on index-* objects within the last 7 days, source
+        "s3.amazonaws.com".
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "s3-lifecycle-deleting-snapshot-blobs"
+        - "S3_LIFECYCLE_DELETION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: MANIFEST_CORRUPTION"
+
+  - id: concurrent-snapshot-automated-manual-collision
+    description: >-
+      Manual snapshot schedule collides with the automated snapshot
+      hour. Both write to the same repository (cs-automated
+      prefix). The manual snapshot returns
+      ConcurrentSnapshotExecutionException every time it fires at
+      the same minute as the automated snapshot. Expected layer:
+      CONCURRENT_SNAPSHOT_LIMIT.
+    input: |
+      Symptom: the nightly manual snapshot job fails immediately
+      with ConcurrentSnapshotExecutionException at exactly 03:00
+      UTC every night. During other hours, manual snapshots
+      succeed.
+
+      DomainName: prod-logs-cluster
+      EngineVersion: OpenSearch_2.13
+      AutomatedSnapshotStartHour: 3 (03:00 UTC)
+      Manual repository: manual-backups
+      Manual repository base_path: cs-automated (NOTE: same prefix
+        as the automated repository)
+      Bucket: prod-os-snapshots-us-east-1
+
+      _snapshot/_status at the time of the manual snapshot attempt:
+        {
+          "snapshots": [
+            {
+              "repository": "cs-automated",
+              "snapshot": "2026-08-05-03",
+              "state": "IN_PROGRESS",
+              "shards_stats": {"INIT": 0, "STARTED": 12, "FINALIZE": 0}
+            }
+          ]
+        }
+
+      Manual snapshot attempt:
+        curl -X PUT
+          "$ENDPOINT/_snapshot/manual-backups/snap-manual-2026-08-05"
+        Response (500):
+          {
+            "error": {
+              "type": "concurrent_snapshot_execution_exception",
+              "reason": "Cannot execute snapshot while another
+                snapshot is in progress"
+            }
+          }
+
+      Manual snapshot succeeds when re-tried at 04:30 UTC.
+
+      Bucket policy, IAM role, repository registration: all CORRECT.
+      No verification issues, no lifecycle rules on the bucket.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "concurrent-snapshot-automated-manual-collision"
+        - "CONCURRENT_SNAPSHOT_LIMIT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SNAPSHOT_TIMEOUT"

@@ -1,0 +1,298 @@
+# Eval test cases for lambda-memory-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per memory optimization pattern. Each
+# case's FunctionName embeds the test-case id so the model naturally
+# echoes it (avoids assertion-token mismatch). The decision framework
+# in SKILL.md produces exactly the expected verdicts below.
+skill: lambda-memory-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cpu-bound-memory-upsize
+    description: >-
+      Python function at 128 MB averaging 5000 ms, CPU-bound (image
+      processing). Power Tuning shows U-curve minimum at 512 MB where
+      duration drops to 950 ms. Cost DECREASES at higher memory because
+      faster execution offsets higher per-GB-second rate. Expected
+      verdict: FURTHER_OPTIMIZATION_AVAILABLE with memory upsize.
+    input: |
+      FunctionName: fn-cpu-bound-memory-upsize
+      Runtime: python3.12
+      MemorySize: 128 MB
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: on-demand (no provisioned concurrency)
+
+      Metrics (last 30 days):
+        - Duration avg: 5000 ms, p95: 6200 ms
+        - Invocations: 47,000,000/month
+        - Errors: 45 (0.000096%)
+        - Memory utilization: avg 38 MB (30% of 128 MB)
+        - InitDuration: 200 ms (cold start, negligible)
+
+      Lambda Insights:
+        - memory_used: avg 38 MB, peak 52 MB
+        - cpu_total_time: avg 4800 ms (96% of Duration — CPU-bound)
+
+      Compute Optimizer finding: Overprovisioned (memory)
+      Memory recommendation options:
+        - rank: 1, memorySize: 512, projectedUtilization: within bounds
+        - rank: 2, memorySize: 1024, projectedUtilization: within bounds
+
+      Power Tuning result:
+        - Tested: [128, 256, 512, 1024, 2048, 3008]
+        - Cheapest (cost-optimal): 512 MB at 950 ms avg
+        - Fastest: 3008 MB at 410 ms avg
+        - URL: https://lambda-power-tuning.show/#example
+
+      Workload context: image enrichment (CPU-bound). Python with Pillow
+      library. Steady-state 24/7 via API Gateway.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "cpu-bound-memory-upsize"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "512"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: io-bound-memory-downsize
+    description: >-
+      Node.js function at 2048 MB averaging 80 ms, I/O-bound (HTTP proxy
+      to downstream API). Memory utilization peak 95 MB (4.6% of 2048 MB).
+      Power Tuning shows U-curve minimum at 256 MB where duration stays
+      ~80 ms. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with
+      memory downsize.
+    input: |
+      FunctionName: fn-io-bound-memory-downsize
+      Runtime: nodejs20.x
+      MemorySize: 2048 MB
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: on-demand (no provisioned concurrency)
+
+      Metrics (last 30 days):
+        - Duration avg: 80 ms, p95: 120 ms
+        - Invocations: 30,000,000/month
+        - Errors: 0
+        - Memory utilization: avg 75 MB (3.7% of 2048 MB)
+        - InitDuration: 450 ms (cold start)
+
+      Lambda Insights:
+        - memory_used: avg 75 MB, peak 95 MB
+        - cpu_total_time: avg 12 ms (15% of Duration — I/O-bound)
+
+      Compute Optimizer finding: Overprovisioned (memory)
+      Memory recommendation options:
+        - rank: 1, memorySize: 256, projectedUtilization: within bounds
+
+      Power Tuning result:
+        - Tested: [128, 256, 512, 1024, 2048]
+        - Cheapest (cost-optimal): 256 MB at 85 ms avg
+        - Fastest: 256 MB at 85 ms avg (I/O-bound — flat U-curve)
+        - URL: https://lambda-power-tuning.show/#example
+
+      Workload context: HTTP proxy to downstream REST API. Waits on
+      network I/O for 85% of duration. No CPU-intensive work. Node.js
+      20.x with axios. Steady-state 24/7 via API Gateway.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "io-bound-memory-downsize"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "256"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: provisioned-concurrency-memory-cascade
+    description: >-
+      Function with 10 provisioned concurrency at 2048 MB, but Power
+      Tuning shows the function is I/O-bound and the U-curve minimum is
+      at 512 MB. The oversized memory inflates the PC idle bill by 4x.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with memory
+      right-sizing (cascading into PC savings).
+    input: |
+      FunctionName: fn-provisioned-concurrency-memory-cascade
+      Runtime: python3.12
+      MemorySize: 2048 MB
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: provisioned concurrency (10 concurrent executions)
+
+      Metrics (last 30 days):
+        - Duration avg: 350 ms, p95: 450 ms
+        - Invocations: 50,000,000/month
+        - Errors: 12
+        - Memory utilization: avg 240 MB (11.7% of 2048 MB)
+        - ConcurrentExecutions: avg 6, p50 5, p95 9, p99 10
+
+      Lambda Insights:
+        - memory_used: avg 240 MB, peak 380 MB
+        - cpu_total_time: avg 95 ms (27% of Duration — I/O-bound)
+
+      Provisioned concurrency config:
+        - provisionedConcurrentExecutions: 10
+        - allocatedProvisionedConcurrentExecutions: 10
+
+      Compute Optimizer finding: Overprovisioned (memory)
+      Memory recommendation options:
+        - rank: 1, memorySize: 512, projectedUtilization: within bounds
+
+      Power Tuning result:
+        - Tested: [256, 512, 1024, 2048, 3008]
+        - Cheapest (cost-optimal): 512 MB at 360 ms avg
+        - Fastest: 512 MB at 360 ms avg (I/O-bound — flat U-curve above 512 MB)
+        - URL: https://lambda-power-tuning.show/#example
+
+      Workload context: HTTP API handler. I/O-bound (DB query + S3 PUT).
+      Latency-sensitive (customer-facing). Steady traffic justifies PC.
+      Peak memory_used 380 MB fits within 512 MB with ~25% headroom.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "provisioned-concurrency-memory-cascade"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "512"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: arm64-power-tuning-retune
+    description: >-
+      Python function already on arm64 at 1024 MB (right-sized for x86_64
+      previously). After ARM64 migration, Power Tuning shows the U-curve
+      minimum shifted to 768 MB because Graviton2 vCPU allocation differs.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with memory
+      downsize based on ARM64 Power Tuning re-measurement.
+    input: |
+      FunctionName: fn-arm64-power-tuning-retune
+      Runtime: python3.12
+      MemorySize: 1024 MB
+      Architecture: arm64
+      Region: us-east-1
+      Pricing: on-demand (no provisioned concurrency)
+
+      Metrics (last 30 days):
+        - Duration avg: 420 ms, p95: 550 ms
+        - Invocations: 25,000,000/month
+        - Errors: 2
+        - Memory utilization: avg 180 MB (17.6% of 1024 MB)
+        - InitDuration: 220 ms (cold start)
+
+      Lambda Insights:
+        - memory_used: avg 180 MB, peak 290 MB
+        - cpu_total_time: avg 380 ms (90% of Duration — CPU-bound)
+
+      Compute Optimizer finding: Optimized (memory was right-sized for x86_64 pre-migration)
+
+      Power Tuning result (re-run after ARM64 migration):
+        - Tested: [256, 512, 768, 1024, 1769, 2048]
+        - Cheapest (cost-optimal): 768 MB at 430 ms avg
+        - Fastest: 1769 MB at 380 ms avg
+        - URL: https://lambda-power-tuning.show/#example
+
+      Workload context: data transformation (CPU-bound). Pure Python +
+      numpy. Migrated from x86_64 to arm64 last month. Power Tuning was
+      re-run after migration as required. Peak memory_used 290 MB fits
+      within 768 MB with ~62% headroom.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "arm64-power-tuning-retune"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "768"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-power-tuned
+    description: >-
+      Node.js function at Power Tuning optimum memory, already on arm64,
+      on-demand, duration well within SLO. No memory dimension has
+      positive savings or latency improvement. Expected verdict:
+      OPTIMIZED.
+    input: |
+      FunctionName: fn-already-power-tuned
+      Runtime: nodejs20.x
+      MemorySize: 512 MB
+      Architecture: arm64
+      Region: us-east-1
+      Pricing: on-demand (no provisioned concurrency)
+
+      Metrics (last 30 days):
+        - Duration avg: 45 ms, p95: 82 ms
+        - Invocations: 10,000,000/month
+        - Errors: 3 (0.00003%)
+        - Memory utilization: avg 180 MB (35% of 512 MB)
+        - InitDuration: 250 ms (cold start, within SLO)
+
+      Lambda Insights:
+        - memory_used: avg 180 MB, peak 240 MB
+        - cpu_total_time: avg 38 ms (84% of Duration — mildly CPU-bound)
+
+      Compute Optimizer finding: Optimized
+
+      Power Tuning result:
+        - Cheapest (cost-optimal): 512 MB at 45 ms avg
+        - Fastest: 512 MB at 45 ms avg (current memory IS both optima)
+        - Current memory IS the Power Tuning optimum
+
+      Workload context: webhook receiver via API Gateway. Simple JSON
+      validation and S3 put. Already on arm64. On-demand (no provisioned
+      concurrency). Duration well within 200 ms p95 SLO. No EFS, no
+      container image, no Layers (single zip), no /tmp overflow.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-power-tuned"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"

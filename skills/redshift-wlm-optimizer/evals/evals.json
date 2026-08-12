@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "redshift-wlm-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Redshift WLM Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "manual-to-auto-wlm-migration",
+      "name": "Redshift cluster on manual WLM with 3 static queues, SQA off, scaling off, WLMQueueLength p99=22 — switch to auto WLM + concurrency scaling + SQA",
+      "difficulty": "hard",
+      "prompt_file": "prompts/manual-to-auto-wlm-migration.md",
+      "baseline_file": "baselines/manual-to-auto-wlm-migration.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "manual-to-auto-wlm-migration", "RECOMMENDATION", "ESTIMATED_IMPACT", "MIGRATION_STEPS", "auto WLM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "short-query-acceleration-enablement",
+      "name": "Redshift cluster with auto WLM + scaling, but SQA disabled — short lookups stuck behind long aggregates",
+      "difficulty": "medium",
+      "prompt_file": "prompts/short-query-acceleration-enablement.md",
+      "baseline_file": "baselines/short-query-acceleration-enablement.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "short-query-acceleration-enablement", "RECOMMENDATION", "ESTIMATED_IMPACT", "SQA"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "materialized-view-for-dashboard",
+      "name": "Dashboard workload with repeated GROUP BY date queries scanning 12B rows, no materialized views — add MVs with auto-refresh",
+      "difficulty": "medium",
+      "prompt_file": "prompts/materialized-view-for-dashboard.md",
+      "baseline_file": "baselines/materialized-view-for-dashboard.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "materialized-view-for-dashboard", "RECOMMENDATION", "ESTIMATED_IMPACT", "materialized view"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "query-monitoring-rule-setup",
+      "name": "Multi-tenant cluster with no QMR rules, runaway analyst queries at 56x median CPU — add QMR log rules",
+      "difficulty": "hard",
+      "prompt_file": "prompts/query-monitoring-rule-setup.md",
+      "baseline_file": "baselines/query-monitoring-rule-setup.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "query-monitoring-rule-setup", "RECOMMENDATION", "ESTIMATED_IMPACT", "query monitoring"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-wlm-config",
+      "name": "Cluster with auto WLM, concurrency scaling, SQA, materialized views, QMR all in place — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-wlm-config.md",
+      "baseline_file": "baselines/already-optimal-wlm-config.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimal-wlm-config", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

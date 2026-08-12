@@ -1,0 +1,269 @@
+# Eval test cases for route53-dns-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: route53-dns-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ns-delegation-mismatch
+    description: >-
+      Public hosted zone has NS records pointing at Route 53 NS
+      (ns-1.awsdns.com, etc.) but the registrar (GoDaddy) has NS
+      records pointing at the old provider (ns-old.provider.net).
+      Domain returns NXDOMAIN from public resolvers. Records exist in
+      the hosted zone. Expected layer: NS_DELEGATION.
+    input: |
+      Symptom: api.example.com returns NXDOMAIN from all public
+      resolvers. The domain was migrated from a legacy DNS provider
+      to Route 53 two days ago. Records were added to the Route 53
+      hosted zone, but the migration team forgot to update the NS
+      records at the registrar.
+
+      Domain: api.example.com
+      HostedZoneId: Z2ABCDEFGHIJ
+      PrivateZone: false
+
+      Hosted zone NS records (list-resource-record-sets):
+        NS: ns-1.awsdns.com, ns-2.awsdns.net,
+            ns-3.awsdns.org, ns-4.awsdns.co.uk
+        A (ALIAS to ALB):
+          dualstack.alb-xxx.us-east-1.elb.amazonaws.com
+
+      Registrar NS (GoDaddy, via dig):
+        ns-old.provider.net
+        ns-old2.provider.net
+
+      dig +trace NS example.com @8.8.8.8:
+        TLD delegates to ns-old.provider.net (not Route 53)
+
+      dig api.example.com @ns-1.awsdns.com +short:
+        (returns the ALB IP — record IS in the zone)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "ns-delegation-mismatch"
+        - "NS_DELEGATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: DNS_CACHE_TTL"
+
+  - id: dnssec-ds-record-mismatch
+    description: >-
+      DNSSEC is enabled on the hosted zone. KSK was rotated; new key
+      tag is 12345. The DS record at the parent (registrar) still has
+      old key tag 67890. Validating resolvers (Cloudflare 1.1.1.1)
+      return SERVFAIL; non-validating resolvers (8.8.8.8) resolve
+      correctly. Expected layer: DNSSEC_DS.
+    input: |
+      Symptom: app.example.com returns SERVFAIL from Cloudflare DNS
+      (1.1.1.1) but resolves correctly from Google DNS (8.8.8.8).
+      The SERVFAIL started after a KSK rotation yesterday.
+
+      Domain: app.example.com
+      HostedZoneId: Z3DEFGHIJKL
+
+      DNSSEC status (get-dnssec):
+        KeySigningKeys[0]:
+          KeyTag: 12345
+          KeyState: ACTIVE
+          DigestAlgorithm: 2 (SHA-256)
+        ZoneSigningKeys[0]:
+          KeyState: ACTIVE
+
+      DS record at parent (dig +dnssec DS example.com @8.8.8.8):
+        67890 13 2 <old-digest>
+        (Key tag 67890 does NOT match KSK key tag 12345)
+
+      Resolution test:
+        dig +dnssec app.example.com @1.1.1.1:
+          status: SERVFAIL, ad: false
+        dig +dnssec app.example.com @8.8.8.8:
+          status: NOERROR, ANSWER: 203.0.113.50
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "dnssec-ds-record-mismatch"
+        - "DNSSEC_DS"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: DNSSEC_KSK"
+
+  - id: private-hosted-zone-vpc-association
+    description: >-
+      Private hosted zone internal.example.com is not associated with
+      VPC vpc-abc123. EC2 instances in the VPC cannot resolve
+      db.internal.example.com. get-hosted-zone shows VPCs is empty.
+      DHCP Options Set uses AmazonProvidedDNS. Expected layer:
+      PHZ_VPC_ASSOCIATION.
+    input: |
+      Symptom: EC2 instances in VPC vpc-abc123 cannot resolve
+      db.internal.example.com. dig returns NXDOMAIN.
+
+      Domain: db.internal.example.com
+      HostedZoneId: Z4EFGHIJKLM
+      PrivateZone: true
+
+      Hosted zone config (get-hosted-zone):
+        VPCs: [] (empty — no VPC associations)
+
+      DHCP Options Set for vpc-abc123:
+        domain-name-servers: AmazonProvidedDNS
+
+      Record in the zone (list-resource-record-sets):
+        A: db.internal.example.com -> 10.0.1.50 (TTL 300)
+
+      DNS resolution test:
+        dig db.internal.example.com @169.254.169.253 +short:
+          (empty — NXDOMAIN; AmazonProvidedDNS has no private zone
+           to answer from)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "private-hosted-zone-vpc-association"
+        - "PHZ_VPC_ASSOCIATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SPLIT_HORIZON"
+
+  - id: health-check-failing-failover
+    description: >-
+      Failover routing PRIMARY record always returns SECONDARY. The
+      health check monitors the Route 53 record name itself (circular
+      dependency) instead of the ALB endpoint. Health check status is
+      Unhealthy. Expected layer: HEALTH_CHECK.
+    input: |
+      Symptom: DNS failover routing always returns the SECONDARY
+      record. The PRIMARY record exists in the zone but is never
+      served. The PRIMARY ALB is confirmed healthy via curl.
+
+      Domain: app.example.com
+      HostedZoneId: Z5GHIJKLMNO
+
+      Failover records (list-resource-record-sets):
+        A PRIMARY:
+          Value: dualstack.alb-primary.us-east-1.elb.amazonaws.com
+          Failover: PRIMARY
+          HealthCheckId: abc123def456
+        A SECONDARY:
+          Value: dualstack.alb-secondary.us-west-2.elb.amazonaws.com
+          Failover: SECONDARY
+
+      Health check config (get-health-check abc123def456):
+        Type: HTTPS
+        FullyQualifiedDomainName: app.example.com
+        ResourcePath: /health
+        Port: 443
+
+      Health check status (get-health-check-status):
+        Status: Unhealthy
+        StatusReport.Reason: "The health check endpoint returned
+          a 404"
+
+      ALB direct test:
+        curl -sI https://dualstack.alb-primary.us-east-1.elb.amazonaws.com/health
+        HTTP/2 200
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "health-check-failing-failover"
+        - "HEALTH_CHECK"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: ROUTING_FAILOVER"
+
+  - id: alias-cname-conflict
+    description: >-
+      Attempting to create an ALIAS record for api.example.com fails
+      with ConflictingDomainExists because an existing CNAME for the
+      same name points at an old CDN. The CNAME must be deleted before
+      the ALIAS can be created. Expected layer: ALIAS_CNAME_CONFLICT.
+    input: |
+      Symptom: attempting to create an A (ALIAS) record for
+      api.example.com pointing at a new ALB fails with
+      ConflictingDomainExists.
+
+      Domain: api.example.com
+      HostedZoneId: Z6HIJKLMNOP
+
+      Change request (failed):
+        Action: CREATE
+        Name: api.example.com.
+        Type: A
+        AliasTarget:
+          HostedZoneId: Z35SXDOTRQ7X7K (ALB hosted zone)
+          DNSName: dualstack.alb-new.us-east-1.elb.amazonaws.com
+
+      Error:
+        { "__type": "ConflictingDomainExists",
+          "message": "A CNAME record already exists with the same
+          name." }
+
+      Existing record (list-resource-record-sets):
+        CNAME: api.example.com -> old-cdn.cloudfront.net (TTL 300)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "alias-cname-conflict"
+        - "ALIAS_CNAME_CONFLICT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: NS_DELEGATION"

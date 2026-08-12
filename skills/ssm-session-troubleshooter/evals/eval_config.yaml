@@ -1,0 +1,48 @@
+# Eval configuration for ssm-session-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: ssm-session-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: instance-not-registered-agent-stopped
+    difficulty: medium
+    prompt_file: prompts/instance-not-registered-agent-stopped.md
+    baseline_file: baselines/instance-not-registered-agent-stopped.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: INSTANCE_NOT_REGISTERED
+  - id: vpc-endpoint-ssmmessages-missing
+    difficulty: hard
+    prompt_file: prompts/vpc-endpoint-ssmmessages-missing.md
+    baseline_file: baselines/vpc-endpoint-ssmmessages-missing.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: VPC_ENDPOINT_MISSING
+  - id: iam-role-missing-ssmmessages-permissions
+    difficulty: hard
+    prompt_file: prompts/iam-role-missing-ssmmessages-permissions.md
+    baseline_file: baselines/iam-role-missing-ssmmessages-permissions.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: IAM_PERMISSION_MISSING
+  - id: agent-outdated-port-forwarding-fails
+    difficulty: medium
+    prompt_file: prompts/agent-outdated-port-forwarding-fails.md
+    baseline_file: baselines/agent-outdated-port-forwarding-fails.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: AGENT_OUTDATED
+  - id: session-document-s3-bucket-empty
+    difficulty: medium
+    prompt_file: prompts/session-document-s3-bucket-empty.md
+    baseline_file: baselines/session-document-s3-bucket-empty.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: AUDIT_LOG_S3_MISSING

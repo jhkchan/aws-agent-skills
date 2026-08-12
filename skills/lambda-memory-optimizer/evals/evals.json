@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "lambda-memory-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Lambda Memory Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cpu-bound-memory-upsize",
+      "name": "Python function at 128 MB, CPU-bound, Power Tuning optimum at 512 MB — memory upsize (cost DECREASES)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cpu-bound-memory-upsize.md",
+      "baseline_file": "baselines/cpu-bound-memory-upsize.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "cpu-bound-memory-upsize", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "512"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "io-bound-memory-downsize",
+      "name": "Node.js function at 2048 MB, I/O-bound, Power Tuning optimum at 256 MB — memory downsize",
+      "difficulty": "medium",
+      "prompt_file": "prompts/io-bound-memory-downsize.md",
+      "baseline_file": "baselines/io-bound-memory-downsize.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "io-bound-memory-downsize", "RECOMMENDATION", "ESTIMATED_SAVINGS", "256"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "provisioned-concurrency-memory-cascade",
+      "name": "Function with 10 PC at 2048 MB, Power Tuning optimum at 512 MB — memory right-size cascades into PC savings",
+      "difficulty": "hard",
+      "prompt_file": "prompts/provisioned-concurrency-memory-cascade.md",
+      "baseline_file": "baselines/provisioned-concurrency-memory-cascade.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "provisioned-concurrency-memory-cascade", "RECOMMENDATION", "ESTIMATED_SAVINGS", "512"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "arm64-power-tuning-retune",
+      "name": "Python function on arm64 at 1024 MB (pre-migration sizing), Power Tuning re-run shows optimum shifted to 768 MB",
+      "difficulty": "hard",
+      "prompt_file": "prompts/arm64-power-tuning-retune.md",
+      "baseline_file": "baselines/arm64-power-tuning-retune.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "arm64-power-tuning-retune", "RECOMMENDATION", "ESTIMATED_SAVINGS", "768"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-power-tuned",
+      "name": "Node.js function at Power Tuning optimum on arm64, on-demand, healthy duration — already optimized",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-power-tuned.md",
+      "baseline_file": "baselines/already-power-tuned.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-power-tuned", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

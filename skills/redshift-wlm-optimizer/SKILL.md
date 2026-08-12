@@ -110,22 +110,22 @@ with exact CLI commands or Data API statements.
 | Section | What it covers | When to jump here |
 |---|---|---|
 | Quick start | Five headline rules and the throughput math | First read |
-| Mindset | Why auto WLM + concurrency scaling wins | Understanding the approach |
-| Quick reference — verdict thresholds | Decision matrix at a glance | Classifying a cluster |
-| Pre-flight data gate | STL/SYS tables, CloudWatch, describe-cluster | Before any recommendation |
-| Step 0 non-obvious behaviours | Auto vs manual caveats, SQA boundaries, QMR | Edge cases |
-| Step 1 WLM mode | Auto WLM vs manual WLM decision | The headline dimension |
+| Mindset | Why auto WLM + concurrency scaling wins | Approach |
+| Verdict thresholds | Decision matrix at a glance | Classifying |
+| Pre-flight data gate | STL/SYS tables, CloudWatch, describe-cluster | Before any rec |
+| Step 0 non-obvious behaviours | Auto vs manual caveats, SQA, QMR | Edge cases |
+| Step 1 WLM mode | Auto WLM vs manual WLM decision | Headline dimension |
 | Step 2 Concurrency scaling | Elastic cluster add for throughput peaks | Queue stalls |
-| Step 3 Short Query Acceleration | SQA isolation for short queries | Mixed workloads |
-| Step 4 Query priority and queue rules | Priority ranking and routing | Multi-tenant clusters |
-| Step 5 Concurrency and memory tuning | Slots and memory % per queue | Manual WLM tuning |
-| Step 6 Query monitoring rules | Metrics-based abort for runaway queries | Runaway query defence |
+| Step 3 SQA | Short Query Acceleration isolation | Mixed workloads |
+| Step 4 Priority and queue rules | Priority ranking and routing | Multi-tenant |
+| Step 5 Concurrency + memory | Slots and memory % per queue | Manual WLM |
+| Step 6 QMR | Metrics-based abort for runaway queries | Runaway defence |
 | Step 7 AQUA | Advanced Query Accelerator | Compute-heavy scans |
-| Step 8 Materialized views | Pre-computed aggregates for dashboards | Dashboard workloads |
-| Step 9 Spectrum and COPY | External table pushdown, bulk load tuning | Data lake + ingestion |
-| Output format | VERDICT block + worked examples | Emitting the result |
-| Anti-Patterns — NEVER | Common misclassifications | Self-check before emit |
-| Pre-flight safety checks | CONFIRM gate, snapshot, maintenance window | Before any apply CLI |
+| Step 8 Materialized views | Pre-computed aggregates for dashboards | Dashboards |
+| Step 9 Spectrum and COPY | External table pushdown, bulk load | Data lake + ingest |
+| Output format | VERDICT block + worked examples | Emitting result |
+| Anti-Patterns — NEVER | Common misclassifications | Self-check |
+| Pre-flight safety | CONFIRM gate, snapshot, maintenance | Before apply CLI |
 
 ## Quick start
 
@@ -239,43 +239,37 @@ choice:
 - **Auto WLM and concurrency scaling are paired.** Enabling auto WLM
   without concurrency scaling still bounds throughput at base cluster
   capacity. Always enable both together.
-- **Concurrency scaling bills per second of active cluster.** The added
-  cluster is not a reserved instance; cost is proportional to queue
-  backlog duration. For most workloads, the cost is sub-5% of the
-  primary cluster's monthly cost.
+- **Concurrency scaling bills per second of active cluster.** Cost is
+  proportional to queue backlog duration, not a reserved size. For most
+  workloads, sub-5% of the primary cluster's monthly cost.
 - **SQA has a max-execution-time boundary.** Queries estimated to
-  complete within the SQA threshold (default 120 s, configurable 0-300
-  s) are routed to SQA. Set too low and SQA never fires; set too high
-  and long queries steal SQA slots.
+  complete within the threshold (default 120 s, configurable 0-300 s)
+  are routed to SQA. Set too low and SQA never fires; set too high and
+  long queries steal SQA slots.
 - **Query priority only biases allocation.** A Highest-priority query
   does NOT preempt running queries; it gets preferred access to the next
-  free slot. Do not use priority as a real-time SLA lever.
+  free slot. Not a real-time SLA lever.
 - **Manual WLM queues have a fixed slot count.** Slots map to memory
   (cluster_memory / total_slots_per_slice). Over-allocating slots to a
   queue starves the others.
-- **Memory % per queue must sum to 100.** When tuning manual WLM,
-  rebalance the entire queue set, not one queue in isolation.
-- **QMR rules operate on STL_QUERY_METRICS counters.** The metric is
-  per-query CPU time (microseconds), row scan count, memory (MB), and
-  elapsed time. Set thresholds at 10x the workload's median, not at
-  arbitrary values.
-- **QMR action is `log` or `hop` or `abort`.** `log` writes to
-  STL_QUERY_METRICS_HISTORY; `hop` moves the query to the next queue;
-  `abort` kills it. Use `log` first to baseline, then promote to
-  `abort` once thresholds are validated.
-- **AQUA is only useful for specific scan patterns.** AQUA accelerates
-  LIKE, REGEXP, UDF, and hash-join on large VARCHAR columns. It does
-  not accelerate numeric aggregation. Verify the workload pattern before
-  enabling.
+- **Memory % per queue must sum to 100.** Rebalance the entire queue
+  set, not one queue in isolation.
+- **QMR rules operate on STL_QUERY_METRICS counters.** Metric is per-
+  query CPU time, row scan count, memory (MB), elapsed time. Set
+  thresholds at 10x median, not arbitrary values.
+- **QMR action is `log` or `hop` or `abort`.** Use `log` first to
+  baseline, then promote to `abort` once thresholds are validated.
+- **AQUA is only useful for specific scan patterns.** Accelerates LIKE,
+  REGEXP, UDF, hash-join on large VARCHAR. Does NOT accelerate numeric
+  aggregation. Verify the workload pattern before enabling.
 - **Materialized views auto-refresh on schedule.** Auto-refresh issues
-  an incremental refresh if the base table has changed. For dashboard
-  workloads, a 5-15 minute refresh interval is typical.
+  an incremental refresh if the base table changed. For dashboards, a
+  5-15 minute refresh interval is typical.
 - **COPY COMPUPDATE is on by default for first loads.** For subsequent
-  loads on tables with established encodings, COMPUPDATE is wasted
-  compute. Set COMPUPDATE OFF for incremental loads.
+  loads with established encodings, turn OFF to avoid wasted compute.
 - **Single-row INSERT generates VACUUM debt.** Each single-row INSERT
-  creates a micro-block that VACUUM must later consolidate. Use COPY or
-  a staging-table + INSERT INTO ... SELECT pattern instead.
+  creates a micro-block VACUUM must consolidate. Use COPY or a staging
+  table + INSERT INTO ... SELECT instead.
 
 ### Step 1: WLM mode — auto WLM vs manual WLM
 

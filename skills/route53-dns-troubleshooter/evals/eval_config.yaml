@@ -1,0 +1,48 @@
+# Eval configuration for route53-dns-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: route53-dns-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: ns-delegation-mismatch
+    difficulty: hard
+    prompt_file: prompts/ns-delegation-mismatch.md
+    baseline_file: baselines/ns-delegation-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: NS_DELEGATION
+  - id: dnssec-ds-record-mismatch
+    difficulty: hard
+    prompt_file: prompts/dnssec-ds-record-mismatch.md
+    baseline_file: baselines/dnssec-ds-record-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: DNSSEC_DS
+  - id: private-hosted-zone-vpc-association
+    difficulty: medium
+    prompt_file: prompts/private-hosted-zone-vpc-association.md
+    baseline_file: baselines/private-hosted-zone-vpc-association.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: PHZ_VPC_ASSOCIATION
+  - id: health-check-failing-failover
+    difficulty: hard
+    prompt_file: prompts/health-check-failing-failover.md
+    baseline_file: baselines/health-check-failing-failover.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: HEALTH_CHECK
+  - id: alias-cname-conflict
+    difficulty: medium
+    prompt_file: prompts/alias-cname-conflict.md
+    baseline_file: baselines/alias-cname-conflict.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: ALIAS_CNAME_CONFLICT

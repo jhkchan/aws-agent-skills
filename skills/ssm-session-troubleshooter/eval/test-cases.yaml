@@ -1,0 +1,359 @@
+# Eval test cases for ssm-session-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each
+# case's TARGET embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The diagnostic ordering in
+# SKILL.md produces exactly the expected verdicts below.
+skill: ssm-session-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: instance-not-registered-agent-stopped
+    description: >-
+      EC2 instance i-0abcdef1234567890 in a public subnet with
+      AmazonSSMManagedInstanceCore attached does not appear in
+      describe-instance-information. The SSM Agent service
+      (amazon-ssm-agent) is in a stopped/inactive state on the
+      instance; LastPingDateTime is more than 24 hours old.
+      AgentVersion is 3.2.x (new enough) but PingStatus is
+      ConnectionLost. Expected layer: INSTANCE_NOT_REGISTERED.
+    input: |
+      Symptom: i-0abcdef1234567890 does not appear in the SSM Fleet
+      Manager console. Operators cannot start Session Manager
+      sessions. The instance is a Linux EC2 instance in a public
+      subnet with route to IGW.
+
+      InstanceId: i-0abcdef1234567890
+      PlatformName: Amazon Linux
+      PlatformVersion: 2
+      InstanceProfile: EC2-SSM-Profile attached, role
+        EC2-SSM-Role has AmazonSSMManagedInstanceCore
+      AgentVersion: 3.2.1546.0
+      PingStatus: ConnectionLost
+      LastPingDateTime: 2026-08-09T14:30:00Z (more than 24h ago)
+      RegistrationDate: 2026-07-15T09:00:00Z
+
+      describe-instance-information output: instance is ABSENT
+        from the response (no entry for this InstanceId).
+
+      VPC: vpc-pub with internet gateway; route table has IGW
+        route. Instance has public IP assigned.
+      SecurityGroup egress: 0.0.0.0/0 on 443 — egress is OPEN.
+
+      On-instance probe (via EC2 Serial Console):
+        sudo systemctl status amazon-ssm-agent
+        → Loaded: loaded (...; disabled; vendor preset: disabled)
+        → Active: inactive (dead) since 2026-08-09T14:28Z
+        → The agent was stopped by an operator and never restarted.
+
+      VPC endpoints in the VPC: none (public subnet, not needed
+        since the instance reaches ssm.us-east-1.amazonaws.com via
+        the IGW).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "instance-not-registered-agent-stopped"
+        - "INSTANCE_NOT_REGISTERED"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: VPC_ENDPOINT_MISSING"
+        - "LAYER: AGENT_OUTDATED"
+
+  - id: vpc-endpoint-ssmmessages-missing
+    description: >-
+      EC2 instance i-private-1 in a private subnet (no NAT, no
+      IGW) is Online in describe-instance-information (PingStatus:
+      Online) but every Session Manager session times out within
+      10 seconds. The VPC has ssm and ec2messages interface
+      endpoints but is MISSING the ssmmessages endpoint. The
+      instance role has AmazonSSMManagedInstanceCore so all
+      ssmmessages:* permissions are present. Expected layer:
+      VPC_ENDPOINT_MISSING.
+    input: |
+      Symptom: i-private-1 is Online in the SSM console
+      (describe-instance-information returns PingStatus: Online),
+      but every Session Manager session started from the CLI times
+      out within 10 seconds with "Your session started, but then
+      timed out while waiting for the instance to start streaming."
+
+      InstanceId: i-private-1
+      PlatformName: Amazon Linux
+      AgentVersion: 3.2.1546.0 (newer than 3.0.196)
+      PingStatus: Online
+      LastPingDateTime: 2026-08-11T20:55:00Z (current)
+
+      InstanceProfile role EC2-SSM-Role has:
+        - AmazonSSMManagedInstanceCore (attached)
+        - Inline policy grants s3:PutObject on the session bucket
+      simulate-principal-policy on EC2-SSM-Role for
+        ssmmessages:OpenDataChannel: Decision: allowed
+        ssmmessages:CreateDataChannel: Decision: allowed
+        ssm:StartSession: Decision: allowed
+
+      VPC: vpc-priv (no internet gateway, no NAT gateway). The
+        instance is in a private subnet only.
+      VPC endpoints configured in vpc-priv:
+        - com.amazonaws.us-east-1.ssm (Interface, State: Available)
+        - com.amazonaws.us-east-1.ec2messages (Interface,
+          State: Available)
+      VPC endpoints MISSING:
+        - com.amazonaws.us-east-1.ssmmessages (NOT FOUND in
+          describe-vpc-endpoints)
+
+      Endpoint security groups: allow 443 inbound from the
+        instance subnet CIDR. Egress on the instance SG: 443 to
+        the subnet CIDR.
+      Private DNS on the existing endpoints: Enabled.
+
+      Agent log (on-instance):
+        "TimeoutError: failed to open data channel on
+        ssmmessages.us-east-1.amazonaws.com after 10s retries"
+        "408 RequestTimeout dialing
+        ssmmessages.us-east-1.amazonaws.com"
+
+      Session document: SSM-SessionManagerRunShell (default,
+        DocumentType: Session, SchemaVersion: 1.0).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "vpc-endpoint-ssmmessages-missing"
+        - "VPC_ENDPOINT_MISSING"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SESSION_CONNECTION_TIMEOUT"
+        - "LAYER: IAM_PERMISSION_MISSING"
+
+  - id: iam-role-missing-ssmmessages-permissions
+    description: >-
+      EC2 instance i-bastion-1 with a CUSTOM instance role
+      (EC2-Session-Role) that was hand-written to include
+      ssm:UpdateInstanceInformation and ssm:StartSession but is
+      MISSING the ssmmessages:CreateDataChannel and
+      ssmmessages:OpenDataChannel permissions. The agent log
+      shows "AccessDeniedException: ssmmessages:OpenDataChannel".
+      Sessions start on the caller side then fail to open the data
+      channel. Expected layer: IAM_PERMISSION_MISSING.
+    input: |
+      Symptom: Sessions to i-bastion-1 start (the CLI returns
+      "Starting session with SessionId: botocore-...") then fail
+      within 2-3 seconds with "SessionManagerPlugin: DataChannel
+      not received". The instance is Online.
+
+      InstanceId: i-bastion-1
+      PlatformName: Amazon Linux 2023
+      AgentVersion: 3.2.1546.0
+      PingStatus: Online
+
+      InstanceProfile role: EC2-Session-Role (CUSTOM, NOT using
+        AmazonSSMManagedInstanceCore).
+      Attached policies on EC2-Session-Role:
+        - Inline "ssm-basics":
+            {
+              "Statement": [
+                {"Effect": "Allow",
+                 "Action": ["ssm:UpdateInstanceInformation",
+                            "ssm:StartSession"],
+                 "Resource": "*"}
+              ]
+            }
+        - NOTE: the inline policy OMITS ssmmessages:*
+          actions entirely.
+
+      simulate-principal-policy on EC2-Session-Role for
+        ssmmessages:OpenDataChannel: Decision: implicitDeny
+        ssmmessages:CreateDataChannel: Decision: implicitDeny
+        ssm:UpdateInstanceInformation: Decision: allowed
+
+      Agent log (on-instance):
+        "ERROR DataChannel: failed to open data channel"
+        "AccessDeniedException: User:
+          arn:aws:sts::111111111111:assumed-role/EC2-Session-Role/...
+          is not authorized to perform: ssmmessages:OpenDataChannel"
+
+      VPC: public subnet with IGW; instance reaches
+        ssmmessages.us-east-1.amazonaws.com on the public endpoint.
+      No VPC endpoints configured (not needed — public subnet).
+
+      Caller role (the human invoking start-session):
+        simulate-principal-policy for ssm:StartSession:
+          Decision: allowed.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "iam-role-missing-ssmmessages-permissions"
+        - "IAM_PERMISSION_MISSING"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: VPC_ENDPOINT_MISSING"
+        - "LAYER: SESSION_CONNECTION_TIMEOUT"
+
+  - id: agent-outdated-port-forwarding-fails
+    description: >-
+      EC2 instance i-jumphost-7 on AmazonSSMManagedInstanceCore
+      with agent 2.3.1234.0. Sessions work fine but port forwarding
+      returns "NotSupported" because port forwarding requires
+      agent 3.0.196 or higher. The instance is in a private subnet
+      with no S3 VPC endpoint, so the agent has not self-updated.
+      Expected layer: AGENT_OUTDATED.
+    input: |
+      Symptom: port forwarding from a developer's machine to
+      i-jumphost-7 returns NotSupported on the first attempt.
+      Interactive Session Manager sessions work fine.
+
+      InstanceId: i-jumphost-7
+      PlatformName: Amazon Linux
+      AgentVersion: 2.3.1234.0
+      PingStatus: Online
+
+      InstanceProfile role: EC2-SSM-Role with
+        AmazonSSMManagedInstanceCore attached. All ssmmessages:*
+        permissions present (simulate-principal-policy allowed).
+
+      VPC: private subnet, no internet gateway, no NAT gateway.
+      VPC endpoints configured: ssm, ec2messages, ssmmessages
+        (all Available, all with private DNS enabled).
+      NO S3 VPC endpoint configured (the agent cannot self-update
+        from the S3 package bucket).
+
+      Port forwarding command issued:
+        aws ssm start-session \
+          --document-name AWS-StartPortForwardingSession \
+          --target i-jumphost-7 \
+          --parameters '{"portNumber":["22"]}'
+
+      Response:
+        "SessionId: botocore-...-portforward"
+        "An error occurred (NotSupported) when calling the
+        StartSession operation: Port forwarding requires SSM
+        Agent version 3.0.196.0 or later. Current agent version
+        on the instance is 2.3.1234.0."
+
+      Interactive sessions (SSM-SessionManagerRunShell) work fine
+        to the same instance.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "agent-outdated-port-forwarding-fails"
+        - "AGENT_OUTDATED"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: PORT_FORWARDING_FAILURE"
+        - "LAYER: INSTANCE_NOT_REGISTERED"
+
+  - id: session-document-s3-bucket-empty
+    description: >-
+      Sessions to i-app-server-3 work but no JSON audit output
+      appears in the S3 session bucket. The SSM-SessionManagerRunShell
+      document's s3BucketName field is empty (never configured).
+      The bucket policy on ssm-session-output-useast1 grants the
+      instance role s3:PutObject. Expected layer:
+      AUDIT_LOG_S3_MISSING.
+    input: |
+      Symptom: Session Manager sessions to i-app-server-3 work
+      (the session opens and the operator gets a shell) but the
+      compliance team reports no JSON audit output in the
+      ssm-session-output-useast1 bucket. There are zero objects
+      under the expected prefix.
+
+      InstanceId: i-app-server-3
+      PlatformName: Amazon Linux 2023
+      AgentVersion: 3.2.1546.0
+      PingStatus: Online
+
+      InstanceProfile role: EC2-SSM-Role with
+        AmazonSSMManagedInstanceCore attached AND an inline policy
+        granting s3:PutObject on
+        arn:aws:s3:::ssm-session-output-useast1/*
+      simulate-principal-policy for s3:PutObject on
+        arn:aws:s3:::ssm-session-output-useast1/*: allowed
+
+      Session document in use (default):
+        get-document SSM-SessionManagerRunShell returns:
+          {
+            "schemaVersion": "1.0",
+            "sessionType": "Standard_Stream",
+            "inputs": {
+              "s3BucketName": "",
+              "s3KeyPrefix": "",
+              "s3EncryptionEnabled": false,
+              "cloudWatchLogGroupName": "ssm-session-logs",
+              "cloudWatchStreamingEnabled": true,
+              "kmsKeyId": "",
+              "shellProfile": {"linux": "bash"}
+            }
+          }
+        Note: s3BucketName is empty — no S3 audit output configured
+        in the document.
+
+      Bucket ssm-session-output-useast1 exists, has a bucket
+        policy granting EC2-SSM-Role s3:PutObject on the bucket
+        ARN. CloudWatch Logs group ssm-session-logs IS receiving
+        streamed session output (so the session itself is healthy).
+
+      describe-sessions --state History shows completed sessions
+        with Status: Terminated normally. No Output field set.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "session-document-s3-bucket-empty"
+        - "AUDIT_LOG_S3_MISSING"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SESSION_RECORDING_S3"
+        - "LAYER: CLOUDWATCH_LOGS_MISSING"

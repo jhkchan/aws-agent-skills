@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ecs-cluster-autoscaling-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ECS Cluster Autoscaling Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "managed-scaling-migration",
+      "name": "ECS cluster using legacy cluster-autoscaler, all on-demand, spread placement, 40% empty hosts — migrate to managed scaling + spot + binpack",
+      "difficulty": "hard",
+      "prompt_file": "prompts/managed-scaling-migration.md",
+      "baseline_file": "baselines/managed-scaling-migration.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "managed-scaling-migration", "RECOMMENDATION", "ESTIMATED_IMPACT", "MIGRATION_STEPS", "managed scaling"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "spot-capacity-provider-strategy",
+      "name": "ECS cluster with all on-demand capacity, stateless burst-tolerant microservices — add spot capacity provider with base+weight",
+      "difficulty": "medium",
+      "prompt_file": "prompts/spot-capacity-provider-strategy.md",
+      "baseline_file": "baselines/spot-capacity-provider-strategy.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "spot-capacity-provider-strategy", "RECOMMENDATION", "ESTIMATED_IMPACT", "spot"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "binpack-placement-efficiency",
+      "name": "ECS cluster using spread-by-host, 1 task per 8-vCPU host, 40% empty hosts — switch to binpack placement",
+      "difficulty": "medium",
+      "prompt_file": "prompts/binpack-placement-efficiency.md",
+      "baseline_file": "baselines/binpack-placement-efficiency.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "binpack-placement-efficiency", "RECOMMENDATION", "ESTIMATED_IMPACT", "binpack"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "target-tracking-metric-selection",
+      "name": "ECS cluster with CPU-only target tracking on memory-bound JVM workload, OOM kills daily — switch to memory or dual-metric",
+      "difficulty": "hard",
+      "prompt_file": "prompts/target-tracking-metric-selection.md",
+      "baseline_file": "baselines/target-tracking-metric-selection.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "target-tracking-metric-selection", "RECOMMENDATION", "ESTIMATED_IMPACT", "memory"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-autoscaling",
+      "name": "ECS cluster with managed scaling, spot base+on-demand burst, binpack+AZ spread, tuned cooldown — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-autoscaling.md",
+      "baseline_file": "baselines/already-optimal-autoscaling.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimal-autoscaling", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

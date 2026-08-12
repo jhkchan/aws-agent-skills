@@ -1,0 +1,43 @@
+# Eval configuration for redshift-wlm-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: redshift-wlm-optimizer
+snapshot_date: "2026-08-09"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: manual-to-auto-wlm-migration
+    difficulty: hard
+    prompt_file: prompts/manual-to-auto-wlm-migration.md
+    baseline_file: baselines/manual-to-auto-wlm-migration.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: short-query-acceleration-enablement
+    difficulty: medium
+    prompt_file: prompts/short-query-acceleration-enablement.md
+    baseline_file: baselines/short-query-acceleration-enablement.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: materialized-view-for-dashboard
+    difficulty: medium
+    prompt_file: prompts/materialized-view-for-dashboard.md
+    baseline_file: baselines/materialized-view-for-dashboard.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: query-monitoring-rule-setup
+    difficulty: hard
+    prompt_file: prompts/query-monitoring-rule-setup.md
+    baseline_file: baselines/query-monitoring-rule-setup.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: already-optimal-wlm-config
+    difficulty: easy
+    prompt_file: prompts/already-optimal-wlm-config.md
+    baseline_file: baselines/already-optimal-wlm-config.md
+    expected_verdict: OPTIMIZED

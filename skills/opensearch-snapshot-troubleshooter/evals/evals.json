@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "opensearch-snapshot-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the OpenSearch Snapshot Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "iam-role-bucket-policy-missing-s3-actions",
+      "name": "repository_verification_exception — bucket policy keyed to OpenSearch service principal instead of snapshot role ARN",
+      "difficulty": "hard",
+      "prompt_file": "prompts/iam-role-bucket-policy-missing-s3-actions.md",
+      "baseline_file": "baselines/iam-role-bucket-policy-missing-s3-actions.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "IAM_ROLE_S3_ACCESS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "iam-role-bucket-policy-missing-s3-actions", "IAM_ROLE_S3_ACCESS", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: REPOSITORY_REGISTRATION", "LAYER: MANIFEST_CORRUPTION"]
+        }
+      ]
+    },
+    {
+      "id": "repository-verification-bucket-region-mismatch",
+      "name": "Cross-region snapshot repository — PUT _snapshot body omits region field; verification fails on bucket region mismatch",
+      "difficulty": "hard",
+      "prompt_file": "prompts/repository-verification-bucket-region-mismatch.md",
+      "baseline_file": "baselines/repository-verification-bucket-region-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "REPOSITORY_REGISTRATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "repository-verification-bucket-region-mismatch", "REPOSITORY_REGISTRATION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: IAM_ROLE_S3_ACCESS"]
+        }
+      ]
+    },
+    {
+      "id": "restore-version-mismatch-target-lower",
+      "name": "Snapshot from OpenSearch 2.13 source restored into 2.11 target — version_not_supported on first shard",
+      "difficulty": "hard",
+      "prompt_file": "prompts/restore-version-mismatch-target-lower.md",
+      "baseline_file": "baselines/restore-version-mismatch-target-lower.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "RESTORE_VERSION_CONFLICT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "restore-version-mismatch-target-lower", "RESTORE_VERSION_CONFLICT", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: RESTORE_ALIAS_CONFLICT"]
+        }
+      ]
+    },
+    {
+      "id": "s3-lifecycle-deleting-snapshot-blobs",
+      "name": "S3 bucket lifecycle expires ALL objects after 30 days — snapshot segment blobs deleted, restore returns SnapshotMissingException",
+      "difficulty": "hard",
+      "prompt_file": "prompts/s3-lifecycle-deleting-snapshot-blobs.md",
+      "baseline_file": "baselines/s3-lifecycle-deleting-snapshot-blobs.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "S3_LIFECYCLE_DELETION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "s3-lifecycle-deleting-snapshot-blobs", "S3_LIFECYCLE_DELETION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: MANIFEST_CORRUPTION"]
+        }
+      ]
+    },
+    {
+      "id": "concurrent-snapshot-automated-manual-collision",
+      "name": "Manual snapshot at 03:00 UTC collides with automated snapshot — ConcurrentSnapshotExecutionException every night",
+      "difficulty": "medium",
+      "prompt_file": "prompts/concurrent-snapshot-automated-manual-collision.md",
+      "baseline_file": "baselines/concurrent-snapshot-automated-manual-collision.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CONCURRENT_SNAPSHOT_LIMIT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "concurrent-snapshot-automated-manual-collision", "CONCURRENT_SNAPSHOT_LIMIT", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: SNAPSHOT_TIMEOUT"]
+        }
+      ]
+    }
+  ]
+}

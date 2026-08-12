@@ -1,0 +1,48 @@
+# Eval configuration for opensearch-snapshot-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: opensearch-snapshot-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: iam-role-bucket-policy-missing-s3-actions
+    difficulty: hard
+    prompt_file: prompts/iam-role-bucket-policy-missing-s3-actions.md
+    baseline_file: baselines/iam-role-bucket-policy-missing-s3-actions.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: IAM_ROLE_S3_ACCESS
+  - id: repository-verification-bucket-region-mismatch
+    difficulty: hard
+    prompt_file: prompts/repository-verification-bucket-region-mismatch.md
+    baseline_file: baselines/repository-verification-bucket-region-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: REPOSITORY_REGISTRATION
+  - id: restore-version-mismatch-target-lower
+    difficulty: hard
+    prompt_file: prompts/restore-version-mismatch-target-lower.md
+    baseline_file: baselines/restore-version-mismatch-target-lower.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: RESTORE_VERSION_CONFLICT
+  - id: s3-lifecycle-deleting-snapshot-blobs
+    difficulty: hard
+    prompt_file: prompts/s3-lifecycle-deleting-snapshot-blobs.md
+    baseline_file: baselines/s3-lifecycle-deleting-snapshot-blobs.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: S3_LIFECYCLE_DELETION
+  - id: concurrent-snapshot-automated-manual-collision
+    difficulty: medium
+    prompt_file: prompts/concurrent-snapshot-automated-manual-collision.md
+    baseline_file: baselines/concurrent-snapshot-automated-manual-collision.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: CONCURRENT_SNAPSHOT_LIMIT

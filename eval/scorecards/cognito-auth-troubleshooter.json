@@ -1,0 +1,70 @@
+{
+  "skill": "cognito-auth-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 14,
+      "max": 20,
+      "justification": "The skill compiles many known Cognito troubleshooting steps but adds little truly novel expert insight (e.g., no unique decision thresholds, quantitative cut\u2011offs for token revocation, or previously undocumented edge\u2011case heuristics). Much of the content restates what a capable model already knows."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (CLI commands, probe ordering) but several steps are generic \"run describe\u2011...\" checks that any AWS operator could infer. The mindset description is solid, yet the procedural list lacks deeper Cognito\u2011only reasoning in a few places."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "The NEVER list is extensive and includes concrete reasons, but a few items (e.g., \"NEVER compare redirect_uri loosely\") are stated without fully explaining the underlying validation algorithm, leaving a slight gap in anti\u2011pattern reasoning."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter is complete, the description clearly states WHAT the skill does, WHEN to invoke it, and provides rich keywords and activation triggers. The only shortfall is the lack of an explicit \u201crequired fields\u201d list in the invocation schema, which could cause ambiguous activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Good layering: quick\u2011start summary, then deeper sections (mindset, philosophy, step\u2011by\u2011step). Some cognitive overload occurs because the full decision tree and many tables appear early, reducing clarity."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated behind explicit CONFIRM prompts and the skill emphasizes read\u2011only probes first. A minor gap is the \u201cdelete\u2011user\u2011pool\u2011client\u201d example, which lacks a safety check (e.g., backup of client ID) before execution."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a coherent custom structure (Quick\u2011Start \u2192 Mindset \u2192 Philosophy \u2192 Process \u2192 Anti\u2011Patterns), but it does not map to a recognized industry pattern or template, making it slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a usable decision tree, concrete CLI probes, and remediation steps. However, it lacks explicit error\u2011handling for failed CLI calls and does not define fallback paths when a probe returns unexpected output, which could hinder an agent's execution."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 64756,
+  "latency_ms": 17011,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

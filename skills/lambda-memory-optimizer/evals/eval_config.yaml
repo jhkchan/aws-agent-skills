@@ -1,0 +1,43 @@
+# Eval configuration for lambda-memory-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: lambda-memory-optimizer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: cpu-bound-memory-upsize
+    difficulty: medium
+    prompt_file: prompts/cpu-bound-memory-upsize.md
+    baseline_file: baselines/cpu-bound-memory-upsize.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: io-bound-memory-downsize
+    difficulty: medium
+    prompt_file: prompts/io-bound-memory-downsize.md
+    baseline_file: baselines/io-bound-memory-downsize.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: provisioned-concurrency-memory-cascade
+    difficulty: hard
+    prompt_file: prompts/provisioned-concurrency-memory-cascade.md
+    baseline_file: baselines/provisioned-concurrency-memory-cascade.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: arm64-power-tuning-retune
+    difficulty: hard
+    prompt_file: prompts/arm64-power-tuning-retune.md
+    baseline_file: baselines/arm64-power-tuning-retune.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: already-power-tuned
+    difficulty: easy
+    prompt_file: prompts/already-power-tuned.md
+    baseline_file: baselines/already-power-tuned.md
+    expected_verdict: OPTIMIZED

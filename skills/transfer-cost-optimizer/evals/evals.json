@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "transfer-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Transfer Family Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "vpc-to-public-endpoint-migration",
+      "name": "VPC endpoint server with NAT Gateway overhead, near-idle, 5-step workflow, 300 GB logs — migrate to PUBLIC + simplify workflow + reduce logs",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpc-to-public-endpoint-migration.md",
+      "baseline_file": "baselines/vpc-to-public-endpoint-migration.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "vpc-to-public-endpoint-migration", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "PUBLIC"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "idle-server-consolidation",
+      "name": "Three PUBLIC servers with combined peak of 9 sessions vs per-server concurrency of 10 — consolidate onto fewer servers",
+      "difficulty": "hard",
+      "prompt_file": "prompts/idle-server-consolidation.md",
+      "baseline_file": "baselines/idle-server-consolidation.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "idle-server-consolidation", "RECOMMENDATION", "ESTIMATED_SAVINGS", "consolidat"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-and-log-cost-reduction",
+      "name": "PUBLIC server with 7-step workflow on 5M small files/month and 500 GB logs — simplify workflow and reduce log verbosity",
+      "difficulty": "hard",
+      "prompt_file": "prompts/workflow-and-log-cost-reduction.md",
+      "baseline_file": "baselines/workflow-and-log-cost-reduction.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "workflow-and-log-cost-reduction", "RECOMMENDATION", "ESTIMATED_SAVINGS", "workflow"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized-transfer",
+      "name": "PUBLIC server, right-sized concurrency, no workflow, controlled logs, service-managed IdP — already optimized",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized-transfer.md",
+      "baseline_file": "baselines/already-optimized-transfer.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized-transfer", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "custom-idp-and-session-optimization",
+      "name": "PUBLIC server with custom API_GATEWAY Lambda IdP, 80K session starts/month with no auth caching, 45-min avg session with 0.6 files — enable caching and investigate session hold",
+      "difficulty": "hard",
+      "prompt_file": "prompts/custom-idp-and-session-optimization.md",
+      "baseline_file": "baselines/custom-idp-and-session-optimization.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "custom-idp-and-session-optimization", "RECOMMENDATION", "ESTIMATED_SAVINGS", "cach"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

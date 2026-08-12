@@ -1,0 +1,70 @@
+{
+  "skill": "route53-dns-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "The skill supplies many AWS\u2011specific diagnostics that a generic model would not know: the exact 12\u2011category layer model, precise AWS CLI commands for each probe, the nuance of DS\u2011record mismatches after KSK rotation, cross\u2011account VPC association steps, resolver inbound/outbound SG requirements, and TTL\u2011based propagation calculations. These constitute genuine expert knowledge beyond baseline DNS troubleshooting."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill encodes a senior DNS engineer mindset (verify delegation before editing records, always use a failing probe, never rely on elimination). It orders procedures in an AWS\u2011specific way (dig\u202f+trace \u2192 list\u2011resource\u2011record\u2011sets \u2192 get\u2011dnssec \u2192 health\u2011check status). The only shortfall is a minor generic statement (\u201ccheck security\u201d) that could be more AWS\u2011focused."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "A comprehensive NEVER list is provided with concrete reasoning (e.g., never declare ROOT_CAUSE without a failing probe, never edit records before NS delegation verification, never disable DNSSEC without fixing DS). One small gap: it does not explicitly warn against using IPv6\u2011only resolvers when the zone lacks AAAA records."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "All required front\u2011matter fields are present, the description clearly states WHAT the skill does, WHEN to invoke, and includes a rich keyword list and activation triggers. The invocation schema and example are well\u2011formed, enabling reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered from quick\u2011start to deep reference, but the early sections are dense, risking cognitive overload before the agent reaches the most critical rules."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "All state\u2011changing CLI commands are gated by explicit CONFIRM prompts, matching the fragility of DNS operations; creative tasks remain unconstrained."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows a clear, recognizable structure (quick start \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 anti\u2011patterns \u2192 safety \u2192 remediation \u2192 deep reference) that aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working decision branches, CLI examples, and output format; however, edge\u2011case handling (e.g., malformed input beyond the brief INSUFFICIENT_DATA clause) is only minimally addressed."
+    }
+  ],
+  "total_score": 112,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 61754,
+  "latency_ms": 9425,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

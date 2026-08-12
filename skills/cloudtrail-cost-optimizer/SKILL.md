@@ -221,29 +221,26 @@ choice:
 - **The first management-event trail per region is free.** Additional
   management-event trails in the same region bill per-event. Org trail +
   one member trail in the same region is the #1 cost trap.
-- **Org trail is automatically multi-region.** `IsMultiRegionTrail=true`
-  is the default for org trails. Single-region org trails don't exist;
-  any per-region trail duplicates at least the in-region events.
+- **Org trail is automatically multi-region.** Single-region org trails
+  don't exist; any per-region trail duplicates at least the in-region
+  events.
 - **Data events bill per 100,000 events regardless of trail count.** Two
   trails each capturing S3 data events on the same bucket bill the
-  events TWICE — there is no deduplication across trails.
-- **S3 lifecycle affects all objects in the prefix.** A lifecycle rule
-  on the CloudTrail prefix will also transition digest files (used for
-  log file integrity validation). Deep Archive digest files take 12 hours
-  to restore — verify your audit RTO first.
-- **CloudTrail Lake ingestion is one-time per event.** Once an event is
-  in an EDS, you pay only retention storage, not re-ingestion. But each
-  EDS ingests independently — multiple EDSs on the same events double-
-  ingest and double-charge.
-- **CloudWatch Logs ingestion bills by bytes, not events.** A
-  high-cardinality event stream (Lambda data events) ingested into
-  CloudWatch Logs costs ~5x the same events in S3.
-- **KMS request pricing is per-call.** Each CloudTrail log file triggers
-  one GenerateDataKey call. At 1.4M log files/month (large org), that's
-  ~$4.20/month — small but multiplied by N trails with N keys.
-- **Insights bills per 100k management events analyzed, not per Insight
-  finding.** An account with 500M management events/month pays $2,500 for
-  Insights regardless of whether any anomalous pattern fires.
+  events TWICE — no deduplication across trails.
+- **S3 lifecycle affects all objects in the prefix.** A rule on the
+  CloudTrail prefix also transitions digest files. Deep Archive digest
+  files take 12 hours to restore — verify your audit RTO first.
+- **CloudTrail Lake ingestion is one-time per event.** Each EDS ingests
+  independently; multiple EDSs on the same events double-ingest and
+  double-charge.
+- **CloudWatch Logs ingestion bills by bytes, not events.** Lambda data
+  events ingested into Logs costs ~5x the same events in S3.
+- **KMS request pricing is per-call.** Each log file triggers one
+  GenerateDataKey. At 1.4M files/month (large org), ~$4.20/month — small
+  but multiplied by N trails with N keys.
+- **Insights bills per 100k management events analyzed, not per finding.**
+  An account with 500M management events/month pays $2,500 regardless of
+  whether any anomalous pattern fires.
 - **Requester Pays on the log bucket shifts cost to the reader.** Useful
   for cross-account audit access; harmful if the reader is another
   monitored account (double-counts your bill).
@@ -251,11 +248,11 @@ choice:
   Without partition projection, a single exploratory query scans all
   historical logs — potentially terabytes at $5/TB scanned.
 - **Log file integrity validation doubles S3 PUT requests.** Each digest
-  file is an extra S3 PUT. At scale, PUT fees alone justify keeping
-  validation off when S3 Object Lock provides equivalent tamper-evidence.
-- **EventBridge as a CloudTrail consumer bills per event published.**
-  Routing management events to EventBridge re-bills them at $1.00/million
-  — useful for real-time response but never free.
+  is an extra PUT. At scale, PUT fees alone justify disabling validation
+  when S3 Object Lock (COMPLIANCE mode) provides equivalent tamper-
+  evidence.
+- **EventBridge as a CloudTrail consumer bills per event published**
+  ($1.00/million) — useful for real-time response but never free.
 
 ### Step 1: Trail consolidation (the #1 lever)
 
@@ -317,13 +314,9 @@ Data events bill at $0.10 per 100,000 events regardless of how many
 trails capture them. Curation reduces event volume without losing audit
 coverage of high-value resources.
 
-**Pricing comparison:**
-```
-Management events:  FREE (first trail per region)
-S3 data events:     $0.10 per 100,000 events
-Lambda data events: $0.10 per 100,000 events
-DynamoDB data events: $0.10 per 100,000 events
-```
+**Pricing comparison:** Management events are FREE on the first trail
+per region. S3, Lambda, and DynamoDB data events all bill at $0.10 per
+100,000 events regardless of how many trails capture them.
 
 **Decision tree:**
 ```
@@ -342,50 +335,23 @@ Is the trail capturing Lambda data events on All Functions?
     └── YES → **FURTHER_OPTIMIZATION_AVAILABLE** (curate or disable)
 ```
 
-**Curating S3 data events with basic event selectors:**
+**Curating S3 data events** — two selector forms are supported. Full
+JSON syntax (basic + advanced with multi-resource-type and readOnly
+filtering) is in `references/cloudtrail-pricing-and-inventory.md`. The
+advanced form is recommended because it supports ARN prefix matching
+and `readOnly` field filtering (eliminates high-volume S3 GET noise).
+
 ```bash
 aws cloudtrail put-event-selectors \
   --trail-name aws-organizational-trail \
-  --event-selectors '[{
-    "ReadWriteType": "All",
-    "IncludeManagementEvents": true,
-    "DataResources": [{
-      "Type": "AWS::S3::Object",
-      "Values": ["arn:aws:s3:::financial-records/", "arn:aws:s3:::pii-data/"]
-    }]
-  }]'
+  --advanced-event-selectors file://curated-selectors.json
 ```
 
-**Advanced event selectors for multi-resource-type curation:**
-```bash
-aws cloudtrail put-event-selectors \
-  --trail-name aws-organizational-trail \
-  --advanced-event-selectors '[
-    {"Name": "ManagementEvents", "FieldSelectors": [
-      {"Field": "eventCategory", "Equals": ["Management"]}
-    ]},
-    {"Name": "S3AuditBuckets", "FieldSelectors": [
-      {"Field": "eventCategory", "Equals": ["Data"]},
-      {"Field": "resources.type", "Equals": ["AWS::S3::Object"]},
-      {"Field": "resources.ARN", "StartsWith": [
-        "arn:aws:s3:::financial-records/",
-        "arn:aws:s3:::pii-data/"
-      ]}
-    ]}
-  ]'
-```
-
-**Data-event saving from curation:**
-```
-old_event_volume = sum(all_bucket_event_counts)
-new_event_volume = sum(curated_bucket_event_counts)
-monthly_saving = ((old_event_volume - new_event_volume) / 100000) × $0.10
-```
-
-Example: 142M S3 data events/month, 80% from log/CDN buckets. Curating
-to high-value buckets drops volume to 28M events. Monthly saving:
-((142M - 28M) / 100k) × $0.10 = $114/month on data event fees, plus
-~600 GB/month saved S3 storage.
+**Data-event saving from curation:** Monthly saving equals
+`(old_volume − curated_volume) / 100000 × $0.10`. Example: 142M
+events/month with 80% low-value buckets; curating drops volume to 28M.
+Monthly saving: `((142M − 28M) / 100k) × $0.10 = $114/month` on data
+event fees plus ~600 GB/month saved S3 storage.
 
 ### Step 3: S3 lifecycle for log files
 
@@ -401,41 +367,24 @@ Glacier Flexible Retrieval: $0.0036/GB-month (1-5 min restore)
 Deep Archive:               $0.00099/GB-month (12 hour restore)
 ```
 
-**Recommended lifecycle policy:**
-```json
-{
-  "Rules": [{
-    "Id": "cloudtrail-lifecycle",
-    "Status": "Enabled",
-    "Filter": {"Prefix": "AWSLogs/"},
-    "Transitions": [
-      {"Days": 30, "StorageClass": "INTELLIGENT_TIERING"},
-      {"Days": 90, "StorageClass": "GLACIER_IR"},
-      {"Days": 180, "StorageClass": "DEEP_ARCHIVE"}
-    ],
-    "Expiration": {"Days": 365}
-  }]
-}
-```
+**Recommended lifecycle policy** (full JSON in
+`references/cloudtrail-pricing-and-inventory.md`):
+- Day 30 → Intelligent-Tiering (auto-tiering; ~$0.0025/GB archive tier)
+- Day 90 → Glacier Instant Retrieval ($0.004/GB-month, ms latency)
+- Day 180 → Deep Archive ($0.00099/GB-month, 12-hour restore)
+- Day 365 → Expire (or your compliance retention SLA)
 
-**Apply via AWS CLI:**
 ```bash
 aws s3api put-bucket-lifecycle-configuration \
   --bucket org-cloudtrail-logs-us-east-1 \
   --lifecycle-configuration file://cloudtrail-lifecycle.json
 ```
 
-**Storage saving math:**
+**Storage saving math (500 GB example):**
 ```
-monthly_storage_cost = sum(log_size_GB_at_storage_class × class_rate)
-
-Example: 500 GB CloudTrail logs at Standard = $11.50/month
-         With lifecycle:
-           - First 30 days @ Standard:        $11.50 × (30/365) × 500 = $0.47
-           - Days 31-90 @ IntelligentTiering: ~$11.50 × (60/365) × 500 = $0.94
-           - Days 91-180 @ Glacier IR:        $2.00 × (90/365) × 500 = $0.25
-           - Days 181-365 @ Deep Archive:     $0.50 × (185/365) × 500 = $0.13
-         Steady-state annual: $1.79 vs $138.00 = 98.7% saving
+Standard only:        500 × $0.023 = $11.50/month steady-state
+With lifecycle:       ~$1.79/month steady-state (98.7% saving on archive tier)
+Note: Glacier IR retrieves cost $0.03/GB but reads are rare (audit queries).
 ```
 
 ### Step 4: CloudTrail Lake event data store cost
@@ -444,12 +393,9 @@ CloudTrail Lake charges $0.75/GB-month ingestion (one-time) plus
 retention storage at S3 Standard rates. Use Lake only when interactive
 SQL queries on audit data are required.
 
-**Pricing model:**
-```
-Ingestion:        $0.75/GB-month (billed once at ingest time)
-Retention storage: $0.023/GB-month (Standard rate, included with EDS)
-Query:            Free (Athena-style federation to EDS)
-```
+**Pricing model:** Ingestion is $0.75/GB-month (one-time at ingest);
+retention storage is $0.023/GB-month (Standard rate); queries are free
+(Athena-style federation to EDS).
 
 **Decision tree:**
 ```
@@ -466,28 +412,15 @@ Is the EDS ingesting all event categories (management + data + insight)?
 ```bash
 aws cloudtrail update-event-data-store \
   --event-data-store <eds-id> \
-  --advanced-event-selectors '[
-    {"Name": "ManagementOnly", "FieldSelectors": [
-      {"Field": "eventCategory", "Equals": ["Management"]}
-    ]}
-  ]'
+  --advanced-event-selectors '[{"Name":"ManagementOnly","FieldSelectors":[
+    {"Field":"eventCategory","Equals":["Management"]}]}]'
 ```
 
-**Lake cost math:**
+**Lake cost math (100 GB/month ingest, 90-day retention):**
 ```
-monthly_ingestion_cost = monthly_ingested_GB × $0.75
-monthly_retention_cost = cumulative_EDS_GB × $0.023
-
-Example: 100 GB/month ingest, 90-day retention:
-  Ingestion: 100 × $0.75 = $75/month
-  Retention: 300 GB (90d × 100/30) × $0.023 = $6.90/month
-  Total: $81.90/month
-
-If management-only filter cuts ingest 90%: 10 GB/month
-  Ingestion: 10 × $0.75 = $7.50/month
-  Retention: 30 GB × $0.023 = $0.69/month
-  Total: $8.19/month
-  Saving: $73.71/month (90%)
+Before: ingestion 100 × $0.75 + retention 300 GB × $0.023 = $81.90/month
+After (mgmt-only, 90% cut): ingestion 10 × $0.75 + 30 GB × $0.023 = $8.19/month
+Saving: $73.71/month (90%)
 ```
 
 ### Step 5: CloudWatch Logs delivery cost
@@ -538,24 +471,10 @@ Per-trail-with-own-key overhead: $1.50/month × trail_count
 Recommendation: Share one CMK across all trails when key policy allows.
 ```
 
-**KMS policy snippet allowing CloudTrail service to use a shared key:**
-```json
-{
-  "Sid": "AllowCloudTrailToUseKey",
-  "Effect": "Allow",
-  "Principal": {"Service": "cloudtrail.amazonaws.com"},
-  "Action": ["kms:GenerateDataKey*", "kms:DescribeKey"],
-  "Resource": "*",
-  "Condition": {
-    "StringLike": {
-      "kms:ViaService": "s3.us-east-1.amazonaws.com"
-    },
-    "StringEquals": {
-      "aws:SourceArn": "arn:aws:cloudtrail:us-east-1:MANAGEMENT_ACCT:trail/*"
-    }
-  }
-}
-```
+**KMS policy snippet allowing CloudTrail service to use a shared key**
+lives in `references/cloudtrail-pricing-and-inventory.md` (the policy
+grants `kms:GenerateDataKey*` to `cloudtrail.amazonaws.com` scoped by
+`aws:SourceArn` to the trail ARN).
 
 **SNS consolidation:**
 - Each trail can notify one SNS topic. Multiple trails in one account
@@ -563,16 +482,11 @@ Recommendation: Share one CMK across all trails when key policy allows.
 - Recommendation: consolidate all trails in an account to a single SNS
   topic with a Lambda filter for high-severity events only.
 
-**Insights gating:**
-```
-Insights cost: $0.50 per 100,000 management events analyzed
-Example: 500M management events/month = $2,500/month
-
-Recommendation: Enable Insights only on:
-  - The org-management account (always)
-  - Member accounts with privileged role assumption activity
-  - Member accounts with prior anomalous findings
-```
+**Insights gating:** Insights bills $0.50 per 100k management events
+analyzed. For 500M events/month that's $2,500/month regardless of
+whether any anomalous pattern fires. Enable Insights only on the org-
+management account (always) and member accounts with privileged role
+assumption activity or prior anomalous findings.
 
 **Disabling Insights on low-risk trails:**
 ```bash
@@ -583,87 +497,20 @@ aws cloudtrail stop-insights-logging --name aws-organizational-trail
 
 Athena queries on CloudTrail logs without partition projection scan the
 entire historical log set — potentially terabytes at $5/TB scanned.
+Partition projection moves pruning client-side: only the matching
+account/region/date partitions are scanned, no Glue Data Catalog
+partitions needed. The full DDL and storage location template are in
+`references/cloudtrail-pricing-and-inventory.md`.
 
-**Partition projection table DDL:**
-```sql
-CREATE EXTERNAL TABLE cloudtrail_logs (
-  eventversion STRING,
-  useridentity STRUCT<
-    type: STRING,
-    principalid: STRING,
-    arn: STRING,
-    accountid: STRING,
-    accesskeyid: STRING,
-    sessioncontext: STRUCT<
-      attributes: STRUCT<
-        mfaauthenticated: STRING,
-        creationdate: STRING
-      >,
-      sessionissuer: STRUCT<
-        type: STRING,
-        principalid: STRING,
-        arn: STRING,
-        accountid: STRING
-      >
-    >
-  >,
-  eventtime STRING,
-  eventsource STRING,
-  eventname STRING,
-  awsregion STRING,
-  sourceipaddress STRING,
-  useragent STRING,
-  errorcode STRING,
-  errormessage STRING,
-  requestparameters STRING,
-  responseelements STRING,
-  additionaleventdata STRING,
-  requestid STRING,
-  eventid STRING,
-  resources ARRAY<STRUCT<arn: STRING, accountid: STRING, type: STRING>>,
-  eventtype STRING,
-  apiversion STRING,
-  readonly STRING,
-  recipientaccountid STRING,
-  serviceeventdetails STRING,
-  sharedeventid STRING
-)
-PARTITIONED BY (
-  accountid_hive STRING,
-  region_hive STRING,
-  year_hive STRING,
-  month_hive STRING,
-  day_hive STRING
-)
-ROW FORMAT SERDE 'org.apache.hive.hcatalog.data.JsonSerDe'
-STORED AS INPUTFORMAT 'com.amazon.emr.cloudtrail.CloudTrailInputFormat'
-OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
-LOCATION 's3://org-cloudtrail-logs-us-east-1/AWSLogs/'
-TBLPROPERTIES (
-  'projection.enabled' = 'true',
-  'projection.accountid_hive.type' = 'enum',
-  'projection.accountid_hive.values' = '111111111111,222222222222',
-  'projection.region_hive.type' = 'enum',
-  'projection.region_hive.values' = 'us-east-1,us-west-2,eu-west-1',
-  'projection.year_hive.type' = 'date',
-  'projection.year_hive.range' = '2024-01-01,NOW',
-  'projection.year_hive.format' = 'yyyy',
-  'projection.month_hive.type' = 'date',
-  'projection.month_hive.range' = '2024-01-01,NOW',
-  'projection.month_hive.format' = 'MM',
-  'projection.day_hive.type' = 'date',
-  'projection.day_hive.range' = '2024-01-01,NOW',
-  'projection.day_hive.format' = 'dd',
-  'storage.location.template' = 's3://org-cloudtrail-logs-us-east-1/AWSLogs/${accountid_hive}/CloudTrail/${region_hive}/${year_hive}/${month_hive}/${day_hive}'
-);
+**Query cost reduction (us-east-1 example):**
+```
+Without projection:  exploratory query scans 2 TB     @ $5/TB    = $10.00
+With projection:     same query scans 3 matching days @ $5/TB    = $0.04
+Saving per query:    $9.96 (99.6% per exploratory query)
 ```
 
-**Query cost reduction:**
-- Without partition projection: a single exploratory query scans ALL
-  historical logs (potentially TB-scale at $5/TB).
-- With partition projection: partition pruning is computed client-side
-  (no Glue Data Catalog partitions needed); only the matching partitions
-  are scanned.
+Apply the partition projection table DDL once per Athena workgroup;
+all subsequent queries on `cloudtrail_logs` inherit the projection.
 
 ### Step 8: Impact estimation
 
@@ -793,6 +640,9 @@ CONFIRM: <confirmation prompt text>
 ### Perfect example output — FURTHER_OPTIMIZATION_AVAILABLE with verified math
 
 Every field below is internally consistent. Copy this shape exactly.
+Additional full worked examples (org-trail consolidation, data-event
+curation, S3 lifecycle, CloudTrail Lake scoping, already-optimized,
+NEED_MORE_INFO) are in `references/cloudtrail-worked-examples.md`.
 
 ```text
 TARGET: aws-organizational-trail
@@ -806,32 +656,18 @@ RECOMMENDATION:
   Current: org trail + All-Buckets S3 data events + Standard storage + no Lake
   Proposed: org trail + curated S3 data events (8 high-value buckets) + Glacier IR @ 90d
   Dimensions changed: data_events (Step 2) + lifecycle (Step 3)
-  Dimensions checked: consolidation ✓ (org trail exists)  data_events → (curate)
-    lifecycle → (no policy)  lake ✓ (not configured)  logs ✓ (S3-only)
-    kms_sns_insights ✓ (shared CMK, no Insights)  athena ✓ (partition projection)
+  Dimensions checked: consolidation ✓  data_events → (curate)
+    lifecycle → (no policy)  lake ✓  logs ✓  kms_sns_insights ✓  athena ✓
   Confidence: HIGH — S3 metrics confirm 113M/142M events are low-value
     bucket writes; lifecycle math is deterministic; us-east-1 pricing.
 ESTIMATED_SAVINGS:
   Current monthly: $1,847.32
-    data_events: 142,000,000 / 100,000 × $0.10 = $142.00
-    s3_storage: 500 GB × $0.023 = $11.50
-    kms_keys: 1 × $1.50 = $1.50
-    sns_notifications: 1.4M / 1M × $0.50 = $0.70
-    insights_events: 0 (not enabled)
-    logs_ingestion: 0 (S3-only)
-    lake_ingestion: 0 (not configured)
-    athena_scans: 1,692.62 (estimated query volume at $5/TB)
+    data_events: $142.00  s3_storage: $11.50  kms_keys: $1.50
+    sns: $0.70  insights: $0  logs: $0  lake: $0  athena_scans: $1,692.62
   Projected monthly: $697.32
-    data_events: 29,000,000 / 100,000 × $0.10 = $29.00 (curated)
-    s3_storage: $1.79 (Glacier IR + Deep Archive lifecycle)
-    kms_keys: $1.50 (unchanged)
-    sns_notifications: $0.30 (fewer files)
-    insights_events: $0
-    logs_ingestion: $0
-    lake_ingestion: $0
-    athena_scans: $664.73 (partition projection reduces 60%)
-  Monthly saving: $1,150.00
-    ($1,847.32 − $697.32 = $1,150.00 ✓)
+    data_events: $29.00 (curated)  s3_storage: $1.79 (Glacier IR + Deep Archive)
+    kms_keys: $1.50  sns: $0.30  insights: $0  logs: $0  lake: $0  athena: $664.73
+  Monthly saving: $1,150.00   ($1,847.32 − $697.32 = $1,150.00 ✓)
   Annual saving: $13,800.00
 MIGRATION_STEPS:
   1. Apply advanced event selectors with curated bucket list:
@@ -877,24 +713,19 @@ REASON, not as dollar savings.
 
 1. **NEVER recommend org trail consolidation without verifying the
    account is the org management account.** Member accounts cannot
-   create org trails; the API call fails. Surface this prerequisite.
-
+   create org trails; the API call fails.
 2. **NEVER recommend disabling management events to reduce cost.**
    Management events are free on the first trail per region. Disabling
-   them breaks audit completeness for ~zero savings.
-
+   breaks audit completeness for ~zero savings.
 3. **NEVER recommend Deep Archive transition without confirming the
    audit RTO tolerates 12-hour restore.** For incident-response use
    cases, Glacier Instant Retrieval (ms-latency) is the right choice.
-
-4. **NEVER recommend curating data events to specific buckets without
-   confirming the bucket list is complete.** Missing a high-value
-   bucket from the selector creates a silent audit blind spot.
-
+4. **NEVER recommend curating data events without confirming the
+   bucket list is complete.** Missing a high-value bucket creates a
+   silent audit blind spot.
 5. **NEVER recommend disabling CloudWatch Logs delivery without
    auditing for existing metric filters, alarms, or Logs Insights
-   queries on the log group.** Disabling breaks downstream monitoring
-   silently.
+   queries on the log group.** Disabling breaks downstream monitoring.
 
 Extended anti-patterns in `references/cloudtrail-worked-examples.md`.
 
@@ -907,12 +738,13 @@ Extended anti-patterns in `references/cloudtrail-worked-examples.md`.
   member trail deletion.
 - **Snapshot existing event selectors before curating.** Restore is a
   re-apply of the prior selector JSON.
-- **Test lifecycle policy on a single prefix first.** Apply to
-  `AWSLogs/<one-account>/` before org-wide rollout.
-- **Confirm S3 Object Lock is enforced before disabling log file
-  integrity validation.** Object Lock provides equivalent tamper-evidence.
-- **CloudTrail Lake EDS changes are immediate.** Stopping ingestion
-  stops queries; export historical data first if needed.
+- **Test lifecycle policy on a single prefix first** (e.g.,
+  `AWSLogs/<one-account>/`) before org-wide rollout.
+- **Confirm S3 Object Lock (COMPLIANCE mode) is enforced before
+  disabling log file integrity validation.** Object Lock provides
+  equivalent tamper-evidence; governance mode is bypassable by root.
+- **CloudTrail Lake EDS changes are immediate.** Export historical data
+  first if re-query may be needed.
 - **KMS key changes require updating the trail's KMS key policy.**
   Sharing a CMK requires the policy to allow all trail-writing accounts.
 - **Insights disabling is irreversible for historical data.** Anomalies
@@ -923,30 +755,20 @@ Extended anti-patterns in `references/cloudtrail-worked-examples.md`.
 
 ## Recent AWS features (2024-2026)
 
-- **CloudTrail Lake federated queries (2024-2025):** Run Athena-style
-  SQL across multiple EDSs. Enables cross-account audit queries without
-  S3 export.
-- **CloudTrail Lake event-category filtering (2024):** EDS can filter
-  by event category (Management, Data, Insights) at ingest time,
-  reducing cost.
-- **CloudTrail advanced event selectors (2024 GA):** Field-level
-  filtering for data events (e.g., readOnly, resources.type). Enables
-  granular curation.
+- **CloudTrail Lake enhancements (2024-2025):** federated queries across
+  EDSs; event-category filtering at ingest time; delegated administrator
+  isolates audit ops from org management account.
+- **CloudTrail advanced event selectors (2024 GA):** field-level
+  filtering (readOnly, resources.type, resources.ARN prefix matching)
+  enables granular data-event curation.
 - **S3 Glacier Instant Retrieval (mature 2024-2025):** ms-latency
-  access at 19% of Standard cost. The default recommendation for
-  CloudTrail logs after 90 days.
-- **S3 Lifecycle with Object Lock (2024):** Object Lock + lifecycle can
-  coexist, enabling tamper-evident archive without log file integrity
-  validation overhead.
-- **CloudTrail Insights for data events (2024-2025):** Insights
-  coverage extended to data event anomalies (e.g., unusual S3 GET
-  volume). Bills per data event analyzed — high-cost, opt-in carefully.
-- **Athena partition projection (mature):** Client-side partition
-  pruning without Glue Data Catalog partitions. Standard for CloudTrail
+  access at 19% of Standard cost; default recommendation for CloudTrail
+  logs after 90 days. Object Lock + lifecycle coexist for tamper-evident
+  archive without log file integrity validation overhead.
+- **CloudTrail Insights for data events (2024-2025):** coverage extended
+  to data event anomalies; bills per data event analyzed — opt in
+  carefully. Athena partition projection is now standard for CloudTrail
   log analytics.
-- **CloudTrail Organizations integration (2024-2025 enhancements):**
-  Org trail now supports delegated administrator for CloudTrail Lake,
-  isolating audit ops from the org management account.
 
 ## References
 
@@ -954,10 +776,9 @@ Extended anti-patterns in `references/cloudtrail-worked-examples.md`.
   trail inventory CLI, event selector syntax, KMS key policy templates,
   S3 lifecycle JSON, Athena partition projection DDL, regional pricing
   multipliers, cost calculation worked examples.
-- `references/cloudtrail-worked-examples.md` — full worked examples
-  (org-trail consolidation, data-event curation, S3 lifecycle rollout,
-  CloudTrail Lake scoping, already-optimized, end-to-end walkthrough,
-  extended NEVER list, edge cases).
+- `references/cloudtrail-worked-examples.md` — org-trail consolidation,
+  data-event curation, S3 lifecycle, CloudTrail Lake scoping, already-
+  optimized, end-to-end walkthrough, extended NEVER list, edge cases.
 
 ## Domain
 
@@ -972,7 +793,5 @@ AWS CloudOps / Governance Audit Logging Cost Optimization & FinOps.
 - **CloudTrail Lake** — https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-lake.html
 - **CloudTrail Insights** — https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-insights-events-with-cloudtrail.html
 - **S3 lifecycle configuration** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html
-- **S3 Glacier Instant Retrieval** — https://aws.amazon.com/s3/storage-classes/glacier/instant-retrieval/
 - **Athena partition projection** — https://docs.aws.amazon.com/athena/latest/ug/partition-projection.html
-- **AWS KMS pricing** — https://aws.amazon.com/kms/pricing/
 - **AWS Well-Architected Framework — Cost Optimization** — https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
