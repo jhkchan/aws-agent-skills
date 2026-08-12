@@ -4,7 +4,7 @@
 > · License: **Apache-2.0** · Maintainer: **Jacky Chan, AWS Community Builder (ML & GenAI)**
 > · A solo, community-driven project.
 
-**90 eval-backed AWS CloudOps agent skills** across **6 task types** (audit · deploy · troubleshoot · optimize · operate) — every skill ships with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric, with co-located structured evals (cases + baselines + delta comparison) on every skill.
+**405 eval-backed AWS CloudOps agent skills** across **13 AWS service families** and **6 task types** (audit · deploy · troubleshoot · optimize · operate · automate) — every skill ships with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric, with co-located structured evals (cases + baselines + delta comparison) on every skill.
 
 ---
 
@@ -25,7 +25,7 @@ git clone https://github.com/jhkchan/aws-agent-skills.git
 # For Claude Code:
 cp -r aws-agent-skills/skills/s3-public-access-auditor ~/.claude/skills/
 
-# Or install ALL 79 skills at once:
+# Or install ALL 405 skills at once:
 cp -r aws-agent-skills/skills/* ~/.claude/skills/
 ```
 
@@ -91,13 +91,31 @@ The repo now covers **6 task types**, not just audit:
 | **troubleshoot** | Diagnose and resolve operational issues | `iam-permission-troubleshooter`, `rds-connectivity-troubleshooter` |
 | **optimize** | Reduce cost or improve performance | `ec2-rightsizing-optimizer`, `s3-lifecycle-optimizer` |
 | **operate** | Day-2 operations (backup, restore, failover) | `rds-backup-restore-operator` |
-| **automate** | Workflow/pipeline patterns | *(planned — see skill-universe.md)* |
+| **automate** | Workflow/pipeline patterns | `securityhub-remediation-automator`, `tag-compliance-automator`, `drift-detection-automator` |
 
 ```
 Deploy a secure S3 bucket with encryption and lifecycle rules.
 ```
 
 The `s3-secure-bucket-deployer` walks through the 10-step provisioning procedure and emits a READY_TO_DEPLOY checklist.
+
+### Coverage matrix
+
+| Family | Skills | | Family | Skills |
+|---|---|---|---|---|
+| Security | 51 | | AppIntegration | 34 |
+| Compute | 43 | | Databases | 31 |
+| Management | 42 | | Governance | 30 |
+| Analytics | 41 | | DevTools | 24 |
+| Storage | 40 | | AI/ML | 16 |
+| Networking | 38 | | FinOps | 13 |
+| | | | Migration | 5 |
+
+| Task type | Skills | | Task type | Skills |
+|---|---|---|---|---|
+| deploy | 155 | | optimize | 41 |
+| audit | 80 | | operate | 40 |
+| troubleshoot | 58 | | automate | 31 |
 
 ### Slash commands
 
@@ -113,7 +131,7 @@ Each skill has a slash command (in `commands/aws/`):
 /aws:troubleshoot-iam-permission-troubleshooter
 /aws:optimize-ec2-rightsizing-optimizer
 /aws:operate-rds-backup-restore-operator
-... (101 commands total)
+... (380+ commands total)
 ```
 
 ---
