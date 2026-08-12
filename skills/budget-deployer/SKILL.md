@@ -358,6 +358,53 @@ dominate false-positive rates:
   service dimensional monitors rather than relying on the
   account-wide one.
 
+## Expert heuristic: API, cost, and timing quirks
+
+These operational details are not in the Budgets documentation front
+page but cause real production incidents:
+
+- **Budgets has a free tier of 2 budgets per account.** The first 2
+  budgets (cost or usage) are free; each additional budget costs
+  ~$0.10/day (~$3/month). This is rarely surfaced during provisioning
+  and shows up as an unexpected line item. For organizations with 50+
+  linked accounts each getting 3 budgets, the budget cost itself can
+  exceed $1,500/month. Consolidate to payer-level budgets with
+  `CostFilters` for linked-account scoping rather than provisioning
+  per-linked-account budgets.
+
+- **The Budgets API has a throttling limit of ~1 update per second
+  per account.** `update-budget`, `create-notification`, and
+  `create-budget-action` share this limit. Terraform/CloudFormation
+  runs that update dozens of budgets in parallel will hit
+  `ThrottlingException`. Sequence budget updates with a 1.5-second
+  delay between calls. The limit is account-wide, not per-budget.
+
+- **The forecast model loses accuracy in the first 10-14 days of a
+  budget period.** AWS Budgets forecast uses a trailing weighted
+  average of the last 14-21 days of actual spend. In the first half
+  of a monthly budget period, the forecast is extrapolated from
+  sparse data and can be off by 30-50%. FORECAST alerts that fire in
+  days 1-14 are unreliable; treat them as informational. After day
+  15, forecast accuracy improves to within ~10-15% of actual.
+
+- **RI/SP coverage and utilization budgets evaluate every 6-8 hours,
+  not in real time.** Usage budgets (`RI_UTILIZATION`, `RI_COVERAGE`,
+  `SP_UTILIZATION`, `SP_COVERAGE`) pull from Cost Explorer's usage
+  data pipeline, which has a 6-8 hour processing delay. A budget
+  alert for RI utilization dropping below 80% may fire 6-8 hours
+  after the actual utilization change. For time-sensitive RI/SP
+  monitoring, supplement with CloudWatch + Cost Explorer API polling
+  at higher frequency.
+
+- **Cost allocation tag activation has a 12-24 hour propagation
+  delay.** Activating a tag key in Billing -> Cost Allocation Tags
+  does not make the tag immediately available in
+  `CostFilters.TagKeyValue`. Budgets created with a tag filter
+  before the tag is fully propagated will return zero spend until
+  the tag data flows through. Always verify tag activation via
+  `aws ce get-cost-and-usage --group-by Type=TAG,Key=<key>` before
+  creating a tag-scoped budget.
+
 ## Prerequisites (verify before provisioning)
 
 Before emitting provisioning commands, verify these prerequisites. If

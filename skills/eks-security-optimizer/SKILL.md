@@ -288,6 +288,54 @@ These operational gotchas route a recommendation away from the obvious:
 - **kubelet anonymous auth must be explicitly disabled.** The default
   kubelet configuration on some AMIs allows anonymous access to the
   kubelet API. This must be disabled via `--anonymous-auth=false`.
+- **PSA and OPA Gatekeeper overlap is NOT redundant — they serve
+  different layers.** PSA enforces a fixed taxonomy (privileged,
+  baseline, restricted) at the admission controller level with NO
+  customization. Gatekeeper/Kyverno enforce custom policies (e.g.,
+  "every pod must have a cost-center label," "images must come from
+  approved registries"). Use BOTH: PSA for the standard pod-hardening
+  floor, Gatekeeper for organization-specific rules. A common mistake
+  is deploying Gatekeeper to enforce baseline security controls that
+  PSA already covers — this doubles the admission latency with zero
+  additional security. Rule: let PSA handle pod spec validation, let
+  Gatekeeper handle cross-cutting governance (labels, registries,
+  resource quotas).
+- **IRSA token audience must match the IAM trust policy `sts:Audience`
+  condition.** The OIDC token issued to a pod contains an audience
+  (`aud`) field that defaults to `sts.amazonaws.com`. If the IAM role's
+  trust policy specifies a custom audience condition
+  (`"StringEquals": {"oidc.eks.region.amazonaws.com/id/XXX:aud":
+  "my-custom-audience"}`), the pod's service account annotation MUST
+  set `eks.amazonaws.com/audience` to the same value. A mismatch causes
+  `AccessDenied` from STS with no obvious error trail — the pod appears
+  healthy but every AWS SDK call fails silently. Expert rule: use the
+  default audience (`sts.amazonaws.com`) unless you have a specific
+  multi-cluster isolation requirement that demands custom audiences.
+- **KMS key rotation does NOT re-encrypt existing Kubernetes secrets
+  in-place.** When you rotate a KMS key (automatic annual rotation or
+  manual), the KMS key material changes but existing ciphertext
+  (already-encrypted secrets in etcd) is decrypted using the old key
+  material and then re-encrypted with the new key material — BUT only
+  on the NEXT write to that secret. Envelope decryption works because
+  KMS retains the ability to decrypt with old key versions. The
+  security improvement is forward-looking (new encrypt operations use
+  the new key material), not retrospective. To force full re-encryption
+  of all secrets after a key rotation, run:
+  `kubectl get secrets -A -o json | kubectl replace -f -` which reads
+  and re-writes every secret, triggering re-encryption with the current
+  key material. Pods holding decrypted secrets in memory are unaffected;
+  the re-encryption only matters for secrets at rest in etcd.
+- **EKS API server audit log volume is a hidden CloudWatch cost.**
+  Audit logging at the `api` and `audit` log types generates one log
+  event per API server request. A busy production cluster (100+ nodes,
+  frequent deployments, controllers polling) can generate 50-200 GB of
+  audit logs per month in CloudWatch Logs. At $0.50/GB ingestion, this
+  is $25-$100/month just for audit logs. The cost is NOT surfaced in
+  the EKS console. Expert rules: (1) set a CloudWatch Logs retention
+  period (30-90 days) to prevent unbounded growth; (2) if cost is
+  prohibitive, enable only `audit` and `authenticator` log types
+  (skip `api` if you have application-level audit logging); (3) export
+  logs to S3 for long-term archival at 10x lower cost.
 
 ### Step 1: Pod Security Standards (PSA)
 

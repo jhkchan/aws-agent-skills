@@ -1,52 +1,62 @@
 ---
 name: documentdb-cluster-deployer
-description: >-
-  Provisions Amazon DocumentDB (MongoDB compatibility) clusters with
-  production defaults: cluster creation (create-db-cluster), instance
-  types (r5.large through r5.24xlarge, t3.medium), storage autoscaling,
-  multi-AZ replication (primary + replicas), parameter groups, subnet
-  groups, security groups, KMS encryption at rest, backup retention (1-35
-  days), global clusters (cross-region), change streams for CDC, indexing
-  strategy (single vs compound vs text), MongoDB API compatibility
-  version (3.6/4.0/5.0), connect via mongo shell, TLS (enable/disable),
-  and CloudWatch metrics. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a DocumentDB cluster, adding
-  instances, configuring change streams, setting up a global cluster,
-  enabling storage autoscaling, or managing backup retention. Triggers:
-  create documentdb cluster, documentdb instance, documentdb change
-  streams, documentdb global cluster, documentdb storage autoscaling,
-  documentdb subnet group, documentdb parameter group, documentdb kms
-  encryption, documentdb backup retention, documentdb index, mongo shell
-  connect documentdb.
+description: 'Provisions Amazon DocumentDB (MongoDB compatibility) clusters with production defaults: cluster creation (create-db-cluster), instance types (r5.large through r5.24xlarge, t3.medium), storage autoscaling, multi-AZ replication (primary + replicas), parameter groups, subnet groups, security groups, KMS encryption at rest, backup retention (1-35 days), global clusters (cross-region), change streams for CDC, indexing strategy (single vs compound vs text), MongoDB API compatibility version (3.6/4.0/5.0), connect via mongo shell, TLS (enable/disable), and CloudWatch metrics. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a DocumentDB cluster, adding instances, configuring change streams, setting up a global cluster, enabling storage autoscaling, or managing backup retention. Triggers: create documentdb cluster, documentdb instance, documentdb change streams, documentdb global cluster, documentdb storage autoscaling, documentdb subnet group, documentdb
+  parameter group, documentdb...'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with docdb access.
-  Works with Terraform aws_docdb_cluster / aws_docdb_cluster_instance /
-  aws_docdb_subnet_group / aws_docdb_global_cluster resources and
-  CloudFormation AWS::DocDB::DBCluster templates.
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with docdb access. Works with Terraform aws_docdb_cluster / aws_docdb_cluster_instance / aws_docdb_subnet_group / aws_docdb_global_cluster resources and CloudFormation AWS::DocDB::DBCluster templates.'
 keywords:
-  - aws
-  - documentdb
-  - mongodb
-  - document database
-  - cloudops
-  - deploy
-  - provisioning
-  - cluster
-  - change streams
-  - global cluster
-  - storage autoscaling
-  - kms encryption
-  - backup retention
-  - indexing
-  - multi-az
-  - parameter group
-  - subnet group
-  - tls
+- aws
+- documentdb
+- mongodb
+- document database
+- cloudops
+- deploy
+- provisioning
+- cluster
+- change streams
+- global cluster
+- storage autoscaling
+- kms encryption
+- backup retention
+- indexing
+- multi-az
+- parameter group
+- subnet group
+- tls
 tags:
+- aws
+- documentdb
+- mongodb
+- cloudops
+- deploy
+- databases
+- provisioning
+- cluster
+- change-streams
+- global-cluster
+- storage-autoscaling
+- kms
+- backup
+- indexing
+dependencies:
+- aws-orchestrator
+metadata:
+  domain: aws-cloudops
+  complexity: high
+  requires_llm: true
+  phase: 1
+  supports_pipeline: true
+  entry_point: false
+  family: Databases
+  task_type: deploy
+  skill_class: capability
+  lifecycle_status: active
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  tags:
   - aws
   - documentdb
   - mongodb
@@ -61,59 +71,21 @@ tags:
   - kms
   - backup
   - indexing
-dependencies:
-  - aws-orchestrator
-metadata:
-  domain: aws-cloudops
-  complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
-  family: Databases
-  task_type: deploy
-  skill_class: capability
-  lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - documentdb
-    - mongodb
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - cluster
-    - change-streams
-    - global-cluster
-    - storage-autoscaling
-    - kms
-    - backup
-    - indexing
   dependencies:
-    - aws-orchestrator
+  - aws-orchestrator
   keywords:
-    - create documentdb cluster
-    - documentdb instance
-    - documentdb change streams
-    - documentdb global cluster
-    - documentdb storage autoscaling
-    - documentdb subnet group
-    - documentdb parameter group
-    - documentdb kms encryption
-    - documentdb backup retention
-    - documentdb index
-    - mongo shell connect documentdb
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon DocumentDB cluster,
-    add instances to a cluster, configure change streams for CDC, set up
-    a global cluster for cross-region disaster recovery, enable storage
-    autoscaling, manage backup retention, create indexes, or connect via
-    mongo shell. Do NOT invoke for Amazon RDS (use RDS skills), Amazon
-    DynamoDB (use DynamoDB skills), Amazon ElastiCache (use ElastiCache
-    skills), or Amazon Neptune (use Neptune skills).
+  - create documentdb cluster
+  - documentdb instance
+  - documentdb change streams
+  - documentdb global cluster
+  - documentdb storage autoscaling
+  - documentdb subnet group
+  - documentdb parameter group
+  - documentdb kms encryption
+  - documentdb backup retention
+  - documentdb index
+  - mongo shell connect documentdb
+  when_to_use: Invoke when the user wants to create an Amazon DocumentDB cluster, add instances to a cluster, configure change streams for CDC, set up a global cluster for cross-region disaster recovery, enable storage autoscaling, manage backup retention, create indexes, or connect via mongo shell. Do NOT invoke for Amazon RDS (use RDS skills), Amazon DynamoDB (use DynamoDB skills), Amazon ElastiCache (use ElastiCache skills), or Amazon Neptune (use Neptune skills).
 ---
 
 # DocumentDB Cluster Deployer

@@ -399,6 +399,50 @@ experience. Each changes a recommendation if ignored:
   new ARN. Old configurations can be deleted once no service references
   them.
 
+- **App Runner v2 eliminates the VPC connector requirement for private
+  networking.** The v2 architecture (2025 GA) gives each service a
+  native ENI in your VPC without provisioning a separate VPC connector
+  resource. This removes the connector's NAT gateway dependency for
+  outbound traffic and reduces egress cost by up to 60% for
+  high-egress services. Services still on the v1 architecture must
+  explicitly migrate; existing VPC connectors continue to work but
+  are not eligible for the cost reduction. Check `NetworkConfiguration.
+  EgressConfiguration` — v2 services show `EgressType: VPC` without a
+  `VpcConnectorArn`.
+
+- **The autoscaler uses a Kubernetes-style HPA algorithm under the
+  hood.** App Runner runs containers on a managed Kubernetes cluster.
+  The autoscaler computes desired instance count as `desired =
+  ceil(currentConcurrentRequests / concurrencySetting)`, then applies
+  a stabilization window (default 60 seconds for scale-in, immediate
+  for scale-out). Burst traffic within a 60-second window may not
+  trigger scale-in even if the concurrent request count drops — the
+  autoscaler waits to confirm the drop is sustained. This explains
+  why `InstanceCount` does not track `RequestCount` perfectly in
+  real-time; the stabilization window introduces lag on scale-in.
+
+- **The concurrency-vs-CPU-utilization trade-off follows a non-linear
+  curve.** Below ~70% CPU utilization, increasing concurrency yields
+  near-linear cost savings (fewer instances, same throughput). Above
+  ~70% CPU, the OS scheduler overhead grows super-linearly: context-
+  switching and memory pressure cause per-request latency to spike
+  2-3x even though throughput is maintained. The sweet spot for CPU-
+  bound workloads is 50-65% CPU utilization at the target concurrency.
+  For I/O-bound workloads (API calls, DB queries), the ceiling is
+  higher (~80% CPU) because threads spend time blocked on network I/O,
+  not consuming CPU cycles. Check `CPUUtilization` at the current
+  concurrency before recommending an increase.
+
+- **Pause/resume has a hidden cost beyond zero compute.** Resuming a
+  paused service pulls the container image from ECR again (cold pull,
+  not cached), taking 30-120 seconds depending on image size. For
+  images > 500 MB, the resume delay can exceed 2 minutes.
+  Additionally, the first few requests after resume have elevated
+  latency (~2x p95) as the JIT compiler and connection pools warm up.
+  For dev/staging environments, schedule resume 5 minutes before the
+  team needs access. The ECR data transfer for re-pulling is typically
+  <$1/month but is not zero.
+
 ### Step 1: Pause/resume analysis (non-prod only)
 
 If the service is in a non-prod environment (dev/staging/QA):
@@ -741,6 +785,14 @@ NOTES:
   - `CPUUtilization` and `MemoryUtilization` (should increase per instance)
 
 ## Recent AWS features (2024-2026)
+
+- **App Runner v2 native VPC networking (2025 GA):** The v2
+  architecture provisions a native ENI per service in your VPC without
+  a separate VPC connector resource. Eliminates the NAT gateway
+  dependency for outbound traffic, reducing egress cost by up to 60%.
+  Existing v1 services must explicitly migrate. Check
+  `NetworkConfiguration.EgressConfiguration` for `EgressType: VPC`
+  without `VpcConnectorArn`.
 
 - **VPC connector for private resources (2024 GA):** App Runner services
   can connect to private VPC resources (RDS, ElastiCache, internal APIs)

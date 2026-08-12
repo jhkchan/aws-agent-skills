@@ -332,6 +332,123 @@ weighted routing for Beanstalk blue-green. The swap is reversible
 (swap back to roll back). Always keep the old environment alive until
 the monitoring period passes.
 
+## Expert heuristic: .ebextensions YAML syntax gotchas
+
+A baseline model assumes .ebextensions are straightforward YAML. The
+expert knows that leading whitespace and YAML parser strictness are
+the #1 cause of silent deployment failures.
+
+```text
+Common .ebextensions YAML gotchas:
+  ├── Leading whitespace: Beanstalk's YAML parser is stricter than
+  │     most YAML libraries. A single space before a top-level key
+  │     (e.g., "  option_settings:" instead of "option_settings:")
+  │     causes the entire config file to be silently skipped.
+  │     No error, no warning — the resources/options simply don't apply.
+  ├── option_settings list vs map syntax:
+  │     AL2023 requires the LIST-of-objects syntax:
+  │       option_settings:
+  │         - namespace: ...
+  │           option_name: ...
+  │           value: ...
+  │     The older MAP syntax (key-value pairs) is silently ignored
+  │     on AL2023 but worked on AL2.
+  ├── Tabs are NEVER valid YAML indentation. Copy-pasting from
+  │     documentation that uses tabs causes silent parse failures.
+  └── CloudFormation Resources block must use exact CFN types —
+        a typo like "AWS::S3::Buckett" fails the deployment but
+        the error message points at CloudFormation, not the typo.
+
+Expert rule:
+  1. Validate every .config file with `yamllint` before deploying
+  2. Check Beanstalk events after EVERY deploy — silent skips show
+     as "info: No options were updated" for the config file
+  3. Use `eb config` to verify the options were actually applied
+```
+
+**Key implication:** A syntactically valid YAML file that Beanstalk
+silently ignores is worse than a syntax error — it gives false
+confidence that configuration was applied. Always verify via
+`describe-configuration-settings` after deployment.
+
+## Expert heuristic: worker tier SQS visibility timeout auto-configuration
+
+A baseline model configures the SQS queue visibility timeout on the
+queue itself. The expert knows Beanstalk worker tiers have a
+non-obvious auto-configuration behavior that overrides it.
+
+```text
+Worker tier SQS visibility timeout:
+  ├── Beanstalk sets the queue's VisibilityTimeout to MATCH the
+  │     environment's HTTP timeout (default 60s)
+  ├── If you set a custom timeout on the SQS queue directly,
+  │     Beanstalk OVERWRITES it on the next environment update
+  ├── To control visibility timeout, set the Beanstalk namespace:
+  │     aws:elasticbeanstalk:sqsd:VisibilityTimeout
+  └── The SQS daemon also sets maxReceiveCount automatically based
+        on the dead-letter queue configuration
+
+Expert rules:
+  1. NEVER set visibility timeout on the SQS queue directly —
+     Beanstalk will overwrite it
+  2. Set it via the sqsd namespace option:
+     Namespace=aws:elasticbeanstalk:sqsd,OptionName=VisibilityTimeout
+  3. Set the HTTP timeout to be LESS than visibility timeout:
+     aws:elasticbeanstalk:application:Environment → HTTP_TIMEOUT
+     If HTTP timeout > visibility timeout, the daemon processes
+     a message while SQS has already made it visible again →
+     duplicate processing
+  4. The daemon retries up to maxReceiveCount then sends to DLQ
+     — configure the DLQ BEFORE the worker environment starts
+```
+
+**Key implication:** The visibility timeout must be coordinated
+between Beanstalk's sqsd namespace and the HTTP timeout. Mismatches
+cause either duplicate processing (timeout too short) or zombie
+messages (timeout too long with no retry).
+
+## Expert heuristic: .platform/hooks vs .ebextensions ordering
+
+AL2023 introduced `.platform/hooks/` alongside `.ebextensions/`. A
+baseline model assumes they run at the same time. The expert knows
+the execution order determines whether resource references work.
+
+```text
+Execution order on AL2023 (critical sequence):
+  Phase 1: .ebextensions processing
+    ├── 01-setup.config → 02-storage.config → ... (lexicographic)
+    │   Each file runs in order:
+    │     1. commands         (root, pre-deployment)
+    │     2. CloudFormation Resources (if any)
+    │     3. files
+    │
+  Phase 2: Application deployment
+    ├── Source bundle extracted to /var/app/current/
+    ├── container_commands run (leader_only gate applies)
+    │
+  Phase 3: .platform/hooks/ execution
+    ├── prebuild/   hooks (during build, before deployment)
+    ├── predeploy/  hooks (after container_commands, before app start)
+    └── postdeploy/ hooks (after app is running and accepting traffic)
+
+Key ordering constraint:
+  .ebextensions commands run BEFORE .platform/hooks
+  → a file created in .ebextensions/commands IS available to
+    .platform/hooks/prebuild/
+  → a resource created in .ebextensions/Resources IS available to
+    .platform/hooks/postdeploy/
+  → BUT .platform/hooks/predeploy/ runs DURING container_commands
+    phase — race condition if both modify the same file
+```
+
+**Key implication:** `.platform/hooks/` is the AL2023-native
+replacement for `.ebextensions/` container commands, but they
+co-exist with a specific phase ordering. Use `.ebextensions/` for
+infrastructure (CloudFormation resources, packages) and
+`.platform/hooks/` for application lifecycle (migrations, cache
+warming, smoke tests). Never split related logic across both —
+the ordering interaction is a source of silent failures.
+
 ## Prerequisites (verify before provisioning)
 
 Before emitting provisioning commands, verify these prerequisites. If

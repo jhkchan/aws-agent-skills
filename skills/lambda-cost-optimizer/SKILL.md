@@ -238,6 +238,44 @@ choice:
   vs Standard (per-state-transition).
 - **The request fee at scale is non-trivial.** At 1B invocations/month,
   the request fee alone is $200/month. Batching via ESM is the only lever.
+- **Power Tuning itself costs money — each execution invokes the target
+  function ~50-200 times across 5-10 memory settings.** The Step
+  Functions state machine runs in Express mode and costs ~$0.02 per
+  tuning run in Step Functions charges, plus the Lambda invocation
+  costs for the test calls (typically $0.01-$0.05 depending on
+  function duration and memory). Total cost per Power Tuning run:
+  $0.03-$0.07. This is negligible for a one-time tuning sweep but
+  matters at scale: tuning 500 functions costs $15-$35. Expert rules:
+  (1) batch-tune only the top 20% of functions by invocation count —
+  they account for 80%+ of spend; (2) re-tune quarterly or after
+  code changes, not weekly; (3) use the Power Tuning `totalPayload`
+  parameter to pass realistic test payloads that match production
+  input — synthetic payloads understate CPU-bound duration and
+  overstate I/O-bound duration.
+- **SnapStart increases memory usage by capturing the full JVM (or
+  runtime) heap snapshot.** The snapshot is restored on cold start
+  instead of re-initializing the runtime. The snapshot size (Java:
+  200-800 MB depending on loaded classes) counts toward the
+  function's memory allocation. A function at 2048 MB with a 600 MB
+  snapshot has 1448 MB available for execution. If the function's
+  peak memory usage + snapshot size exceeds the configured memory,
+  you get OOM kills that did NOT occur before SnapStart was enabled.
+  Expert rule: after enabling SnapStart, re-run Power Tuning — the
+  optimal memory point often shifts UPWARD because the snapshot
+  consumes headroom that was previously available for execution.
+- **Each Lambda Layer adds ~50-200ms of cold start init time for .zip
+  extraction, independent of layer content size.** The init cost is
+  per-layer (extraction + mount), not per-byte. A function with 5
+  layers of 1 MB each pays 5x the extraction overhead of a function
+  with 1 layer of 5 MB. Expert rules: (1) consolidate related
+  dependencies into a single layer rather than splitting by
+  package — fewer layers = fewer extraction cycles; (2) prefer a
+  fat deployment package over layers for single-function use;
+  (3) use layers ONLY when the same dependency is shared across
+  3+ functions (the per-function extraction overhead is offset by
+  reduced package upload/deploy time); (4) monitor InitDuration
+  before and after adding a layer — if it increases by > 200ms,
+  flatten the layers.
 
 ### Step 1: Memory configuration (the #1 lever)
 

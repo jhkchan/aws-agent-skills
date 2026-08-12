@@ -192,6 +192,64 @@ obvious layer:
    treating absent data as a breach — useful for silent-failure
    detection, but the underlying missing-data issue remains.
 
+4. **The evaluation window is `Period * EvaluationPeriods`, but
+   `DatapointsToAlarm` can be less than `EvaluationPeriods`.** An
+   alarm with `Period: 300, EvaluationPeriods: 5, DatapointsToAlarm: 3`
+   evaluates the last 25 minutes (5 * 300s) and transitions to ALARM
+   if ANY 3 of the 5 data points breach the threshold. The remaining
+   2 data points can be non-breaching or missing. This "M-of-N" logic
+   is the #1 cause of "alarm fired but the dashboard looks fine" —
+   the operator sees 3 green periods and 2 red periods and expects
+   the alarm to stay OK, but M=3 is sufficient. Always check
+   `DatapointsToAlarm` alongside `EvaluationPeriods`.
+
+5. **Composite alarm Rule evaluation short-circuits on the first
+   false child under AND, and the first true child under OR.**
+   `ALARM(c1) AND ALARM(c2) AND ALARM(c3)` — if c1 is OK, CloudWatch
+   does not evaluate c2 or c3. This is unobservable in the console
+   (all children show their current state) but means a recently-fixed
+   child (c1 transitions to OK) instantly de-escalates the composite
+   even if c2 and c3 are still ALARM. Under OR, the first ALARM child
+   short-circuits to true. This matters for incident routing: a
+   composite alarm may resolve faster than the individual child
+   alarms suggest.
+
+6. **The anomaly detection band is computed as `mean(history) +/-
+   (stddev(history) * StandardDeviations)`, but the history window
+   is a rolling ~15 days, not the alarm's evaluation period.** The
+   band updates continuously as new data arrives. A sudden but
+   sustained shift (e.g., traffic doubles and stays elevated for 5
+   days) causes the band to widen over time until the new baseline
+   is "normal" — the alarm stops firing even though the metric is
+   still elevated vs. the original baseline. The band is also
+   per-period: a metric with daily seasonality will have a wider
+   band during peak hours and a narrower band off-peak, causing
+   inconsistent alerting behavior across the day.
+
+7. **New custom metrics cause INSUFFICIENT_DATA for the first
+   `EvaluationPeriods * Period` seconds, not a fixed 15 minutes.**
+   A freshly-created alarm on a new metric stays in
+   INSUFFICIENT_DATA until enough data points exist to fill the
+   evaluation window. For `Period: 300, EvaluationPeriods: 1`, that
+   is 5 minutes. For `Period: 300, EvaluationPeriods: 5`, that is
+   25 minutes. The 15-minute figure in AWS docs refers to the
+   anomaly detector training window, not the alarm evaluation
+   window. Operators who "just deployed the alarm" and see
+   INSUFFICIENT_DATA for 25 minutes think the metric pipeline is
+   broken; it is just the evaluation window filling up.
+
+8. **Cross-account alarm actions require the SNS topic policy to
+   trust the CloudWatch service principal in the ALARM's account,
+   not the SNS topic's account.** When an alarm in account A
+   publishes to an SNS topic in account B, the topic policy in B
+   must allow `Principal: {Service: cloudwatch.amazonaws.com}` with
+   a condition `aws:SourceAccount: <account-A>`. Without the
+   `SourceAccount` condition, the publish may succeed but be
+   rejected by some downstream subscriptions. Cross-account Lambda
+   actions require `--source-arn <alarm-arn-in-account-A>` on the
+   `lambda:add-permission` call in account B. This IAM gotcha is
+   not surfaced in the alarm setup wizard.
+
 ## Configuration dependency graph
 
 ```

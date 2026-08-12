@@ -222,6 +222,78 @@ Four behaviours separate a senior Cognito engineer from a generalist:
   exception often contains the Lambda's exception type and message,
   making CloudWatch Logs the fastest path to root cause.
 
+## Expert heuristic
+
+Five behaviors that a senior identity engineer knows from incident
+experience but are not surfaced in the Cognito console:
+
+- **ID token, access token, and identity pool session credentials have
+  independent lifecycles, and the application must handle each expiry
+  separately.** The access token (default 1 hour) is used for API
+  authorization. The ID token (default 1 hour) carries OIDC identity
+  claims. The refresh token (default 30 days) mints new access/ID
+  tokens. But the identity pool session (temporary AWS credentials)
+  has its own lifecycle: STS credentials expire per the role's
+  `MaxSessionDuration` (default 1 hour, max 12 hours), independent of
+  the Cognito token validity. A common failure: the app refreshes the
+  access token at 59 minutes but does not call
+  `GetCredentialsForIdentity` to refresh STS credentials — the API
+  call fails with expired AWS credentials even though the Cognito
+  tokens are fresh.
+
+- **Token revocation via `RevokeToken` is NOT immediate for JWTs
+  already issued.** Cognito JWTs are stateless — the access and ID
+  tokens are signed JWTs that are valid until their `exp` claim,
+  regardless of server-side revocation. `RevokeToken` invalidates the
+  REFRESH token (preventing new token issuance), but any access/ID
+  token already in the client's possession remains valid until expiry
+  (up to 1 hour by default). For immediate revocation, use
+  `GlobalSignOut` (invalidates all tokens) AND shorten
+  `AccessTokenValidity` to minimize the window. There is no JWT
+  blocklist in Cognito — this is a fundamental stateless-JWT
+  limitation, not a Cognito bug.
+
+- **The hosted UI `cookie` grant flow stores tokens in a Cognito-
+  managed cookie, which has different security properties than the
+  `code` grant flow.** The `code` grant flow returns an authorization
+  code to the app via redirect; the app exchanges it for tokens
+  server-side (tokens never appear in the browser URL). The implicit
+  `cookie` flow (used by managed login) stores the access/ID tokens
+  directly in a non-HttpOnly cookie
+  (`CognitoIdentityServiceProvider.<clientId>.<username>.accessToken`),
+  accessible to JavaScript. This is a security trade-off: the cookie
+  flow enables seamless SSO across subdomains but exposes tokens to
+  XSS. The cookie expiry is tied to the token `exp` claim, not to a
+  separate session duration. When diagnosing "token leaks in browser
+  dev tools," check whether the app client uses the `cookie` grant
+  (managed login) vs `code` grant.
+
+- **The SRP (Secure Remote Password) auth flow requires the client to
+  compute a verifier, but Cognito never stores the plaintext password
+  — only the verifier.** The flow is: (1) client sends `USER_SRP_AUTH`
+  with username and a random `SRP_A` value, (2) Cognito responds with
+  `SRP_B` and a salt, (3) client computes `PASSWORD_CLAIM_SIGNATURE`
+  using HMAC-SHA256 of the password-derived key with the salt and
+  `SRP_A`/`SRP_B`. If the client's SRP implementation uses a different
+  hash algorithm or key derivation (e.g., some older SDKs use SHA-1,
+  newer ones use SHA-256), the signature mismatch causes
+  `NotAuthorizedException` with no diagnostic detail. The AWS SDK and
+  Amplify handle this correctly, but custom SRP implementations
+  (mobile, non-AWS SDKs) are a common source of silent auth failures.
+
+- **Identity pool credential refresh requires re-calling
+  `GetCredentialsForIdentity` with the same identity ID, but the STS
+  credentials returned may fail if the underlying Cognito token has
+  expired.** The refresh chain is: Cognito access token (1 hr) ->
+  `GetCredentialsForIdentity` -> STS credentials (1-12 hrs). If the
+  app caches STS credentials for 12 hours but the Cognito access token
+  expires at 1 hour, the second `GetCredentialsForIdentity` call fails
+  because the access token is expired — even though the STS credentials
+  are still valid. Always refresh the Cognito access token (via
+  `REFRESH_TOKEN_AUTH`) BEFORE calling `GetCredentialsForIdentity` on
+  credential expiry. The identity ID persists across credential
+  refreshes; do not create a new identity ID for each refresh.
+
 ## Quick reference — symptom triage table
 
 | Symptom phrase / error | Most likely layer | First probe |
