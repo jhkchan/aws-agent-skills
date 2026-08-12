@@ -2,25 +2,20 @@
 name: apprunner-autoscaling-optimizer
 description: >-
   Optimises AWS App Runner autoscaling configuration for cost and
-  performance — auto-scaling configuration (MinSize/MaxSize provisioning),
-  concurrency setting (requests per instance, the primary cost lever),
-  CPU/memory utilization target tuning, instance type sizing (1 vCPU / 2
-  GB vs 2 vCPU / 4 GB vs 4 vCPU / 8 GB), health check interval tuning
-  (affects scale-out speed and false-positive restarts), scale-in cooldown
-  (default 60s, tradeoff between cost and flapping), scale-out speed,
-  static vs dynamic traffic pattern analysis, cost-per-request modeling,
-  custom domain SSL overhead (negligible compute, but certificate
-  management), deployment vs auto-scaling interaction (deployments pause
-  scaling), VPC ingress/egress cost analysis (NAT gateway, VPC endpoints),
-  observability cost (CloudWatch Logs ingestion from App Runner),
-  pause/resume for non-prod cost savings (100% compute savings). Reads
-  App Runner service configuration, CloudWatch metrics (RequestCount,
-  InstanceCount, CPUUtilization, MemoryUtilization, 4xx/5xx rates), and
-  Cost Explorer data to project monthly savings. Emits OPTIMIZED with
-  specific recommendation and estimated savings, or
-  FURTHER_OPTIMIZATION_AVAILABLE. Use when reviewing App Runner spend,
-  tuning concurrency, right-sizing MinSize, or evaluating pause/resume
-  for non-prod environments.
+  performance — auto-scaling configuration (MinSize/MaxSize
+  provisioning), concurrency setting (requests per instance, the
+  primary cost lever), CPU/memory utilization target tuning, instance
+  type sizing (1 vCPU / 2 GB vs 2 vCPU / 4 GB vs 4 vCPU / 8 GB),
+  health check interval tuning, scale-in cooldown, static vs dynamic
+  traffic pattern analysis, cost-per-request modeling, VPC ingress/
+  egress cost analysis (NAT gateway, VPC endpoints), observability
+  cost, and pause/resume for non-prod cost savings. Reads App Runner
+  service configuration, CloudWatch metrics, and Cost Explorer data
+  to project monthly savings. Emits OPTIMIZED with specific
+  recommendation and estimated savings, or
+  FURTHER_OPTIMIZATION_AVAILABLE. Use when reviewing App Runner
+  spend, tuning concurrency, right-sizing MinSize, or evaluating
+  pause/resume for non-prod environments.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0

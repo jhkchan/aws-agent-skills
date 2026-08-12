@@ -837,6 +837,15 @@ Terraform / CloudFormation alarms do NOT.
 
 ## Recent AWS features (2024-2026)
 
+- **DatapointsToAlarm M-of-N evaluation (2024-2025):** Alarms now
+  support `DatapointsToAlarm` < `EvaluationPeriods`, enabling
+  "breach M out of N periods" logic. A common source of "alarm fired
+  but dashboard looks fine" — 3 of 5 periods breaching is sufficient.
+- **Cross-account alarm actions with SourceAccount condition (2025):**
+  SNS topic policies for cross-account alarm publishing now support
+  `aws:SourceAccount` condition to scope the CloudWatch principal to
+  the alarm's owning account. Required for secure cross-account
+  alarm-to-SNS routing.
 - **Composite alarm rule expressions (2024):** GA of the full boolean
   grammar; INSUFFICIENT predicate now enables detection of children in
   INSUFFICIENT_DATA state.
