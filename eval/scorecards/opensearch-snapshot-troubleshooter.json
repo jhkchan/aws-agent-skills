@@ -1,0 +1,70 @@
+{
+  "skill": "opensearch-snapshot-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides a detailed 13\u2011category diagnostic tree, specific AWS CLI commands, bucket\u2011policy templates and version\u2011compatibility matrix that go beyond generic knowledge, but some content merely restates common AWS documentation (e.g., basic snapshot registration steps) and lacks explicit decision thresholds (e.g., exact shard\u2011unassigned count that triggers SNAPSHOT_TIMEOUT), resulting in a modest deduction."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific reasoning order (registration \u2192 verification \u2192 IAM \u2192 snapshot status \u2192 cluster health, etc.) and includes precise probe commands. Missing a dedicated step for cross\u2011account bucket\u2011policy verification and KMS key policy ordering, which prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides many concrete pitfalls with reasoning (bucket policy keyed to service principal, lifecycle rules with empty prefix, concurrent snapshot limit, version mismatch, etc.). Lacks a concise explicit \"NEVER\" list and could include more experience\u2011driven warnings (e.g., about VPC endpoint policies), so two points are deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states purpose, when_to_use/when_not_to_use are detailed, activation_triggers, invocation_schema, and a minimal example are present. No missing elements."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information well (quick start \u2192 mindset \u2192 philosophy \u2192 detailed steps). However, the quick\u2011start section packs many details (symptom\u2011layer map, multiple warnings) that may overload the initial reader, and some deep references are buried in large blocks, causing a small penalty."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are gated behind explicit confirmation prompts, while all diagnostic probes are read\u2011only. The calibration matches the fragility of snapshot operations perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a coherent, recognizable pattern (quick start, mindset, philosophy, process steps, output spec, safety checks, remediation, deep reference) that aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a usable decision tree, concrete CLI commands, error\u2011handling guidance, and output format. Minor gaps: no guidance on pagination for large log or S3 listings and no explicit rate\u2011limit mitigation advice, resulting in a one\u2011point deduction."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 48362,
+  "latency_ms": 32480,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

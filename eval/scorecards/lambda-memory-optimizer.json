@@ -1,0 +1,70 @@
+{
+  "skill": "lambda-memory-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides several concrete, expert\u2011level numbers (1769\u202fMB\u202f=\u202f1\u202fvCPU, ~64\u202fMB EFS overhead, 256\u202fMB min for container images, exact cost formulas, ARM64 vCPU performance delta). However, most of the content restates publicly documented AWS behavior; the novelty is limited to aggregation rather than brand\u2011new insight, so 4 points are deducted."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Defines a clear AWS\u2011specific workflow (pre\u2011flight data gate, ordered steps 0\u20117, PC\u2011memory cascade, SnapStart enablement, ARM64 re\u2011tuning). One point deducted because some steps are generic best\u2011practice phrasing (e.g., \"run Power Tuning before assuming\") rather than a uniquely tailored procedure."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never recommend memory change without Power Tuning evidence). However it omits several common pitfalls such as IAM permission failures for Power Tuning, concurrency\u2011scaling side\u2011effects, and missing guidance on handling versioning when SnapStart is enabled."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Full front\u2011matter, clear description, exhaustive keyword list, activation triggers, invocation schema, and a minimal valid example are all present and correctly formatted."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "The document layers information well (quick start, mindset, step\u2011by\u2011step, deep references). Minor overload occurs in the long \u201cQuick navigation\u201d table where some rows repeat information, but overall critical rules are not buried."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (memory changes) are gated by CONFIRM prompts, pre\u2011flight checks, and explicit safety steps. One point deducted because the skill still allows bulk processing without a hard limit on concurrent changes (only a recommendation of 5 functions), leaving a slight freedom gap for fragile operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Process steps \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Safety checks), making the skill easy to parse."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 9,
+      "max": 15,
+      "justification": "Provides decision trees, CLI snippets, and worked examples, enabling an agent to act. However, several example blocks contain arithmetic inconsistencies (e.g., mismatched latency delta, mis\u2011calculated ARM discount savings) and contradictory statements, which would cause an agent to emit incorrect recommendations."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 50069,
+  "latency_ms": 23020,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
