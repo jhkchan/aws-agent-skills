@@ -1,0 +1,176 @@
+{
+  "skill": "grafana-data-source-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Grafana Data Source Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Managed Grafana workspace provisioning (CloudWatch data source with IAM Identity Center, Prometheus AMP with SigV4, multi-data-source with SAML SSO, dashboard provisioning via API key, missing workspace role permissions prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "cloudwatch-data-source",
+      "name": "Grafana workspace with CloudWatch data source and IAM Identity Center",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — CloudWatch data source, AWS_SSO auth, workspace IAM role with cloudwatch:GetMetricData + logs:StartQuery, SERVICE_MANAGED permissions",
+      "prompt": "Create a Managed Grafana workspace named prod-observability in us-east-1, account 123456789012. Use IAM Identity Center authentication with SERVICE_MANAGED permissions. Data source: CloudWatch (default region us-east-1). Workspace IAM role GrafanaWorkspaceRole with CloudWatch metrics and logs read permissions. Tags: Environment=production, Team=ops.",
+      "prompt_file": "prompts/cloudwatch-data-source.md",
+      "baseline_file": "baselines/cloudwatch-data-source.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GRAFANA: g-aaaa1111 (prod-observability, AWS_SSO)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Workspace name: prod-observability\n  [✓] Authentication: AWS_SSO (IAM Identity Center)\n  [✓] Permission type: SERVICE_MANAGED\n  [✓] Workspace IAM role: arn:aws:iam::123456789012:role/GrafanaWorkspaceRole — attached\n  [✓] CloudWatch permissions: cloudwatch:GetMetricData, cloudwatch:ListMetrics, logs:StartQuery, logs:GetQueryResults\n  [✓] Data sources: CloudWatch (default)\nVERIFICATION_COMMANDS:\n  aws grafana describe-workspace --workspace-id g-aaaa1111 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "CloudWatch",
+            "cloudwatch:GetMetricData",
+            "AWS_SSO",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "prometheus-amp-data-source",
+      "name": "Grafana workspace with Prometheus (AMP) data source using SigV4",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Prometheus AMP data source, SigV4 auth with workspace role, aps:QueryMetrics permission",
+      "prompt": "Create a Managed Grafana workspace named amp-observability in us-east-1. Use IAM Identity Center authentication. Data source: Prometheus connected to AMP workspace ws-aaa111. Workspace IAM role GrafanaWorkspaceRole with aps:QueryMetrics and aps:ListWorkspaces permissions. SigV4 authentication using workspace IAM role. Tags: Environment=production, Source=amp.",
+      "prompt_file": "prompts/prometheus-amp-data-source.md",
+      "baseline_file": "baselines/prometheus-amp-data-source.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GRAFANA: g-bbbb2222 (amp-observability, AWS_SSO)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Workspace IAM role: arn:aws:iam::123456789012:role/GrafanaWorkspaceRole — attached\n  [✓] Prometheus permissions: aps:QueryMetrics, aps:ListWorkspaces\n  [✓] Data sources: Prometheus-AMP (SigV4 auth, workspace role)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aps:QueryMetrics",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-data-source-saml-sso",
+      "name": "Grafana workspace with CloudWatch + Athena + Timestream and SAML SSO",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — multi-data-source (CloudWatch + Athena + Timestream), SAML SSO with Okta IdP, all per-service permissions noted",
+      "prompt": "Create a Managed Grafana workspace named enterprise-grafana in us-east-1. Use SAML SSO authentication with Okta as the IdP. IdP metadata URL: https://idp.example.com/saml/metadata. Permission type CUSTOM. Data sources: CloudWatch, Athena (workgroup primary, results bucket s3://athena-results-123456789012), and Timestream. Workspace IAM role GrafanaWorkspaceRole with per-service read permissions for all three data sources. Tags: Environment=production, Auth=saml.",
+      "prompt_file": "prompts/multi-data-source-saml-sso.md",
+      "baseline_file": "baselines/multi-data-source-saml-sso.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GRAFANA: g-cccc3333 (enterprise-grafana, SAML)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Authentication: SAML (IdP: Okta)\n  [✓] SAML IdP metadata: https://idp.example.com/saml/metadata\n  [✓] CloudWatch permissions: cloudwatch:GetMetricData, logs:StartQuery\n  [✓] Athena permissions: athena:StartQueryExecution, s3:GetObject\n  [✓] Timestream permissions: timestream:SelectQuery\n  [✓] Data sources: CloudWatch, Athena, Timestream",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SAML",
+            "cloudwatch:GetMetricData",
+            "athena:StartQueryExecution",
+            "timestream:SelectQuery",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dashboard-provisioning",
+      "name": "Dashboard provisioning via API key and JSON import",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — API key creation (ADMIN, 86400s TTL), 3 dashboards imported via Grafana API, data source UID verification",
+      "prompt": "Provision dashboards in existing Grafana workspace g-aaaa1111 in us-east-1. The workspace is ACTIVE with CloudWatch and Prometheus data sources already configured. Create a workspace API key named ci-cd-provisioning with ADMIN role and 86400 second TTL. Import 3 dashboards from JSON files: overview.json, metrics.json, logs.json. Ensure data source UIDs in dashboard JSON match the workspace data source UIDs.",
+      "prompt_file": "prompts/dashboard-provisioning.md",
+      "baseline_file": "baselines/dashboard-provisioning.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "GRAFANA: g-aaaa1111 (prod-observability)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Workspace API key: ci-cd-provisioning (ADMIN, ttl: 86400s)\n  [✓] Dashboard provisioning: 3 dashboards imported\n  [✓] Data source UID verification: checked",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "api-key",
+            "ADMIN",
+            "86400",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-workspace-role-permissions",
+      "name": "Workspace role missing CloudWatch permissions (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — workspace IAM role has cloudwatch:ListMetrics but is missing cloudwatch:GetMetricData, GetMetricStatistics, and logs:StartQuery",
+      "prompt": "Create a Managed Grafana workspace named prod-grafana in us-east-1 with CloudWatch data source. Use IAM Identity Center authentication. Workspace IAM role GrafanaWorkspaceRole exists but only has cloudwatch:ListMetrics — it is missing cloudwatch:GetMetricData, cloudwatch:GetMetricStatistics, and logs:StartQuery permissions.",
+      "prompt_file": "prompts/missing-workspace-role-permissions.md",
+      "baseline_file": "baselines/missing-workspace-role-permissions.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "GRAFANA: g-dddd4444 (prod-grafana, AWS_SSO)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] CloudWatch permissions: FAIL — workspace role GrafanaWorkspaceRole is missing cloudwatch:GetMetricData, cloudwatch:GetMetricStatistics, and logs:StartQuery; CloudWatch data source would return empty results silently",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "cloudwatch:GetMetricData",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "ssm-association-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds useful expert heuristics (integer rate\u2011control vs percentages, mandatory KMS for S3 output, tag vs instance\u2011ID dynamics, apply\u2011at\u2011creation nuance, AWS\u2011specific cron syntax) that many baseline models omit, but most of these points are documented in AWS docs, so the delta is moderate rather than groundbreaking."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedural flow (document \u2192 bucket policy \u2192 instance profile \u2192 association \u2192 verification) and concrete CLI commands, yet some steps (e.g., generic \"verify prerequisites\") are generic rather than uniquely AWS\u2011oriented, losing a few points."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list with specific reasons (avoid percentage rate control, static instance\u2011ID targets for autoscaling, unencrypted S3 output, missing apply\u2011at\u2011creation, Unix cron syntax, non\u2011idempotent remediation, missing default document version). Only a minor gap: does not call out the pitfall of forgetting to set the default document version before association creation."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter, description, activation keywords, strict output contract, and when\u2011to\u2011use section are all present and well\u2011formed; a minor shortfall is the lack of an explicit version\u2011compatibility matrix, which prevents a perfect score."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a navigation table and layered sections, but the initial sections are dense and include many details before the concise checklist, creating some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates tightly for destructive actions (enforces KMS, integer rate\u2011control, apply\u2011at\u2011creation) while allowing flexibility for non\u2011production; however, it does not explicitly permit dev\u2011stage relaxations (e.g., SSE\u2011S3), costing one point."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 NEVER \u2192 Output format) that aids comprehension, but the structure is slightly ad\u2011hoc rather than adhering to a formalized template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI examples, checklist, and verification commands; however, the model output shows minor inconsistencies (e.g., association version numbers) and does not cover error handling for missing bucket policies, leading to a small deduction."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 41128,
+  "latency_ms": 8086,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

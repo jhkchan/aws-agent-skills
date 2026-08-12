@@ -1,0 +1,49 @@
+# Eval configuration for grafana-data-source-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: grafana-data-source-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: cloudwatch-data-source
+    difficulty: hard
+    prompt_file: prompts/cloudwatch-data-source.md
+    baseline_file: baselines/cloudwatch-data-source.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: prometheus-amp-data-source
+    difficulty: hard
+    prompt_file: prompts/prometheus-amp-data-source.md
+    baseline_file: baselines/prometheus-amp-data-source.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: multi-data-source-saml-sso
+    difficulty: hard
+    prompt_file: prompts/multi-data-source-saml-sso.md
+    baseline_file: baselines/multi-data-source-saml-sso.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: dashboard-provisioning
+    difficulty: medium
+    prompt_file: prompts/dashboard-provisioning.md
+    baseline_file: baselines/dashboard-provisioning.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-workspace-role-permissions
+    difficulty: easy
+    prompt_file: prompts/missing-workspace-role-permissions.md
+    baseline_file: baselines/missing-workspace-role-permissions.md
+    expected_verdict: PREREQUISITES_MISSING
