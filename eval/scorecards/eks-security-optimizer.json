@@ -1,0 +1,70 @@
+{
+  "skill": "eks-security-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 13,
+      "max": 20,
+      "justification": "The skill repeats many well\u2011known AWS/EKS hardening steps (PSA labeling, IRSA setup, KMS encryption CLI) that a competent model already knows. It does add a few concrete decision\u2011tree thresholds and a specific severity matrix, but the bulk is restatement rather than novel expert insight."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedural flow (Step\u202f0\u20118) and exact CLI commands, but some procedures are generic (e.g., \u201cverify\u201d steps lack concrete validation commands) and the ordering is occasionally implicit rather than strictly enforced."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with reasons (audit\u2011first PSA, IRSA permission mapping, default\u2011deny warning, KMS re\u2011encryption, private endpoint access). However, the list is limited to five items; additional common pitfalls (e.g., version skew between CNI and network\u2011policy plugin) are omitted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, activation triggers, invocation schema, and example are present. The \"when_to_use\" and \"when_not_to_use\" sections are clear, but the activation triggers are long and could cause false positives, preventing a perfect score."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "Uses a navigation table, quick\u2011start, mindset, then deep step\u2011by\u2011step sections, which is good layering. Nevertheless, the early sections already contain many detailed commands and edge\u2011case notes, leading to some cognitive overload before the user reaches the detailed steps."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and audit\u2011first recommendations. The only gap is that the skill does not enforce a hard limit on batch size for changes (it mentions a bulk\u2011operation limit but does not provide a concrete enforcement rule)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (What it does, Quick navigation, Mindset, Process, Output format). Minor inconsistency: the anti\u2011pattern section appears after the output contract, breaking the otherwise linear flow."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a decision matrix, concrete CLI snippets, and worked examples, enabling an agent to act. Missing are explicit error\u2011handling branches for partial data (e.g., when GuardDuty is disabled) and a validated JSON output schema, which could cause runtime ambiguity."
+    }
+  ],
+  "total_score": 100,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 42020,
+  "latency_ms": 11875,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

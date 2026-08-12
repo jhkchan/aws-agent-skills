@@ -1,0 +1,48 @@
+# Eval configuration for athena-query-failure-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: athena-query-failure-troubleshooter
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: serde-csv-separator-mismatch
+    difficulty: medium
+    prompt_file: prompts/serde-csv-separator-mismatch.md
+    baseline_file: baselines/serde-csv-separator-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: SERDE_PROPERTY
+  - id: stale-partitions-no-projection
+    difficulty: medium
+    prompt_file: prompts/stale-partitions-no-projection.md
+    baseline_file: baselines/stale-partitions-no-projection.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: STALE_PARTITIONS
+  - id: ctas-workgroup-output-denied
+    difficulty: hard
+    prompt_file: prompts/ctas-workgroup-output-denied.md
+    baseline_file: baselines/ctas-workgroup-output-denied.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: CTAS_OUTPUT_LOCATION
+  - id: column-type-int-na-strings
+    difficulty: medium
+    prompt_file: prompts/column-type-int-na-strings.md
+    baseline_file: baselines/column-type-int-na-strings.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: COLUMN_TYPE_MISMATCH
+  - id: s3-bucket-access-denied-glue-ok
+    difficulty: hard
+    prompt_file: prompts/s3-bucket-access-denied-glue-ok.md
+    baseline_file: baselines/s3-bucket-access-denied-glue-ok.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: S3_PERMISSION

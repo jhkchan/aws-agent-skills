@@ -1,0 +1,264 @@
+# Eval test cases for transit-gateway-routing-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each
+# case's TARGET embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The diagnostic ordering in
+# SKILL.md produces exactly the expected verdicts below.
+skill: transit-gateway-routing-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: tgw-static-route-overrides-propagated
+    description: >-
+      VPC-A cannot ping VPC-B through TGW. VPC-A's route table has
+      10.20.0.0/16 → tgw-aaa. The TGW route table tgw-rtb-default
+      contains a static route for 10.20.0.0/16 pointing at
+      tgw-attach-vpc-c (a legacy attachment from a prior migration),
+      which overrides the propagated route from VPC-B's attachment.
+      Traffic is forwarded to VPC-C and dropped. Expected layer:
+      TGW_STATIC_ROUTE_PRIORITY.
+    input: |
+      Symptom: EC2 instance i-aaa in VPC vpc-a (10.10.0.0/16) cannot
+      ping EC2 instance i-bbb in VPC vpc-b (10.20.0.0/16) through
+      transit gateway tgw-aaa. The ping returns "request timeout".
+      i-bbb never sees the packet in its VPC flow logs. Both VPCs are
+      attached to the TGW.
+
+      TGW: tgw-aaa
+      Route table: tgw-rtb-default (associated with vpc-a's attachment)
+      Attachment A: tgw-attach-vpc-a (VPC vpc-a, 10.10.0.0/16)
+      Attachment B: tgw-attach-vpc-b (VPC vpc-b, 10.20.0.0/16)
+      Attachment C: tgw-attach-vpc-c (VPC vpc-c, 10.30.0.0/16, legacy)
+
+      VPC-A route table: 10.20.0.0/16 → tgw-aaa
+      VPC-B route table: 10.10.0.0/16 → tgw-aaa (return path OK)
+
+      TGW route table tgw-rtb-default contents:
+        - 10.20.0.0/16 → tgw-attach-vpc-c (type: static, state: active)
+        - 10.20.0.0/16 → tgw-attach-vpc-b (type: propagated, state: active)
+        - 10.30.0.0/16 → tgw-attach-vpc-c (type: propagated, state: active)
+        - 10.10.0.0/16 → tgw-attach-vpc-a (type: propagated, state: active)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "tgw-static-route-overrides-propagated"
+        - "TGW_STATIC_ROUTE_PRIORITY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TGW_OVERLAPPING_CIDR"
+
+  - id: tgw-peering-non-transitive
+    description: >-
+      VPC on tgw-a (us-east-1) cannot reach VPC on tgw-c (us-west-2).
+      tgw-a peers with tgw-b; tgw-b peers with tgw-c. Operators
+      expect tgw-b to transit traffic between tgw-a and tgw-c. TGW
+      peering is non-transitive — no transitive hop is supported.
+      Expected layer: TGW_PEERING_NON_TRANSITIVE.
+    input: |
+      Symptom: EC2 in vpc-a (us-east-1, attached to tgw-a) cannot
+      reach EC2 in vpc-c (us-west-2, attached to tgw-c). Ping times
+      out. tgw-a has a peering to tgw-b; tgw-b has a peering to
+      tgw-c. Operators expect tgw-b to forward traffic between
+      tgw-a and tgw-c as an intermediate hop.
+
+      TGW topology:
+        - tgw-a (us-east-1): peering to tgw-b (available)
+        - tgw-b (us-east-1): peering to tgw-a (available), peering to tgw-c (available)
+        - tgw-c (us-west-2): peering to tgw-b (available)
+
+      Attachments:
+        - tgw-a: vpc-a (10.10.0.0/16), peering-to-tgw-b
+        - tgw-b: vpc-b (10.20.0.0/16), peering-to-tgw-a, peering-to-tgw-c
+        - tgw-c: vpc-c (10.30.0.0/16), peering-to-tgw-b
+
+      tgw-a route table search for 10.30.0.0/16: no route (only
+        routes for 10.10.0.0/16 and the peering subnet to tgw-b)
+      tgw-c route table search for 10.10.0.0/16: no route
+
+      VPC-A route table: 10.30.0.0/16 → tgw-a (forward path OK)
+      VPC-C route table: 10.10.0.0/16 → tgw-c (return path OK)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "tgw-peering-non-transitive"
+        - "TGW_PEERING_NON_TRANSITIVE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TGW_ROUTE_TABLE_ASSOCIATION"
+
+  - id: tgw-appliance-mode-disabled
+    description: >-
+      Stateful inspection VPC attached to tgw-aaa with
+      ApplianceModeSupport=disable. Cross-VPC flows succeed when
+      source is in us-east-1a (where the firewall ENI lives); fail
+      intermittently when source is in us-east-1b. Firewall logs
+      show "out-of-state drop". Expected layer: TGW_APPLIANCE_MODE.
+    input: |
+      Symptom: cross-VPC flows through the inspection VPC succeed
+      when the source EC2 is in us-east-1a (where the firewall ENI
+      lives), but intermittently fail when the source EC2 is in
+      us-east-1b. The firewall logs show "out-of-state drop" for
+      the failing flows.
+
+      TGW: tgw-aaa
+      Inspection VPC attachment: tgw-attach-inspection
+        Options.ApplianceModeSupport: disable
+        Subnet: subnet-inspection-1a (us-east-1a only)
+      Firewall: AWS Network Firewall in us-east-1a, stateful rules
+
+      VPC-A attachment: tgw-attach-vpc-a (10.10.0.0/16)
+      VPC-B attachment: tgw-attach-vpc-b (10.20.0.0/16)
+      Traffic flow: vpc-a → tgw-aaa → inspection-vpc → tgw-aaa → vpc-b
+
+      TGW route tables: all routes correct for both VPCs (verified).
+      No static routes override. CIDRs do not overlap.
+
+      Recent pattern (last 24h):
+        - Source AZ us-east-1a → success (40 flows)
+        - Source AZ us-east-1b → out-of-state drop (38 flows)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "tgw-appliance-mode-disabled"
+        - "TGW_APPLIANCE_MODE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TGW_ROUTE_TABLE_ASSOCIATION"
+
+  - id: tgw-vpc-default-route-blackhole
+    description: >-
+      VPC-A can ping VPC-B (forward path works), but VPC-B cannot
+      reply — return traffic blackholes. VPC-B's route table has a
+      default route 0.0.0.0/0 → igw-bbb (internet gateway) but no
+      entry for VPC-A's CIDR 10.10.0.0/16. Return traffic goes to
+      the IGW and is dropped. Expected layer: VPC_DEFAULT_ROUTE_TGW.
+    input: |
+      Symptom: VPC-A's EC2 i-aaa (10.10.0.0/16) cannot ping VPC-B's
+      EC2 i-bbb (10.20.0.0/16) through TGW. The forward path works
+      (i-bbb sees the ICMP echo request in tcpdump), but the reply
+      never returns to i-aaa.
+
+      TGW: tgw-aaa
+      Attachment A: tgw-attach-vpc-a (VPC vpc-a, 10.10.0.0/16)
+      Attachment B: tgw-attach-vpc-b (VPC vpc-b, 10.20.0.0/16)
+
+      VPC-A route table:
+        - 10.20.0.0/16 → tgw-aaa (forward path)
+        - 0.0.0.0/0 → igw-aaa (internet)
+
+      VPC-B route table:
+        - 10.20.0.0/16 → local
+        - 0.0.0.0/0 → igw-bbb (internet; NO route for 10.10.0.0/16)
+
+      TGW route table tgw-rtb-default:
+        - 10.10.0.0/16 → tgw-attach-vpc-a (propagated, active)
+        - 10.20.0.0/16 → tgw-attach-vpc-b (propagated, active)
+        Both attachments associated with tgw-rtb-default.
+
+      i-bbb tcpdump shows incoming ICMP echo request from i-aaa,
+      and outgoing echo reply routed to the IGW (not the TGW).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "tgw-vpc-default-route-blackhole"
+        - "VPC_DEFAULT_ROUTE_TGW"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TGW_ROUTE_TABLE_PROPAGATION"
+
+  - id: tgw-overlapping-cidr
+    description: >-
+      VPC-A (10.0.0.0/16) and VPC-B (10.0.1.0/24) are both attached
+      to tgw-aaa. The 10.0.1.0/24 subnet of VPC-B overlaps with the
+      10.0.0.0/16 of VPC-A. TGW longest-prefix match routes
+      10.0.1.0/24 to VPC-B, shadowing VPC-A's broader CIDR.
+      Traffic from VPC-C (10.30.0.0/16) to 10.0.1.5 in VPC-A goes
+      to VPC-B instead. Expected layer: TGW_OVERLAPPING_CIDR.
+    input: |
+      Symptom: EC2 i-target (10.0.1.5) in VPC-A (10.0.0.0/16) is
+      unreachable from VPC-C (10.30.0.0/16) through TGW. Ping
+      returns a reply from a DIFFERENT host (a database in VPC-B
+      that happens to use the same IP). VPC-B's CIDR is 10.0.1.0/24,
+      which overlaps with VPC-A's broader 10.0.0.0/16.
+
+      TGW: tgw-aaa
+      Attachment A: tgw-attach-vpc-a (VPC vpc-a, CIDR 10.0.0.0/16)
+      Attachment B: tgw-attach-vpc-b (VPC vpc-b, CIDR 10.0.1.0/24)
+      Attachment C: tgw-attach-vpc-c (VPC vpc-c, CIDR 10.30.0.0/16)
+
+      TGW route table tgw-rtb-default:
+        - 10.0.0.0/16 → tgw-attach-vpc-a (propagated, active)
+        - 10.0.1.0/24 → tgw-attach-vpc-b (propagated, active)
+        - 10.30.0.0/16 → tgw-attach-vpc-c (propagated, active)
+
+      VPC-C route table: 10.0.0.0/16 → tgw-aaa, 10.0.1.0/24 → tgw-aaa
+
+      i-target (10.0.1.5) lives in VPC-A's subnet, but the TGW
+      longest-prefix match sends 10.0.1.0/24 traffic to VPC-B.
+
+      No static routes in the TGW route table. All attachments are
+      associated with tgw-rtb-default.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "tgw-overlapping-cidr"
+        - "TGW_OVERLAPPING_CIDR"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TGW_STATIC_ROUTE_PRIORITY"

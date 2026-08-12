@@ -1,0 +1,286 @@
+# Eval test cases for glue-job-failure-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each
+# case's TARGET embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The diagnostic ordering in
+# SKILL.md produces exactly the expected verdicts below.
+skill: glue-job-failure-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: glue-dpu-insufficient-g1x-oom
+    description: >-
+      Glue ETL job on G.1X with 10 workers. Input dataset grew from
+      50 GB to 250 GB (5x). CloudWatch Logs show "Container killed
+      by YARN for exceeding memory limits" on 3 executors. The same
+      script succeeded last week on the smaller dataset. G.2X would
+      double the executor count. Expected layer: GLUE_DPU_INSUFFICIENT.
+    input: |
+      Symptom: Glue job etl-daily-orders failed at 03:17 UTC.
+      CloudWatch Logs show "Container killed by YARN for exceeding
+      memory limits. Container [pid=1234] was killed." on 3
+      executors. The job runs on G.1X with 10 workers. The same job
+      succeeded last week on a 50 GB dataset; the failed run used a
+      250 GB dataset (5x growth).
+
+      JobName: glue-dpu-insufficient-g1x-oom
+      JobRunId: jr_abc123
+      WorkerType: G.1X
+      NumberOfWorkers: 10
+      Timeout: 150 (default 2.5h)
+      GlueVersion: glue-4.0
+      Command.Name: glueetl
+      Role: AWSGlueServiceRole-glue-etl (includes AWSGlueServiceRole)
+
+      Last successful run: 2026-08-03 (dataset 50 GB)
+      Failed run dataset: 250 GB (5x growth)
+
+      CloudWatch metrics (failed run):
+        - glue.executor.memory.maxUsed Maximum: 9.7 GB (out of 10 GB
+          heap per executor on G.1X)
+        - 3 executors killed by YARN within a 5-minute window
+
+      Script has not changed since the last successful run.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "glue-dpu-insufficient-g1x-oom"
+        - "GLUE_DPU_INSUFFICIENT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: GLUE_ETL_SCRIPT_ERROR"
+
+  - id: glue-bookmark-partition-key-mismatch
+    description: >-
+      Glue job with --job-bookmark-option=job-bookmark-enable
+      reprocesses all data on every run. The script was updated 3
+      days ago to change partition_keys from ["event_date"] to
+      ["event_date","event_hour"]. The bookmark state references
+      the old single-key schema and cannot compare. Expected layer:
+      GLUE_BOOKMARK_CORRUPTED.
+    input: |
+      Symptom: Glue job etl-hourly-events succeeds but reprocesses
+      all data on every run despite --job-bookmark-option=
+      job-bookmark-enable. CloudWatch Logs show "Processing
+      2,400,000 records" on every run; the source table grows by
+      ~100,000 records per hour, so a bookmarked run should process
+      ~100,000, not 2.4M.
+
+      JobName: glue-bookmark-partition-key-mismatch
+      JobRunId: jr_def456
+      WorkerType: G.2X
+      NumberOfWorkers: 10
+      Timeout: 60
+      GlueVersion: glue-4.0
+
+      --job-bookmark-option: job-bookmark-enable (confirmed via
+        get-job-run Arguments)
+
+      Script history:
+        - 2026-08-01: partition_keys=["event_date"]
+        - 2026-08-05 (3 days ago): partition_keys changed to
+          ["event_date","event_hour"]
+
+      get-job-bookmark output:
+        - bookmark state references only "event_date" (old schema)
+
+      Data Catalog table exists; partitions loaded; no JDBC
+      connection; worker type is G.2X (not a memory issue).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "glue-bookmark-partition-key-mismatch"
+        - "GLUE_BOOKMARK_CORRUPTED"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: GLUE_DPU_INSUFFICIENT"
+
+  - id: glue-jdbc-connection-sg-missing
+    description: >-
+      Glue ETL job reads from RDS PostgreSQL via JDBC. The Glue
+      connection exists but the RDS security group does not allow
+      inbound from the Glue connection's security group on port 5432.
+      Job fails with "Connection timed out". Expected layer:
+      GLUE_JDBC_CONNECTION_ERROR.
+    input: |
+      Symptom: Glue job etl-from-rds fails with
+      "org.postgresql.util.PSQLException: Connection timed out" when
+      trying to read from RDS PostgreSQL. The Glue JDBC connection
+      exists; the JDBC URL is correct; the RDS instance is in the
+      same VPC.
+
+      JobName: glue-jdbc-connection-sg-missing
+      JobRunId: jr_ghi789
+      WorkerType: G.2X
+      NumberOfWorkers: 5
+      GlueVersion: glue-4.0
+
+      Glue connection: rds-prod-connection
+        ConnectionType: jdbc
+        ConnectionProperties.JDBC_URL: jdbc:postgresql://
+          rds-prod.cluster-xxx.us-east-1.rds.amazonaws.com:5432/db
+        PhysicalConnectionRequirements:
+          SubnetId: subnet-private-a
+          SecurityGroupIdList: [sg-glue-etl]
+          AvailabilityZone: us-east-1a
+
+      RDS instance:
+        DBInstanceIdentifier: rds-prod
+        VpcSecurityGroups: [sg-rds-prod]
+        Port: 5432
+
+      sg-rds-prog inbound rules:
+        - Port 5432, Source: sg-bastion (bastion host)
+        - (NO rule for sg-glue-etl)
+
+      sg-glue-etl outbound: 0.0.0.0/0 all ports (allow all)
+
+      Subnet route table: subnet-private-a can reach the RDS subnet
+        (same VPC, local route).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "glue-jdbc-connection-sg-missing"
+        - "GLUE_JDBC_CONNECTION_ERROR"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: GLUE_DPU_INSUFFICIENT"
+
+  - id: glue-partition-not-loaded-msck
+    description: >-
+      Glue job reads a Data Catalog table backed by S3 partitioned
+      data. The table exists and the S3 path has data, but
+      df.count() returns 0. MSCK REPAIR TABLE was never run after
+      new partition data landed. get-partitions returns 0.
+      Expected layer: GLUE_PARTITION_NOT_LOADED.
+    input: |
+      Symptom: Glue job etl-aggregation reads from Data Catalog
+      table events_table. The table exists and the S3 path has
+      data, but the job processes 0 records (df.count() == 0).
+
+      JobName: glue-partition-not-loaded-msck
+      JobRunId: jr_jkl012
+      WorkerType: G.1X
+      NumberOfWorkers: 5
+      GlueVersion: glue-4.0
+
+      Data Catalog:
+        Database: analytics
+        Table: events_table
+        StorageDescriptor.Location:
+          s3://data-lake-prod/events/year=2026/month=08/day=05/
+        TableType: EXTERNAL_TABLE
+
+      aws glue get-partitions --database analytics --table-name
+        events_table: returns 0 partitions
+
+      aws s3 ls s3://data-lake-prod/events/year=2026/month=08/:
+        - day=05/ (500 parquet files, 2 GB)
+        - day=04/ (480 parquet files, 1.9 GB)
+        - day=03/ (450 parquet files, 1.8 GB)
+
+      The data was written by Kinesis Firehose; no Glue crawler has
+      run since the data landed.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "glue-partition-not-loaded-msck"
+        - "GLUE_PARTITION_NOT_LOADED"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: GLUE_DATA_CATALOG_TABLE_NOT_FOUND"
+
+  - id: glue-worker-type-g025x-spark
+    description: >-
+      Glue ETL job configured with WorkerType G.025X (micro) on a
+      Spark job (Command.Name: glueetl). G.025X is for Python shell
+      only and cannot run Spark. Job fails with chronic OOM
+      immediately. Expected layer: GLUE_WORKER_TYPE_WRONG.
+    input: |
+      Symptom: Glue job etl-spark-g025x fails immediately with
+      "Container killed by YARN for exceeding memory limits" on
+      every executor. The job was recently "cost-optimised" by
+      switching from G.1X to G.025X.
+
+      JobName: glue-worker-type-g025x-spark
+      JobRunId: jr_mno345
+      WorkerType: G.025X
+      NumberOfWorkers: 10
+      Timeout: 60
+      GlueVersion: glue-4.0
+      Command.Name: glueetl (Spark ETL job)
+
+      The script uses glue_context.create_dynamic_frame.from_catalog
+      (Spark-based DynamicFrame API).
+
+      CloudWatch Logs:
+        - "Container killed by YARN for exceeding memory limits"
+          on all executors within 2 minutes of job start
+        - The job never progresses past the initial data load
+
+      G.025X provides 0.0625 DPU per worker (1 GB memory, no Spark
+      executor). G.025X is designed for Python shell jobs only.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "glue-worker-type-g025x-spark"
+        - "GLUE_WORKER_TYPE_WRONG"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: GLUE_DPU_INSUFFICIENT"

@@ -1,0 +1,70 @@
+{
+  "skill": "cloudformation-stack-rollback-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 15,
+      "max": 20,
+      "justification": "The skill assembles a comprehensive decision tree and many known rollback blockers, but most of the content (custom resource timeout, ContinueUpdateRollback, drift, IAM replacement) is already standard knowledge for senior CloudFormation engineers; it adds limited novel ordering or thresholds."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (e.g., use describe\u2011stack\u2011events, then continue\u2011update\u2011rollback), but the ordering is sometimes vague (no explicit priority when multiple failure patterns appear) and some steps are generic \"check logs\" without CloudFormation\u2011focused guidance."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "A solid NEVER list is provided with reasons, but a few warnings lack concrete impact explanations (e.g., orphaned resources cost implications) and the list does not cover all destructive pitfalls such as accidental policy overrides without rollback."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Full frontmatter, clear description, activation triggers, invocation schema, and a minimal example are present, enabling reliable activation. Slight omission: the invocation schema does not explicitly version its JSON contract, which could affect strict parsers."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (quick start \u2192 mindset \u2192 philosophy \u2192 detailed decision tree \u2192 output format). Nonetheless, the early sections are dense, which may overload the agent before it knows which layer to consult."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and read\u2011only probes are emphasized. Minor gap: temporary stack\u2011policy overrides are not paired with an automated rollback of the policy itself, leaving room for human error."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable structure (Quick Start \u2192 Mindset \u2192 Philosophy \u2192 Table \u2192 Process \u2192 Anti\u2011Patterns), but the inclusion of a non\u2011standard \"Philosophy\" block slightly breaks the typical pattern used in other CloudOps skills."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a clear decision tree, concrete CLI commands, and output format, enabling an agent to act. Lacks handling for pagination of CLI results, and the fallback INSUFFICIENT_DATA path is generic, leaving some edge\u2011cases unaddressed."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 38107,
+  "latency_ms": 8540,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

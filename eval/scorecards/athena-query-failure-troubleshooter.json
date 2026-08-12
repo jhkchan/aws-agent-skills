@@ -1,0 +1,70 @@
+{
+  "skill": "athena-query-failure-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill consolidates a 13\u2011category diagnostic tree, exact AWS CLI commands, precise property values (e.g., 30\u2011minute timeout, partition\u2011projection TBLPROPERTIES), and nuanced engine\u2011version differences that a generic model would not enumerate. This provides concrete expert knowledge beyond baseline capability."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The procedure follows a senior\u2011engineer mindset: read\u2011only probes first, ordered decision\u2011tree, explicit pre\u2011flight safety checks, and AWS\u2011specific ordering (get\u2011query\u2011execution \u2192 glue get\u2011table \u2192 s3 ls). Only minor generic wording (\"check permissions\") prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "A thorough NEVER list is provided with concrete reasons (e.g., never assume CTAS writes to source location, never rely on MSCK REPAIR for large partitions). Only minor omission: no explicit anti\u2011pattern for federated catalogs or Lake Formation edge cases."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers and invocation schema are well defined. Slight shortcoming: entry_point flag is false (though not required) and the description could better highlight limits of offline vs live diagnosis."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick start \u2192 mindset \u2192 philosophy \u2192 detailed decision tree). However, the quick\u2011start section packs many details, which may cause initial cognitive overload before the reader reaches deeper layers."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions (DROP/CREATE, MSCK REPAIR) are gated with explicit CONFIRM prompts and safety checks. Creative tasks are not over\u2011constrained, matching the fragility of Athena operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows a coherent, recognizable pattern (quick start, mindset, philosophy, triage table, stepwise process, anti\u2011patterns, safety gates, remediation, deep reference). No ad\u2011hoc structure detected."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a usable decision tree, concrete CLI commands, and worked examples. Some edge cases (Lake Formation permissions, multi\u2011catalog failures) are not fully covered, and the examples assume the operator has all required IAM context, which could limit immediate execution."
+    }
+  ],
+  "total_score": 110,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 61307,
+  "latency_ms": 12595,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

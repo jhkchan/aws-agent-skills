@@ -1,0 +1,289 @@
+# Eval test cases for s3-access-denied-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it.
+skill: s3-access-denied-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: kms-key-policy-decrypt-missing
+    description: >-
+      Application role with s3:GetObject permission on the bucket.
+      Objects are SSE-KMS encrypted with a customer-managed CMK.
+      Caller's IAM policy does NOT include kms:Decrypt on the key.
+      Every GetObject returns AccessDenied. The KMS gate is a
+      separate authorisation layer from S3. Expected root cause:
+      KMS_KEY_POLICY.
+    input: |
+      Symptom: application role arn:aws:iam::111111111111:role/app-role
+      gets "Access Denied" (HTTP 403) on every s3:GetObject call for
+      objects in prod-data-bucket. The bucket policy and IAM policy
+      both allow s3:GetObject. Objects are encrypted with SSE-KMS using
+      a customer-managed key
+      arn:aws:kms:us-east-1:111111111111:key/abc-123.
+
+      Bucket: prod-data-bucket
+      Key: orders/2024/order-001.json
+      Caller: arn:aws:iam::111111111111:role/app-role
+      Action: s3:GetObject
+      Error: "Access Denied" (HTTP 403)
+
+      IAM policy (app-role):
+        - Allow s3:GetObject on arn:aws:s3:::prod-data-bucket/*
+        - Allow s3:ListBucket on arn:aws:s3:::prod-data-bucket
+
+      Bucket policy:
+        - Allow s3:GetObject for principal
+          arn:aws:iam::111111111111:role/app-role
+
+      Bucket encryption: SSE-KMS with
+        arn:aws:kms:us-east-1:111111111111:key/abc-123
+      KMS key manager: CUSTOMER
+      KMS key state: Enabled
+      Caller kms:Decrypt on key abc-123: NOT PRESENT
+
+      SCPs: none deny s3 or kms
+      Permission boundary: none
+      VPC endpoint policy: allows all S3 actions
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "kms-key-policy-decrypt-missing"
+        - "KMS_KEY_POLICY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: IMPLICIT_DENY_IAM"
+
+  - id: cross-account-bucket-policy-missing
+    description: >-
+      Cross-account caller in 222222222222 has IAM policy allowing
+      s3:GetObject on bucket in 111111111111. Bucket policy does NOT
+      list account 222222222222. Cross-account requires BOTH policies.
+      Expected root cause: CROSS_ACCOUNT_MISSING_BUCKET_POLICY.
+    input: |
+      Symptom: role arn:aws:iam::222222222222:role/cross-account-reader
+      gets "Access Denied" on s3:GetObject for
+      s3://shared-data-bucket/reports/daily.csv. The caller is in a
+      different account than the bucket owner.
+
+      Bucket: shared-data-bucket (owner: 111111111111)
+      Key: reports/daily.csv
+      Caller: arn:aws:iam::222222222222:role/cross-account-reader
+      Action: s3:GetObject
+      Error: "Access Denied" (HTTP 403)
+
+      IAM policy (cross-account-reader in 222222222222):
+        - Allow s3:GetObject on arn:aws:s3:::shared-data-bucket/*
+
+      Bucket policy (shared-data-bucket in 111111111111):
+        - Allow s3:GetObject for principal
+          arn:aws:iam::111111111111:role/internal-reader
+        (NO statement for account 222222222222)
+
+      Encryption: SSE-S3 (no KMS)
+      Object ownership: BucketOwnerEnforced
+      SCPs: none deny s3
+      Permission boundary: none
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "cross-account-bucket-policy-missing"
+        - "CROSS_ACCOUNT_MISSING_BUCKET_POLICY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: KMS_KEY_POLICY"
+
+  - id: explicit-deny-bucket-policy
+    description: >-
+      Caller's IAM policy allows s3:PutObject. But the bucket policy
+      has an explicit Deny for s3:PutObject from any IP outside the
+      corporate CIDR. Caller is a Lambda function in a VPC — the
+      aws:SourceIp condition does not match. Explicit deny overrides
+      the IAM allow. Expected root cause: EXPLICIT_DENY_BUCKET_POLICY.
+    input: |
+      Symptom: Lambda function fn-data-pipeline gets "Access Denied"
+      on s3:PutObject to prod-logs-bucket. The function's execution
+      role has s3:PutObject permission. The bucket policy has an
+      explicit Deny based on aws:SourceIp not matching the corporate
+      CIDR 10.0.0.0/8. The Lambda function is VPC-attached; its
+      source IP is the NAT Gateway IP (which is outside 10.0.0.0/8
+      because the NAT is in a different VPC).
+
+      Bucket: prod-logs-bucket
+      Caller: arn:aws:iam::111111111111:role/fn-data-pipeline-role
+      Action: s3:PutObject
+      Error: "Access Denied" (HTTP 403)
+
+      IAM policy (fn-data-pipeline-role):
+        - Allow s3:PutObject on arn:aws:s3:::prod-logs-bucket/*
+
+      Bucket policy (prod-logs-bucket):
+        Statement 1: Allow s3:PutObject for principal *
+        Statement 2: Deny s3:PutObject if
+          "aws:SourceIp" not in ["10.0.0.0/8"]
+          (this Deny applies to all callers outside the corp CIDR)
+
+      Encryption: SSE-S3
+      SCPs: none deny s3
+      Permission boundary: none
+
+      CloudTrail errorMessage: "explicit deny"
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "explicit-deny-bucket-policy"
+        - "EXPLICIT_DENY_BUCKET_POLICY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: IMPLICIT_DENY_IAM"
+
+  - id: scp-deny-s3-actions
+    description: >-
+      Caller's IAM policy and bucket policy both allow s3:GetObject.
+      But an SCP at the OU level denies all S3 actions for accounts
+      in the "Sandbox" OU. The caller's account is in Sandbox. SCPs
+      are evaluated first in the hierarchy. Expected root cause:
+      SCP_DENY.
+    input: |
+      Symptom: role arn:aws:iam::999999999999:role/sandbox-app gets
+      "Access Denied" on s3:GetObject for
+      s3://sandbox-data-bucket/config.json. The IAM policy and bucket
+      policy both allow the action. The account 999999999999 is in
+      the "Sandbox" OU, which has an SCP denying all S3 actions.
+
+      Bucket: sandbox-data-bucket
+      Key: config.json
+      Caller: arn:aws:iam::999999999999:role/sandbox-app
+      Action: s3:GetObject
+      Error: "Access Denied" (HTTP 403)
+
+      IAM policy (sandbox-app):
+        - Allow s3:GetObject on arn:aws:s3:::sandbox-data-bucket/*
+
+      Bucket policy (sandbox-data-bucket):
+        - Allow s3:GetObject for principal *
+
+      SCPs on OU "Sandbox" (contains account 999999999999):
+        - Deny s3:* for all principals
+          (a blanket deny applied to enforce sandbox isolation)
+
+      Encryption: SSE-S3
+      Permission boundary: none
+      KMS: not in use
+
+      simulate-principal-policy result: explicitDeny
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "scp-deny-s3-actions"
+        - "SCP_DENY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: IMPLICIT_DENY_IAM"
+
+  - id: object-ownership-acl-conflict
+    description: >-
+      Bucket created before April 2023 with ObjectWriter ownership.
+      Account B uploaded objects with a bucket-owner-full-control ACL.
+      Account A's bucket policy allows s3:GetObject for its own roles.
+      But objects uploaded by account B are owned by account B —
+      account A's bucket policy cannot grant access. Expected root
+      cause: OBJECT_OWNERSHIP.
+    input: |
+      Symptom: role arn:aws:iam::111111111111:role/data-reader gets
+      "Access Denied" on s3:GetObject for some objects in
+      shared-upload-bucket. The bucket policy allows the role. Some
+      objects are accessible; others are not. The inaccessible
+      objects were uploaded by a cross-account partner
+      (account 222222222222).
+
+      Bucket: shared-upload-bucket (owner: 111111111111)
+      Caller: arn:aws:iam::111111111111:role/data-reader
+      Action: s3:GetObject
+      Error: "Access Denied" (HTTP 403) — on SOME objects only
+
+      IAM policy (data-reader):
+        - Allow s3:GetObject on arn:aws:s3:::shared-upload-bucket/*
+
+      Bucket policy:
+        - Allow s3:GetObject for principal
+          arn:aws:iam::111111111111:role/data-reader
+
+      Object ownership: ObjectWriter (NOT BucketOwnerEnforced)
+      Encryption: SSE-S3
+
+      Object ACL (accessible object):
+        Owner: 111111111111 (bucket owner)
+        Grants: full control to bucket owner
+
+      Object ACL (denied object):
+        Owner: 222222222222 (uploader — different account)
+        Grants: full control to 222222222222 only
+        (no grant to the bucket owner 111111111111)
+
+      SCPs: none deny s3
+      KMS: not in use
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "object-ownership-acl-conflict"
+        - "OBJECT_OWNERSHIP"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: KMS_KEY_POLICY"

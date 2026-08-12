@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "eks-security-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EKS Security Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "psa-irsa-network-gaps",
+      "name": "Production cluster missing PSA, IRSA on 12/15 namespaces, and no network policies — CRITICAL multi-dimension finding",
+      "difficulty": "hard",
+      "prompt_file": "prompts/psa-irsa-network-gaps.md",
+      "baseline_file": "baselines/psa-irsa-network-gaps.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "psa-irsa-network-gaps", "RECOMMENDATION", "SEVERITY", "REMEDIATION_STEPS", "IRSA"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "irsa-migration-opportunity",
+      "name": "Cluster with good posture except 16/20 namespaces still on node IAM role — IRSA migration",
+      "difficulty": "medium",
+      "prompt_file": "prompts/irsa-migration-opportunity.md",
+      "baseline_file": "baselines/irsa-migration-opportunity.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "irsa-migration-opportunity", "RECOMMENDATION", "SEVERITY", "REMEDIATION_STEPS", "IRSA"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "network-policy-gap",
+      "name": "Cluster with good IAM and PSA but no network policies — default allow all east-west traffic",
+      "difficulty": "medium",
+      "prompt_file": "prompts/network-policy-gap.md",
+      "baseline_file": "baselines/network-policy-gap.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "network-policy-gap", "RECOMMENDATION", "SEVERITY", "REMEDIATION_STEPS", "network"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-secured-cluster",
+      "name": "Cluster with all eight security dimensions configured — already optimized",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-secured-cluster.md",
+      "baseline_file": "baselines/already-secured-cluster.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-secured-cluster", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "kms-and-imdsv-gaps",
+      "name": "Cluster with good pod-level security but no KMS encryption and IMDSv2 not enforced",
+      "difficulty": "hard",
+      "prompt_file": "prompts/kms-and-imdsv-gaps.md",
+      "baseline_file": "baselines/kms-and-imdsv-gaps.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "kms-and-imdsv-gaps", "RECOMMENDATION", "SEVERITY", "REMEDIATION_STEPS", "KMS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+# Eval configuration for eks-security-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: eks-security-optimizer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: psa-irsa-network-gaps
+    difficulty: hard
+    prompt_file: prompts/psa-irsa-network-gaps.md
+    baseline_file: baselines/psa-irsa-network-gaps.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: irsa-migration-opportunity
+    difficulty: medium
+    prompt_file: prompts/irsa-migration-opportunity.md
+    baseline_file: baselines/irsa-migration-opportunity.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: network-policy-gap
+    difficulty: medium
+    prompt_file: prompts/network-policy-gap.md
+    baseline_file: baselines/network-policy-gap.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: already-secured-cluster
+    difficulty: easy
+    prompt_file: prompts/already-secured-cluster.md
+    baseline_file: baselines/already-secured-cluster.md
+    expected_verdict: OPTIMIZED
+  - id: kms-and-imdsv-gaps
+    difficulty: hard
+    prompt_file: prompts/kms-and-imdsv-gaps.md
+    baseline_file: baselines/kms-and-imdsv-gaps.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE

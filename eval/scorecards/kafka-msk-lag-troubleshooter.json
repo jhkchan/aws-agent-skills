@@ -1,0 +1,70 @@
+{
+  "skill": "kafka-msk-lag-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 14,
+      "max": 20,
+      "justification": "The skill assembles many concrete thresholds, AWS\u2011specific metric names, and a detailed decision matrix that a senior engineer would find useful, but it omits explicit handling for the MSK_PROVISIONED_THROTTLE layer and lacks KRaft\u2011specific diagnostic metrics, leaving a gap in expert\u2011level coverage."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Defines a clear AWS\u2011centric diagnostic flow (pre\u2011flight, symptom entry, layer\u2011specific probes) and uses AWS CLI commands, yet some procedures are generic (e.g., \"check CPU\") and lack explicit ordering for edge\u2011case interactions such as overlapping broker\u2011CPU and disk\u2011I/O saturation."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "A thorough NEVER list enumerates common pitfalls (e.g., treating RecordsLagMax as average, adding consumers beyond partition count, high fetch.min.bytes on low\u2011volume topics) with concrete reasoning, covering the major anti\u2011patterns without noticeable omissions."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "The skill includes complete frontmatter, a clear multi\u2011sentence description, explicit when\u2011to\u2011use/when\u2011not\u2011to\u2011use sections, activation triggers, a well\u2011formed invocation schema, and a concrete example, satisfying all specification requirements."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Content is organized into layers (Quick start, Mindset, Philosophy, Pre\u2011flight, Process, Steps), but the initial Quick start already contains a large amount of detailed information, causing some cognitive overload before the agent reaches the deeper decision tree."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "All state\u2011changing actions are gated by explicit CONFIRM prompts, while diagnostic probes are read\u2011only; the calibration of freedom versus fragility is precise and appropriate for the task."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (quick start \u2192 mindset \u2192 philosophy \u2192 diagnostic tree \u2192 anti\u2011patterns \u2192 safety \u2192 remediation), but the pattern mixes narrative prose with dense tables, making the overall shape less uniform than a strict template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete AWS CLI commands, a decision tree, and a precise output format, enabling an agent to act. However, the invocation schema is described in prose rather than a strict JSON schema, which could hinder automated parsing and edge\u2011case handling."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 63334,
+  "latency_ms": 37270,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

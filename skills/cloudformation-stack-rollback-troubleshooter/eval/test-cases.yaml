@@ -1,0 +1,334 @@
+# Eval test cases for cloudformation-stack-rollback-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per rollback root-cause layer family.
+# Each case's TARGET embeds the test-case id so the model naturally
+# echoes it (avoids assertion-token mismatch). The diagnostic ordering
+# in SKILL.md produces exactly the expected verdicts below.
+skill: cloudformation-stack-rollback-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: custom-resource-lambda-timeout
+    description: >-
+      CloudFormation stack stuck in UPDATE_ROLLBACK_FAILED. The blocking
+      resource is Custom::AppConfig. The provider Lambda has Timeout: 3
+      and timed out processing a Delete request during rollback.
+      CloudFormation waited 1 hour then failed. Expected layer:
+      CUSTOM_RESOURCE_TIMEOUT (#1 rollback blocker).
+    input: |
+      Symptom: CloudFormation stack prod-infrastructure is stuck in
+      UPDATE_ROLLBACK_FAILED after a failed update. The stack event
+      shows the custom resource AppConfigCustomResource failed to roll
+      back because the provider Lambda timed out without sending a
+      response to the CloudFormation signal URL.
+
+      StackName: prod-infrastructure
+      StackStatus: UPDATE_ROLLBACK_FAILED
+      StackId: arn:aws:cloudformation:us-east-1:111111111111:stack/prod-infrastructure/abc-123
+
+      Failed resource:
+        LogicalResourceId: AppConfigCustomResource
+        ResourceType: Custom::AppConfig
+        ResourceStatus: DELETE_FAILED
+        ResourceStatusReason: "Custom Resource failed: Provider did
+          not respond within 60 minutes. Last known state: Provider
+          Lambda function timed out."
+
+      Provider Lambda context:
+        FunctionName: appconfig-custom-resource-provider
+        Timeout: 3
+        Runtime: nodejs20.x
+        Handler: index.handler
+        Last log before timeout:
+          "2025-08-05T14:23:11.012Z Processing Delete request for
+          AppConfig environment=prod"
+          "Task timed out after 3.00 seconds"
+
+      Stack policy: (none — no stack policy set)
+      Drift: (none detected)
+      Nested stacks: (none)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "custom-resource-lambda-timeout"
+        - "CUSTOM_RESOURCE_TIMEOUT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: NESTED_STACK_CASCADE"
+        - "LAYER: IAM_REPLACEMENT"
+
+  - id: update-rollback-failed-needs-continue
+    description: >-
+      Stack in UPDATE_ROLLBACK_FAILED after an IAM Role update that
+      changed the Path property (Replacement: True). The old role's
+      deletion failed because it's still attached to an instance
+      profile. The operator needs to identify the blocking resource
+      and unblock with ContinueUpdateRollback. Expected layer:
+      IAM_REPLACEMENT.
+    input: |
+      Symptom: CloudFormation stack prod-iam-roles is stuck in
+      UPDATE_ROLLBACK_FAILED. The update changed the Path property of
+      an IAM Role from /old-path/ to /service/. This is a Replacement
+      operation. The new role was created but the old role couldn't be
+      deleted because it's still attached to an instance profile
+      (EC2InstanceProfile).
+
+      StackName: prod-iam-roles
+      StackStatus: UPDATE_ROLLBACK_FAILED
+
+      Failed resource:
+        LogicalResourceId: AppServiceRole
+        ResourceType: AWS::IAM::Role
+        ResourceStatus: DELETE_FAILED
+        ResourceStatusReason: "Cannot delete entity: Role is attached
+          to instance profile AppServiceInstanceProfile"
+
+      IAM context:
+        - AppServiceRole (old, /old-path/): exists, has
+          AWSLambdaBasicExecutionRole attached
+        - AppServiceInstanceProfile: contains AppServiceRole
+        - AppServiceRole (new, /service/): created successfully
+          during the update
+
+      Template summary shows:
+        AWS::IAM::Role UpdateBehavior: Replacement
+        (Path is an immutable property — changing it triggers
+        replacement)
+
+      Stack policy: (none)
+      Drift: (none detected)
+      Nested stacks: (none)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "update-rollback-failed-needs-continue"
+        - "IAM_REPLACEMENT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: CUSTOM_RESOURCE_TIMEOUT"
+        - "LAYER: NESTED_STACK_CASCADE"
+
+  - id: nested-stack-cascade-rollback
+    description: >-
+      Parent stack stuck in UPDATE_ROLLBACK_FAILED because a nested
+      child stack is also in UPDATE_ROLLBACK_FAILED. The child's
+      blocking resource is a custom resource. The child must be fixed
+      first before the parent can retry. Expected layer:
+      NESTED_STACK_CASCADE.
+    input: |
+      Symptom: CloudFormation stack prod-platform is stuck in
+      UPDATE_ROLLBACK_FAILED. The failed resource is a nested stack
+      (NetworkingStack). The child stack NetworkingStack is also in
+      UPDATE_ROLLBACK_FAILED — its own blocking resource is a custom
+      resource that timed out.
+
+      StackName: prod-platform
+      StackStatus: UPDATE_ROLLBACK_FAILED
+
+      Failed resource (parent):
+        LogicalResourceId: NetworkingStack
+        ResourceType: AWS::CloudFormation::Stack
+        ResourceStatus: UPDATE_FAILED
+        ResourceStatusReason: "Embedded stack
+          arn:aws:cloudformation:us-east-1:111111111111:stack/prod-platform-NetworkingStack-xyz/def-456
+          was not successfully updated."
+
+      Child stack:
+        StackName: prod-platform-NetworkingStack-xyz
+        StackStatus: UPDATE_ROLLBACK_FAILED
+        Failed resource:
+          LogicalResourceId: VpcEndpointCustomResource
+          ResourceType: Custom::VpcEndpoint
+          ResourceStatus: DELETE_FAILED
+          ResourceStatusReason: "Custom Resource timed out waiting
+            for provider response (provider Lambda timed out at
+            10s)."
+
+      Operator context: The team has been trying to continue-update-
+      rollback on the parent stack but it keeps failing because the
+      child is still stuck.
+
+      Stack policy: (none)
+      Drift: (none detected)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "nested-stack-cascade-rollback"
+        - "NESTED_STACK_CASCADE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: CUSTOM_RESOURCE_TIMEOUT"
+        - "LAYER: IAM_REPLACEMENT"
+
+  - id: stack-policy-blocks-rollback
+    description: >-
+      Stack in UPDATE_ROLLBACK_FAILED. The blocking resource is an RDS
+      instance that CloudFormation tried to modify during rollback. A
+      stack policy with Deny on Update:Replace for AWS::RDS::DBInstance
+      prevents the rollback from modifying it. Expected layer:
+      STACK_POLICY_BLOCKING.
+    input: |
+      Symptom: CloudFormation stack prod-data is stuck in
+      UPDATE_ROLLBACK_FAILED. The rollback failed because a stack
+      policy blocks updates to the RDS DBInstance resource. The error
+      in stack events is "Action not allowed by stack policy."
+
+      StackName: prod-data
+      StackStatus: UPDATE_ROLLBACK_FAILED
+
+      Failed resource:
+        LogicalResourceId: PrimaryDB
+        ResourceType: AWS::RDS::DBInstance
+        ResourceStatus: UPDATE_FAILED
+        ResourceStatusReason: "Action not allowed by stack policy:
+          Update:Replace is denied for resources of type
+          AWS::RDS::DBInstance"
+
+      Stack policy:
+        {
+          "Statement": [{
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "Update:*",
+            "Resource": "*",
+            "Condition": {
+              "StringEquals": {
+                "ResourceType": ["AWS::RDS::DBInstance"]
+              }
+            }
+          }]
+        }
+
+      Drift: (none detected)
+      Nested stacks: (none)
+      Custom resources: (none)
+
+      The update that triggered the rollback was attempting to change
+      the DBInstanceClass from db.r5.xlarge to db.r5.2xlarge. The
+      rollback needs to revert to db.r5.xlarge but the stack policy
+      blocks the replacement.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "stack-policy-blocks-rollback"
+        - "STACK_POLICY_BLOCKING"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: DRIFT_DETECTION"
+        - "LAYER: DEPENDENT_RESOURCE_IN_USE"
+
+  - id: drift-detection-blocking-rollback
+    description: >-
+      Stack in UPDATE_ROLLBACK_FAILED. The blocking resource is an EC2
+      Security Group that was manually modified outside CloudFormation
+      (extra ingress rule added). During rollback, CloudFormation tries
+      to revert to the template state but the drift causes a mismatch.
+      Expected layer: DRIFT_DETECTION.
+    input: |
+      Symptom: CloudFormation stack prod-app is stuck in
+      UPDATE_ROLLBACK_FAILED. The rollback failed on a Security Group
+      resource because its actual state doesn't match the expected
+      template state. An operator manually added an ingress rule via
+      the AWS Console last week (drift).
+
+      StackName: prod-app
+      StackStatus: UPDATE_ROLLBACK_FAILED
+
+      Failed resource:
+        LogicalResourceId: AppSecurityGroup
+        ResourceType: AWS::EC2::SecurityGroup
+        ResourceStatus: UPDATE_FAILED
+        ResourceStatusReason: "Resource not in expected state:
+          Security Group sg-abc123 has ingress rules that do not
+          match the template."
+
+      Drift detection result:
+        StackResourceDriftStatus: MODIFIED
+        PropertyDifferences:
+          - PropertyPath: /SecurityGroupIngress/1
+            DifferenceType: ADD
+            ExpectedValue: (not present in template)
+            ActualValue: {IpProtocol: tcp, FromPort: 5432,
+              ToPort: 5432, CidrIp: 10.0.1.0/24}
+          - PropertyPath: /Tags/0/Value
+            DifferenceType: NOT_EQUAL
+            ExpectedValue: "prod-app-sg"
+            ActualValue: "prod-app-sg-manual-edit"
+
+      Stack policy: (none)
+      Nested stacks: (none)
+      Custom resources: (none)
+
+      The update that triggered the rollback added a new egress rule.
+      The rollback tried to remove it, but CloudFormation also tried
+      to reconcile the manually-added ingress rule and failed because
+      the drifted state didn't match any expected configuration.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "drift-detection-blocking-rollback"
+        - "DRIFT_DETECTION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: STACK_POLICY_BLOCKING"
+        - "LAYER: DEPENDENT_RESOURCE_IN_USE"

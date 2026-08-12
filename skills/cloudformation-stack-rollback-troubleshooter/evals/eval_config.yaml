@@ -1,0 +1,48 @@
+# Eval configuration for cloudformation-stack-rollback-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudformation-stack-rollback-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: custom-resource-lambda-timeout
+    difficulty: hard
+    prompt_file: prompts/custom-resource-lambda-timeout.md
+    baseline_file: baselines/custom-resource-lambda-timeout.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: CUSTOM_RESOURCE_TIMEOUT
+  - id: update-rollback-failed-needs-continue
+    difficulty: hard
+    prompt_file: prompts/update-rollback-failed-needs-continue.md
+    baseline_file: baselines/update-rollback-failed-needs-continue.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: IAM_REPLACEMENT
+  - id: nested-stack-cascade-rollback
+    difficulty: hard
+    prompt_file: prompts/nested-stack-cascade-rollback.md
+    baseline_file: baselines/nested-stack-cascade-rollback.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: NESTED_STACK_CASCADE
+  - id: stack-policy-blocks-rollback
+    difficulty: hard
+    prompt_file: prompts/stack-policy-blocks-rollback.md
+    baseline_file: baselines/stack-policy-blocks-rollback.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: STACK_POLICY_BLOCKING
+  - id: drift-detection-blocking-rollback
+    difficulty: hard
+    prompt_file: prompts/drift-detection-blocking-rollback.md
+    baseline_file: baselines/drift-detection-blocking-rollback.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: DRIFT_DETECTION

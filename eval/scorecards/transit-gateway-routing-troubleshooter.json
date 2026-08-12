@@ -1,0 +1,70 @@
+{
+  "skill": "transit-gateway-routing-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill delivers a concrete 14\u2011layer diagnostic decision tree, explicit ordering of checks (association \u2192 propagation \u2192 return path), and nuanced AWS\u2011specific facts (static routes always win, TGW peering is non\u2011transitive, appliance\u2011mode behavior, overlapping CIDR longest\u2011prefix rules, flow\u2011log interpretation). These details go beyond a generic model\u2019s knowledge, but most points are restatements of official docs rather than novel insights, so full credit is not awarded."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill encodes expert AWS\u2011specific procedures: exact CLI commands per layer, bidirectional routing mindset, and a step\u2011by\u2011step probe hierarchy. However some procedures are generic (e.g., \u201ccheck both directions\u201d) and the invocation schema lacks precise field validation for cross\u2011account peering scenarios, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "A thorough NEVER list enumerates common pitfalls (e.g., never emit ROOT_CAUSE without a failing probe, never assume TGW peering is transitive, never use cross\u2011VPC SG references) with clear reasoning. The list omits a few advanced anti\u2011patterns such as IAM permission failures or health\u2011event masking, hence a slight deduction."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and an invocation example are provided. The invocation_schema, however, is vague about required JSON structure and optional fields, which could cause unreliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The Quick\u2011Start section gives a concise symptom\u2011to\u2011layer map, with deeper technical details deferred to later sections. Nonetheless the document front\u2011loads a large amount of dense information (mindset, philosophy, full decision tree) that may overwhelm an agent before it reaches the needed layer."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "All diagnostic probes are read\u2011only, and every state\u2011changing remediation command is gated behind an explicit CONFIRM prompt. The calibration matches the fragility of TGW operations perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable structure (frontmatter \u2192 quick start \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 anti\u2011patterns \u2192 safety \u2192 remediation), aiding comprehension. Minor ad\u2011hoc ordering of some sections (e.g., anti\u2011patterns interleaved with safety checks) prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, evidence format, and worked examples, enabling an agent to execute the troubleshooting flow. Missing edge\u2011case handling (cross\u2011account peering, pagination of CLI output, IAM permission errors) and some ambiguity in input parsing reduce usability slightly."
+    }
+  ],
+  "total_score": 107,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 46175,
+  "latency_ms": 10170,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

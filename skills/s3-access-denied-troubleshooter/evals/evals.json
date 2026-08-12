@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "s3-access-denied-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the S3 Access Denied Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "kms-key-policy-decrypt-missing",
+      "name": "SSE-KMS object AccessDenied — caller missing kms:Decrypt on customer-managed CMK despite s3:GetObject granted",
+      "difficulty": "hard",
+      "prompt_file": "prompts/kms-key-policy-decrypt-missing.md",
+      "baseline_file": "baselines/kms-key-policy-decrypt-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "KMS_KEY_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "kms-key-policy-decrypt-missing", "KMS_KEY_POLICY", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: IMPLICIT_DENY_IAM"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-bucket-policy-missing",
+      "name": "Cross-account S3 GetObject denied — bucket policy does not list caller's account; cross-account requires both policies",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-bucket-policy-missing.md",
+      "baseline_file": "baselines/cross-account-bucket-policy-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CROSS_ACCOUNT_MISSING_BUCKET_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "cross-account-bucket-policy-missing", "CROSS_ACCOUNT_MISSING_BUCKET_POLICY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: KMS_KEY_POLICY"]
+        }
+      ]
+    },
+    {
+      "id": "explicit-deny-bucket-policy",
+      "name": "Bucket policy explicit Deny overrides IAM Allow — aws:SourceIp condition blocks VPC-attached Lambda via NAT Gateway IP",
+      "difficulty": "hard",
+      "prompt_file": "prompts/explicit-deny-bucket-policy.md",
+      "baseline_file": "baselines/explicit-deny-bucket-policy.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "EXPLICIT_DENY_BUCKET_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "explicit-deny-bucket-policy", "EXPLICIT_DENY_BUCKET_POLICY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: IMPLICIT_DENY_IAM"]
+        }
+      ]
+    },
+    {
+      "id": "scp-deny-s3-actions",
+      "name": "SCP at OU level denies all S3 actions — evaluated before IAM and bucket policy in the hierarchy",
+      "difficulty": "hard",
+      "prompt_file": "prompts/scp-deny-s3-actions.md",
+      "baseline_file": "baselines/scp-deny-s3-actions.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SCP_DENY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "scp-deny-s3-actions", "SCP_DENY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: IMPLICIT_DENY_IAM"]
+        }
+      ]
+    },
+    {
+      "id": "object-ownership-acl-conflict",
+      "name": "Object ownership mismatch — objects uploaded by cross-account partner owned by uploader, not bucket owner; ACLs block bucket owner",
+      "difficulty": "hard",
+      "prompt_file": "prompts/object-ownership-acl-conflict.md",
+      "baseline_file": "baselines/object-ownership-acl-conflict.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "OBJECT_OWNERSHIP",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "object-ownership-acl-conflict", "OBJECT_OWNERSHIP", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: KMS_KEY_POLICY"]
+        }
+      ]
+    }
+  ]
+}

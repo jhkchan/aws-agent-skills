@@ -1,0 +1,230 @@
+# Eval test cases for bedrock-model-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# workload name embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: bedrock-model-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: opus-to-haiku-downgrade
+    description: >-
+      Customer support chatbot using Opus for simple FAQ Q&A. Average
+      output 180 tokens (extraction/lookup), well within Haiku's
+      capability. 2,000-token system prompt repeated every invocation.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with model
+      downgrade to Haiku + prompt caching.
+    input: |
+      Workload: opus-to-haiku-downgrade (customer support chatbot)
+      ModelId: anthropic.claude-3-opus-20240229-v1:0
+      Region: us-east-1
+      Pricing: on-demand
+
+      Metrics (last 30 days):
+        - InputTokenCount total: 500,000,000 (avg 2,500/invocation)
+        - OutputTokenCount total: 36,000,000 (avg 180/invocation)
+        - InvocationCount: 200,000
+        - InvocationLatency avg: 3,200 ms, p95: 5,800 ms
+        - ThrottledInvocationCount: 0
+
+      Workload context: FAQ Q&A. System prompt is 2,000 tokens of
+      company policy + FAQ, repeated on every invocation. Responses are
+      short (avg 180 output tokens). No batch processing.
+
+      Cost Explorer: $10,200/month on Bedrock (Service=Bedrock).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "opus-to-haiku-downgrade"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "Haiku"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: prompt-caching-opportunity
+    description: >-
+      Document analysis workload using Sonnet with a 3,000-token system
+      prompt (legal instructions + format spec) repeated on every call.
+      Prompt caching not enabled. Invocation rate is steady (~2/sec).
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with prompt
+      caching.
+    input: |
+      Workload: prompt-caching-opportunity (legal document analyser)
+      ModelId: anthropic.claude-3-5-sonnet-20241022-v2:0
+      Region: us-east-1
+      Pricing: on-demand
+
+      Metrics (last 30 days):
+        - InputTokenCount total: 180,000,000 (avg 3,000/invocation)
+        - OutputTokenCount total: 30,000,000 (avg 500/invocation)
+        - InvocationCount: 60,000
+        - InvocationLatency avg: 2,100 ms, p95: 3,400 ms
+        - ThrottledInvocationCount: 0
+
+      Workload context: legal document clause extraction. System prompt
+      is 2,800 tokens of legal instructions + output format spec,
+      repeated on every invocation. User query (200 tokens) varies per
+      invocation. Invocation rate ~2/sec (steady, well within cache TTL).
+      Prompt caching is NOT currently enabled.
+
+      Cost Explorer: $990/month on Bedrock.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "prompt-caching-opportunity"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "cach"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: batch-inference-migration
+    description: >-
+      Bulk document summarisation workload processing 500,000 documents
+      per month via real-time InvokeModel. Non-interactive (results
+      consumed by a nightly pipeline). Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with batch inference migration.
+    input: |
+      Workload: batch-inference-migration (bulk document summarisation)
+      ModelId: anthropic.claude-3-haiku-20240307-v1:0
+      Region: us-east-1
+      Pricing: on-demand
+
+      Metrics (last 30 days):
+        - InputTokenCount total: 750,000,000 (avg 1,500/invocation)
+        - OutputTokenCount total: 250,000,000 (avg 500/invocation)
+        - InvocationCount: 500,000
+        - InvocationLatency avg: 1,800 ms, p95: 2,900 ms
+        - ThrottledInvocationCount: 12,000 (2.4%)
+
+      Workload context: bulk summarisation of internal documents
+      (PDF transcripts, meeting notes). Results are consumed by a
+      nightly search indexing pipeline — no user is waiting for real-
+      time responses. 500k documents/month, batch of 1 per invocation.
+
+      Cost Explorer: $500/month on Bedrock.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "batch-inference-migration"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "batch"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimized-workload
+    description: >-
+      Classification workload already on Haiku, prompt caching enabled
+      for system prompt, response length controlled via max_tokens=200,
+      no batch-eligible traffic. Expected verdict: OPTIMIZED.
+    input: |
+      Workload: already-optimized-workload (email classifier)
+      ModelId: anthropic.claude-3-haiku-20240307-v1:0
+      Region: us-east-1
+      Pricing: on-demand
+
+      Metrics (last 30 days):
+        - InputTokenCount total: 120,000,000 (avg 400/invocation, of which
+          350 are cached system prompt)
+        - OutputTokenCount total: 15,000,000 (avg 50/invocation)
+        - InvocationCount: 300,000
+        - InvocationLatency avg: 450 ms, p95: 800 ms
+        - ThrottledInvocationCount: 0
+
+      Workload context: email classification (spam/not-spam/priority).
+      System prompt (350 tokens, classification instructions) is cached
+      via prompt caching (cache hit rate 94%). max_tokens=200 set.
+      Interactive workload (batch not eligible). No Guardrails. No KB.
+
+      Cost Explorer: $48.75/month on Bedrock.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized-workload"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: response-length-control
+    description: >-
+      Product description generator using Sonnet with no max_tokens set.
+      Average output 1,200 tokens where 300 would suffice. Expected
+      verdict: FURTHER_OPTIMIZATION_AVAILABLE with response length
+      control.
+    input: |
+      Workload: response-length-control (product description generator)
+      ModelId: anthropic.claude-3-5-sonnet-20241022-v2:0
+      Region: us-east-1
+      Pricing: on-demand
+
+      Metrics (last 30 days):
+        - InputTokenCount total: 80,000,000 (avg 800/invocation)
+        - OutputTokenCount total: 120,000,000 (avg 1,200/invocation)
+        - InvocationCount: 100,000
+        - InvocationLatency avg: 4,500 ms, p95: 7,200 ms
+        - ThrottledInvocationCount: 0
+
+      Workload context: e-commerce product description generator. Input
+      is product specs (800 tokens). Output averages 1,200 tokens —
+      verbose prose where structured 300-token JSON would suffice.
+      max_tokens is not set (defaults to model max). No stop sequences.
+
+      Cost Explorer: $2,040/month on Bedrock ($240 input + $1,800 output).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "response-length-control"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "max_tokens"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"

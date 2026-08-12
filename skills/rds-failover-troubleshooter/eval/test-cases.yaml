@@ -1,0 +1,317 @@
+# Eval test cases for rds-failover-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it.
+skill: rds-failover-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: app-instance-endpoint-not-cluster
+    description: >-
+      Aurora PostgreSQL cluster failed over at 03:17 UTC. The writer
+      cluster endpoint resolved to the new writer within 1 second.
+      The application continued receiving "cannot execute WRITE in a
+      read-only transaction" errors because the connection string
+      uses the instance endpoint (instance-1), which became a reader
+      after failover. Expected root cause: APP_NOT_CLUSTER_ENDPOINT.
+    input: |
+      Symptom: Aurora PostgreSQL cluster prod-db-cluster failed over
+      automatically at 03:17 UTC. The writer cluster endpoint
+      resolved to the new writer (instance-2) within 1 second.
+      However, the application (payments-service) continued
+      receiving "cannot execute WRITE in a read-only transaction"
+      errors. The application did not recover until manually
+      restarted at 03:35 UTC.
+
+      DBClusterIdentifier: prod-db-cluster
+      Engine: aurora-postgresql
+      EngineVersion: 16.2
+      WriterEndpoint: prod-db-cluster.cluster-xxxxxxxxxxxx.us-east-1.rds.amazonaws.com
+      ReaderEndpoint: prod-db-cluster.cluster-ro-xxxxxxxxxxxx.us-east-1.rds.amazonaws.com
+
+      DBClusterMembers:
+        - instance-1: was writer before failover, now reader
+          (PromotionTier: 15)
+        - instance-2: was reader, now writer
+          (PromotionTier: 0)
+
+      Application connection string (from config):
+        jdbc:postgresql://prod-db-cluster-instance-1.xxxxxxxxxxxx.us-east-1.rds.amazonaws.com:5432/prod_db
+
+      RDS events (last 2 hours):
+        - 03:17:05 — RDS-EVENT-0088: Aurora failover started
+        - 03:17:18 — RDS-EVENT-0089: Aurora failover completed
+
+      DNS verification:
+        - prod-db-cluster.cluster-xxxx resolves to instance-2 IP
+          (new writer) — TTL 1 second
+        - prod-db-cluster-instance-1.xxxx resolves to instance-1 IP
+          (now reader) — TTL 300 seconds
+
+      JVM DNS cache: networkaddress.cache.ttl=60
+      Connection pool: HikariCP maxLifetime=30s
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "app-instance-endpoint-not-cluster"
+        - "APP_NOT_CLUSTER_ENDPOINT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: CONNECTION_POOL_CACHING"
+
+  - id: connection-pool-hikari-stale-cache
+    description: >-
+      Aurora MySQL cluster failed over. Application uses the correct
+      cluster endpoint. DNS TTL is 1 second. But the HikariCP
+      connection pool has maxLifetime=300s and the JVM DNS cache TTL
+      is 60s. Application did not recover for 4.5 minutes after the
+      DB failover completed. Expected root cause: CONNECTION_POOL_CACHING.
+    input: |
+      Symptom: Aurora MySQL cluster orders-db-cluster failed over at
+      14:23 UTC. The DB failover completed in 12 seconds. The
+      application (orders-api, Java/Spring Boot) did not recover
+      until 14:27:30 UTC — 4.5 minutes later. The application uses
+      the correct cluster endpoint.
+
+      DBClusterIdentifier: orders-db-cluster
+      Engine: aurora-mysql
+      EngineVersion: 8.0.mysql_aurora.3.05.2
+
+      Application connection string:
+        jdbc:mysql://orders-db-cluster.cluster-xxxxxxxxxxxx.us-east-1.rds.amazonaws.com:3306/orders_db
+
+      RDS events:
+        - 14:23:12 — RDS-EVENT-0088: Aurora failover started
+        - 14:23:24 — RDS-EVENT-0089: Aurora failover completed
+
+      DNS verification:
+        - orders-db-cluster.cluster-xxxx resolves to new writer IP
+          — TTL 1 second (verified)
+
+      JVM configuration:
+        - networkaddress.cache.ttl=60 (Java default, not overridden)
+
+      HikariCP configuration:
+        - maxLifetime=300000 (5 minutes)
+        - maximumPoolSize=20
+        - connectionTimeout=30000 (30 seconds)
+
+      OS DNS resolver: systemd-resolved with Cache=yes (caches per
+        TTL)
+
+      Application error pattern:
+        - 14:23:24 to 14:27:30: "Communications link failure" and
+          "Connection refused" errors
+        - 14:27:30: errors cleared (coincides with connection pool
+          cycling connections at maxLifetime boundary)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "connection-pool-hikari-stale-cache"
+        - "CONNECTION_POOL_CACHING"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: APP_NOT_CLUSTER_ENDPOINT"
+
+  - id: failover-priority-tier-wrong-instance
+    description: >-
+      Aurora PostgreSQL cluster with two reader instances. The
+      intended promotion target (instance-reader-large, db.r6g.2xlarge)
+      has PromotionTier=15. A smaller reader (instance-reader-small,
+      db.r6g.large) has PromotionTier=0. The smaller instance was
+      promoted instead of the larger one. Expected root cause:
+      FAILOVER_PRIORITY_TIER.
+    input: |
+      Symptom: Aurora PostgreSQL cluster analytics-db-cluster failed
+      over. The application expected instance-reader-large
+      (db.r6g.2xlarge) to become the new writer. Instead,
+      instance-reader-small (db.r6g.large) was promoted, causing
+      performance issues because the smaller instance class cannot
+      handle the write workload.
+
+      DBClusterIdentifier: analytics-db-cluster
+      Engine: aurora-postgresql
+      EngineVersion: 16.2
+
+      DBClusterMembers (before failover):
+        - instance-writer: writer, db.r6g.2xlarge, PromotionTier=0
+        - instance-reader-large: reader, db.r6g.2xlarge, PromotionTier=15
+        - instance-reader-small: reader, db.r6g.large, PromotionTier=0
+
+      DBClusterMembers (after failover):
+        - instance-reader-small: NOW WRITER, db.r6g.large
+          (PromotionTier=0 — promoted first because it had tier 0)
+        - instance-reader-large: still reader, db.r6g.2xlarge
+          (PromotionTier=15 — NOT promoted because tier 15 is last)
+        - instance-writer: now reader, db.r6g.2xlarge
+          (PromotionTier=0)
+
+      CloudWatch metrics (post-failover):
+        - CPUUtilization on instance-reader-small: 95% (overloaded)
+        - DatabaseConnections to instance-reader-small: 450
+          (high; pool exhausted)
+
+      RDS events:
+        - Failover completed; instance-reader-small promoted
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "failover-priority-tier-wrong-instance"
+        - "FAILOVER_PRIORITY_TIER"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: STORAGE_FULL"
+
+  - id: storage-full-prevents-failover
+    description: >-
+      Multi-AZ RDS MySQL instance with 500 GB allocated storage.
+      FreeStorageSpace dropped to 0.5 GB. Primary instance failed;
+      failover triggered but the standby could not complete promotion
+      because it also had insufficient storage. Error: FailoverFailed.
+      Expected root cause: STORAGE_FULL.
+    input: |
+      Symptom: Multi-AZ RDS MySQL instance prod-mysql failed over
+      automatically when the primary became unresponsive. The
+      failover event appeared in RDS events but the standby did not
+      become available. Error: "FailoverFailed" and
+      "InsufficientStorage".
+
+      DBInstanceIdentifier: prod-mysql
+      Engine: mysql
+      EngineVersion: 8.0.35
+      MultiAZ: true
+      DBInstanceClass: db.m6i.2xlarge
+      AllocatedStorage: 500 GB
+      StorageType: gp3
+
+      RDS events (last 2 hours):
+        - 02:15:00 — RDS-EVENT-0065: DB instance has insufficient storage
+        - 02:17:30 — RDS-EVENT-0049: Multi-AZ failover started
+        - 02:18:45 — RDS-EVENT-0006: DB instance failover failed
+          (reason: InsufficientStorage)
+
+      CloudWatch metrics:
+        - FreeStorageSpace (last 6 hours): dropped from 50 GB to 0.5 GB
+        - DiskQueueDepth: spiked to 800 (sustained high I/O wait)
+        - WriteLatency: increased 10x
+
+      DBInstanceStatus: storage-full
+
+      Application impact: complete database outage since 02:15 UTC.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "storage-full-prevents-failover"
+        - "STORAGE_FULL"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: MULTI_AZ_HEALTH_THRESHOLD"
+
+  - id: parameter-group-mismatch-standby
+    description: >-
+      Multi-AZ RDS PostgreSQL instance. Primary uses parameter group
+      prod-pg-params-v2; standby still uses default-pg-params (from
+      initial creation). After failover, the standby fails health
+      checks because max_connections is 200 (default) vs 500 on the
+      primary. Expected root cause: PARAMETER_GROUP_MISMATCH.
+    input: |
+      Symptom: Multi-AZ RDS PostgreSQL instance prod-postgres failed
+      over. The standby instance started promotion but failed health
+      checks during the promotion phase. The RDS event log shows
+      "DB instance has configuration mismatch with primary." The
+      standby's DB parameter group differs from the primary's.
+
+      DBInstanceIdentifier: prod-postgres
+      Engine: postgres
+      EngineVersion: 16.2
+      MultiAZ: true
+      DBInstanceClass: db.r6i.4xlarge
+
+      Primary DBParameterGroups:
+        - prod-pg-params-v2 (status: applied)
+          — max_connections=500
+          — shared_buffers=12GB
+          — work_mem=64MB
+
+      Standby DBParameterGroups:
+        - default.postgres16 (status: applied)
+          — max_connections=200 (default — LOWER than primary)
+          — shared_buffers=256MB (default)
+          — work_mem=4MB (default)
+
+      RDS events:
+        - 09:10:00 — RDS-EVENT-0049: Multi-AZ failover started
+        - 09:11:30 — Configuration mismatch detected during promotion
+        - 09:12:00 — RDS-EVENT-0006: DB instance failover failed
+          (reason: parameter group mismatch)
+
+      CloudWatch metrics:
+        — DatabaseConnections: dropped to 0 at failover start
+        — No recovery after 10 minutes
+
+      DBInstanceStatus: available (reverted to primary; standby
+        still unhealthy)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      ROOT_CAUSE, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "parameter-group-mismatch-standby"
+        - "PARAMETER_GROUP_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "ROOT_CAUSE: STORAGE_FULL"

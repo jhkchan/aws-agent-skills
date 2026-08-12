@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "transit-gateway-routing-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Transit Gateway Routing Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "tgw-static-route-overrides-propagated",
+      "name": "VPC-A cannot ping VPC-B; TGW static route for 10.20.0.0/16 points at wrong (legacy) attachment, overriding the propagated route",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tgw-static-route-overrides-propagated.md",
+      "baseline_file": "baselines/tgw-static-route-overrides-propagated.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TGW_STATIC_ROUTE_PRIORITY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "tgw-static-route-overrides-propagated", "TGW_STATIC_ROUTE_PRIORITY", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TGW_OVERLAPPING_CIDR"]
+        }
+      ]
+    },
+    {
+      "id": "tgw-peering-non-transitive",
+      "name": "VPC on tgw-a cannot reach VPC on tgw-c through tgw-b as intermediate hop; TGW peering is non-transitive",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tgw-peering-non-transitive.md",
+      "baseline_file": "baselines/tgw-peering-non-transitive.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TGW_PEERING_NON_TRANSITIVE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "tgw-peering-non-transitive", "TGW_PEERING_NON_TRANSITIVE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TGW_ROUTE_TABLE_ASSOCIATION"]
+        }
+      ]
+    },
+    {
+      "id": "tgw-appliance-mode-disabled",
+      "name": "Stateful inspection VPC drops cross-AZ flows; ApplianceModeSupport=disable on the inspection attachment",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tgw-appliance-mode-disabled.md",
+      "baseline_file": "baselines/tgw-appliance-mode-disabled.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TGW_APPLIANCE_MODE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "tgw-appliance-mode-disabled", "TGW_APPLIANCE_MODE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TGW_ROUTE_TABLE_ASSOCIATION"]
+        }
+      ]
+    },
+    {
+      "id": "tgw-vpc-default-route-blackhole",
+      "name": "Forward path VPC-A→VPC-B works but return traffic blackholes; VPC-B route table has no route for VPC-A CIDR, default goes to IGW",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tgw-vpc-default-route-blackhole.md",
+      "baseline_file": "baselines/tgw-vpc-default-route-blackhole.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "VPC_DEFAULT_ROUTE_TGW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "tgw-vpc-default-route-blackhole", "VPC_DEFAULT_ROUTE_TGW", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TGW_ROUTE_TABLE_PROPAGATION"]
+        }
+      ]
+    },
+    {
+      "id": "tgw-overlapping-cidr",
+      "name": "VPC-A 10.0.0.0/16 and VPC-B 10.0.1.0/24 overlap; TGW longest-prefix match shadows VPC-A's broader CIDR for the overlapping subnet",
+      "difficulty": "hard",
+      "prompt_file": "prompts/tgw-overlapping-cidr.md",
+      "baseline_file": "baselines/tgw-overlapping-cidr.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TGW_OVERLAPPING_CIDR",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "tgw-overlapping-cidr", "TGW_OVERLAPPING_CIDR", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TGW_STATIC_ROUTE_PRIORITY"]
+        }
+      ]
+    }
+  ]
+}

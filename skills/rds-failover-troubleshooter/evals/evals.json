@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "rds-failover-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the RDS Failover Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "app-instance-endpoint-not-cluster",
+      "name": "Aurora failover completed but app hits reader — application uses instance endpoint instead of cluster endpoint",
+      "difficulty": "hard",
+      "prompt_file": "prompts/app-instance-endpoint-not-cluster.md",
+      "baseline_file": "baselines/app-instance-endpoint-not-cluster.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "APP_NOT_CLUSTER_ENDPOINT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "app-instance-endpoint-not-cluster", "APP_NOT_CLUSTER_ENDPOINT", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: CONNECTION_POOL_CACHING"]
+        }
+      ]
+    },
+    {
+      "id": "connection-pool-hikari-stale-cache",
+      "name": "Aurora failover completed in 12s but app took 4.5 min to recover — HikariCP maxLifetime and JVM DNS cache caching old IP",
+      "difficulty": "hard",
+      "prompt_file": "prompts/connection-pool-hikari-stale-cache.md",
+      "baseline_file": "baselines/connection-pool-hikari-stale-cache.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CONNECTION_POOL_CACHING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "connection-pool-hikari-stale-cache", "CONNECTION_POOL_CACHING", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: APP_NOT_CLUSTER_ENDPOINT"]
+        }
+      ]
+    },
+    {
+      "id": "failover-priority-tier-wrong-instance",
+      "name": "Aurora failover promoted wrong instance — smaller reader with tier 0 promoted over larger reader with tier 15",
+      "difficulty": "hard",
+      "prompt_file": "prompts/failover-priority-tier-wrong-instance.md",
+      "baseline_file": "baselines/failover-priority-tier-wrong-instance.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "FAILOVER_PRIORITY_TIER",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "failover-priority-tier-wrong-instance", "FAILOVER_PRIORITY_TIER", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: STORAGE_FULL"]
+        }
+      ]
+    },
+    {
+      "id": "storage-full-prevents-failover",
+      "name": "Multi-AZ failover failed — both primary and standby storage-full; InsufficientStorage prevents promotion",
+      "difficulty": "hard",
+      "prompt_file": "prompts/storage-full-prevents-failover.md",
+      "baseline_file": "baselines/storage-full-prevents-failover.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "STORAGE_FULL",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "storage-full-prevents-failover", "STORAGE_FULL", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: MULTI_AZ_HEALTH_THRESHOLD"]
+        }
+      ]
+    },
+    {
+      "id": "parameter-group-mismatch-standby",
+      "name": "Multi-AZ standby fails health checks during promotion — parameter group mismatch between primary and standby",
+      "difficulty": "hard",
+      "prompt_file": "prompts/parameter-group-mismatch-standby.md",
+      "baseline_file": "baselines/parameter-group-mismatch-standby.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "PARAMETER_GROUP_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "parameter-group-mismatch-standby", "PARAMETER_GROUP_MISMATCH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "ROOT_CAUSE: STORAGE_FULL"]
+        }
+      ]
+    }
+  ]
+}

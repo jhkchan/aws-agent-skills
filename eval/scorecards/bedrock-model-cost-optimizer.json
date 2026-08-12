@@ -1,0 +1,70 @@
+{
+  "skill": "bedrock-model-cost-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Adds concrete expert data not usually known to a generic model: exact per\u20111k\u2011token rates for each Bedrock model, the 1.25\u00d7 cache\u2011write premium, 90% cache\u2011hit savings math, 50% batch discount, guardrail token\u2011price ($0.001/1k), OCU $400 minimum, and a break\u2011even formula for fine\u2011tuning. Minor omission: no mention of regional pricing multipliers."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific decision process: pre\u2011flight data gate, ordered steps (model selection \u2192 caching \u2192 batch \u2192 response length \u2192 fine\u2011tune \u2192 guardrails \u2192 throughput), and exact CLI commands for each mitigation. Procedure is largely AWS\u2011centric; only a small amount of generic \u201ccheck traffic\u201d language remains."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a concrete NEVER list with detailed reasoning (e.g., never downgrade without task verification, never cache low\u2011traffic workloads, never batch interactive jobs, never fine\u2011tune without break\u2011even, never provisioned throughput without steady traffic). Lacks a few additional pitfalls such as ignoring token\u2011rounding effects or regional price variance."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Complete frontmatter, clear description of WHAT it does, WHEN to invoke, and exhaustive keyword/trigger list. Invocation schema and example are present and conform to the required contract."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Top\u2011level quick\u2011start, then mindset, then step\u2011by\u2011step deep dive, then references. Critical rules (e.g., cache write premium) are placed in the \u201cStep\u202f0\u201d section rather than buried. Slight overload in the Quick navigation table but overall well layered."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Calibrates freedom precisely: destructive actions are gated by CONFIRM, batch only for non\u2011real\u2011time, caching gated by hit\u2011rate >1 per 5\u202fmin, provisioned throughput only if spend >$10k and CV<0.3, etc. No over\u2011constraining of creative tasks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Process steps \u2192 Output contract \u2192 Anti\u2011Patterns \u2192 Safety checks \u2192 References), making the document easy to parse."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides decision trees, working CLI snippets, exact output block format, and self\u2011check checklist. However, error\u2011handling for missing CloudWatch metrics beyond the listed gates and handling of API failures are not detailed, leaving some edge cases unaddressed."
+    }
+  ],
+  "total_score": 112,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 48169,
+  "latency_ms": 15652,
+  "assertions_passed": false,
+  "assertions_passed_count": 1,
+  "assertions_failed_count": 4
+}

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "bedrock-model-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Bedrock Model Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "opus-to-haiku-downgrade",
+      "name": "Customer support chatbot on Opus for FAQ Q&A, avg 180 output tokens — downgrade to Haiku + prompt caching",
+      "difficulty": "medium",
+      "prompt_file": "prompts/opus-to-haiku-downgrade.md",
+      "baseline_file": "baselines/opus-to-haiku-downgrade.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "opus-to-haiku-downgrade", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "Haiku"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "prompt-caching-opportunity",
+      "name": "Legal document analyser on Sonnet with 2,800-token system prompt, no caching — enable prompt caching",
+      "difficulty": "hard",
+      "prompt_file": "prompts/prompt-caching-opportunity.md",
+      "baseline_file": "baselines/prompt-caching-opportunity.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "prompt-caching-opportunity", "RECOMMENDATION", "ESTIMATED_SAVINGS", "cach"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "batch-inference-migration",
+      "name": "Bulk document summarisation via real-time InvokeModel, non-interactive nightly pipeline — migrate to batch",
+      "difficulty": "hard",
+      "prompt_file": "prompts/batch-inference-migration.md",
+      "baseline_file": "baselines/batch-inference-migration.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "batch-inference-migration", "RECOMMENDATION", "ESTIMATED_SAVINGS", "batch"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized-workload",
+      "name": "Email classifier on Haiku, caching enabled, max_tokens=200, no batch eligible — already optimized",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized-workload.md",
+      "baseline_file": "baselines/already-optimized-workload.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized-workload", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "response-length-control",
+      "name": "Product description generator on Sonnet, no max_tokens, avg 1,200 output tokens — response length control",
+      "difficulty": "medium",
+      "prompt_file": "prompts/response-length-control.md",
+      "baseline_file": "baselines/response-length-control.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "response-length-control", "RECOMMENDATION", "ESTIMATED_SAVINGS", "max_tokens"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

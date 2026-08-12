@@ -1,0 +1,48 @@
+# Eval configuration for transit-gateway-routing-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: transit-gateway-routing-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: tgw-static-route-overrides-propagated
+    difficulty: hard
+    prompt_file: prompts/tgw-static-route-overrides-propagated.md
+    baseline_file: baselines/tgw-static-route-overrides-propagated.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TGW_STATIC_ROUTE_PRIORITY
+  - id: tgw-peering-non-transitive
+    difficulty: hard
+    prompt_file: prompts/tgw-peering-non-transitive.md
+    baseline_file: baselines/tgw-peering-non-transitive.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TGW_PEERING_NON_TRANSITIVE
+  - id: tgw-appliance-mode-disabled
+    difficulty: hard
+    prompt_file: prompts/tgw-appliance-mode-disabled.md
+    baseline_file: baselines/tgw-appliance-mode-disabled.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TGW_APPLIANCE_MODE
+  - id: tgw-vpc-default-route-blackhole
+    difficulty: hard
+    prompt_file: prompts/tgw-vpc-default-route-blackhole.md
+    baseline_file: baselines/tgw-vpc-default-route-blackhole.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: VPC_DEFAULT_ROUTE_TGW
+  - id: tgw-overlapping-cidr
+    difficulty: hard
+    prompt_file: prompts/tgw-overlapping-cidr.md
+    baseline_file: baselines/tgw-overlapping-cidr.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TGW_OVERLAPPING_CIDR

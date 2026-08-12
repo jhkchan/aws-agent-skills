@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "kafka-msk-lag-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Kafka MSK Lag Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "partition-skew-hot-key",
+      "name": "RecordsLagMax 8M on one partition; keyed producer with hot device-id routes 80% of traffic to partition 7",
+      "difficulty": "hard",
+      "prompt_file": "prompts/partition-skew-hot-key.md",
+      "baseline_file": "baselines/partition-skew-hot-key.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "PARTITION_SKEW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "partition-skew-hot-key", "PARTITION_SKEW", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CONSUMER_RATE", "LAYER: CONSUMER_FETCH_TUNING"]
+        }
+      ]
+    },
+    {
+      "id": "broker-disk-isr-shrink",
+      "name": "UnderReplicatedPartitions 14 sustained; broker-2 disk 92%; ISRShrink; producer acks=all receives NOT_ENOUGH_REPLICAS",
+      "difficulty": "hard",
+      "prompt_file": "prompts/broker-disk-isr-shrink.md",
+      "baseline_file": "baselines/broker-disk-isr-shrink.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "ISR_SHRINK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "broker-disk-isr-shrink", "ISR_SHRINK", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CONSUMER_RATE", "LAYER: PARTITION_SKEW"]
+        }
+      ]
+    },
+    {
+      "id": "consumer-fetch-microbatch-stall",
+      "name": "Low-volume topic with fetch.min.bytes=10MB; consumer waits full fetch.max.wait.ms per poll; lag climbs despite consumer not being CPU-bound",
+      "difficulty": "medium",
+      "prompt_file": "prompts/consumer-fetch-microbatch-stall.md",
+      "baseline_file": "baselines/consumer-fetch-microbatch-stall.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CONSUMER_FETCH_TUNING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "consumer-fetch-microbatch-stall", "CONSUMER_FETCH_TUNING", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CONSUMER_RATE", "LAYER: PARTITION_SKEW"]
+        }
+      ]
+    },
+    {
+      "id": "msk-serverless-cu-throttle",
+      "name": "MSK Serverless; ConsumedReadThroughput CU throttle on hot partition 2; lag on one partition only; cluster aggregate has capacity",
+      "difficulty": "hard",
+      "prompt_file": "prompts/msk-serverless-cu-throttle.md",
+      "baseline_file": "baselines/msk-serverless-cu-throttle.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "MSK_SERVERLESS_THROTTLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "msk-serverless-cu-throttle", "MSK_SERVERLESS_THROTTLE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CONSUMER_RATE", "LAYER: BROKER_SATURATION"]
+        }
+      ]
+    },
+    {
+      "id": "rebalance-storm-no-static-membership",
+      "name": "Sawtooth lag pattern; rebalance events correlate with lag spikes; no static membership; rolling deployment triggers stop-the-world rebalances",
+      "difficulty": "hard",
+      "prompt_file": "prompts/rebalance-storm-no-static-membership.md",
+      "baseline_file": "baselines/rebalance-storm-no-static-membership.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "REBALANCE_STORM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "rebalance-storm-no-static-membership", "REBALANCE_STORM", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CONSUMER_RATE", "LAYER: PARTITION_SKEW"]
+        }
+      ]
+    }
+  ]
+}

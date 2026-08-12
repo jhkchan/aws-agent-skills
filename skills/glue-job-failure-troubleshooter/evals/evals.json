@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "glue-job-failure-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Glue Job Failure Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "glue-dpu-insufficient-g1x-oom",
+      "name": "Container killed by YARN on G.1X; dataset grew 5x since last successful run; G.2X doubles executor count",
+      "difficulty": "hard",
+      "prompt_file": "prompts/glue-dpu-insufficient-g1x-oom.md",
+      "baseline_file": "baselines/glue-dpu-insufficient-g1x-oom.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "GLUE_DPU_INSUFFICIENT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "glue-dpu-insufficient-g1x-oom", "GLUE_DPU_INSUFFICIENT", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: GLUE_ETL_SCRIPT_ERROR"]
+        }
+      ]
+    },
+    {
+      "id": "glue-bookmark-partition-key-mismatch",
+      "name": "Job bookmark enabled but reprocesses all data every run; partition_keys changed without bookmark reset",
+      "difficulty": "hard",
+      "prompt_file": "prompts/glue-bookmark-partition-key-mismatch.md",
+      "baseline_file": "baselines/glue-bookmark-partition-key-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "GLUE_BOOKMARK_CORRUPTED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "glue-bookmark-partition-key-mismatch", "GLUE_BOOKMARK_CORRUPTED", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: GLUE_DPU_INSUFFICIENT"]
+        }
+      ]
+    },
+    {
+      "id": "glue-jdbc-connection-sg-missing",
+      "name": "Glue JDBC connection to RDS fails; RDS security group missing inbound rule for Glue connection SG on port 5432",
+      "difficulty": "hard",
+      "prompt_file": "prompts/glue-jdbc-connection-sg-missing.md",
+      "baseline_file": "baselines/glue-jdbc-connection-sg-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "GLUE_JDBC_CONNECTION_ERROR",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "glue-jdbc-connection-sg-missing", "GLUE_JDBC_CONNECTION_ERROR", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: GLUE_DPU_INSUFFICIENT"]
+        }
+      ]
+    },
+    {
+      "id": "glue-partition-not-loaded-msck",
+      "name": "Data Catalog table exists and S3 has data but df.count() returns 0; partitions not loaded via MSCK REPAIR after Firehose data landed",
+      "difficulty": "medium",
+      "prompt_file": "prompts/glue-partition-not-loaded-msck.md",
+      "baseline_file": "baselines/glue-partition-not-loaded-msck.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "GLUE_PARTITION_NOT_LOADED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "glue-partition-not-loaded-msck", "GLUE_PARTITION_NOT_LOADED", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: GLUE_DATA_CATALOG_TABLE_NOT_FOUND"]
+        }
+      ]
+    },
+    {
+      "id": "glue-worker-type-g025x-spark",
+      "name": "Spark ETL job on G.025X (micro) workers; G.025X cannot run Spark, chronic OOM; worker type must switch to G.1X or G.2X",
+      "difficulty": "medium",
+      "prompt_file": "prompts/glue-worker-type-g025x-spark.md",
+      "baseline_file": "baselines/glue-worker-type-g025x-spark.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "GLUE_WORKER_TYPE_WRONG",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "glue-worker-type-g025x-spark", "GLUE_WORKER_TYPE_WRONG", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: GLUE_DPU_INSUFFICIENT"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "rds-failover-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill supplies several expert\u2011level specifics (e.g., Aurora DNS TTL = 1\u202fs, exact promotion\u2011tier ordering rules, storage\u2011full blocking failover, recovery_mode impact, Aurora Global DB managed vs unmanaged failover timings) that a generic model would not automatically enumerate. However, a portion of the content merely restates publicly documented facts without adding novel decision thresholds, so it falls short of a perfect 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are largely AWS\u2011specific (e.g., probing promotion tier, checking parameter groups) and follow a sensible diagnostic order. However, several steps are generic (\"check connection string\", \"verify DNS TTL\") and the ordering across all 13 categories is not fully explicit, leaving some ambiguity in the exact workflow."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "A comprehensive NEVER list is provided with concrete reasons for most pitfalls (e.g., using instance endpoint, stale DNS cache). One minor weakness: the rationale for some option\u2011group conflicts is brief and could cite specific engine\u2011level failures, preventing a perfect score."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete, includes clear description, activation triggers, invocation schema, and a minimal example. The skill unambiguously defines when to invoke it and the expected output shape, meeting all specification requirements."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill presents a high\u2011level Quick\u2011Start map first, but then immediately dives into extensive tables, deep references, and long prose. This front\u2011loads a lot of detail, creating cognitive overload for an agent that might only need the top\u2011level decision tree."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (modify\u2011db\u2011instance, increase storage, failover commands) are gated behind explicit CONFIRM prompts and pre\u2011flight safety checks, matching the fragility of the operations. A minor gap is the lack of explicit region\u2011scope guidance in the safety checklist."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable structure (Quick\u2011Start, Mindset, Philosophy, Process steps, Anti\u2011Patterns, Remediation). A small deviation is the deep reference section, which feels appended rather than integrated, but overall the pattern is clear."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI probes, decision trees, and working output examples, enabling an agent to execute the skill end\u2011to\u2011end. Missing are explicit handling of ambiguous or multiple simultaneous root causes, which could leave the agent without a clear branch in such cases."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 53989,
+  "latency_ms": 9301,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

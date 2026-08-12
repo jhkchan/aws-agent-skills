@@ -1,0 +1,233 @@
+# Eval test cases for eks-security-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per security pattern. Each case's
+# cluster name embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: eks-security-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: psa-irsa-network-gaps
+    description: >-
+      Production EKS cluster with no Pod Security Admission, 12 of 15
+      namespaces using node IAM role instead of IRSA, and no network
+      policies. A single pod compromise allows full cluster takeover.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with CRITICAL
+      severity covering PSA, IRSA, and network policy dimensions.
+    input: |
+      ClusterName: psa-irsa-network-gaps
+      Region: us-east-1
+      KubernetesVersion: 1.30
+
+      Pod Security Admission: not configured (no PSS labels on namespaces)
+      IRSA: enabled on 3 of 15 namespaces (remaining 12 use node IAM role)
+      Network Policies: none (default allow all east-west traffic)
+      Secrets Encryption: KMS not configured (uses default encryption)
+      ECR Image Scanning: scan-on-push enabled (enhanced scanning via Inspector)
+      GuardDuty EKS Runtime: enabled (aws-guardduty-agent addon active)
+      Admission Webhook: OPA Gatekeeper deployed (8 policies enforced)
+      Service Mesh mTLS: not configured (no App Mesh or Istio)
+      Audit Logging: enabled (api, audit, authenticator, controllerManager, scheduler)
+      API Server Endpoint: public (0.0.0.0/0) with private endpoint also enabled
+      IMDSv2: enforced (HttpPutResponseHopLimit=1)
+
+      Emit the standard security optimization block (TARGET, VERDICT,
+      REASON, RECOMMENDATION, SEVERITY, ESTIMATED_RISK,
+      REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "psa-irsa-network-gaps"
+        - "RECOMMENDATION"
+        - "SEVERITY"
+        - "REMEDIATION_STEPS"
+        - "IRSA"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: irsa-migration-opportunity
+    description: >-
+      EKS cluster where most workloads use the node IAM role. PSA is
+      configured (baseline-enforce), network policies are in place, but
+      IAM identity is the remaining gap. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with HIGH severity on IAM dimension.
+    input: |
+      ClusterName: irsa-migration-opportunity
+      Region: us-east-1
+      KubernetesVersion: 1.30
+
+      Pod Security Admission: baseline-enforce on all non-system namespaces,
+        restricted-audit on production namespaces
+      IRSA: enabled on 4 of 20 namespaces (remaining 16 use node IAM role)
+      Network Policies: Calico installed, default-deny in all namespaces,
+        explicit allow rules configured
+      Secrets Encryption: KMS enabled (customer-managed key)
+      ECR Image Scanning: scan-on-push enabled with enhanced scanning
+      GuardDuty EKS Runtime: enabled
+      Admission Webhook: Kyverno deployed (12 policies enforced)
+      Service Mesh mTLS: Istio installed with STRICT mTLS mode
+      Audit Logging: all 5 types enabled
+      API Server Endpoint: public with restricted CIDR ranges (10.0.0.0/8)
+      IMDSv2: enforced (HttpPutResponseHopLimit=1)
+
+      Emit the standard security optimization block (TARGET, VERDICT,
+      REASON, RECOMMENDATION, SEVERITY, ESTIMATED_RISK,
+      REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "irsa-migration-opportunity"
+        - "RECOMMENDATION"
+        - "SEVERITY"
+        - "REMEDIATION_STEPS"
+        - "IRSA"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: network-policy-gap
+    description: >-
+      EKS cluster with good IAM posture (IRSA on all namespaces) and PSA
+      configured, but no network policies — default allow all east-west.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with HIGH severity
+      on network dimension.
+    input: |
+      ClusterName: network-policy-gap
+      Region: us-east-1
+      KubernetesVersion: 1.30
+
+      Pod Security Admission: restricted-enforce on production namespaces,
+        baseline-enforce on all others
+      IRSA: enabled on all non-system namespaces (18/18)
+      Network Policies: none (no Calico or Cilium installed, default allow)
+      Secrets Encryption: KMS enabled
+      ECR Image Scanning: scan-on-push enabled with enhanced scanning
+      GuardDuty EKS Runtime: enabled
+      Admission Webhook: OPA Gatekeeper deployed (10 policies enforced)
+      Service Mesh mTLS: App Mesh with permissive mode (not strict)
+      Audit Logging: all 5 types enabled
+      API Server Endpoint: private only
+      IMDSv2: enforced (HttpPutResponseHopLimit=1)
+
+      Emit the standard security optimization block (TARGET, VERDICT,
+      REASON, RECOMMENDATION, SEVERITY, ESTIMATED_RISK,
+      REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "network-policy-gap"
+        - "RECOMMENDATION"
+        - "SEVERITY"
+        - "REMEDIATION_STEPS"
+        - "network"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-secured-cluster
+    description: >-
+      EKS cluster with all security dimensions configured: PSA
+      restricted-enforce, IRSA on all namespaces, Calico default-deny,
+      KMS encryption, ECR enhanced scanning, GuardDuty runtime, Gatekeeper
+      policies, Istio STRICT mTLS, private API server, IMDSv2 enforced.
+      Expected verdict: OPTIMIZED.
+    input: |
+      ClusterName: already-secured-cluster
+      Region: us-east-1
+      KubernetesVersion: 1.30
+
+      Pod Security Admission: restricted-enforce on all non-system namespaces
+      IRSA: enabled on all non-system namespaces (20/20)
+      Network Policies: Calico installed, default-deny in all namespaces
+        with explicit allow rules for all required flows
+      Secrets Encryption: KMS enabled (customer-managed key, rotation enabled)
+      ECR Image Scanning: scan-on-push enabled with enhanced scanning
+        (Inspector), CRITICAL findings block policy via Kyverno
+      GuardDuty EKS Runtime: enabled (aws-guardduty-agent active)
+      Admission Webhook: Kyverno deployed (15 policies including
+        disallow-privileged, require-resource-limits, verify-image-scans)
+      Service Mesh mTLS: Istio installed with STRICT mTLS mode
+      Audit Logging: all 5 types enabled (api, audit, authenticator,
+        controllerManager, scheduler)
+      API Server Endpoint: private only (accessed via VPN)
+      IMDSv2: enforced (HttpPutResponseHopLimit=1)
+
+      Emit the standard security optimization block (TARGET, VERDICT,
+      REASON, RECOMMENDATION, SEVERITY, ESTIMATED_RISK,
+      REMEDIATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-secured-cluster"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: kms-and-imdsv-gaps
+    description: >-
+      EKS cluster with good pod-level security (PSA, IRSA, network
+      policies) but missing infrastructure-level controls: no KMS secrets
+      encryption and IMDSv2 not enforced (IMDSv1 still accessible, hop-
+      limit=2). Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with
+      HIGH severity on secrets and IMDS dimensions.
+    input: |
+      ClusterName: kms-and-imdsv-gaps
+      Region: us-east-1
+      KubernetesVersion: 1.30
+
+      Pod Security Admission: baseline-enforce on all non-system namespaces,
+        restricted-audit on production
+      IRSA: enabled on all non-system namespaces (15/15)
+      Network Policies: Cilium installed, default-deny in all namespaces
+        with explicit allow rules
+      Secrets Encryption: KMS NOT configured (uses default encryption)
+      ECR Image Scanning: scan-on-push enabled with enhanced scanning
+      GuardDuty EKS Runtime: enabled
+      Admission Webhook: Gatekeeper deployed (8 policies enforced)
+      Service Mesh mTLS: Istio installed with STRICT mTLS mode
+      Audit Logging: all 5 types enabled
+      API Server Endpoint: public with restricted CIDR ranges
+      IMDSv2: NOT enforced (HttpPutResponseHopLimit=2, IMDSv1 accessible)
+
+      Emit the standard security optimization block (TARGET, VERDICT,
+      REASON, RECOMMENDATION, SEVERITY, ESTIMATED_RISK,
+      REMEDIATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "kms-and-imdsv-gaps"
+        - "RECOMMENDATION"
+        - "SEVERITY"
+        - "REMEDIATION_STEPS"
+        - "KMS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"

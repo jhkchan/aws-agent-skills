@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "lambda-timeout-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Lambda Timeout Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "timeout-init-phase-snapstart",
+      "name": "Java 21 Spring Boot Lambda times out during init phase; SnapStart not enabled; zero application logs",
+      "difficulty": "hard",
+      "prompt_file": "prompts/timeout-init-phase-snapstart.md",
+      "baseline_file": "baselines/timeout-init-phase-snapstart.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TIMEOUT_INIT_PHASE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "timeout-init-phase-snapstart", "TIMEOUT_INIT_PHASE", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TIMEOUT_CONFIG", "LAYER: TIMEOUT_DOWNSTREAM"]
+        }
+      ]
+    },
+    {
+      "id": "timeout-sdk-retry-storm",
+      "name": "Node.js Lambda with SDK v3 default maxRetries: 3 causes cascading timeouts on throttled DynamoDB during traffic peak",
+      "difficulty": "hard",
+      "prompt_file": "prompts/timeout-sdk-retry-storm.md",
+      "baseline_file": "baselines/timeout-sdk-retry-storm.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TIMEOUT_SDK_RETRY_STORM",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "timeout-sdk-retry-storm", "TIMEOUT_SDK_RETRY_STORM", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TIMEOUT_CONFIG", "LAYER: TIMEOUT_INIT_PHASE"]
+        }
+      ]
+    },
+    {
+      "id": "timeout-step-functions-mismatch",
+      "name": "Step Functions Task TimeoutSeconds: 30 fires before Lambda Timeout: 60 — Lambda succeeds at 38s but execution fails",
+      "difficulty": "hard",
+      "prompt_file": "prompts/timeout-step-functions-mismatch.md",
+      "baseline_file": "baselines/timeout-step-functions-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TIMEOUT_STEP_FUNCTIONS_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "timeout-step-functions-mismatch", "TIMEOUT_STEP_FUNCTIONS_MISMATCH", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TIMEOUT_CONFIG", "LAYER: TIMEOUT_DOWNSTREAM"]
+        }
+      ]
+    },
+    {
+      "id": "timeout-http-client-no-connect",
+      "name": "Node.js Lambda axios.get to firewalled partner API; axios has no default connect timeout; hangs on TCP SYN",
+      "difficulty": "medium",
+      "prompt_file": "prompts/timeout-http-client-no-connect.md",
+      "baseline_file": "baselines/timeout-http-client-no-connect.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TIMEOUT_HTTP_CLIENT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "timeout-http-client-no-connect", "TIMEOUT_HTTP_CLIENT", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TIMEOUT_CONFIG", "LAYER: TIMEOUT_DOWNSTREAM"]
+        }
+      ]
+    },
+    {
+      "id": "timeout-db-connection-no-proxy",
+      "name": "Python Lambda opens psycopg2 connection per invocation; TLS handshake to Aurora consumes the budget under concurrency; no RDS Proxy",
+      "difficulty": "hard",
+      "prompt_file": "prompts/timeout-db-connection-no-proxy.md",
+      "baseline_file": "baselines/timeout-db-connection-no-proxy.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TIMEOUT_DB_CONNECTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "timeout-db-connection-no-proxy", "TIMEOUT_DB_CONNECTION", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TIMEOUT_CONFIG", "LAYER: TIMEOUT_DOWNSTREAM"]
+        }
+      ]
+    }
+  ]
+}

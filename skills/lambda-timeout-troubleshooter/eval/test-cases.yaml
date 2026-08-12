@@ -1,0 +1,345 @@
+# Eval test cases for lambda-timeout-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per timeout root-cause layer family.
+# Each case's TARGET embeds the test-case id so the model naturally
+# echoes it (avoids assertion-token mismatch). The diagnostic ordering
+# in SKILL.md produces exactly the expected verdicts below.
+skill: lambda-timeout-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: timeout-init-phase-snapstart
+    description: >-
+      Java 21 / Spring Boot Lambda with 8s configured Timeout. InitDuration
+      8200 ms on every cold start. Zero application log lines before each
+      TaskTimeoutException — the handler never ran. SnapStart not enabled.
+      Expected layer: TIMEOUT_INIT_PHASE.
+    input: |
+      Symptom: fn-init-phase-snapstart returns TaskTimeoutException on
+      every cold start. Warm invocations succeed in 50 ms. The error
+      pattern is 100% on cold starts, 0% on warm.
+
+      FunctionName: fn-init-phase-snapstart
+      Qualifier: prod (version 5)
+      Runtime: java21
+      Timeout: 8
+      MemorySize: 1024
+      Handler: com.example.Handler::handleRequest
+      PackageType: Zip
+      VpcConfig: (none — function is not VPC-attached)
+      FileSystemConfigs: (none)
+      SnapStart: { ApplyOn: None }
+      LastUpdateStatus: Successful (last update 3 days ago)
+
+      Recent log pattern (each cold start):
+        START RequestId: ...
+        (no further log line — no application logs)
+        END RequestId: ... Duration: 8000.00 ms
+          Memory Size: 1024 MB Max Memory Used: 440 MB
+        Init Duration: 8200.34 ms
+        Task timed out after 8.00 seconds
+
+      CloudWatch metrics (last hour):
+        - Duration p50: 50 ms (warm), p99: 8000 ms (cold)
+        - InitDuration Average: 8200 ms, Maximum: 8400 ms
+        - MemoryUtilization Maximum: 43%
+        - Errors: 18 (matches cold-start count)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "timeout-init-phase-snapstart"
+        - "TIMEOUT_INIT_PHASE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TIMEOUT_CONFIG"
+        - "LAYER: TIMEOUT_DOWNSTREAM"
+
+  - id: timeout-sdk-retry-storm
+    description: >-
+      Node.js Lambda with 30s Timeout calling DynamoDB. Table is
+      provisioned at 200 WCU while sustaining 5000+ WCU of demand.
+      AWS SDK v3 default maxRetries: 3 with exponential backoff causes
+      each invocation to make 3 throttled attempts (~9s each) before
+      the function times out. Logs show "Retrying request ... attempt
+      2 of 3" before each kill. Bursty pattern correlated with traffic
+      peaks. Expected layer: TIMEOUT_SDK_RETRY_STORM.
+    input: |
+      Symptom: fn-sdk-retry-storm started returning TaskTimeoutException
+      after the 09:00 traffic peak. 60% of invocations now time out at
+      30s during peak; off-peak invocations complete in 2-4s. Errors
+      metric shows 142 timeouts in the last hour.
+
+      FunctionName: fn-sdk-retry-storm
+      Qualifier: prod (version 18)
+      Runtime: nodejs20.x
+      Timeout: 30
+      MemorySize: 512
+      Handler: index.handler
+      PackageType: Zip
+      VpcConfig: (none)
+      SnapStart: (not applicable — Node.js)
+
+      Recent log pattern (peak-hour timeouts):
+        INFO  Putting item to orders-table (id=...)
+        Retrying request ... attempt 2 of 3
+        Retrying request ... attempt 3 of 3
+        (no further log line)
+        END RequestId: ... Duration: 30000.00 ms
+          Memory Size: 512 MB Max Memory Used: 142 MB
+        Task timed out after 30.00 seconds
+
+      CloudWatch metrics (last hour):
+        - Duration p50: 2.1s (off-peak), p99: 30s (peak), Maximum: 30s
+        - MemoryUtilization Maximum: 28%
+        - Errors: 142 (correlated with traffic peak)
+
+      DynamoDB context:
+        - Table orders-table
+        - BillingModeSummary: PROVISIONED
+        - WriteCapacityUnits: 200
+        - WriteThrottleEvents (last hour): sustained during peak
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "timeout-sdk-retry-storm"
+        - "TIMEOUT_SDK_RETRY_STORM"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TIMEOUT_CONFIG"
+        - "LAYER: TIMEOUT_INIT_PHASE"
+
+  - id: timeout-step-functions-mismatch
+    description: >-
+      Lambda with Timeout: 60s is invoked by Step Functions Task with
+      TimeoutSeconds: 30. Step Functions fails the execution at 30s
+      with States.Timeout while the Lambda continues and succeeds at
+      38s. Caller-side timeout fires before function-side timeout.
+      Expected layer: TIMEOUT_STEP_FUNCTIONS_MISMATCH.
+    input: |
+      Symptom: fn-step-functions-mismatch is invoked by a Step Functions
+      state machine. Executions fail with States.Timeout at exactly
+      30.00s on the ETL Task state, but the Lambda function's own
+      CloudWatch shows Duration: 38000 ms (success) for the same
+      RequestId. The operator sees Step Functions failures and assumes
+      the Lambda timed out.
+
+      FunctionName: fn-step-functions-mismatch
+      Qualifier: prod (version 11)
+      Runtime: python3.12
+      Timeout: 60
+      MemorySize: 1024
+      Handler: app.handler
+      VpcConfig: (none)
+
+      Step Functions state machine (Task state):
+        "ETL": {
+          "Type": "Task",
+          "Resource": "arn:aws:lambda:us-east-1:111111111111:function:fn-step-functions-mismatch:prod",
+          "TimeoutSeconds": 30,
+          "Next": "Notify"
+        }
+
+      Step Functions execution history (last failure):
+        - 2025-08-05T09:14:22.011Z: TaskStateEntered (ETL)
+        - 2025-08-05T09:14:52.018Z: ExecutionFailed (error: States.Timeout)
+
+      Lambda CloudWatch (same RequestId):
+        - START RequestId: 8f3...
+        - INFO  Starting ETL batch
+        - INFO  Processing 1247 records
+        - INFO  Batch complete
+        - END RequestId: 8f3... Duration: 38000.00 ms
+          Memory Size: 1024 MB Max Memory Used: 410 MB
+          Status: SUCCESS
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "timeout-step-functions-mismatch"
+        - "TIMEOUT_STEP_FUNCTIONS_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TIMEOUT_CONFIG"
+        - "LAYER: TIMEOUT_DOWNSTREAM"
+
+  - id: timeout-http-client-no-connect
+    description: >-
+      Node.js Lambda with axios.get call to external API. axios default
+      has no connect timeout. The external endpoint's DNS resolves but
+      the host is firewalled (TCP SYN black-hole). Each invocation
+      hangs on the SYN for the entire Lambda Timeout. Last log line is
+      the axios call with no further output. Expected layer:
+      TIMEOUT_HTTP_CLIENT.
+    input: |
+      Symptom: fn-http-client-no-connect started failing after a
+      partner rotated their firewall rules. Every invocation now
+      returns TaskTimeoutException at exactly 10s. Logs show the
+      axios.get call as the last line; no further output.
+
+      FunctionName: fn-http-client-no-connect
+      Qualifier: prod (version 4)
+      Runtime: nodejs20.x
+      Timeout: 10
+      MemorySize: 256
+      Handler: index.handler
+      VpcConfig: (none)
+
+      Function code (excerpt):
+        const axios = require('axios');
+        exports.handler = async (event) => {
+          console.log('calling partner API');
+          const res = await axios.get('https://api.partner.example.com/verify');
+          console.log('partner responded', res.status);
+          return { status: res.status };
+        };
+
+      Recent log pattern (every invocation):
+        INFO  calling partner API
+        (no further log line)
+        END RequestId: ... Duration: 10000.00 ms
+          Memory Size: 256 MB Max Memory Used: 78 MB
+        Task timed out after 10.00 seconds
+
+      CloudWatch metrics (last hour):
+        - Duration p50: 10s, p99: 10s, Maximum: 10s
+        - MemoryUtilization Maximum: 30%
+        - Errors: 100%
+
+      Partner API context:
+        - DNS resolves to 3.18.12.63 (verified)
+        - TCP connect from EC2 in same region: SYN black-hole
+          (firewalled after partner rotation)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "timeout-http-client-no-connect"
+        - "TIMEOUT_HTTP_CLIENT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TIMEOUT_CONFIG"
+        - "LAYER: TIMEOUT_DOWNSTREAM"
+
+  - id: timeout-db-connection-no-proxy
+    description: >-
+      Python Lambda opens a new psycopg2 connection per invocation
+      (no module-scope reuse, no RDS Proxy). Each invocation pays
+      2-3s for TCP + TLS + auth handshake to Aurora PostgreSQL.
+      Under concurrency the function times out because the handshake
+      consumes most of the Timeout. Expected layer:
+      TIMEOUT_DB_CONNECTION.
+    input: |
+      Symptom: fn-db-connection-no-proxy started timing out at 10s
+      after traffic doubled at the start of the marketing campaign.
+      Logs show "Connecting to DB" as the last line before each kill.
+      The Aurora cluster is healthy (CPU 20%, connections 30/500).
+
+      FunctionName: fn-db-connection-no-proxy
+      Qualifier: prod (version 9)
+      Runtime: python3.12
+      Timeout: 10
+      MemorySize: 256
+      Handler: app.handler
+      VpcConfig:
+        SubnetIds: [subnet-private-a, subnet-private-b]
+        SecurityGroupIds: [sg-db]
+
+      Function code (excerpt):
+        import psycopg2
+        def handler(event, context):
+            print('Connecting to DB')
+            conn = psycopg2.connect(
+                host='db.cluster-xxx.us-east-1.rds.amazonaws.com',
+                dbname='app', user='app', password='...'
+            )
+            print('Connected, running query')
+            cur = conn.cursor()
+            cur.execute('SELECT ...')
+            return cur.fetchall()
+
+      Recent log pattern (peak-hour timeouts):
+        INFO  Connecting to DB
+        (no further log line — killed during handshake)
+        END RequestId: ... Duration: 10000.00 ms
+          Memory Size: 256 MB Max Memory Used: 110 MB
+        Task timed out after 10.00 seconds
+
+      Off-peak invocations (when concurrency is low):
+        INFO  Connecting to DB
+        INFO  Connected, running query (Duration so far: 2800 ms)
+        INFO  Query complete
+        END Duration: 3100 ms (succeeds)
+
+      Aurora context:
+        - Cluster CPU: 20%, connections: 30 / 500 (not exhausted)
+        - Engine: aurora-postgresql, TLS required
+        - No RDS Proxy configured
+        - Cross-AZ mount: function subnets span us-east-1a and 1b;
+          primary is in us-east-1c (cross-AZ handshake adds latency)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "timeout-db-connection-no-proxy"
+        - "TIMEOUT_DB_CONNECTION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TIMEOUT_CONFIG"
+        - "LAYER: TIMEOUT_DOWNSTREAM"

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudformation-stack-rollback-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudFormation Stack Rollback Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "custom-resource-lambda-timeout",
+      "name": "UPDATE_ROLLBACK_FAILED caused by custom resource provider Lambda timing out at 3s during Delete — the #1 rollback blocker",
+      "difficulty": "hard",
+      "prompt_file": "prompts/custom-resource-lambda-timeout.md",
+      "baseline_file": "baselines/custom-resource-lambda-timeout.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CUSTOM_RESOURCE_TIMEOUT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "custom-resource-lambda-timeout", "CUSTOM_RESOURCE_TIMEOUT", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: NESTED_STACK_CASCADE", "LAYER: IAM_REPLACEMENT"]
+        }
+      ]
+    },
+    {
+      "id": "update-rollback-failed-needs-continue",
+      "name": "UPDATE_ROLLBACK_FAILED caused by IAM Role Path change (Replacement: True) — old role can't be deleted, still attached to instance profile",
+      "difficulty": "hard",
+      "prompt_file": "prompts/update-rollback-failed-needs-continue.md",
+      "baseline_file": "baselines/update-rollback-failed-needs-continue.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "IAM_REPLACEMENT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "update-rollback-failed-needs-continue", "IAM_REPLACEMENT", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CUSTOM_RESOURCE_TIMEOUT", "LAYER: NESTED_STACK_CASCADE"]
+        }
+      ]
+    },
+    {
+      "id": "nested-stack-cascade-rollback",
+      "name": "Parent stack UPDATE_ROLLBACK_FAILED because nested child stack is also stuck — child's custom resource timed out; child must be fixed first",
+      "difficulty": "hard",
+      "prompt_file": "prompts/nested-stack-cascade-rollback.md",
+      "baseline_file": "baselines/nested-stack-cascade-rollback.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "NESTED_STACK_CASCADE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "nested-stack-cascade-rollback", "NESTED_STACK_CASCADE", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CUSTOM_RESOURCE_TIMEOUT", "LAYER: IAM_REPLACEMENT"]
+        }
+      ]
+    },
+    {
+      "id": "stack-policy-blocks-rollback",
+      "name": "Stack policy Deny on Update:Replace for AWS::RDS::DBInstance prevents rollback from reverting DBInstanceClass change",
+      "difficulty": "hard",
+      "prompt_file": "prompts/stack-policy-blocks-rollback.md",
+      "baseline_file": "baselines/stack-policy-blocks-rollback.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "STACK_POLICY_BLOCKING",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "stack-policy-blocks-rollback", "STACK_POLICY_BLOCKING", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: DRIFT_DETECTION", "LAYER: DEPENDENT_RESOURCE_IN_USE"]
+        }
+      ]
+    },
+    {
+      "id": "drift-detection-blocking-rollback",
+      "name": "Security Group manually modified outside CloudFormation (drift) blocks rollback — actual state doesn't match template state",
+      "difficulty": "hard",
+      "prompt_file": "prompts/drift-detection-blocking-rollback.md",
+      "baseline_file": "baselines/drift-detection-blocking-rollback.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "DRIFT_DETECTION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "drift-detection-blocking-rollback", "DRIFT_DETECTION", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: STACK_POLICY_BLOCKING", "LAYER: DEPENDENT_RESOURCE_IN_USE"]
+        }
+      ]
+    }
+  ]
+}

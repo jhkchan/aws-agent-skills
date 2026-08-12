@@ -1,0 +1,48 @@
+# Eval configuration for lambda-timeout-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: lambda-timeout-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: timeout-init-phase-snapstart
+    difficulty: hard
+    prompt_file: prompts/timeout-init-phase-snapstart.md
+    baseline_file: baselines/timeout-init-phase-snapstart.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TIMEOUT_INIT_PHASE
+  - id: timeout-sdk-retry-storm
+    difficulty: hard
+    prompt_file: prompts/timeout-sdk-retry-storm.md
+    baseline_file: baselines/timeout-sdk-retry-storm.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TIMEOUT_SDK_RETRY_STORM
+  - id: timeout-step-functions-mismatch
+    difficulty: hard
+    prompt_file: prompts/timeout-step-functions-mismatch.md
+    baseline_file: baselines/timeout-step-functions-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TIMEOUT_STEP_FUNCTIONS_MISMATCH
+  - id: timeout-http-client-no-connect
+    difficulty: medium
+    prompt_file: prompts/timeout-http-client-no-connect.md
+    baseline_file: baselines/timeout-http-client-no-connect.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TIMEOUT_HTTP_CLIENT
+  - id: timeout-db-connection-no-proxy
+    difficulty: hard
+    prompt_file: prompts/timeout-db-connection-no-proxy.md
+    baseline_file: baselines/timeout-db-connection-no-proxy.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TIMEOUT_DB_CONNECTION

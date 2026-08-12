@@ -1,0 +1,321 @@
+# Eval test cases for athena-query-failure-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each
+# case's TARGET embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The diagnostic ordering in
+# SKILL.md produces exactly the expected verdicts below.
+skill: athena-query-failure-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: serde-csv-separator-mismatch
+    description: >-
+      Athena table orders_csv uses OpenCSVSerDe with separatorChar=','
+      but the S3 data is tab-delimited. Columns 2 and 3 return NULL
+      for every row. The query SUCCEEDS but the data is wrong. Expected
+      layer: SERDE_PROPERTY.
+    input: |
+      Symptom: Athena query on table analytics.orders_csv returns NULL
+      for customer_id and amount columns. The query SUCCEEDS (no error)
+      but the data is wrong — order_id contains the entire tab-
+      delimited row as a single string.
+
+      Database: analytics
+      Table: orders_csv
+      Query: SELECT * FROM analytics.orders_csv LIMIT 10
+      QueryStatus: SUCCEEDED (no error)
+
+      DDL:
+        CREATE EXTERNAL TABLE analytics.orders_csv (
+          order_id   STRING,
+          customer_id STRING,
+          amount     STRING
+        )
+        ROW FORMAT SERDE
+          'org.apache.hadoop.hive.serde2.OpenCSVSerDe'
+        WITH SERDEPROPERTIES (
+          'separatorChar' = ','
+        )
+        STORED AS INPUTFORMAT
+          'org.apache.hadoop.mapred.TextInputFormat'
+        OUTPUTFORMAT
+          'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+        LOCATION
+          's3://prod-analytics/orders/'
+
+      Query result (first 3 rows):
+        order_id                          customer_id  amount
+        ORD001\tCUST123\t150.00           NULL         NULL
+        ORD002\tCUST456\t200.00           NULL         NULL
+        ORD003\tCUST789\t350.00           NULL         NULL
+
+      S3 data sample (head -3 of s3://prod-analytics/orders/data.csv):
+        ORD001	CUST123	150.00
+        ORD002	CUST456	200.00
+        ORD003	CUST789	350.00
+
+      Workgroup: primary (Athena engine v3)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "serde-csv-separator-mismatch"
+        - "SERDE_PROPERTY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SERDE_MISMATCH"
+        - "LAYER: COLUMN_TYPE_MISMATCH"
+
+  - id: stale-partitions-no-projection
+    description: >-
+      Athena table events_daily returns zero rows for dt='2026-08-05'
+      even though S3 has data at s3://prod-analytics/events/dt=2026-08-05/.
+      Glue get-partitions returns 0. No partition projection configured.
+      Expected layer: STALE_PARTITIONS.
+    input: |
+      Symptom: Athena query returns zero rows for today's data even
+      though the S3 bucket has the files. The query SUCCEEDS with no
+      error but returns an empty result set.
+
+      Database: analytics
+      Table: events_daily
+      Query: SELECT count(*) FROM analytics.events_daily
+             WHERE dt = '2026-08-05'
+      QueryStatus: SUCCEEDED
+      QueryResult: 0 rows
+
+      DDL:
+        CREATE EXTERNAL TABLE analytics.events_daily (
+          event_id   STRING,
+          event_type STRING,
+          payload    STRING
+        )
+        PARTITIONED BY (dt DATE)
+        STORED AS PARQUET
+        LOCATION
+          's3://prod-analytics/events/'
+
+      Glue get-partitions:
+        Count: 0
+
+      S3 listing:
+        aws s3 ls s3://prod-analytics/events/dt=2026-08-05/
+        2026-08-05 14:00:00   1234567 part-00001.parquet
+        2026-08-05 14:00:00    987654 part-00002.parquet
+
+      Table TBLPROPERTIES:
+        (no projection.* properties set)
+
+      Workgroup: primary
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "stale-partitions-no-projection"
+        - "STALE_PARTITIONS"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: S3_PERMISSION"
+        - "LAYER: TABLE_LOCATION"
+
+  - id: ctas-workgroup-output-denied
+    description: >-
+      CTAS query fails with Access Denied on
+      s3://aws-athena-query-results-111111111111-us-east-1/. The
+      workgroup has EnforceWorkGroupConfiguration=true. The IAM role
+      lacks s3:PutObject on the result bucket. Operator's
+      external_location was silently overridden. Expected layer:
+      CTAS_OUTPUT_LOCATION.
+    input: |
+      Symptom: CREATE TABLE AS SELECT query fails with "Access Denied
+      s3://aws-athena-query-results-111111111111-us-east-1/tables/...".
+      The operator expected the CTAS to write to
+      s3://prod-analytics/summary/ (the external_location in the
+      query), but it is writing to the workgroup result bucket.
+
+      Query:
+        CREATE TABLE analytics.orders_summary
+        WITH (external_location = 's3://prod-analytics/summary/')
+        AS SELECT order_id, SUM(amount) as total
+        FROM analytics.orders_csv
+        GROUP BY order_id;
+
+      QueryStatus: FAILED
+      StateChangeReason: "Access Denied s3://aws-athena-query-results-111111111111-us-east-1/tables/q=..."
+
+      Workgroup: primary
+      EnforceWorkGroupConfiguration: true
+      OutputLocation: s3://aws-athena-query-results-111111111111-us-east-1/
+
+      IAM simulate-principal-policy:
+        s3:PutObject on arn:aws:s3:::prod-analytics/* → ALLOWED
+        s3:PutObject on arn:aws:s3:::aws-athena-query-results-111111111111-us-east-1/* → DENIED (implicitDeny)
+
+      Glue permissions: verified (glue:CreateTable, glue:UpdateTable allowed)
+
+      Source table S3 permissions: verified (s3:GetObject on prod-analytics allowed)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "ctas-workgroup-output-denied"
+        - "CTAS_OUTPUT_LOCATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: S3_PERMISSION"
+        - "LAYER: GLUE_PERMISSION"
+
+  - id: column-type-int-na-strings
+    description: >-
+      Athena table products declares amount as INT but the CSV data
+      contains "N/A" for some rows. OpenCSVSerDe reads all columns as
+      STRING then casts; the cast of "N/A" to INT fails. Query returns
+      NULL for those rows or throws HIVE_CURSOR_ERROR. Expected layer:
+      COLUMN_TYPE_MISMATCH.
+    input: |
+      Symptom: Athena query on analytics.products returns NULL for the
+      amount column on rows where the CSV has "N/A". For rows with
+      numeric values (e.g., "150"), the amount is correct. Some queries
+      throw HIVE_CURSOR_ERROR when scanning the bad rows.
+
+      Database: analytics
+      Table: products
+      Query: SELECT product_id, amount FROM analytics.products LIMIT 100
+      QueryStatus: SUCCEEDED (but some rows have NULL amount)
+
+      DDL:
+        CREATE EXTERNAL TABLE analytics.products (
+          product_id STRING,
+          amount     INT
+        )
+        ROW FORMAT SERDE
+          'org.apache.hadoop.hive.serde2.OpenCSVSerDe'
+        WITH SERDEPROPERTIES (
+          'separatorChar' = ','
+        )
+        STORED AS TEXTFILE
+        LOCATION 's3://prod-analytics/products/'
+
+      Query result (sample):
+        product_id  amount
+        PROD001     150
+        PROD002     NULL    ← CSV has "N/A"
+        PROD003     200
+        PROD004     NULL    ← CSV has "N/A"
+        PROD005     350
+
+      S3 data sample (head -5):
+        PROD001,150
+        PROD002,N/A
+        PROD003,200
+        PROD004,N/A
+        PROD005,350
+
+      OpenCSVSerDe behavior: reads all columns as STRING, then casts
+      amount to INT. CAST("N/A" AS INT) returns NULL in Athena engine v3.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "column-type-int-na-strings"
+        - "COLUMN_TYPE_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SERDE_MISMATCH"
+        - "LAYER: SERDE_PROPERTY"
+
+  - id: s3-bucket-access-denied-glue-ok
+    description: >-
+      Athena query fails with "Access Denied s3://prod-data-lake/".
+      The IAM role has glue:GetTable (Glue permissions verified) but
+      LACKS s3:GetObject on the data bucket. Two-layer permission:
+      Glue passes, S3 fails. Expected layer: S3_PERMISSION.
+    input: |
+      Symptom: Athena query fails with "QUERY_FAILED: Access Denied
+      s3://prod-data-lake/events/data.parquet". The error is on the
+      S3 read, not on Glue catalog access.
+
+      Database: analytics
+      Table: events
+      Query: SELECT * FROM analytics.events LIMIT 10
+      QueryStatus: FAILED
+      StateChangeReason: "Access Denied s3://prod-data-lake/events/data.parquet"
+
+      Table LOCATION: s3://prod-data-lake/events/
+
+      IAM simulate-principal-policy:
+        glue:GetTable on arn:aws:glue:us-east-1:111111111111:table/analytics/events → ALLOWED
+        glue:GetPartitions → ALLOWED
+        glue:GetDatabase → ALLOWED
+        s3:GetObject on arn:aws:s3:::prod-data-lake/* → DENIED (implicitDeny)
+        s3:ListBucket on arn:aws:s3:::prod-data-lake → DENIED (implicitDeny)
+
+      S3 bucket policy:
+        (bucket policy does not grant access to the Athena role; relies
+         on IAM which is missing the s3 actions)
+
+      Lake Formation: not enabled on this catalog
+
+      Workgroup: primary
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "s3-bucket-access-denied-glue-ok"
+        - "S3_PERMISSION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: GLUE_PERMISSION"
+        - "LAYER: CTAS_OUTPUT_LOCATION"

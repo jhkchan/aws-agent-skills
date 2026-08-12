@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "athena-query-failure-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Athena Query Failure Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "serde-csv-separator-mismatch",
+      "name": "OpenCSVSerDe with separatorChar=',' but S3 data is tab-delimited; columns 2-3 return NULL; query SUCCEEDS with wrong data",
+      "difficulty": "medium",
+      "prompt_file": "prompts/serde-csv-separator-mismatch.md",
+      "baseline_file": "baselines/serde-csv-separator-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SERDE_PROPERTY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "serde-csv-separator-mismatch", "SERDE_PROPERTY", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: SERDE_MISMATCH", "LAYER: COLUMN_TYPE_MISMATCH"]
+        }
+      ]
+    },
+    {
+      "id": "stale-partitions-no-projection",
+      "name": "Query returns zero rows for dt='2026-08-05'; S3 has data; Glue get-partitions returns 0; no partition projection configured",
+      "difficulty": "medium",
+      "prompt_file": "prompts/stale-partitions-no-projection.md",
+      "baseline_file": "baselines/stale-partitions-no-projection.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "STALE_PARTITIONS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "stale-partitions-no-projection", "STALE_PARTITIONS", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: S3_PERMISSION", "LAYER: TABLE_LOCATION"]
+        }
+      ]
+    },
+    {
+      "id": "ctas-workgroup-output-denied",
+      "name": "CTAS fails with Access Denied on workgroup result bucket; EnforceWorkGroupConfiguration=true overrides external_location; IAM role lacks s3:PutObject",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ctas-workgroup-output-denied.md",
+      "baseline_file": "baselines/ctas-workgroup-output-denied.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CTAS_OUTPUT_LOCATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "ctas-workgroup-output-denied", "CTAS_OUTPUT_LOCATION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: S3_PERMISSION", "LAYER: GLUE_PERMISSION"]
+        }
+      ]
+    },
+    {
+      "id": "column-type-int-na-strings",
+      "name": "Column declared INT but CSV data has 'N/A' strings; OpenCSVSerDe reads as STRING then casts; CAST('N/A' AS INT) returns NULL",
+      "difficulty": "medium",
+      "prompt_file": "prompts/column-type-int-na-strings.md",
+      "baseline_file": "baselines/column-type-int-na-strings.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "COLUMN_TYPE_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "column-type-int-na-strings", "COLUMN_TYPE_MISMATCH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: SERDE_MISMATCH", "LAYER: SERDE_PROPERTY"]
+        }
+      ]
+    },
+    {
+      "id": "s3-bucket-access-denied-glue-ok",
+      "name": "Query fails with Access Denied s3://prod-data-lake/; Glue permissions verified OK; IAM role lacks s3:GetObject on data bucket",
+      "difficulty": "hard",
+      "prompt_file": "prompts/s3-bucket-access-denied-glue-ok.md",
+      "baseline_file": "baselines/s3-bucket-access-denied-glue-ok.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "S3_PERMISSION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "s3-bucket-access-denied-glue-ok", "S3_PERMISSION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: GLUE_PERMISSION", "LAYER: CTAS_OUTPUT_LOCATION"]
+        }
+      ]
+    }
+  ]
+}
