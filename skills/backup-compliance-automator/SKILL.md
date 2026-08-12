@@ -548,33 +548,57 @@ destructive actions behind a human approval (task token).
 
 ## Output format (STRICT output contract)
 
+When this skill concludes a compliance design or audit, the agent MUST
+respond with the block below using the literal all-caps labels `VAULT:`,
+`VERDICT:`, `CHECKLIST:`, `FINDINGS:`, and `REMEDIATION:`. Do NOT
+preface with prose, headings, or disclaimers — emit the block as the
+first lines of the response. This contract is what assertion-based evals
+and downstream compliance pipelines rely on; deviating from the literal
+labels breaks automation silently.
+
+### Decision tree — backup compliance evaluation
+
 ```text
-FRAMEWORK:
-  - [PASS|FAIL] Audit Manager framework configured
-  - [PASS|FAIL] Required controls mapped (per framework spec)
-  - [PASS|FAIL] Framework actively evaluating (last run within 24h)
-REPORTING:
-  - [PASS|FAIL] Compliance report plan scheduled
-  - [PASS|FAIL] Job summary report scheduled
-  - [PASS|FAIL] Coverage report scheduled
-  - [PASS|FAIL] Reports land in versioned S3 bucket with retention
-LEGAL_HOLD:
-  - [PASS|FAIL] BackupLegalHold mechanism documented
-  - [PASS|FAIL] Legal hold tested (create + release cycle)
-  - [PASS|FAIL] Vault Lock in compliance mode (immutable retention)
-  - [PASS|FAIL] EventBridge trigger for litigation hold (if required)
-CROSS_ACCOUNT:
-  - [PASS|FAIL] Organizations backup delegated admin configured (or N/A: single)
-  - [PASS|FAIL] Org-wide backup vault with member access policy
-  - [PASS|FAIL] Cross-account copy actions in member plans
-SEARCH:
-  - [PASS|FAIL] Backup Search scoped to in-scope vaults (if applicable)
-  - [PASS|FAIL] eDiscovery workflow documented (search -> hold)
-VERIFICATION:
-  - [PASS|FAIL] Restore drill run within last 90 days
-  - [PASS|FAIL] Cost allocation tags active in Cost Explorer
-  - [PASS|FAIL] Report freshness verified (no stale reports)
+Backup compliance request?
+├── Designing a new compliance framework?
+│     ├── Choose framework: CIS | NIST | SOC2 | HIPAA | PCI | FedRAMP | custom
+│     ├── Map required controls from framework spec
+│     ├── Configure Audit Manager framework with controls
+│     ├── Set up reporting (compliance, job summary, coverage)
+│     ├── Legal hold? → YES: BackupLegalHold + Vault Lock (LOCK_MODE)
+│     ├── Cross-account? → YES: Organizations delegated admin + org vault
+│     └── Verify: restore drill, cost tags, report freshness
+├── Auditing existing backup compliance?
+│     ├── Check framework exists and controls mapped
+│     ├── Check backup frequency meets policy (last backup age)
+│     ├── Check encryption on all recovery points
+│     ├── Check retention meets minimum (Vault Lock)
+│     ├── Check cross-region replication (DR requirement)
+│     ├── Check legal hold tested (create + release cycle)
+│     └── Check restore drill within required window
+└── Gap found?
+      ├── Missing control? → Add control to framework
+      ├── Unencrypted recovery point? → CRITICAL — enable encryption
+      ├── Vault Lock in GOVERNANCE mode? → Promote to LOCK_MODE
+      ├── No restore drill? → Run drill, document RTO
+      └── Stale report? → Re-run report plan, alarm on failures
+```
+
+### Output template
+
+```text
+VAULT: <vault-name> (<region>)
 VERDICT: AUTOMATED | MANUAL_STEP_REQUIRED
+CHECKLIST:
+  [PASS|FAIL|N/A] Compliance framework: <CIS|NIST|SOC2|HIPAA|PCI|FedRAMP|custom> — <n> controls mapped, last evaluation <date>
+  [PASS|FAIL|N/A] Backup frequency audit: last backup age <Xd>, max allowed <Xd> (<compliant|non-compliant>)
+  [PASS|FAIL|N/A] Encryption verification: <n>/<n> recovery points encrypted
+  [PASS|FAIL|N/A] Retention compliance: Vault Lock <LOCK_MODE|GOVERNANCE|none>, min <d>d max <d>d
+  [PASS|FAIL|N/A] Cross-region replication: <configured|not configured>, destination <region>
+  [PASS|FAIL|N/A] Legal hold: <tested|untested>, Vault Lock <mode>
+  [PASS|FAIL|N/A] Restore drill: last <date>, RTO <duration> (within <required> window)
+  [PASS|FAIL|N/A] Reporting: compliance report <freshness>, coverage report <configured|missing>
+  [PASS|FAIL|N/A] Cost allocation tags: <active|inactive> in Cost Explorer
 FINDINGS:
   - [INFO|WARN|HIGH|CRITICAL] <observation>
 REMEDIATION:
@@ -582,85 +606,132 @@ REMEDIATION:
   2. <step 2>
 ```
 
-### Worked example — AUTOMATED SOC2 cross-account
+### FORBIDDEN NEVER patterns (output contract)
+
+1. **NEVER emit `VERDICT: AUTOMATED` when any `[FAIL]` is present in the
+   checklist.** A single `[FAIL]` on any compliance pillar means the
+   playbook has a gap. The verdict MUST be `MANUAL_STEP_REQUIRED` with
+   the specific gap cited in FINDINGS and REMEDIATION.
+
+2. **NEVER mark Encryption as `[PASS]` without confirming
+   `BACKUP_RECOVERY_POINT_ENCRYPTED` control is in the framework AND all
+   recovery points are encrypted.** An unencrypted recovery point is a
+   compliance failure even if the backup ran successfully.
+
+3. **NEVER mark Retention compliance as `[PASS]` when Vault Lock is in
+   `GOVERNANCE` mode for a framework that requires immutability (HIPAA,
+   NIST, PCI, FedRAMP).** GOVERNANCE mode allows root to override
+   retention — only `LOCK_MODE` (compliance mode) satisfies immutability
+   requirements.
+
+4. **NEVER mark Restore drill as `[PASS]` without a documented restore
+   within the required window (typically 90 days for NIST, 365 days for
+   HIPAA).** A backup plan that never tested restores is unverified
+   recovery capability.
+
+5. **NEVER omit the FINDINGS section.** Even when
+   `VERDICT: AUTOMATED`, informational findings (e.g., cost observations,
+   minor warnings) MUST appear. An empty FINDINGS section implies the
+   audit was not thorough.
+
+6. **NEVER mark Legal hold as `[PASS]` if the create + release cycle has
+   not been tested.** The team's first legal hold operation should not
+   be under court deadline pressure. An untested legal hold is `[FAIL]`.
+
+7. **NEVER list remediation steps without a corresponding FINDING.**
+   Every REMEDIATION item MUST trace to a specific finding. Orphan
+   remediation steps create confusion about what was actually broken.
+
+### Perfect worked example — NIST compliance report with 3 non-compliant resources
+
 ```text
-FRAMEWORK:
-  - [PASS] Framework: soc2-backup-compliance (4 controls)
-  - [PASS] Controls: PLAN_EXISTENCE, RESOURCES_PROTECTED, MANUAL_DELETION_DISABLED, LAST_BACKUP_AGE 1d
-  - [PASS] Last evaluation: 2026-08-10 02:00 UTC
-REPORTING:
-  - [PASS] Compliance report: monthly, lands in s3://backup-compliance-reports
-  - [PASS] Job summary report: weekly
-  - [PASS] Coverage report: weekly
-  - [PASS] S3 bucket: versioning + Object Lock mode GOVERNANCE
-LEGAL_HOLD:
-  - [PASS] BackupLegalHold mechanism documented
-  - [PASS] Test hold: 2026-07-15, created + released successfully
-  - [PASS] Vault Lock: production-vault, LOCK_MODE, 7-365d
-  - [PASS] EventBridge trigger: custom.legal -> create-legal-hold Lambda
-CROSS_ACCOUNT:
-  - [PASS] Delegated admin: 222222222222 (audit account)
-  - [PASS] Org vault: org-compliance-vault with member access policy
-  - [PASS] All 30 member plans have COPY_ACTION to org vault
-SEARCH:
-  - [PASS] Backup Search scoped to production + org-compliance vaults
-  - [PASS] eDiscovery: search -> create-legal-hold workflow
-VERIFICATION:
-  - [PASS] Restore drill: 2026-07-20, RTO 35min for EBS 1TB
-  - [PASS] Cost allocation tags active (Project, Environment, Compliance)
-  - [PASS] Latest report: 2026-08-10, within 24h SLA
-VERDICT: AUTOMATED
+VAULT: nist-production-vault (us-east-1)
+VERDICT: MANUAL_STEP_REQUIRED
+CHECKLIST:
+  [PASS] Compliance framework: NIST — 6 controls mapped (PLAN_EXISTENCE, RESOURCES_PROTECTED, MANUAL_DELETION_DISABLED, LAST_BACKUP_AGE 1d, RECOVERY_POINT_ENCRYPTED, VARIANT_WITH_REGION_ISOLATION), last evaluation 2026-08-11 02:00 UTC
+  [FAIL] Backup frequency audit: 3 of 47 resources have last backup age > 24h (max allowed 1d) — non-compliant
+  [PASS] Encryption verification: 47/47 recovery points encrypted (KMS key arn:aws:kms:us-east-1:123456789012:key/abc-123)
+  [FAIL] Retention compliance: Vault Lock in GOVERNANCE mode — NIST requires LOCK_MODE (compliance mode) for immutability; min 7d max 365d
+  [PASS] Cross-region replication: configured, destination us-west-2 (CopyAction in all backup plan rules)
+  [PASS] Legal hold: tested 2026-07-22 (create + release on non-production recovery point, documented in runbook)
+  [FAIL] Restore drill: last restore 2026-04-15 (> 90-day NIST window) — RTO unverified for current infrastructure
+  [PASS] Reporting: compliance report 2026-08-11 (within 24h SLA), coverage report weekly, job summary weekly
+  [PASS] Cost allocation tags: active in Cost Explorer (Project, Environment, Compliance, Workload)
 FINDINGS:
-  - [INFO] Cross-account copy adds ~12% to per-job cost
+  - [CRITICAL] Vault Lock in GOVERNANCE mode: root account can override retention.
+    NIST SP 800-34 requires compliance mode (LOCK_MODE) where even root cannot
+    bypass the lock. Affected: all 47 recovery points in nist-production-vault.
+  - [HIGH] 3 resources have stale backups (> 24h since last recovery point):
+    - i-0abc123def456 (EC2 instance, orders-api-prod-1): last backup 2026-08-09
+    - db-def456ghi789 (RDS instance, payments-db): last backup 2026-08-10
+    - vol-ghi789abc012 (EBS volume, cache-volume-prod): last backup 2026-08-08
+    These resources are tagged for the backup plan but the plan has not produced
+    a recovery point within the NIST-required daily window.
+  - [HIGH] Restore drill overdue: last drill was 2026-04-15 (118 days ago).
+    NIST SP 800-34 requires annual testing; internal policy requires 90-day
+    cadence. RTO for current infrastructure is unverified.
+REMEDIATION:
+  1. Promote Vault Lock from GOVERNANCE to LOCK_MODE (irreversible — test on
+     non-production vault first):
+     aws backup put-backup-vault-lock-configuration \
+       --backup-vault-name nist-production-vault \
+       --min-retention-days 7 --max-retention-days 365 \
+       --mode LOCK_MODE --changeable-for-days 3
+  2. Investigate the 3 stale backup resources:
+     aws backup list-recovery-points-by-resource --resource-arn arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def456
+     aws backup list-recovery-points-by-resource --resource-arn arn:aws:rds:us-east-1:123456789012:db:payments-db
+     Verify the backup plan is active and on-demand backup job succeeds:
+     aws backup start-backup-job --backup-vault-name nist-production-vault \
+       --resource-arn arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def456 \
+       --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupDefaultServiceRole \
+       --start-window-minutes 60 --complete-window-minutes 1440
+  3. Run a restore drill on a tier-1 resource (e.g., payments-db) to a
+     non-production VPC; document RTO and RPO. Target completion: 2026-08-19.
+  4. Re-run the compliance report after remediation:
+     aws backup start-report-job --report-plan-name nist-monthly-compliance
+```
+
+**Key details in this example:**
+
+- **3 non-compliant resources** identified by resource ARN with last
+  backup date for each.
+- **Vault Lock GOVERNANCE vs LOCK_MODE** is the critical finding — NIST
+  requires immutability that GOVERNANCE mode does not provide.
+- **Restore drill overdue** by 28 days (118 days since last drill vs
+  90-day policy). This is a separate finding from the stale backups.
+- **FINDINGS severity** drives remediation priority: CRITICAL before
+  HIGH, with specific CLI commands for each.
+
+### Worked example — AUTOMATED (all gates passing)
+
+```text
+VAULT: soc2-production-vault (us-east-1)
+VERDICT: AUTOMATED
+CHECKLIST:
+  [PASS] Compliance framework: SOC2 — 5 controls mapped, last evaluation 2026-08-11 02:00 UTC
+  [PASS] Backup frequency audit: all 62 resources have last backup age <= 24h
+  [PASS] Encryption verification: 62/62 recovery points encrypted
+  [PASS] Retention compliance: Vault Lock LOCK_MODE, min 7d max 365d
+  [PASS] Cross-region replication: configured, destination us-west-2
+  [PASS] Legal hold: tested 2026-07-15 (create + release cycle documented)
+  [PASS] Restore drill: last 2026-07-20, RTO 35min for EBS 1TB (within 90-day window)
+  [PASS] Reporting: compliance report 2026-08-11 (within 24h SLA), coverage + job summary weekly
+  [PASS] Cost allocation tags: active (Project, Environment, Compliance)
+FINDINGS:
+  - [INFO] Cross-region copy adds ~12% to per-job cost
   - [WARN] One member account (333333333333) missing cost tag: Project
 REMEDIATION:
   1. Add Project tag to backup jobs in account 333333333333
 ```
 
-### Worked example — MANUAL_STEP_REQUIRED (no legal hold test, no org vault)
-```text
-FRAMEWORK:
-  - [PASS] Framework: hipaa-backup (5 controls)
-  - [FAIL] Missing control: BACKUP_RECOVERY_POINT_ENCRYPTED (required by HIPAA)
-  - [PASS] Last evaluation: 2026-08-10
-REPORTING:
-  - [PASS] Compliance report scheduled monthly
-  - [FAIL] No coverage report (unprotected resources invisible)
-  - [PASS] Reports in S3
-LEGAL_HOLD:
-  - [PASS] BackupLegalHold mechanism documented
-  - [FAIL] Legal hold never tested (create + release cycle unverified)
-  - [FAIL] Vault Lock in GOVERNANCE mode (compliance mode required for HIPAA)
-  - [FAIL] No EventBridge trigger for litigation hold
-CROSS_ACCOUNT:
-  - [FAIL] No delegated admin (org with 30 accounts)
-  - [FAIL] No org-wide vault
-  - [FAIL] Per-account plans only; 12 accounts have stale recovery points
-SEARCH:
-  - [FAIL] Backup Search not scoped
-VERIFICATION:
-  - [FAIL] Last restore drill: 14 months ago (HIPAA requires annual)
-  - [PASS] Cost allocation tags partially active
-  - [WARN] Latest compliance report: 2026-07-10 (31 days stale)
-VERDICT: MANUAL_STEP_REQUIRED
-FINDINGS:
-  - [CRITICAL] Missing encryption control: HIPAA requires at-rest encryption
-    on all recovery points.
-  - [CRITICAL] Vault Lock in GOVERNANCE mode: root can override retention.
-    HIPAA requires compliance mode (LOCK_MODE).
-  - [CRITICAL] Legal hold untested: under court deadline pressure, the
-    team will not know how to create or release holds.
-  - [HIGH] No org-wide vault: 12 accounts have stale recovery points with
-    no central visibility.
-  - [HIGH] No restore drill in 14 months: recovery capability unverified.
-REMEDIATION:
-  1. Add BACKUP_RECOVERY_POINT_ENCRYPTED control to the framework.
-  2. Switch Vault Lock from GOVERNANCE to LOCK_MODE (compliance mode).
-  3. Run a legal hold test: create + release on a non-production recovery
-     point; document the runbook.
-  4. Delegate backup admin to central audit account; deploy org vault.
-  5. Run a restore drill on a tier-1 resource; document RTO.
-```
+**Self-check before emit:**
+- [ ] VAULT name and region present?
+- [ ] All 9 checklist rows present with [PASS|FAIL|N/A]?
+- [ ] Any [FAIL] → VERDICT is MANUAL_STEP_REQUIRED (never AUTOMATED)?
+- [ ] Every [FAIL] has a corresponding finding with severity?
+- [ ] Every finding traces to a remediation step with CLI command?
+- [ ] Encryption and Retention rows cite the specific control/mode?
+- [ ] FINDINGS section is non-empty (at least one INFO)?
 
 ## NEVER (these things)
 

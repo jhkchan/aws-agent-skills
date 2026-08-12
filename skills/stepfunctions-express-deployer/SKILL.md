@@ -689,6 +689,39 @@ VERIFICATION_COMMANDS:
   <copy-pasteable verification commands — one per [✓] item>
 ```
 
+### Decision tree: Express vs Standard
+
+```text
+Express vs Standard — START
+  │
+  Q1: Does any single execution need to run > 5 minutes?
+  ├── YES → STANDARD (Express hard-caps at 5 min per execution)
+  └── NO  → Q2
+  │
+  Q2: Does the ASL use .waitForTaskToken (callback / human-approval)?
+  ├── YES → STANDARD (Express rejects .waitForTaskToken at create-time)
+  └── NO  → Q3
+  │
+  Q3: Is exactly-once required AND idempotency is infeasible?
+  ├── YES → STANDARD (Express is at-least-once; retries can double-execute)
+  └── NO  → Q4
+  │
+  Q4: Is the workload high-volume (> 1,000 executions/day)?
+  ├── NO  → Either works; prefer STANDARD unless cost is a concern
+  └── YES → Q5
+  │
+  Q5: Can all side-effecting integrations be made idempotent?
+  ├── NO  → STANDARD (at-least-once risks duplicate writes / charges)
+  └── YES → EXPRESS
+             Cost model:
+               Standard: $25.00 / 1M state transitions
+               Express:  $1.00 / 1M invocations + $0.025 / GB-hour
+               10-state workflow, 1M runs/day:
+                 Standard = $250/day  |  Express = $1/day
+               10-state workflow, 10M runs/day:
+                 Standard = $2,500/day  |  Express = $10/day
+```
+
 ### FORBIDDEN output patterns
 
 1. **NEVER emit `VERDICT: READY_TO_DEPLOY` without showing ALL 9
@@ -724,26 +757,103 @@ VERIFICATION_COMMANDS:
    `[✗] ASL uses .waitForTaskToken at line 42 — replace with .sync
    or migrate to Standard`. A bare `[✗]` is non-compliant.
 
+7. **NEVER omit the cost-model comparison from the Express-vs-
+   Standard checklist row.** The row MUST cite the cost delta
+   (e.g., "Express $1/M invocations vs Standard $25/M transitions")
+   so the operator can sanity-check the type choice. A bare
+   "EXPRESS" without cost rationale is non-compliant.
+
 ### Perfect example output — READY_TO_DEPLOY
 
+Scenario: High-volume event-processing Express workflow. JSON event
+batches land in S3; a Distributed Map fans them out to a Lambda for
+per-event processing. Async, triggered by EventBridge every 5 minutes.
+At 2M executions/day with a 5-state workflow: Standard would cost
+~$250/day ($25/M x 10M transitions); Express costs ~$2/day ($1/M
+x 2M invocations). p99 execution duration = 12s.
+
 ```text
-EXPRESS_WORKFLOW: order-processor
+EXPRESS_WORKFLOW: event-processor-express
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
-  [✓] Express-vs-Standard decision: EXPRESS (p99 duration 8s, idempotent)
-  [✓] Duration budget: p99 8s < 5 min (sync: p99 8s < 29s)
-  [✓] No .waitForTaskToken in ASL: verified (grep returned 0 matches)
-  [✓] ASL definition validated: Distributed Map (1000 concurrency, S3 ItemReader), Lambda Task
-  [✓] IAM execution role: scoped to function:process-item + s3:GetObject on my-bucket/input.json
-  [✓] Logging: /aws/states/order-processor, level ALL, includeExecutionData=true
-  [✓] Invocation mode: async (EventBridge scheduled)
-  [✓] EventBridge schedule: rate(5 minutes) + alarm on ExecutionsFailed
-  [✓] Idempotency: ChargeCard uses IdempotencyKey.$: "$$.Execution.Id"
+  [✓] Express-vs-Standard decision: EXPRESS (p99 12s, idempotent;
+        cost: Express $1/M invocations vs Standard $25/M transitions;
+        2M runs/day x 5 states = 10M transitions -> Standard $250/day vs Express $2/day)
+  [✓] Duration budget: p99 12s < 5 min (async; no sync API Gateway alignment needed)
+  [✓] No .waitForTaskToken in ASL: verified (grep -c ':waitForTaskToken' definition.json = 0)
+  [✓] ASL definition validated: Distributed Map (MaxConcurrency 1000, S3 ItemReader)
+        + Lambda Task with idempotency key (see ASL below)
+  [✓] IAM execution role: sfn-event-processor-exec, trust=states.us-east-1.amazonaws.com,
+        scoped to lambda:InvokeFunction on arn:aws:lambda:us-east-1:123456789012:function:process-event
+        + s3:GetObject on arn:aws:s3:::event-input-bucket/events/*.json
+  [✓] Logging: /aws/states/event-processor-express, level ALL, includeExecutionData=true
+        (30-day retention; see logging CLI below)
+  [✓] Invocation mode: async (EventBridge schedule rate(5 minutes))
+  [✓] EventBridge schedule: rule event-processor-schedule, target role eventbridge-sfn-role,
+        CloudWatch alarm event-processor-failed on ExecutionsFailed >= 1
+  [✓] Idempotency: ProcessEvent Lambda checks IdempotencyKey=$$.Execution.Id against
+        DynamoDB table event-idempotency before writing; duplicate retries are no-ops
 VERIFICATION_COMMANDS:
-  aws stepfunctions describe-state-machine --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:order-processor
-  aws logs describe-log-groups --log-group-name-prefix /aws/states/order-processor
-  aws events describe-rule --name order-processor-schedule
-  aws cloudwatch describe-alarms --alarm-names order-processor-failed
+  aws stepfunctions describe-state-machine --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:event-processor-express
+  grep -c ':waitForTaskToken' definition.json
+  aws logs describe-log-groups --log-group-name-prefix /aws/states/event-processor-express
+  aws events describe-rule --name event-processor-schedule
+  aws cloudwatch describe-alarms --alarm-names event-processor-failed
+```
+
+ASL definition (Distributed Map + Lambda Task with idempotency key):
+
+```json
+{
+  "StartAt": "FanOutProcess",
+  "States": {
+    "FanOutProcess": {
+      "Type": "Map",
+      "ItemProcessor": {
+        "ProcessorConfig": { "Mode": "DISTRIBUTED" },
+        "StartAt": "ProcessEvent",
+        "States": {
+          "ProcessEvent": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:us-east-1:123456789012:function:process-event",
+            "Parameters": {
+              "IdempotencyKey.$": "$$.Execution.Id",
+              "EventPayload.$": "$.value"
+            },
+            "Retry": [
+              { "ErrorEquals": ["States.TaskFailed"], "MaxAttempts": 3, "BackoffRate": 2 }
+            ],
+            "End": true
+          }
+        }
+      },
+      "ItemReader": {
+        "Resource": "arn:aws:states:::s3:getObject",
+        "Parameters": { "Bucket": "event-input-bucket", "Key": "events/batch.json" }
+      },
+      "MaxConcurrency": 1000,
+      "End": true
+    }
+  }
+}
+```
+
+Logging configuration CLI (create log group with retention + attach
+at state machine creation):
+
+```bash
+aws logs create-log-group --log-group-name /aws/states/event-processor-express
+aws logs put-retention-policy \
+  --log-group-name /aws/states/event-processor-express --retention-in-days 30
+
+aws stepfunctions create-state-machine \
+  --name event-processor-express \
+  --definition file://definition.json \
+  --role-arn arn:aws:iam::123456789012:role/sfn-event-processor-exec \
+  --type EXPRESS \
+  --logging-configuration \
+    level=ALL,includeExecutionData=true,\
+    destinations='[{CloudWatchLogsLogGroup={LogGroupArn=arn:aws:logs:us-east-1:123456789012:log-group:/aws/states/event-processor-express:*}}]'
 ```
 
 ### Perfect example output — PREREQUISITES_MISSING

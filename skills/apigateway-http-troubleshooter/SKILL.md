@@ -495,7 +495,58 @@ If critical configuration is missing (integration ID, authorizer ID,
 VPC link ID, stage name, API type), emit INSUFFICIENT_DATA with the
 exact missing fields and the next probe to run once info is available.
 
-## Output format
+## Output format (STRICT output contract)
+
+When this skill concludes diagnosis, the agent MUST respond with the
+block below using the literal all-caps labels `TARGET:`, `VERDICT:`,
+`REASON:`, `LAYER:`, `EVIDENCE:`, and `REMEDIATION:`. Do NOT preface
+with prose, headings, or disclaimers — emit the block as the first
+lines of the response. This contract is what assertion-based evals and
+downstream diagnostic pipelines rely on; deviating from the literal
+labels breaks automation silently.
+
+### Decision tree — symptom to layer
+
+```text
+Incoming symptom (HTTP status / error body)
+├── 403 Forbidden
+│     └── JWT authorizer? → JWT_AUTHORIZER
+│           ├── Check IdentitySource header name matches client
+│           ├── Check Issuer matches token iss (including trailing slash)
+│           └── Check Audience matches token aud (case-sensitive)
+├── 404 Not Found / wrong route handling
+│     └── Route matching? → ROUTE_MATCHING / ROUTE_PRIORITY_CATCHALL
+│           ├── Check route exists in get-routes
+│           ├── Check stage was deployed (not just config)
+│           └── Check route key: case, trailing slash, method
+├── Browser CORS error
+│     └── CORS? → CORS_MISCONFIG
+│           ├── Check actual HTTP response first (browser masks real error)
+│           ├── Check AllowOrigins includes browser origin
+│           └── Check AllowMethods includes OPTIONS
+├── 502 Bad Gateway from Lambda
+│     ├── Body garbled / base64? → PAYLOAD_FORMAT_VERSION
+│     │     ├── Check PayloadFormatVersion 1.0 vs 2.0
+│     │     └── Check handler reads isBase64Encoded
+│     └── Response shape wrong? → INTEGRATION_LAMBDA_PROXY
+│           ├── Check statusCode is integer
+│           └── Check body is string
+├── 502 / 504 after ~29 seconds
+│     └── Timeout? → INTEGRATION_TIMEOUT
+├── 429 Too Many Requests
+│     └── Throttling? → THROTTLING_BURST
+├── Config changed but not live
+│     └── Stage? → STAGE_DEPLOYMENT
+├── 502 from VPC link / private integration
+│     └── VPC link? → VPCLINK_CONNECTIVITY
+│           └── Check NLB target health first (VPC link is transparent)
+├── No logs despite traffic
+│     └── Logging? → LOGGING_MISCONFIG
+└── None of the above
+      └── INSUFFICIENT_DATA — list missing fields
+```
+
+### Output template
 
 ```text
 TARGET: <api-id / stage / route-key>
@@ -507,9 +558,9 @@ LAYER: <ROUTE_MATCHING | ROUTE_PRIORITY_CATCHALL | JWT_AUTHORIZER |
         STAGE_DEPLOYMENT | THROTTLING_BURST | VPCLINK_CONNECTIVITY |
         LOGGING_MISCONFIG | PARAMETER_MAPPING | UNKNOWN>
 EVIDENCE:
-  - <observed symptom — HTTP status code and response body>
-  - <failing probe — command and output confirming the cause>
-  - <passing probes — layers ruled out>
+  - Symptom: <HTTP status code and response body>
+  - Failing probe: <command and output confirming the cause>
+  - Passing probes: <layers ruled out>
 REMEDIATION:
   1. <specific action with CLI command>
   2. <verification command after the fix>
@@ -518,33 +569,93 @@ CONFIRM: Before executing any state-changing CLI, emit and await operator
   (yes/no)"
 ```
 
-### Worked example — Payload format version 2.0 base64 body
+### FORBIDDEN NEVER patterns (output contract)
+
+1. **NEVER declare `VERDICT: ROOT_CAUSE_IDENTIFIED` without a failing
+   probe matching the symptom.** "Process of elimination" is not
+   evidence. The EVIDENCE section MUST cite the specific command and
+   output that confirms the root cause.
+
+2. **NEVER diagnose an HTTP API (apigatewayv2) with REST API
+   (apigateway) tooling.** The CLIs, config models, and payload formats
+   differ. Always identify the API type first (`get-api` vs
+   `get-rest-api`) and cite it in the TARGET line.
+
+3. **NEVER emit `VERDICT: ROOT_CAUSE_IDENTIFIED` for a 502 without
+   checking `PayloadFormatVersion`.** Payload format version 2.0
+   base64-encodes binary bodies; a handler that does
+   `JSON.parse(event.body)` without checking `isBase64Encoded` throws.
+   This is the single most common silent break for Lambda integrations
+   on HTTP APIs.
+
+4. **NEVER conclude "the route does not exist" without checking the
+   deployed stage snapshot.** A route may exist in config but not in the
+   deployed stage. Always verify with both `get-routes` AND `get-stage`.
+
+5. **NEVER trust a browser CORS error at face value.** The browser
+   reports "No Access-Control-Allow-Origin" for ANY failed cross-origin
+   request, including 403s and 502s. Check the actual HTTP response
+   headers before declaring `LAYER: CORS_MISCONFIG`.
+
+6. **NEVER recommend raising the Lambda timeout past 29 seconds for an
+   API-Gateway-facing integration.** API Gateway has a hard 29-second
+   cap. The correct fix for long-running work is async redesign, not a
+   longer timeout.
+
+7. **NEVER omit the CONFIRM gate before state-changing commands.**
+   `update-integration`, `update-authorizer`, `create-deployment`, and
+   `update-route` all change production traffic behavior. Always emit
+   the confirmation prompt and await explicit approval.
+
+### Perfect worked example — 502 from Lambda proxy (payload format v2 base64 decode issue)
 
 ```text
-TARGET: api abc1234 / POST /orders / stage $default
+TARGET: orders-api (abc1234) / POST /orders / stage $default
 VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: Integration PayloadFormatVersion is 2.0; the Lambda handler
-  reads event.body as raw JSON without checking isBase64Encoded. POST
-  bodies with binary content arrive base64-encoded and JSON.parse
-  throws, causing 502 Bad Gateway (Step 5a).
+REASON: HTTP API integration PayloadFormatVersion is 2.0; the Lambda
+  handler reads event.body as raw JSON without checking isBase64Encoded.
+  POST bodies with binary or non-JSON content arrive base64-encoded and
+  JSON.parse throws SyntaxError, which API Gateway surfaces as 502 Bad
+  Gateway. GET requests succeed because they have no body to decode.
 LAYER: PAYLOAD_FORMAT_VERSION
 EVIDENCE:
-  - Symptom: POST /orders returns 502 when body > 1 KB; GET succeeds.
-  - Probe: aws apigatewayv2 get-integration returns PayloadFormatVersion: "2.0".
-  - Probe: Lambda logs show "SyntaxError: Unexpected token in JSON" at
-    JSON.parse(event.body) with isBase64Encoded: true.
-  - Passing: AutoDeploy true; JWT audience matches; CORS allows origin.
+  - Symptom: POST /orders returns 502 Bad Gateway when body > 1 KB;
+    GET /orders succeeds. Response body: {"message":"Internal Server Error"}.
+  - Probe (failing): aws apigatewayv2 get-integration --api-id abc1234
+    --integration-id int-xyz returns PayloadFormatVersion: "2.0",
+    IntegrationSubtype: Lambda.
+  - Probe (failing): Lambda logs (/aws/lambda/orders-handler) show
+    "SyntaxError: Unexpected token 'e' in JSON at position 0" at
+    JSON.parse(event.body); event.isBase64Encoded: true.
+  - Probe (passing): aws apigatewayv2 get-stage --api-id abc1234
+    --stage-name '$default' returns AutoDeploy: true,
+    LastDeploymentStatus: DEPLOYED.
+  - Probe (passing): aws apigatewayv2 get-authorizer confirms JWT
+    Issuer and Audience match the decoded test token.
+  - Probe (passing): aws apigatewayv2 get-api CorsConfiguration
+    includes AllowOrigins matching the caller, AllowMethods includes
+    OPTIONS and POST.
 REMEDIATION:
-  1. Update handler to check isBase64Encoded:
+  1. Update the Lambda handler to check isBase64Encoded before parsing:
      if (event.isBase64Encoded) {
        event.body = Buffer.from(event.body, 'base64').toString('utf-8');
      }
-  2. Redeploy Lambda; verify POST /orders succeeds with 2 KB body.
-  3. Alternative: switch to PayloadFormatVersion 1.0:
+     const payload = JSON.parse(event.body);
+  2. Redeploy the Lambda function:
+     aws lambda update-function-code --function-name orders-handler \
+       --s3-bucket deploy-bucket --s3-key orders-handler-v2.zip
+  3. Verify POST /orders succeeds with a 2 KB body:
+     curl -X POST https://abc1234.execute-api.us-east-1.amazonaws.com/orders \
+       -H "Content-Type: application/json" \
+       -H "Authorization: Bearer <token>" \
+       -d '{"data":"xxxxx"}'
+  4. Alternative fix (if handler change is not immediately deployable):
+     Switch to PayloadFormatVersion 1.0 (test in non-prod first):
      aws apigatewayv2 update-integration --api-id abc1234 \
        --integration-id int-xyz --payload-format-version 1.0
 CONFIRM: Before updating, emit: "CONFIRM: About to update integration
-  PayloadFormatVersion on api abc1234. Proceed? (yes/no)"
+  PayloadFormatVersion on api abc1234 from 2.0 to 1.0. This changes the
+  Lambda event shape. Test in non-prod first. Proceed? (yes/no)"
 ```
 
 ### Worked example — INSUFFICIENT_DATA
@@ -567,6 +678,13 @@ REMEDIATION: Provide: (1) integration config from get-integration,
   Lambda logs for a failing request, (4) confirm intermittent vs
   consistent 502.
 ```
+
+**Self-check before emit:**
+- [ ] API type identified (HTTP vs REST) and cited in TARGET?
+- [ ] VERDICT has a matching failing probe in EVIDENCE?
+- [ ] At least one passing probe cited (layer ruled out)?
+- [ ] REMEDIATION includes copy-pasteable CLI commands?
+- [ ] CONFIRM gate present before any state-changing action?
 
 ## Anti-Patterns — NEVER
 

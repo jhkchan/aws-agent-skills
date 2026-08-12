@@ -690,6 +690,35 @@ VERIFICATION_COMMANDS:
   <copy-pasteable verification commands — one per [✓] item>
 ```
 
+### Decision tree: Object Lambda deployment path
+
+```text
+Object Lambda — START
+  │
+  Q1: Transform objects on READ (not write)?
+  ├── NO  → Use S3 Batch Operations or Lambda on upload (not Object Lambda)
+  └── YES → Q2
+  │
+  Q2: Is the transform per-request (different output per caller / role)?
+  ├── NO  → Pre-materialize a transformed copy (cheaper for static transforms)
+  └── YES → Q3
+  │
+  Q3: Will peak GET rate exceed the Lambda concurrency budget?
+  ├── YES → Set reserved concurrency BEFORE traffic; add CloudFront caching
+  │         at edge to reduce origin GETs (cache TTL = transform freshness)
+  └── NO  → Q4
+  │
+  Q4: Need HeadObject / ListObjects transforms beyond GetObject?
+  ├── YES → Add each operation to TransformationConfiguration explicitly
+  └── NO  → Q5
+  │
+  Q5: Multi-region DR or latency required?
+  ├── YES → Per-region OLAP + per-region Lambda + Route 53 latency routing
+  └── NO  → Single-region OLAP; optional CloudFront for edge caching
+             CloudFront: origin = OLAP hostname, CachePolicy includes
+             headers needed by transform, TTL based on transform freshness
+```
+
 ### FORBIDDEN output patterns
 
 1. **NEVER emit `VERDICT: READY_TO_DEPLOY` without showing ALL 8
@@ -725,27 +754,84 @@ VERIFICATION_COMMANDS:
    — add permission before deploy`. A bare `[✗]` with no explanation
    is non-compliant.
 
+7. **NEVER deploy an Object Lambda AP behind CloudFront without
+   confirming the cache behavior accounts for transform output
+   variance.** CloudFront caches the OLAP response; if the transform
+   produces role-specific output (e.g., PII redaction varies by
+   caller), caching MUST be disabled or keyed on the authorization
+   header. A single cached response served to all callers defeats the
+   per-request transform and can leak data across principals.
+
 ### Perfect example output — READY_TO_DEPLOY
 
+Scenario: CSV-to-JSON transformation on retrieval. Analysts query S3
+CSV reports via BI tools; the Object Lambda AP converts CSV to JSON
+on the fly. CloudFront sits in front for edge caching (CSV refreshes
+hourly, cache TTL = 3600s). Reserved concurrency = 100 for peak load.
+
 ```text
-OBJECT_LAMBDA_SPEC: pii-redact-olap
+OBJECT_LAMBDA_SPEC: csv-json-olap
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
-  [✓] Bucket baseline: prod-data-lake, BPA all 4 True, SSE-KMS, versioning Enabled
-  [✓] Supporting standard AP: dlake-team-a-ap with Lambda-read policy on arn:aws:iam::111111111111:role/olap-exec
-  [✓] IAM execution role: olap-exec, trust=s3-object-lambda.amazonaws.com, perms include s3-object-lambda:WriteGetObjectResponse
-  [✓] Transform Lambda: pii-redact-fn (python3.12, index.handler, uses WriteGetObjectResponse)
-  [✓] Reserved concurrency: 50 (expected peak ~40 GETs/sec)
-  [✓] Object Lambda AP: pii-redact-olap, SupportingAccessPoint=arn:aws:s3:us-east-1:111111111111:accesspoint/dlake-team-a-ap
-  [✓] TransformationConfiguration: operations=[GetObject, HeadObject]
+  [✓] Bucket baseline: analytics-reports, BPA all 4 True, SSE-KMS, versioning Enabled
+  [✓] Supporting standard AP: reports-std-ap with Lambda-read policy on
+        arn:aws:iam::444455556666:role/olap-transform-exec
+  [✓] IAM execution role: olap-transform-exec, trust=s3-object-lambda.amazonaws.com,
+        perms include s3-object-lambda:WriteGetObjectResponse + s3:GetObject on
+        arn:aws:s3:us-east-1:444455556666:accesspoint/reports-std-ap/*
+  [✓] Transform Lambda: csv-to-json-fn (python3.12, index.handler,
+        uses WriteGetObjectResponse; see Lambda code below)
+  [✓] Reserved concurrency: 100 (expected peak ~80 GETs/sec)
+  [✓] Object Lambda AP: csv-json-olap,
+        SupportingAccessPoint=arn:aws:s3:us-east-1:444455556666:accesspoint/reports-std-ap
+  [✓] TransformationConfiguration: operations=[GetObject]
+  [✓] CloudFront: distribution E2Q1U3V5EXAMPLE, origin = OLAP hostname
+        (csv-json-olap-444455556666.s3-object-lambda.us-east-1.amazonaws.com),
+        DefaultTTL=3600 (CSV refreshes hourly), CachePolicy=CachingOptimized
   [OPTIONAL] Multi-region / GetObjectACL / range downloads: none
 VERIFICATION_COMMANDS:
-  aws s3control get-access-point --account-id 111111111111 --name dlake-team-a-ap
-  aws s3control get-access-point-policy --account-id 111111111111 --name dlake-team-a-ap
-  aws s3control get-access-point-for-object-lambda --account-id 111111111111 --name pii-redact-olap
-  aws s3control get-access-point-configuration-for-object-lambda --account-id 111111111111 --name pii-redact-olap
-  aws lambda get-function --function-name pii-redact-fn
-  aws lambda get-function-concurrency --function-name pii-redact-fn
+  aws s3control get-access-point --account-id 444455556666 --name reports-std-ap
+  aws s3control get-access-point-policy --account-id 444455556666 --name reports-std-ap
+  aws s3control get-access-point-for-object-lambda --account-id 444455556666 --name csv-json-olap
+  aws s3control get-access-point-configuration-for-object-lambda --account-id 444455556666 --name csv-json-olap
+  aws lambda get-function --function-name csv-to-json-fn
+  aws lambda get-function-concurrency --function-name csv-to-json-fn
+  aws cloudfront get-distribution-config --id E2Q1U3V5EXAMPLE
+```
+
+CSV-to-JSON transform Lambda (uses WriteGetObjectResponse, NOT return):
+
+```python
+import boto3, urllib.request, csv, io, json
+
+s3 = boto3.client("s3")
+
+def handler(event, context):
+    # Fetch original CSV via the presigned URL from Object Lambda event
+    presigned_url = event["getObjectContext"]["inputS3Url"]
+    with urllib.request.urlopen(presigned_url) as resp:
+        csv_body = resp.read().decode("utf-8")
+
+    # Transform: CSV rows -> JSON array (one object per row)
+    reader = csv.DictReader(io.StringIO(csv_body))
+    json_output = json.dumps(list(reader), indent=2)
+
+    # Write back via WriteGetObjectResponse (return is a silent no-op)
+    s3.write_get_object_response(
+        RequestRoute=event["getObjectContext"]["outputRoute"],
+        RequestToken=event["getObjectContext"]["outputToken"],
+        Body=json_output,
+        ContentType="application/json"
+    )
+```
+
+CloudFront integration (cache transform output at edge to reduce
+Lambda invocations):
+
+```bash
+aws cloudfront create-distribution \
+  --origin-domain-name csv-json-olap-444455556666.s3-object-lambda.us-east-1.amazonaws.com \
+  --default-cache-behavior 'TargetOriginId=csv-json-olap-origin,ViewerProtocolPolicy=redirect-to-https,DefaultTTL=3600,MinTTL=0,MaxTTL=86400'
 ```
 
 ### Perfect example output — PREREQUISITES_MISSING

@@ -4,21 +4,18 @@ description: >-
   Provisions AWS Private Certificate Authority (ACM PCA) with production
   defaults: CA creation (root vs subordinate), key algorithm (RSA_2048,
   EC_prime256v1), signing algorithm (SHA256withRSA, SHA256withECDSA),
-  CRL configuration (S3 bucket, expiration in days, CNAME), certificate
-  template (arn:aws:acm-pca:::template/EndEntityCertificate_CertPassedPathLen_0),
-  CA certificate issuance (self-signed root vs parent-signed subordinate),
-  certificate revocation, audit via CloudTrail, CA deletion (7-30 day
-  mandatory waiting period), certificate authority permissions
-  (create-permission for cross-account ACM access), integration with ACM
-  for managed private cert lifecycle, CRL distribution point, and OCSP
-  support. Emits a READY_TO_DEPLOY checklist with verification commands.
-  Use when creating a private certificate authority, issuing private
-  certificates, configuring CRL revocation, setting up subordinate CA
-  hierarchies, integrating ACM PCA with ACM for managed renewal, or
-  deleting a private CA. Triggers: create private certificate authority,
-  acm pca root ca, acm pca subordinate ca, issue private certificate,
-  crl configuration s3, revoke certificate acm pca, ca deletion waiting
-  period, acm pca permissions, acm managed private cert.
+  CRL configuration (S3 bucket, expiration, CNAME), certificate template
+  selection, CA certificate issuance (self-signed root vs parent-signed
+  subordinate), certificate revocation, audit via CloudTrail, CA deletion
+  (7-30 day mandatory waiting period), CA permissions for ACM integration,
+  and OCSP support. Emits a READY_TO_DEPLOY checklist with verification
+  commands. Use when creating a private CA, issuing private certificates,
+  configuring CRL revocation, setting up subordinate CA hierarchies,
+  integrating ACM PCA with ACM, or deleting a private CA. Triggers: create
+  private certificate authority, acm pca root ca, acm pca subordinate ca,
+  issue private certificate, crl configuration s3, revoke certificate acm
+  pca, ca deletion waiting period, acm pca permissions, acm managed
+  private cert.
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -665,24 +662,66 @@ trail.
 10. **NEVER assume CA deletion is instant.** The mandatory waiting
     period is 7-30 days. Plan decommissioning timelines accordingly.
 
-## Output format
+## Output format (STRICT output contract)
+
+When this skill is invoked with an ACM PCA provisioning request, the
+agent MUST respond with the block below using the literal all-caps
+labels `ACM_PCA:`, `VERDICT:`, `CHECKLIST:`, and
+`VERIFICATION_COMMANDS:`. Do NOT preface the checklist with prose,
+headings, or disclaimers — emit the block as the first lines of the
+response. This contract is what assertion-based evals and downstream
+provisioning pipelines rely on; deviating from the literal labels
+breaks automation silently.
+
+If any prerequisite is missing, the verdict is `PREREQUISITES_MISSING`
+with a specific gap citation in the checklist (marked `[✗]`), and
+`READY_TO_DEPLOY` MUST NOT also appear.
+
+### Decision tree — CA provisioning flow
 
 ```text
-ACM_PCA: <ca-arn> (<ROOT|SUBORDINATE>, <key-algorithm>, <signing-algorithm>)
+Need a private CA?
+├── Need a self-signed trust anchor?
+│     → ROOT CA
+│       ├── Key: RSA_2048 (default) | RSA_4096 | EC_prime256v1 | EC_secp384r1
+│       ├── Signing: SHA256withRSA (RSA) | SHA256withECDSA (EC)
+│       ├── Template: RootCACertificate/V1
+│       ├── CRL? → YES: create S3 bucket + policy → configure CrlConfiguration
+│       │          NO: skip (OCSP only or none)
+│       ├── ACM integration? → YES: create-permission for acm.amazonaws.com
+│       └── Activate: self-sign → import-certificate-authority-certificate
+│
+├── Need a CA signed by an existing parent?
+│     → SUBORDINATE CA
+│       ├── PREREQUISITE: parent CA ACTIVE + has create-permission
+│       ├── Template: SubordinateCACertificate_PathLen0/V1
+│       └── Activate: parent signs CSR → import into subordinate
+│
+└── Need to issue end-entity certs (TLS)?
+      → CA (root or subordinate) must be ACTIVE
+      → Template: EndEntityCertificate/CertPassedPathLen/0
+      → For ACM-managed lifecycle: create-permission for acm.amazonaws.com
+```
+
+### Output template
+
+```text
+ACM_PCA: <ca-name> (<ROOT|SUBORDINATE>, <key-algorithm>, <signing-algorithm>)
 VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
 CHECKLIST:
   [✓|✗] CA type: ROOT | SUBORDINATE
   [✓|✗] Key algorithm: RSA_2048 | RSA_4096 | EC_prime256v1 | EC_secp384r1
   [✓|✗] Signing algorithm: SHA256withRSA | SHA256withECDSA | ...
   [✓|✗] Subject DN: CN=<cn>, O=<org>, C=<country>
-  [✓|✗] Revocation: CRL (bucket <name>, expiration <days>) | OCSP | Both | None
   [✓|✗] CRL S3 bucket: <bucket-name> — exists
   [✓|✗] CRL bucket policy: grants acm-pca.amazonaws.com s3:PutObject
+  [✓|✗] CRL expiration: <days> days, CustomCname: <cname|none>
+  [✓|✗] OCSP: enabled | disabled
   [✓|✗] CA status: CREATING | PENDING_CERTIFICATE | ACTIVE
   [✓|✗] CA certificate: self-signed (root) | parent-signed (subordinate, parent <parent-arn>)
-  [✓|✗] Parent CA permission: create-permission granted (for subordinate)
-  [✓|✗] ACM integration: create-permission for acm.amazonaws.com
   [✓|✗] Certificate template: <template-arn-suffix>
+  [✓|✗] ACM integration: create-permission for acm.amazonaws.com (IssueCertificate, GetCertificate, ListPermissions)
+  [✓|✗] Parent CA permission: create-permission granted (for subordinate only)
   [✓|✗] Tags: <key=value list>
 VERIFICATION_COMMANDS:
   aws acm-pca describe-certificate-authority --certificate-authority-arn <ca-arn> --region <region>
@@ -690,28 +729,83 @@ VERIFICATION_COMMANDS:
   aws s3api get-bucket-policy --bucket <crl-bucket>
 ```
 
-### Worked example — root CA with CRL
+### FORBIDDEN NEVER patterns (output contract)
+
+1. **NEVER emit `VERDICT: READY_TO_DEPLOY` without confirming CA status
+   is `ACTIVE`.** A CA in `PENDING_CERTIFICATE` cannot issue
+   certificates. The checklist MUST show `CA status: ACTIVE` with `[✓]`.
+
+2. **NEVER mark CRL as `[✓]` without confirming the S3 bucket policy.**
+   CRL publication silently fails without the policy granting
+   `acm-pca.amazonaws.com` `s3:PutObject`. The checklist MUST show both
+   the bucket name AND the policy status as verified.
+
+3. **NEVER mark ACM integration as `[✓]` without confirming
+   `create-permission` for `acm.amazonaws.com`.** Without this
+   permission, ACM cannot request or renew private certificates. The
+   verification MUST include `list-permissions` output.
+
+4. **NEVER show a subordinate CA as `READY_TO_DEPLOY` without confirming
+   the parent CA is `ACTIVE` and has `create-permission`.** A
+   subordinate without parent signing stays `PENDING_CERTIFICATE`
+   indefinitely. Both conditions (parent ACTIVE AND permission granted)
+   must be met.
+
+5. **NEVER omit the certificate template from the checklist.** The
+   template determines key usage, extended key usage, and path length.
+   A missing or wrong template produces a certificate with incorrect
+   extensions that may be rejected by clients.
+
+6. **NEVER emit `VERDICT: PREREQUISITES_MISSING` without citing the
+   specific gap.** Each `[✗]` item MUST have a one-line reason citing
+   what is missing and how to fix it. A bare `[✗]` with no explanation
+   is non-compliant.
+
+### Perfect worked example — root CA with RSA_2048, CRL, and ACM end-entity issuance
 
 ```text
-ACM_PCA: arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/aaaa-bbbb-cccc (ROOT, RSA_2048, SHA256withRSA)
+ACM_PCA: Example Root CA (ROOT, RSA_2048, SHA256withRSA)
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
   [✓] CA type: ROOT
   [✓] Key algorithm: RSA_2048
   [✓] Signing algorithm: SHA256withRSA
   [✓] Subject DN: CN=Example Root CA, O=Example Org, C=US
-  [✓] Revocation: CRL (bucket acm-pca-crl-123456789012-us-east-1, expiration 7 days)
   [✓] CRL S3 bucket: acm-pca-crl-123456789012-us-east-1 — exists
-  [✓] CRL bucket policy: grants acm-pca.amazonaws.com s3:PutObject
+  [✓] CRL bucket policy: grants acm-pca.amazonaws.com s3:PutObject, s3:PutObjectAcl, s3:GetBucketAcl, s3:GetBucketLocation
+  [✓] CRL expiration: 7 days, CustomCname: crl.example.com
+  [✓] OCSP: enabled (OCSP + CRL both active for maximum client compatibility)
   [✓] CA status: ACTIVE
   [✓] CA certificate: self-signed (RootCACertificate/V1 template, validity 10 years)
-  [✓] Certificate template: RootCACertificate/V1
-  [✓] Tags: Environment=production, Purpose=trust-anchor
+  [✓] Certificate template: RootCACertificate/V1 (CA cert); EndEntityCertificate/CertPassedPathLen/0 (end-entity issuance)
+  [✓] ACM integration: create-permission for acm.amazonaws.com — IssueCertificate, GetCertificate, ListPermissions granted
+  [✓] Tags: Environment=production, Purpose=trust-anchor, Owner=platform-team
 VERIFICATION_COMMANDS:
   aws acm-pca describe-certificate-authority --certificate-authority-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/aaaa-bbbb-cccc --region us-east-1
   aws acm-pca list-permissions --certificate-authority-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/aaaa-bbbb-cccc --region us-east-1
   aws s3api get-bucket-policy --bucket acm-pca-crl-123456789012-us-east-1
+  aws acm-pca get-certificate-authority-certificate --certificate-authority-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/aaaa-bbbb-cccc --region us-east-1
 ```
+
+**How this example maps to provisioning steps:**
+
+1. Created S3 bucket `acm-pca-crl-123456789012-us-east-1` for CRL.
+2. Applied bucket policy granting `acm-pca.amazonaws.com` write access.
+3. Created ROOT CA with `RSA_2048` / `SHA256withRSA`, CRL enabled (7-day
+   expiration, CNAME `crl.example.com`), OCSP enabled.
+4. Obtained CSR, issued self-signed certificate using
+   `RootCACertificate/V1` template (10-year validity).
+5. Imported the certificate to activate the CA (`ACTIVE` status).
+6. Granted `create-permission` to `acm.amazonaws.com` so ACM can request
+   end-entity certificates using `EndEntityCertificate/CertPassedPathLen/0`
+   template.
+
+**Self-check before emit:**
+- [ ] CA status confirmed ACTIVE (not PENDING_CERTIFICATE)?
+- [ ] CRL bucket policy grants acm-pca.amazonaws.com s3:PutObject?
+- [ ] ACM create-permission confirmed via list-permissions?
+- [ ] Certificate template correct for the CA type?
+- [ ] For subordinate: parent CA ACTIVE + create-permission confirmed?
 
 ## Error handling
 

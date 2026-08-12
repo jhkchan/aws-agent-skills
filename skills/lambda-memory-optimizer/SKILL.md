@@ -657,6 +657,11 @@ CONFIRM: <confirmation prompt text>
 7. **NEVER round intermediate formula steps differently from the final
    figure.** Compute at full precision, round only the displayed result.
 
+8. **NEVER omit the POWER_TUNING_RESULTS table from a
+   FURTHER_OPTIMIZATION_AVAILABLE verdict.** The table must show at least
+   the current memory, the cost-optimal memory, and the latency-optimal
+   memory with concrete $/invocation and p99 latency values.
+
 ### Perfect example output — FURTHER_OPTIMIZATION_AVAILABLE with verified math
 
 Every field below is internally consistent. Copy this shape exactly.
@@ -664,46 +669,70 @@ Additional full worked examples are in
 `references/lambda-memory-worked-examples.md`.
 
 ```text
-TARGET: order-enrichment-api
+TARGET: order-enrichment-api (arn:aws:lambda:us-east-1:123456789012:function:order-enrichment-api)
 VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
-REASON: Python function at 128 MB averaging 5000 ms is CPU-bound (Power
-  Tuning U-curve minimum at 512 MB where duration drops to 950 ms).
-  Combined with ARM64 migration (20% compute discount), monthly compute
-  drops 38.5%. Invocations are 47M/month so the per-invocation saving
-  compounds. Power Tuning also shows fastest at 3008 MB (410 ms) for
-  latency-critical routing — surfaced for operator choice.
+REASON: Python function at 128 MB averaging 5000 ms is CPU-bound
+  (cpu_total_time / Duration = 0.96). Power Tuning U-curve shows
+  cost-optimal at 256 MB where duration drops to 1100 ms — the per-
+  invocation cost drops 54.7% because the duration reduction more than
+  offsets the higher per-GB-second rate. Invocations are 47M/month so
+  the saving compounds. Latency-optimal at 3008 MB (220 ms p99) is
+  surfaced separately for operator choice.
+POWER_TUNING_RESULTS:
+  | Memory   | Avg Duration | p99 Duration | $/Invocation | Tag            |
+  |----------|-------------|-------------|-------------|----------------|
+  | 128 MB   | 5000 ms     | 6200 ms     | $0.0000106  | current        |
+  | 256 MB   | 1100 ms     | 1400 ms     | $0.0000048  | cost-optimal   |
+  | 512 MB   | 650 ms      | 800 ms      | $0.0000056  |                |
+  | 1024 MB  | 400 ms      | 500 ms      | $0.0000069  |                |
+  | 2048 MB  | 280 ms      | 350 ms      | $0.0000095  |                |
+  | 3008 MB  | 220 ms      | 280 ms      | $0.0000112  | latency-optimal|
+COST_COMPARISON:
+  Current:  128 MB at 5000 ms → $0.0000106/inv × 47M/month = $499.14/month
+  Proposed: 256 MB at 1100 ms → $0.0000048/inv × 47M/month = $224.66/month
+  Saving:   $274.48/month (54.9%) — cost-optimal at 256 MB
+  Latency:  p99 drops from 6200 ms to 1400 ms (77% reduction)
 RECOMMENDATION:
   Current: 128 MB at 5000 ms avg, x86_64, on-demand, InitDuration 1800 ms
-  Proposed: 512 MB at 950 ms avg, arm64, on-demand, InitDuration 200 ms (SnapStart n/a for Python)
-  Dimensions changed: memory (Step 1) + architecture (Step 6)
-  Dimensions checked: memory → (upsize)  pc_memory ✓ (no PC)
+  Proposed: 256 MB at 1100 ms avg, x86_64, on-demand, InitDuration 1800 ms
+  Dimensions changed: memory (Step 1)
+  Dimensions checked: memory → (upsize to cost-optimal)  pc_memory ✓ (no PC)
     init ✓ (no SnapStart for Python)  efs_container_layers ✓ (zip, no EFS)
-    tmp ✓ (no /tmp overflow)  architecture → (x86 to arm64)
-  Confidence: HIGH — Power Tuning measured the U-curve empirically;
-    Python 3.12 fully supports arm64; all deps have arm64 wheels.
+    tmp ✓ (no /tmp overflow)  architecture ✓ (x86_64, ARM eval deferred)
+  Confidence: HIGH — Power Tuning measured the U-curve empirically across
+    6 memory values; cpu_total_time / Duration = 0.96 confirms CPU-bound.
 ESTIMATED_SAVINGS:
-  Current monthly: $498.98
-    compute: 47M × 5.0 × 0.125 × $0.0000166667 = $489.58
+  Current monthly: $499.14
+    compute: 47M × 5.0 × 0.125 × $0.0000166667 = $489.74
     requests: 47M × $0.0000002 = $9.40
     PC: $0 (on-demand)
-  Projected monthly: $307.07
-    compute: 47M × 0.95 × 0.5 × $0.0000166667 × 0.80 (ARM) = $297.67
+  Projected monthly: $224.66
+    compute: 47M × 1.1 × 0.25 × $0.0000166667 = $215.26
     requests: 47M × $0.0000002 = $9.40
     PC: $0 (on-demand)
-  Monthly saving: $191.91   ($498.98 − $307.07 = $191.91 ✓)
-  Annual saving: $2,302.92
-  Latency delta: p95 drops from 6200 ms to ~1100 ms (82% reduction)
+  Monthly saving: $274.48   ($499.14 − $224.66 = $274.48 ✓)
+  Annual saving: $3,293.76
+  Latency delta: p99 drops from 6200 ms to 1400 ms (77% reduction)
 MIGRATION_STEPS:
   1. Run Power Tuning to confirm the U-curve:
-     aws stepfunctions start-execution --state-machine-arn <arn> --input '{...}'
-  2. Update memory and architecture together:
-     aws lambda update-function-configuration --function-name order-enrichment-api --memory-size 512 --architectures arm64
+     aws stepfunctions start-execution \
+       --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:powerTuning \
+       --input '{"lambda":{"resource":"arn:aws:lambda:us-east-1:123456789012:function:order-enrichment-api","num":5},"power":{"values":[128,256,512,1024,2048,3008]}}'
+  2. Update memory to 256 MB (cost-optimal):
+     aws lambda update-function-configuration \
+       --function-name order-enrichment-api --memory-size 256 --region us-east-1
   3. Publish a version and test via staging alias:
      aws lambda publish-version --function-name order-enrichment-api
-  4. Monitor Duration and Errors for 7 days post-change.
+     aws lambda update-alias --function-name order-enrichment-api \
+       --name staging --function-version 2
+  4. Monitor Duration and Errors for 7 days post-change:
+     aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
+       --metric-name Duration --dimensions Name=FunctionName,Value=order-enrichment-api \
+       --start-time $(date -u -v-7d +%Y-%m-%dT%H:%M:%S) \
+       --end-time $(date -u +%Y-%m-%dT%H:%M:%S) --period 86400 --statistics Average
 CONFIRM: About to update-function-configuration on order-enrichment-api
-  (128 MB x86 → 512 MB arm64). Monthly saving $191.91 (38.5%); p95 latency
-  improvement ~82%. Proceed? (yes/no)
+  (128 MB → 256 MB). Monthly saving $274.48 (54.9%); p99 latency
+  improvement 77%. Proceed? (yes/no)
 ```
 
 **Self-check before emit:**

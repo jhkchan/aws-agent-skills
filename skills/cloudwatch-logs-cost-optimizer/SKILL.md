@@ -619,6 +619,36 @@ MIGRATION_STEPS:
 CONFIRM: <confirmation prompt text>
 ```
 
+### Decision tree: cost-optimization priority
+
+```text
+Cost Optimization — START
+  │
+  Q1: RetentionInDays = 0 (Never expire) OR field absent?
+  ├── YES → STEP 1 (retention sweep) — 90%+ storage savings; highest leverage
+  └── NO  → Q2
+  │
+  Q2: Logs Insights queries > 100/month on this log group?
+  ├── YES → STEP 2 (convert to metric filters) — $0.005/GB scan → free
+  └── NO  → Q3
+  │
+  Q3: Retention > 90 days for compliance AND no S3 export?
+  ├── YES → STEP 4 (Firehose → S3 / Glacier) — 94% cheaper long-term
+  └── NO  → Q4
+  │
+  Q4: CloudWatch agent batch_count at default (1000)?
+  ├── YES → STEP 3 (increase to 10000) — 10x fewer PutLogEvents requests
+  └── NO  → Q5
+  │
+  Q5: Subscription filters fanning out to another CW Logs group?
+  ├── YES → STEP 5 (redirect to Firehose) — eliminates double ingestion ($1.00/GB)
+  └── NO  → Q6
+  │
+  Q6: Vended logs (VPC Flow / Route53) to CW Logs at > 10 GB/day?
+  ├── YES → STEP 6 (redirect to S3) — eliminates $0.50/GB ingestion
+  └── NO  → All dimensions checked → emit OPTIMIZED
+```
+
 ### FORBIDDEN output patterns
 
 1. **NEVER emit `VERDICT: FURTHER_OPTIMIZATION_AVAILABLE` with `Monthly
@@ -651,48 +681,77 @@ CONFIRM: <confirmation prompt text>
 ### Perfect example output — FURTHER_OPTIMIZATION_AVAILABLE with verified math
 
 Every field below is internally consistent. Copy this shape exactly.
+The scenario: a 500 GB/month application log group with Never-expire
+retention has accumulated 6,000 GB over 12 months. Retention to 30
+days caps storage at 500 GB steady-state (91.7% storage cost cut).
+Two orphaned subscription filters waste $250/month in double ingestion.
+A Firehose S3 export provides a compliance archive.
 
 ```text
-TARGET: /aws/lambda/order-processor-prod
+TARGET: /app/payment-service-prod
 VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
-REASON: Lambda log group with Never-expire retention has accumulated
-  10,080 GB over 12 months at $0.03/GB-month ($302.40/month storage and
-  growing). Combined with 450 Logs Insights queries/month scanning 120 GB
-  each ($270/month that converts to free metric filters). Retention to 30
-  days caps storage at 840 GB steady-state; query migration eliminates
-  the $270/month scan charge.
+REASON: Application log group with Never-expire retention has accumulated
+  6,000 GB over 12 months at $0.03/GB-month ($180.00/month storage and
+  growing). Two orphaned subscription filters deliver to a decommissioned
+  Lambda account, adding $250.00/month in double-ingestion charges.
+  Retention to 30 days caps storage at 500 GB steady-state ($15.00/month,
+  91.7% storage reduction). A Firehose S3 export provides a compliance
+  archive at $26.00/month (Firehose + S3 Standard).
 RECOMMENDATION:
-  Current: Never expire, 840 GB/month ingested, 10,080 GB stored, 450 Insights queries/month, N/A (serverless)
-  Proposed: 30 days, 840 GB/month ingested, 840 GB stored (steady), 0 Insights queries (5 metric filters), N/A
-  Dimensions changed: retention (Step 1) + queries (Step 2)
-  Dimensions checked: retention → (Never to 30d)  queries → (Insights to filters)
-    agent ✓ (Lambda, no agent)  cold-storage ✓ (30d under S3 crossover)  subscription ✓ (none)
-    destination ✓ (Lambda logs, not vended)  data-protection ✓ (no PII fields)
+  Current: Never expire, 500 GB/month ingested, 6,000 GB stored, 0 Insights queries/month,
+           agent batch_count 10000, 2 subscription filters (orphaned)
+  Proposed: 30 days, 500 GB/month ingested, 500 GB stored (steady), 0 Insights queries/month,
+            agent batch_count 10000, 0 subscription filters (cleaned up),
+            Firehose S3 export for compliance archive
+  Dimensions changed: retention (Step 1) + subscription (Step 5) + cold-storage (Step 4)
+  Dimensions checked: retention → (Never to 30d)  queries ✓ (none to convert)
+    agent ✓ (batch_count already 10000)  cold-storage → (add Firehose S3 export)
+    subscription → (2 orphaned filters removed)  destination ✓ (app logs, not vended)
+    data-protection ✓ (no PII fields detected)
   Confidence: HIGH — describe-log-groups confirms RetentionInDays absent and
-    storedBytes=10,080 GB; CloudTrail StartQuery events confirm 450 queries/month.
+    storedBytes=6,000 GB; describe-subscription-filters confirms 2 filters pointing
+    to arn:aws:lambda:us-east-1:999988887777:function:log-shipper (decommissioned).
 ESTIMATED_SAVINGS:
-  Current monthly: $992.40
-    ingestion: 840 GB × $0.50 = $420.00
-    storage: 10,080 GB × $0.03 = $302.40
-    requests: included in Lambda execution (no separate PutLogEvents charge)
-    insights: 450 × 120 GB × $0.005 = $270.00
-  Projected monthly: $445.20
-    ingestion: 840 GB × $0.50 = $420.00 (unchanged)
-    storage: 840 GB × $0.03 = $25.20 (steady-state at 30-day retention)
-    requests: included
-    insights: 5 metric filters × $0.00 = $0.00 (free)
-  Monthly saving: $547.20 ($992.40 − $445.20)
-  Annual saving: $6,566.40
+  Current monthly: $680.00
+    ingestion: 500 GB x $0.50 = $250.00
+    storage: 6,000 GB x $0.03 = $180.00
+    subscription double-ingestion: 500 GB x $0.50 = $250.00 (orphaned Lambda dest)
+    insights: 0 queries = $0.00
+  Projected monthly: $291.00
+    ingestion: 500 GB x $0.50 = $250.00 (unchanged — retention does not reduce ingestion)
+    storage: 500 GB x $0.03 = $15.00 (steady-state at 30-day retention)
+    Firehose delivery: 500 GB x $0.029 = $14.50 (compliance archive to S3)
+    S3 Standard storage: 500 GB x $0.023 = $11.50 (first 90 days; lifecycle to GIR after)
+    subscription: $0.00 (orphaned filters removed)
+    insights: $0.00
+  Monthly saving: $389.00 ($680.00 − $291.00)
+  Annual saving: $4,668.00
+  Storage-only savings: $180.00 → $15.00 = 91.7% reduction
 MIGRATION_STEPS:
-  1. Set retention to 30 days:
-     aws logs put-retention-policy --log-group-name /aws/lambda/order-processor-prod --retention-in-days 30
-  2. Create 5 metric filters for the frequent Insights query patterns:
-     aws logs put-metric-filter --log-group-name /aws/lambda/order-processor-prod --filter-name ErrorCount --filter-pattern '"ERROR"' --metric-transformations metricName=ErrorCount,metricNamespace=AppMetrics,metricValue=1,defaultValue=0
-  3. Verify retention applied and old logs being deleted within 24 hours.
-  4. Verify metric filters emitting data via CloudWatch metrics console.
-CONFIRM: About to put-retention-policy on /aws/lambda/order-processor-prod
-  (Never → 30 days). This will delete logs older than 30 days within hours.
-  Saving $547.20/month (55.1%). Proceed? (yes/no)
+  1. Create Firehose delivery stream to S3 for compliance archive:
+     aws firehose create-delivery-stream --delivery-stream-name payment-log-archive \
+       --s3-destination-configuration \
+       RoleARN=arn:aws:iam::444455556666:role/firehose-s3-role,\
+       BucketARN=arn:aws:s3:::payment-log-archive-bucket,\
+       Prefix=logs/,BufferingSize=5,BufferingInterval=300
+  2. Verify Firehose stream is ACTIVE before proceeding:
+     aws firehose describe-delivery-stream --delivery-stream-name payment-log-archive
+  3. Remove orphaned subscription filters (decommissioned Lambda destination):
+     aws logs delete-subscription-filter --log-group-name /app/payment-service-prod \
+       --filter-name log-shipper-lambda
+     aws logs delete-subscription-filter --log-group-name /app/payment-service-prod \
+       --filter-name log-shipper-lambda-v2
+  4. Set retention to 30 days (deletes logs older than 30d within hours):
+     aws logs put-retention-policy --log-group-name /app/payment-service-prod \
+       --retention-in-days 30
+  5. Verify retention applied + subscription filters removed:
+     aws logs describe-log-groups --log-group-name-prefix /app/payment-service-prod
+     aws logs describe-subscription-filters --log-group-name /app/payment-service-prod
+CONFIRM: About to put-retention-policy on /app/payment-service-prod
+  (Never → 30 days). This will delete 5,500 GB of logs older than 30 days
+  within hours. Firehose S3 export configured for compliance archive.
+  Saving $389.00/month (57.2%). Storage alone: 91.7% reduction.
+  Proceed? (yes/no)
 ```
 
 **Self-check before emit:**

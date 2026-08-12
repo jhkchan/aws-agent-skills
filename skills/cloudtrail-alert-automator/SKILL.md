@@ -537,80 +537,178 @@ confirmed security events.
 
 ## Output format (STRICT output contract)
 
+### Literal output labels
+
+Every alert design MUST emit exactly one block per rule using the labels
+`ALERT_NAME:`, `EVENT:`, `VERDICT:`, `CHECKLIST:`, `GAP:`, and `TEMPLATE:`.
+Do NOT preface with prose.
+
 ```text
-ALERT: <reference>
-EVENT: <event-name(s)>
-RULE:
-  - Pattern: <EventBridge event pattern summary>
-  - Bus: default | custom
-ENRICHMENT:
-  - lookup-events: <15-min actor context>
-  - Severity: CRITICAL | HIGH | MEDIUM | LOW
-ROUTING:
-  - SNS: <topic ARN by severity>
-  - Security Hub: <configured | not configured>
-  - Slack/Teams: <configured | not configured>
-DEDUP:
-  - Window: <minutes>
-  - Key: <dedup key formula>
-SUPPRESSION:
-  - Roles: <suppressed role list>
-  - Non-suppressible: DeleteTrail, StopLogging, root
+ALERT_NAME: <alert reference name>
+EVENT: <CloudTrail eventName(s)>
 VERDICT: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
-GAP: <if REVIEW_REQUIRED, the specific missing piece>
+CHECKLIST:
+  [✓|✗] EventBridge rule: <rule name + pattern summary>
+  [✓|✗] Lambda enrichment: <function ARN, lookup-events lookback>
+  [✓|✗] SNS topic: <topic ARN by severity>
+  [✓|✗] Security Hub finding: <configured | not configured>
+  [✓|✗] Slack/Teams webhook: <configured | not configured>
+  [✓|✗] Deduplication: <window minutes, key formula>
+  [✓|✗] Suppression list: <role ARNs | N/A>
+  [✓|✗] Non-suppressible events enforced: DeleteTrail, StopLogging, root
+GAP: <specific missing piece or None>
 TEMPLATE: <CLI snippet or IaC>
 ```
 
-### Worked example — AUTOMATION_DEPLOYED, root login alert
+### FORBIDDEN — NEVER do these
+
+1. NEVER create an EventBridge rule for `ConsoleLogin` without filtering
+   on `responseElements.ConsoleLogin: Success`. Without the filter a
+   brute-force scenario generates thousands of alerts per minute,
+   exhausting Lambda concurrency and throttling real security events.
+
+2. NEVER suppress `DeleteTrail`, `StopLogging`, `UpdateTrail`, or
+   `DeleteEventDataStore` events. Even when the actor is a known
+   automation role, these events blind the entire detection system.
+   A compromised service role calling `StopLogging` is an active attack.
+
+3. NEVER use the same SNS topic for all severity levels. Routing
+   CRITICAL (root login) and LOW (tag changes) to the same topic trains
+   operators to ignore alerts. Always create at least 4 severity-tiered
+   topics.
+
+4. NEVER omit the deduplication layer. Without dedup a CI/CD pipeline
+   deploying 50 stacks produces 50 identical alerts. Operators mute the
+   channel, and the next real security event is invisible.
+
+5. NEVER hardcode Slack/Teams webhook URLs in Lambda source code. Store
+   in Secrets Manager or Parameter Store. A webhook committed to source
+   control is a credential leak.
+
+6. NEVER set the enrichment Lambda timeout below 10 seconds. The
+   `lookup-events` API call can take 3-5 seconds under load. A 3-second
+   timeout silently degrades to un-enriched alerts.
+
+7. NEVER wire Slack webhook delivery directly from SNS without a queue.
+   Slack enforces 1 message/second per URL. A burst of 10 alerts
+   produces `429 Too Many Requests` for 9. Use SNS → SQS → Lambda.
+
+### Worked example — root-login alert with full enrichment
+
+Scenario: root console login in production account. EventBridge detects
+the `ConsoleLogin` event by `userIdentity.type: Root`. Lambda enrichment
+adds 15-minute actor context via `lookup-events`, classifies as CRITICAL,
+publishes to the critical SNS topic, creates a Security Hub finding, and
+sends a formatted Slack alert.
 
 ```text
-ALERT: root-login-prod
+ALERT_NAME: root-login-prod
 EVENT: ConsoleLogin (by root)
-RULE:
-  - Pattern: source=aws.signin, userIdentity.type=Root, eventName=ConsoleLogin, responseElements.ConsoleLogin=Success
-  - Bus: default
-ENRICHMENT:
-  - lookup-events: 15-min lookback for root actor context
-  - Severity: CRITICAL
-ROUTING:
-  - SNS: arn:aws:sns:us-east-1:111111111111:cloudtrail-critical
-  - Security Hub: finding import configured (CRITICAL, NEW)
-  - Slack: webhook configured (#sec-incidents)
-DEDUP:
-  - Window: 0 (never dedup root login)
-  - Key: N/A
-SUPPRESSION:
-  - Roles: N/A — root events NEVER suppressed
-  - Non-suppressible: DeleteTrail, StopLogging, root
 VERDICT: AUTOMATION_DEPLOYED
+CHECKLIST:
+  [✓] EventBridge rule: cloudtrail-alert-root-login
+      pattern: {"source":["aws.signin"],"detail-type":["AWS API Call via CloudTrail"],"detail":{"userIdentity":{"type":["Root"]},"eventName":["ConsoleLogin"],"responseElements":{"ConsoleLogin":["Success"]}}}
+  [✓] Lambda enrichment: arn:aws:lambda:us-east-1:111111111111:function:cloudtrail-enrichment
+      lookup-events: 15-min lookback for root actor recent API calls
+      severity classification: CRITICAL (userIdentity.type == Root → always CRITICAL)
+  [✓] SNS topic: arn:aws:sns:us-east-1:111111111111:cloudtrail-critical
+  [✓] Security Hub finding: configured (BatchImportFindings, Severity CRITICAL/90.0, deterministic Id via uuid5)
+  [✓] Slack webhook: configured (#sec-incidents, via SQS → Lambda consumer for rate-limit safety)
+  [✓] Deduplication: window 0 min (never dedup root login), key N/A
+  [✓] Suppression list: N/A — root events NEVER suppressed
+  [✓] Non-suppressible events enforced: DeleteTrail, StopLogging, root
 GAP: None
 TEMPLATE:
-  aws events put-rule --name cloudtrail-alert-root-login --event-pattern '{"source":["aws.signin"],"detail-type":["AWS API Call via CloudTrail"],"detail":{"userIdentity":{"type":["Root"]},"eventName":["ConsoleLogin"],"responseElements":{"ConsoleLogin":["Success"]}}}'
+  aws events put-rule --name cloudtrail-alert-root-login \\
+    --event-pattern '{"source":["aws.signin"],"detail-type":["AWS API Call via CloudTrail"],"detail":{"userIdentity":{"type":["Root"]},"eventName":["ConsoleLogin"],"responseElements":{"ConsoleLogin":["Success"]}}}'
+  aws events put-targets --rule cloudtrail-alert-root-login \\
+    --targets '[{"Id":"enrichment","Arn":"arn:aws:lambda:us-east-1:111111111111:function:cloudtrail-enrichment","InputTransformer":{"InputPathsMap":{"detail":"$.detail"},"InputTemplate":"{\"detail\": <detail>}"}}]'
 ```
 
-### Worked example — REVIEW_REQUIRED, Security Hub not enabled
+Slack webhook payload (sent by SQS-buffered consumer Lambda):
+
+```json
+{
+  "attachments": [{
+    "color": "#FF0000",
+    "title": "[CRITICAL] CloudTrail Alert",
+    "fields": [
+      {"title": "Event", "value": "ConsoleLogin (root)", "short": true},
+      {"title": "Actor", "value": "arn:aws:iam::111111111111:root", "short": true},
+      {"title": "Source IP", "value": "203.0.113.42", "short": true},
+      {"title": "Severity", "value": "CRITICAL", "short": true},
+      {"title": "Recent Activity", "value": "3 API calls in last 15 min: ListBuckets, GetUser, ListRoles", "short": false}
+    ]
+  }]
+}
+```
+
+Lambda enrichment function (deployed at
+`arn:aws:lambda:us-east-1:111111111111:function:cloudtrail-enrichment`):
+
+```python
+import json, hashlib, boto3
+from datetime import datetime, timedelta, timezone
+
+cloudtrail = boto3.client('cloudtrail')
+sns = boto3.client('sns')
+
+SEVERITY_TOPIC = {
+    'CRITICAL': 'arn:aws:sns:us-east-1:111111111111:cloudtrail-critical',
+    'HIGH': 'arn:aws:sns:us-east-1:111111111111:cloudtrail-high',
+    'MEDIUM': 'arn:aws:sns:us-east-1:111111111111:cloudtrail-medium',
+    'LOW': 'arn:aws:sns:us-east-1:111111111111:cloudtrail-low',
+}
+
+def lambda_handler(event, context):
+    detail = event['detail']
+    event_name = detail['eventName']
+    actor_arn = detail.get('userIdentity', {}).get('arn', 'unknown')
+
+    # CRITICAL: root events are never deduplicated or suppressed
+    severity = 'CRITICAL' if detail.get('userIdentity', {}).get('type') == 'Root' else 'HIGH'
+
+    # Enrich with 15-min lookup-events context
+    lookback = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
+    enrichment = {'recent_events': []}
+    try:
+        resp = cloudtrail.lookup_events(
+            LookupAttributes=[{'AttributeKey': 'Username',
+                'AttributeValue': detail['userIdentity'].get('userName', 'root')}],
+            StartTime=lookback, MaxResults=20)
+        enrichment['recent_events'] = [
+            {'eventName': e['EventName'], 'eventTime': e['EventTime'].isoformat()}
+            for e in resp.get('Events', [])]
+    except Exception as e:
+        enrichment['lookup_error'] = str(e)
+
+    enrichment.update(severity=severity,
+        source_ip=detail.get('sourceIPAddress', 'unknown'),
+        region=detail.get('awsRegion', 'unknown'),
+        account_id=detail.get('recipientAccountId', detail.get('accountId')))
+
+    topic = SEVERITY_TOPIC[severity]
+    msg = json.dumps({'event_name': event_name, 'severity': severity,
+        'actor': actor_arn, 'enrichment': enrichment, 'raw_event': detail},
+        default=str)[:250000]  # SNS 256 KB cap safety
+    sns.publish(TopicArn=topic, Message=msg, Subject=f'[{severity}] {event_name}')
+    return {'status': 'alerted', 'severity': severity}
+```
+
+### Decision tree
 
 ```text
-ALERT: iam-change-alert
-EVENT: AttachRolePolicy, DetachRolePolicy, CreatePolicyVersion
-RULE:
-  - Pattern: source=aws.iam, eventName=[AttachRolePolicy, DetachRolePolicy, CreatePolicyVersion]
-  - Bus: default
-ENRICHMENT:
-  - lookup-events: configured, 15-min lookback
-  - Severity: HIGH
-ROUTING:
-  - SNS: arn:aws:sns:us-east-1:111111111111:cloudtrail-high
-  - Security Hub: NOT CONFIGURED — securityhub describe-hub returns ResourceNotFoundException
-  - Slack: webhook configured (#security)
-DEDUP:
-  - Window: 5 minutes
-  - Key: MD5(eventName|actorArn|resourceId)
-SUPPRESSION:
-  - Roles: cicd-deploy-role, CloudFormation StackSet role
-  - Non-suppressible: DeleteTrail, StopLogging, root
-VERDICT: REVIEW_REQUIRED
-GAP: Security Hub is not enabled. Steps: (1) aws securityhub enable-security-hub; (2) update enrichment Lambda with BatchImportFindings call (Step 6); (3) re-deploy. SNS + Slack are operational.
+Is the CloudTrail event a management event?
+├─ Yes → Security-critical (root login, trail tampering, org leave)?
+│        ├─ Yes → CRITICAL, never suppress, 0-min dedup
+│        │        Route: SNS critical topic + Security Hub finding + Slack #sec-incidents
+│        └─ No → Infrastructure change (SG, VPC, KMS)?
+│                 ├─ Yes → HIGH/MEDIUM, suppressible by known roles, 1-5 min dedup
+│                 │        Route: SNS high/medium topic + Slack #security
+│                 └─ No → LOW (tags, login failure, read-only)
+│                          Route: SNS low topic + daily digest
+└─ No → Data event (S3, Lambda)? → Not covered by lookup-events
+         Use CloudTrail Lake query for enrichment
 ```
 
 ## Anti-Patterns — NEVER do these things

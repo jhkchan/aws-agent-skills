@@ -454,87 +454,127 @@ aws logs put-metric-filter \
   --metric-value 1 --metric-namespace SecurityAudit --metric-name CertAPIAnomaly
 ```
 
-## Output format
+## STRICT output contract
+
+Every renewal design MUST emit a single block using these literal labels, in
+this order. Do NOT substitute markdown headings or camelCase variants —
+assertion-based evals and downstream automation parse the literal labels
+`CERTIFICATE:`, `VERDICT:`, `CHECKLIST:`, `GAP:`, `TEMPLATE:`.
 
 ```text
-RENEWAL: <reference>
-CERTIFICATE: <domain-or-arn>
-CLASSIFICATION:
-  - Validation: DNS | EMAIL | IMPORTED
-  - Attached to: ALB | CloudFront | API Gateway | ORPHANED
-  - Renewal path: MANAGED | CUSTOM_PIPELINE | MANUAL
-DETECTION:
-  - CloudWatch alarm: DaysToExpiry < <threshold>
-  - EventBridge scan: rate(1 day)
-RENEWAL_FLOW:
-  - ACM managed: Yes | No
-  - Custom Lambda: <function ARN or template reference>
-VALIDATION:
-  - Method: DNS | EMAIL
-  - Route 53 CNAME: <record> -> <target>
-NOTIFICATION:
-  - SNS topic: <arn>
-AUDIT:
-  - CloudTrail: cert API tracking
-  - SNI verification: openssl per service
+CERTIFICATE: <certificate-arn>
 VERDICT: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
-GAP: <if REVIEW_REQUIRED>
-TEMPLATE: <CLI snippet or YAML>
+CHECKLIST:
+  [x] DaysToExpiry: <countdown> (NotBefore <YYYY-MM-DD>, NotAfter <YYYY-MM-DD>)
+  [x] Renewal method: ACM_AUTO | MANUAL_REIMPORT | PCA_ISSUE | EMAIL_APPROVAL | CUSTOM_PIPELINE
+  [x] RenewalEligibility: ELIGIBLE | INELIGIBLE
+  [x] DNS validation: VALIDATED | PENDING | FAILED | N/A (CNAME <record> -> <target>)
+  [x] InUseBy: ALB <arn> | CloudFront <dist-id> | API Gateway <domain> | ORPHANED
+  [x] RenewalStatus: PENDING_AUTO_RENEWAL | IN_PROGRESS | SUCCESS | FAILED
+  [x] Detection: CloudWatch DaysToExpiry < <threshold> + EventBridge scan rate(1 day)
+GAP: <if REVIEW_REQUIRED, the specific gap and remediation>
+TEMPLATE: <CLI snippet or YAML; "(held in draft)" if blocked>
 ```
 
-### Worked example — AUTOMATION_DEPLOYED
+### FORBIDDEN output patterns — NEVER
+
+1. NEVER emit `VERDICT: AUTOMATION_DEPLOYED` while any CHECKLIST item is
+   `[ ]` (unchecked). Any unmet requirement forces `REVIEW_REQUIRED`.
+
+2. NEVER claim `Renewal method: ACM_AUTO` for an imported (private-key)
+   cert. ACM holds no stored private key — those are `MANUAL_REIMPORT` by
+   construction, regardless of `RenewalEligibility`.
+
+3. NEVER report a renewal as complete without a fresh SNI check
+   (`openssl s_client -servername <domain> -connect <endpoint>:443`)
+   showing the new `notAfter`. CloudFront propagation is 5-60 min; ALB
+   is immediate but verify anyway.
+
+4. NEVER report `DNS validation: VALIDATED` unless the CNAME
+   (`_abc.www.example.com -> _xyz.acm-validations.aws.`) is still
+   resolvable via `dig`. A deleted CNAME silently breaks the next
+   managed renewal even when the cert is currently `ISSUED`.
+
+5. NEVER emit a CloudFront renewal where the cert is outside `us-east-1`.
+   CloudFront silently ignores certs in any other region — the
+   distribution continues serving the old cert with no error.
+
+6. NEVER omit the `InUseBy` classification. An orphaned cert
+   (`InUseBy: []`) disables ACM managed renewal even when
+   `RenewalEligibility: ELIGIBLE`. Always classify explicitly.
+
+7. NEVER emit `DaysToExpiry` as a bare number — always pair it with the
+   detection wiring (CloudWatch alarm threshold + EventBridge scan). A
+   countdown with no alarm is noise, not automation.
+
+### Worked example — AUTOMATION_DEPLOYED (cert at 14 days, auto-renewal in progress)
 
 ```text
-RENEWAL: prod-alb-cert-renewal
-CERTIFICATE: www.example.com (arn:aws:acm:us-east-1:111111111111:certificate/abc-123)
-CLASSIFICATION:
-  - Validation: DNS
-  - Attached to: ALB
-  - Renewal path: MANAGED (ACM auto-renewal for DNS-validated cert on supported service)
-DETECTION:
-  - CloudWatch alarm: DaysToExpiry < 45 with SNS action
-  - EventBridge scan: rate(1 day) Lambda cert-scan
-RENEWAL_FLOW:
-  - ACM managed: Yes (RenewalEligibility: ELIGIBLE)
-  - Custom Lambda: Not required
-VALIDATION:
-  - Method: DNS
-  - Route 53 CNAME: _abc123.www.example.com -> _xyz789.acm-validations.aws.
-NOTIFICATION:
-  - SNS topic: arn:aws:sns:us-east-1:111111111111:cert-expiry-alerts
-AUDIT:
-  - CloudTrail: acm.amazonaws.com event tracking
-  - SNI verification: openssl s_client -servername www.example.com
+CERTIFICATE: arn:aws:acm:us-east-1:111111111111:certificate/abc-123-def-456
 VERDICT: AUTOMATION_DEPLOYED
+CHECKLIST:
+  [x] DaysToExpiry: 14 (NotBefore 2025-08-11, NotAfter 2026-08-26; managed-renewal window opened at 60d on 2026-06-27)
+  [x] Renewal method: ACM_AUTO (DNS-validated cert attached to ALB — managed renewal path)
+  [x] RenewalEligibility: ELIGIBLE
+  [x] DNS validation: VALIDATED (CNAME _abc123.www.example.com -> _xyz789.acm-validations.aws., TTL 300, dig confirmed)
+  [x] InUseBy: arn:aws:elasticloadbalancing:us-east-1:111111111111:listener/app/prod-alb/abc/def (ALB HTTPS :443, SNI default cert)
+  [x] RenewalStatus: PENDING_AUTO_RENEWAL (ACM has fired daily renewal attempts since 60d window; CNAME propagation delayed; EventBridge scan + CloudWatch alarm < 30d both active)
+  [x] Detection: CloudWatch alarm acm-www-expiring-14d (DaysToExpiry < 30, SNS arn:aws:sns:us-east-1:111111111111:cert-expiry-alerts) + EventBridge acm-daily-cert-scan rate(1 day)
 GAP: None
 TEMPLATE:
-  aws cloudwatch put-metric-alarm --alarm-name acm-www-expiring-45 --namespace AWS/CertificateManager --metric-name DaysToExpiry --dimensions Name=CertificateArn,Value=arn:aws:acm:us-east-1:111111111111:certificate/abc-123 --statistic Minimum --period 86400 --threshold 45 --comparison-operator LessThanThreshold --evaluation-periods 1 --alarm-actions arn:aws:sns:us-east-1:111111111111:cert-expiry-alerts
+  # CloudWatch alarm — urgent tier (< 30 days) on the specific cert ARN
+  aws cloudwatch put-metric-alarm \
+    --alarm-name acm-www-expiring-14d --namespace AWS/CertificateManager \
+    --metric-name DaysToExpiry \
+    --dimensions Name=CertificateArn,Value=arn:aws:acm:us-east-1:111111111111:certificate/abc-123-def-456 \
+    --statistic Minimum --period 86400 --threshold 30 --comparison-operator LessThanThreshold \
+    --evaluation-periods 1 --alarm-actions arn:aws:sns:us-east-1:111111111111:cert-expiry-alerts
+
+  # EventBridge daily scan (catches gaps managed renewal cannot — orphaned, imported, PCA CA expiry)
+  aws events put-rule --name acm-daily-cert-scan --schedule-expression "rate(1 day)" --state ENABLED
+
+  # No re-import needed; managed renewal rotates the cert in place (ARN unchanged).
+  # Confirm renewal completion via SNI after RenewalStatus flips to SUCCESS:
+  openssl s_client -connect prod-alb-123.us-east-1.elb.amazonaws.com:443 -servername www.example.com \
+    </dev/null 2>/dev/null | openssl x509 -noout -subject -dates
 ```
 
-### Worked example — REVIEW_REQUIRED
+### Worked example — REVIEW_REQUIRED (imported orphaned cert)
 
 ```text
-RENEWAL: orphaned-imported-cert
-CERTIFICATE: api.internal.example.com (arn:aws:acm:us-east-1:111111111111:certificate/def-456)
-CLASSIFICATION:
-  - Validation: IMPORTED (private key from external CA)
-  - Attached to: ORPHANED (InUseBy: [])
-  - Renewal path: MANUAL (ACM cannot renew imported certs)
-DETECTION:
-  - CloudWatch alarm: DaysToExpiry < 30 (fires but no auto-remediation)
-  - EventBridge scan: flagged as HIGH risk
-RENEWAL_FLOW:
-  - ACM managed: No (INELIGIBLE)
-  - Custom Lambda: Requires external CA renewal + re-import
-VALIDATION:
-  - Method: IMPORTED (N/A)
-NOTIFICATION:
-  - SNS topic: arn:aws:sns:us-east-1:111111111111:cert-expiry-alerts
-AUDIT:
-  - CloudTrail: acm.amazonaws.com event tracking
+CERTIFICATE: arn:aws:acm:us-east-1:111111111111:certificate/def-456-ghi-789
 VERDICT: REVIEW_REQUIRED
-GAP: Imported private-key certificate with no managed renewal path. Required: (1) Renew at external CA; (2) export new cert+key+chain; (3) import via acm import-certificate; (4) re-associate to target. Migrate to DNS-validated ACM cert or PCA-issued cert for managed renewal.
-TEMPLATE: (manual import flow — see references/imported-cert-manual-renewal.md)
+CHECKLIST:
+  [x] DaysToExpiry: 14 (NotBefore 2025-08-11, NotAfter 2026-08-26)
+  [ ] Renewal method: MANUAL_REIMPORT (imported cert — ACM holds no private key)
+  [ ] RenewalEligibility: INELIGIBLE
+  [ ] DNS validation: N/A (imported certs bypass DNS validation)
+  [ ] InUseBy: ORPHANED (InUseBy: [] — managed renewal disabled)
+  [ ] RenewalStatus: FAILED (no managed path; daily scan flagged HIGH risk at < 30d)
+  [x] Detection: CloudWatch alarm firing (DaysToExpiry < 30) + EventBridge scan flagged HIGH
+GAP: Imported private-key certificate is orphaned and INELIGIBLE for managed renewal. Required: (1) Renew at external CA; (2) export new cert + private key + chain PEM; (3) re-import via `aws acm import-certificate --certificate file://cert.pem --private-key file://key.pem --certificate-chain file://chain.pem`; (4) re-attach to listener/distribution. Migrate to DNS-validated ACM cert or PCA-issued cert for managed renewal path.
+TEMPLATE: (held in draft — external CA renewal + manual acm import-certificate flow required; see references/imported-cert-manual-renewal.md)
+```
+
+### Decision tree — renewal path classification
+
+```
+Start: cert with DaysToExpiry ≤ 60
+├─ Imported cert (Status: ISSUED, RenewalEligibility: INELIGIBLE)?
+│   └─ Yes → MANUAL_REIMPORT → VERDICT: REVIEW_REQUIRED
+│            (external CA + aws acm import-certificate + re-attach)
+├─ RenewalEligibility = ELIGIBLE AND InUseBy ≠ []?
+│   ├─ Yes → Validation method?
+│   │       ├─ DNS + CNAME resolvable → ACM_AUTO → VERDICT: AUTOMATION_DEPLOYED
+│   │       │                           (verify SNI post-rotation)
+│   │       └─ DNS CNAME missing OR EMAIL → REVIEW_REQUIRED
+│   │                                     (fix CNAME or migrate EMAIL→DNS)
+│   └─ No (orphaned or INELIGIBLE) → go to next branch
+├─ PCA-issued via ACM (Status: ISSUED, CertificateAuthorityArn present)?
+│   ├─ CA Status = ACTIVE AND cert attached → ACM_AUTO with CA-health check
+│   └─ CA expired OR cert orphaned → REVIEW_REQUIRED (renew CA first)
+└─ PCA-exported (used outside AWS)?
+    └─ Full manual pipeline → REVIEW_REQUIRED (issue from PCA + export + ship)
 ```
 
 ## Anti-Patterns — NEVER do these

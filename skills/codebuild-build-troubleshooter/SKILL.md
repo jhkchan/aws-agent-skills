@@ -200,6 +200,74 @@ CONFIRM: Before executing any state-changing CLI, emit and await operator
 
 ## NEVER
 
+### FORBIDDEN output patterns
+
+1. **NEVER emit `VERDICT: ROOT_CAUSE_IDENTIFIED` without a failing probe
+   in the EVIDENCE block.** The phase status `FAILED` is a symptom, not
+   a root cause. Read `contexts[].message` and run the diagnostic probe
+   before naming the category.
+
+2. **NEVER confuse the service role with the source credential in the
+   REMEDIATION block.** A `CannotPullContainerError` from ECR is the
+   service role; a `DOWNLOAD_SOURCE` failure is the source credential.
+   The fix steps MUST target the correct identity.
+
+3. **NEVER recommend adding a NAT Gateway without first checking for VPC
+   endpoints.** ECR interface endpoints and the S3 gateway endpoint are
+   cheaper and more secure. The NAT is required for external package
+   registries only.
+
+4. **NEVER conflate `LOCAL_DOCKER_LAYER` cache with `S3` cache in
+   REMEDIATION.** `LOCAL_DOCKER_LAYER` requires `privilegedMode: true`;
+   `S3` cache requires bucket IAM. Mixing them up produces a fix that
+   does not resolve the issue.
+
+5. **NEVER omit the `CONFIRM` gate from a REMEDIATION block that
+   contains state-changing commands** (`update-project`,
+   `put-role-policy`, `start-build`). The gate is mandatory before any
+   write operation.
+
+6. **NEVER emit a ROOT_CAUSE of `UNKNOWN` with `VERDICT:
+   ROOT_CAUSE_IDENTIFIED`.** If the root cause is unknown, the verdict
+   MUST be `INSUFFICIENT_DATA` with a list of missing information.
+
+### Diagnostic decision tree
+
+```text
+Read batch-get-builds phases[] — find the FIRST FAILED phase.
+├── DOWNLOAD_SOURCE → FAILED
+│   ├── "authentication failed" (CodeCommit) → SOURCE_CHECKOUT_AUTH
+│   ├── "Bad credentials" (GitHub) → SOURCE_CHECKOUT_AUTH
+│   └── "Access Denied" (S3 source) → SOURCE_CHECKOUT_AUTH
+├── contexts[].message contains BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE
+│   ├── simulate-principal-policy for ecr:* returns implicitDeny
+│   │   → IMAGE_PULL_AUTH (service role lacks ECR read)
+│   ├── image size approaching 15 GB
+│   │   → IMAGE_PULL_SIZE
+│   └── image from Docker Hub
+│       → IMAGE_PULL_AUTH (Docker Hub rate limit)
+├── INSTALL / PRE_BUILD / BUILD / POST_BUILD → FAILED
+│   ├── logs show "Cannot connect to the Docker daemon"
+│   │   → DOCKER_PRIVILEGED_MODE (enable privilegedMode: true)
+│   ├── "runtime version not available"
+│   │   → RUNTIME_VERSION
+│   └── non-zero exit code on a buildspec command
+│       → PHASE_COMMAND_FAIL
+├── UPLOAD_ARTIFACTS → FAILED
+│   ├── simulate-principal-policy for s3:PutObject returns implicitDeny
+│   │   → ARTIFACT_S3_PERMISSION
+│   └── KMS access denied on artifacts bucket
+│       → ARTIFACT_KMS
+├── phases[].phaseStatus: TIMED_OUT
+│   ├── same phase consistently times out
+│   │   → BUILD_TIMEOUT_CONFIG
+│   └── different phase times out each build
+│       → BUILD_TIMEOUT_DOWNSTREAM
+└── YAML_FILE_ERROR
+    └── validate-buildspec fails
+        → BUILDSPEC_SYNTAX
+```
+
 - **NEVER** declare `ROOT_CAUSE_IDENTIFIED` without a failing probe that
   matches the symptom. The phase status (`FAILED`) is a symptom, not a
   root cause; read the phase `contexts[].message` and the build logs
@@ -634,32 +702,102 @@ CONFIRM: Before updating the project, emit and await:
   (yes/no)"
 ```
 
-### Worked example — ECR image pull auth
+### Worked example — ECR image pull auth (BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE)
 
 ```text
-TARGET: cb-deploy-runner / build-id: cb-deploy-runner:def67890
+TARGET: cb-deploy-runner (arn:aws:codebuild:us-east-1:123456789012:project/cb-deploy-runner)
+  Build ID: cb-deploy-runner:9f8e7d6c-5b4a-3210-fedc-ba9876543210
 VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: INSTALL phase fails with BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE.
-  The image is
-  111111111111.dkr.ecr.us-east-1.amazonaws.com/base-images:latest
-  (cross-account ECR). The service role lacks ecr:BatchGetImage (Step 2b).
+REASON: The INSTALL phase fails with BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE
+  when pulling 111111111111.dkr.ecr.us-east-1.amazonaws.com/ci-base-images:python3.12
+  (cross-account ECR). The CodeBuild service role
+  (arn:aws:iam::123456789012:role/codebuild-cb-deploy-runner-role) lacks
+  ecr:BatchGetImage and ecr:GetDownloadUrlForLayer on the source ECR repo.
+  The image exists (950 MB, under 15 GB cap) and the project is not
+  VPC-attached, ruling out IMAGE_PULL_SIZE and VPC_NO_EGRESS.
 ROOT_CAUSE: IMAGE_PULL_AUTH
 EVIDENCE:
-  - Symptom: INSTALL fails with "BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE:
-    Unable to pull .../base-images:latest."
-  - Probe: aws iam simulate-principal-policy for ecr:BatchGetImage
-    returns implicitDeny.
-  - Passing: image exists in ECR (850 MB, under cap); not VPC-attached.
+  - Symptom: INSTALL phase FAILED. Log excerpt from CloudWatch:
+    "BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE: Unable to pull
+     111111111111.dkr.ecr.us-east-1.amazonaws.com/ci-base-images:python3.12:
+     insufficient privileges"
+  - Failing probe:
+    aws iam simulate-principal-policy \
+      --policy-source-arn arn:aws:iam::123456789012:role/codebuild-cb-deploy-runner-role \
+      --action-names ecr:BatchGetImage ecr:GetDownloadUrlForLayer ecr:BatchCheckLayerAvailability \
+      --resource-arns arn:aws:ecr:us-east-1:111111111111:repository/ci-base-images \
+      --output json
+    Result: "EvalDecision": "implicitDeny" for all three actions.
+  - Passing probes:
+    - Image exists: aws ecr describe-images --repository-name ci-base-images \
+      --image-ids imageTag=python3.12 --registry-id 111111111111
+      → imageSizeInBytes: ~950 MB (under 15 GB cap)
+    - Not VPC-attached: batch-get-projects shows vpcConfig = null
+    - ECR repo policy exists but only grants account 111111111111 roles,
+      not the CodeBuild service role in account 123456789012
 REMEDIATION:
-  1. Add ECR read policy to the service role:
-     aws iam put-role-policy --role-name <role-name> \
-       --policy-name ecr-pull-base-images \
-       --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ecr:BatchGetImage","ecr:GetDownloadUrlForLayer","ecr:BatchCheckLayerAvailability"],"Resource":"arn:aws:ecr:us-east-1:111111111111:repository/base-images"}]}'
-  2. Verify the ECR repo policy grants cross-account access.
-  3. Re-run the build; INSTALL should pull successfully.
-CONFIRM: Before updating the role, emit and await:
-  "CONFIRM: About to add ECR read permissions to the service role.
-   Proceed? (yes/no)"
+  1. Add ECR read permissions to the CodeBuild service role (account
+     123456789012):
+     aws iam put-role-policy \
+       --role-name codebuild-cb-deploy-runner-role \
+       --policy-name ecr-pull-ci-base-images \
+       --policy-document '{
+         "Version": "2012-10-17",
+         "Statement": [
+           {
+             "Effect": "Allow",
+             "Action": [
+               "ecr:BatchGetImage",
+               "ecr:GetDownloadUrlForLayer",
+               "ecr:BatchCheckLayerAvailability"
+             ],
+             "Resource": "arn:aws:ecr:us-east-1:111111111111:repository/ci-base-images"
+           },
+           {
+             "Effect": "Allow",
+             "Action": "ecr:GetAuthorizationToken",
+             "Resource": "*"
+           }
+         ]
+       }'
+  2. Grant cross-account access in the ECR repo policy (account
+     111111111111):
+     aws ecr put-repository-policy \
+       --registry-id 111111111111 \
+       --repository-name ci-base-images \
+       --policy-text '{
+         "Version": "2012-10-17",
+         "Statement": [{
+           "Sid": "AllowCodeBuildCrossAccountPull",
+           "Effect": "Allow",
+           "Principal": {
+             "AWS": "arn:aws:iam::123456789012:role/codebuild-cb-deploy-runner-role"
+           },
+           "Action": [
+             "ecr:BatchGetImage",
+             "ecr:GetDownloadUrlForLayer",
+             "ecr:BatchCheckLayerAvailability"
+           ]
+         }]
+       }'
+  3. Verify the IAM simulation now returns allowed:
+     aws iam simulate-principal-policy \
+       --policy-source-arn arn:aws:iam::123456789012:role/codebuild-cb-deploy-runner-role \
+       --action-names ecr:BatchGetImage \
+       --resource-arns arn:aws:ecr:us-east-1:111111111111:repository/ci-base-images \
+       --output json
+     Expected: "EvalDecision": "allowed"
+  4. Re-run the build to confirm the fix:
+     aws codebuild start-build --project-name cb-deploy-runner --region us-east-1
+  5. Verify the INSTALL phase succeeds:
+     aws codebuild batch-get-builds --ids <new-build-id> \
+       --query 'builds[0].phases[?phaseType==`INSTALL`].phaseStatus' --output text
+     Expected: SUCCEEDED
+CONFIRM: Before updating the service role IAM and ECR repo policy, emit
+  and await: "CONFIRM: About to add ECR read permissions to role
+  codebuild-cb-deploy-runner-role (account 123456789012) and update the
+  cross-account repo policy on ci-base-images (account 111111111111).
+  Proceed? (yes/no)"
 ```
 
 ### Worked example — INSUFFICIENT_DATA

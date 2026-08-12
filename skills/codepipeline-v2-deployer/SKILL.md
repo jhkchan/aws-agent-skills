@@ -602,36 +602,143 @@ it silently deploys an empty string.
 
 ## Output format (per V2 pipeline deployment plan)
 
+Every V2 deployment plan MUST emit a single block using these literal
+labels, in this order. Do NOT substitute markdown headings or camelCase
+variants — assertion-based evals and downstream provisioning parse the
+literal labels `PIPELINE:`, `VERDICT:`, `CHECKLIST:`, `FINDINGS:`,
+`DEPLOY_COMMANDS:`.
+
 ```text
-PIPELINE_SPEC: <name>
+PIPELINE: <pipeline-name>
 VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-ARCHITECTURE:
-  Type: V2 (event-driven, no polling)
-  Source: CodeCommit / S3 / GitHub via CodeConnections
-  Trigger: branch=main, paths=src/**, tags=deploy=prod
-  Build: CodeBuild (my-service-build), exports IMAGE_URI, IMAGE_TAG
-  Deploy: CloudFormation (CREATE_REPLACE on prod-my-service) | ECS | CodeDeploy
-  Approval: enabled between Build and Deploy | none
-  Variables: IMAGE_URI flows from Build to Deploy
-  Cross-account: target=<account>, KMS key <arn>, role <arn>
-  Artifact bucket: my-pipeline-artifacts (block-public-access + KMS CMK + versioning)
-  Pipeline role: arn:aws:iam::<source>:role/my-pipeline-role (scoped)
 CHECKLIST:
-  [x] Pipeline type V2 confirmed (event-driven, no polling)
-  [x] Source action configured (CodeCommit / S3 / GitHub)
-  [x] Trigger with branch/path/tag filter (NOT unscoped)
-  [x] Build (CodeBuild) with exported namespace variables
-  [x] Deploy action with target role / cluster / stack
-  [x] Manual approval gate configured (if gated release)
-  [x] Namespace variables validated (no silent empty strings)
-  [x] Cross-account KMS key policy + IAM role wired (if applicable)
-  [x] Artifact bucket hardened (block public access + KMS + versioning)
-  [x] Pipeline IAM role scoped (no wildcards)
+  [x] Pipeline type: V2 (event-driven, no polling; PollForSourceChanges=false)
+  [x] Source: CodeCommit <repo/main> | S3 <bucket/key> | GitHub via CodeConnections <connection-arn + repo/branch>
+  [x] Trigger filter: Branches=[main], FilePaths=src/**, Tags=deploy=prod (NOT unscoped)
+  [x] Build: CodeBuild project <name>, exports namespace variables <list>
+  [x] Test stage: CodeBuild <test-project> with unit + integration tests
+  [x] Manual approval: enabled between <stage A> and <stage B> | none (ExternalEntityLink + SNS topic arn)
+  [x] Deploy: CloudFormation <CREATE_REPLACE on stack> | ECS <cluster/service> | CodeDeploy <app/group> | S3 <bucket> | ServiceCatalog <product>
+  [x] Artifacts: S3 <bucket-name> (block-public-access=true, SSE-KMS CMK <key-arn>, versioning=enabled)
+  [x] Cross-account: target=<account>, KMS key policy grants kms:Decrypt+GenerateDataKey to <role>, IAM role <arn> | n/a
+  [x] Pipeline IAM role: arn:aws:iam::<source>:role/<name> (no wildcard resources on S3/KMS/CodeBuild)
+  [x] Namespace variables: validated non-empty via stage condition (no silent empty strings)
 FINDINGS:
-  - [INFO] Pricing: $0.002/execution (event-driven)
-  - [WARN] Trigger filter MUST scope to production branches
+  - [INFO] <observation (pricing, propagation time, etc.)>
+  - [WARN] <caution (trigger scoping, approval timeout, etc.)>
 DEPLOY_COMMANDS:
   <ordered list of aws codepipeline / kms / iam / s3api commands>
+```
+
+### FORBIDDEN output patterns — NEVER
+
+1. NEVER emit `VERDICT: READY_TO_DEPLOY` while any CHECKLIST item is
+   `[ ]` (unchecked). Any unmet requirement forces
+   `PREREQUISITES_MISSING`.
+
+2. NEVER emit a V2 pipeline trigger without a filter (no `Branches`,
+   `FilePaths`, or `Tags` criteria). An unscoped trigger fires on EVERY
+   push to EVERY branch — flooding history, burning per-execution
+   costs ($0.002 × N feature pushes/day), and risking unintended prod
+   deploys from feature branches.
+
+3. NEVER emit a cross-account deploy plan where the KMS key policy is
+   missing `kms:Decrypt` and `kms:GenerateDataKey` grants to the target
+   account's deployment role. S3 bucket policy alone does NOT grant
+   cross-account access to encrypted objects — the deploy fails with
+   "Access Denied" that looks like S3 but is actually KMS.
+
+4. NEVER emit a pipeline IAM role with `"Resource": "*"` on `s3:GetObject`,
+   `kms:*`, or `codebuild:*`. Wildcards create a privilege escalation
+   path — a malicious CodeBuild project can exfiltrate other pipelines'
+   artifacts. Scope every resource to the exact ARN.
+
+5. NEVER emit secrets (tokens, passwords, signing keys) as namespace
+   variables. Namespace variables render in plaintext in CloudTrail,
+   the pipeline execution history, and the console. Use Secrets Manager
+   or Parameter Store SecureString, referenced by ARN in the action's
+   IAM role.
+
+6. NEVER emit a V2 pipeline with `PollForSourceChanges: true`. V2
+   rejects this with a confusing "Invalid action configuration" error.
+   After V1→V2 migration, set `DetectOptions: false` and add a trigger
+   block. Also delete the legacy CloudWatch Events rule — a leftover
+   rule fires alongside the V2 trigger and produces duplicate executions.
+
+7. NEVER emit a deployment plan that consumes a namespace variable
+   (e.g., `#{BuildVars.IMAGE_URI}`) without a stage condition validating
+   the variable is non-empty. A missing variable silently renders as
+   `""` — ECS rejects the empty image string with a confusing
+   "InvalidParameterException", not a clear "variable undefined" error.
+
+### Worked example — READY_TO_DEPLOY (CI/CD with test stage + manual approval + prod CFN deploy)
+
+```text
+PIPELINE: payments-service-cicd
+VERDICT: READY_TO_DEPLOY
+CHECKLIST:
+  [x] Pipeline type: V2 (event-driven; PollForSourceChanges: false — replaced legacy V1 CloudWatch Events rule)
+  [x] Source: CodeCommit repo payments-service, branch main (OutputArtifacts: SourceOutput)
+  [x] Trigger filter: Branches=[main], FilePaths.Includes=[src/**], FilePaths.Excludes=[docs/**, README.md] (NO unscoped trigger)
+  [x] Build: CodeBuild project payments-service-build, exports IMAGE_URI, IMAGE_TAG, BUILD_VERSION
+  [x] Test stage: CodeBuild project payments-service-tests (unit + integration, buildspec at tests/buildspec.yml) — gates Build stage via InputArtifact
+  [x] Manual approval: enabled between Test and DeployProd (ExternalEntityLink: https://internal.example.com/change/CHG-78901, SNS topic arn:aws:sns:us-east-1:111111111111:prod-payments-approval)
+  [x] Deploy: CloudFormation CREATE_REPLACE on stack prod-payments-service, RoleArn arn:aws:iam::222222222222:role/CrossAccountCFNExecution (target account 222222222222), TemplatePath BuildOutput::template.yaml, Capabilities CAPABILITY_IAM
+  [x] Artifacts: S3 payments-pipeline-artifacts (block-public-access all true, SSE-KMS CMK arn:aws:kms:us-east-1:111111111111:key/abc-123, versioning enabled, lifecycle Glacier 90d)
+  [x] Cross-account: target=222222222222, KMS key policy grants kms:Decrypt+GenerateDataKey to arn:aws:iam::222222222222:role/CrossAccountCFNExecution, IAM role trust allows arn:aws:iam::111111111111:role/payments-pipeline-role
+  [x] Pipeline IAM role: arn:aws:iam::111111111111:role/payments-pipeline-role (scoped to exact ARNs — no wildcards on S3/KMS/CodeBuild/CodeCommit; iam:PassRole scoped to CrossAccountCFNExecution)
+  [x] Namespace variables: validated via stage condition on DeployProd — `Conditions: [{ConditionKey: "#{BuildVars.IMAGE_URI}", Operator: StringEquals, ConditionValue: "", Not: true}]` (empty IMAGE_URI blocks deploy)
+FINDINGS:
+  - [INFO] Pricing: $0.002/execution + $1/active pipeline/month + $0.01/build-minute for CodeBuild
+  - [WARN] Manual approval has no enforced timeout — wire an external scheduled Lambda to auto-reject approvals older than 48 hours
+  - [WARN] After V1→V2 migration, delete the legacy CloudWatch Events rule payments-cicd-legacy-trigger to prevent duplicate executions
+DEPLOY_COMMANDS:
+  # 1. Create KMS CMK with cross-account key policy (source account 111111111111)
+  aws kms create-key --policy file://kms-key-policy.json --description "payments-pipeline-artifacts CMK"
+
+  # 2. Create artifact bucket with block-public-access + KMS + versioning
+  aws s3api create-bucket --bucket payments-pipeline-artifacts --region us-east-1 \
+    --block-public-access BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+  aws s3api put-bucket-encryption --bucket payments-pipeline-artifacts \
+    --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"aws:kms","KMSMasterKeyID":"arn:aws:kms:us-east-1:111111111111:key/abc-123"}}]}'
+  aws s3api put-bucket-versioning --bucket payments-pipeline-artifacts --versioning-configuration Status=Enabled
+
+  # 3. Create cross-account CFN execution role in TARGET account 222222222222
+  aws iam create-role --role-name CrossAccountCFNExecution --assume-role-policy-document file://trust-policy.json
+
+  # 4. Create the pipeline role in SOURCE account 111111111111
+  aws iam create-role --role-name payments-pipeline-role --assume-role-policy-document file://pipeline-trust-policy.json
+  aws iam put-role-policy --role-name payments-pipeline-role --policy-name scoped --policy-document file://pipeline-role-policy.json
+
+  # 5. Create the V2 pipeline (trigger filter scoped to main + src/**)
+  aws codepipeline create-pipeline --cli-input-json file://payments-service-cicd.json
+
+  # 6. Verify
+  aws codepipeline get-pipeline-state --name payments-service-cicd
+```
+
+### Decision tree — V2 pipeline shape selection
+
+```
+Start: V2 deployment requirement
+├─ Source = CodeCommit / GitHub via CodeConnections / S3 (event-driven capable)?
+│   └─ No (legacy V1-only source) → emit ERROR — V2 requires event-driven source
+├─ Cross-account deploy target?
+│   ├─ Yes → KMS key policy grants kms:Decrypt + GenerateDataKey to target role?
+│   │       ├─ Yes → CFN deploy action with RoleArn in target account
+│   │       └─ No  → PREREQUISITES_MISSING (KMS key policy is the actual blocker, not S3)
+│   └─ No  → same-account CFN / ECS / CodeDeploy / S3 / ServiceCatalog
+├─ Gated release required?
+│   ├─ Yes → Insert Manual approval action between Test and Deploy stages
+│   │       (wire SNS topic for reviewer notification; schedule external Lambda
+│        for stale-approval auto-reject — CodePipeline does NOT enforce timeouts)
+│   └─ No  → Continuous deploy (Test → Deploy direct)
+├─ Trigger scope:
+│   ├─ Filter present (Branches + FilePaths + Tags)? → READY_TO_DEPLOY
+│   └─ No filter → PREREQUISITES_MISSING (unscoped trigger = every push to every branch)
+└─ Namespace variables consumed downstream?
+    ├─ Stage condition validates non-empty? → READY_TO_DEPLOY
+    └─ No validation → PREREQUISITES_MISSING (silent empty-string deploy risk)
 ```
 
 ## Verification commands (run after deployment)

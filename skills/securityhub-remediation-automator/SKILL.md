@@ -155,18 +155,21 @@ Every remediation design MUST produce exactly one REMEDIATION block per
 finding type, following this format:
 
 ```text
-REMEDIATION: <reference>
+FINDING_ID: <Security Hub finding Id — arn:aws:securityhub:...>
 FINDING_TYPE: <Security Hub finding type>
 STANDARD: <CIS | PCI | FSBP | Custom | N/A>
-SEVERITY_ROUTE: CRITICAL_AUTO | HIGH_AUTO | MEDIUM_NOTIFY | LOW_NOTIFY | SUPPRESSED
-RUNBOOK: <SSM document name or Lambda function ARN or "NONE">
-TRIGGER: AUTOMATIC | MANUAL | NOTIFIED
-SAFETY: <gates applied>
-SUPPRESSION: <NONE | rule-with-expiration-YYYY-MM-DD>
-INSIGHT: <insight ARN or "TBD">
 VERDICT: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+CHECKLIST:
+  [✓|✗] Severity route: CRITICAL_AUTO | HIGH_AUTO | MEDIUM_NOTIFY | LOW_NOTIFY
+  [✓|✗] EventBridge rule: <rule name + pattern summary>
+  [✓|✗] SSM runbook / Lambda fixer: <document name | function ARN | NONE>
+  [✓|✗] batch-update-findings: NOTIFIED on dispatch → RESOLVED on success
+  [✓|✗] SQS DLQ: <DLQ ARN on the EventBridge target>
+  [✓|✗] Suppression: <NONE | rule + expiration YYYY-MM-DD>
+  [✓|✗] Insight: <insight ARN | TBD>
+  [✓|✗] Safety gate: <dry-run 48h | pre-prod validated>
 GAP: <if REVIEW_REQUIRED, the specific missing piece>
-TEMPLATE: <CLI snippet or YAML>
+TEMPLATE: <CLI snippet or IaC>
 ```
 
 ## NEVER section
@@ -504,40 +507,142 @@ aws securityhub create-members \
 
 ## Output format
 
-### Worked example — AUTOMATION_DEPLOYED, Critical S3 finding
+### Literal output labels
+
+Every remediation design MUST emit exactly one block per finding type using
+the labels `FINDING_ID:`, `FINDING_TYPE:`, `VERDICT:`, `CHECKLIST:`, `GAP:`,
+and `TEMPLATE:`. Do NOT preface with prose.
 
 ```text
-REMEDIATION: prod-securityhub-baseline
+FINDING_ID: <finding Id — arn:aws:securityhub:us-east-1:ACCT:subscription/...>
+FINDING_TYPE: <Security Hub finding type>
+STANDARD: <CIS | PCI | FSBP | Custom | N/A>
+VERDICT: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+CHECKLIST:
+  [✓|✗] Severity route: CRITICAL_AUTO | HIGH_AUTO | MEDIUM_NOTIFY | LOW_NOTIFY
+  [✓|✗] EventBridge rule: <rule name + pattern>
+  [✓|✗] SSM runbook / Lambda fixer: <name | ARN | NONE>
+  [✓|✗] batch-update-findings: wired
+  [✓|✗] SQS DLQ: <ARN>
+  [✓|✗] Suppression: <NONE | rule+expiration>
+  [✓|✗] Insight: <ARN | TBD>
+  [✓|✗] Safety gate: <validated>
+GAP: <specific missing piece or None>
+TEMPLATE: <CLI snippet or IaC>
+```
+
+### FORBIDDEN — NEVER do these
+
+1. NEVER wire an EventBridge rule on `aws.securityhub` without a
+   `Severity.Label` filter. Without it the rule fires on EVERY finding
+   including LOW and INFORMATIONAL, overwhelming Lambda concurrency and
+   spiking costs.
+
+2. NEVER use `update-findings` (deprecated). Use `batch-update-findings`
+   which accepts up to 100 findings per call and is the forward-compatible
+   API.
+
+3. NEVER suppress a finding without an expiration date in the Note.
+   Permanent suppression violates PCI DSS, SOC 2, ISO 27001. Always set
+   "Suppressed until YYYY-MM-DD" and run a daily evaluator Lambda.
+
+4. NEVER auto-remediate without calling `batch-update-findings` afterward.
+   A remediation that fixes the resource but leaves the finding in NEW
+   status triggers duplicate remediation and corrupts dashboards.
+
+5. NEVER deploy a Lambda remediation function without an SQS DLQ on the
+   EventBridge target. Failed invocations are silently dropped without a
+   DLQ; the finding stays open and no one knows.
+
+6. NEVER confuse `detail-type: "Security Hub Findings - Imported"` with
+   `"Security Hub Findings - Custom Action"`. The former is for
+   automation (fires on ingestion); the latter fires on human console
+   click.
+
+7. NEVER key remediation idempotency on `UpdatedAt`. Security Hub
+   re-evaluates controls periodically, changing `UpdatedAt` without
+   changing the finding state. Key on finding `Id`.
+
+### Worked example — Critical S3 public-access finding, auto-remediated
+
+Scenario: FSBP control S3.1 detects a publicly accessible S3 bucket.
+EventBridge routes the CRITICAL finding to a Lambda dispatcher that
+invokes the `AWS-DisableS3BucketPublicAccess` SSM runbook, then closes
+the finding via `batch-update-findings`.
+
+```text
+FINDING_ID: arn:aws:securityhub:us-east-1:111111111111:subscription/cis-aws-foundations-benchmark/v/1.2.0/3.1/finding/01a23456-7890-abcd-ef01-234567890abc
 FINDING_TYPE: Software and Configuration Checks/AWS Security Best Practices/S3.1
 STANDARD: FSBP
-SEVERITY_ROUTE: CRITICAL_AUTO
-RUNBOOK: AWS-DisableS3BucketPublicAccess
-TRIGGER: AUTOMATIC (EventBridge on aws.securityhub, Severity CRITICAL)
-SAFETY: post-execution-verification, cloudtrail-audit, batch-update-findings-on-success
-SUPPRESSION: NONE
-INSIGHT: arn:aws:securityhub:us-east-1:111111111111:insight/abc123
 VERDICT: AUTOMATION_DEPLOYED
+CHECKLIST:
+  [✓] Severity route: CRITICAL_AUTO (Critical → SSM auto-remediate, 1h SLA)
+  [✓] EventBridge rule: securityhub-critical-auto-remediation
+      pattern: {"source":["aws.securityhub"],"detail-type":["Security Hub Findings - Imported"],"detail":{"findings":{"Severity":{"Label":["CRITICAL"]},"Workflow":{"Status":["NEW"]}}}}
+  [✓] SSM runbook: AWS-DisableS3BucketPublicAccess (param: S3BucketName = corp-data-lake-prod)
+  [✓] batch-update-findings: NOTIFIED on dispatch → RESOLVED after runbook success
+  [✓] SQS DLQ: arn:aws:sqs:us-east-1:111111111111:securityhub-remediation-dlq
+  [✓] Suppression: NONE
+  [✓] Insight: arn:aws:securityhub:us-east-1:111111111111:insight/abc123
+  [✓] Safety gate: dry-run tested 48h in staging, zero false positives
 GAP: None
 TEMPLATE:
-  aws events put-rule --name securityhub-critical-auto \
-    --event-pattern '{"source":["aws.securityhub"],"detail-type":["Security Hub Findings - Imported"],"detail":{"findings":{"Severity":{"Label":["CRITICAL","HIGH"]},"Workflow":{"Status":["NEW"]}}}}'
+  aws events put-rule --name securityhub-critical-auto-remediation \\
+    --event-pattern '{"source":["aws.securityhub"],"detail-type":["Security Hub Findings - Imported"],"detail":{"findings":{"Severity":{"Label":["CRITICAL"]},"Workflow":{"Status":["NEW"]}}}}'
+  aws ssm start-automation-execution \\
+    --document-name AWS-DisableS3BucketPublicAccess \\
+    --parameters '{"S3BucketName":["corp-data-lake-prod"],"AutomationAssumeRole":["arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole"]}'
+  aws securityhub batch-update-findings \\
+    --finding-identifiers '[{"Id":"arn:aws:securityhub:us-east-1:111111111111:subscription/cis-aws-foundations-benchmark/v/1.2.0/3.1/finding/01a23456-7890-abcd-ef01-234567890abc","ProductArn":"arn:aws:securityhub:us-east-1::product/aws/securityhub"}]' \\
+    --workflow '{"Status":"RESOLVED"}' \\
+    --note '{"Text":"S3 public access disabled via AWS-DisableS3BucketPublicAccess. Verified BlockPublicAccess=TRUE.","UpdatedBy":"remediation-dispatcher"}'
 ```
+
+Severity routing summary (how each tier is handled):
+
+| Severity | Route | Mechanism | SLA |
+|---|---|---|---|
+| CRITICAL | SSM auto-remediate | EventBridge → Lambda dispatcher → SSM runbook → batch-update-findings RESOLVED | 1 hour |
+| HIGH | Lambda fixer | EventBridge → Lambda custom remediation → batch-update-findings RESOLVED | 24 hours |
+| MEDIUM | Notify only | EventBridge → SNS → security channel email | 7 days |
+| LOW | Weekly digest | Scheduled Lambda → aggregated SNS digest | 30 days |
 
 ### Worked example — REVIEW_REQUIRED, no runbook mapped
 
 ```text
-REMEDIATION: securityhub-custom-finding
+FINDING_ID: arn:aws:securityhub:us-east-1:111111111111:subscription/custom/lambda-cred-exposure/finding/02b34567
 FINDING_TYPE: Software and Configuration Checks/Custom/ExposedCredentialsInLambda
 STANDARD: Custom
-SEVERITY_ROUTE: HIGH_AUTO
-RUNBOOK: NONE — no managed runbook for Lambda env-var credential exposure
-TRIGGER: NOTIFIED (SNS to security channel)
-SAFETY: NONE — workflow not yet built
-SUPPRESSION: NONE
-INSIGHT: TBD
 VERDICT: REVIEW_REQUIRED
+CHECKLIST:
+  [✗] Severity route: HIGH_AUTO — no runbook available
+  [✓] EventBridge rule: securityhub-high-auto-remediation (configured)
+  [✗] SSM runbook / Lambda fixer: NONE — no managed runbook for Lambda env-var credential exposure
+  [✓] batch-update-findings: NOTIFIED (SNS to security channel)
+  [✓] SQS DLQ: arn:aws:sqs:us-east-1:111111111111:securityhub-remediation-dlq
+  [✓] Suppression: NONE
+  [✗] Insight: TBD — create insight for tracking
+  [✗] Safety gate: not yet built
 GAP: No managed runbook exists. Build a custom Lambda that (1) reads the finding, (2) rotates the credential via Secrets Manager, (3) updates the environment variable, (4) calls batch-update-findings RESOLVED. Then wire the EventBridge rule.
-TEMPLATE: (custom Lambda — see Step 6 pattern)
+TEMPLATE: (custom Lambda — see Step 6 pattern in skill body)
+```
+
+### Decision tree
+
+```text
+Is there a managed SSM runbook for this finding type?
+├─ Yes → Severity CRITICAL or HIGH?
+│        ├─ Yes → AUTOMATION_DEPLOYED
+│        │        (EventBridge → Lambda dispatcher → SSM runbook → batch-update-findings RESOLVED)
+│        └─ No (MEDIUM/LOW) → MEDIUM_NOTIFY / LOW_NOTIFY
+│                         (EventBridge → SNS → email/digest, no auto-fix)
+└─ No → Is a custom Lambda remediation feasible?
+         ├─ Yes → Build + test in staging → AUTOMATION_DEPLOYED
+         └─ No → REVIEW_REQUIRED (cite the gap: "no runbook, Lambda not feasible")
+                  (route: NOTIFIED via SNS, create insight for backlog tracking)
+
+Is the finding an accepted risk?
+  → Suppress with expiration date in Note → daily evaluator re-opens when expired
 ```
 
 ## Anti-Patterns — NEVER do these things

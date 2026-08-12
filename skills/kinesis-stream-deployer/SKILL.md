@@ -673,7 +673,71 @@ VERIFICATION_COMMANDS:
   aws cloudwatch describe-alarms --alarm-name-prefix "Kinesis-<stream-name>" --region <region>
 ```
 
-### Worked example — on-demand stream with enhanced fan-out and SSE-KMS
+### FORBIDDEN output patterns
+
+1. **NEVER emit `VERDICT: READY_TO_DEPLOY` with a `[✗]` checklist item.**
+   If any prerequisite is missing, the verdict MUST be
+   `PREREQUISITES_MISSING`. Do not mix verdicts.
+
+2. **NEVER omit the stream mode from the checklist.** The mode
+   (`PROVISIONED` or `ON_DEMAND`) determines whether shard count is
+   relevant and which CloudWatch alarms apply.
+
+3. **NEVER list a shard count for an on-demand stream without marking
+   it `N/A`.** `--shard-count` is IGNORED when `StreamMode=ON_DEMAND`.
+   Showing a number misleads the operator into thinking it matters.
+
+4. **NEVER show enhanced fan-out consumers without the consumer ARN.**
+   The consumer ARN is required for IAM policy Resource clauses and
+   for `deregister-stream-consumer` cleanup. Omitting it breaks
+   downstream automation.
+
+5. **NEVER omit the SSE-KMS line from the checklist.** Even if
+   encryption is disabled, the line MUST appear as `[✓] SSE-KMS:
+   Disabled` so the operator explicitly confirms the decision.
+
+6. **NEVER omit the IteratorAgeMilliseconds alarm from a READY_TO_DEPLOY
+   checklist.** Without it, consumer lag goes undetected until data
+   loss. This alarm is mandatory for every deployed stream.
+
+7. **NEVER omit VERIFICATION_COMMANDS from the output block.** The
+   verification commands are what the operator runs after deployment
+   to confirm the stream is ACTIVE, consumers are registered, and
+   encryption is enabled.
+
+### Decision tree
+
+```text
+Is the write throughput predictable and steady?
+├── YES, > ~2-3 MiB/sec sustained
+│   → PROVISIONED mode
+│     ├── Size shards: ceil(write_mib/sec) with 20-30% headroom
+│     ├── Add WriteProvisionedThroughputExceeded alarm
+│     └── Proceed to consumer / encryption / IAM steps
+├── NO — bursty, unpredictable, or unknown
+│   → ON_DEMAND mode
+│     ├── Shard count: N/A (auto-scales)
+│     ├── Skip WriteProvisionedThroughputExceeded alarm
+│     └── Proceed to consumer / encryption / IAM steps
+└── UNKNOWN — new workload
+    → Start ON_DEMAND, evaluate after 2-4 weeks
+
+How many consumers read from this stream?
+├── 1 consumer → standard GetRecords (no enhanced fan-out)
+├── 2-3 consumers, latency-tolerant → standard GetRecords (shared)
+├── 2-3 consumers, low-latency → enhanced fan-out (dedicated push)
+└── 4+ consumers → enhanced fan-out (avoids read contention)
+
+Is SSE-KMS required?
+├── YES (compliance / security policy)
+│   ├── Use CMK (recommended) or alias/aws/kinesis
+│   ├── Key policy MUST permit kinesis.amazonaws.com
+│   └── Producer + consumer IAM MUST include kms:GenerateDataKey, kms:Decrypt
+└── NO
+    └── Confirm explicitly in checklist: [✓] SSE-KMS: Disabled
+```
+
+### Worked example — on-demand stream with 2 enhanced fan-out consumers and SSE-KMS
 
 ```text
 KINESIS_STREAM: telemetry-ingest (arn:aws:kinesis:us-east-1:123456789012:stream/telemetry-ingest)
@@ -683,20 +747,32 @@ CHECKLIST:
   [✓] Stream mode: ON_DEMAND
   [✓] Shard count: N/A (on-demand auto-scales)
   [✓] Retention period: 168 hours (7 days)
-  [✓] Enhanced fan-out: realtime-processor (arn:aws:kinesis:us-east-1:123456789012:stream/telemetry-ingest/consumer/realtime-processor:1620000000)
-  [✓] SSE-KMS: enabled (key alias/kinesis/telemetry-ingest)
-  [✓] KMS key policy: permits kinesis.amazonaws.com (GenerateDataKey, Decrypt)
-  [✓] Producer IAM: EC2-producer-role → kinesis:PutRecord, PutRecords on stream ARN
-  [✓] Consumer IAM: Lambda-consumer-role → kinesis:SubscribeToShard on stream + consumer ARN
-  [✓] CloudWatch alarm: IteratorAgeMilliseconds > 300000 → arn:aws:sns:us-east-1:123456789012:alerts
-  [✓] CloudWatch alarm: N/A (on-demand mode — no WriteProvisionedThroughputExceeded)
-  [✓] Resource policy: Same account (no resource policy needed)
+  [✓] Enhanced fan-out consumer 1: realtime-processor
+      (arn:aws:kinesis:us-east-1:123456789012:stream/telemetry-ingest/consumer/realtime-processor:1620000000)
+  [✓] Enhanced fan-out consumer 2: anomaly-detector
+      (arn:aws:kinesis:us-east-1:123456789012:stream/telemetry-ingest/consumer/anomaly-detector:1630000000)
+  [✓] SSE-KMS: enabled (key arn:aws:kms:us-east-1:123456789012:key/abcd1234-5678-90ef-1234-567890abcdef,
+      alias/kinesis/telemetry-ingest)
+  [✓] KMS key policy: permits kinesis.amazonaws.com (kms:GenerateDataKey, kms:Decrypt)
+  [✓] Producer IAM: EC2-producer-role → kinesis:PutRecord, PutRecords on
+      arn:aws:kinesis:us-east-1:123456789012:stream/telemetry-ingest
+      + kms:GenerateDataKey on KMS key ARN
+  [✓] Consumer IAM (consumer 1): Lambda-processor-role → kinesis:SubscribeToShard
+      on stream ARN + consumer/realtime-processor ARN + kms:Decrypt on KMS key ARN
+  [✓] Consumer IAM (consumer 2): Lambda-detector-role → kinesis:SubscribeToShard
+      on stream ARN + consumer/anomaly-detector ARN + kms:Decrypt on KMS key ARN
+  [✓] CloudWatch alarm: IteratorAgeMilliseconds > 300000 for 3 periods →
+      arn:aws:sns:us-east-1:123456789012:alerts-topic
+  [✓] CloudWatch alarm: N/A (on-demand — no WriteProvisionedThroughputExceeded)
+  [✓] Resource policy: Same account (no cross-account resource policy needed)
   [✓] Tags: Environment=production, Service=telemetry, Team=data-platform
 VERIFICATION_COMMANDS:
   aws kinesis describe-stream-summary --stream-name telemetry-ingest --region us-east-1
   aws kinesis list-stream-consumers --stream-arn arn:aws:kinesis:us-east-1:123456789012:stream/telemetry-ingest --region us-east-1
   aws kinesis describe-stream --stream-name telemetry-ingest --query 'StreamDescription.{Encryption:EncryptionType,KeyId:KeyId}' --region us-east-1
   aws cloudwatch describe-alarms --alarm-name-prefix "Kinesis-telemetry-ingest" --region us-east-1
+  aws kms describe-key --key-id alias/kinesis/telemetry-ingest --region us-east-1
+  aws iam simulate-principal-policy --policy-source-arn arn:aws:iam::123456789012:role/Lambda-processor-role --action-names kinesis:SubscribeToShard kms:Decrypt --output json
 ```
 
 ## Error handling

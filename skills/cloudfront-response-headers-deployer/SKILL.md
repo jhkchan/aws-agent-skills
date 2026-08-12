@@ -486,71 +486,164 @@ CorsConfig:
 
 ## Output format (per operation)
 
+Every operation MUST emit a single block using these literal labels, in this
+order. Do NOT substitute markdown headings or camelCase variants —
+assertion-based evals and downstream provisioning parse the literal labels
+`DISTRIBUTION_ID:`, `VERDICT:`, `CHECKLIST:`, `GAP:`, `IAC_TEMPLATE:`,
+`MANUAL_GAPS:`, `NOTES:`.
+
 ```text
-OPERATION: <create | update | attach | audit>
+DISTRIBUTION_ID: <id> | "(new — will be created)"
 VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-TARGET: <policy-name>
-REQUIREMENTS:
-  - [PASS] <requirement description>
-  - [FAIL] <requirement description> — <gap>
-IAC_TEMPLATE: <inline CloudFormation / Terraform template, or "(held in draft)">
+CHECKLIST:
+  [x] Target distribution: exists + Deployed state (or greenfield)
+  [x] Target behavior: DefaultCacheBehavior | PathPattern <pattern>
+  [x] Response headers policy:
+        - Security headers: CSP <value>, HSTS <max-age + includeSubDomains + preload>, X-Frame-Options <DENY|SAMEORIGIN>, X-Content-Type-Options nosniff, Referrer-Policy <value>, Permissions-Policy <value>
+        - CORS: origins <list|*>, methods <list>, headers <list>, credentials <true|false>, max-age <sec>
+        - Custom headers: <name=value list>
+        - Removal headers: <list> (NEVER Server or Via)
+  [x] Policy origin: managed <ID + name> | custom
+  [x] Override: true on every security header (else origin values win)
+  [x] Attach plan: update-distribution with current ETag
+GAP: <if PREREQUISITES_MISSING, the specific gap and remediation>
+IAC_TEMPLATE: <inline CloudFormation / Terraform; "(held in draft)" if blocked>
 MANUAL_GAPS:
-  - GAP: <gap description>
-    REMEDIATION: <exact CLI or IaC snippet to close the gap>
+  - GAP: <gap>
+    REMEDIATION: <exact CLI / IaC snippet>
     REASON: <why this cannot be automated>
-NOTES: <managed policy version, attach-vs-embed, distribution deploy state>
+NOTES: <managed policy version, attach-vs-embed, invalidation guidance, deploy state>
 ```
 
-### Perfect example output — READY_TO_DEPLOY
+### FORBIDDEN output patterns — NEVER
+
+1. NEVER emit `VERDICT: READY_TO_DEPLOY` while any CHECKLIST item is
+   `[ ]` (unchecked). A single unchecked item forces
+   `PREREQUISITES_MISSING`.
+
+2. NEVER emit a CORS config with `Access-Control-Allow-Origin: *`
+   combined with `AllowCredentials: true`. Browsers reject this
+   combination silently — CloudFront serves the headers, the browser
+   console shows the CORS error, and no CloudFront metric fires.
+
+3. NEVER emit security headers with `Override: false`. Without
+   `Override: true`, origin-emitted headers (often absent or weak) win
+   over the policy. The CloudFront API accepts `Override: false`
+   silently. Every security header in the policy MUST be `Override: true`.
+
+4. NEVER emit `HSTS: max-age=63072000; includeSubDomains; preload` on a
+   non-production distribution. HSTS is irreversible for the `max-age`
+   duration — once a browser sees it, all subdomains are HTTPS-only for
+   2 years. Use `max-age=300` for testing; reserve the 2-year duration
+   for verified production sites.
+
+5. NEVER emit a `RemoveHeaders` list that includes `Server` or `Via`.
+   CloudFront injects these at the edge and silently ignores removal
+   attempts. List only origin-emitted fingerprint headers
+   (`X-Powered-By`, `X-AspNet-Version`).
+
+6. NEVER emit `X-Frame-Options: ALLOW-FROM`. `ALLOW-FROM` is deprecated
+   and ignored by modern browsers. Use `DENY` or `SAMEORIGIN`, and use
+   CSP `frame-ancestors` for fine-grained control.
+
+7. NEVER auto-execute `update-distribution` without the current ETag
+   from `get-distribution-config`. Without `--if-match <etag>`, the
+   update fails with `PreconditionFailed` and provides no warning
+   during planning.
+
+### Worked example — READY_TO_DEPLOY (distribution with HSTS + X-Frame-Options + CSP)
 
 ```text
-OPERATION: create
+DISTRIBUTION_ID: E27TVSIEXAMPLE1A
 VERDICT: READY_TO_DEPLOY
-TARGET: prod-security-headers-policy
-REQUIREMENTS:
-  - [PASS] Distribution E27TVSIEXAMPLE exists in Deployed state
-  - [PASS] Target behavior DefaultCacheBehavior has no policy attached
-  - [PASS] Origin app.example.com reachable on HTTPS
-  - [PASS] CORS origin list consistent with cert SAN
-  - [PASS] CSP compatible with site script inventory (no inline)
+CHECKLIST:
+  [x] Target distribution: E27TVSIEXAMPLE1A exists in Deployed state (verified via get-distribution-config)
+  [x] Target behavior: DefaultCacheBehavior (PathPattern: * — catch-all)
+  [x] Response headers policy:
+        - Security headers:
+            Content-Security-Policy: "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+            Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+            X-Frame-Options: DENY
+            X-Content-Type-Options: nosniff
+            Referrer-Policy: strict-origin-when-cross-origin
+            Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+        - CORS: not configured (same-origin app — no cross-origin requirements)
+        - Custom headers: X-Content-Classification=Restricted, X-Service-Version=1.2.3
+        - Removal headers: X-Powered-By, X-AspNet-Version (CloudFront Server/Via intentionally not listed — cannot be removed)
+  [x] Policy origin: custom (managed SecurityHeadersPolicy does not include CSP frame-ancestors 'none' + Permissions-Policy simultaneously)
+  [x] Override: true on every security header (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
+  [x] Attach plan: get-distribution-config E27TVSIEXAMPLE1A → capture ETag → update-distribution with --if-match
+GAP: None
 IAC_TEMPLATE:
-  # CloudFormation AWS::CloudFront::ResponseHeadersPolicy (custom):
-  #   SecurityHeadersConfig: CSP default-src 'self'; HSTS 2yr preload;
-  #     X-Frame-Options DENY; X-Content-Type-Options nosniff;
-  #     Referrer-Policy strict-origin-when-cross-origin;
-  #     Permissions-Policy camera=(), microphone=(), geolocation=()
-  #   CorsConfig: specific origins, GET/POST/OPTIONS, credentials true,
-  #     max-age 86400
-  # Plus AWS::CloudFront::Distribution update attaching policy ID.
-  # Full template in references/response-headers-policy-templates.md.
+  # CloudFormation — AWS::CloudFront::ResponseHeadersPolicy (custom) +
+  # AWS::CloudFront::Distribution update attaching policy ID to DefaultCacheBehavior
+  SecurityHeadersConfig:
+    ContentSecurityPolicy: { Content: "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'", Override: true }
+    StrictTransportSecurity: { AccessControlMaxAgeSec: 63072000, IncludeSubdomains: true, Preload: true, Override: true }
+    FrameOptions: { FrameOption: DENY, Override: true }
+    ContentTypeOptions: { Override: true }
+    ReferrerPolicy: { ReferrerPolicy: "strict-origin-when-cross-origin", Override: true }
+    PermissionsPolicy: { Content: "camera=(), microphone=(), geolocation=(), payment=()", Override: true }
+  CustomHeadersConfig:
+    Items:
+      - { Header: { Value: Restricted }, Name: X-Content-Classification, Override: true }
+      - { Header: { Value: 1.2.3 }, Name: X-Service-Version, Override: true }
+  RemoveHeadersConfig:
+    Items: [X-Powered-By, X-AspNet-Version]
+  # Full CloudFormation / Terraform template in references/response-headers-policy-templates.md
 MANUAL_GAPS: (none)
 NOTES:
-  - Distribution update requires ETag match (get-distribution-config first).
-  - CloudFront invalidation recommended after attach (cache may serve old headers).
+  - Distribution update requires ETag match — call get-distribution-config E27TVSIEXAMPLE1A first.
+  - CloudFront invalidation recommended after attach: aws cloudfront create-invalidation --distribution-id E27TVSIEXAMPLE1A --paths "/*"
   - Test CSP in Report-Only mode first if site has unknown inline scripts.
+  - HSTS max-age=63072000 with includeSubDomains is irreversible for 2 years — confirm all subdomains serve HTTPS before deploy.
 ```
 
-### Perfect example output — PREREQUISITES_MISSING
+### Worked example — PREREQUISITES_MISSING (wildcard CORS + credentials)
 
 ```text
-OPERATION: create
+DISTRIBUTION_ID: E1BCDEFGHIJ2EXAMPLE
 VERDICT: PREREQUISITES_MISSING
-TARGET: prod-cors-policy
-REQUIREMENTS:
-  - [FAIL] CORS config uses Access-Control-Allow-Origin "*" with
-    AllowCredentials: true. Browsers reject this combination.
-  - [PASS] Distribution exists in Deployed state
+CHECKLIST:
+  [x] Target distribution: E1BCDEFGHIJ2EXAMPLE exists in Deployed state
+  [x] Target behavior: DefaultCacheBehavior
+  [ ] Response headers policy: CORS config uses Access-Control-Allow-Origin: "*" with AllowCredentials: true (BROWSERS REJECT THIS COMBINATION)
+  [x] Policy origin: custom
+  [x] Override: true on every header
+  [x] Attach plan: get-distribution-config → update-distribution with ETag
+GAP: CORS policy combines wildcard origin "*" with AllowCredentials: true. CloudFront will serve the headers; the browser rejects the response and logs a CORS error in the console. The CloudFront API does not validate this combination — the browser does.
 IAC_TEMPLATE: (held in draft — apply after closing the gap below)
 MANUAL_GAPS:
   - GAP: CORS policy combines wildcard origin with credentials.
     REMEDIATION:
-      Change Access-ControlAllowOrigins from ["*"] to a specific origin list:
+      Change AccessControlAllowOrigins from ["*"] to a specific origin list:
       aws cloudfront update-response-headers-policy --id <policy-id> \
         --response-headers-policy-config file://fixed-cors.json --if-match <etag>
-    REASON: Browsers reject Access-Control-Allow-Origin: * with credentials.
-      The CloudFront API does not validate this; the browser does.
+      where fixed-cors.json sets AccessControlAllowOrigins.Items to ["https://app.example.com"].
+    REASON: Browsers reject Access-Control-Allow-Origin: * with credentials. CloudFront API does not validate; the browser does.
 NOTES:
   - Use specific origins for credentialed CORS, OR set AllowCredentials: false.
+  - For dynamic origin reflection (echo the requesting Origin header), use Lambda@Edge or CloudFront Functions — response headers policies do not support reflection.
+```
+
+### Decision tree — managed policy vs custom policy
+
+```
+Start: response headers requirement
+├─ CORS required?
+│   ├─ Yes → Preflight (OPTIONS) needed?
+│   │   ├─ Yes → CORS-with-preflight-and-SecurityHeadersPolicy (managed ID 5cc3b908-e619-4b99-88e5-2ca770afe08f)
+│   │   │         if security headers also needed; else custom (no managed
+│   │   │         preflight-only policy)
+│   │   └─ No  → CORSAndHTTPSecurityHeadersPolicy (managed ID e0bbb029-0798-45b7-9b86-9e6a1c2670e4)
+│   │            OR SimpleCORS (managed ID 608323ce734e4449839d234493be9c7c) if no security headers
+│   └─ No  → Security headers only?
+│            ├─ Default OWASP baseline sufficient?
+│            │   ├─ Yes → SecurityHeadersPolicy (managed ID 0857826db9cffff310d5ad62955c9c26)
+│            │   └─ No  → Custom (CSP / Permissions-Policy / HSTS tweak required)
+│            └─ Custom or removal headers needed?
+│                └─ Yes → Custom policy (managed policies cannot be modified)
+└─ Wildcard origin "*" with credentials true? → ALWAYS PREREQUISITES_MISSING
 ```
 
 ## STRICT output contract

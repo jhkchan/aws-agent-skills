@@ -798,74 +798,136 @@ Then a second Lambda bumps next month's `BudgetLimit` by the
 rollover delta at month start. This is the ONLY way to implement
 rollover — there is no native setting.
 
-## Output format
+## STRICT output contract
+
+Every budget action design MUST emit a single block using these literal
+labels, in this order. Do NOT substitute markdown headings or camelCase
+variants — assertion-based evals and downstream provisioning pipelines
+parse the literal labels `BUDGET:`, `VERDICT:`, `CHECKLIST:`, `GAP:`,
+`TEMPLATE:`.
 
 ```text
-BUDGET: <reference>
-TYPE: <COST | USAGE | RI_COVERAGE | RI_UTILIZATION | SAVINGS_PLANS_COVERAGE | SAVINGS_PLANS_UTILIZATION>
-LIMIT: <amount> <unit>
-TIME_UNIT: <MONTHLY | QUARTERLY | ANNUALLY | DAILY>
-THRESHOLD:
-  - Forecast: <value>% (SNS notify)
-  - Actual: <value>% (IAM/SCP/SSM action)
-NOTIFICATION:
-  - Topic: <SNS ARN>
-  - Targets: <list>
-RESPONSE:
-  - SCP: <deny new EC2 / ECS / Lambda launch>
-  - IAM: <attach budget-restrict-policy to <users>>
-  - SSM: <stop non-prod EC2>
-  - Lambda: <custom action>
-MULTI_ACCOUNT: <single | payer-scoped | stack-set-per-OU>
-COST_ALLOCATION_TAGS: <activated | not-activated | n/a>
-ROLLOVER: <none | lambda-driven>
+BUDGET: <budget-name>
 VERDICT: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
-GAP: <if REVIEW_REQUIRED, the specific missing piece>
-TEMPLATE: <CLI snippet or YAML for the budget configuration>
+CHECKLIST:
+  [x] Budget type: COST | USAGE | RI_COVERAGE | RI_UTILIZATION | SAVINGS_PLANS_COVERAGE | SAVINGS_PLANS_UTILIZATION
+  [x] Monthly amount: <$> <unit> (TimeUnit: MONTHLY | QUARTERLY | ANNUALLY | DAILY)
+  [x] Threshold: ACTUAL <percent>% AND/OR FORECASTED <percent>% (PERCENTAGE | ABSOLUTE_VALUE)
+  [x] Action: SNS_NOTIFY | SCP_DENY | IAM_RESTRICT | SSM_STOP_EC2 | LAMBDA_CUSTOM
+  [x] Cost allocation tags: ACTIVATED | NOT_ACTIVATED | N/A
+  [x] Multi-account scope: SINGLE | PAYER_LINKED_ACCOUNT | STACK_SET_PER_OU
+  [x] Approval model: AUTOMATIC | MANUAL (start MANUAL; promote to AUTOMATIC after cycle 2)
+  [x] Execution role: <arn> (trusts budgets.amazonaws.com, has organizations:AttachPolicy / iam:AttachUserPolicy)
+  [x] SCP detach / IAM detach on recovery: WIRED (Lambda scheduled) | NOT WIRED
+GAP: <if REVIEW_REQUIRED, the specific gap and remediation>
+TEMPLATE: <CLI snippet or CloudFormation; "(held in draft)" if blocked>
 ```
 
-### Worked example — AUTOMATION_DEPLOYED, simple cost budget with SCP
+### FORBIDDEN output patterns — NEVER
+
+1. NEVER emit `VERDICT: AUTOMATION_DEPLOYED` while any CHECKLIST item is
+   `[ ]`. Any unmet requirement forces `REVIEW_REQUIRED`.
+
+2. NEVER recommend `Action: SCP_DENY` with `Approval model: AUTOMATIC` in
+   a fresh deployment. SCP attach is irreversible until manually detached
+   and a false positive locks an entire OU out of resource creation for
+   5-15+ minutes. Always start `MANUAL`; promote to `AUTOMATIC` only
+   after a false-positive-free cycle.
+
+3. NEVER emit a tag-scoped budget (`CostFilters: Tag`) without verifying
+   the tag is `ACTIVATED` in the Billing console. Non-activated tags
+   silently match zero spend — the budget never fires and operators
+   believe spend is under control.
+
+4. NEVER combine `Access-Control-Allow-Origin: *` style wildcards in
+   `CostFilters` with `ThresholdType: ABSOLUTE_VALUE` across multiple
+   LinkedAccounts without recalculating per member. An absolute $10K
+   threshold across 20 member accounts means $200K total exposure.
+
+5. NEVER claim `Action: SNS_NOTIFY` is enforcement. SNS is reporting,
+   not control. If the goal is prevention of further spend, the action
+   MUST be `SCP_DENY`, `IAM_RESTRICT`, `SSM_STOP_EC2`, or `LAMBDA_CUSTOM`.
+
+6. NEVER report a budget action as wired without confirming the SNS
+   topic policy allows `budgets.amazonaws.com` to publish AND the
+   execution role trust policy includes `budgets.amazonaws.com`. Both
+   are silent-failure conditions — the budget fires, the action stays
+   in `ERROR` state, and no alarm pages.
+
+7. NEVER use `RI_COVERAGE` or `RI_UTILIZATION` budgets for cost control.
+   They measure commitment performance, not spend. A 100% RI
+   utilization target can be met while overall compute spend triples.
+
+### Worked example — AUTOMATION_DEPLOYED ($10K/month cost budget at 80%, SCP deny at 100%)
 
 ```text
-BUDGET: prod-cost-budget
-TYPE: COST
-LIMIT: 50000 USD
-TIME_UNIT: MONTHLY
-THRESHOLD:
-  - Forecast: 80% (SNS notify — Slack forwarder)
-  - Actual: 100% (SCP deny)
-NOTIFICATION:
-  - Topic: arn:aws:sns:us-east-1:111111111111:budget-alerts
-  - Targets: ops@company.com, Slack #finops-alerts
-RESPONSE:
-  - SCP: deny ec2:RunInstances, ecs:RegisterTaskDefinition, lambda:CreateFunction
-MULTI_ACCOUNT: single (111111111111)
-COST_ALLOCATION_TAGS: activated
-ROLLOVER: none
+BUDGET: monthly-app-cost-budget
 VERDICT: AUTOMATION_DEPLOYED
+CHECKLIST:
+  [x] Budget type: COST (unblended USD spend)
+  [x] Monthly amount: 10000 USD (TimeUnit: MONTHLY, resets 1st of month)
+  [x] Threshold: FORECASTED 80% (SNS notify — Slack #finops-alerts) AND ACTUAL 100% (SCP deny)
+  [x] Action: SNS_NOTIFY at 80% forecast + SCP_DENY at 100% actual
+  [x] Cost allocation tags: N/A (no CostFilters — budget covers whole account 111111111111)
+  [x] Multi-account scope: SINGLE (account 111111111111, Org member of o-abc123def456)
+  [x] Approval model: MANUAL (cycle 1 — notify-only verified; cycle 2 — IAM on CI bot verified; SCP promotes to AUTOMATIC after cycle 3)
+  [x] Execution role: arn:aws:iam::111111111111:role/BudgetActionExecutionRole (trusts budgets.amazonaws.com; policy grants organizations:AttachPolicy + organizations:DetachPolicy on ou-abc-123def456)
+  [x] SCP detach on recovery: WIRED (EventBridge schedule rule budget-period-reset → Lambda detach-scp-stale at 00:05 UTC on day 1)
 GAP: None
 TEMPLATE:
-  aws budgets put-budget-action --account-id 111111111111 --budget-name prod-cost-budget --notification-type ACTUAL --action-type APPLY_SCP_FAMILY --action-threshold '{"ActionThresholdValue":100,"ActionThresholdType":"PERCENTAGE"}' --definition '{"ScpActionDefinition":{"PolicyId":"p-abc123def456","PolicyDocument":"{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Deny\",\"Action\":[\"ec2:RunInstances\"],\"Resource\":\"*\"}]}"}}' --execution-role-arn arn:aws:iam::111111111111:role/BudgetActionExecutionRole --approval-model AUTOMATIC
+  # Budget + 80% forecast SNS notification
+  aws budgets create-budget --account-id 111111111111 --budget '{"BudgetName":"monthly-app-cost-budget","BudgetLimit":{"Amount":"10000","Unit":"USD"},"TimeUnit":"MONTHLY","BudgetType":"COST"}' \
+    --notifications-with-subscribers '[{"Notification":{"NotificationType":"FORECASTED","ComparisonOperator":"GREATER_THAN","Threshold":80,"ThresholdType":"PERCENTAGE"},"Subscribers":[{"SubscriptionType":"SNS","Address":"arn:aws:sns:us-east-1:111111111111:budget-alerts"}]}]'
+
+  # SCP deny at 100% ACTUAL (pre-create the SCP in Organizations first)
+  aws organizations create-policy --type SERVICE_CONTROL_POLICY --name budget-breach-deny-new-resources --description "Attached when monthly-app-cost-budget breaches 100% ACTUAL" --content file://scp-deny-new-resources.json
+
+  # Wire the budget action (ApprovalModel: MANUAL — flip to AUTOMATIC after cycle 3)
+  aws budgets put-budget-action --account-id 111111111111 --budget-name monthly-app-cost-budget \
+    --notification-type ACTUAL --action-type APPLY_SCP_FAMILY \
+    --action-threshold '{"ActionThresholdValue":100,"ActionThresholdType":"PERCENTAGE"}' \
+    --definition '{"ScpActionDefinition":{"PolicyId":"p-abc123def456","PolicyDocument":"{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Deny\",\"Action\":[\"ec2:RunInstances\",\"ecs:RegisterTaskDefinition\",\"lambda:CreateFunction\"],\"Resource\":\"*\"}]}"}}' \
+    --execution-role-arn arn:aws:iam::111111111111:role/BudgetActionExecutionRole --approval-model MANUAL
 ```
 
-### Worked example — REVIEW_REQUIRED, missing cost allocation tags
+### Worked example — REVIEW_REQUIRED (tag-scoped budget, tag not activated)
 
 ```text
-BUDGET: env-tag-scoped-budget
-TYPE: COST
-LIMIT: 20000 USD
-TIME_UNIT: MONTHLY
-THRESHOLD:
-  - Actual: 90% (SNS notify)
-NOTIFICATION:
-  - Topic: arn:aws:sns:us-east-1:111111111111:budget-alerts
-RESPONSE: notify-only
-MULTI_ACCOUNT: single
-COST_ALLOCATION_TAGS: NOT-ACTIVATED (tag 'env' is not active in Billing console)
-ROLLOVER: none
+BUDGET: env-prod-tag-scoped-budget
 VERDICT: REVIEW_REQUIRED
-GAP: Cost allocation tag 'env' is not activated. The budget CostFilters clause will match zero spend until activated. Activate via aws ce update-cost-allocation-tags-status --tag-keys env --status Active and wait 24 hours before creating the budget.
-TEMPLATE: (blocked until tags activated)
+CHECKLIST:
+  [x] Budget type: COST (CostFilters: Tag=env:prod)
+  [x] Monthly amount: 20000 USD (TimeUnit: MONTHLY)
+  [x] Threshold: ACTUAL 90% (SNS notify)
+  [x] Action: SNS_NOTIFY
+  [ ] Cost allocation tags: NOT_ACTIVATED (tag 'env' is not active in Billing console — verified via `aws ce get-cost-and-usage --group-by Type=TAG,Key=env` returning only $NULL)
+  [x] Multi-account scope: SINGLE
+  [x] Approval model: N/A (notify-only)
+  [x] Execution role: N/A (notify-only — no SCP/IAM action)
+  [x] SCP detach on recovery: N/A
+GAP: Cost allocation tag 'env' is NOT activated. The budget's CostFilters clause matches zero spend until the tag is activated, so the budget will never fire even at $1M of prod spend. Activate via `aws ce update-cost-allocation-tags-status --tag-keys env --status Active`, wait up to 24 hours for activation to take effect (historical data is NOT backfilled), then re-run this skill to emit AUTOMATION_DEPLOYED.
+TEMPLATE: (held in draft — blocked until tag 'env' is activated)
+```
+
+### Decision tree — budget action selection
+
+```
+Start: budget requirement
+├─ Goal = notify only (no enforcement)?
+│   └─ Yes → SNS_NOTIFY (create-notification + subscribe)
+│            OR APPLY_SSM_ACTION for stop-instances notify-only flows
+├─ Goal = enforce on a single account?
+│   ├─ Is the account an Org member?
+│   │   ├─ Yes → Block new resource creation?
+│   │   │       ├─ Yes → APPLY_SCP_FAMILY (target = account itself or leaf OU)
+│   │   │       └─ No  → APPLY_IAM_ACTION (target = CI bot user / group, not app roles)
+│   │   └─ No (standalone) → APPLY_IAM_ACTION or EventBridge → Lambda
+│   └─ Goal = stop running resources? → APPLY_SSM_ACTION (STOP_EC2_INSTANCES, static IDs)
+├─ Goal = enforce across OU / fleet?
+│   └─ StackSet to OU with APPLY_SCP_FAMILY at innermost leaf OU
+└─ Budget type is RI_COVERAGE / RI_UTILIZATION / SAVINGS_PLANS_*?
+    └─ Notify-only — NEVER enforcement. RI/SP budgets measure commitment,
+       not spend. Wire to SNS for human review.
 ```
 
 ## Anti-Patterns — NEVER do these things

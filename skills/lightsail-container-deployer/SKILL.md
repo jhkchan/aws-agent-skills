@@ -690,52 +690,201 @@ aws logs get-log-events \
     the IAM access key is deactivated or deleted, the next deployment
     pull will fail. Plan for key rotation.
 
-## Output format
+## Output format (STRICT output contract)
+
+When this skill is invoked, the agent MUST respond with the block defined
+below using the literal all-caps labels `LIGHTSAIL_CONTAINER:`,
+`VERDICT:`, `CHECKLIST:`, `VERIFICATION_COMMANDS:`, `FORBIDDEN:`, and
+`DECISION_TREE:`. Do NOT preface with prose, headings, or disclaimers.
+
+If any prerequisite is missing, the verdict is `PREREQUISITES_MISSING`
+with a specific gap citation (marked `[✗]`), and `READY_TO_DEPLOY`
+MUST NOT also appear.
+
+### Literal output labels
 
 ```text
 LIGHTSAIL_CONTAINER: <service-name>
 VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
 CHECKLIST:
-  [✓|✗] Container service: <name> — power <scale>, <node-count> nodes
-  [✓|✗] Container image: <image-uri> — <public | ECR private>
-  [✓|✗] ECR auth: access key configured | Not needed (public image)
+  [✓|✗] Power scale: <nano|micro|small|medium|large|xlarge> (<vCPU>, <RAM>)
+  [✓|✗] Node count: <N> nodes — <redundancy note>
+  [✓|✗] Container image: <uri> — <public | ECR private>
+  [✓|✗] ECR auth: <access key configured | Not needed>
   [✓|✗] Container port: <port> → HTTP
   [✓|✗] Public endpoint: <url> — HTTPS, managed TLS
   [✓|✗] Health check: <path> — interval <n>s, threshold <n>
-  [✓|✗] Environment variables: <count> variables
+  [✓|✗] Environment variables: <count>
   [✓|✗] Secrets: <count> parameters
-  [✓|✗] Scale: <node-count> nodes — <redundancy note>
   [✓|✗] Managed TLS: auto-provisioned for default domain
-  [✓|✗] Custom domain: <domain> (CNAME configured) | Not configured
-  [✓|✗] CloudWatch Logs: enabled | Disabled
-  [✓|✗] Tags: <key=value list>
+  [✓|✗] Custom domain: <domain CNAME | Not configured>
+  [✓|✗] CloudWatch Logs: <enabled | disabled>
+  [✓|✗] Tags: <key=value>
 VERIFICATION_COMMANDS:
   aws lightsail get-container-services --service-name <name>
   aws lightsail get-container-service-deployments --service-name <name>
 ```
 
-### Worked example — small production service with ECR
+### FORBIDDEN — NEVER do these
+
+1. NEVER confuse power scale with node count. Power scale
+   (nano/micro/small/medium/large/xlarge) is CPU and RAM per node. Node
+   count (1-20) is replicas. A large x 1 has zero redundancy; a medium x
+   2 provides failover at similar cost.
+
+2. NEVER assume ECR private images work without credentials. Lightsail
+   needs an IAM access key with `ecr:GetDownloadUrlForLayer`,
+   `ecr:BatchGetImage`, and `ecr:GetAuthorizationToken`. Public registry
+   images (Docker Hub) do not need auth.
+
+3. NEVER deploy with scale 1 in production. A single node is a single
+   point of failure. Use at least 2 nodes for availability.
+
+4. NEVER assume the public endpoint works without a mapped port. The
+   endpoint requires a container with a port mapped as HTTP. If no port
+   is mapped, the endpoint returns 503.
+
+5. NEVER use plaintext environment variables for secrets. Use Lightsail
+   parameters. Plaintext variables are visible in the deployment
+   configuration and returned by `get-container-services`.
+
+6. NEVER forget that changing power or scale triggers a rolling redeploy.
+   Both operations replace existing containers. Plan for brief downtime
+   or ensure health checks pass before traffic shifts.
+
+7. NEVER ignore the health check path. The path must return HTTP 200. A
+   path returning 3xx, 4xx, or 5xx marks the endpoint unhealthy and
+   blocks deployment success silently.
+
+### Worked example — small container service with ECR private image + managed TLS
+
+Scenario: production API gateway deployed as a Lightsail Container Service
+using a private ECR image, 2 nodes for high availability, managed TLS for
+HTTPS, and a custom domain via CNAME.
 
 ```text
-LIGHTSAIL_CONTAINER: my-app
+LIGHTSAIL_CONTAINER: api-gateway
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
-  [✓] Container service: my-app — power small, 2 nodes
-  [✓] Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:v1.0 — ECR private
-  [✓] ECR auth: access key AKIAXXX configured
+  [✓] Power scale: small (1 vCPU, 2 GB RAM)
+  [✓] Node count: 2 nodes — production redundancy (failover capable)
+  [✓] Container image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/api-gateway:v1.2 — ECR private
+  [✓] ECR auth: access key AKIARXAMPLEKEY configured (IAM user lightsail-ecr-puller)
   [✓] Container port: 8080 → HTTP
-  [✓] Public endpoint: https://abc123.us-east-1.cs.amazonlightsail.com — HTTPS, managed TLS
-  [✓] Health check: /health — interval 5s, threshold 2
-  [✓] Environment variables: 3 variables
-  [✓] Secrets: 2 parameters
-  [✓] Scale: 2 nodes — production redundancy
-  [✓] Managed TLS: auto-provisioned for default domain
-  [✓] Custom domain: app.example.com (CNAME configured)
-  [✓] CloudWatch Logs: enabled
-  [✓] Tags: Environment=production, Project=web-api
+  [✓] Public endpoint: https://qtc4n3q8t.us-east-1.cs.amazonlightsail.com — HTTPS, managed TLS
+  [✓] Health check: /health — interval 5s, healthyThreshold 2, unhealthyThreshold 2
+  [✓] Environment variables: 3 (NODE_ENV=production, LOG_LEVEL=info, PORT=8080)
+  [✓] Secrets: 2 parameters (DATABASE_URL, JWT_SECRET)
+  [✓] Managed TLS: auto-provisioned for default domain (qtc4n3q8t.us-east-1.cs.amazonlightsail.com)
+  [✓] Custom domain: api.example.com (CNAME → qtc4n3q8t.us-east-1.cs.amazonlightsail.com)
+  [✓] CloudWatch Logs: enabled (/aws/lightsail/container/api-gateway)
+  [✓] Tags: Environment=production, Project=api-gateway, Team=platform
 VERIFICATION_COMMANDS:
-  aws lightsail get-container-services --service-name my-app
-  aws lightsail get-container-service-deployments --service-name my-app
+  aws lightsail get-container-services --service-name api-gateway
+  aws lightsail get-container-service-deployments --service-name api-gateway
+```
+
+Deploy commands:
+
+```bash
+# 1. Create the container service (small power, 2 nodes for HA)
+aws lightsail create-container-service \
+  --service-name api-gateway \
+  --power small \
+  --scale 2 \
+  --tags key=Environment,value=production key=Project,value=api-gateway
+
+# 2. Create containers.json with ECR private image + env vars + port
+cat > /tmp/containers.json << 'CJSON'
+{
+  "api-gateway": {
+    "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/api-gateway:v1.2",
+    "environment": {
+      "NODE_ENV": "production",
+      "LOG_LEVEL": "info",
+      "PORT": "8080"
+    },
+    "ports": {
+      "8080": "HTTP"
+    }
+  }
+}
+CJSON
+
+# 3. Create endpoint.json with health check
+cat > /tmp/endpoint.json << 'EJSON'
+{
+  "containerName": "api-gateway",
+  "containerPort": 8080,
+  "healthCheck": {
+    "healthyThreshold": 2,
+    "unhealthyThreshold": 2,
+    "intervalSeconds": 5,
+    "path": "/health",
+    "successCodes": "200"
+  }
+}
+EJSON
+
+# 4. Deploy with ECR credentials
+aws lightsail create-container-service-deployment \
+  --service-name api-gateway \
+  --containers file:///tmp/containers.json \
+  --public-endpoint file:///tmp/endpoint.json
+
+# 5. Verify the public endpoint
+aws lightsail get-container-services \
+  --service-name api-gateway \
+  --query 'containerServices[0].{State:State,Power:Power,Scale:Scale,Url:publicEndpoint.url}'
+
+# 6. Add custom domain CNAME in Route 53
+PUBLIC_DOMAIN=$(aws lightsail get-container-services \
+  --service-name api-gateway \
+  --query 'containerServices[0].publicEndpoint.url' --output text)
+
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z2DEXAMPLEZONE \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "api.example.com",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "'"$PUBLIC_DOMAIN"'"}]
+      }
+    }]
+  }'
+```
+
+### Decision tree
+
+```text
+What power scale is needed?
+├─ Dev / testing only?
+│  → nano (0.25 vCPU, 0.5 GB) or micro (0.5 vCPU, 1 GB)
+├─ Small production workload?
+│  → small (1 vCPU, 2 GB) — minimum recommended for production
+├─ Medium traffic?
+│  → medium (2 vCPU, 4 GB)
+├─ High traffic?
+│  → large (4 vCPU, 8 GB)
+└─ Compute-intensive?
+   → xlarge (8 vCPU, 16 GB)
+
+How many nodes?
+├─ Development? → 1 node (no redundancy, single point of failure)
+├─ Production? → 2 nodes minimum (failover capable)
+└─ Production-grade? → 3+ nodes (handles node failures gracefully)
+
+ECR private or public image?
+├─ Public registry (Docker Hub)? → No auth needed, specify image directly
+└─ ECR private? → Create IAM access key with ECR read perms → pass to deployment
+   → Key rotation requires a new deployment version
+
+Need HTTPS?
+  → Managed TLS is auto-provisioned for the default domain
+  → For custom domain: add CNAME → Lightsail extends TLS coverage automatically
 ```
 
 ## Error handling

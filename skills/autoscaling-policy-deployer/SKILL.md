@@ -642,52 +642,67 @@ wrong" line is the post-mortem finding.
    UTC; an operator expecting 9 AM local gets 9 AM UTC. Always specify
    `--time-zone` and verify the schedule chain's bounds are consistent.
 
-## Output format
+## Output format (STRICT output contract)
 
+When this skill is invoked with an ASG scaling provisioning request,
+the agent MUST respond with the checklist defined below using the
+literal all-caps labels `POLICY_SPEC:`, `VERDICT:`, `CHECKLIST:`, and
+`VERIFICATION_COMMANDS:`. Do NOT preface the checklist with prose,
+headings, or disclaimers — emit the block as the first lines of the
+response. This contract is what assertion-based evals and downstream
+provisioning pipelines rely on; deviating from the literal labels
+breaks automation silently.
+
+### Decision tree — scaling policy selection
+
+```text
+Need to scale an ASG?
+├── Metric is well-defined and continuous (CPU, ALB req count, custom)?
+│     └── TARGET TRACKING (recommended default)
+│           ├── Predefined: ASGAverageCPUUtilization | ALBRequestCountPerTarget
+│           ├── Custom: must verify Dimensions match emitted metric
+│           ├── Target value: CPU % (e.g., 50) | req/target/min (e.g., 1000)
+│           ├── Cooldowns: ScaleOutCooldown 60s, ScaleInCooldown 300s (defaults)
+│           └── Rule: ONE target tracking policy per metric dimension
+├── Need threshold-based reactive scaling on a DIFFERENT metric?
+│     └── STEP SCALING
+│           ├── Prerequisite: CloudWatch alarm created FIRST
+│           ├── Set TreatMissingData explicitly (breaching for scale-out)
+│           ├── Step adjustments: MetricIntervalLowerBound/UpperBound + ScalingAdjustment
+│           └── NEVER use same metric as target tracking (dual-policy trap)
+├── Need proactive scaling for predictable traffic patterns?
+│     └── PREDICTIVE SCALING
+│           ├── Requires >= 24h of CloudWatch history
+│           ├── Mode: ForecastAndScale (not ForecastOnly)
+│           └── Pairs with target tracking (different mechanism, same metric OK)
+├── Need capacity at known times (business hours, off-hours)?
+│     └── SCHEDULED SCALING
+│           ├── Always set --time-zone (default is UTC)
+│           └── Verify Min <= Desired <= Max across overlapping actions
+└── Need safe template rollout or Spot reliability?
+      ├── INSTANCE REFRESH: checkpoints [50,100], MinHealthyPercentage <= 90
+      └── CAPACITY REBALANCE: only for Spot-backed ASGs (no-op on On-Demand-only)
 ```
-POLICY_SPEC: <asg-name>
-VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-CHECKLIST:
-  [✓|✗] ASG baseline (multi-AZ, health checks, Min<=Desired<=Max): verified
-  [✓|✗] Scaling policy type(s): one per metric dimension (no dual-policy)
-  [✓|✗] Target tracking: <metric> target <value> (alarm created by AWS)
-  [✓|✗] Step scaling: <metric> alarm <arn> + step adjustments (different metric)
-  [✓|✗] Scheduled scaling: <recurrence> <timezone> (Min/Max consistent)
-  [✓|✗] Warm pool: <state> min <n> (instance reuse policy set)
-  [✓|✗] Instance refresh: <strategy> checkpoints [<pct>] MinHealthyPercentage <pct>
-  [✓|✗] Advanced: capacity rebalance <on|off> | predictive <mode> | MIP <strategy>
-VERIFICATION_COMMANDS:
-  <copy-pasteable verification commands>
-```
 
-## STRICT output contract
-
-The rules below are hard constraints. Violating any one produces a
-checklist that looks complete but contains a silent misconfiguration.
-Self-check EVERY emitted block against these rules before returning.
-
-### Required output structure
-
-Every response MUST be a single block using these literal labels, in
-this order. Do NOT preface with prose, headings, or disclaimers.
+### Output template
 
 ```text
 POLICY_SPEC: <asg-name>
 VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
 CHECKLIST:
-  [✓|✗] ASG baseline (multi-AZ, health checks, Min<=Desired<=Max): verified
-  [✓|✗] Scaling policy type(s): one per metric dimension (no dual-policy)
-  [✓|✗] Target tracking: <metric> target <value> (alarm created by AWS)
-  [✓|✗] Step scaling: <metric> alarm <arn> + step adjustments (different metric)
-  [✓|✗] Scheduled scaling: <recurrence> <timezone> (Min/Max consistent)
-  [✓|✗] Warm pool: <state> min <n> (instance reuse policy set)
-  [✓|✗] Instance refresh: <strategy> checkpoints [<pct>] MinHealthyPercentage <pct>
-  [✓|✗] Advanced: capacity rebalance <on|off> | predictive <mode> | MIP <strategy>
+  [✓|✗|OPTIONAL] ASG baseline (multi-AZ, health checks, Min<=Desired<=Max)
+  [✓|✗|OPTIONAL] Scaling policy type(s): one per metric dimension (no dual-policy)
+  [✓|✗|OPTIONAL] Target tracking: <metric> target <value> ScaleOutCooldown <s> ScaleInCooldown <s>
+  [✓|✗|OPTIONAL] Step scaling: <metric> alarm <arn> + step adjustments (different metric)
+  [✓|✗|OPTIONAL] Scheduled scaling: <recurrence> <timezone> (Min/Max consistent)
+  [✓|✗|OPTIONAL] Warm pool: <state> min <n> (ReuseOnScaleIn=<true|false>)
+  [✓|✗|OPTIONAL] Instance refresh: <strategy> checkpoints [<pct>] MinHealthyPercentage <pct>
+  [✓|✗|OPTIONAL] Advanced: capacity rebalance <on|off> | predictive <mode> | MIP <strategy>
 VERIFICATION_COMMANDS:
   <copy-pasteable verification commands — one per [✓] item>
 ```
 
-### FORBIDDEN output patterns
+### FORBIDDEN NEVER patterns (output contract)
 
 1. **NEVER emit `VERDICT: READY_TO_DEPLOY` without showing ALL 8
    checklist items.** Every item MUST appear with a status marker:
@@ -697,67 +712,84 @@ VERIFICATION_COMMANDS:
 
 2. **NEVER mark both Target tracking and Step scaling as `[✓]` without
    confirming they target DIFFERENT metrics.** Two reactive policies on
-   the same metric is the dual-policy trap (see Expert heuristic). If
-   both are on the same metric, one MUST be `[✗]` with a one-line
-   warning, OR the verdict MUST be `PREREQUISITES_MISSING`.
+   the same metric is the dual-policy trap. If both are on the same
+   metric, one MUST be `[✗]` with a warning, OR the verdict MUST be
+   `PREREQUISITES_MISSING`.
 
 3. **NEVER mark Target tracking as `[✓]` without confirming the metric
    emits live datapoints.** Custom metric target tracking with no
    datapoints silently freezes capacity. The verification MUST include
-   `get-metric-statistics` and the rationale MUST cite the namespace
-   and dimensions.
+   `get-metric-statistics` citing the namespace and dimensions.
 
 4. **NEVER mark Predictive scaling as `[✓]` without confirming
    `Mode: ForecastAndScale` and >= 24h of history.** `ForecastOnly`
    emits forecasts but does NOT provision capacity. < 24h history
-   produces empty forecasts with no error. The verification MUST
-   include `describe-scaling-policies` and `get-metric-statistics`.
+   produces empty forecasts with no error.
 
 5. **NEVER mark Capacity rebalance as `[✓]` without confirming the ASG
    has Spot capacity.** Capacity rebalance on an On-Demand-only ASG is
-   a silent no-op. The verification MUST include
-   `describe-auto-scaling-groups --query ...MixedInstancesPolicy` and
-   the rationale MUST cite the Spot allocation strategy.
+   a silent no-op. Verify `MixedInstancesPolicy` includes Spot.
 
-6. **NEVER emit `VERDICT: PREREQUISITES_MISSING` without citing the
-   specific gap.** Each `[✗]` item MUST have a one-line reason:
-   `[✗] Launch template version invalid — update template and verify
-   health before attaching policy`. A bare `[✗]` with no explanation
-   is non-compliant.
+6. **NEVER mark Instance refresh as `[✓]` without confirming
+   `CheckpointPercentages` is set.** Without checkpoints, the refresh
+   runs to completion with no pause point for rollback.
 
-### Perfect example output — READY_TO_DEPLOY
+7. **NEVER emit `VERDICT: PREREQUISITES_MISSING` without citing the
+   specific gap.** Each `[✗]` item MUST have a one-line reason citing
+   what is wrong and how to fix it. A bare `[✗]` is non-compliant.
+
+### Perfect worked example — target tracking on ALB RequestCountPerTarget
 
 ```text
 POLICY_SPEC: prod-web-asg
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
-  [✓] ASG baseline: multi-AZ (3 AZs), ELB health checks, Min=2 Desired=4 Max=10
-  [✓] Scaling policy type(s): target tracking (CPU) + predictive (CPU, different mechanism)
-  [✓] Target tracking: ASGAverageCPUUtilization target 50.0 (alarm aws-managed)
-  [OPTIONAL] Step scaling: not configured (target tracking on CPU is sufficient)
-  [✓] Scheduled scaling: "0 9 * * Mon-Fri" America/New_York (Min=3 Max=10)
+  [✓] ASG baseline: multi-AZ (us-east-1a, us-east-1b, us-east-1c), ELB health checks, Min=4 Desired=6 Max=20
+  [✓] Scaling policy type(s): target tracking (ALBRequestCountPerTarget) — one policy, one metric dimension
+  [✓] Target tracking: ALBRequestCountPerTarget target 1000.0 ScaleOutCooldown 60 ScaleInCooldown 300 (ResourceLabel: app/prod-alb/123abc/prod-web-tg)
+  [OPTIONAL] Step scaling: not configured (target tracking on ALB req count is sufficient for this workload)
+  [✓] Scheduled scaling: "0 9 * * Mon-Fri" America/New_York (Min=6 Max=20); "0 19 * * *" America/New_York (Min=2 Max=10)
   [✓] Warm pool: Stopped min 2 (ReuseOnScaleIn=true)
-  [✓] Instance refresh: Rolling checkpoints [50,100] MinHealthyPercentage 50
-  [✓] Advanced: capacity rebalance on | predictive ForecastAndScale | MIP capacity-optimized
+  [✓] Instance refresh: Rolling checkpoints [50,100] MinHealthyPercentage 50 InstanceWarmup 300
+  [OPTIONAL] Advanced: capacity rebalance off (On-Demand-only ASG) | predictive off | MIP none
 VERIFICATION_COMMANDS:
   aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names prod-web-asg
-  aws autoscaling describe-policies --auto-scaling-group-names prod-web-asg
-  aws autoscaling describe-scheduled-actions --auto-scaling-group-names prod-web-asg
+  aws autoscaling describe-policies --auto-scaling-group-names prod-web-asg --query 'ScalingPolicies[].{Name:PolicyName,Type:PolicyType,Target:TargetTrackingConfiguration.TargetValue,Metric:TargetTrackingConfiguration.PredefinedMetricSpecification.PredefinedMetricType,ResourceLabel:TargetTrackingConfiguration.PredefinedMetricSpecification.ResourceLabel,ScaleOut:TargetTrackingConfiguration.ScaleOutCooldown,ScaleIn:TargetTrackingConfiguration.ScaleInCooldown}'
+  aws autoscaling describe-scheduled-actions --auto-scaling-group-name prod-web-asg
   aws autoscaling describe-warm-pool --auto-scaling-group-name prod-web-asg
   aws autoscaling describe-instance-refreshes --auto-scaling-group-name prod-web-asg
-  aws cloudwatch get-metric-statistics --namespace AWS/EC2 --metric-name CPUUtilization --start-time $(date -u -v-24H +%Y-%m-%dT%H:%M:%SZ) --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) --period 300 --statistics Average
+  aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/prod-web-tg/abc123
+  aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name RequestCountPerTarget --dimensions Name=TargetGroup,Value=app/prod-alb/123abc/prod-web-tg Name=LoadBalancer,Value=app/prod-alb/123abc --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) --period 60 --statistics Sum
 ```
 
-### Perfect example output — PREREQUISITES_MISSING
+**Key details in this example:**
+
+- **Metric:** `ALBRequestCountPerTarget` with `ResourceLabel:
+  app/prod-alb/123abc/prod-web-tg` (ties the policy to a specific ALB
+  + Target Group pair).
+- **Target value:** `1000.0` requests per target per minute (~16.7 RPS
+  per instance). This is per-instance-per-minute, NOT aggregate RPS.
+  Operators who conflate this with RPS under-provision.
+- **Cooldowns:** ScaleOut 60s (fast response to traffic spikes),
+  ScaleIn 300s (5-minute grace to avoid premature termination).
+- **Health checks:** ELB type required for ALB-based metrics — the
+  prerequisite table confirmed this before the policy was attached.
+- **No dual-policy:** Step scaling is `[OPTIONAL]` — NOT configured on
+  the same metric. If step scaling were needed, it would target a
+  DIFFERENT metric (e.g., SQS queue depth).
+- **Capacity rebalance off:** This ASG is On-Demand-only. Marking it
+  `[✓]` would be a silent no-op violation.
+
+### Worked example — PREREQUISITES_MISSING (dual-policy trap)
 
 ```text
 POLICY_SPEC: prod-web-asg
 VERDICT: PREREQUISITES_MISSING
 CHECKLIST:
   [✓] ASG baseline: multi-AZ (3 AZs), EC2 health checks, Min=2 Desired=4 Max=10
-  [✗] Scaling policy type(s): dual-policy conflict — target tracking on CPU AND step scaling on CPU; remove one
-  [✓] Target tracking: ASGAverageCPUUtilization target 50.0 (alarm aws-managed)
-  [✗] Step scaling: SAME metric (CPU) as target tracking — this is the dual-policy trap; choose a different metric or remove
+  [✗] Scaling policy type(s): dual-policy conflict — target tracking on CPU AND step scaling on CPU; both reactive on same metric dimension
+  [✓] Target tracking: ASGAverageCPUUtilization target 50.0 ScaleOutCooldown 60 ScaleInCooldown 300
+  [✗] Step scaling: SAME metric (CPU) as target tracking — this is the dual-policy trap; alarms conflict, ASG oscillates. Choose a different metric or remove.
   [OPTIONAL] Scheduled scaling: not configured
   [OPTIONAL] Warm pool: not configured
   [OPTIONAL] Instance refresh: not configured
@@ -772,6 +804,7 @@ VERIFICATION_COMMANDS:
 - [ ] If Target tracking AND Step scaling are both `[✓]`, they target DIFFERENT metrics?
 - [ ] If Predictive scaling is `[✓]`, `Mode: ForecastAndScale` and >= 24h history confirmed?
 - [ ] If Capacity rebalance is `[✓]`, ASG has Spot capacity (MIP present)?
+- [ ] If Instance refresh is `[✓]`, CheckpointPercentages is set?
 - [ ] Every `[✗]` cites the specific gap and what the operator must provide?
 
 ## Recent AWS features
