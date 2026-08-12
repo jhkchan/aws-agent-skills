@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ssm-patch-compliance-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SSM Patch Compliance Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "al2023-prod-auto-install",
+      "name": "Amazon Linux 2023 fleet — AUTOMATION_DEPLOYED with full baseline + maintenance window + snapshot",
+      "difficulty": "easy",
+      "prompt_file": "prompts/al2023-prod-auto-install.md",
+      "baseline_file": "baselines/al2023-prod-auto-install.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "al2023-prod-auto-install", "AWS-RunPatchBaseline", "VERDICT", "TEMPLATE", "Patch Group"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "win2022-nat-gap",
+      "name": "Windows Server 2022 in private VPC without NAT — REVIEW_REQUIRED, network-egress gap",
+      "difficulty": "medium",
+      "prompt_file": "prompts/win2022-nat-gap.md",
+      "baseline_file": "baselines/win2022-nat-gap.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "win2022-nat-gap", "VERDICT", "GAP", "NAT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "tag-key-drift",
+      "name": "PatchGroup tag-key drift (no space) — instances invisible to Patch Manager",
+      "difficulty": "medium",
+      "prompt_file": "prompts/tag-key-drift.md",
+      "baseline_file": "baselines/tag-key-drift.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "tag-key-drift", "VERDICT", "GAP", "Patch Group"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "stackset-multi-account",
+      "name": "Multi-account patch-baseline rollout via CloudFormation StackSets across Organization OU",
+      "difficulty": "hard",
+      "prompt_file": "prompts/stackset-multi-account.md",
+      "baseline_file": "baselines/stackset-multi-account.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "stackset-multi-account", "StackSet", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "critical-exception-list",
+      "name": "Fleet with 3 critical-instance exceptions — scan-only patch group + exception register",
+      "difficulty": "hard",
+      "prompt_file": "prompts/critical-exception-list.md",
+      "baseline_file": "baselines/critical-exception-list.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "critical-exception-list", "exception", "VERDICT", "scan-only"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

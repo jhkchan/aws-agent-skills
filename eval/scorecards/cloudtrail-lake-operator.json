@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds many concrete expert details (retention limits 90\u20113653 days, INDEFINITE literal, KMS key\u2011policy grant specifics, partition\u2011or\u2011perish rule, multi\u2011column partitioning, undelete 7\u2011day window, default termination protection) that a generic model would not know. However, a portion restates publicly documented behavior without new insight (e.g., basic CLI syntax) and omits deeper IAM permission nuances, preventing a perfect score."
+      "justification": "Adds concrete expert details not usually known by a generic model: exact retention limits (90\u20113653 days or INDEFINITE), precise pre\u2011check priority order, cost breakdowns, recent feature timeline (multi\u2011column partitioning, EDS replication), and a decision tree for each operation. This constitutes genuine delta, though many points (e.g., basic CLI syntax) are already known, so full marks are not awarded."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific step\u2011by\u2011step mindset, pre\u2011flight checklist, confirm gate, capture pre\u2011state, and post\u2011verification flow that mirrors real CloudTrail Lake operations. Missing only a brief procedure for handling pagination and API throttling, which would make the process fully comprehensive."
+      "justification": "Encodes AWS\u2011specific procedures: KMS key\u2011policy verification, organization\u2011scope validation, Athena workgroup and Lake Formation grant checks, and a mandatory CONFIRM gate before any state\u2011changing CLI. Only minor generic phrasing (e.g., \"check security\") prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never query without eventTime filter, never assume global scope, never delete protected EDS). Lacks a few cost\u2011related anti\u2011patterns (e.g., unchecked data\u2011event volume leading to runaway storage costs), so it falls just short of maximum."
+      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., \"NEVER run a query without WHERE eventTime\" and why). Missing a few niche pitfalls such as forgetting to disable termination protection before delete (mentioned only indirectly) and some partner\u2011registration edge cases, so not full credit."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present and clear. Activation triggers are extensive but some are overly generic (e.g., \"CloudTrail Lake query slow\"), which could cause ambiguous activation in edge cases."
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata, verdict_shape, when_to_use, activation_triggers, invocation_schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides reliable activation triggers."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Content is layered into quick reference, mindset, pre\u2011flight, process, anti\u2011patterns, etc., allowing agents to skim before diving deeper. The sheer length of the initial sections may still overload a model that expects a concise top\u2011level summary."
+      "justification": "Layers information well: quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 anti\u2011patterns \u2192 output contract. A small amount of detailed cost tables appears early, which could overload a first glance, but overall the hierarchy is clear."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained with mandatory CONFIRM gates and pre\u2011check blocking. Creative query tasks are given freedom but still require partition pruning. The skill does not enforce limits on result size or scan\u2011budget for queries, a minor freedom\u2011calibration gap."
+      "justification": "Destructive operations are tightly constrained by a mandatory CONFIRM gate and exhaustive pre\u2011checks, while creative query writing is left flexible with guidance on partition pruning. One point is deducted because the skill could better calibrate freedom for bulk non\u2011AWS ingestion (e.g., rate\u2011limit guidance)."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output contract \u2192 Anti\u2011Patterns). A few sections (e.g., cost baselines) feel ad\u2011hoc rather than part of the core pattern."
+      "justification": "Follows a recognizable structure (quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns). Minor ad\u2011hoc ordering of some sections (e.g., cost baselines mixed with mindset) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Agent can execute operations using the provided contract and examples. However, the skill mentions a non\u2011allowed `VERDICT: ERROR` value, which conflicts with the strict output contract, and some sections (e.g., malformed\u2011input handling) are ambiguous."
+      "justification": "Provides working examples, decision trees, and clear CLI commands, enabling an agent to execute operations. However, the output contract does not accommodate the documented ERROR verdict for malformed input, and pagination handling is mentioned but not integrated into the step\u2011by\u2011step flow, leaving edge cases unaddressed."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 53486,
-  "latency_ms": 5639,
+  "token_count": 54426,
+  "latency_ms": 12675,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

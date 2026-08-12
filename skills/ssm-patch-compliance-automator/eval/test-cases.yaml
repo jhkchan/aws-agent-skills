@@ -1,0 +1,188 @@
+# Eval test cases for ssm-patch-compliance-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: ssm-patch-compliance-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: al2023-prod-auto-install
+    description: >-
+      Standard Amazon Linux 2023 fleet with a pre-validated patch baseline,
+      correct Patch Group tagging, and a weekly maintenance window. The
+      skill should produce an AUTOMATION_DEPLOYED workflow with the full
+      baseline + patch group + maintenance window + compliance monitoring
+      template, including pre-patch snapshot and SNS notification.
+    input: |
+      Design reference: al2023-prod-auto-install
+      Account: 111111111111
+      Region: us-east-1
+
+      Fleet: 120 Amazon Linux 2023 instances (prod environment)
+      All instances tagged: "Patch Group" = "al2023-prod"
+      SSM agent: all instances Online (verified via describe-instance-information)
+      Existing baseline: al2023-prod-baseline (pb-0abc123def)
+        - Critical/Important: ApproveAfterDays 0
+        - Medium: ApproveAfterDays 7
+      Maintenance window: weekly Saturday 02:00 UTC, 4 hours, cutoff 1 hour
+      Pre-patch snapshot: enabled (aws:createImage)
+      SNS notification: arn:aws:sns:us-east-1:111111111111:patch-notify
+      Pre-prod validation: canary cycle completed (3 instances, all Compliant).
+      RebootOption: RebootIfNeeded
+
+      Emit the standard PATCH block (BASELINE, PATCH_GROUP,
+      MAINTENANCE_WINDOW, COMPLIANCE_MONITORING, SAFETY, REBOOT,
+      VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "al2023-prod-auto-install"
+        - "AWS-RunPatchBaseline"
+        - "VERDICT"
+        - "TEMPLATE"
+        - "Patch Group"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: win2022-nat-gap
+    description: >-
+      Windows Server 2022 fleet in a private VPC without NAT gateway or
+      WSUS. Patches will fail to download. The skill should classify
+      REVIEW_REQUIRED and cite the network-egress gap.
+    input: |
+      Design reference: win2022-nat-gap
+      Account: 111111111111
+      Region: us-east-1
+
+      Fleet: 45 Windows Server 2022 instances (prod, private VPC)
+      VPC has no NAT gateway, no WSUS server, no VPC endpoints for Windows Update.
+      Instances tagged: "Patch Group" = "win2022-prod"
+      SSM agent: all Online
+      Desired baseline: win2022-prod-baseline
+        - MSRC Critical/Important: ApproveAfterDays 3
+      Maintenance window: weekly Sunday 02:00 UTC, 6 hours
+
+      Emit the standard PATCH block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "win2022-nat-gap"
+        - "VERDICT"
+        - "GAP"
+        - "NAT"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: tag-key-drift
+    description: >-
+      Fleet tagged with "PatchGroup" (no space) instead of "Patch Group".
+      The skill should detect the tag-key drift and classify
+      REVIEW_REQUIRED, citing the exact tag-key mismatch.
+    input: |
+      Design reference: tag-key-drift
+      Account: 111111111111
+      Region: us-east-1
+
+      Fleet: 80 Amazon Linux 2023 instances
+      Instances tagged: "PatchGroup" = "al2023-prod" (note: NO space in key)
+      Baseline: al2023-prod-baseline exists and is registered for "al2023-prod"
+      Maintenance window: configured with targets Key=tag:Patch Group,Values=al2023-prod
+      SSM agent: all Online
+      describe-instance-patch-states: 0 instances returning patch state
+
+      Emit the standard PATCH block. Explain why no instances are
+      being patched despite all configuration appearing correct.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "tag-key-drift"
+        - "VERDICT"
+        - "GAP"
+        - "Patch Group"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: stackset-multi-account
+    description: >-
+      Multi-account patch-baseline rollout via CloudFormation StackSets
+      across an Organization OU. The skill should produce an
+      AUTOMATION_DEPLOYED workflow with the StackSet template and
+      flag that patch-group associations require separate automation.
+    input: |
+      Design reference: stackset-multi-account
+      Account: 111111111111 (management account)
+      Region: us-east-1
+
+      Organization OU: ou-abc-123defghi (15 member accounts)
+      Fleet per account: ~20-50 Amazon Linux 2023 instances each
+      Desired baseline: al2023-org-baseline
+        - Critical/Important: ApproveAfterDays 0
+        - Medium: ApproveAfterDays 7
+      StackSet permission model: SERVICE_MANAGED
+      Auto-deployment: enabled, do not retain on account removal
+
+      Emit the standard PATCH block. Include the CloudFormation
+      StackSet template and the patch-group-association automation
+      strategy.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "stackset-multi-account"
+        - "StackSet"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: critical-exception-list
+    description: >-
+      Fleet with 3 critical instances that must NOT be auto-patched.
+      The skill should produce AUTOMATION_DEPLOYED for the general
+      fleet with an exception list for the critical instances,
+      scan-only patch group for exceptions, and review dates.
+    input: |
+      Design reference: critical-exception-list
+      Account: 111111111111
+      Region: us-east-1
+
+      Fleet: 200 Amazon Linux 2023 instances (prod)
+      General fleet: 197 instances tagged "Patch Group" = "al2023-prod"
+      Critical exceptions (3 instances):
+        - i-0db123prod: Primary database proxy, change-frozen until Q4 migration
+        - i-0aux456legacy: Legacy app, patching breaks JCE provider
+        - i-0mon789grafana: Monitoring server, patching requires coordinated restart
+      Desired approach: general fleet gets weekly Install; exceptions get
+      Scan-only via "Patch Group" = "critical-scan-only"
+
+      Emit the standard PATCH block. Include the exception register.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "critical-exception-list"
+        - "exception"
+        - "VERDICT"
+        - "scan-only"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

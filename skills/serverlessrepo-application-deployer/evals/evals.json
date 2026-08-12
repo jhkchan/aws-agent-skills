@@ -1,0 +1,180 @@
+{
+  "skill": "serverlessrepo-application-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Serverless Application Repository Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across SAR publishing topologies (private app with SAM template and cross-account application policy, public app with LICENSE requirement, nested application composition requiring CAPABILITY_AUTO_EXPAND, semantic version update from 1.0.0 to 1.1.0, missing LICENSE prerequisite failure for public sharing). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "private-app-sam-deploy",
+      "name": "Private SAR application with SAM template and cross-account application policy",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — private SAR app, SAM transform declared, README + LICENSE present, semantic version 1.0.0, application policy grants consumer account 999999999999, CAPABILITY_IAM required",
+      "prompt": "Publish a serverless application named s3-file-processor. SAM template with Transform: AWS::Serverless-2016-10-31, a Lambda function (AWS::Serverless::Function) with S3 event trigger, and an S3 bucket parameter. README.md present. LICENSE present (Apache-2.0). Semantic version 1.0.0. Private sharing — grant consumer account 999999999999 deploy permission. Author: Jacky Chan. Labels: s3, lambda, event-driven. Region us-east-1. Publisher account 123456789012.",
+      "prompt_file": "prompts/private-app-sam-deploy.md",
+      "baseline_file": "baselines/private-app-sam-deploy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SAR_APPLICATION: s3-file-processor (1.0.0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] SAM template: template.yaml (Transform: AWS::Serverless-2016-10-31)\n  [✓] README.md: present\n  [✓] LICENSE: present (Apache-2.0)\n  [✓] Packaging: sam package → S3 artifact\n  [✓] Semantic version: 1.0.0\n  [✓] Sharing: Private+Policy (granted to 999999999999)\n  [✓] Application policy: PutApplicationPolicy → Principal: 999999999999, Action: CreateCloudFormationChangeSet\n  [✓] Capabilities: CAPABILITY_IAM\n  [✓] Author profile: Jacky Chan, labels: s3, lambda, event-driven\n  [✓] Application ARN: arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor\nVERIFICATION_COMMANDS:\n  aws serverlessrepo get-application --application-id arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "AWS::Serverless-2016-10-31",
+            "999999999999",
+            "1.0.0",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "CAPABILITY_IAM"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "public-app-cross-account-policy",
+      "name": "Public SAR application with LICENSE requirement and implicit policy",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — public SAR app, LICENSE required for public sharing, application policy implicit (public = anyone), CAPABILITY_IAM, semantic version 1.2.0",
+      "prompt": "Publish a serverless application named realtime-stream-processor as PUBLIC. SAM template with an AWS::Serverless::Function processing Kinesis events. README.md present. LICENSE present (MIT). Semantic version 1.2.0. Public sharing — anyone can discover and deploy. Author: Jacky Chan. Labels: kinesis, lambda, streaming. Region us-east-1. Publisher account 123456789012.",
+      "prompt_file": "prompts/public-app-cross-account-policy.md",
+      "baseline_file": "baselines/public-app-cross-account-policy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SAR_APPLICATION: realtime-stream-processor (1.2.0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] SAM template: template.yaml (Transform: AWS::Serverless-2016-10-31)\n  [✓] README.md: present\n  [✓] LICENSE: present (MIT) — required for PUBLIC sharing\n  [✓] Semantic version: 1.2.0\n  [✓] Sharing: Public (anyone can discover and deploy)\n  [✓] Application policy: implicit (public = open)\n  [✓] Capabilities: CAPABILITY_IAM\n  [✓] Author profile: Jacky Chan, labels: kinesis, lambda, streaming\n  [✓] Application ARN: arn:aws:serverlessrepo:us-east-1:123456789012:apps/realtime-stream-processor\nVERIFICATION_COMMANDS:\n  aws serverlessrepo get-application --application-id arn:aws:serverlessrepo:us-east-1:123456789012:apps/realtime-stream-processor --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PUBLIC",
+            "LICENSE",
+            "1.2.0",
+            "VERDICT",
+            "CHECKLIST",
+            "CAPABILITY_IAM"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nested-applications-composition",
+      "name": "Parent SAR application with nested child applications requiring CAPABILITY_AUTO_EXPAND",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — parent app nests two child SAR apps via AWS::Serverless::Application, CAPABILITY_AUTO_EXPAND required, child ARNs cited",
+      "prompt": "Publish a parent serverless application named data-pipeline-suite. The SAM template nests two child SAR applications: arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor (version 1.0.0) and arn:aws:serverlessrepo:us-east-1:123456789012:apps/kinesis-forwarder (version 2.0.0). README.md present. LICENSE present (Apache-2.0). Semantic version 1.0.0. Private sharing. Author: Jacky Chan. Region us-east-1.",
+      "prompt_file": "prompts/nested-applications-composition.md",
+      "baseline_file": "baselines/nested-applications-composition.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SAR_APPLICATION: data-pipeline-suite (1.0.0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] SAM template: template.yaml (Transform: AWS::Serverless-2016-10-31)\n  [✓] Nested applications: s3-file-processor (1.0.0), kinesis-forwarder (2.0.0)\n  [✓] Capabilities: CAPABILITY_IAM CAPABILITY_AUTO_EXPAND\n  [✓] Semantic version: 1.0.0\n  [✓] Sharing: Private\nVERIFICATION_COMMANDS:\n  aws serverlessrepo get-application --application-id arn:aws:serverlessrepo:us-east-1:123456789012:apps/data-pipeline-suite --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "CAPABILITY_AUTO_EXPAND",
+            "AWS::Serverless::Application",
+            "nested",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "semantic-version-update",
+      "name": "SAR application version update from 1.0.0 to 1.1.0 (MINOR bump)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — update existing app, new version 1.1.0 (MINOR bump for backward-compatible feature), cannot overwrite 1.0.0",
+      "prompt": "Update the existing SAR application arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor from version 1.0.0 to 1.1.0. The update adds a new optional parameter MemorySize (backward-compatible). README updated. Packaged template ready. Author: Jacky Chan. Region us-east-1.",
+      "prompt_file": "prompts/semantic-version-update.md",
+      "baseline_file": "baselines/semantic-version-update.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SAR_APPLICATION: s3-file-processor (1.1.0)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Semantic version: 1.1.0 (MINOR bump from 1.0.0 — backward-compatible)\n  [✓] Previous version 1.0.0 preserved (immutable)\n  [✓] New parameter: MemorySize (optional, Number, default 256)\n  [✓] README.md: updated\n  [✓] Packaged template: ready (S3-backed CodeUri)\nVERIFICATION_COMMANDS:\n  aws serverlessrepo get-application --application-id arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "1.1.0",
+            "1.0.0",
+            "semantic version",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-readme-license",
+      "name": "Public SAR application without LICENSE (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — public app requires LICENSE; file is missing",
+      "prompt": "Publish a serverless application named event-router as PUBLIC. SAM template with AWS::Serverless::Function. README.md present. No LICENSE file (it was never created). Semantic version 1.0.0. Author: Jacky Chan. Region us-east-1.",
+      "prompt_file": "prompts/missing-readme-license.md",
+      "baseline_file": "baselines/missing-readme-license.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SAR_APPLICATION: event-router\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] LICENSE: MISSING — required for PUBLIC sharing; the SAR API rejects public publishes without a LICENSE file",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "LICENSE",
+            "VERDICT",
+            "CHECKLIST",
+            "PUBLIC"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}
