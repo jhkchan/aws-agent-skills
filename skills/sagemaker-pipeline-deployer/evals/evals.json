@@ -1,0 +1,180 @@
+{
+  "skill": "sagemaker-pipeline-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the SageMaker Pipeline Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across SageMaker Pipeline topologies (end-to-end pipeline with conditional register and registry gate, conditional branch on metric via JsonGet, TuningStep with best-model promotion via get_top_model_s3_uri, pipeline-wide caching and ParallelismConfiguration, missing execution role / iam:PassRole prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "end-to-end-pipeline-with-registry",
+      "name": "End-to-end SageMaker Pipeline with conditional register and Model Registry gate",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — ProcessingStep → TrainingStep → ConditionStep → CreateModel/Transform/RegisterModel DAG with property references, PendingManualApproval gate, caching and parallelism",
+      "prompt": "Build a SageMaker Pipeline named xgb-training-pipeline in us-east-1. Step 1 preprocess raw data with sklearn 1.2-1 on ml.m5.xlarge (ProcessingStep \"Preprocess\"). Step 2 train built-in XGBoost 1.7-1 on ml.m5.2xlarge x2 (TrainingStep \"Train\") consuming the Preprocess train/validation outputs via property references. Step 3 evaluate and ConditionStep \"CheckAUC\" branches when accuracy >= 0.9 (ApprovalThreshold parameter). On success run CreateModelStep, TransformStep (batch input s3://my-ml-bucket/batch-input), and RegisterModelStep to group xgb-classifier-group in PendingManualApproval status. Enable caching with 30-day window. Parallelism MaxParallelExecutionSteps=3. Execution role arn:aws:iam::123456789012:role/SageMakerPipelineExecutionRole.",
+      "prompt_file": "prompts/end-to-end-pipeline-with-registry.md",
+      "baseline_file": "baselines/end-to-end-pipeline-with-registry.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PIPELINE: xgb-training-pipeline\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Execution role: arn:aws:iam::123456789012:role/SageMakerPipelineExecutionRole\n  [✓] Steps DAG: Preprocess → Train → Evaluate → CheckAUC → [CreateModel, Transform, RegisterModel] | else → FailStep\n  [✓] ProcessingStep: Preprocess (sklearn 1.2-1, ml.m5.xlarge)\n  [✓] TrainingStep: Train (built-in xgboost 1.7-1, ml.m5.2xlarge x2)\n  [✓] ConditionStep: CheckAUC (JsonGet metrics.accuracy.value ≥ 0.9)\n  [✓] RegisterModelStep: RegisterModel (group: xgb-classifier-group, PendingManualApproval)\n  [✓] Caching: enabled (window: P30D)\n  [✓] ParallelismConfiguration: MaxParallelExecutionSteps=3\n  [✓] Model Registry gate: enforced (PendingManualApproval)\nVERIFICATION_COMMANDS:\n  aws sagemaker describe-pipeline --pipeline-name xgb-training-pipeline",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "xgb-training-pipeline",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "PendingManualApproval",
+            "Preprocess",
+            "Train"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conditional-branch-on-metric",
+      "name": "ConditionStep branching on a metric via JsonGet from a property file",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — ConditionStep with JsonGet-from-property-file, if_steps register model, else_steps FailStep",
+      "prompt": "Add a ConditionStep to my SageMaker Pipeline. The prior step \"Evaluate\" writes a PropertyFile evaluation_report containing {\"metrics\": {\"accuracy\": {\"value\": 0.93}}}. The ConditionStep \"CheckAUC\" should branch when accuracy >= ApprovalThreshold (default 0.9). if_steps: CreateModelStep, RegisterModelStep to group classifier-group (PendingManualApproval). else_steps: FailStep with message \"metric below threshold\". Pipeline is in us-east-1.",
+      "prompt_file": "prompts/conditional-branch-on-metric.md",
+      "baseline_file": "baselines/conditional-branch-on-metric.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PIPELINE: <pipeline-name>\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] ConditionStep: CheckAUC (JsonGet metrics.accuracy.value ≥ ApprovalThreshold=0.9)\n  [✓] if_steps: CreateModelStep, RegisterModelStep (group: classifier-group, PendingManualApproval)\n  [✓] else_steps: FailStep (metric below threshold)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "CheckAUC",
+            "JsonGet",
+            "VERDICT",
+            "CHECKLIST",
+            "PendingManualApproval"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tuning-step-hpo",
+      "name": "TuningStep with best-model promotion via get_top_model_s3_uri",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — TuningStep with max_jobs=20 max_parallel_jobs=4, best model fed via get_top_model_s3_uri to CreateModel and RegisterModel",
+      "prompt": "Add a TuningStep \"Tune\" to my SageMaker Pipeline in us-east-1. Use the existing XGBoost estimator. Objective: maximize validation:auc. Ranges: max_depth Integer 3-10, eta Continuous 0.05-0.4. max_jobs=20, max_parallel_jobs=4. After tuning, use get_top_model_s3_uri to feed a CreateModelStep and a RegisterModelStep to group xgb-classifier-group (PendingManualApproval). Pipeline execution role arn:aws:iam::123456789012:role/SageMakerPipelineExecutionRole.",
+      "prompt_file": "prompts/tuning-step-hpo.md",
+      "baseline_file": "baselines/tuning-step-hpo.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PIPELINE: <pipeline-name>\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] TuningStep: Tune (max_jobs=20, max_parallel_jobs=4)\n  [✓] CreateModelStep: model_data via get_top_model_s3_uri\n  [✓] RegisterModelStep: group xgb-classifier-group, PendingManualApproval",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Tune",
+            "max_jobs=20",
+            "max_parallel_jobs=4",
+            "VERDICT",
+            "CHECKLIST",
+            "get_top_model_s3_uri"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "caching-and-parallelism",
+      "name": "Pipeline-wide caching and ParallelismConfiguration with digest-pinned image",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — enable_caching with P30D window, ParallelismConfiguration=5, custom image pinned by digest/tag (cache key behavior noted)",
+      "prompt": "Configure my SageMaker Pipeline named training-pipeline in us-east-1. Enable caching with a 30-day cache window. Set ParallelismConfiguration MaxParallelExecutionSteps=5. The pipeline uses a custom algorithm image referenced by tag my-registry/my-image:v1.4.2 (digest-pinned). Verify image pinning is correct for cache behavior.",
+      "prompt_file": "prompts/caching-and-parallelism.md",
+      "baseline_file": "baselines/caching-and-parallelism.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "PIPELINE: training-pipeline\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Caching: enabled (window: P30D)\n  [✓] ParallelismConfiguration: MaxParallelExecutionSteps=5\n  [✓] Image reference: my-registry/my-image:v1.4.2 (immutable tag — cache key stable across code changes)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "caching",
+            "MaxParallelExecutionSteps=5",
+            "VERDICT",
+            "CHECKLIST",
+            "P30D"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-execution-role",
+      "name": "SageMaker Pipeline without execution role / iam:PassRole (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no execution role provided and default role lacks iam:PassRole for child-job roles",
+      "prompt": "Build a SageMaker Pipeline named training-pipeline in us-east-1 with ProcessingStep, TrainingStep, and RegisterModelStep. I have not set up an execution role yet — please use the default SageMaker role and proceed. Pipeline should register to group classifier-group.",
+      "prompt_file": "prompts/missing-execution-role.md",
+      "baseline_file": "baselines/missing-execution-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "PIPELINE: training-pipeline\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Execution role: missing — pipeline needs a role that trusts sagemaker.amazonaws.com and has iam:PassRole for the child TrainingJob/ProcessingJob roles",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "execution role",
+            "VERDICT",
+            "CHECKLIST",
+            "PassRole"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

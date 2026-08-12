@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "budget-action-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Budget Action Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cost-budget-sns-notification",
+      "name": "Standard cost budget with SNS notification only — AUTOMATION_DEPLOYED, notify-only",
+      "difficulty": "easy",
+      "prompt_file": "prompts/cost-budget-sns-notification.md",
+      "baseline_file": "baselines/cost-budget-sns-notification.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "cost-budget-sns-notification", "create-budget", "create-notification", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "forecast-proactive-action",
+      "name": "Cost budget with forecast-driven IAM action against a CI bot user",
+      "difficulty": "medium",
+      "prompt_file": "prompts/forecast-proactive-action.md",
+      "baseline_file": "baselines/forecast-proactive-action.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "forecast-proactive-action", "APPLY_IAM_ACTION", "FORECASTED", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "scp-deny-hard-enforcement",
+      "name": "Cost budget with APPLY_SCP_FAMILY hard enforcement in an Org member account",
+      "difficulty": "hard",
+      "prompt_file": "prompts/scp-deny-hard-enforcement.md",
+      "baseline_file": "baselines/scp-deny-hard-enforcement.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "scp-deny-hard-enforcement", "APPLY_SCP_FAMILY", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "missing-cost-allocation-tag",
+      "name": "Tag-scoped budget where the tag is NOT activated in Billing — silent zero-match",
+      "difficulty": "medium",
+      "prompt_file": "prompts/missing-cost-allocation-tag.md",
+      "baseline_file": "baselines/missing-cost-allocation-tag.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "missing-cost-allocation-tag", "VERDICT", "GAP", "cost allocation"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "ri-coverage-budget",
+      "name": "RI coverage budget measuring commitment performance, notify-only response",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ri-coverage-budget.md",
+      "baseline_file": "baselines/ri-coverage-budget.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "ri-coverage-budget", "RI_COVERAGE", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

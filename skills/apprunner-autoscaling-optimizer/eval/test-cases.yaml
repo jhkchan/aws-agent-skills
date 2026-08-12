@@ -1,0 +1,242 @@
+# Eval test cases for apprunner-autoscaling-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: apprunner-autoscaling-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: concurrency-tuning-further-optimization
+    description: >-
+      Operator wants to optimize App Runner service cost. Concurrency is
+      set to 100 but observed peak is 42 concurrent requests per instance.
+      CPU 35%, memory 30%. MinSize 1, MaxSize 25. Recommendation should
+      increase concurrency to 150 for ~19% savings.
+    input: |
+      Service: prod-api-service
+      Region: us-east-1
+
+      AutoScalingConfiguration:
+        MinSize: 1
+        MaxSize: 25
+        Concurrency: 100
+
+      InstanceConfiguration:
+        Cpu: 1 vCPU
+        Memory: 2 GB
+
+      Metrics (last 30 days):
+        RequestCount: 8,000,000/month
+        Avg InstanceCount: 2.3
+        Peak InstanceCount: 6
+        Avg CPUUtilization: 35%
+        Avg MemoryUtilization: 30%
+        Peak concurrent requests per instance: 42
+        Latency p50: 120ms, p95: 280ms, p99: 450ms
+        5xxResponseCount: 12 (0.00015%)
+
+      Traffic pattern: dynamic (3x peak during business hours)
+      Current monthly cost: $1,200
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "concurrency"
+        - "150"
+        - "create-auto-scaling-configuration"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPTIMIZED"
+
+  - id: pause-non-prod-savings-further-optimization
+    description: >-
+      A dev environment App Runner service runs 24/7 at MinSize 1.
+      Pausing outside business hours (7pm-7am + weekends) saves 75% of
+      compute. Recommendation should include EventBridge pause/resume.
+    input: |
+      Service: dev-staging-service
+      Region: us-east-1
+
+      AutoScalingConfiguration:
+        MinSize: 1
+        MaxSize: 5
+        Concurrency: 50
+
+      InstanceConfiguration:
+        Cpu: 1 vCPU
+        Memory: 2 GB
+
+      Metrics (last 30 days):
+        RequestCount: 50,000/month
+        Avg InstanceCount: 1.0
+        Traffic hours: 9am-6pm weekdays only
+        After-hours and weekend traffic: 0
+
+      Environment: dev/staging (non-production)
+      Current monthly cost: $720
+
+      Emit the standard optimization block.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "pause"
+        - "75%"
+        - "EventBridge"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPTIMIZED"
+
+  - id: already-optimal-config-optimized
+    description: >-
+      A production App Runner service is already well-configured.
+      Concurrency 80 matches observed peak (72). MinSize 1 matches
+      steady-state. CPU 45%, memory 38%. No VPC egress. Health check
+      10s. All dimensions optimal.
+    input: |
+      Service: prod-web-service
+      Region: us-east-1
+
+      AutoScalingConfiguration:
+        MinSize: 1
+        MaxSize: 10
+        Concurrency: 80
+
+      InstanceConfiguration:
+        Cpu: 1 vCPU
+        Memory: 2 GB
+
+      HealthCheckConfiguration:
+        Interval: 10
+        Timeout: 3
+        HealthyThreshold: 2
+        UnhealthyThreshold: 3
+
+      Metrics (last 30 days):
+        RequestCount: 12,000,000/month
+        Avg InstanceCount: 1.8
+        Peak InstanceCount: 4
+        Avg CPUUtilization: 45%
+        Avg MemoryUtilization: 38%
+        Peak concurrent requests per instance: 72
+        Latency p50: 80ms, p95: 180ms
+        5xxResponseCount: 3 (0.000025%)
+
+      NetworkConfiguration: no VPC connector (public ingress)
+      Traffic pattern: static (consistent 24/7)
+      Current monthly cost: $850
+
+      Emit the standard optimization block.
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "prod-web-service"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+
+  - id: instance-type-downgrade-further-optimization
+    description: >-
+      Service is on 2 vCPU / 4 GB but CPU avg 15%, memory avg 22%.
+      Downgrading to 1 vCPU / 2 GB saves ~50% of per-instance cost.
+      Concurrency is well within limits.
+    input: |
+      Service: prod-worker-service
+      Region: us-east-1
+
+      AutoScalingConfiguration:
+        MinSize: 1
+        MaxSize: 8
+        Concurrency: 50
+
+      InstanceConfiguration:
+        Cpu: 2 vCPU
+        Memory: 4 GB
+
+      Metrics (last 30 days):
+        RequestCount: 2,000,000/month
+        Avg InstanceCount: 1.2
+        Peak InstanceCount: 3
+        Avg CPUUtilization: 15%
+        Avg MemoryUtilization: 22%
+        Peak concurrent requests per instance: 28
+        Latency p95: 150ms
+        5xxResponseCount: 0
+
+      Traffic pattern: bursty (event-driven batch processing)
+      Current monthly cost: $950
+
+      Emit the standard optimization block.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "1 vCPU"
+        - "2 GB"
+        - "downgrade"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPTIMIZED"
+
+  - id: vpc-egress-nat-cost-further-optimization
+    description: >-
+      Service uses VPC connector to access private RDS. NAT gateway
+      egress cost is $380/month (40% of compute). S3 and DynamoDB
+      traffic should use VPC endpoints to bypass NAT gateway.
+    input: |
+      Service: prod-data-service
+      Region: us-east-1
+
+      AutoScalingConfiguration:
+        MinSize: 2
+        MaxSize: 15
+        Concurrency: 80
+
+      InstanceConfiguration:
+        Cpu: 2 vCPU
+        Memory: 4 GB
+
+      NetworkConfiguration:
+        VpcConnector: yes
+        EgressConfiguration: NAT gateway
+
+      Metrics (last 30 days):
+        RequestCount: 5,000,000/month
+        Avg InstanceCount: 3.1
+        Avg CPUUtilization: 42%
+        Avg MemoryUtilization: 35%
+        Data transferred to S3: 800 GB/month
+        Data transferred to DynamoDB: 200 GB/month
+        Data transferred to RDS (private): 50 GB/month
+
+      Cost breakdown (last 30 days):
+        App Runner compute: $950/month
+        NAT gateway processing: $380/month ($0.045/GB * 8.4 TB incl. S3+DDB)
+        NAT gateway hourly: $32/month
+        Total NAT cost: $412/month
+
+      Current monthly cost: $1,362/month (compute + NAT)
+      Traffic pattern: dynamic
+
+      Emit the standard optimization block.
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VPC endpoint"
+        - "NAT"
+        - "S3"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "VERDICT: OPTIMIZED"

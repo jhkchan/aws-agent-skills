@@ -1,0 +1,158 @@
+# Eval test cases for eventbridge-scheduler-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across scheduler topologies
+# (Lambda rate schedule with flexible time window OFF, Step Functions
+# cron schedule with timezone and DLQ, SNS one-time schedule with
+# retry policy, schedule group bulk operations, missing target IAM
+# role prerequisite failure).
+skill: eventbridge-scheduler-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: lambda-rate-schedule
+    description: >-
+      Provision a rate-based EventBridge Scheduler schedule targeting
+      a Lambda function with flexible time window OFF and constant JSON
+      input. Expects READY_TO_DEPLOY with exact-time invocation noted
+      and the Scheduler-managed IAM role highlighted.
+    input: |
+      Create an EventBridge Scheduler schedule called hourly-report
+      that invokes Lambda function report-generator
+      (arn:aws:lambda:us-east-1:123456789012:function:report-generator)
+      every 1 hour. Flexible time window OFF (exact-time invocation).
+      Pass constant JSON input: {"report_type": "hourly", "env":
+      "prod"}. Schedule group: prod-schedules. Tags: Environment=
+      production, Team=data.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "hourly-report"
+        - "rate(1 hour)"
+        - "report-generator"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "OFF"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: stepfunctions-cron-schedule
+    description: >-
+      Provision a cron-based EventBridge Scheduler schedule targeting
+      a Step Functions state machine with timezone, DLQ, and retry
+      policy. Expects READY_TO_DEPLOY with timezone specified,
+      DLQ SQS queue noted, and retry policy configured.
+    input: |
+      Create an EventBridge Scheduler schedule called weekday-etl
+      that triggers Step Functions state machine etl-pipeline
+      (arn:aws:states:us-east-1:123456789012:stateMachine:etl-pipeline)
+      at 9 AM weekdays, US Eastern timezone. DLQ:
+      arn:aws:sqs:us-east-1:123456789012:scheduler-dlq. Retry: max 3
+      attempts, max event age 3600 seconds. Tags: Environment=
+      production, Team=data.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "weekday-etl"
+        - "MON-FRI"
+        - "America/New_York"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "retry"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: sns-one-time-schedule
+    description: >-
+      Provision a one-time EventBridge Scheduler schedule targeting
+      SNS with retry policy. Expects READY_TO_DEPLOY with one-time
+      expression (at), auto-delete noted, and retry policy configured.
+    input: |
+      Create a one-time EventBridge Scheduler schedule called
+      campaign-launch that publishes to SNS topic marketing-alerts
+      (arn:aws:sns:us-east-1:123456789012:marketing-alerts) at
+      2026-09-01T14:00:00 UTC. Auto-delete after completion. Retry:
+      max 5 attempts. Pass input {"campaign": "summer-sale"}.
+      Tags: Environment=production, Team=marketing.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "campaign-launch"
+        - "one-time"
+        - "2026-09-01T14:00:00"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "delete"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: group-bulk-operations
+    description: >-
+      Provision a schedule group and demonstrate bulk enable/disable.
+      Expects READY_TO_DEPLOY with group creation noted and the bulk
+      operation capability highlighted.
+    input: |
+      Create an EventBridge Scheduler schedule group called
+      maintenance-jobs in us-east-1, account 123456789012. Add two
+      schedules to the group: daily-cleanup (rate(1 day)) targeting
+      Lambda cleanup-function and weekly-audit (cron(0 0 ? * SUN *))
+      targeting Lambda audit-function. Flexible time window MAXIMUM
+      for both (cost optimization). Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "maintenance-jobs"
+        - "MAXIMUM"
+        - "daily-cleanup"
+        - "weekly-audit"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-target-iam-role
+    description: >-
+      Operator requests a schedule but the target Lambda function does
+      not exist and the caller lacks iam:PassRole. This is a
+      prerequisite failure. Expects PREREQUISITES_MISSING with the
+      missing target and missing iam:PassRole cited.
+    input: |
+      Create an EventBridge Scheduler schedule called my-job that
+      invokes Lambda function nonexistent-function every 5 minutes.
+      The function does not exist. Also, the caller does not have
+      iam:PassRole permission.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "iam:PassRole"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "nonexistent-function"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

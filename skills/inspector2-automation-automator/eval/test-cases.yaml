@@ -1,0 +1,195 @@
+# Eval test cases for inspector2-automation-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: inspector2-automation-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ec2-critical-auto-patch
+    description: >-
+      Standard Critical Inspector finding on an EC2 instance running
+      Amazon Linux 2. The skill should produce an AUTOMATION_DEPLOYED
+      workflow with EventBridge routing to AWS-RunPatchBaseline
+      (Operation=Install, RebootOption=RebootIfNeeded), a pre-patch
+      snapshot step, the SSM patch baseline creation, and the
+      rescan verification step. Expert knowledge of SSM patch
+      baseline + snapshot must surface.
+    input: |
+      Design reference: ec2-critical-auto-patch
+      Account: 111111111111
+      Region: us-east-1
+
+      Finding: CVE-2026-1234 on openssl (CVSS 9.8)
+      Severity: CRITICAL
+      Resource: AWS_EC2_INSTANCE i-0abc123def456 (Amazon Linux 2,
+        SSM agent healthy, Patch Group tag = "critical-patch-group")
+      Inspector coverage: enabled (EC2/ECR/Lambda)
+      SSM service role ARN:
+        arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole
+      Pre-prod validation: completed (Cycle 1 Scan + Cycle 2 Install
+        in non-prod; ready for prod).
+
+      Emit the standard FINDING block (SEVERITY, DETECTION, RESPONSE,
+      SSM_RUNBOOK, VERIFICATION, MULTI_ACCOUNT, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "ec2-critical-auto-patch"
+        - "AWS-RunPatchBaseline"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: ecr-image-scan-rebuild
+    description: >-
+      Critical Inspector finding on an ECR container image. The
+      skill should produce an AUTOMATION_DEPLOYED workflow with
+      EventBridge → CodeBuild rebuild trigger, scan-on-push enable
+      step, and the expert note that ECR scans are push-time and
+      need scheduled rescans for new CVEs against existing images.
+    input: |
+      Design reference: ecr-image-scan-rebuild
+      Account: 111111111111
+      Region: us-east-1
+
+      Finding: CVE-2026-5678 on log4j in base image (CVSS 9.1)
+      Severity: CRITICAL
+      Resource: AWS_ECR_CONTAINER_IMAGE prod-app:v1.2.3
+      CodeBuild project: arn:aws:codebuild:us-east-1:111111111111:project/container-rebuild-pipeline
+      ECR scan-on-push: enabled on prod-app repo
+      Existing image has 12 deployed copies in ECS.
+      Pre-prod validation: completed.
+
+      Emit the standard FINDING block. Include the CodeBuild rebuild
+      trigger and the scheduled rescan recommendation.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "ecr-image-scan-rebuild"
+        - "CodeBuild"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: lambda-finding-notify
+    description: >-
+      High-severity Inspector finding on a Lambda function via
+      static code scan. The skill should produce an
+      AUTOMATION_DEPLOYED workflow with EventBridge → Lambda → SNS
+      notify (no auto-patch possible; CI/CD redeploy required),
+      and surface the expert note that Lambda code scans are
+      static analysis at deploy time, not runtime.
+    input: |
+      Design reference: lambda-finding-notify
+      Account: 111111111111
+      Region: us-east-1
+
+      Finding: CVE-2026-9090 on lodash dependency (CVSS 7.5)
+      Severity: HIGH
+      Resource: AWS_LAMBDA_FUNCTION order-processor-prod
+      SNS topic ARN: arn:aws:sns:us-east-1:111111111111:app-team-notify
+      Lambda function is deployed via CodePipeline (CI/CD available).
+      No runtime issues reported (GuardDuty clean).
+
+      Emit the standard FINDING block. Make clear that Lambda code
+      scan findings require function code update via CI/CD, not
+      SSM patching.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "lambda-finding-notify"
+        - "AWS_LAMBDA_FUNCTION"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: delegated-admin-multiaccount
+    description: >-
+      High-severity Inspector finding surfaced in the management
+      account, but the delegated admin is not yet configured.
+      The skill should classify REVIEW_REQUIRED because fleet-wide
+      automation depends on the delegated admin. GAP must cite the
+      register-delegated-administrator requirement.
+    input: |
+      Design reference: delegated-admin-multiaccount
+      Account: 111111111111 (management account of org o-abc123def)
+      Region: us-east-1
+
+      Finding: CVE-2026-2211 on amazon-linux base (CVSS 8.2)
+      Severity: HIGH
+      Resource: AWS_ECR_CONTAINER_IMAGE across 15 member accounts
+      Member accounts: 222222222222 ... 363636363636
+      Delegated admin: NOT configured for inspector2.amazonaws.com
+        (aws organizations list-delegated-administrators returns empty)
+      Inspector enabled in member accounts individually, but no
+        aggregated view exists.
+
+      Emit the standard FINDING block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "delegated-admin-multiaccount"
+        - "VERDICT"
+        - "GAP"
+        - "delegated admin"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: finding-suppression-accepted-risk
+    description: >-
+      Critical Inspector finding on a legacy EC2 instance that has
+      no patch available (decommission scheduled next year). The
+      skill should produce an AUTOMATION_DEPLOYED workflow for
+      suppression with the rationale documented, the rescan-free
+      audit trail, and the re-open behavior on finding change.
+    input: |
+      Design reference: finding-suppression-accepted-risk
+      Account: 111111111111
+      Region: us-east-1
+
+      Finding: CVE-2026-7777 on openssl 1.0.1 (no vendor patch,
+        CVSS 9.0)
+      Severity: CRITICAL
+      Resource: AWS_EC2_INSTANCE i-legacy000123 (legacy-billing-app)
+      Instance is in isolated VPC, no internet egress.
+      Decommission scheduled: 2027-Q1 (approved by CISO).
+      Finding ARN: arn:aws:inspector2:us-east-1:111111111111:finding/suppressed001
+
+      Emit the standard FINDING block. Make the suppression
+      rationale explicit (decommission approved, isolated VPC, no
+      patch available).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "finding-suppression-accepted-risk"
+        - "SUPPRESSED"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

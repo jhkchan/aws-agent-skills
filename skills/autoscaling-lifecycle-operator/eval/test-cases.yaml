@@ -1,0 +1,242 @@
+# Eval test cases for autoscaling-lifecycle-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: autoscaling-lifecycle-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: launch-hook-bootstrap-ready
+    description: >-
+      Operator wants to add a launch lifecycle hook for bootstrap
+      registration on a web-tier ASG. All pre-checks pass: no conflicting
+      hook, HeartbeatTimeout 300s, Lambda Active with
+      CompleteLifecycleAction permission, HealthCheckGracePeriod covers
+      bootstrap. Plan should produce OPERATION_COMPLETED.
+    input: |
+      Operation: add-launch-hook
+      ASG: prod-web-asg
+      Hook name: web-bootstrap-hook
+      HeartbeatTimeout: 300
+      DefaultResult: CONTINUE
+      Notification target: arn:aws:lambda:us-east-1:111111111111:function:web-lifecycle-action
+
+      ASG metadata (aws autoscaling describe-auto-scaling-groups):
+        AutoScalingGroupName: prod-web-asg
+        MinSize: 2
+        MaxSize: 20
+        DesiredCapacity: 4
+        LaunchTemplate: {LaunchTemplateId: lt-abc123, Version: 2}
+        TargetGroupARNs: [arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/web-tg/abc]
+        HealthCheckType: ELB
+        HealthCheckGracePeriod: 600
+        ServiceLinkedRoleARN: arn:aws:iam::111111111111:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling
+
+      Existing lifecycle hooks (aws autoscaling describe-lifecycle-hooks):
+        (none)
+
+      Lambda metadata (aws lambda get-function-configuration):
+        FunctionName: web-lifecycle-action
+        State: Active
+        Runtime: python3.12
+        Timeout: 120
+
+      Lambda execution role policies:
+        - AWSLambdaBasicExecutionRole
+        - Custom: autoscaling:CompleteLifecycleAction on arn:aws:autoscaling:us-east-1:111111111111:autoScalingGroup:...
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "prod-web-asg"
+        - "put-lifecycle-hook"
+        - "HeartbeatTimeout"
+        - "complete-lifecycle-action"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "REVIEW_REQUIRED"
+
+  - id: terminate-hook-spot-timeout-review-required
+    description: >-
+      Operator wants to add a terminate hook with HeartbeatTimeout 3600 on
+      an ASG with capacity rebalance enabled and Spot instances. Pre-checks
+      must REVIEW_REQUIRED because the hook timeout exceeds the Spot 2-min
+      interruption window.
+    input: |
+      Operation: add-terminate-hook
+      ASG: prod-spot-asg
+      Hook name: spot-drain-hook
+      HeartbeatTimeout: 3600
+      DefaultResult: CONTINUE
+      Notification target: arn:aws:lambda:us-east-1:111111111111:function:spot-drain-action
+
+      ASG metadata:
+        AutoScalingGroupName: prod-spot-asg
+        MinSize: 0
+        MaxSize: 10
+        DesiredCapacity: 5
+        MixedInstancesPolicy:
+          InstancesDistribution:
+            OnDemandPercentageAboveBaseCapacity: 0
+            SpotAllocationStrategy: capacity-optimized
+        CapacityRebalance: true
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "HeartbeatTimeout"
+        - "capacity rebalance"
+        - "120"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPERATION_COMPLETED"
+
+  - id: warm-pool-fast-scale-out-completed
+    description: >-
+      Operator configures a warm pool on prod-web-asg. All pre-checks pass:
+      PoolMinSize 3, MaxGroupPreparedCapacity 5 <= MaxSize 20, subnet IPs
+      available, launch template is EBS-backed. Plan produces
+      OPERATION_COMPLETED with verified warm pool instances.
+    input: |
+      Operation: configure-warm-pool
+      ASG: prod-web-asg
+      PoolMinSize: 3
+      MaxGroupPreparedCapacity: 5
+
+      ASG metadata:
+        AutoScalingGroupName: prod-web-asg
+        MinSize: 2
+        MaxSize: 20
+        DesiredCapacity: 4
+        LaunchTemplate: {LaunchTemplateId: lt-abc123, Version: 2}
+
+      Subnet check: 200+ available IPs across all ASG subnets
+
+      Post-config verification (already executed):
+        aws autoscaling put-warm-pool --auto-scaling-group-name prod-web-asg \
+          --pool-min-size 3 --max-group-prepared-capacity 5
+        Result: success
+
+        aws autoscaling describe-warm-pool --auto-scaling-group-name prod-web-asg:
+          PoolMinSize: 3
+          MaxGroupPreparedCapacity: 5
+          Instances: [i-aaa (Stopped), i-bbb (Stopped), i-ccc (Stopped)]
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "prod-web-asg"
+        - "put-warm-pool"
+        - "PoolMinSize"
+        - "Stopped"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "REVIEW_REQUIRED"
+
+  - id: diagnose-stuck-pending-wait-review-required
+    description: >-
+      An instance is stuck in Pending:Wait for 42 minutes. The lifecycle
+      Lambda timed out (30s Lambda timeout vs 45s bootstrap). Diagnose and
+      emit REVIEW_REQUIRED with the timeout fix.
+    input: |
+      Operation: diagnose-stuck
+      ASG: prod-api-asg
+
+      ASG metadata:
+        AutoScalingGroupName: prod-api-asg
+        DesiredCapacity: 6
+        Lifecycle hooks:
+          - LifecycleHookName: api-bootstrap-hook
+            LifecycleTransition: autoscaling:EC2_INSTANCE_LAUNCHING
+            HeartbeatTimeout: 3600
+            DefaultResult: CONTINUE
+            NotificationTargetARN: arn:aws:lambda:us-east-1:111111111111:function:api-lifecycle-action
+
+      Stuck instance:
+        InstanceId: i-xxx
+        LifecycleState: Pending:Wait
+        Duration in Pending:Wait: 42 minutes
+
+      Lambda metadata:
+        FunctionName: api-lifecycle-action
+        State: Active
+        Timeout: 30
+
+      CloudWatch Logs (last hour):
+        api-lifecycle-action: "TASK FAILED: Task timed out after 30.00 seconds"
+        (last invocation 42 minutes ago)
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "Pending:Wait"
+        - "timed out"
+        - "update-function-configuration"
+        - "3600"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPERATION_COMPLETED"
+
+  - id: capacity-rebalance-enable-completed
+    description: >-
+      Operator enables capacity rebalance on a Spot ASG with an existing
+      terminate hook that has HeartbeatTimeout 90 (within the 120s Spot
+      window). All pre-checks pass. Plan produces OPERATION_COMPLETED.
+    input: |
+      Operation: enable-capacity-rebalance
+      ASG: prod-spot-asg
+
+      ASG metadata:
+        AutoScalingGroupName: prod-spot-asg
+        MinSize: 0
+        MaxSize: 10
+        DesiredCapacity: 5
+        MixedInstancesPolicy:
+          InstancesDistribution:
+            OnDemandPercentageAboveBaseCapacity: 0
+            SpotAllocationStrategy: capacity-optimized
+        CapacityRebalance: false
+
+      Existing lifecycle hooks:
+        - LifecycleHookName: spot-drain-hook
+          LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+          HeartbeatTimeout: 90
+          DefaultResult: CONTINUE
+
+      Post-config verification (already executed):
+        aws autoscaling update-auto-scaling-group \
+          --auto-scaling-group-name prod-spot-asg \
+          --capacity-rebalance
+        Result: success
+
+        aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names prod-spot-asg:
+          CapacityRebalance: true
+
+      Emit the standard VERDICT block (post-verification form).
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "prod-spot-asg"
+        - "capacity-rebalance"
+        - "CapacityRebalance"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "REVIEW_REQUIRED"

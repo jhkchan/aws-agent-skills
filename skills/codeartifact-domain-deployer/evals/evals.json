@@ -1,0 +1,181 @@
+{
+  "skill": "codeartifact-domain-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the CodeArtifact Domain Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across domain topologies (npm domain with external connection and upstream cascade, cross-account repository policy for sharing, VPC endpoint for private access, KMS CMK encryption, missing parent domain prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "npm-domain-with-external-connection",
+      "name": "npm domain with external connection and upstream cascade",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — npm domain, internal upstream first, external connection to npmjs.com last, 12-hour auth token expiry noted",
+      "prompt": "Create a CodeArtifact domain called my-domain in us-east-1, account 123456789012. Create an npm repository my-team-packages within it. Add an upstream to shared-team-packages (internal) and an external connection to npmjs.com. The cascade order must put the internal repo before the public registry. Tags: Environment=production, Team=platform.",
+      "prompt_file": "prompts/npm-domain-with-external-connection.md",
+      "baseline_file": "baselines/npm-domain-with-external-connection.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CODEARTIFACT_DOMAIN: my-domain (123456789012)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Domain: my-domain — encryption: aws-managed\n  [✓] Repository: my-team-packages (format: npm)\n  [✓] Upstream cascade: my-team-packages → shared-team-packages → ext:npmjs\n  [✓] External connection: npmjs (domain-scoped)\n  [✓] Authorization token: aws codeartifact login (12-hour expiry — CI refresh required)\n  [✓] Package immutability: enforced\n  [✓] Tags: Environment=production, Team=platform\nVERIFICATION_COMMANDS:\n  aws codeartifact describe-domain --domain my-domain --region us-east-1\n  aws codeartifact describe-repository --domain my-domain --repository my-team-packages --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "my-domain",
+            "my-team-packages",
+            "npmjs",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "upstream cascade"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-repository-policy",
+      "name": "Cross-account repository policy for read access sharing",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — domain owner grants read access to consumer account via repository policy, consumer login uses domain owner account ID",
+      "prompt": "Create a CodeArtifact domain shared-artifacts in us-east-1, owner account 123456789012. Create a pip repository data-science-pkgs. Grant read access to consumer account 999999999999 via repository policy. The consumer should use aws codeartifact login with the domain owner account ID. Tags: Environment=production.",
+      "prompt_file": "prompts/cross-account-repository-policy.md",
+      "baseline_file": "baselines/cross-account-repository-policy.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CODEARTIFACT_DOMAIN: shared-artifacts (123456789012)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Domain: shared-artifacts — encryption: aws-managed\n  [✓] Repository: data-science-pkgs (format: pip)\n  [✓] Authorization token: aws codeartifact login (12-hour expiry)\n  [✓] Cross-account repository policy: 999999999999 (read)\n  [✓] Tags: Environment=production\nVERIFICATION_COMMANDS:\n  aws codeartifact describe-domain --domain shared-artifacts --region us-east-1\n  aws codeartifact describe-repository --domain shared-artifacts --repository data-science-pkgs --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-artifacts",
+            "999999999999",
+            "123456789012",
+            "repository policy",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vpc-endpoint-private-access",
+      "name": "VPC interface endpoint for private CodeArtifact access",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — both API and repositories VPC endpoints created, private DNS enabled, dual-endpoint requirement noted",
+      "prompt": "Create a CodeArtifact domain internal-registry in us-east-1, account 123456789012. Create a maven repository java-artifacts. Set up VPC interface endpoints for private access in VPC vpc-aaa11122, subnets subnet-aaa111 and subnet-bbb222, security group sg-priv-1. Tags: Environment=production, Network=private.",
+      "prompt_file": "prompts/vpc-endpoint-private-access.md",
+      "baseline_file": "baselines/vpc-endpoint-private-access.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CODEARTIFACT_DOMAIN: internal-registry (123456789012)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Domain: internal-registry — encryption: aws-managed\n  [✓] Repository: java-artifacts (format: maven)\n  [✓] VPC endpoint: vpce-id (api + repositories, private DNS enabled)\n  [✓] Tags: Environment=production, Network=private\nVERIFICATION_COMMANDS:\n  aws ec2 describe-vpc-endpoints --filters Name=service-name,Values=com.amazonaws.us-east-1.codeartifact.* --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "internal-registry",
+            "private-dns-enabled",
+            "codeartifact.api",
+            "codeartifact.repositories",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kms-encryption-custom-key",
+      "name": "CodeArtifact domain with customer-managed KMS encryption key",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — domain created with CMK ARN, encryption immutability noted (cannot change after creation)",
+      "prompt": "Create a CodeArtifact domain secure-domain in us-east-1, account 123456789012. Use a customer-managed KMS key arn:aws:kms:us-east-1:123456789012:key/abcd1234-ef56-7890-abcd-ef1234567890 for encryption. Create a nuget repository dotnet-packages. Tags: Environment=production, Compliance=required.",
+      "prompt_file": "prompts/kms-encryption-custom-key.md",
+      "baseline_file": "baselines/kms-encryption-custom-key.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CODEARTIFACT_DOMAIN: secure-domain (123456789012)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Domain: secure-domain — encryption: CMK arn:aws:kms:us-east-1:123456789012:key/abcd1234\n  [✓] Repository: dotnet-packages (format: nuget)\n  [✓] KMS encryption: CMK — immutable at domain creation\n  [✓] Tags: Environment=production, Compliance=required\nVERIFICATION_COMMANDS:\n  aws codeartifact describe-domain --domain secure-domain --region us-east-1\n  aws codeartifact describe-repository --domain secure-domain --repository dotnet-packages --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "secure-domain",
+            "CMK",
+            "immutable",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-domain-prerequisite",
+      "name": "Repository requested without parent domain existing (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — domain my-domain does not exist; repository creation requires a parent domain",
+      "prompt": "Create a CodeArtifact repository my-packages in us-east-1, account 123456789012, under domain my-domain. The domain my-domain does not exist yet.",
+      "prompt_file": "prompts/missing-domain-prerequisite.md",
+      "baseline_file": "baselines/missing-domain-prerequisite.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "CODEARTIFACT_DOMAIN: my-domain\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Domain: my-domain — does not exist; repository creation requires a parent domain",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "domain",
+            "VERDICT",
+            "CHECKLIST",
+            "my-domain"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "inspector2-automation-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Inspector2 Automation Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "ec2-critical-auto-patch",
+      "name": "Critical Inspector finding on EC2 — AWS-RunPatchBaseline with snapshot gate",
+      "difficulty": "easy",
+      "prompt_file": "prompts/ec2-critical-auto-patch.md",
+      "baseline_file": "baselines/ec2-critical-auto-patch.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "ec2-critical-auto-patch", "AWS-RunPatchBaseline", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "ecr-image-scan-rebuild",
+      "name": "Critical finding on ECR container image — CodeBuild rebuild trigger",
+      "difficulty": "medium",
+      "prompt_file": "prompts/ecr-image-scan-rebuild.md",
+      "baseline_file": "baselines/ecr-image-scan-rebuild.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "ecr-image-scan-rebuild", "CodeBuild", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "lambda-finding-notify",
+      "name": "High-severity Lambda code scan finding — SNS notify, CI/CD redeploy required",
+      "difficulty": "medium",
+      "prompt_file": "prompts/lambda-finding-notify.md",
+      "baseline_file": "baselines/lambda-finding-notify.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "lambda-finding-notify", "AWS_LAMBDA_FUNCTION", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "delegated-admin-multiaccount",
+      "name": "Multi-account finding where delegated admin is NOT configured — REVIEW_REQUIRED",
+      "difficulty": "hard",
+      "prompt_file": "prompts/delegated-admin-multiaccount.md",
+      "baseline_file": "baselines/delegated-admin-multiaccount.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "delegated-admin-multiaccount", "VERDICT", "GAP", "delegated admin"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "finding-suppression-accepted-risk",
+      "name": "Critical finding on legacy instance — suppression workflow with documented rationale",
+      "difficulty": "hard",
+      "prompt_file": "prompts/finding-suppression-accepted-risk.md",
+      "baseline_file": "baselines/finding-suppression-accepted-risk.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "finding-suppression-accepted-risk", "SUPPRESSED", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

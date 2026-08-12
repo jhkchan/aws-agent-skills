@@ -1,0 +1,182 @@
+{
+  "skill": "eventbridge-scheduler-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the EventBridge Scheduler Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across scheduler topologies (Lambda rate schedule with flexible time window OFF, Step Functions cron schedule with timezone and DLQ, SNS one-time schedule with retry policy, schedule group bulk operations, missing target IAM role prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "lambda-rate-schedule",
+      "name": "Lambda rate schedule with flexible time window OFF and constant JSON input",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — rate(1 hour), Lambda target, flexible time window OFF (exact-time), constant JSON input, Scheduler-managed IAM role",
+      "prompt": "Create an EventBridge Scheduler schedule called hourly-report that invokes Lambda function report-generator (arn:aws:lambda:us-east-1:123456789012:function:report-generator) every 1 hour. Flexible time window OFF (exact-time invocation). Pass constant JSON input: {\"report_type\": \"hourly\", \"env\": \"prod\"}. Schedule group: prod-schedules. Tags: Environment=production, Team=data.",
+      "prompt_file": "prompts/lambda-rate-schedule.md",
+      "baseline_file": "baselines/lambda-rate-schedule.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SCHEDULER: hourly-report (rate(1 hour))\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Schedule name: hourly-report\n  [✓] Schedule type: rate\n  [✓] Expression: rate(1 hour) (timezone: UTC)\n  [✓] Flexible time window: OFF (exact-time invocation)\n  [✓] Target: Lambda — arn:aws:lambda:us-east-1:123456789012:function:report-generator\n  [✓] IAM role: Scheduler-managed (auto-scoped to target ARN)\n  [✓] Target input: {\"report_type\": \"hourly\", \"env\": \"prod\"}\n  [✓] Schedule group: prod-schedules\n  [✓] State: ENABLED\n  [✓] Tags: Environment=production, Team=data\nVERIFICATION_COMMANDS:\n  aws scheduler get-schedule --name hourly-report --group-name prod-schedules --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "hourly-report",
+            "rate(1 hour)",
+            "report-generator",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "OFF"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stepfunctions-cron-schedule",
+      "name": "Step Functions cron schedule with timezone, DLQ, and retry policy",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — cron(0 9 ? * MON-FRI *), Step Functions target, America/New_York timezone, DLQ configured, retry max 3",
+      "prompt": "Create an EventBridge Scheduler schedule called weekday-etl that triggers Step Functions state machine etl-pipeline (arn:aws:states:us-east-1:123456789012:stateMachine:etl-pipeline) at 9 AM weekdays, US Eastern timezone. DLQ: arn:aws:sqs:us-east-1:123456789012:scheduler-dlq. Retry: max 3 attempts, max event age 3600 seconds. Tags: Environment=production, Team=data.",
+      "prompt_file": "prompts/stepfunctions-cron-schedule.md",
+      "baseline_file": "baselines/stepfunctions-cron-schedule.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SCHEDULER: weekday-etl (cron(0 9 ? * MON-FRI *))\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Schedule name: weekday-etl\n  [✓] Schedule type: cron\n  [✓] Expression: cron(0 9 ? * MON-FRI *) (timezone: America/New_York)\n  [✓] Flexible time window: OFF\n  [✓] Target: Step Functions — etl-pipeline\n  [✓] IAM role: Scheduler-managed\n  [✓] Retry policy: max 3 attempts, max age 3600s\n  [✓] Dead-letter queue: arn:aws:sqs:us-east-1:123456789012:scheduler-dlq\n  [✓] State: ENABLED\nVERIFICATION_COMMANDS:\n  aws scheduler get-schedule --name weekday-etl --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "weekday-etl",
+            "MON-FRI",
+            "America/New_York",
+            "VERDICT",
+            "CHECKLIST",
+            "retry"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sns-one-time-schedule",
+      "name": "SNS one-time schedule with retry policy and auto-delete",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — one-time at(2026-09-01T14:00:00), SNS target, auto-delete after completion, retry max 5",
+      "prompt": "Create a one-time EventBridge Scheduler schedule called campaign-launch that publishes to SNS topic marketing-alerts (arn:aws:sns:us-east-1:123456789012:marketing-alerts) at 2026-09-01T14:00:00 UTC. Auto-delete after completion. Retry: max 5 attempts. Pass input {\"campaign\": \"summer-sale\"}. Tags: Environment=production, Team=marketing.",
+      "prompt_file": "prompts/sns-one-time-schedule.md",
+      "baseline_file": "baselines/sns-one-time-schedule.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SCHEDULER: campaign-launch (at(2026-09-01T14:00:00))\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Schedule name: campaign-launch\n  [✓] Schedule type: one-time\n  [✓] Expression: at(2026-09-01T14:00:00) (timezone: UTC)\n  [✓] Target: SNS — marketing-alerts\n  [✓] IAM role: Scheduler-managed\n  [✓] Retry policy: max 5 attempts\n  [✓] Delete after completion: true\n  [✓] State: ENABLED\nVERIFICATION_COMMANDS:\n  aws scheduler get-schedule --name campaign-launch --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "campaign-launch",
+            "one-time",
+            "2026-09-01T14:00:00",
+            "VERDICT",
+            "CHECKLIST",
+            "delete"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "group-bulk-operations",
+      "name": "Schedule group with bulk operations and flexible time window MAXIMUM",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — group creation, two schedules with MAXIMUM flexible time window (cost optimization), bulk enable/disable capability noted",
+      "prompt": "Create an EventBridge Scheduler schedule group called maintenance-jobs in us-east-1, account 123456789012. Add two schedules to the group: daily-cleanup (rate(1 day)) targeting Lambda cleanup-function and weekly-audit (cron(0 0 ? * SUN *)) targeting Lambda audit-function. Flexible time window MAXIMUM for both (cost optimization). Tags: Environment=production.",
+      "prompt_file": "prompts/group-bulk-operations.md",
+      "baseline_file": "baselines/group-bulk-operations.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "SCHEDULER: maintenance-jobs (group)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Schedule group: maintenance-jobs\n  [✓] Schedule: daily-cleanup (rate(1 day)) — MAXIMUM flexible window\n  [✓] Schedule: weekly-audit (cron(0 0 ? * SUN *)) — MAXIMUM flexible window\n  [✓] IAM role: Scheduler-managed per schedule\n  [✓] Bulk operations: enable/disable all via group state\n  [✓] Tags: Environment=production\nVERIFICATION_COMMANDS:\n  aws scheduler list-schedules --group-name maintenance-jobs --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "maintenance-jobs",
+            "MAXIMUM",
+            "daily-cleanup",
+            "weekly-audit",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-target-iam-role",
+      "name": "Schedule with missing target and missing iam:PassRole (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — target Lambda function does not exist AND caller lacks iam:PassRole",
+      "prompt": "Create an EventBridge Scheduler schedule called my-job that invokes Lambda function nonexistent-function every 5 minutes. The function does not exist. Also, the caller does not have iam:PassRole permission.",
+      "prompt_file": "prompts/missing-target-iam-role.md",
+      "baseline_file": "baselines/missing-target-iam-role.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "SCHEDULER: my-job\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Target: nonexistent-function — Lambda function does not exist\n  [✗] IAM role: caller lacks iam:PassRole — Scheduler cannot assume its managed role",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "iam:PassRole",
+            "VERDICT",
+            "CHECKLIST",
+            "nonexistent-function"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

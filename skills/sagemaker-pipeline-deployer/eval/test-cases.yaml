@@ -1,0 +1,170 @@
+# Eval test cases for sagemaker-pipeline-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across SageMaker Pipeline
+# topologies (end-to-end pipeline with conditional register, conditional
+# branch on metric, tuning step with best-model promotion, caching and
+# parallelism configuration, missing execution role / iam:PassRole).
+skill: sagemaker-pipeline-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: end-to-end-pipeline-with-registry
+    description: >-
+      Define an end-to-end SageMaker Pipeline: ProcessingStep (sklearn)
+      feeds TrainingStep (built-in XGBoost), then ConditionStep branches
+      on AUC; if above threshold, CreateModel + Transform +
+      RegisterModel (PendingManualApproval). Expects READY_TO_DEPLOY
+      with DAG noted via property references, registry gate enforced,
+      and verification commands.
+    input: |
+      Build a SageMaker Pipeline named xgb-training-pipeline in
+      us-east-1. Step 1 preprocess raw data with sklearn 1.2-1 on
+      ml.m5.xlarge (ProcessingStep "Preprocess"). Step 2 train built-in
+      XGBoost 1.7-1 on ml.m5.2xlarge x2 (TrainingStep "Train") consuming
+      the Preprocess train/validation outputs via property references.
+      Step 3 evaluate and ConditionStep "CheckAUC" branches when
+      accuracy >= 0.9 (ApprovalThreshold parameter). On success run
+      CreateModelStep, TransformStep (batch input
+      s3://my-ml-bucket/batch-input), and RegisterModelStep to group
+      xgb-classifier-group in PendingManualApproval status. Enable
+      caching with 30-day window. Parallelism MaxParallelExecutionSteps=3.
+      Execution role arn:aws:iam::123456789012:role/SageMakerPipelineExecutionRole.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "xgb-training-pipeline"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "PendingManualApproval"
+        - "Preprocess"
+        - "Train"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: conditional-branch-on-metric
+    description: >-
+      Define a ConditionStep that branches on a metric produced by an
+      evaluation step, with if_steps that register the model and
+      else_steps that fail the pipeline. Expects READY_TO_DEPLOY with
+      JsonGet-from-property-file noted and the metric/threshold cited.
+    input: |
+      Add a ConditionStep to my SageMaker Pipeline. The prior step
+      "Evaluate" writes a PropertyFile evaluation_report containing
+      {"metrics": {"accuracy": {"value": 0.93}}}. The ConditionStep
+      "CheckAUC" should branch when accuracy >= ApprovalThreshold
+      (default 0.9). if_steps: CreateModelStep, RegisterModelStep to
+      group classifier-group (PendingManualApproval). else_steps:
+      FailStep with message "metric below threshold". Pipeline is in
+      us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "CheckAUC"
+        - "JsonGet"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "PendingManualApproval"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: tuning-step-hpo
+    description: >-
+      Define a TuningStep that runs 20 HPO jobs (4 parallel) over an
+      XGBoost estimator, then promote the best model via
+      get_top_model_s3_uri into a CreateModelStep and RegisterModelStep.
+      Expects READY_TO_DEPLOY with max_jobs/max_parallel_jobs noted and
+      best-model property reference used.
+    input: |
+      Add a TuningStep "Tune" to my SageMaker Pipeline in us-east-1.
+      Use the existing XGBoost estimator. Objective: maximize
+      validation:auc. Ranges: max_depth Integer 3-10, eta Continuous
+      0.05-0.4. max_jobs=20, max_parallel_jobs=4. After tuning, use
+      get_top_model_s3_uri to feed a CreateModelStep and a
+      RegisterModelStep to group xgb-classifier-group
+      (PendingManualApproval). Pipeline execution role
+      arn:aws:iam::123456789012:role/SageMakerPipelineExecutionRole.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Tune"
+        - "max_jobs=20"
+        - "max_parallel_jobs=4"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "get_top_model_s3_uri"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: caching-and-parallelism
+    description: >-
+      Configure pipeline-wide caching (30-day window) and
+      ParallelismConfiguration (MaxParallelExecutionSteps=5) on an
+      existing pipeline. Expects READY_TO_DEPLOY with cache-key
+      behavior noted (image digest pinning, ETag-based inputs).
+    input: |
+      Configure my SageMaker Pipeline named training-pipeline in
+      us-east-1. Enable caching with a 30-day cache window. Set
+      ParallelismConfiguration MaxParallelExecutionSteps=5. The
+      pipeline uses a custom algorithm image referenced by tag
+      my-registry/my-image:v1.4.2 (digest-pinned). Verify image pinning
+      is correct for cache behavior.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "caching"
+        - "MaxParallelExecutionSteps=5"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "P30D"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-execution-role
+    description: >-
+      Operator requests a SageMaker Pipeline but does not provide an
+      execution role, and the default role lacks iam:PassRole for child
+      jobs. This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING with the execution-role / PassRole gap
+      cited.
+    input: |
+      Build a SageMaker Pipeline named training-pipeline in us-east-1
+      with ProcessingStep, TrainingStep, and RegisterModelStep. I have
+      not set up an execution role yet — please use the default
+      SageMaker role and proceed. Pipeline should register to group
+      classifier-group.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "execution role"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "PassRole"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

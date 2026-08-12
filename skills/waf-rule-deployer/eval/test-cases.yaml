@@ -1,0 +1,153 @@
+# Eval test cases for waf-rule-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across WAF rule topologies
+# (CloudFront ACL with managed rules + custom allow, regional ALB ACL
+# with rate-based rule and geo-match, WCU budget overage failure,
+# logging misconfiguration, missing CloudFront us-east-1 constraint).
+skill: waf-rule-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cloudfront-managed-and-custom-allow
+    description: >-
+      Provision a CloudFront-scoped Web ACL in us-east-1 with
+      AWSManagedRulesCommonRuleSet, SQLiRuleSet,
+      AmazonIpReputationList, a custom allow rule for partner IPs at
+      priority 0, and a geo-match block at priority 40. Expects
+      READY_TO_DEPLOY with WCU budget cited and priority order
+      verified (allow before block).
+    input: |
+      Create a CloudFront Web ACL named production-cloudfront-acl
+      protecting distribution E1234567890 in account 123456789012.
+      Add AWSManagedRulesCommonRuleSet, AWSManagedRulesSQLiRuleSet,
+      and AWSManagedRulesAmazonIpReputationList managed rule groups.
+      Add a custom allow rule for partner CIDRs (IP set partner-cidrs
+      with 203.0.113.0/24 and 198.51.100.10/32) at priority 0.
+      Add a custom block for high-risk geos RU and KP at priority 40.
+      Enable logging to Firehose aws-waf-logs-production (S3 bucket
+      waf-logs-bucket, redact Authorization header). Default action
+      ALLOW. Tags: Environment=production, Protected=cloudfront.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "CLOUDFRONT"
+        - "us-east-1"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "WCU"
+        - "AWSManagedRulesCommonRuleSet"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: regional-alb-rate-and-geo
+    description: >-
+      Provision a Regional Web ACL for an ALB in us-west-2 with a
+      rate-based rule (100 req/5min per IP on /login) and a geo-match
+      block. Expects READY_TO_DEPLOY with regional scope, rate-based
+      rule cited, and geo-match cited.
+    input: |
+      Create a Regional Web ACL named api-protection-acl protecting
+      ALB arn:aws:elasticloadbalancing:us-west-2:123456789012:loadbalancer/app/api-alb/1234567890
+      in us-west-2. Add a rate-based rule blocking IPs exceeding
+      100 requests per 5 minutes on /login (priority 100, action
+      BLOCK). Add a geo-match block for countries RU and KP at
+      priority 40. Default action ALLOW. Tags: Environment=production,
+      Service=api.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "REGIONAL"
+        - "us-west-2"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "rate"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: wcu-budget-exceeded
+    description: >-
+      Operator requests a Web ACL with too many managed rule groups
+      exceeding the 1500 WCU limit. Expects PREREQUISITES_MISSING
+      with the WCU overage cited.
+    input: |
+      Create a Web ACL with AWSManagedRulesCommonRuleSet,
+      AWSManagedRulesSQLiRuleSet, AWSManagedRulesLinuxRuleSet,
+      AWSManagedRulesWindowsRuleSet, AWSManagedRulesUnixRuleSet,
+      AWSManagedRulesPHPRuleSet, AWSManagedRulesWordPressRuleSet,
+      AWSManagedRulesBotControlRuleSet, AWSManagedRulesATPRuleSet,
+      and 20 custom regex pattern set match rules. Account
+      123456789012, region us-east-1, scope CLOUDFRONT.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "WCU"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "1500"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: logging-missing-firehose-prefix
+    description: >-
+      Operator requests WAF logging to a Firehose stream that does
+      not start with the required aws-waf-logs- prefix. Expects
+      PREREQUISITES_MISSING with the naming violation cited.
+    input: |
+      Create a CloudFront Web ACL named edge-protection in us-east-1.
+      Enable logging to Firehose stream waf-traffic-stream delivering
+      to S3 bucket waf-logs-bucket. Add AWSManagedRulesCommonRuleSet.
+      Default action ALLOW. Account 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "aws-waf-logs-"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
+
+  - id: cloudfront-acl-wrong-region
+    description: >-
+      Operator requests a CloudFront-scoped Web ACL in us-west-2.
+      Expects PREREQUISITES_MISSING with the region violation cited
+      (CloudFront scope requires us-east-1).
+    input: |
+      Create a CloudFront Web ACL named cdn-protection in us-west-2
+      protecting distribution E9876543210. Add
+      AWSManagedRulesCommonRuleSet and AWSManagedRulesSQLiRuleSet.
+      Default action BLOCK. Account 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "us-east-1"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

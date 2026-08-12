@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "autoscaling-lifecycle-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Auto Scaling Lifecycle Hook Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "launch-hook-bootstrap-ready",
+      "name": "Add launch lifecycle hook for bootstrap registration — all pre-checks pass (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/launch-hook-bootstrap-ready.md",
+      "baseline_file": "baselines/launch-hook-bootstrap-ready.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "prod-web-asg", "put-lifecycle-hook", "VERDICT", "HeartbeatTimeout", "complete-lifecycle-action", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "terminate-hook-spot-timeout-review-required",
+      "name": "Add terminate hook with HeartbeatTimeout 3600 on Spot ASG with capacity rebalance (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/terminate-hook-spot-timeout-review-required.md",
+      "baseline_file": "baselines/terminate-hook-spot-timeout-review-required.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "HeartbeatTimeout", "capacity rebalance", "120", "VERDICT", "PRE_CHECKS"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPERATION_COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "warm-pool-fast-scale-out-completed",
+      "name": "Configure warm pool for fast scale-out — all pre-checks pass (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/warm-pool-fast-scale-out-completed.md",
+      "baseline_file": "baselines/warm-pool-fast-scale-out-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "prod-web-asg", "put-warm-pool", "PoolMinSize", "VERDICT", "Stopped"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "diagnose-stuck-pending-wait-review-required",
+      "name": "Diagnose instance stuck in Pending:Wait — Lambda timeout too short (REVIEW_REQUIRED with fix)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/diagnose-stuck-pending-wait-review-required.md",
+      "baseline_file": "baselines/diagnose-stuck-pending-wait-review-required.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "Pending:Wait", "timed out", "update-function-configuration", "VERDICT", "3600"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPERATION_COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "capacity-rebalance-enable-completed",
+      "name": "Enable capacity rebalance on Spot ASG with compatible terminate hook (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/capacity-rebalance-enable-completed.md",
+      "baseline_file": "baselines/capacity-rebalance-enable-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "prod-spot-asg", "capacity-rebalance", "CapacityRebalance", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

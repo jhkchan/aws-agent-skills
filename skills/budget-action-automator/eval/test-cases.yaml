@@ -1,0 +1,194 @@
+# Eval test cases for budget-action-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: budget-action-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cost-budget-sns-notification
+    description: >-
+      Standard cost budget with SNS notification only. Reversible,
+      no enforcement action. The skill should produce an
+      AUTOMATION_DEPLOYED workflow with create-budget +
+      create-notification + subscribe, an SNS topic access policy
+      granting budgets.amazonaws.com permission, and the standard
+      forecast + actual threshold pairing.
+    input: |
+      Design reference: cost-budget-sns-notification
+      Account: 111111111111
+      Region: us-east-1
+
+      Budget type: COST
+      Limit: $10,000 USD / MONTHLY
+      Threshold: Forecast 80% (SNS notify), Actual 100% (SNS notify)
+      SNS topic ARN: arn:aws:sns:us-east-1:111111111111:budget-alerts
+      Topic policy: already grants budgets.amazonaws.com publish.
+      Cost allocation tags: n/a (no CostFilters).
+
+      Emit the standard BUDGET ACTION block (TYPE, LIMIT, TIME_UNIT,
+      THRESHOLD, NOTIFICATION, RESPONSE, MULTI_ACCOUNT,
+      COST_ALLOCATION_TAGS, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "cost-budget-sns-notification"
+        - "create-budget"
+        - "create-notification"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: forecast-proactive-action
+    description: >-
+      Cost budget with forecast-driven IAM action. The skill should
+      produce an AUTOMATION_DEPLOYED workflow pairing FORECASTED
+      threshold (90%) with APPLY_IAM_ACTION against a CI bot user,
+      plus an ACTUAL threshold (100%) as backup. The expert
+      knowledge (forecast is probabilistic, IAM action does not
+      detach on recovery) must surface in the GAP/guardrails.
+    input: |
+      Design reference: forecast-proactive-action
+      Account: 111111111111
+      Region: us-east-1
+
+      Budget type: COST
+      Limit: $25,000 USD / MONTHLY
+      Threshold:
+        - FORECASTED 90% -> APPLY_IAM_ACTION against user "ci-bot-prod"
+        - ACTUAL 100% -> SNS notify
+      IAM policy to attach: arn:aws:iam::111111111111:policy/budget-restrict-launch
+      Execution role ARN: arn:aws:iam::111111111111:role/BudgetActionExecutionRole
+      Cost allocation tags: n/a.
+      Pre-validation: completed in non-prod.
+
+      Emit the standard BUDGET ACTION block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "forecast-proactive-action"
+        - "APPLY_IAM_ACTION"
+        - "FORECASTED"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: scp-deny-hard-enforcement
+    description: >-
+      Cost budget with SCP deny for hard enforcement in an
+      Organization member account. The skill should produce an
+      AUTOMATION_DEPLOYED workflow with APPLY_SCP_FAMILY, the
+      Organizations policy pre-creation step, the execution role
+      with budgets.amazonaws.com trust, and the explicit reminder
+      that SCPs do NOT detach on recovery (wire a Lambda for detach).
+    input: |
+      Design reference: scp-deny-hard-enforcement
+      Account: 111111111111 (member of org o-abc123def)
+      Region: us-east-1
+
+      Budget type: COST
+      Limit: $50,000 USD / MONTHLY
+      Threshold: ACTUAL 100% -> APPLY_SCP_FAMILY deny new ec2:RunInstances
+      Org target: account 111111111111
+      Existing SCP ID to attach: p-breach000123 (already created)
+      Execution role ARN: arn:aws:iam::111111111111:role/BudgetActionExecutionRole
+      Approval model: AUTOMATIC (validated in non-prod for 1 cycle).
+
+      Emit the standard BUDGET ACTION block.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "scp-deny-hard-enforcement"
+        - "APPLY_SCP_FAMILY"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: missing-cost-allocation-tag
+    description: >-
+      Cost budget scoped by CostFilters Tag (env=prod) but the tag
+      is not activated in the Billing console. The skill should
+      classify REVIEW_REQUIRED because the budget would silently
+      match zero spend until the tag is activated. GAP must cite
+      the activation requirement and the 24-hour wait.
+    input: |
+      Design reference: missing-cost-allocation-tag
+      Account: 111111111111
+      Region: us-east-1
+
+      Budget type: COST
+      Limit: $20,000 USD / MONTHLY
+      CostFilters: {Tag: ["env:prod"]}
+      Threshold: Actual 90% (SNS notify)
+      SNS topic ARN: arn:aws:sns:us-east-1:111111111111:budget-alerts
+      Cost allocation tags: env is NOT activated in Billing console.
+        Recent ce get-cost-and-usage --group-by Type=TAG,Key=env
+        returns only $NULL rows.
+
+      Emit the standard BUDGET ACTION block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "missing-cost-allocation-tag"
+        - "VERDICT"
+        - "GAP"
+        - "cost allocation"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: ri-coverage-budget
+    description: >-
+      RI coverage budget measuring commitment performance, not cost.
+      The skill should produce an AUTOMATION_DEPLOYED workflow with
+      BudgetType RI_COVERAGE, a 75% target, notify-only response
+      (no enforcement action since RI coverage is informational),
+      and surface the expert note that RI coverage/utilization
+      budgets do NOT respond to on-demand spend.
+    input: |
+      Design reference: ri-coverage-budget
+      Account: 111111111111
+      Region: us-east-1
+
+      Budget type: RI_COVERAGE
+      Limit: 75 (% coverage) / MONTHLY
+      Threshold: Actual < 75% (SNS notify — coverage dropped)
+      SNS topic ARN: arn:aws:sns:us-east-1:111111111111:commitment-alerts
+      Existing RI utilization: 96% (RIs in use are utilized).
+      Cost allocation tags: n/a.
+
+      Emit the standard BUDGET ACTION block. Note any special
+      semantics for RI coverage vs cost budgets.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "ri-coverage-budget"
+        - "RI_COVERAGE"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

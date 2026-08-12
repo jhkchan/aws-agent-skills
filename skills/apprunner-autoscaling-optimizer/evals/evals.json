@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "apprunner-autoscaling-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the App Runner Autoscaling Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "concurrency-tuning-further-optimization",
+      "name": "Concurrency 100 overprovisioned — observed peak 42 per instance (FURTHER_OPTIMIZATION_AVAILABLE)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/concurrency-tuning-further-optimization.md",
+      "baseline_file": "baselines/concurrency-tuning-further-optimization.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "concurrency", "150", "create-auto-scaling-configuration", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "pause-non-prod-savings-further-optimization",
+      "name": "Dev environment running 24/7 — pause outside business hours saves 75% (FURTHER_OPTIMIZATION_AVAILABLE)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/pause-non-prod-savings-further-optimization.md",
+      "baseline_file": "baselines/pause-non-prod-savings-further-optimization.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "pause", "75%", "EventBridge", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimal-config-optimized",
+      "name": "Production service already well-configured across all dimensions (OPTIMIZED)",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimal-config-optimized.md",
+      "baseline_file": "baselines/already-optimal-config-optimized.md",
+      "expected_verdict": "OPTIMIZED",
+      "expected_risk": "NONE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "prod-web-service", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "FURTHER_OPTIMIZATION_AVAILABLE"]
+        }
+      ]
+    },
+    {
+      "id": "instance-type-downgrade-further-optimization",
+      "name": "2 vCPU / 4 GB with 15% CPU — downgrade to 1 vCPU / 2 GB (FURTHER_OPTIMIZATION_AVAILABLE)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/instance-type-downgrade-further-optimization.md",
+      "baseline_file": "baselines/instance-type-downgrade-further-optimization.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "1 vCPU", "2 GB", "downgrade", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    },
+    {
+      "id": "vpc-egress-nat-cost-further-optimization",
+      "name": "NAT gateway egress $412/month — VPC endpoints for S3/DynamoDB (FURTHER_OPTIMIZATION_AVAILABLE)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/vpc-egress-nat-cost-further-optimization.md",
+      "baseline_file": "baselines/vpc-egress-nat-cost-further-optimization.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "expected_risk": "LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "VPC endpoint", "NAT", "S3", "VERDICT"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}
