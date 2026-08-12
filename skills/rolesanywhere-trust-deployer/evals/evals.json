@@ -1,0 +1,178 @@
+{
+  "skill": "rolesanywhere-trust-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Roles Anywhere Trust Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across IAM Roles Anywhere (self-managed CA trust anchor with IAM role trust policy, profile with role mapping and inline session policy, credential helper STS exchange command, CRL revocation configuration, missing CA certificate and missing IAM trust policy prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "trust-anchor-certificate-authority",
+      "name": "Self-managed CA trust anchor with IAM role trust policy for Roles Anywhere",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — trust anchor binds self-managed CA cert (CERTIFICATE_BUNDLE) to AWS IAM, IAM role RolesAnywhereCIRunner with rolesanywhere.amazonaws.com trust policy and AmazonS3ReadOnlyAccess",
+      "prompt": "Create a Roles Anywhere trust anchor in us-east-1 account 123456789012. Bind my external self-managed CA certificate (ca-cert.pem, PEM-encoded) to AWS IAM. Name the trust anchor prod-pki-trust-anchor. The IAM role RolesAnywhereCIRunner should have a trust policy allowing rolesanywhere.amazonaws.com to assume it. The role should have AmazonS3ReadOnlyAccess attached. Region us-east-1.",
+      "prompt_file": "prompts/trust-anchor-certificate-authority.md",
+      "baseline_file": "baselines/trust-anchor-certificate-authority.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ROLES_ANYWHERE: ta-aaa111222 → (no profile yet) → arn:aws:iam::123456789012:role/RolesAnywhereCIRunner\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Trust anchor: ta-aaa111222 — self-managed CA (CERTIFICATE_BUNDLE, ca-cert.pem)\n  [✓] IAM role: arn:aws:iam::123456789012:role/RolesAnywhereCIRunner (trust: rolesanywhere.amazonaws.com; permissions: AmazonS3ReadOnlyAccess)\n  [✓] CA certificate verified: ca-cert.pem (PEM)\nVERIFICATION_COMMANDS:\n  aws rolesanywhere list-trust-anchors --region us-east-1\n  aws iam get-role --role-name RolesAnywhereCIRunner",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "trust anchor",
+            "CERTIFICATE_BUNDLE",
+            "rolesanywhere.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "profile-role-mapping",
+      "name": "Roles Anywhere profile with role mapping and inline session policy",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — profile maps trust anchor ta-aaa111222 to role RolesAnywhereCIRunner, session duration 3600s, inline session policy restricting to s3:GetObject on my-ci-artifacts bucket",
+      "prompt": "Create a Roles Anywhere profile in us-east-1 account 123456789012. Trust anchor ta-aaa111222 (already exists). Map the certificate to IAM role arn:aws:iam::123456789012:role/RolesAnywhereCIRunner. Session duration 3600 seconds. Attach an inline session policy restricting to s3:GetObject on arn:aws:s3:::my-ci-artifacts/*. Name the profile ci-runner-profile. Region us-east-1.",
+      "prompt_file": "prompts/profile-role-mapping.md",
+      "baseline_file": "baselines/profile-role-mapping.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ROLES_ANYWHERE: ta-aaa111222 → p-bbb222333 → arn:aws:iam::123456789012:role/RolesAnywhereCIRunner\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Profile: p-bbb222333 — roleArns: arn:aws:iam::123456789012:role/RolesAnywhereCIRunner (duration: 3600s)\n  [✓] Session policy: inline — restrict to s3:GetObject on my-ci-artifacts/*\nVERIFICATION_COMMANDS:\n  aws rolesanywhere list-profiles --region us-east-1\n  aws rolesanywhere get-profile --profile-id p-bbb222333",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "profile",
+            "RolesAnywhereCIRunner",
+            "session",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "credential-helper-sts-exchange",
+      "name": "aws_signing_helper credential-process for STS temporary credentials",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — credential-process command with client-cert.pem, client-key.pem, trust anchor ta-aaa111222, profile p-bbb222333, role RolesAnywhereCIRunner; AWS CLI profile configuration shown",
+      "prompt": "Configure the aws_signing_helper credential helper in us-east-1 account 123456789012. Client certificate client-cert.pem and private key client-key.pem. Trust anchor ID ta-aaa111222. Profile ID p-bbb222333. Role ARN arn:aws:iam::123456789012:role/RolesAnywhereCIRunner. Region us-east-1. Show the credential-process command and the AWS CLI profile configuration.",
+      "prompt_file": "prompts/credential-helper-sts-exchange.md",
+      "baseline_file": "baselines/credential-helper-sts-exchange.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ROLES_ANYWHERE: ta-aaa111222 → p-bbb222333 → arn:aws:iam::123456789012:role/RolesAnywhereCIRunner\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Credential helper: aws_signing_helper credential-process (client-side, cert: client-cert.pem)\n  [✓] Trust anchor: ta-aaa111222\n  [✓] Profile: p-bbb222333\nVERIFICATION_COMMANDS:\n  ./aws_signing_helper credential-process --certificate client-cert.pem --private-key client-key.pem --trust-anchor-id ta-aaa111222 --profile-id p-bbb222333 --role-arn arn:aws:iam::123456789012:role/RolesAnywhereCIRunner --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws_signing_helper",
+            "credential-process",
+            "client-cert.pem",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "revocation-configuration",
+      "name": "Certificate Revocation List (CRL) configuration for trust anchor",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — CRL prod-pki-crl created from crl.pem and attached to trust anchor ta-aaa111222; create and update workflow shown; compromised certs rejected before expiration",
+      "prompt": "Configure revocation for a Roles Anywhere trust anchor in us-east-1 account 123456789012. Trust anchor ID ta-aaa111222. Create a CRL named prod-pki-crl from crl.pem (base64-encoded). The trust anchor should reject any certificate listed on the CRL. Show the create and update CRL commands. Region us-east-1.",
+      "prompt_file": "prompts/revocation-configuration.md",
+      "baseline_file": "baselines/revocation-configuration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ROLES_ANYWHERE: ta-aaa111222 (CRL revocation enabled)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Revocation: CRL configured (prod-pki-crl) on trust anchor ta-aaa111222\n  [✓] CRL update workflow: openssl ca -gencrl, then aws rolesanywhere update-crl\nVERIFICATION_COMMANDS:\n  aws rolesanywhere list-crls --region us-east-1\n  aws rolesanywhere get-crl --crl-id <crl-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "CRL",
+            "revocation",
+            "ta-aaa111222",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-trust-anchor-ca",
+      "name": "Roles Anywhere profile without CA certificate or IAM trust policy (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — no CA certificate provided (no trust anchor can be created), IAM role RolesAnywhereCIRunner lacks rolesanywhere.amazonaws.com trust policy principal",
+      "prompt": "Create a Roles Anywhere profile in us-east-1 account 123456789012. I do not have a CA certificate yet but I want to map certificates to role arn:aws:iam::123456789012:role/RolesAnywhereCIRunner. The role RolesAnywhereCIRunner currently has a trust policy that only allows ec2.amazonaws.com (no rolesanywhere.amazonaws.com principal). Session duration 3600 seconds. Region us-east-1.",
+      "prompt_file": "prompts/missing-trust-anchor-ca.md",
+      "baseline_file": "baselines/missing-trust-anchor-ca.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ROLES_ANYWHERE: (no trust anchor) → (no profile) → arn:aws:iam::123456789012:role/RolesAnywhereCIRunner\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] CA certificate: missing — a trust anchor requires a PEM-encoded CA certificate to bind the external PKI to AWS IAM\n  [✗] IAM role trust policy: RolesAnywhereCIRunner only allows ec2.amazonaws.com; must add rolesanywhere.amazonaws.com as a principal for Roles Anywhere assume to succeed",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "trust anchor",
+            "rolesanywhere.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

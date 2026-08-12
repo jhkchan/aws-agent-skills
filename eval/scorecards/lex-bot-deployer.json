@@ -1,0 +1,70 @@
+{
+  "skill": "lex-bot-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 13,
+      "max": 20,
+      "justification": "The skill mostly restates documented Lex V2 concepts; the only genuine delta are specific heuristics such as the NLU confidence threshold (0.40), the explicit slot\u2011priority ordering rule, and the dependency\u2011graph table. These add modest expert insight but do not constitute a full senior\u2011engineer knowledge boost."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are largely AWS\u2011specific (e.g., enable both DIALOG and FULFILLMENT hooks, build locale before versioning, grant Lambda permission). However some steps are generic (e.g., \"validate with regex\") and the ordering for creating the IAM role before the bot is not explicitly enforced."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "A solid NEVER list is provided with concrete reasons (e.g., never assume slot order, never point runtime at a version). Missing are a few common pitfalls such as cross\u2011region Lambda latency and duplicate slot\u2011priority collisions, which reduces completeness."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, and activation triggers are present. The trigger list is long and somewhat ambiguous, and the \"when NOT to invoke\" guidance is limited to V1/Connect/Alexa, leaving edge\u2011case activation unclear."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill uses sections, quick\u2011navigation tables, and layered detail, but the initial narrative is dense and critical NEVER rules appear later, causing potential cognitive overload for an agent reading top\u2011to\u2011bottom."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive operations (bot creation, versioning) are guarded by a thorough prerequisite checklist, matching task fragility. The only shortfall is the lack of an explicit confirmation prompt before executing the creation commands."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (Mindset, Dependency Graph, Step\u2011by\u2011step procedure, NEVER list, Output format), aiding comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, a ready\u2011to\u2011deploy checklist, and error\u2011handling guidance. Lacks handling for edge cases such as duplicate slot priorities, locale build failures, or missing region specifications, which could cause execution errors."
+    }
+  ],
+  "total_score": 100,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 54765,
+  "latency_ms": 34262,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

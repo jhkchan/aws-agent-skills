@@ -1,0 +1,70 @@
+{
+  "skill": "pinpoint-journey-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill provides many AWS\u2011specific heuristics (dependency graph, entry\u2011strategy decision tree, quiet\u2011time hold semantics) that a baseline model would not know, but a large portion restates official Pinpoint documentation (e.g., API parameter names, basic activity types). It lacks deeper expert guidance such as optimal holdout sizing, performance\u2011impact thresholds, or concrete decision thresholds for when to prefer multivariate vs conditional splits."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (exact CLI commands, JSON activity structures, Lambda permission steps) and follow a logical order, yet some steps are generic (e.g., \"verify before provisioning\") and the IAM permission flow for custom channels is only sketched, missing the exact policy ARN pattern and ordering of role creation."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list with specific reasons (confusing conditional vs multivariate, assuming quiet\u2011time cancels, switching entry mode after start, missing Lambda permission, percentages not summing to 100, duration\u2011based waits with quiet\u2011time drift, SMS throughput limits). Missing a few additional pitfalls such as forgetting to enable open\u2011tracking for email metrics, so deduct 2 points."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT it does, WHEN to invoke, and provides exhaustive keywords and triggers. The output contract is precisely defined. Slight deduction for the \"when_to_use\" paragraph being a bit verbose, which could affect reliable activation parsing."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered: high\u2011level overview, quick navigation table, detailed sections, heuristics, then checklist and output format. However, the initial sections contain a dense dependency\u2011graph table that may overload the agent before it knows whether it needs that depth, costing one point."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (create\u2011journey) are gated by a thorough prerequisites checklist, and the skill calibrates freedom for creative vs fragile tasks. Deduct two points because the skill does not enforce strict validation of numeric fields (e.g., multivariate percentages, holdout range) \u2013 it only warns."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Prerequisites \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). The structure is consistent and aids comprehension. No deduction."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI examples, a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling tips. Missing are explicit handling of API errors (e.g., retry logic), pagination for large segments, and detailed IAM role creation for Lambda custom channels, which could cause execution failures."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 45659,
+  "latency_ms": 15373,
+  "assertions_passed": false,
+  "assertions_passed_count": 1,
+  "assertions_failed_count": 4
+}

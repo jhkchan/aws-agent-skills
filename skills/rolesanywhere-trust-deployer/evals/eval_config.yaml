@@ -1,0 +1,49 @@
+# Eval configuration for rolesanywhere-trust-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: rolesanywhere-trust-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: trust-anchor-certificate-authority
+    difficulty: hard
+    prompt_file: prompts/trust-anchor-certificate-authority.md
+    baseline_file: baselines/trust-anchor-certificate-authority.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: profile-role-mapping
+    difficulty: hard
+    prompt_file: prompts/profile-role-mapping.md
+    baseline_file: baselines/profile-role-mapping.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: credential-helper-sts-exchange
+    difficulty: medium
+    prompt_file: prompts/credential-helper-sts-exchange.md
+    baseline_file: baselines/credential-helper-sts-exchange.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: revocation-configuration
+    difficulty: medium
+    prompt_file: prompts/revocation-configuration.md
+    baseline_file: baselines/revocation-configuration.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-trust-anchor-ca
+    difficulty: easy
+    prompt_file: prompts/missing-trust-anchor-ca.md
+    baseline_file: baselines/missing-trust-anchor-ca.md
+    expected_verdict: PREREQUISITES_MISSING

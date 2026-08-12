@@ -694,12 +694,11 @@ aws cloudtrail lookup-events \
 
 7. **NEVER use long-lived certificates without expiration.** Certificates
    should have a reasonable expiration (e.g., 90 days for CI runners,
-   1 year for servers). Avoid 10-year certificates — they are hard to
-   revoke and rotate.
+   1 year for servers). Avoid 10-year certificates.
 
 8. **NEVER forget the credential helper on the client.** The signing
-   helper must be installed on the client machine. Without it, the
-   workload cannot sign requests with the certificate.
+   helper must be installed on the client; without it, the workload
+   cannot sign requests with the certificate.
 
 9. **NEVER assume role-passthrough is safe without controls.**
    Role-passthrough mode lets the client specify any role ARN at

@@ -1,0 +1,161 @@
+# Eval test cases for rolesanywhere-trust-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across IAM Roles Anywhere
+# (trust anchor from self-managed CA, profile with role mapping and
+# session policy, credential helper STS exchange, revocation CRL
+# configuration, missing CA certificate prerequisite failure).
+skill: rolesanywhere-trust-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: trust-anchor-certificate-authority
+    description: >-
+      Provision a Roles Anywhere trust anchor that binds a self-managed
+      external CA certificate (PEM) to AWS IAM, plus an IAM role with
+      the rolesanywhere.amazonaws.com trust policy. Expects
+      READY_TO_DEPLOY with the trust anchor ID, CA source
+      (CERTIFICATE_BUNDLE), and IAM role trust policy cited.
+    input: |
+      Create a Roles Anywhere trust anchor in us-east-1 account
+      123456789012. Bind my external self-managed CA certificate
+      (ca-cert.pem, PEM-encoded) to AWS IAM. Name the trust anchor
+      prod-pki-trust-anchor. The IAM role RolesAnywhereCIRunner
+      should have a trust policy allowing
+      rolesanywhere.amazonaws.com to assume it. The role should have
+      AmazonS3ReadOnlyAccess attached. Region us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "trust anchor"
+        - "CERTIFICATE_BUNDLE"
+        - "rolesanywhere.amazonaws.com"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: profile-role-mapping
+    description: >-
+      Provision a Roles Anywhere profile that maps the trust anchor to
+      the IAM role with a session policy restricting to s3:GetObject
+      on a specific bucket. Expects READY_TO_DEPLOY with role ARN,
+      session duration, and session policy cited.
+    input: |
+      Create a Roles Anywhere profile in us-east-1 account
+      123456789012. Trust anchor ta-aaa111222 (already exists). Map
+      the certificate to IAM role
+      arn:aws:iam::123456789012:role/RolesAnywhereCIRunner. Session
+      duration 3600 seconds. Attach an inline session policy
+      restricting to s3:GetObject on arn:aws:s3:::my-ci-artifacts/*.
+      Name the profile ci-runner-profile. Region us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "profile"
+        - "RolesAnywhereCIRunner"
+        - "session"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: credential-helper-sts-exchange
+    description: >-
+      Configure the aws_signing_helper credential helper to exchange a
+      client X.509 certificate for STS temporary credentials.
+      Expects READY_TO_DEPLOY with the credential-process command,
+      certificate and private-key flags, trust anchor ID, and profile
+      ID cited.
+    input: |
+      Configure the aws_signing_helper credential helper in us-east-1
+      account 123456789012. Client certificate client-cert.pem and
+      private key client-key.pem. Trust anchor ID ta-aaa111222.
+      Profile ID p-bbb222333. Role ARN
+      arn:aws:iam::123456789012:role/RolesAnywhereCIRunner. Region
+      us-east-1. Show the credential-process command and the AWS CLI
+      profile configuration.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws_signing_helper"
+        - "credential-process"
+        - "client-cert.pem"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: revocation-configuration
+    description: >-
+      Configure a Certificate Revocation List (CRL) on the trust
+      anchor so compromised certificates are rejected before
+      expiration. Expects READY_TO_DEPLOY with the CRL name, trust
+      anchor reference, and CRL update workflow cited.
+    input: |
+      Configure revocation for a Roles Anywhere trust anchor in
+      us-east-1 account 123456789012. Trust anchor ID ta-aaa111222.
+      Create a CRL named prod-pki-crl from crl.pem (base64-encoded).
+      The trust anchor should reject any certificate listed on the
+      CRL. Show the create and update CRL commands. Region us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "CRL"
+        - "revocation"
+        - "ta-aaa111222"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-trust-anchor-ca
+    description: >-
+      Operator requests a Roles Anywhere profile but has not provided a
+      CA certificate or created a trust anchor. The IAM role also lacks
+      the rolesanywhere.amazonaws.com trust policy. This is a
+      prerequisite failure. Expects PREREQUISITES_MISSING with the
+      missing CA certificate and missing IAM trust policy cited.
+    input: |
+      Create a Roles Anywhere profile in us-east-1 account
+      123456789012. I do not have a CA certificate yet but I want to
+      map certificates to role
+      arn:aws:iam::123456789012:role/RolesAnywhereCIRunner. The role
+      RolesAnywhereCIRunner currently has a trust policy that only
+      allows ec2.amazonaws.com (no rolesanywhere.amazonaws.com
+      principal). Session duration 3600 seconds. Region us-east-1.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "trust anchor"
+        - "rolesanywhere.amazonaws.com"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
