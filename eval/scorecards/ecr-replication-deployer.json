@@ -1,0 +1,70 @@
+{
+  "skill": "ecr-replication-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides specific expert heuristics not usually recalled by a baseline model: registry\u2011level replication scope, precise replication\u2011lag expectations per region, storage\u2011cost doubling, exact supported upstream URLs for pull\u2011through cache, and a timeline of recent AWS feature releases. These concrete details constitute genuine delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: ordered CLI commands, dependency graph, verification queries, and a step\u2011by\u2011step workflow that mirrors the real put\u2011registry\u2011replication\u2011configuration API flow. Not a generic \"check security\" checklist."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a concrete NEVER list with explicit reasons (e.g., replication is registry\u2011level, replicas are read\u2011only, batch\u2011delete is blocked). Lacks a few additional pitfalls such as missing IAM role permissions, but overall strong."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation keywords, and strict output contract are defined. Minor weakness: trigger wording could be tighter (no explicit regex or disambiguation), but activation is still reliable."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses quick\u2011navigation table and layered sections (mindset, steps, NEVER, output format). However, the initial sections are information\u2011dense and some critical anti\u2011pattern rules are buried later, causing some cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately for configuration tasks: destructive actions are warned, replication lag is highlighted, and cost implications are spelled out. Lacks explicit input validation (e.g., 12\u2011digit account\u2011ID format), leaving a small gap for fragile operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Stepwise Process \u2192 NEVER list \u2192 Output format) that aids comprehension and aligns with established skill templates."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Model output examples mostly follow the required checklist format, but include multiple separate blocks, headings, and code fences, violating the \"no prose\" contract. Some checklist items use \"not specified\" instead of explicit failure marks, and error\u2011handling guidance is limited."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 40196,
+  "latency_ms": 13819,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

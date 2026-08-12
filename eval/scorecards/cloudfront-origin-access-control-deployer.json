@@ -1,0 +1,70 @@
+{
+  "skill": "cloudfront-origin-access-control-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides several expert\u2011level specifics (bucket policy must use cloudfront.amazonaws.com principal with AWS:SourceArn, SSE\u2011KMS requires always\u2011sign, zero\u2011downtime OAI\u2192OAC migration flow, multi\u2011distribution ARN list, region handling) that go beyond a baseline model, but a few points (e.g., OAC signing behavior options) are restatements of official docs, so not full novelty."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes an AWS\u2011specific procedural order (create OAC \u2192 update bucket policy \u2192 update distribution \u2192 verify KMS policy) and includes a decision\u2011tree for OAC vs OAI, signing behavior, and origin type. Only minor generic phrasing (\"verify permissions\") prevents a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never use OAC ID as bucket\u2011policy principal, never pair OAC with website endpoint, never use never\u2011sign with SSE\u2011KMS). One minor omission: no explicit warning about stale ETag handling during distribution updates."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Full front\u2011matter, clear description, precise WHEN\u2011TO\u2011USE clause, exhaustive keyword list, and a strict output contract with literal labels. All required metadata present and unambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Top\u2011level summary, quick\u2011navigation table, and layered sections (mindset, steps, NEVER, references). Critical rules are not buried, but the large \u201cConfiguration dependency graph\u201d table adds some cognitive load, preventing a perfect score."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions (OAC creation, bucket\u2011policy writes) are gated by a prerequisite checklist and a PREREQUISITES_MISSING verdict. Creative tasks (e.g., multi\u2011distribution design) are left open, matching task fragility."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Step\u2011by\u2011step process \u2192 NEVER list \u2192 Output format \u2192 References. Structure is consistent with other CloudOps skills."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides ready\u2011to\u2011run CLI snippets, a checklist, and verification commands. However, the skill does not cover error handling for failed AWS CLI calls (e.g., stale ETag, permission errors) and the example output omits handling of missing KMS key policy when SSE\u2011KMS is disabled, leaving a small usability gap."
+    }
+  ],
+  "total_score": 113,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 50022,
+  "latency_ms": 8407,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

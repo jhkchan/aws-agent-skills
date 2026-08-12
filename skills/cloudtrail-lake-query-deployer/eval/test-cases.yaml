@@ -1,0 +1,146 @@
+# Eval test cases for cloudtrail-lake-query-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across CloudTrail Lake topologies
+# (management events EDS with data protection, data events EDS with
+# selectors, multi-account Organization EDS, forensic query patterns,
+# missing event type decision prerequisite).
+skill: cloudtrail-lake-query-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: mgmt-eds-with-data-protection
+    description: >-
+      Provision a CloudTrail Lake management events EDS with 90-day
+      retention, data protection (PII masking for email and phone),
+      and CloudWatch alerting. Expects READY_TO_DEPLOY with data
+      protection fields cited and per-GB billing noted.
+    input: |
+      Create a CloudTrail Lake event data store for management events.
+      EDS name: mgmt-events-eds. Retention: 90 days. I need data
+      protection to mask EmailAddress and PhoneNumber. CloudWatch alarm
+      for query failures to SNS
+      arn:aws:sns:us-east-1:123456789012:ct-lake-alerts. Account:
+      123456789012. Region us-east-1. Tags: Environment=production,
+      Domain=security.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "management events"
+        - "data protection"
+        - "EmailAddress"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: data-events-eds-with-selectors
+    description: >-
+      Provision a CloudTrail Lake data events EDS with advanced event
+      selectors filtering S3 PutObject and DeleteObject on a specific
+      bucket. Expects READY_TO_DEPLOY with selectors cited and
+      per-GB ingested billing noted.
+    input: |
+      Create a CloudTrail Lake event data store for data events. EDS
+      name: s3-audit-eds. I only need S3 PutObject and DeleteObject
+      events on bucket arn:aws:s3:::audit-bucket/. Retention: 365 days.
+      No management events. Account: 123456789012. Region us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "data events"
+        - "selector"
+        - "PutObject"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: multi-account-org-eds
+    description: >-
+      Provision a multi-account CloudTrail Lake EDS via Organizations
+      ingesting management events from all member accounts. Expects
+      READY_TO_DEPLOY with multi-account Organization coverage cited.
+    input: |
+      Create a CloudTrail Lake event data store for my Organization.
+      I need management events from ALL member accounts (5 accounts).
+      EDS name: org-mgmt-eds. Retention: 2555 days (7 years). Data
+      protection to mask EmailAddress. Management account:
+      123456789012. Region us-east-1. Tags: Compliance=SOX.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "multi-account"
+        - "Organization"
+        - "management events"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: forensic-query-patterns
+    description: >-
+      Set up a CloudTrail Lake EDS and demonstrate forensic query
+      patterns (who deleted a resource, what did a user do). Expects
+      READY_TO_DEPLOY with forensic query patterns cited and time-range
+      filtering noted.
+    input: |
+      Create a CloudTrail Lake EDS for forensic investigation. EDS name:
+      forensic-eds. Management events. Retention 365 days. I need to be
+      able to query who deleted resources and what specific users did.
+      Show me the forensic query patterns. Account: 123456789012.
+      Region us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "forensic"
+        - "query"
+        - "eventTime"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-event-type-decision
+    description: >-
+      Operator requests a CloudTrail Lake EDS but has not decided which
+      event type to ingest (management, data, Insights). This is a
+      prerequisite failure — event type is immutable after creation.
+    input: |
+      Create a CloudTrail Lake event data store. EDS name: undecided-eds.
+      I am not sure which event types I need. Just create it for now and
+      I will figure out the event types later.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "event type"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

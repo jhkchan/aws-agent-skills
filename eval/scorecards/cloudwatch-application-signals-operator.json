@@ -1,0 +1,70 @@
+{
+  "skill": "cloudwatch-application-signals-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides specific MWMBR window/threshold combos and a dependency graph that a baseline model would not list, but omits deeper expert nuances such as cross\u2011account sharing steps, cost\u2011impact considerations, and full IAM policy examples, limiting the delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Orders operations correctly (instrumentation \u2192 enable signals \u2192 discover services \u2192 SLO \u2192 burn\u2011rate) and supplies concrete CLI commands, yet some verification steps are generic (e.g., \"check trace volume\") without AWS\u2011specific commands, leaving the procedure slightly vague."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never enable without OTel, never use single burn\u2011rate threshold). Missing a few common pitfalls such as \"never set SLO interval >30 days\" explicitly, and some warnings lack deeper operational context."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, triggers, and when_to_use are present. Output format is precisely defined. Minor gap: activation keywords are listed but not tied to a formal schema that an agent runtime would parse reliably."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "Uses quick\u2011navigation table and layers details (mindset \u2192 heuristics \u2192 steps). However, the document is dense; many critical rules (e.g., NEVER list) are buried deep, causing potential cognitive overload for a first\u2011time reader."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive actions (SLO creation, alarm setup) are gated by prerequisite checks. No over\u2011constrained rules for creative tasks. Slight deduction for lack of explicit safety guards on irreversible actions (e.g., SLO deletion)."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (mindset, steps, NEVER, output format), yet sections like \"Expert heuristic\" and \"Recent features\" are inserted ad\u2011hoc, breaking strict structural consistency."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides working CLI examples, checklist template, and verification commands, enabling an agent to execute the skill. Some command snippets contain placeholders (e.g., \"...\" for SLI config) and lack error\u2011handling branches, which could cause execution failures."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 46948,
+  "latency_ms": 7346,
+  "assertions_passed": false,
+  "assertions_passed_count": 1,
+  "assertions_failed_count": 4
+}

@@ -1,0 +1,177 @@
+{
+  "skill": "cloudtrail-lake-query-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the CloudTrail Lake Query Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across CloudTrail Lake topologies (management EDS with data protection, data events EDS with selectors, multi-account Organization EDS, forensic query patterns, missing event type prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "mgmt-eds-with-data-protection",
+      "name": "Management events EDS with PII data protection and CloudWatch alerting",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — management EDS, 90-day retention, EmailAddress + PhoneNumber masking, CloudWatch query failure alarm",
+      "prompt": "Create a CloudTrail Lake event data store for management events. EDS name: mgmt-events-eds. Retention: 90 days. I need data protection to mask EmailAddress and PhoneNumber. CloudWatch alarm for query failures to SNS arn:aws:sns:us-east-1:123456789012:ct-lake-alerts.",
+      "prompt_file": "prompts/mgmt-eds-with-data-protection.md",
+      "baseline_file": "baselines/mgmt-eds-with-data-protection.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUDTRAIL_LAKE: mgmt-events-eds\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Event type: Management events\n  [✓] Retention: 90 days\n  [✓] Data protection: EmailAddress, PhoneNumber masked\nVERIFICATION_COMMANDS:\n  aws cloudtrail list-event-data-stores",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "management events",
+            "data protection",
+            "EmailAddress",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data-events-eds-with-selectors",
+      "name": "Data events EDS with advanced selectors for S3 write events",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — data events EDS, selectors for PutObject/DeleteObject on specific bucket, 365-day retention",
+      "prompt": "Create a CloudTrail Lake event data store for data events. EDS name: s3-audit-eds. I only need S3 PutObject and DeleteObject events on bucket arn:aws:s3:::audit-bucket/. Retention: 365 days. No management events.",
+      "prompt_file": "prompts/data-events-eds-with-selectors.md",
+      "baseline_file": "baselines/data-events-eds-with-selectors.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUDTRAIL_LAKE: s3-audit-eds\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Event type: Data events\n  [✓] Advanced selectors: S3 PutObject, DeleteObject on audit-bucket\n  [✓] Retention: 365 days\nVERIFICATION_COMMANDS:\n  aws cloudtrail list-event-data-stores",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "data events",
+            "selector",
+            "PutObject",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-account-org-eds",
+      "name": "Multi-account Organization EDS with 7-year retention and data protection",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Organization EDS, all member accounts, management events, 2555-day retention",
+      "prompt": "Create a CloudTrail Lake event data store for my Organization. I need management events from ALL member accounts (5 accounts). EDS name: org-mgmt-eds. Retention: 2555 days (7 years). Data protection to mask EmailAddress. Management account: 123456789012.",
+      "prompt_file": "prompts/multi-account-org-eds.md",
+      "baseline_file": "baselines/multi-account-org-eds.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUDTRAIL_LAKE: org-mgmt-eds\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Multi-account: Organization EDS (5 member accounts)\n  [✓] Retention: 2555 days\n  [✓] Data protection: EmailAddress masked\nVERIFICATION_COMMANDS:\n  aws cloudtrail list-event-data-stores",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "multi-account",
+            "Organization",
+            "management events",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "forensic-query-patterns",
+      "name": "Forensic EDS with query patterns for security investigation",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — management EDS for forensic querying, query patterns for who-deleted-X and what-did-user-Y-do",
+      "prompt": "Create a CloudTrail Lake EDS for forensic investigation. EDS name: forensic-eds. Management events. Retention 365 days. I need to be able to query who deleted resources and what specific users did. Show me the forensic query patterns.",
+      "prompt_file": "prompts/forensic-query-patterns.md",
+      "baseline_file": "baselines/forensic-query-patterns.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "CLOUDTRAIL_LAKE: forensic-eds\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Event type: Management events\n  [✓] Forensic queries: who-deleted, what-user-did, unusual-login, root-activity\nVERIFICATION_COMMANDS:\n  aws cloudtrail-data start-query --query-statement ...",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "forensic",
+            "query",
+            "eventTime",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-event-type-decision",
+      "name": "EDS without event type decision (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — event type not decided; EDS type is immutable after creation",
+      "prompt": "Create a CloudTrail Lake event data store. EDS name: undecided-eds. I am not sure which event types I need. Just create it for now and I will figure out the event types later.",
+      "prompt_file": "prompts/missing-event-type-decision.md",
+      "baseline_file": "baselines/missing-event-type-decision.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "CLOUDTRAIL_LAKE: undecided-eds\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Event type: MISSING — event type (management, data, Insights) must be decided at creation; EDS type is immutable and cannot be changed later",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "event type",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}
