@@ -219,17 +219,13 @@ correctly but never fires because the band does not exist. The
 procedure below forces an explicit check on historical data depth.
 
 **Cross-dependency gotchas:**
-- The anomaly detector MUST reach `TRAINED` state before the band is
-  usable. This requires at least 15 data points at the configured
-  period (roughly 2 weeks at 5-minute resolution).
-- The std dev multiplier change does NOT take effect immediately. The
-  model re-trains with the new value, which can take up to 15 minutes.
-- Cross-account anomaly detection requires the metric to be shared
-  (via CloudWatch cross-account sharing or RAM). A detector created on
-  a non-shared metric in the wrong account sees no data.
-- Composite alarms evaluate the AND/OR of child alarm states. If a
-  child alarm is in `INSUFFICIENT_DATA`, the composite may also be in
-  `INSUFFICIENT_DATA` depending on the logic.
+- The detector MUST reach `TRAINED` state before the band is usable
+  (requires >= 15 data points at the configured period).
+- Std dev multiplier changes take up to 15 minutes (model re-trains).
+- Cross-account detection requires metric sharing (resource policy or
+  RAM). A detector on a non-shared metric sees no data.
+- Composite alarms evaluate AND/OR of children; a child in
+  `INSUFFICIENT_DATA` may propagate to the composite.
 
 ## Expert heuristic: the two-week baseline requirement
 
@@ -492,43 +488,15 @@ Where `m1` is the metric being monitored.
 **CLI — create a metric math dashboard via put-dashboard:**
 
 ```bash
-# The metric math expression ANOMALY_DETECTION_BAND produces
-# upper and lower band values. In the console, this is visualized
-# as a shaded band around the actual metric line.
-
-# Example dashboard body (simplified):
-cat <<'EOF' > /tmp/dashboard.json
-{
-  "widgets": [
-    {
-      "type": "metric",
-      "x": 0, "y": 0, "width": 12, "height": 6,
-      "properties": {
-        "metrics": [
-          [ "AWS/EC2", "CPUUtilization", "InstanceId", "i-abc1234567890" ],
-          [ { "expression": "ANOMALY_DETECTION_BAND(m1)",
-              "label": "Anomaly Band",
-              "id": "e1" } ]
-        ],
-        "view": "timeSeries",
-        "stacked": false,
-        "region": "us-east-1",
-        "period": 300,
-        "stat": "Average"
-      }
-    }
-  ]
-}
-EOF
-
+# The ANOMALY_DETECTION_BAND function produces upper/lower band values.
+# In the console, this renders as a shaded band around the metric line.
 aws cloudwatch put-dashboard \
   --dashboard-name "AnomalyDetection-CPU" \
-  --dashboard-body file:///tmp/dashboard.json
+  --dashboard-body '{"widgets":[{"type":"metric","x":0,"y":0,"width":12,"height":6,"properties":{"metrics":[["AWS/EC2","CPUUtilization","InstanceId","i-abc1234567890"],[{"expression":"ANOMALY_DETECTION_BAND(m1)","label":"Anomaly Band","id":"e1"}]],"view":"timeSeries","period":300,"stat":"Average"}}]}'
 ```
 
 The `ANOMALY_DETECTION_BAND` function references the metric `m1`
-(the first metric in the array) and produces the expected band. The
-console renders this as a shaded band around the metric line.
+(the first metric in the array) and produces the expected band.
 
 ## Step 6 — Alarm on band breach
 
@@ -666,49 +634,30 @@ accounts. This requires CloudWatch cross-account observability sharing.
 1. The member account must enable sharing (cloudwatch:PutResourcePolicy).
 2. The monitoring account must have a data source link to the member
    account.
-3. The anomaly detector is created in the monitoring account, referencing
-   the member account's metric.
+3. The anomaly detector is created in the monitoring account,
+   referencing the member account's metric.
 
 **Member account — enable sharing:**
 
 ```bash
-# In the member account
 aws cloudwatch put-resource-policy \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Principal": { "AWS": "arn:aws:iam::111111111111:root" },
-        "Action": [ "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics" ],
-        "Resource": "*"
-      }
-    ]
-  }'
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::111111111111:root"},"Action":["cloudwatch:GetMetricData","cloudwatch:GetMetricStatistics"],"Resource":"*"}]}'
 ```
 
-**Monitoring account — create detector on member metric:**
+**Monitoring account — create detector and link:**
 
 ```bash
-# In the monitoring account, reference the member account's metric
-aws cloudwatch put-metric-anomaly-detector \
-  --namespace "AWS/EC2" \
-  --metric-name "CPUUtilization" \
-  --dimensions Name=InstanceId,Value=i-abc1234567890 \
-  --stat "Average" \
-  --period 300 \
-  --configuration '{"StandardDeviation": 3}'
-# The metric is resolved from the linked member account data source
-```
-
-**Cross-account data source link:**
-
-```bash
-# In the monitoring account, create a link to the member account
-aws logs create-link \
-  --link-name "member-account-link" \
+# Create data source link to member account
+aws logs create-link --link-name "member-account-link" \
   --resource-arn "arn:aws:logs:us-east-1:222222222222:log-group:*" \
   --filter 'logGroupNamePrefix("aws/cloudwatch/")'
+
+# Create detector (metric resolved from linked member account)
+aws cloudwatch put-metric-anomaly-detector \
+  --namespace "AWS/EC2" --metric-name "CPUUtilization" \
+  --dimensions Name=InstanceId,Value=i-abc1234567890 \
+  --stat "Average" --period 300 \
+  --configuration '{"StandardDeviation": 3}'
 ```
 
 **Note:** cross-account observability uses the "source account" and

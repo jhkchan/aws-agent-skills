@@ -4,7 +4,7 @@
 > · License: **Apache-2.0** · Maintainer: **Jacky Chan, AWS Community Builder (ML & GenAI)**
 > · A solo, community-driven project.
 
-**405 eval-backed AWS CloudOps agent skills** across **13 AWS service families** and **6 task types** (audit · deploy · troubleshoot · optimize · operate · automate) — every skill ships with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric, with co-located structured evals (cases + baselines + delta comparison) on every skill.
+**409 eval-backed AWS CloudOps agent skills** across **13 AWS service families** and **6 task types** (audit · deploy · troubleshoot · optimize · operate · automate) — every skill ships with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric, with co-located structured evals (cases + baselines + delta comparison) on every skill.
 
 ---
 
@@ -25,7 +25,7 @@ git clone https://github.com/jhkchan/aws-agent-skills.git
 # For Claude Code:
 cp -r aws-agent-skills/skills/s3-public-access-auditor ~/.claude/skills/
 
-# Or install ALL 405 skills at once:
+# Or install ALL 409 skills at once:
 cp -r aws-agent-skills/skills/* ~/.claude/skills/
 ```
 
