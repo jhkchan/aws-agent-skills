@@ -1,0 +1,70 @@
+{
+  "skill": "ec2-spot-interruption-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete expert thresholds (3 families\u202f\u00d7\u202f3 AZs, 90\u2011second design window, lambda timeout\u202f\u2265\u202f60\u202fs, spot\u2011placement\u2011score categories, capacity\u2011optimized vs lowest\u2011price trade\u2011offs, recent features like capacity\u2011rebalance GA and Graviton4) that a generic model would not enumerate, but omits deeper cost\u2011impact calculations and cross\u2011region considerations, so not a perfect 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedure order (pre\u2011checks, confirm gate, CLI commands) and embeds expert mindset (2\u2011minute window, diversification math). However it lacks an explicit rollback/recovery procedure for failed state\u2011changing commands, leaving the process slightly incomplete."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides a concrete NEVER list with specific reasons (e.g., never set ELB delay >\u202f2\u202fmin, never use lowest\u2011price with a single pool), but misses a few pitfalls such as forgetting the EventBridge resource\u2011based policy and could give more rationale for some items, so two points are deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter, description, keywords, activation triggers, and an invocation schema are all present and clear. The only shortfall is the absence of a formal JSON schema for the input payload, which prevents strict validation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns) which aids progressive disclosure, but the initial \u201cWhat this skill does\u201d paragraph is dense and mixes many details, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are gated by a mandatory CONFIRM prompt and extensive pre\u2011checks, showing good calibration. However the skill permits bulk modifications (e.g., modify Spot Fleet overrides) without explicit limits on scope or safety nets for partial failures."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns) that aids comprehension, but the inclusion of an ad\u2011hoc \"Quick navigation\" table and occasional inconsistent heading levels slightly break the uniform pattern."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, decision trees, and worked examples that an agent could execute. Lacks explicit error\u2011handling/retry guidance for AWS CLI failures, partial rollbacks, and multi\u2011region considerations, which could cause execution gaps."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 49611,
+  "latency_ms": 16458,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

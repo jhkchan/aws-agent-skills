@@ -1,0 +1,70 @@
+{
+  "skill": "iam-key-rotation-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete, non\u2011obvious IAM nuances (eventual consistency of get\u2011access\u2011key\u2011last\u2011used, 24\u2011hour inactivity buffer, exact 7\u2011day overlap window, cross\u2011account sync via assume\u2011role, recent AWS feature references) that a generic model would not enumerate."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Specifies an AWS\u2011specific end\u2011to\u2011end procedure: generate credential report, EventBridge daily rule, Lambda rotation flow with create \u2192 verify via STS \u2192 24h inactivity check \u2192 deactivate \u2192 72h wait \u2192 delete, plus exact CLI commands and IAM permission sets."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides a detailed NEVER list with concrete rationales (outage risk, break\u2011glass protection, slot limits, secret leakage, batch rotation, missing overlap, stale credential report) that directly prevent common pitfalls."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT the skill does, WHEN to invoke, and provides rich keywords and activation triggers. Invocation_schema is described but not formally JSON\u2011schema\u2011validated, causing slight vagueness."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections (mindset, quick navigation, step\u2011by\u2011step, appendices) so a reader can skim first and dive deeper, though some critical rules are repeated and the initial overview is dense."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom tightly for destructive actions: confirmation gate, overlap window constraints, exception list checks, 24\u2011hour inactivity buffer, and staged delete after monitoring, preventing accidental key loss."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Process \u2192 Anti\u2011patterns \u2192 Appendices) that aligns with other CloudOps skills, aiding comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides runnable snippets, CloudFormation skeleton, decision tree, and example outputs, enabling an agent to act. However, the Lambda code is minimal (no pagination, limited error handling, missing IAM policy granularity), so a production\u2011ready implementation would require additional work."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 41866,
+  "latency_ms": 12044,
+  "assertions_passed": false,
+  "assertions_passed_count": 1,
+  "assertions_failed_count": 4
+}

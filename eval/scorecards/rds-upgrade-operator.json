@@ -1,0 +1,70 @@
+{
+  "skill": "rds-upgrade-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many concrete expert details (20% free storage threshold, exact parameter\u2011group families, blue/green deployment ordering, driver\u2011compatibility quirks, sequential major\u2011version path rules). However it omits some advanced edge\u2011cases such as IAM permission checks, encryption\u2011key handling, and RDS Proxy considerations, so the knowledge is not completely exhaustive."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedures: pre\u2011flight checklist order, explicit CONFIRM gate, snapshot creation, CLI wait commands, blue\u2011green provisioning steps, and global\u2011cluster sequencing. Slight deduction because the procedure for handling pending\u2011reboot parameter changes is mentioned only in prose, not as a concrete step in the process flow."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Robust NEVER list with clear reasoning (e.g., never upgrade without manual snapshot, never use wrong parameter\u2011group family, never skip major versions). Lacks a few common pitfalls such as never ignore IAM role/permission errors and never overlook storage\u2011type conversion (gp2\u2192gp3) before a major upgrade."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The invocation_schema is somewhat vague about exact JSON field names and required structure, which could hinder reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Content is layered well: quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns, safety checks, and examples. Minor overload risk from large tables in the quick reference, but overall the hierarchy is clear."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained by a mandatory CONFIRM gate and exhaustive pre\u2011checks. Creative/plan\u2011only tasks have appropriate freedom. Slight deduction because the handling of immediate vs. maintenance\u2011window minor upgrades could be more explicitly calibrated."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern (overview \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns \u2192 safety checklist) that aligns with established CloudOps skill structures."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides actionable CLI commands, decision trees, and example output blocks that an agent can follow. Missing explicit error\u2011handling branches for snapshot creation failure or wait\u2011command timeouts, and limited guidance on pagination handling beyond a brief note."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 48941,
+  "latency_ms": 14282,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

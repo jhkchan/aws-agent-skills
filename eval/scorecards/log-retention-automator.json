@@ -1,0 +1,70 @@
+{
+  "skill": "log-retention-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides concrete expert details not usually known by a generic model: exact put\u2011retention\u2011policy throttling limits (\u22485\u201110\u202freq/s), 5\u2011second eventual\u2011consistency wait, rounding\u2011up table for non\u2011allowed retention values, cost crossover point (~90\u202fdays) between CloudWatch and S3, Firehose buffer recommendations (5\u202fMB/300\u202fs), and the default\u2011first EventBridge strategy. These specifics constitute genuine delta."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill outlines an AWS\u2011specific end\u2011to\u2011end procedure: inventory, tag\u2011to\u2011tier mapping, rate\u2011limited put\u2011retention\u2011policy loop, EventBridge rule creation, Lambda handler with default\u2011first strategy, daily sweep Lambda, and StackSet rollout. It lacks a concise decision\u2011tree for IAM permission scoping (least\u2011privilege policy) which would complete the procedure."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Lists a thorough NEVER list with concrete reasoning (e.g., never leave log groups at Never Expire, never round retention down, never deploy EventBridge rule without DLQ, never delete a log group to reset retention, never assume tags exist on CreateLogGroup). Only minor omission: no explicit warning about forgetting to update the tag\u2011map when new environments are added."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata, when_to_use, activation_triggers, invocation_schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides reliable activation keywords."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections and a quick\u2011navigation table to let the agent dive deeper as needed. The initial Mindset and Critical Rules sections are dense, which adds some cognitive load before the agent reaches the step\u2011by\u2011step process."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Calibrates freedom appropriately: destructive actions (put\u2011retention\u2011policy) are gated by a mandatory confirmation prompt, rate\u2011limiting, and default\u2011first fallback; creative design steps are left open. Minor gap: IAM role permissions are mentioned only generically, not tightly scoped."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Process steps \u2192 Anti\u2011Patterns \u2192 Appendices), aiding comprehension. The pattern is consistent throughout the document."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides working CLI snippets, Lambda code, error\u2011handling tables, verification commands, cost estimation, and a full audit checklist, enabling an agent to execute the automation end\u2011to\u2011end. Slight deficiency: IAM role trust policy and permission details are not fully fleshed out, requiring the agent to infer or look up additional information."
+    }
+  ],
+  "total_score": 110,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 44265,
+  "latency_ms": 12659,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}

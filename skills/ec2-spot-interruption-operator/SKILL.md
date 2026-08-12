@@ -366,74 +366,43 @@ items listed. Do NOT execute until the operator reviews.
 4. SQS queue (or Lambda target) is healthy — no consumer lag.
 
 **For handle-interruption (live EventBridge warning event):**
-5. The event's `detail.instance-action` is `terminate`, `stop`, or
-   `hibernate` — determines the shutdown sequence.
-6. The instance is registered to a target group (if ELB-integrated).
-7. The graceful-shutdown Lambda is `Active` with reserved concurrency
-   >= 1 and timeout >= 60.
-8. The checkpoint target (S3 bucket or DynamoDB table) exists and is
-   writable by the Lambda's execution role.
-9. The 2-minute window has not already elapsed (check the event
-   `time` against the current time).
+5. Event `detail.instance-action` determines shutdown sequence
+   (`terminate`, `stop`, or `hibernate`).
+6. Instance registered to a target group. Lambda `Active` with
+   reserved concurrency >= 1, timeout >= 60. Checkpoint target exists.
+7. The 2-minute window has not already elapsed.
 
 **For configure-pipeline (set up EventBridge + SQS + Lambda):**
-5. The EventBridge rule event pattern matches `"detail-type":
-   ["EC2 Spot Instance Interruption Warning"]`.
-6. The SQS queue has a dead-letter queue configured.
-7. The Lambda function timeout is >= 60 seconds (to fit within the
-   2-minute window with a safety margin).
-8. The Lambda's execution role has permissions: `ec2:DescribeInstances`,
-   `elasticloadbalancing:DeregisterTargets`,
-   `elasticloadbalancing:DescribeTargetHealth`, `s3:PutObject` (or
-   `dynamodb:PutItem`), `sns:Publish` (for notifications).
-9. The ALB/NLB target group `deregistration_delay.timeout_seconds`
-   is set to 30-60 seconds for Spot targets.
+5. EventBridge pattern matches `"EC2 Spot Instance Interruption
+   Warning"`. SQS queue has DLQ configured.
+6. Lambda timeout >= 60. Lambda role has `ec2:DescribeInstances`,
+   `elasticloadbalancing:DeregisterTargets`, `s3:PutObject`.
+7. Target group `deregistration_delay.timeout_seconds` is 30-60s.
 
-**For tune-replacement-strategy (modify Spot Fleet or ASG allocation):**
-5. The current `AllocationStrategy` is identified
-   (`lowest-price` / `diversified` / `capacity-optimized` /
-   `capacity-optimized-prioritized`).
-6. The proposed strategy is `capacity-optimized` (recommended) or
-   `diversified` with >= 3 pools.
-7. For ASGs: `CapacityRebalance` is enabled (or will be enabled).
-8. The Spot Fleet `ExcessCapacityTerminationPolicy` is reviewed
-   (default `true` — the Fleet terminates excess Spot Instances if
-   target capacity drops).
+**For tune-replacement-strategy (modify Fleet or ASG):**
+5. Current `AllocationStrategy` identified. Proposed strategy is
+   `capacity-optimized` (recommended) or `diversified` with >= 3 pools.
+6. For ASGs: `CapacityRebalance` enabled. `ExcessCapacityTerminationPolicy`
+   reviewed (default `true`).
 
 **For audit-diversification (read-only):**
-5. The Spot Fleet `LaunchTemplateConfigs[0].Overrides` lists all
-   instance types and AZs.
-6. The ASG `MixedInstancesPolicy.LaunchTemplate.Overrides` lists
-   all instance types.
-7. Count of unique instance families >= 3.
-8. Count of unique AZs >= 3.
-9. Graviton (arm64) families included (optional but recommended for
-   cost and resilience).
+5. Fleet/ASG `Overrides` lists all instance types and AZs.
+6. Count of unique instance families >= 3, unique AZs >= 3.
+   Graviton included (recommended).
 
 **For validate-placement-score (read-only):**
-5. `get-spot-placement-scores` is called with the target capacity
-   and instance type list.
-6. The score is interpreted: >= 7 is "good", 4-6 is "marginal",
-   <= 3 is "avoid — high risk of unfulfilled requests".
+5. `get-spot-placement-scores` called. Score >= 7 good, 4-6 marginal,
+   <= 3 avoid.
 
 **For configure-checkpointing (stateful workload):**
-5. The checkpoint target (S3 bucket or DynamoDB table) exists.
-6. The application supports checkpoint signals (SIGTERM handler,
-   health-check endpoint, or a custom integration).
-7. The checkpoint frequency is configured (interval or event-driven).
-8. The checkpoint restore path is tested (can the replacement load
-   the checkpoint and resume?).
+5. Checkpoint target exists. Application supports checkpoint signals
+   (SIGTERM handler). Checkpoint frequency configured. Restore path
+   tested.
 
 **For audit-pipeline-health (read-only):**
-5. EventBridge rule `State: ENABLED`.
-6. SQS queue `ApproximateAgeOfOldestMessage` < 120 seconds.
-7. SQS dead-letter queue is empty (or has only old, investigated
-   messages).
-8. Lambda `State: Active`, `ReservedConcurrentExecutions >= 1`.
-9. Lambda CloudWatch Logs show recent successful invocations (or
-   no invocations if no recent interruptions — both are healthy).
-10. ELB target group `deregistration_delay.timeout_seconds` is
-    30-60 seconds for Spot targets.
+5. EventBridge `ENABLED`. SQS `ApproximateAgeOfOldestMessage` < 120s.
+   DLQ empty. Lambda `Active`, reserved concurrency >= 1. ELB delay
+   30-60s.
 
 **Interruption-handling failure-mode table:**
 

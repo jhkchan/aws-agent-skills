@@ -1,0 +1,70 @@
+{
+  "skill": "backup-vault-compliance-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete, senior\u2011engineer level details that are not generic: the mandatory 3\u2011day cool\u2011off for Vault Lock, the regulatory\u2011driven 90\u2011day minimum and 2557\u2011day maximum retention, a decision\u2011tree for choosing COMPLIANCE vs GOVERNANCE mode, and a curated list of 2024\u20112026 AWS Backup features. The bulk of the content restates known concepts, so it falls short of a perfect 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific, ordered procedure (inventory \u2192 policy \u2192 lock \u2192 encryption \u2192 coverage \u2192 replication \u2192 frequency \u2192 Config rules \u2192 reporting \u2192 multi\u2011account rollout) with exact CLI commands and required parameters. Only a small amount of advice is generic (e.g., \u201ccheck coverage\u201d) which prevents a full score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Lists a solid set of NEVER rules with concrete reasons (e.g., irreversible compliance\u2011mode lock, missing KMS condition, cross\u2011account trust), but omits a few common pitfalls such as IAM policy precedence conflicts and stale Config rule drift."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and an invocation schema are all present, enabling reliable activation. The trigger list is extensive but some entries are phrased loosely (e.g., \u201cbackup compliance report\u201d), costing one point."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a navigation table and step\u2011by\u2011step sections, exposing high\u2011level intent before details. However, the initial Mindset and Quick navigation sections are dense and contain many details that could overload the reader, leading to a modest deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (Vault Lock, policy changes) are guarded by a mandatory confirmation gate and explicit cool\u2011off guidance; however, cross\u2011region replication steps could be tighter about required IAM conditions, leaving a small freedom gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset, Process steps, Output format, Anti\u2011Patterns, Appendices) that aids comprehension, but some sections (e.g., the anti\u2011pattern list) are inserted ad\u2011hoc rather than as a dedicated, consistently styled block."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides working CLI snippets, decision trees, and example outputs, enabling an agent to execute the skill. Nonetheless, placeholders like <plan-id>, lack of explicit error handling for API failures, and missing pagination details reduce immediate, error\u2011free usability."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 42560,
+  "latency_ms": 18030,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}
