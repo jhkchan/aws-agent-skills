@@ -1,0 +1,174 @@
+{
+  "skill": "opensearch-alerting-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the OpenSearch Alerting Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across alerting topologies (per-query error monitor with Slack, cluster metrics monitor with SNS + notification plugin, anomaly detection monitor with Chime, per-document monitor with custom webhook, SNS action without notification plugin prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "per-query-error-slack",
+      "name": "Per-query error count monitor with Slack notification",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — per-query monitor, error count aggregation, threshold trigger severity 1, Slack destination, every 5 minutes",
+      "prompt": "Create an OpenSearch alerting monitor named error-count-monitor on the cluster at https://search-prod.example.com. Monitor type per-query. Target index application-logs-*. Query: match level=error, range @timestamp >= now-5m, aggregate value_count. Trigger when error_count > 100, severity 1. Action: notify Slack destination ops-alerts-slack (already configured). Schedule every 5 minutes. Tags: Environment=production, Team=ops.",
+      "prompt_file": "prompts/per-query-error-slack.md",
+      "baseline_file": "baselines/per-query-error-slack.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "OPENSEARCH_ALERTING: error-count-monitor (per-query) — every 5 minutes\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Monitor type: per-query\n  [✓] Target index: application-logs-*\n  [✓] Query: match level=error, range now-5m, aggregate value_count\n  [✓] Trigger: high-error-count — severity 1 — error_count > 100\n  [✓] Destination: ops-alerts-slack (slack)\n  [✓] Action: notify-slack → destination ops-alerts-slack\n  [✓] Schedule: every 5 MINUTES\n  [✓] Alert severity: 1 (high)\nVERIFICATION_COMMANDS:\n  curl <endpoint>/_plugins/_alerting/monitors/<monitor-id>\n  curl <endpoint>/_plugins/_alerting/destinations/<destination-id>",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "per-query",
+            "error-count-monitor",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "severity"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cluster-metrics-sns",
+      "name": "Cluster metrics JVM heap monitor with SNS notification",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — cluster-metrics monitor, JVM heap > 85%, severity 1, SNS destination, notification plugin configured, every 1 minute",
+      "prompt": "Create an OpenSearch cluster metrics monitor named jvm-heap-monitor on cluster https://search-prod.example.com. Monitor JVM heap usage and trigger when it exceeds 85%, severity 1. Action: notify SNS destination ops-alerts-sns (topic arn:aws:sns:us-east-1:123456789012:alert-topic). The notification plugin (notification.yaml) is configured with role arn:aws:iam::123456789012:role/os-alerting-sns. Schedule every 1 minute. Tags: Environment=production, Service=search.",
+      "prompt_file": "prompts/cluster-metrics-sns.md",
+      "baseline_file": "baselines/cluster-metrics-sns.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "OPENSEARCH_ALERTING: jvm-heap-monitor (cluster-metrics) — every 1 minute\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Monitor type: cluster-metrics\n  [✓] Cluster metrics: JVM heap usage\n  [✓] Trigger: heap-exceeded — severity 1 — JVM heap > 85%\n  [✓] Destination: ops-alerts-sns (sns)\n  [✓] Notification plugin: configured (role arn:aws:iam::123456789012:role/os-alerting-sns)\n  [✓] Action: notify-sns → destination ops-alerts-sns\n  [✓] Schedule: every 1 MINUTE\n  [✓] Alert severity: 1 (high)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "cluster-metrics",
+            "JVM",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "anomaly-detection-monitor",
+      "name": "Anomaly detection monitor with Random Cut Forest and Chime notification",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — anomaly detection monitor, RCF detector running, anomaly_grade > 0.9 trigger, severity 2, Chime destination",
+      "prompt": "Create an OpenSearch anomaly detection monitor named latency-anomaly-monitor on cluster https://search-prod.example.com. The anomaly detector latency-detector-001 is already created and in running state. Trigger when anomaly_grade > 0.9, severity 2. Action: notify Chime destination ops-chime-webhook (already configured). Schedule every 5 minutes. Tags: Environment=production, Type=anomaly.",
+      "prompt_file": "prompts/anomaly-detection-monitor.md",
+      "baseline_file": "baselines/anomaly-detection-monitor.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "OPENSEARCH_ALERTING: latency-anomaly-monitor (per-query, anomaly) — every 5 minutes\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Monitor type: per-query (anomaly detection)\n  [✓] Anomaly detector: latency-detector-001 — state running\n  [✓] Trigger: anomaly-detected — severity 2 — anomaly_grade > 0.9\n  [✓] Destination: ops-chime-webhook (chime)\n  [✓] Action: notify-chime → destination ops-chime-webhook\n  [✓] Schedule: every 5 MINUTES\n  [✓] Alert severity: 2 (medium-high)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "anomaly",
+            "latency-detector-001",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "per-document-monitor",
+      "name": "Per-document monitor with custom webhook notification",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — per-document monitor, error log per-row alerting, custom webhook destination, every 10 minutes",
+      "prompt": "Create an OpenSearch per-document monitor named per-user-error-monitor on cluster https://search-prod.example.com. Target index application-logs-*. Query: match level=error, range @timestamp >= now-5m. Each matching document should trigger a custom webhook notification to destination per-user-webhook (already configured). Schedule every 10 minutes. Tags: Environment=production, Type=per-doc.",
+      "prompt_file": "prompts/per-document-monitor.md",
+      "baseline_file": "baselines/per-document-monitor.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "OPENSEARCH_ALERTING: per-user-error-monitor (per-document) — every 10 minutes\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Monitor type: per-document\n  [✓] Target index: application-logs-*\n  [✓] Query: match level=error, range now-5m\n  [✓] Destination: per-user-webhook (custom webhook)\n  [✓] Action: notify-webhook → destination per-user-webhook (per-document)\n  [✓] Schedule: every 10 MINUTES",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "per-document",
+            "per-user-error-monitor",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-notification-plugin",
+      "name": "SNS action without notification plugin configured (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — operator requests SNS action but notification.yaml plugin is not configured on the domain",
+      "prompt": "Create an OpenSearch cluster metrics monitor named disk-usage-monitor on cluster https://search-prod.example.com. Monitor disk usage and trigger when it exceeds 80%, severity 1. Action: notify SNS destination ops-alerts-sns. The notification plugin (notification.yaml) has NOT been configured on this domain. Schedule every 5 minutes.",
+      "prompt_file": "prompts/missing-notification-plugin.md",
+      "baseline_file": "baselines/missing-notification-plugin.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "OPENSEARCH_ALERTING: disk-usage-monitor (cluster-metrics)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Notification plugin: NOT configured — SNS actions require notification.yaml at the domain level\n  → Configure notification.yaml with SNS topic ARN and IAM role before creating the monitor",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "notification",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "skill": "waf-rule-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides concrete expert details not usually restated by a baseline model: exact WCU estimates per managed rule group, the 1500 WCU hard limit, the mandatory us-east-1 region for CloudFront\u2011scoped ACLs, the required Firehose name prefix, and the rule\u2011priority ordering rule (specific allow must have lower numeric priority than broad block). However much of this information is available in AWS docs, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (CLI commands, scope\u2011region coupling) but some steps are generic (\"verify prerequisites\") and the exact ordering of creating IP sets before rule groups is not always enforced."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "The NEVER list is detailed and reasoned, yet it omits common pitfalls such as over\u2011using COUNT before BLOCK, forgetting to pin managed rule group versions, and the danger of duplicate rule names across referenced rule groups."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Triggers are exhaustive. Minor issue: the \"when_to_use\" paragraph repeats activation keywords, adding redundancy but not breaking activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Top\u2011level summary, quick\u2011navigation table, then deep sections. Information is layered appropriately. Slight overload in the long description block where many heuristics are mixed, but overall disclosure is well\u2011structured."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (Web ACL creation) are guarded by prerequisite checks, but the skill still allows unlimited custom rule additions without explicit caps, which could unintentionally exceed WCU limits."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The overall layout follows a recognizable pattern (Mindset \u2192 Steps \u2192 NEVER \u2192 Output), yet some sections (e.g., the large example block) break the flow and feel ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides decision trees, concrete CLI commands, and error\u2011handling guidance. Model output examples reveal gaps: missing specific\u2011allow rule in a large example, ambiguous checklist items, and inconsistent inclusion of required lines (managed rule groups omitted in some READY_TO_DEPLOY outputs). These indicate that an agent could produce incomplete or incorrect checklists, so usability is penalized."
+    }
+  ],
+  "total_score": 101,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 48258,
+  "latency_ms": 16692,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}

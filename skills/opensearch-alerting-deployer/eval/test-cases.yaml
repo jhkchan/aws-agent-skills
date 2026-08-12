@@ -1,0 +1,160 @@
+# Eval test cases for opensearch-alerting-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across OpenSearch alerting
+# topologies (per-query error monitor with Slack, cluster metrics
+# monitor with SNS, anomaly detection monitor, per-document monitor,
+# SNS action missing notification plugin prerequisite failure).
+skill: opensearch-alerting-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: per-query-error-slack
+    description: >-
+      Provision a per-query monitor that counts error logs every 5
+      minutes and triggers a Slack notification when the count
+      exceeds 100. Expects READY_TO_DEPLOY with destination cited,
+      trigger condition cited, and schedule cited.
+    input: |
+      Create an OpenSearch alerting monitor named error-count-monitor
+      on the cluster at https://search-prod.example.com. Monitor type
+      per-query. Target index application-logs-*. Query: match
+      level=error, range @timestamp >= now-5m, aggregate value_count.
+      Trigger when error_count > 100, severity 1. Action: notify
+      Slack destination ops-alerts-slack (already configured).
+      Schedule every 5 minutes. Tags: Environment=production,
+      Team=ops.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "per-query"
+        - "error-count-monitor"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "severity"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cluster-metrics-sns
+    description: >-
+      Provision a cluster metrics monitor that triggers an SNS
+      notification when JVM heap exceeds 85%. Expects READY_TO_DEPLOY
+      with cluster-metrics type, SNS destination cited, and
+      notification plugin noted.
+    input: |
+      Create an OpenSearch cluster metrics monitor named
+      jvm-heap-monitor on cluster
+      https://search-prod.example.com. Monitor JVM heap usage and
+      trigger when it exceeds 85%, severity 1. Action: notify SNS
+      destination ops-alerts-sns (topic
+      arn:aws:sns:us-east-1:123456789012:alert-topic). The
+      notification plugin (notification.yaml) is configured with
+      role arn:aws:iam::123456789012:role/os-alerting-sns. Schedule
+      every 1 minute. Tags: Environment=production, Service=search.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cluster-metrics"
+        - "JVM"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: anomaly-detection-monitor
+    description: >-
+      Provision a per-query monitor using anomaly detection (Random
+      Cut Forest) that triggers when anomaly_grade > 0.9. Expects
+      READY_TO_DEPLOY with anomaly detector cited and detector state
+      running.
+    input: |
+      Create an OpenSearch anomaly detection monitor named
+      latency-anomaly-monitor on cluster
+      https://search-prod.example.com. The anomaly detector
+      latency-detector-001 is already created and in running state.
+      Trigger when anomaly_grade > 0.9, severity 2. Action: notify
+      Chime destination ops-chime-webhook (already configured).
+      Schedule every 5 minutes. Tags: Environment=production,
+      Type=anomaly.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "anomaly"
+        - "latency-detector-001"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: per-document-monitor
+    description: >-
+      Provision a per-document monitor that triggers per matching
+      document. Expects READY_TO_DEPLOY with per-document type cited
+      and destination cited.
+    input: |
+      Create an OpenSearch per-document monitor named
+      per-user-error-monitor on cluster
+      https://search-prod.example.com. Target index
+      application-logs-*. Query: match level=error, range
+      @timestamp >= now-5m. Each matching document should trigger
+      a custom webhook notification to destination
+      per-user-webhook (already configured). Schedule every 10
+      minutes. Tags: Environment=production, Type=per-doc.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "per-document"
+        - "per-user-error-monitor"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-notification-plugin
+    description: >-
+      Operator requests an SNS action but the notification plugin
+      (notification.yaml) is not configured on the OpenSearch domain.
+      Expects PREREQUISITES_MISSING with the notification plugin gap
+      cited.
+    input: |
+      Create an OpenSearch cluster metrics monitor named
+      disk-usage-monitor on cluster
+      https://search-prod.example.com. Monitor disk usage and
+      trigger when it exceeds 80%, severity 1. Action: notify SNS
+      destination ops-alerts-sns. The notification plugin
+      (notification.yaml) has NOT been configured on this domain.
+      Schedule every 5 minutes.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "notification"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

@@ -1,0 +1,49 @@
+# Eval configuration for opensearch-alerting-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: opensearch-alerting-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: per-query-error-slack
+    difficulty: hard
+    prompt_file: prompts/per-query-error-slack.md
+    baseline_file: baselines/per-query-error-slack.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: cluster-metrics-sns
+    difficulty: hard
+    prompt_file: prompts/cluster-metrics-sns.md
+    baseline_file: baselines/cluster-metrics-sns.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: anomaly-detection-monitor
+    difficulty: hard
+    prompt_file: prompts/anomaly-detection-monitor.md
+    baseline_file: baselines/anomaly-detection-monitor.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: per-document-monitor
+    difficulty: medium
+    prompt_file: prompts/per-document-monitor.md
+    baseline_file: baselines/per-document-monitor.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-notification-plugin
+    difficulty: easy
+    prompt_file: prompts/missing-notification-plugin.md
+    baseline_file: baselines/missing-notification-plugin.md
+    expected_verdict: PREREQUISITES_MISSING

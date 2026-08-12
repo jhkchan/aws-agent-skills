@@ -236,9 +236,9 @@ creation succeeds but execution fails on the first job-launching step.
 
 ## Expert heuristic: steps are a DAG, not a sequence
 
-A baseline model strings steps into a list and assumes the list order
-is the execution order. The correct heuristic: SageMaker builds a DAG
-from declared dependencies.
+A baseline model strings steps into a list and assumes the list order is
+the execution order. The correct heuristic: SageMaker builds a DAG from
+declared dependencies.
 
 ```text
 Pipeline execution plan (DAG):
@@ -253,8 +253,7 @@ Pipeline execution plan (DAG):
       ├── if accuracy ≥ threshold:
       │     ├── CreateModelStep → TransformStep (batch)
       │     └── RegisterModelStep (registry, PendingManualApproval)
-      └── else:
-            FailStep (re-tune or alert)
+      └── else: FailStep (re-tune or alert)
 ```
 
 **Key implication:** the `steps=[...]` list is NOT a script. It's a node
@@ -285,9 +284,9 @@ Parameters for values you expect to sweep.
 ## Expert heuristic: model registry gates production deployment
 
 The Model Registry is the gate between experimentation and production.
-`RegisterModel` adds a version to a Model Package Group. New versions
-are `PendingManualApproval` by default. Production deployment pipelines
-query for `Approved` versions and deploy only those.
+`RegisterModel` adds a version to a Model Package Group in
+`PendingManualApproval` status. Production deployment pipelines query
+for `Approved` versions and deploy only those.
 
 ```text
 Registry-driven deployment flow:
@@ -301,8 +300,8 @@ Registry-driven deployment flow:
 ```
 
 **Key implication:** registering a model is NOT deploying it. The
-approval workflow is the safety gate. Auto-approving defeats the gate —
-only do this for non-production stages.
+approval workflow is the safety gate. Auto-approving defeats it — only
+do this for non-production stages.
 
 ## Prerequisites (verify before provisioning)
 
@@ -684,12 +683,11 @@ wire CodePipeline upstream. The invoke role must trust
    CI/CD. Auto-approving defeats the gate.
 
 5. **NEVER reference a step property from a branch that didn't run.**
-   If CreateModelStep is in a ConditionStep's `if_steps`,
-   TransformStep must also be downstream of the same condition.
+   If CreateModelStep is in `if_steps`, TransformStep must be too.
 
 6. **NEVER set `ParallelismConfiguration` above account quotas.**
    Account quotas cap total concurrent jobs across all pipelines.
-   Excess steps queue but don't error — verify quotas first.
+   Excess steps queue silently — verify quotas first.
 
 7. **NEVER mix Terraform-managed and SDK-upserted pipelines.** Pick
    one — `terraform apply` and `pipeline.upsert()` fighting over the
@@ -700,13 +698,13 @@ wire CodePipeline upstream. The invoke role must trust
 
 9. **NEVER forget the JsonGet property file when branching on metrics.**
    ConditionStep reads metrics via `JsonGet` from a `PropertyFile`
-   pointing to a JSON file the prior step wrote. Without it, the
-   condition errors.
+   pointing to JSON the prior step wrote. Without it, the condition
+   errors.
 
 10. **NEVER rely on EventBridge triggers without an invoke role.** The
     target needs `events.amazonaws.com` permission to call
-    `sagemaker:StartPipelineExecution` via a role. Missing role =
-    silent no-op trigger.
+    `sagemaker:StartPipelineExecution` via a role. Missing role = silent
+    no-op trigger.
 
 ## Output format
 

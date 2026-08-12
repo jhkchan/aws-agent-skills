@@ -1,0 +1,70 @@
+{
+  "skill": "budget-action-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many specific, non\u2011obvious details (forecast confidence intervals, exact SCP attach semantics, execution\u2011role trust policy, SSM action limitations, blast\u2011radius validation cycles, multi\u2011account StackSet pattern). However, a large portion restates standard AWS Budgets concepts that a senior CloudOps engineer would already know, so full 20 is not earned."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes the expert 4\u2011stage pipeline, decision tree for threshold selection, pre\u2011flight safety gates, and step\u2011by\u2011step AWS\u2011specific CLI order. One point deducted because some procedures are generic (e.g., \u201crun a backup before change\u201d) and not uniquely tied to Budgets."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., silent failure if SNS topic policy missing, SCP remains attached after recovery, forecast thresholds are probabilistic). Missing a few niche pitfalls such as the need for `organizations:DetachPolicy` permission on the execution role and the edge case of absolute\u2011value thresholds in multi\u2011account budgets, hence the deduction."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Front\u2011matter, clear description, when_to_use, activation_triggers, and invocation_schema are present. The activation triggers are free\u2011form strings and the invocation_schema is a prose description rather than a strict JSON schema, making reliable automated activation slightly ambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 12,
+      "max": 15,
+      "justification": "The skill is very dense; most of the detailed CLI snippets, anti\u2011patterns, and validation steps appear up\u2011front, which can overload an agent before it knows whether it needs that depth. The navigation table helps, but the overall layering is not optimal."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (SCP deny) are guarded by manual\u2011approval defaults, validation cycles, and blast\u2011radius limits. Creative tasks are given flexibility. One point deducted because the default example for SCP deny uses AUTOMATIC approval without an explicit warning that the user must change it for production."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Process steps \u2192 Anti\u2011patterns \u2192 Output format). Minor ad\u2011hoc ordering of some sections (e.g., anti\u2011patterns placed after the full process) prevents a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides working CLI snippets, output format, and examples, enabling an agent to act. Nonetheless, there are concrete errors: `--action-type NOTIFY` is not a valid Budgets API value, some JSON payloads miss required fields (e.g., missing `ExecutionRoleArn` in the second snippet), and placeholders like `<account-id>` are not consistently replaced, which would cause execution failures."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 49780,
+  "latency_ms": 11762,
+  "assertions_passed": false,
+  "assertions_passed_count": 1,
+  "assertions_failed_count": 4
+}

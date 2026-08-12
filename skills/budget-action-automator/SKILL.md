@@ -21,12 +21,10 @@ license: Apache-2.0
 compatibility: >-
   Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
   Codex, Gemini). No AWS CLI required for offline workflow design.
-  Live deployment uses aws budgets create-budget,
-  create-notification, subscribe, put-budget-action,
-  describe-budget-action, describe-budget-action-histories,
-  aws ce get-cost-and-usage, get-cost-forecast, aws organizations
-  attach-policy, create-policy, aws sns create-topic, subscribe, and
-  aws lambda add-permission (for EventBridge targets) — AWS CLI v2,
+  Live deployment uses aws budgets create-budget, create-notification,
+  subscribe, put-budget-action, describe-budget-action, aws ce
+  get-cost-and-usage, get-cost-forecast, aws organizations
+  attach-policy, create-policy, aws sns create-topic — AWS CLI v2,
   SSO or key-based credentials.
 keywords:
   - AWS Budgets

@@ -23,14 +23,12 @@ license: Apache-2.0
 compatibility: >-
   Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
   Codex, Gemini). No AWS CLI required for offline workflow design.
-  Live deployment uses aws inspector2 enable, disable, list-findings,
-  batch-get-finding-details, update-configuration, list-coverage,
-  aws ssm create-document, start-automation-execution,
-  create-patch-baseline, update-patch-baseline, register-patch-baseline-for-patches,
-  aws events put-rule, put-targets, aws securityhub
-  batch-import-findings, aws ecr put-image-scanning-configuration,
-  start-image-scan, and aws codebuild start-build — AWS CLI v2,
-  SSO or key-based credentials.
+  Live deployment uses aws inspector2 enable, list-findings,
+  list-coverage, aws ssm create-document, start-automation-execution,
+  create-patch-baseline, aws events put-rule, put-targets, aws
+  securityhub batch-import-findings, aws ecr
+  put-image-scanning-configuration, start-image-scan, and aws
+  codebuild start-build — AWS CLI v2, SSO or key-based credentials.
 keywords:
   - Amazon Inspector
   - Inspector v2

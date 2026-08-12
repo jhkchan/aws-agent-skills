@@ -1,0 +1,70 @@
+{
+  "skill": "inspector2-automation-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many expert nuances (e.g., ECR scan\u2011on\u2011push vs manual rescan, Lambda static\u2011analysis limits, delegated\u2011admin propagation, blast\u2011radius validation cycles) that a generic model would not enumerate, but it lacks a concise decision\u2011tree for multi\u2011account fallback and does not surface a clear rule\u2011based matrix for when to choose patch vs notify vs suppress beyond the severity table."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill encodes an AWS\u2011specific end\u2011to\u2011end procedure (enable \u2192 detect \u2192 triage \u2192 remediate \u2192 verify) with exact CLI commands, EventBridge patterns, SSM automation runbook design, and patch\u2011baseline creation. The only shortfall is the absence of explicit IAM role policy definitions required for EventBridge \u2192 SSM or EventBridge \u2192 CodeBuild, which are essential for a production\u2011ready procedure."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough \"NEVER\" list with concrete reasons (e.g., never auto\u2011patch production without non\u2011prod soak, never assume continuous ECR scans). Lacks warnings about IAM over\u2011privilege, throttling of EventBridge/Lambda bursts, and missing DLQ handling details."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata, verdict shape, when_to_use, activation_triggers, invocation_schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides reliable keywords."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document layers information (one\u2011line takeaway, quick navigation, critical rules, pre\u2011flight checklist, step\u2011by\u2011step workflow, anti\u2011patterns, appendices). However, the critical rules and expert knowledge sections are dense, causing some cognitive overload before the reader reaches the actionable steps."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (patching, suppression) are guarded by mandatory confirmation prompts, snapshot steps, and a multi\u2011stage validation protocol. The skill also scopes blast radius (tag\u2011scoped, OU\u2011wide). Slightly less tight for multi\u2011account delegation where the skill only mentions a check but does not enforce a guardrail."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows the established pattern (Mindset \u2192 Navigation \u2192 Process steps \u2192 Anti\u2011Patterns \u2192 Appendices), making it instantly recognizable and easy to follow."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides ready\u2011to\u2011run CLI snippets, Lambda code, CloudFormation templates, decision trees, and verification commands, enabling an agent to execute the automation. Missing are explicit error\u2011handling branches (e.g., handling SSM start\u2011automation failures) and the IAM role policies needed for the EventBridge targets, which could cause execution gaps."
+    }
+  ],
+  "total_score": 109,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 49006,
+  "latency_ms": 9508,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

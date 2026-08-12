@@ -1,0 +1,159 @@
+# Eval test cases for amplify-branch-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Amplify branch deployment
+# topologies (production branch with custom domain and PR preview,
+# pull-request preview ephemeral environment, monorepo subdir detection
+# via appRoot, Next.js SSR with SPA redirects, missing Git provider
+# connection prerequisite failure).
+skill: amplify-branch-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: production-branch-with-custom-domain
+    description: >-
+      Configure an Amplify app with a production branch (main) mapped to
+      a custom domain via Route 53, security headers, SPA rewrite, build
+      settings via amplify.yml, and PR preview enabled. Expects
+      READY_TO_DEPLOY with domain DNS verification noted, the
+      amplify.yml-vs-buildspec.yml distinction surfaced, and
+      verification commands.
+    input: |
+      Set up an AWS Amplify app named my-web-app in us-east-1 from
+      https://github.com/org/my-web-app. Production branch "main" with
+      auto-build enabled, stage PRODUCTION. Build settings via
+      amplify.yml at repo root (Next.js build to .next/). Map custom
+      domain example.com to main, and staging.example.com to a staging
+      branch. Route 53 hosted zone Z1DXXXXXXXXXX. Security headers:
+      HSTS, X-Frame-Options, X-Content-Type-Options. SPA rewrite
+      catch-all. Enable PR preview on main with a fixed environment
+      name "pr-preview". Build instance medium.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "amplify.yml"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "example.com"
+        - "PR preview"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: pr-preview-ephemeral
+    description: >-
+      Enable PR preview on an existing Amplify app's main branch with a
+      fixed pullRequestEnvironmentName for cost control. Expects
+      READY_TO_DEPLOY with the ephemeral-environment-per-PR nature
+      noted and the URL-rotates-per-build caveat surfaced.
+    input: |
+      Enable pull request preview on my existing Amplify app
+      d2y0lrmp1qq2tu for branch "main". Use a fixed environment name
+      "pr-preview" so only one PR builds at a time (cost control).
+      Region us-east-1. The team needs to know the preview URL rotates
+      per build.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "enablePullRequestPreview"
+        - "pr-preview"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "ephemeral"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: monorepo-subdir-detection
+    description: >-
+      Configure an Amplify app for a monorepo where the web app lives at
+      packages/web-app with its own amplify.yml. Expects READY_TO_DEPLOY
+      with appRoot=packages/web-app noted and the monorepo-detection
+      requirement surfaced.
+    input: |
+      Create an Amplify app for my monorepo at
+      https://github.com/org/my-monorepo. The web app lives at
+      packages/web-app and has its own amplify.yml there. Production
+      branch "main", auto-build enabled. The repo root is a Turborepo
+      workspace — do NOT build from the root. Region us-east-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "appRoot"
+        - "packages/web-app"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "amplify.yml"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ssr-nextjs-with-redirects
+    description: >-
+      Configure an Amplify app for a Next.js SSR site with custom
+      redirect rules (SPA rewrite catch-all and /api route to function),
+      custom security headers, and Lambda serverless function awareness.
+      Expects READY_TO_DEPLOY with SSR auto-detection noted and the
+      per-branch Lambda caveat surfaced.
+    input: |
+      Configure Amplify for my Next.js 14 SSR app at
+      https://github.com/org/my-next-app. The app uses App Router with
+      SSR pages and API routes. Production branch "main". Build to
+      .next/. Redirects: catch-all SPA rewrite (status 200), /api route
+      to the serverless function. Security headers: HSTS, CSP, and
+      X-Frame-Options. Region us-east-1. The team has 8 active feature
+      branches.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SSR"
+        - "status: 200"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "serverless"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-repo-connection
+    description: >-
+      Operator requests an Amplify app but the Git provider (GitHub) is
+      not connected via OAuth in the console. This is a prerequisite
+      failure. Expects PREREQUISITES_MISSING with the Git provider
+      connection gap cited.
+    input: |
+      Create an Amplify app named my-app from
+      https://github.com/org/my-repo in us-east-1. I have not connected
+      GitHub to Amplify yet — please proceed with the CLI and we'll
+      figure out auth later. Production branch "main".
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Git provider connection"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "OAuth"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"
