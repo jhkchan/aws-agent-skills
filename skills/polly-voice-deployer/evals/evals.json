@@ -1,0 +1,179 @@
+{
+  "skill": "polly-voice-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Polly Voice Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Polly TTS scenarios (neural real-time synthesis with lexicon, async batch to S3 via start-speech-synthesis-task, SSML with standard engine full tag support, speech marks for lip-sync, SSML break/emphasis on neural engine which silently fails). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "neural-realtime-lexicon",
+      "name": "Neural real-time synthesis with custom lexicon",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — neural engine, voice Joanna en-US, MP3 24000 Hz, lexicon company-terms referenced, real-time synthesize-speech mode, per-character cost estimate",
+      "prompt": "Configure Amazon Polly to synthesize a greeting message using the neural engine. Voice: Joanna (en-US, Female). Output format: MP3 at 24000 Hz. Use a lexicon named company-terms (already uploaded) so that \"AWS\" and \"EC2\" are pronounced correctly. The text is: \"Welcome to AWS. Your EC2 instance is ready.\" This is a real-time synthesis for a web application. Region us-east-1. Tags: Environment=production, UseCase=greeting.",
+      "prompt_file": "prompts/neural-realtime-lexicon.md",
+      "baseline_file": "baselines/neural-realtime-lexicon.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "POLLY_VOICE: Joanna (neural engine, en-US)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: neural\n  [✓] Voice: Joanna (en-US, Female)\n  [✓] Voice available on engine: PASS\n  [✓] SSML compatibility: plain text — PASS\n  [✓] Output format: mp3\n  [✓] Sample rate: 24000 Hz — PASS\n  [✓] Lexicon: company-terms — uploaded\n  [✓] Synthesis mode: real-time (synthesize-speech)\n  [✓] Estimated cost: $0.000832 (52 chars × $16/1M)\nVERIFICATION_COMMANDS:\n  aws polly describe-voices --engine neural --query 'Voices[?Id==`Joanna`]'\n  aws polly list-lexicons --query 'Lexicons[?Name==`company-terms`]'",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Joanna",
+            "neural",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "company-terms"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "async-s3-batch",
+      "name": "Asynchronous batch synthesis to S3 with long-form engine",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — long-form engine, voice Joanna en-US, async start-speech-synthesis-task to S3 bucket my-polly-output, MP3 24000 Hz, cost estimate for 50K chars",
+      "prompt": "Configure Amazon Polly to batch-synthesize a 50,000-character article to S3 using the long-form engine. Voice: Joanna (en-US). Output format: MP3 at 24000 Hz. S3 output bucket: my-polly-output, key prefix: audio/articles/. Region us-east-1. Tags: Environment=production, UseCase=audiobook.",
+      "prompt_file": "prompts/async-s3-batch.md",
+      "baseline_file": "baselines/async-s3-batch.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "POLLY_VOICE: Joanna (long-form engine, en-US)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: long-form\n  [✓] Voice: Joanna (en-US, Female)\n  [✓] Output format: mp3\n  [✓] Sample rate: 24000 Hz — PASS\n  [✓] Synthesis mode: async (start-speech-synthesis-task → s3://my-polly-output/audio/articles/)\n  [✓] Estimated cost: $5.00 (50000 chars × $100/1M)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "start-speech-synthesis-task",
+            "my-polly-output",
+            "long-form",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ssml-standard-engine",
+      "name": "SSML synthesis with standard engine (full tag support)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — standard engine selected for full SSML support (break, emphasis, prosody, phoneme), voice Matthew en-US, MP3 24000 Hz",
+      "prompt": "Configure Amazon Polly to synthesize speech using SSML. The SSML uses <break time=\"500ms\"/>, <emphasis level=\"strong\">, and <prosody rate=\"slow\"> tags. Voice: Matthew (en-US). Output: MP3 at 24000 Hz. Text includes phoneme tags for IPA pronunciation. Region us-east-1. Tags: Environment=production, UseCase=ivr.",
+      "prompt_file": "prompts/ssml-standard-engine.md",
+      "baseline_file": "baselines/ssml-standard-engine.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "POLLY_VOICE: Matthew (standard engine, en-US)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: standard\n  [✓] Voice: Matthew (en-US, Male)\n  [✓] SSML compatibility: break, emphasis, prosody, phoneme — PASS (all supported on standard)\n  [✓] Output format: mp3\n  [✓] Sample rate: 24000 Hz — PASS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "standard",
+            "Matthew",
+            "SSML",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "speech-marks-lipsync",
+      "name": "Speech marks generation for lip-sync animation",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — speech marks generated as separate request (OutputFormat=json), viseme and word mark types, two-request pattern (audio + marks) noted",
+      "prompt": "Configure Amazon Polly to generate speech marks for lip-sync animation. Voice: Joanna (en-US, neural engine). Need viseme and word-level marks. Output: JSON speech marks file. Also need the corresponding MP3 audio file. Region us-east-1. Tags: Environment=production, UseCase=avatar-lipsync.",
+      "prompt_file": "prompts/speech-marks-lipsync.md",
+      "baseline_file": "baselines/speech-marks-lipsync.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "POLLY_VOICE: Joanna (neural engine, en-US)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Engine: neural\n  [✓] Voice: Joanna (en-US, Female)\n  [✓] Speech marks: viseme, word (separate request, OutputFormat=json)\n  [✓] Audio: MP3 at 24000 Hz (separate request from marks)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "speech marks",
+            "viseme",
+            "json",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ssml-break-on-neural",
+      "name": "SSML break/emphasis tags on neural engine (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — <break> and <emphasis> tags only work with standard engine; neural silently ignores them",
+      "prompt": "Configure Amazon Polly neural voice synthesis with SSML. Use voice Joanna (neural engine). The SSML includes <break time=\"500ms\"/> between sentences and <emphasis level=\"strong\"> on key terms. Output: MP3 at 24000 Hz. Region us-east-1. Tags: Environment=production.",
+      "prompt_file": "prompts/ssml-break-on-neural.md",
+      "baseline_file": "baselines/ssml-break-on-neural.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "POLLY_VOICE: Joanna (neural engine, en-US)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] SSML compatibility: FAIL — <break> and <emphasis> tags are only supported by the standard engine; neural silently ignores them. Switch to standard engine, or remove these tags and use <prosody> for timing.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "break",
+            "neural",
+            "VERDICT",
+            "CHECKLIST",
+            "standard"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

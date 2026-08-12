@@ -1,0 +1,70 @@
+{
+  "skill": "transcribe-job-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 18,
+      "max": 20,
+      "justification": "Provides concrete expert heuristics (mode decision tree, dependency graph, mutual exclusion of diarization vs channel identification, cost formulas, recent feature timeline) that a baseline model would not know without research."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes AWS\u2011specific procedural ordering (e.g., create vocab before referencing, check READY state, exact CLI flags, sequence of steps) rather than generic \"check permissions\" advice."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 15,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with precise reasons (e.g., diarization vs channel identification, retroactive PII redaction, medical API misuse, permission checks), fully satisfying anti\u2011pattern requirements."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, activation keywords, when_to_use, and strict output contract are all present; only minor vagueness in \"when to invoke\" phrasing could be tighter."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections (quick navigation, mindset, step\u2011by\u2011step, NEVER list, output format) but some sections (full tables) are dense; overall still respects progressive disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Constrains destructive actions by requiring prerequisite verification and explicit NEVER rules; however, the skill leaves some optional flags (e.g., subtitles) loosely defined, slightly under\u2011calibrated."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a clear, repeatable pattern (mindset \u2192 heuristics \u2192 step list \u2192 prerequisites \u2192 output format) that aligns with the established skill template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 14,
+      "max": 15,
+      "justification": "Model output examples are fully functional, include correct checklists, verification commands, and handle missing prerequisites; only minor omission is lack of explicit error\u2011branch for unsupported language\u2011code combos."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 42407,
+  "latency_ms": 17281,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

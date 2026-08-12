@@ -1,0 +1,49 @@
+# Eval configuration for lex-bot-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: lex-bot-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: coffee-order-dialog-codehook
+    difficulty: hard
+    prompt_file: prompts/coffee-order-dialog-codehook.md
+    baseline_file: baselines/coffee-order-dialog-codehook.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: voice-bot-polly-sentiment
+    difficulty: hard
+    prompt_file: prompts/voice-bot-polly-sentiment.md
+    baseline_file: baselines/voice-bot-polly-sentiment.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: multi-intent-version-alias
+    difficulty: medium
+    prompt_file: prompts/multi-intent-version-alias.md
+    baseline_file: baselines/multi-intent-version-alias.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: custom-slotype-confirmation-closing
+    difficulty: medium
+    prompt_file: prompts/custom-slotype-confirmation-closing.md
+    baseline_file: baselines/custom-slotype-confirmation-closing.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-lambda-permission
+    difficulty: easy
+    prompt_file: prompts/missing-lambda-permission.md
+    baseline_file: baselines/missing-lambda-permission.md
+    expected_verdict: PREREQUISITES_MISSING

@@ -1,0 +1,183 @@
+{
+  "skill": "lex-bot-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Lex Bot Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Lex V2 bot topologies (coffee ordering bot with dialog + fulfillment code hooks and slot priorities, voice bot with Polly neural and sentiment analysis, multi-intent bot with version and alias blue-green, custom slot types with confirmation and closing prompts, missing Lambda resource-based permission prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "coffee-order-dialog-codehook",
+      "name": "Coffee ordering bot with dialog and fulfillment code hooks",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — full bot with custom slot types, explicit slot priorities, both DIALOG_CODE_HOOK and FULFILLMENT_CODE_HOOK wired, conversation logs, KMS encryption, version and alias",
+      "prompt": "Create a Lex V2 bot named OrderCoffeeBot in us-east-1 (account 123456789012). Locale en-US, NLU confidence threshold 0.40. Intents: OrderCoffee, Greeting, Fallback. OrderCoffee has slots CoffeeSize (required, priority 1, custom slot type CoffeeSizeType), CoffeeDrink (required, priority 2, custom slot type CoffeeDrinkType), and CoffeeTemp (optional, priority 3, AMAZON.AlphaNumeric). Wire both DIALOG_CODE_HOOK and FULFILLMENT_CODE_HOOK to Lambda function OrderCoffeeFulfillment. Enable conversation logs (text only) to CloudWatch Logs group /aws/lex/OrderCoffeeBot. KMS CMK abc-def-123 for encryption. Build the locale, create bot version 1, and alias prod pointing at version 1.",
+      "prompt_file": "prompts/coffee-order-dialog-codehook.md",
+      "baseline_file": "baselines/coffee-order-dialog-codehook.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LEX_BOT: OrderCoffeeBot (bot-abc123) | locale: en-US | alias: prod → 1\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Bot: OrderCoffeeBot (bot-abc123), dataPrivacy childDirected=false\n  [✓] Locale: en-US — Built (NLU threshold 0.40)\n  [✓] Slots (priority order): CoffeeSize:CoffeeSizeType:required (priority 1), CoffeeDrink:CoffeeDrinkType:required (priority 2), CoffeeTemp:AMAZON.AlphaNumeric:optional (priority 3)\n  [✓] Code hook: DIALOG_CODE_HOOK=enabled, FULFILLMENT_CODE_HOOK=enabled\n  [✓] Lambda resource-based permission: lexv2.amazonaws.com granted\n  [✓] Conversation logs: text=on\n  [✓] KMS encryption: abc-def-123\n  [✓] Bot version: 1, Alias: prod → 1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "OrderCoffeeBot",
+            "en-US",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "DIALOG_CODE_HOOK",
+            "FULFILLMENT_CODE_HOOK",
+            "priority"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "voice-bot-polly-sentiment",
+      "name": "Voice bot with Polly neural voice, sentiment analysis, and Twilio channel",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — voice bot with Polly neural Joanna, sentiment analysis enabled, Twilio SMS channel integration with Secrets Manager credentials",
+      "prompt": "Create a Lex V2 voice bot named CustomerSupportBot in us-east-1 (account 123456789012). Locale en-US, Polly neural voice_id Joanna. Enable sentiment analysis. Intent: HandleComplaint with slots IssueType (required, priority 1, AMAZON.AlphaNumeric) and Severity (required, priority 2, AMAZON.Number). Wire DIALOG_CODE_HOOK and FULFILLMENT_CODE_HOOK to Lambda ComplaintHandler. Build, version 1, alias prod. Integrate Twilio SMS channel (credentials in Secrets Manager twilio/customersupport).",
+      "prompt_file": "prompts/voice-bot-polly-sentiment.md",
+      "baseline_file": "baselines/voice-bot-polly-sentiment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LEX_BOT: CustomerSupportBot (bot-def456) | locale: en-US | alias: prod → 1\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Voice: Polly voice_id=Joanna, engine=neural\n  [✓] Sentiment analysis: enabled\n  [✓] Channel integration: Twilio (Secrets Manager: twilio/customersupport)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "CustomerSupportBot",
+            "Joanna",
+            "neural",
+            "sentiment",
+            "Twilio",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-intent-version-alias",
+      "name": "Multi-intent bot with blue-green version and alias deployment",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — multi-intent bot with ReturnIntent fulfillment, two bot versions, prod and staging aliases for blue-green",
+      "prompt": "Create a Lex V2 bot named MultiIntentBot in us-east-1 (account 123456789012). Locale en-US. Intents: BookFlight, CancelFlight, CheckStatus, Greeting, Fallback. Each intent has required slots with explicit priorities. Wire DIALOG_CODE_HOOK only (no fulfillment — client handles action via ReturnIntent). Build the locale, create bot version 1 and version 2, create alias prod pointing at version 1 and alias staging pointing at version 2 for blue-green deployment.",
+      "prompt_file": "prompts/multi-intent-version-alias.md",
+      "baseline_file": "baselines/multi-intent-version-alias.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LEX_BOT: MultiIntentBot (bot-ghi789) | locale: en-US | alias: prod → 1, staging → 2\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Fulfillment mode: ReturnIntent\n  [✓] Bot version: 1 and 2\n  [✓] Alias: prod → 1, staging → 2 (blue-green)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "MultiIntentBot",
+            "ReturnIntent",
+            "blue-green",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom-slotype-confirmation-closing",
+      "name": "Custom slot types with confirmation, closing, and failure prompts",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — custom slot type enumerations (PizzaSize, PizzaCrust), confirmation/closing/failure prompts, both code hooks wired",
+      "prompt": "Create a Lex V2 bot named PizzaOrderBot in us-east-1 (account 123456789012). Locale en-US. Intent: OrderPizza with custom slot types PizzaSize (values: small, medium, large) and PizzaCrust (values: thin, thick, stuffed). Slots: PizzaSize (required, priority 1), PizzaCrust (required, priority 2), Quantity (optional, priority 3, AMAZON.Number). Configure confirmation prompt \"Should I order a {Quantity} {PizzaSize} {PizzaCrust} pizza?\", closing prompt \"Your pizza order is confirmed.\", and failure prompt \"Okay, I've cancelled that.\" Wire DIALOG_CODE_HOOK and FULFILLMENT_CODE_HOOK to Lambda PizzaOrderFulfillment. Build, version 1, alias prod.",
+      "prompt_file": "prompts/custom-slotype-confirmation-closing.md",
+      "baseline_file": "baselines/custom-slotype-confirmation-closing.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "LEX_BOT: PizzaOrderBot (bot-jkl012) | locale: en-US | alias: prod → 1\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Custom slot types: PizzaSize (small/medium/large), PizzaCrust (thin/thick/stuffed)\n  [✓] Prompts: elicitation, confirmation, closing, failure\n  [✓] Code hook: DIALOG_CODE_HOOK=enabled, FULFILLMENT_CODE_HOOK=enabled",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PizzaOrderBot",
+            "confirmation",
+            "closing",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-lambda-permission",
+      "name": "Lambda code hook without resource-based permission (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Lambda function lacks resource-based permission granting lexv2.amazonaws.com invoke access; code hook will silently fail at runtime",
+      "prompt": "Create a Lex V2 bot named BrokenHookBot in us-east-1 (account 123456789012). Locale en-US. Intent: TestIntent with slot TestSlot (required, priority 1, AMAZON.AlphaNumeric). Wire DIALOG_CODE_HOOK to Lambda function OrderCoffeeFulfillment. The Lambda does NOT have a resource-based permission granting lexv2.amazonaws.com invoke access. Build, version 1, alias prod.",
+      "prompt_file": "prompts/missing-lambda-permission.md",
+      "baseline_file": "baselines/missing-lambda-permission.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "LEX_BOT: BrokenHookBot\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Lambda resource-based permission: MISSING — lexv2.amazonaws.com not granted on OrderCoffeeFulfillment; code hook will silently fail at runtime",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "Lambda",
+            "permission",
+            "lexv2.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

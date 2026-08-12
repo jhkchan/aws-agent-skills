@@ -1,0 +1,164 @@
+# Eval test cases for greengrass-component-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Greengrass v2 component
+# scenarios (basic component with configuration merge, Docker container
+# component with volume mount, Lambda function as component with
+# aws.lambda dependency, dependency chain with hard and soft deps,
+# missing recipe lifecycle hooks).
+skill: greengrass-component-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: basic-component-deploy
+    description: >-
+      Deploy a basic Greengrass v2 component with a recipe containing
+      install, startup, and shutdown lifecycle hooks, an S3 artifact,
+      and configuration merge overrides. Expects READY_TO_DEPLOY with
+      thing group targeting, lifecycle hooks noted, and config merge
+      keys cited.
+    input: |
+      Create a Greengrass v2 component com.example.TemperatureSensor
+      version 1.0.0. The recipe should have install, startup, and
+      shutdown lifecycle hooks. Artifact is a Python script at
+      s3://my-greengrass-artifacts/artifacts/com.example.TemperatureSensor/1.0.0/sensor.py.
+      Deploy to thing group FactoryDevices (3 devices) in us-east-1.
+      Core device MyFactoryGateway is HEALTHY. Token exchange role
+      has s3:GetObject on the bucket. Configuration merge should
+      override interval to 10 and logLevel to debug. Tags:
+      Environment=production, Site=factory-1.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "com.example.TemperatureSensor"
+        - "1.0.0"
+        - "FactoryDevices"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "lifecycle"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: docker-component
+    description: >-
+      Deploy a Docker container as a Greengrass v2 component with a
+      local volume mount and the DockerApplicationManager dependency.
+      Expects READY_TO_DEPLOY with HARD dependency on
+      aws.greengrass.DockerApplicationManager, volume mount via
+      {work:path}, and image cited.
+    input: |
+      Create a Greengrass v2 component com.example.EdgeInference
+      version 1.0.0 that runs a Docker container (image:
+      edge-ml-processor:latest). It needs a local volume mount for
+      model data at {work:path}/models. Deploy to thing group
+      EdgeDevices (5 devices) in us-east-1. Include the
+      aws.greengrass.DockerApplicationManager as a HARD dependency
+      version 2.0.0. Tags: Environment=production, Runtime=docker.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "com.example.EdgeInference"
+        - "DockerApplicationManager"
+        - "edge-ml-processor"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: lambda-component
+    description: >-
+      Deploy a Lambda function as a Greengrass v2 component with the
+      aws.lambda runtime dependency. Expects READY_TO_DEPLOY with
+      aws.lambda as HARD dependency and Lambda ARN cited.
+    input: |
+      Create a Greengrass v2 component from Lambda function
+      arn:aws:lambda:us-east-1:123456789012:function:edge-data-processor:5
+      named com.example.EdgeDataProcessor version 1.0.0. Deploy to
+      thing group DataProcessors (2 devices) in us-east-1. The
+      component must depend on aws.lambda version 2.3.0 as a HARD
+      dependency. Tags: Environment=production, Runtime=lambda.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "com.example.EdgeDataProcessor"
+        - "aws.lambda"
+        - "edge-data-processor"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: dependency-chain
+    description: >-
+      Deploy a Greengrass v2 component with both HARD and SOFT
+      dependencies in a dependency chain. Expects READY_TO_DEPLOY
+      with both dependency types noted and resolution order correct.
+    input: |
+      Create a Greengrass v2 component com.example.DataPipeline
+      version 2.0.0. It has a HARD dependency on
+      com.example.StreamCollector version 1.1.0 and a SOFT dependency
+      on com.example.OptionalLogger version 1.0.0. Deploy to thing
+      group PipelineDevices (10 devices) in us-east-1. The component
+      has an artifact at
+      s3://gg-artifacts/pipeline/2.0.0/pipeline.sh. Configuration
+      merge: batchSize=50. Tags: Environment=staging.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "com.example.DataPipeline"
+        - "com.example.StreamCollector"
+        - "com.example.OptionalLogger"
+        - "HARD"
+        - "SOFT"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-recipe-lifecycle
+    description: >-
+      Operator requests a Greengrass v2 component but the recipe is
+      missing lifecycle hooks (no install, startup, or shutdown
+      defined). This is a prerequisite failure. Expects
+      PREREQUISITES_MISSING with the missing lifecycle cited.
+    input: |
+      Create a Greengrass v2 component com.example.BrokenComponent
+      version 1.0.0. The recipe has metadata and artifacts but no
+      lifecycle section (no install, startup, or shutdown hooks).
+      Deploy to thing group TestDevices (1 device) in us-east-1.
+      Artifact at s3://gg-artifacts/broken/1.0.0/app.py.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "lifecycle"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "com.example.BrokenComponent"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

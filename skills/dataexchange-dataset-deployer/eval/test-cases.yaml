@@ -1,0 +1,160 @@
+# Eval test cases for dataexchange-dataset-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Data Exchange scenarios
+# (S3 asset export to subscriber bucket with Lake Formation, auto-export
+# EventBridge rule on new revision, API asset live access, entitlement-
+# based sharing across accounts, missing finalized revision).
+skill: dataexchange-dataset-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: s3-export-lake-formation
+    description: >-
+      Subscribe to a Data Exchange S3_SNAPSHOT data product, export
+      assets to a subscriber S3 bucket, and integrate with Lake
+      Formation for governed access. Expects READY_TO_DEPLOY with
+      export job, LF registration, and Data Catalog table noted.
+    input: |
+      Subscribe to Data Exchange data set ds-abc12345
+      (S3_SNAPSHOT type, CSV market data). Subscription sub-def67890
+      is ACTIVE. The latest revision r-ghi11122 is FINALIZED with
+      5 assets. Export to S3 bucket my-analytics-bucket in us-east-1.
+      IAM role dx-export-role has s3:PutObject on the bucket.
+      Integrate with Lake Formation: register the S3 location and
+      create Data Catalog table market_data in database
+      data_exchange_db. Tags: Environment=production,
+      DataSource=market-data.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ds-abc12345"
+        - "S3_SNAPSHOT"
+        - "my-analytics-bucket"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "Lake Formation"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: auto-export-eventbridge
+    description: >-
+      Configure auto-export for a Data Exchange data set using an
+      EventBridge rule that triggers an export job on new revision
+      publication. Expects READY_TO_DEPLOY with EventBridge rule,
+      Lambda target, and auto-export flow noted.
+    input: |
+      Set up auto-export for Data Exchange data set ds-auto123.
+      Subscription is ACTIVE. When a new revision is published, an
+      EventBridge rule should trigger Lambda function dx-auto-export
+      to start an export job copying S3_SNAPSHOT assets to bucket
+      my-auto-bucket in us-east-1. IAM role for Lambda has
+      dataexchange:StartJob and s3:PutObject permissions.
+      Tags: Environment=production, Pipeline=auto-export.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "EventBridge"
+        - "auto-export"
+        - "ds-auto123"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: api-asset-live-access
+    description: >-
+      Consume a Data Exchange API asset (REST endpoint) that provides
+      live real-time data. Expects READY_TO_DEPLOY with API asset
+      accessed live (NOT exported to S3), authentication via Data
+      Exchange credentials, and rate-limiting noted.
+    input: |
+      Access API asset from Data Exchange data set ds-api456.
+      Subscription sub-api789 is ACTIVE. The latest revision
+      r-api111 has an API asset (REST endpoint at
+      https://api.provider.com/v1/marketdata). The API provides
+      real-time market data. Authentication is via Data Exchange
+      signing keys. Tags: Environment=production, AccessMode=live.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        "API"
+        - "ds-api456"
+        - "live"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: entitlement-cross-account
+    description: >-
+      Share a Data Exchange data set with another AWS account via
+      entitlement. Expects READY_TO_DEPLOY with entitlement as the
+      sharing mechanism (NOT IAM), target account cited, and export
+      flow for the receiving account.
+    input: |
+      Share Data Exchange data set ds-share789 with AWS account
+      999999999999 via entitlement. The data set is S3_SNAPSHOT type.
+      Provider account is 123456789012 in us-east-1. After the
+      entitlement is created, the receiving account should export
+      to bucket their-dx-bucket. Tags: Environment=production,
+      SharedWith=partner.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "entitlement"
+        - "999999999999"
+        - "ds-share789"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-finalized-revision
+    description: >-
+      Operator requests an export of a Data Exchange data set, but the
+      latest revision is still in DRAFT state (not finalized).
+      This is a prerequisite failure. Expects PREREQUISITES_MISSING
+      with the unfinalized revision cited.
+    input: |
+      Export assets from Data Exchange data set ds-broken456.
+      Subscription sub-broken123 is ACTIVE. The latest revision
+      r-draft999 is in DRAFT state (not finalized). Attempting to
+      create an export job for this revision. Destination bucket
+      is my-bucket in us-east-1.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "revision"
+        - "DRAFT"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "ds-broken456"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

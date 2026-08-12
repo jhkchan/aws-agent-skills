@@ -1,0 +1,162 @@
+# Eval test cases for transcribe-job-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Transcribe scenarios
+# (batch transcription with diarization and custom vocabulary,
+# medical transcription job, custom vocabulary with vocabulary
+# filter, PII content redaction, missing S3 output permissions
+# prerequisite failure).
+skill: transcribe-job-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: batch-diarization-vocab
+    description: >-
+      Deploy a batch transcription job with speaker diarization
+      enabled (mono audio, 3 speakers), a custom vocabulary for
+      company-specific terms, and SRT/VTT subtitle output. Expects
+      READY_TO_DEPLOY with diarization noted, custom vocabulary
+      verified READY, and cost estimate based on audio duration.
+    input: |
+      Configure Amazon Transcribe to transcribe a 1-hour mono WAV
+      meeting recording from s3://my-input-bucket/audio/meeting.wav.
+      Language: en-US. Enable speaker diarization (3 speakers).
+      Use a custom vocabulary named company-terms (already in READY
+      state) for AWS service names. Output to
+      s3://my-output-bucket. Need SRT and VTT subtitles. Region
+      us-east-1. Tags: Environment=production,
+      UseCase=meeting-transcription.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "diarization"
+        - "company-terms"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "start-transcription-job"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: medical-transcription
+    description: >-
+      Deploy a medical transcription job using the medical API
+      (start-medical-transcription-job) for a clinical dictation.
+      Expects READY_TO_DEPLOY with medical API noted, specialty
+      specified, and medical pricing applied.
+    input: |
+      Configure Amazon Transcribe Medical to transcribe a
+      physician dictation audio file from
+      s3://medical-input/dictations/cardiology-note.wav. Language:
+      en-US (medical does not support auto-identify). Specialty:
+      CARDIOLOGY. Type: DICTATION. Output to
+      s3://medical-output. Region us-east-1. Tags:
+      Environment=production, UseCase=clinical-dictation,
+      Compliance=HIPAA.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "medical"
+        - "CARDIOLOGY"
+        - "DICTATION"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: vocabulary-and-filter
+    description: >-
+      Deploy a batch transcription with both a custom vocabulary
+      (to boost desired terms) and a vocabulary filter (to mask
+      unwanted terms). Expects READY_TO_DEPLOY with both applied
+      simultaneously and filter mode specified.
+    input: |
+      Configure Amazon Transcribe to transcribe a customer support
+      call recording from s3://calls-input/recordings/call-001.flac.
+      Language: en-US. Use custom vocabulary "support-terms" (READY)
+      for product names. Also use vocabulary filter "profanity-filter"
+      (READY) in mask mode. No diarization needed. Output to
+      s3://calls-output. Region us-east-1. Tags:
+      Environment=production, UseCase=call-analysis.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "support-terms"
+        - "profanity-filter"
+        - "mask"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: pii-redaction
+    description: >-
+      Deploy a batch transcription with PII content redaction
+      enabled. Expects READY_TO_DEPLOY with PII redaction applied
+      during transcription, entity types specified, and the
+      redacted-only output mode noted.
+    input: |
+      Configure Amazon Transcribe to transcribe a financial
+      services call from s3://fin-input/calls/customer-call.wav.
+      Language: en-US. Enable PII content redaction — mask NAME,
+      SSN, CREDIT_CARD_NUMBER, BANK_ACCOUNT_NUMBER, and PHONE.
+      Output only the redacted transcript to s3://fin-output.
+      Region us-east-1. Tags: Environment=production,
+      UseCase=compliance, Regulation=PCI-DSS.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "PII"
+        - "redaction"
+        - "SSN"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-s3-output-permissions
+    description: >-
+      Operator requests a transcription job but the S3 output bucket
+      does not grant Transcribe write permissions. This is a
+      prerequisite failure. Expects PREREQUISITES_MISSING with the
+      S3 PutObject permission gap cited.
+    input: |
+      Configure Amazon Transcribe to transcribe audio from
+      s3://input-bucket/audio.wav. Language: en-US. Output to
+      s3://output-bucket. The output bucket does not have a bucket
+      policy granting Transcribe write access. Region us-east-1.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "S3"
+        - "PutObject"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "output"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

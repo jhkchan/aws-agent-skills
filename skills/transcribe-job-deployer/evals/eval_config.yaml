@@ -1,0 +1,49 @@
+# Eval configuration for transcribe-job-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: transcribe-job-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: batch-diarization-vocab
+    difficulty: hard
+    prompt_file: prompts/batch-diarization-vocab.md
+    baseline_file: baselines/batch-diarization-vocab.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: medical-transcription
+    difficulty: hard
+    prompt_file: prompts/medical-transcription.md
+    baseline_file: baselines/medical-transcription.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: vocabulary-and-filter
+    difficulty: medium
+    prompt_file: prompts/vocabulary-and-filter.md
+    baseline_file: baselines/vocabulary-and-filter.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: pii-redaction
+    difficulty: medium
+    prompt_file: prompts/pii-redaction.md
+    baseline_file: baselines/pii-redaction.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-s3-output-permissions
+    difficulty: easy
+    prompt_file: prompts/missing-s3-output-permissions.md
+    baseline_file: baselines/missing-s3-output-permissions.md
+    expected_verdict: PREREQUISITES_MISSING

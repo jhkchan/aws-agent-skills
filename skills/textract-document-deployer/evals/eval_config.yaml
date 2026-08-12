@@ -1,0 +1,49 @@
+# Eval configuration for textract-document-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: textract-document-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: async-forms-tables-sns-kms
+    difficulty: hard
+    prompt_file: prompts/async-forms-tables-sns-kms.md
+    baseline_file: baselines/async-forms-tables-sns-kms.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: queries-natural-language
+    difficulty: hard
+    prompt_file: prompts/queries-natural-language.md
+    baseline_file: baselines/queries-natural-language.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: expense-analysis-invoices
+    difficulty: medium
+    prompt_file: prompts/expense-analysis-invoices.md
+    baseline_file: baselines/expense-analysis-invoices.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: lambda-sync-realtime
+    difficulty: medium
+    prompt_file: prompts/lambda-sync-realtime.md
+    baseline_file: baselines/lambda-sync-realtime.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-s3-getobject-permission
+    difficulty: easy
+    prompt_file: prompts/missing-s3-getobject-permission.md
+    baseline_file: baselines/missing-s3-getobject-permission.md
+    expected_verdict: PREREQUISITES_MISSING

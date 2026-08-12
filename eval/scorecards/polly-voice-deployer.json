@@ -1,0 +1,70 @@
+{
+  "skill": "polly-voice-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides many expert details (engine\u2011selection decision tree, exact SSML tag support per engine, pricing per million characters, lexicon constraints), but omits deeper delta such as region\u2011specific price variations, token limits for the generative engine, and concrete thresholds for when to switch from neural to long\u2011form based on text length or latency."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Lists AWS\u2011specific CLI sequences and ordering (engine \u2192 voice \u2192 lexicon \u2192 synthesis mode) and includes verification steps, yet the async\u2011task procedure does not explicitly require checking the Polly service\u2011linked role or confirming the S3 bucket policy before starting the task."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete pitfalls (break/emphasis on neural, missing lexicon, wrong sample rate, etc.) and reasons, but the entry about lexicon regionality lacks a deeper why (e.g., eventual DNS routing and IAM scoping) and does not warn about versioning conflicts that can cause silent failures."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, keywords, and when_to_use are present, and the output contract is clearly defined. However, the skill does not include a dedicated \"activation\" field in the frontmatter; triggers are only embedded in the free\u2011form description, which could hinder automated skill discovery."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document layers high\u2011level sections (quick navigation, mindset, step\u2011by\u2011step) but the initial Mindset paragraph is dense and contains many heuristics before the quick\u2011navigation table, causing some cognitive overload for a first\u2011time reader."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Calibrates constraints for fragile operations (sample\u2011rate validation, S3 permissions) but leaves the S3 bucket name completely free without any naming\u2011pattern check or guidance on bucket\u2011policy requirements, which could lead to avoidable async\u2011task failures."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Heuristics \u2192 NEVER \u2192 Output format), yet the Mindset section is not visually separated from the procedural steps, making the overall structure feel slightly ad\u2011hoc rather than a clean, repeatable template."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI examples, a ready\u2011to\u2011deploy checklist, and error\u2011handling guidance, but lacks a combined workflow for generating audio\u202f+\u202fspeech\u2011marks in a single pipeline and does not address pagination when listing voices for large language sets, leaving edge cases unhandled."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 45047,
+  "latency_ms": 21339,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

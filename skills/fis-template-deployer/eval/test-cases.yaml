@@ -1,0 +1,177 @@
+# Eval test cases for fis-template-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across FIS fault actions
+# (EC2 stop-instances with stop condition and tag-based targeting,
+# network connectivity disruption across AZs, RDS DB cluster failover,
+# ECS container-instance drain, missing IAM role permission for the
+# fault action on target resources).
+skill: fis-template-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: ec2-stop-instances-experiment
+    description: >-
+      Provision a FIS experiment template that stops one EC2 instance
+      tagged FIS_Target=enabled in staging for 5 minutes, with a
+      CloudWatch CPU-high alarm stop condition. Expects READY_TO_DEPLOY
+      with tag-based target scoping, stop condition alarm ARN cited,
+      and IAM role scoped to ec2:StopInstances on the FIS_Target tag.
+    input: |
+      Create a FIS experiment template in us-east-1 account
+      123456789012. Action: aws:ec2:stop-instances with startAfter 5m.
+      Target: EC2 instances tagged FIS_Target=enabled and
+      Environment=staging, selectionMode COUNT(1). Stop condition:
+      CloudWatch alarm FIS-CPU-High (alarm ARN
+      arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-CPU-High).
+      IAM role FISExperimentRole (trust fis.amazonaws.com,
+      ec2:StopInstances on tag FIS_Target=enabled). Log group
+      /aws/fis/stop-instance-experiment. Tags: Environment=staging,
+      ExperimentType=HA-Test.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws:ec2:stop-instances"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "FIS-CPU-High"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: network-connectivity-disruption
+    description: >-
+      Provision a FIS experiment template that disrupts network
+      connectivity between two AZs in a VPC for 2 minutes to test
+      multi-AZ failover. Expects READY_TO_DEPLOY with the network
+      disruption action parameters, AZ scoping, and the FIS network
+      agent IAM permissions (ec2:CreateNetworkInterface) cited.
+    input: |
+      Create a FIS experiment template in us-east-1 account
+      123456789012. Action: aws:network:disrupt-connectivity with
+      duration 2m, scope between us-east-1a and us-east-1b in VPC
+      vpc-aaa11122. Stop condition: CloudWatch alarm
+      FIS-HealthCheck-Fail (ARN
+      arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-HealthCheck-Fail).
+      IAM role FISNetworkRole with ec2:CreateNetworkInterface and
+      ec2:DeleteNetworkInterface permissions plus FIS network agent
+      pass-role. Log group /aws/fis/network-disruption. Tags:
+      Environment=staging, ExperimentType=MultiAZ-Network.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws:network:disrupt-connectivity"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "us-east-1a"
+        - "us-east-1b"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: rds-failover-experiment
+    description: >-
+      Provision a FIS experiment template that triggers an RDS Aurora
+      DB cluster failover to test HA. Expects READY_TO_DEPLOY with the
+      RDS failover action, the DB cluster target by cluster ARN, and
+      IAM role scoped to rds:FailoverDBCluster on the target cluster.
+    input: |
+      Create a FIS experiment template in us-east-1 account
+      123456789012. Action: aws:rds:failover-db-cluster. Target: RDS
+      DB cluster aurora-prod-cluster (ARN
+      arn:aws:rds:us-east-1:123456789012:cluster:aurora-prod-cluster),
+      selectionMode COUNT(1). Stop condition: CloudWatch alarm
+      FIS-RDS-Lag-High (ARN
+      arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-RDS-Lag-High).
+      IAM role FISRDSRole with rds:FailoverDBCluster and
+      rds:DescribeDBClusters scoped to the target cluster ARN. Log
+      group /aws/fis/rds-failover. Tags: Environment=staging,
+      ExperimentType=RDS-Failover.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws:rds:failover-db-cluster"
+        - "aurora-prod-cluster"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ecs-container-instance-drain
+    description: >-
+      Provision a FIS experiment template that drains an ECS container
+      instance for 5 minutes to test task rescheduling. Expects
+      READY_TO_DEPLOY with the ECS drain action, cluster+tag-based
+      targeting, and IAM role scoped to ECS drain permissions.
+    input: |
+      Create a FIS experiment template in us-east-1 account
+      123456789012. Action: aws:ecs:drain-container-instances with
+      duration 5m. Target: ECS container instances in cluster
+      ecs-prod-cluster tagged FIS_Target=enabled, selectionMode
+      COUNT(1). Stop condition: CloudWatch alarm FIS-ECS-Task-Pending
+      (ARN
+      arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-ECS-Task-Pending).
+      IAM role FISECSRole with ecs:ListContainerInstances,
+      ecs:UpdateContainerInstancesState, and
+      ecs:DescribeContainerInstances scoped to cluster
+      arn:aws:ecs:us-east-1:123456789012:cluster/ecs-prod-cluster.
+      Log group /aws/fis/ecs-drain. Tags: Environment=staging,
+      ExperimentType=ECS-Drain.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aws:ecs:drain-container-instances"
+        - "ecs-prod-cluster"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-iam-role-permissions
+    description: >-
+      Operator requests a FIS experiment template with an IAM role that
+      lacks ec2:StopInstances permission on the target resources. This
+      is a prerequisite failure. Expects PREREQUISITES_MISSING with the
+      missing permission cited.
+    input: |
+      Create a FIS experiment template in us-east-1 account
+      123456789012. Action: aws:ec2:stop-instances. Target: EC2
+      instances tagged FIS_Target=enabled, selectionMode COUNT(1).
+      Stop condition: CloudWatch alarm FIS-CPU-High (ARN
+      arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-CPU-High).
+      IAM role FISExperimentRole — the role has trust policy for
+      fis.amazonaws.com but only grants ec2:DescribeInstances (no
+      ec2:StopInstances permission). Log group
+      /aws/fis/stop-instance-experiment.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "ec2:StopInstances"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

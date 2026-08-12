@@ -1,0 +1,180 @@
+{
+  "skill": "dataexchange-dataset-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Data Exchange Dataset Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Data Exchange scenarios (S3 asset export with Lake Formation integration, auto-export EventBridge rule on new revision, API asset live access via Data Exchange gateway, entitlement-based cross-account sharing, unfinalized revision prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "s3-export-lake-formation",
+      "name": "S3 asset export with Lake Formation governed access",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — S3_SNAPSHOT export to subscriber bucket, Lake Formation registration, Data Catalog table creation, IAM role with s3:PutObject",
+      "prompt": "Subscribe to Data Exchange data set ds-abc12345 (S3_SNAPSHOT type, CSV market data). Subscription sub-def67890 is ACTIVE. The latest revision r-ghi11122 is FINALIZED with 5 assets. Export to S3 bucket my-analytics-bucket in us-east-1. IAM role dx-export-role has s3:PutObject on the bucket. Integrate with Lake Formation: register the S3 location and create Data Catalog table market_data in database data_exchange_db. Tags: Environment=production, DataSource=market-data.",
+      "prompt_file": "prompts/s3-export-lake-formation.md",
+      "baseline_file": "baselines/s3-export-lake-formation.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DATA_EXCHANGE: ds-abc12345 (subscription: sub-def67890) → S3: my-analytics-bucket\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Subscription: sub-def67890 — ACTIVE\n  [✓] Data set: ds-abc12345 — S3_SNAPSHOT (CSV files)\n  [✓] Revision: r-ghi11122 — FINALIZED\n  [✓] Assets: 5 assets of type S3_SNAPSHOT\n  [✓] Destination S3 bucket: my-analytics-bucket — exists\n  [✓] IAM role: dx-export-role with s3:PutObject on my-analytics-bucket — configured\n  [✓] Lake Formation: S3 location registered, Data Catalog table market_data — configured\nVERIFICATION_COMMANDS:\n  aws dataexchange get-data-set --data-set-id ds-abc12345 --region us-east-1\n  aws dataexchange get-job --job-id <job-id> --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ds-abc12345",
+            "S3_SNAPSHOT",
+            "my-analytics-bucket",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "Lake Formation"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "auto-export-eventbridge",
+      "name": "Auto-export with EventBridge rule on new revision",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — EventBridge rule triggers Lambda on Data Update event, Lambda calls StartJob for EXPORT_ASSETS_TO_S3, auto-export flow noted",
+      "prompt": "Set up auto-export for Data Exchange data set ds-auto123. Subscription is ACTIVE. When a new revision is published, an EventBridge rule should trigger Lambda function dx-auto-export to start an export job copying S3_SNAPSHOT assets to bucket my-auto-bucket in us-east-1. IAM role for Lambda has dataexchange:StartJob and s3:PutObject permissions. Tags: Environment=production, Pipeline=auto-export.",
+      "prompt_file": "prompts/auto-export-eventbridge.md",
+      "baseline_file": "baselines/auto-export-eventbridge.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DATA_EXCHANGE: ds-auto123 (subscription: ACTIVE) → S3: my-auto-bucket\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Data set: ds-auto123 — S3_SNAPSHOT\n  [✓] Auto-export: EventBridge rule on Data Update → Lambda dx-auto-export → StartJob\n  [✓] Destination S3 bucket: my-auto-bucket — exists\n  [✓] IAM role: dataexchange:StartJob + s3:PutObject — configured",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EventBridge",
+            "auto-export",
+            "ds-auto123",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "api-asset-live-access",
+      "name": "API asset live access via Data Exchange gateway",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — API asset accessed live (NOT exported to S3), authentication via Data Exchange signing keys, rate-limiting noted",
+      "prompt": "Access API asset from Data Exchange data set ds-api456. Subscription sub-api789 is ACTIVE. The latest revision r-api111 has an API asset (REST endpoint at https://api.provider.com/v1/marketdata). The API provides real-time market data. Authentication is via Data Exchange signing keys. Tags: Environment=production, AccessMode=live.",
+      "prompt_file": "prompts/api-asset-live-access.md",
+      "baseline_file": "baselines/api-asset-live-access.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DATA_EXCHANGE: ds-api456 (subscription: sub-api789) → API: https://api.provider.com/v1/marketdata\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Subscription: sub-api789 — ACTIVE\n  [✓] Data set: ds-api456 — API asset\n  [✓] API asset access: https://api.provider.com/v1/marketdata — live access via Data Exchange gateway\n  [✓] Authentication: Data Exchange signing keys — configured",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "API",
+            "ds-api456",
+            "live",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "entitlement-cross-account",
+      "name": "Cross-account data set sharing via entitlement",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — entitlement as the sharing mechanism (NOT IAM), target account cited, receiving account exports to their S3 bucket",
+      "prompt": "Share Data Exchange data set ds-share789 with AWS account 999999999999 via entitlement. The data set is S3_SNAPSHOT type. Provider account is 123456789012 in us-east-1. After the entitlement is created, the receiving account should export to bucket their-dx-bucket. Tags: Environment=production, SharedWith=partner.",
+      "prompt_file": "prompts/entitlement-cross-account.md",
+      "baseline_file": "baselines/entitlement-cross-account.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "DATA_EXCHANGE: ds-share789 (entitlement → account 999999999999)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Data set: ds-share789 — S3_SNAPSHOT\n  [✓] Entitlement: target account 999999999999 — entitled\n  [✓] Receiving account export: their-dx-bucket",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "entitlement",
+            "999999999999",
+            "ds-share789",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-finalized-revision",
+      "name": "Export with unfinalized revision (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — latest revision r-draft999 is in DRAFT state; only FINALIZED revisions can be exported; export job will fail",
+      "prompt": "Export assets from Data Exchange data set ds-broken456. Subscription sub-broken123 is ACTIVE. The latest revision r-draft999 is in DRAFT state (not finalized). Attempting to create an export job for this revision. Destination bucket is my-bucket in us-east-1.",
+      "prompt_file": "prompts/missing-finalized-revision.md",
+      "baseline_file": "baselines/missing-finalized-revision.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "DATA_EXCHANGE: ds-broken456 (subscription: sub-broken123)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Revision: r-draft999 — DRAFT (must be FINALIZED before export; export jobs fail on unfinalized revisions)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "revision",
+            "DRAFT",
+            "VERDICT",
+            "CHECKLIST",
+            "ds-broken456"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+# Eval configuration for fis-template-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: fis-template-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: ec2-stop-instances-experiment
+    difficulty: hard
+    prompt_file: prompts/ec2-stop-instances-experiment.md
+    baseline_file: baselines/ec2-stop-instances-experiment.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: network-connectivity-disruption
+    difficulty: hard
+    prompt_file: prompts/network-connectivity-disruption.md
+    baseline_file: baselines/network-connectivity-disruption.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: rds-failover-experiment
+    difficulty: medium
+    prompt_file: prompts/rds-failover-experiment.md
+    baseline_file: baselines/rds-failover-experiment.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: ecs-container-instance-drain
+    difficulty: medium
+    prompt_file: prompts/ecs-container-instance-drain.md
+    baseline_file: baselines/ecs-container-instance-drain.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-iam-role-permissions
+    difficulty: easy
+    prompt_file: prompts/missing-iam-role-permissions.md
+    baseline_file: baselines/missing-iam-role-permissions.md
+    expected_verdict: PREREQUISITES_MISSING

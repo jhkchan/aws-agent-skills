@@ -1,0 +1,174 @@
+{
+  "skill": "fis-template-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the FIS Template Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across FIS fault actions (EC2 stop-instances with stop condition and tag-based targeting, network connectivity disruption across AZs, RDS Aurora cluster failover for HA, ECS container-instance drain for task rescheduling, missing ec2:StopInstances permission prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "ec2-stop-instances-experiment",
+      "name": "EC2 stop-instances FIS experiment with stop condition and tag-based targeting",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — aws:ec2:stop-instances action on tag FIS_Target=enabled in staging, COUNT(1) selectionMode, CloudWatch CPU-high alarm stop condition, IAM role scoped to ec2:StopInstances on the FIS_Target tag",
+      "prompt": "Create a FIS experiment template in us-east-1 account 123456789012. Action: aws:ec2:stop-instances with startAfter 5m. Target: EC2 instances tagged FIS_Target=enabled and Environment=staging, selectionMode COUNT(1). Stop condition: CloudWatch alarm FIS-CPU-High (alarm ARN arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-CPU-High). IAM role FISExperimentRole (trust fis.amazonaws.com, ec2:StopInstances on tag FIS_Target=enabled). Log group /aws/fis/stop-instance-experiment. Tags: Environment=staging, ExperimentType=HA-Test.",
+      "prompt_file": "prompts/ec2-stop-instances-experiment.md",
+      "baseline_file": "baselines/ec2-stop-instances-experiment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FIS_TEMPLATE: EXTVAR123456 — aws:ec2:stop-instances on EC2 instances tagged FIS_Target=enabled\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Action: aws:ec2:stop-instances — startAfter: 5m\n  [✓] Target: aws:ec2:instance via tags {FIS_Target=enabled, Environment=staging} (selectionMode: COUNT(1))\n  [✓] Stop condition: arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-CPU-High\n  [✓] IAM role: arn:aws:iam::123456789012:role/FISExperimentRole (trust: fis.amazonaws.com; permissions: ec2:StopInstances on tag:FIS_Target=enabled)\n  [✓] Log group: /aws/fis/stop-instance-experiment\nVERIFICATION_COMMANDS:\n  aws fis get-experiment-template --id EXTVAR123456 --region us-east-1\n  aws cloudwatch describe-alarms --alarm-names FIS-CPU-High",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws:ec2:stop-instances",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "FIS-CPU-High"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network-connectivity-disruption",
+      "name": "Network connectivity disruption between AZs for multi-AZ failover testing",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — aws:network:disrupt-connectivity action between us-east-1a and us-east-1b, FIS network agent IAM role with ec2:CreateNetworkInterface, CloudWatch health-check alarm stop condition",
+      "prompt": "Create a FIS experiment template in us-east-1 account 123456789012. Action: aws:network:disrupt-connectivity with duration 2m, scope between us-east-1a and us-east-1b in VPC vpc-aaa11122. Stop condition: CloudWatch alarm FIS-HealthCheck-Fail (ARN arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-HealthCheck-Fail). IAM role FISNetworkRole with ec2:CreateNetworkInterface and ec2:DeleteNetworkInterface permissions plus FIS network agent pass-role. Log group /aws/fis/network-disruption. Tags: Environment=staging, ExperimentType=MultiAZ-Network.",
+      "prompt_file": "prompts/network-connectivity-disruption.md",
+      "baseline_file": "baselines/network-connectivity-disruption.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FIS_TEMPLATE: EXTVAR223456 — aws:network:disrupt-connectivity between us-east-1a and us-east-1b\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Action: aws:network:disrupt-connectivity — duration: 2m\n  [✓] Network scope: us-east-1a ↔ us-east-1b in vpc-aaa11122\n  [✓] Stop condition: arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-HealthCheck-Fail\n  [✓] IAM role: arn:aws:iam::123456789012:role/FISNetworkRole (trust: fis.amazonaws.com; permissions: ec2:CreateNetworkInterface, ec2:DeleteNetworkInterface, FIS network agent pass-role)\n  [✓] Log group: /aws/fis/network-disruption\nVERIFICATION_COMMANDS:\n  aws fis get-experiment-template --id EXTVAR223456 --region us-east-1\n  aws cloudwatch describe-alarms --alarm-names FIS-HealthCheck-Fail",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws:network:disrupt-connectivity",
+            "VERDICT",
+            "CHECKLIST",
+            "us-east-1a",
+            "us-east-1b"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rds-failover-experiment",
+      "name": "RDS Aurora DB cluster failover for HA testing",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — aws:rds:failover-db-cluster action on aurora-prod-cluster by ARN, IAM role scoped to rds:FailoverDBCluster on the target cluster ARN, CloudWatch RDS-lag alarm stop condition",
+      "prompt": "Create a FIS experiment template in us-east-1 account 123456789012. Action: aws:rds:failover-db-cluster. Target: RDS DB cluster aurora-prod-cluster (ARN arn:aws:rds:us-east-1:123456789012:cluster:aurora-prod-cluster), selectionMode COUNT(1). Stop condition: CloudWatch alarm FIS-RDS-Lag-High (ARN arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-RDS-Lag-High). IAM role FISRDSRole with rds:FailoverDBCluster and rds:DescribeDBClusters scoped to the target cluster ARN. Log group /aws/fis/rds-failover. Tags: Environment=staging, ExperimentType=RDS-Failover.",
+      "prompt_file": "prompts/rds-failover-experiment.md",
+      "baseline_file": "baselines/rds-failover-experiment.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FIS_TEMPLATE: EXTVAR323456 — aws:rds:failover-db-cluster on aurora-prod-cluster\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Action: aws:rds:failover-db-cluster\n  [✓] Target: aws:rds:cluster via ARN arn:aws:rds:us-east-1:123456789012:cluster:aurora-prod-cluster (selectionMode: COUNT(1))\n  [✓] Stop condition: arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-RDS-Lag-High\n  [✓] IAM role: arn:aws:iam::123456789012:role/FISRDSRole (trust: fis.amazonaws.com; permissions: rds:FailoverDBCluster, rds:DescribeDBClusters on cluster ARN)\n  [✓] Log group: /aws/fis/rds-failover\nVERIFICATION_COMMANDS:\n  aws fis get-experiment-template --id EXTVAR323456 --region us-east-1\n  aws rds describe-db-clusters --db-cluster-identifier aurora-prod-cluster --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws:rds:failover-db-cluster",
+            "aurora-prod-cluster",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ecs-container-instance-drain",
+      "name": "ECS container-instance drain for task rescheduling testing",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — aws:ecs:drain-container-instances action on ecs-prod-cluster with FIS_Target=enabled tag, IAM role scoped to ECS drain permissions, CloudWatch task-pending alarm stop condition",
+      "prompt": "Create a FIS experiment template in us-east-1 account 123456789012. Action: aws:ecs:drain-container-instances with duration 5m. Target: ECS container instances in cluster ecs-prod-cluster tagged FIS_Target=enabled, selectionMode COUNT(1). Stop condition: CloudWatch alarm FIS-ECS-Task-Pending (ARN arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-ECS-Task-Pending). IAM role FISECSRole with ecs:ListContainerInstances, ecs:UpdateContainerInstancesState, and ecs:DescribeContainerInstances scoped to cluster arn:aws:ecs:us-east-1:123456789012:cluster/ecs-prod-cluster. Log group /aws/fis/ecs-drain. Tags: Environment=staging, ExperimentType=ECS-Drain.",
+      "prompt_file": "prompts/ecs-container-instance-drain.md",
+      "baseline_file": "baselines/ecs-container-instance-drain.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "FIS_TEMPLATE: EXTVAR423456 — aws:ecs:drain-container-instances on ecs-prod-cluster\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Action: aws:ecs:drain-container-instances — duration: 5m\n  [✓] Target: aws:ecs:container-instance via cluster ecs-prod-cluster + tags {FIS_Target=enabled} (selectionMode: COUNT(1))\n  [✓] Stop condition: arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-ECS-Task-Pending\n  [✓] IAM role: arn:aws:iam::123456789012:role/FISECSRole (trust: fis.amazonaws.com; permissions: ecs:ListContainerInstances, ecs:UpdateContainerInstancesState, ecs:DescribeContainerInstances on cluster)\n  [✓] Log group: /aws/fis/ecs-drain\nVERIFICATION_COMMANDS:\n  aws fis get-experiment-template --id EXTVAR423456 --region us-east-1\n  aws ecs describe-container-instances --cluster ecs-prod-cluster --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aws:ecs:drain-container-instances",
+            "ecs-prod-cluster",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-iam-role-permissions",
+      "name": "FIS experiment with IAM role missing the fault action permission (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — IAM role FISExperimentRole lacks ec2:StopInstances permission required by the aws:ec2:stop-instances action; experiment would fail to start with permission denied",
+      "prompt": "Create a FIS experiment template in us-east-1 account 123456789012. Action: aws:ec2:stop-instances. Target: EC2 instances tagged FIS_Target=enabled, selectionMode COUNT(1). Stop condition: CloudWatch alarm FIS-CPU-High (ARN arn:aws:cloudwatch:us-east-1:123456789012:alarm:FIS-CPU-High). IAM role FISExperimentRole — the role has trust policy for fis.amazonaws.com but only grants ec2:DescribeInstances (no ec2:StopInstances permission). Log group /aws/fis/stop-instance-experiment.",
+      "prompt_file": "prompts/missing-iam-role-permissions.md",
+      "baseline_file": "baselines/missing-iam-role-permissions.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "FIS_TEMPLATE: aws:ec2:stop-instances on EC2 instances tagged FIS_Target=enabled\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] IAM role permissions: FISExperimentRole lacks ec2:StopInstances — required by the aws:ec2:stop-instances action; experiment would fail to start with permission denied",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "ec2:StopInstances",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

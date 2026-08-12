@@ -1,0 +1,161 @@
+# Eval test cases for textract-document-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Textract deployment
+# topologies (multipage async Forms+Tables with SNS+KMS+OutputConfig,
+# Queries feature for natural-language form questions, Expense Analysis
+# for invoices/receipts, Lambda synchronous real-time single-page,
+# missing IAM s3:GetObject permission prerequisite failure).
+skill: textract-document-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: async-forms-tables-sns-kms
+    description: >-
+      Deploy an asynchronous multipage document analysis pipeline with
+      Forms + Tables feature types, S3 input, OutputConfig, KMS
+      encryption, and SNS completion notification. Expects
+      READY_TO_DEPLOY with StartDocumentAnalysis, OutputConfig to a
+      customer-owned bucket, KMS key on input and output, and SNS
+      notification role.
+    input: |
+      Set up an async Textract pipeline for a 1450-page PDF invoice
+      bundle at s3://doc-input/invoices/2026-q3.pdf in us-east-1.
+      Extract Forms and Tables. Write structured output to
+      s3://doc-output/textract/ (same region). Encrypt with KMS key
+      arn:aws:kms:us-east-1:123456789012:key/abcd1234.... Notify
+      SNS topic arn:aws:sns:us-east-1:123456789012:TextractComplete
+      on completion. IAM role arn:aws:iam::123456789012:role/TextractProcessingRole.
+      Tag Project=invoice-automation.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "StartDocumentAnalysis"
+        - "FORMS"
+        - "TABLES"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "OutputConfig"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: queries-natural-language
+    description: >-
+      Deploy an async Textract pipeline using the Queries feature to
+      ask natural-language questions of a forms PDF. Expects
+      READY_TO_DEPLOY with QUERIES FeatureType and QueriesConfig
+      containing the user-supplied questions.
+    input: |
+      Use Textract on a 320-page forms PDF at
+      s3://forms-input/claims/2026-batch.pdf in us-east-1. I need the
+      Queries feature to ask: "What is the policy number?", "What is
+      the claimant name?", and "What is the date of loss?". Write
+      results to s3://forms-output/queries/ (same region). No KMS, no
+      SNS. Account 123456789012. Role arn:aws:iam::123456789012:role/TextractQueriesRole.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "QUERIES"
+        - "QueriesConfig"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "policy number"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: expense-analysis-invoices
+    description: >-
+      Deploy a Textract Expense Analysis pipeline for a batch of
+      invoices and receipts. Expects READY_TO_DEPLOY with
+      StartExpenseAnalysis (purpose-built for invoices/receipts), not
+      AnalyzeDocument FORMS.
+    input: |
+      Process a 600-page batch of invoices and receipts at
+      s3://expense-input/batch-2026.pdf in us-east-1 using Textract.
+      I need vendor names, totals, and line items. Output to
+      s3://expense-output/results/. Same region. KMS key
+      arn:aws:kms:us-east-1:123456789012:key/efgh5678.... SNS topic
+      arn:aws:sns:us-east-1:123456789012:ExpenseComplete. Role
+      arn:aws:iam::123456789012:role/ExpenseRole.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Expense"
+        - "StartExpenseAnalysis"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: lambda-sync-realtime
+    description: >-
+      Deploy a real-time single-page Textract pipeline behind Lambda
+      using the synchronous AnalyzeDocument API with Forms + Tables.
+      Expects READY_TO_DEPLOY with Lambda function and synchronous API
+      (not StartDocumentAnalysis).
+    input: |
+      Build a real-time Textract endpoint for single-page PNG documents
+      uploaded to s3://realtime-input/ in us-east-1. Use Lambda to
+      AnalyzeDocument with FORMS and TABLES. The Lambda should be
+      triggered on S3 PUT. Role
+      arn:aws:iam::123456789012:role/TextractLambdaRole. Output via
+      API response (no OutputConfig — single page).
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AnalyzeDocument"
+        - "FORMS"
+        - "TABLES"
+        - "Lambda"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-s3-getobject-permission
+    description: >-
+      Operator requests a Textract pipeline but the IAM role lacks
+      s3:GetObject on the input bucket. This is a prerequisite
+      failure. Expects PREREQUISITES_MISSING with the IAM gap cited.
+    input: |
+      Set up an async Textract pipeline for
+      s3://doc-input/invoices/2026-q3.pdf in us-east-1. Forms +
+      Tables. Output to s3://doc-output/textract/. The IAM role is
+      arn:aws:iam::123456789012:role/TextractProcessingRole — it has
+      s3:PutObject on the output bucket and textract:Start* but NO
+      s3:GetObject permission on the input bucket.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "s3:GetObject"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "input bucket"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

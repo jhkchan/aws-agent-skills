@@ -1,0 +1,179 @@
+{
+  "skill": "transcribe-job-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Transcribe Job Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Transcribe scenarios (batch transcription with diarization and custom vocabulary, medical transcription via separate API, custom vocabulary with vocabulary filter for call analysis, PII content redaction for compliance, missing S3 output bucket permissions). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "batch-diarization-vocab",
+      "name": "Batch transcription with speaker diarization and custom vocabulary",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — standard batch job, mono WAV audio, speaker diarization (3 speakers), custom vocabulary company-terms (READY), SRT+VTT subtitles, cost estimate",
+      "prompt": "Configure Amazon Transcribe to transcribe a 1-hour mono WAV meeting recording from s3://my-input-bucket/audio/meeting.wav. Language: en-US. Enable speaker diarization (3 speakers). Use a custom vocabulary named company-terms (already in READY state) for AWS service names. Output to s3://my-output-bucket. Need SRT and VTT subtitles. Region us-east-1. Tags: Environment=production, UseCase=meeting-transcription.",
+      "prompt_file": "prompts/batch-diarization-vocab.md",
+      "baseline_file": "baselines/batch-diarization-vocab.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TRANSCRIBE_JOB: meeting-transcription-001 (standard batch)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Transcription type: standard batch\n  [✓] Input audio: s3://my-input-bucket/audio/meeting.wav (WAV)\n  [✓] Output bucket: s3://my-output-bucket (Transcribe has PutObject)\n  [✓] Language: en-US (specified)\n  [✓] Custom vocabulary: company-terms — READY\n  [✓] Speaker separation: diarization (mono audio, 3 expected speakers)\n  [✓] Output formats: JSON + SRT + VTT\n  [✓] Estimated cost: $86.40 (3600 seconds × $0.024/sec)\nVERIFICATION_COMMANDS:\n  aws transcribe get-transcription-job --transcription-job-name meeting-transcription-001\n  aws transcribe get-vocabulary --vocabulary-name company-terms",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "diarization",
+            "company-terms",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "start-transcription-job"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "medical-transcription",
+      "name": "Medical transcription job for clinical dictation",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — medical batch via start-medical-transcription-job, cardiology specialty, DICTATION type, specified language (no auto-identify), medical pricing",
+      "prompt": "Configure Amazon Transcribe Medical to transcribe a physician dictation audio file from s3://medical-input/dictations/cardiology-note.wav. Language: en-US (medical does not support auto-identify). Specialty: CARDIOLOGY. Type: DICTATION. Output to s3://medical-output. Region us-east-1. Tags: Environment=production, UseCase=clinical-dictation, Compliance=HIPAA.",
+      "prompt_file": "prompts/medical-transcription.md",
+      "baseline_file": "baselines/medical-transcription.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TRANSCRIBE_JOB: cardiology-dictation-001 (medical batch)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Transcription type: medical batch (start-medical-transcription-job)\n  [✓] Input audio: s3://medical-input/dictations/cardiology-note.wav (WAV)\n  [✓] Output bucket: s3://medical-output (Transcribe has PutObject)\n  [✓] Language: en-US (specified — medical does not support auto-identify)\n  [✓] Specialty: CARDIOLOGY\n  [✓] Type: DICTATION\n  [✓] Output formats: JSON (medical supports JSON only)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "medical",
+            "CARDIOLOGY",
+            "DICTATION",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vocabulary-and-filter",
+      "name": "Custom vocabulary with vocabulary filter (call analysis)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — standard batch, custom vocabulary support-terms (boost) + vocabulary filter profanity-filter (mask mode), both applied simultaneously",
+      "prompt": "Configure Amazon Transcribe to transcribe a customer support call recording from s3://calls-input/recordings/call-001.flac. Language: en-US. Use custom vocabulary \"support-terms\" (READY) for product names. Also use vocabulary filter \"profanity-filter\" (READY) in mask mode. No diarization needed. Output to s3://calls-output. Region us-east-1. Tags: Environment=production, UseCase=call-analysis.",
+      "prompt_file": "prompts/vocabulary-and-filter.md",
+      "baseline_file": "baselines/vocabulary-and-filter.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TRANSCRIBE_JOB: call-analysis-001 (standard batch)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Transcription type: standard batch\n  [✓] Input audio: s3://calls-input/recordings/call-001.flac (FLAC)\n  [✓] Language: en-US (specified)\n  [✓] Custom vocabulary: support-terms — READY\n  [✓] Vocabulary filter: profanity-filter (mask mode) — READY\n  [✓] Speaker separation: none",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "support-terms",
+            "profanity-filter",
+            "mask",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pii-redaction",
+      "name": "PII content redaction for compliance (financial services)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — standard batch with PII content redaction enabled at job creation, entity types NAME/SSN/CREDIT_CARD_NUMBER/BANK_ACCOUNT_NUMBER/PHONE, redacted-only output",
+      "prompt": "Configure Amazon Transcribe to transcribe a financial services call from s3://fin-input/calls/customer-call.wav. Language: en-US. Enable PII content redaction — mask NAME, SSN, CREDIT_CARD_NUMBER, BANK_ACCOUNT_NUMBER, and PHONE. Output only the redacted transcript to s3://fin-output. Region us-east-1. Tags: Environment=production, UseCase=compliance, Regulation=PCI-DSS.",
+      "prompt_file": "prompts/pii-redaction.md",
+      "baseline_file": "baselines/pii-redaction.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "TRANSCRIBE_JOB: fin-compliance-001 (standard batch + PII redaction)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Transcription type: standard batch\n  [✓] Input audio: s3://fin-input/calls/customer-call.wav (WAV)\n  [✓] Language: en-US (specified)\n  [✓] PII redaction: PII (NAME, SSN, CREDIT_CARD_NUMBER, BANK_ACCOUNT_NUMBER, PHONE) — redacted output only\n  [✓] Output formats: JSON (redacted)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "PII",
+            "redaction",
+            "SSN",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-s3-output-permissions",
+      "name": "Missing S3 output bucket write permissions (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — output bucket does not grant Transcribe s3:PutObject; job would fail",
+      "prompt": "Configure Amazon Transcribe to transcribe audio from s3://input-bucket/audio.wav. Language: en-US. Output to s3://output-bucket. The output bucket does not have a bucket policy granting Transcribe write access. Region us-east-1.",
+      "prompt_file": "prompts/missing-s3-output-permissions.md",
+      "baseline_file": "baselines/missing-s3-output-permissions.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "TRANSCRIBE_JOB: transcription-001 (standard batch)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Output bucket: s3://output-bucket — FAIL (no s3:PutObject permission for Transcribe; add a bucket policy granting Transcribe write access before starting the job)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "S3",
+            "PutObject",
+            "VERDICT",
+            "CHECKLIST",
+            "output"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}
