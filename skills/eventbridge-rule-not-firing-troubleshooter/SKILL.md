@@ -1,18 +1,6 @@
 ---
 name: eventbridge-rule-not-firing-troubleshooter
-description: >-
-  Diagnoses Amazon EventBridge rules that fail to fire through a ten-category
-  diagnostic tree: event pattern mismatch (source, detail-type, detail JSON
-  path), content-based filtering errors (prefix, numeric, exists,
-  anything-but, nested path depth limits), input transformer malformed
-  templates, dead-letter queue configuration gaps, custom bus vs default
-  bus mismatch, schedule expression syntax errors (cron vs rate vs
-  fixed-rate), IAM role for target invocation (cross-account
-  events.amazonaws.com principal), EventBus resource-based policy
-  blocking PutEvents, target Lambda resource-based policy missing
-  EventBridge principal, and event source mapping for Kinesis/Stream
-  targets. Walks symptoms to a verified root cause with evidence-backed
-  probes; emits ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA.
+description: 'Diagnoses Amazon EventBridge rules that fail to fire through a ten-category diagnostic tree: event pattern mismatch (source, detail-type, detail JSON path), content-based filtering errors (prefix, numeric, exists, anything-but, nested path depth limits), input transformer malformed templates, dead-letter queue configuration gaps, custom bus vs default bus mismatch, schedule expression syntax errors (cron vs rate vs fixed-rate), IAM role for target invocation (cross-account events.amazonaws.com principal), EventBus resource-based policy blocking PutEvents, target Lambda resource-based policy missing EventBridge principal, and event source mapping for Kinesis/Stream targets. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA.'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
@@ -38,50 +26,23 @@ keywords:
 - event source mapping
 - Kinesis
 - troubleshooting
-tags:
-- eventbridge
-- appintegration
-- troubleshooting
-- event-pattern
-- content-based-filtering
-- schedule
-- iam-role
-- cross-account
-- dlq
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing an EventBridge rule that is not triggering its targets (event pattern mismatch, schedule expression syntax error, DLQ filling, bus mismatch, cross-account target invocation failure, input transformer error, content-based filter too strict, EventBus policy blocking PutEvents, target Lambda missing EventBridge principal), walking a symptom to the failed layer with verify and fix commands, or validating why a known event does not match a rule.
-  when_not_to_use: EventBridge Pipe configuration debugging (use the Pipe source/target/filter JSON separately), SaaS partner integration onboarding (use the partner provider setup docs), CloudWatch Events legacy API migration (use the events: prefix migration guide), IAM policy authoring for the target invocation role (use iam-least-privilege-advisor), or Step Functions orchestration debugging (use the Step Functions execution history). This skill diagnoses rule-firing failures; it does not author event patterns from scratch or tune Pipe configurations.
-  activation_triggers:
-  - EventBridge rule not firing
-  - EventBridge rule not triggering
-  - event pattern does not match
-  - EventBridge DLQ filling
-  - EventBridge dead-letter queue
-  - EventBridge schedule expression error
-  - EventBridge cron syntax
-  - EventBridge rate expression
-  - PutEvents AccessDenied
-  - events.amazonaws.com principal
-  - EventBridge target Lambda not invoked
-  - EventBridge cross-account target
-  - EventBus policy
-  - input transformer error EventBridge
-  - content-based filtering EventBridge
-  - custom event bus mismatch
-  - troubleshoot EventBridge rule
-  invocation_schema: 'Input: either (a) a symptom description ("rule not firing", "DLQ filling", "target Lambda never invoked"), optionally paired with the rule definition (describe-rule output), the event bus name, and a sample event payload, OR (b) a RuleName plus EventBusName for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {PATTERN_SOURCE_MISMATCH, PATTERN_DETAIL_TYPE_MISMATCH, PATTERN_DETAIL_PATH_MISMATCH, CONTENT_FILTER_TOO_STRICT, CONTENT_FILTER_NESTED_DEPTH, INPUT_TRANSFORMER_ERROR, DLQ_MISCONFIGURED, BUS_MISMATCH, SCHEDULE_SYNTAX, TARGET_IAM_ROLE, TARGET_LAMBDA_PERMISSION, EVENTBUS_POLICY, EVENT_SOURCE_MAPPING, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline pattern classification):\nSymptom: \"EventBridge rule ev-orders-prod-rule\nis not firing. Events are being put on the bus successfully (200\nOK from PutEvents) but the target Lambda is never invoked.\"\nEventBusName: custom.orders-bus\nRuleName: ev-orders-prod-rule\nEventPattern:\n  source: [\"myapp.orders\"]\n  detail-type: [\"Order Created\"]\n  detail:\n    status: [\"confirmed\"]\nSampleEvent:\n  source: \"myapp.orders\"\n  detail-type: \"Order Created\"\n  detail: { \"status\": \"pending\", \"orderId\": \"12345\" }"
+  when_not_to_use: 'EventBridge Pipe configuration debugging (use the Pipe source/target/filter JSON separately), SaaS partner integration onboarding (use the partner provider setup docs), CloudWatch Events legacy API migration (use the events: prefix migration guide), IAM policy authoring for the target invocation role (use iam-least-privilege-advisor), or Step Functions orchestration debugging (use the Step Functions execution history). This skill diagnoses rule-firing failures; it does not author event patterns from scratch or tune Pipe configurations.'
+  activation_triggers: ''
+  invocation_schema: '''Input: either (a) a symptom description ("rule not firing", "DLQ filling", "target Lambda never invoked"), optionally paired with the rule definition (describe-rule output), the event bus name, and a sample event payload, OR (b) a RuleName plus EventBusName for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {PATTERN_SOURCE_MISMATCH, PATTERN_DETAIL_TYPE_MISMATCH, PATTERN_DETAIL_PATH_MISMATCH, CONTENT_FILTER_TOO_STRICT, CONTENT_FILTER_NESTED_DEPTH, INPUT_TRANSFORMER_ERROR, DLQ_MISCONFIGURED, BUS_MISMATCH, SCHEDULE_SYNTAX, TARGET_IAM_ROLE, TARGET_LAMBDA_PERMISSION, EVENTBUS_POLICY, EVENT_SOURCE_MAPPING, UNKNOWN}.'''
+  invocation_example: '"# Minimal valid input (offline pattern classification):\nSymptom: \"EventBridge rule ev-orders-prod-rule\nis not firing. Events are being put on the bus successfully (200\nOK from PutEvents) but the target Lambda is never invoked.\"\nEventBusName: custom.orders-bus\nRuleName: ev-orders-prod-rule\nEventPattern:\n  source: [\"myapp.orders\"]\n  detail-type: [\"Order Created\"]\n  detail:\n    status: [\"confirmed\"]\nSampleEvent:\n  source: \"myapp.orders\"\n  detail-type: \"Order Created\"\n  detail: { \"status\": \"pending\", \"orderId\": \"12345\" }"'
 ---
 
 # EventBridge Rule Not Firing Troubleshooter

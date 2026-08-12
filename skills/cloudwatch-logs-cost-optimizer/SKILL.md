@@ -1,10 +1,23 @@
 ---
 name: cloudwatch-logs-cost-optimizer
-description: 'Optimises Amazon CloudWatch Logs cost across six dimensions: log group retention (Never expire is the #1 waste — moving to 30 days typically cuts storage cost 90%+ since storage is billed at $0.03/GB-month and Never-expire groups accumulate indefinitely), Logs Insights query cost ($0.005/GB scanned — frequent queries should be converted to metric filters which are free), CloudWatch agent buffer tuning (batch_count and batch_size reduce PutLogEvents API charges at $0.40/million ingestion requests), S3 export via Firehose for cold-storage compliance archives ($0.023/GB-month S3 Standard vs Logs $0.50/GB ingestion + $0.03/GB-month storage), subscription filter cost-aware cross-account aggregation, and vended log destinations (VPC Flow Logs and Route53 Resolver Logs sent to S3 directly bypass Logs ingestion fees entirely). Evaluates account-level data protection policies for PII storage reduction, embedded metric format tradeoffs, and log group aggregation patterns. Emits OPTIMIZED when no cost lever yields further savings, or FURTHER_OPTIMIZATION_AVAILABLE with a specific recommendation, dollar estimate, and CLI remediation. Use when reviewing CloudWatch Logs spend, triaging retention sweeps, planning a Logs Insights migration, or running a FinOps log-cost audit.'
+description: 'Optimises Amazon CloudWatch Logs cost across six dimensions: log group retention (Never expire is the #1 waste
+  — moving to 30 days typically cuts storage cost 90%+ since storage is billed at $0.03/GB-month and Never-expire groups accumulate
+  indefinitely), Logs Insights query cost ($0.005/GB scanned — frequent queries should be converted to metric filters which
+  are free), CloudWatch agent buffer tuning (batch_count and batch_size reduce PutLogEvents API charges at $0.40/million ingestion
+  requests), S3 export via Firehose for cold-storage compliance archives ($0.023/GB-month S3 Standard vs Logs $0.50/GB ingestion
+  + $0.03/GB-month storage), subscription filter cost-aware cross-account aggregation, and vended log destinations (VPC Flow
+  Logs and Route53 Resolver Logs sent to S3 directly bypass Logs ingestion fees entirely). Evaluates account-level data protection
+  policies for PII storage reduction, embedded metric format tradeoffs, and log group aggregation patterns. Emits OPTIMIZED
+  when no cost lever yields f...'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch Logs metrics, retention settings, and Cost Explorer findings. Live-account optimization uses aws logs describe-log-groups, aws logs describe-metric-filters, aws logs describe-subscription-filters, aws cloudwatch get-metric-statistics (IncomingBytes, IncomingLogEvents), aws firehose describe-delivery-streams, aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification
+  works from pasted CloudWatch Logs metrics, retention settings, and Cost Explorer findings. Live-account optimization uses
+  aws logs describe-log-groups, aws logs describe-metric-filters, aws logs describe-subscription-filters, aws cloudwatch get-metric-statistics
+  (IncomingBytes, IncomingLogEvents), aws firehose describe-delivery-streams, aws ce get-cost-and-usage (AWS CLI v2, SSO or
+  key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference
+  matrix for other regions.
 keywords:
 - CloudWatch Logs
 - log retention
@@ -47,8 +60,14 @@ metadata:
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising CloudWatch Logs cost, triaging retention sweep candidates (Never-expire groups), migrating frequent Logs Insights queries to metric filters, planning a Firehose-to-S3 cold-storage pipeline for compliance archives, tuning CloudWatch agent buffer settings to reduce PutLogEvents request charges, evaluating vended log destination placement (VPC Flow Logs to S3 vs CloudWatch Logs), or running a FinOps audit of observability spend.
-  when_not_to_use: CloudWatch alarm configuration or tuning (use cloudwatch-alarm-auditor), Logs Insights query debugging or syntax help (use cloudwatch-logs-insights-troubleshooter), logs-not-ingesting investigations (use cloudwatch-logs-not-ingesting-troubleshooter), S3 storage class optimization for non-log objects (use s3-storage-class-optimizer), or Firehose delivery stream troubleshooting. This skill focuses on cost-driven optimization of CloudWatch Logs, not functional debugging of log pipelines.
+  when_to_use: Optimising CloudWatch Logs cost, triaging retention sweep candidates (Never-expire groups), migrating frequent
+    Logs Insights queries to metric filters, planning a Firehose-to-S3 cold-storage pipeline for compliance archives, tuning
+    CloudWatch agent buffer settings to reduce PutLogEvents request charges, evaluating vended log destination placement (VPC
+    Flow Logs to S3 vs CloudWatch Logs), or running a FinOps audit of observability spend.
+  when_not_to_use: CloudWatch alarm configuration or tuning (use cloudwatch-alarm-auditor), Logs Insights query debugging
+    or syntax help (use cloudwatch-logs-insights-troubleshooter), logs-not-ingesting investigations (use cloudwatch-logs-not-ingesting-troubleshooter),
+    S3 storage class optimization for non-log objects (use s3-storage-class-optimizer), or Firehose delivery stream troubleshooting.
+    This skill focuses on cost-driven optimization of CloudWatch Logs, not functional debugging of log pipelines.
   activation_triggers:
   - optimise CloudWatch Logs cost
   - CloudWatch Logs retention sweep
@@ -70,8 +89,14 @@ metadata:
   - CloudWatch Logs FinOps
   - reduce observability bill
   - log group aggregation
-  invocation_schema: 'Input: either (a) a log group identifier + live-account context, (b) a Cost Explorer CloudWatch Logs charge breakdown, OR (c) CloudWatch Logs metrics (IncomingBytes, IncomingLogEvents) with retention setting and at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per log group (or account-level finding), where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "# Minimal valid input (offline finding classification):\nLogGroupName: /aws/lambda/order-processor-prod\nRetentionInDays: 0 (Never expire)\nRegion: us-east-1\nStoredBytes: 842 GB\nMetrics (last 30 days):\n  - IncomingBytes avg: 28 GB/day\n  - IncomingLogEvents avg: 12,000,000/day\n  - Logs Insights queries/month: 450 (scanning ~120 GB each)\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  invocation_schema: 'Input: either (a) a log group identifier + live-account context, (b) a Cost Explorer CloudWatch Logs
+    charge breakdown, OR (c) CloudWatch Logs metrics (IncomingBytes, IncomingLogEvents) with retention setting and at least
+    14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS
+    block per log group (or account-level finding), where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline finding classification):\nLogGroupName: /aws/lambda/order-processor-prod\n\
+    RetentionInDays: 0 (Never expire)\nRegion: us-east-1\nStoredBytes: 842 GB\nMetrics (last 30 days):\n  - IncomingBytes\
+    \ avg: 28 GB/day\n  - IncomingLogEvents avg: 12,000,000/day\n  - Logs Insights queries/month: 450 (scanning ~120 GB each)\n\
+    Emit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
 ---
 
 # CloudWatch Logs Cost Optimizer

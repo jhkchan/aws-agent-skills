@@ -1,24 +1,10 @@
 ---
 name: ecr-push-pull-troubleshooter
-description: >-
-  Diagnoses Amazon ECR push and pull failures through a fourteen-category
-  diagnostic tree: authentication (docker login token expiry, IAM
-  ecr:GetAuthorizationToken), repository policy vs IAM policy precedence,
-  lifecycle policy prematurely deleting images, image size limit (10 GB),
-  cross-region replication lag, KMS encryption key access denied, registry
-  alias confusion (public vs private), scan-on-push findings blocking
-  deployment, image tag immutability conflicts, docker manifest errors,
-  pull-through cache misconfiguration, Fargate/ECS platform version vs
-  image architecture mismatch (arm64 vs x86_64), layer download failures,
-  and throttling. Walks symptoms to a verified root cause with
-  evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or
-  INSUFFICIENT_DATA.
+description: 'Diagnoses Amazon ECR push and pull failures through a fourteen-category diagnostic tree: authentication (docker login token expiry, IAM ecr:GetAuthorizationToken), repository policy vs IAM policy precedence, lifecycle policy prematurely deleting images, image size limit (10 GB), cross-region replication lag, KMS encryption key access denied, registry alias confusion (public vs private), scan-on-push findings blocking deployment, image tag immutability conflicts, docker manifest errors, pull-through cache misconfiguration, Fargate/ECS platform version vs image architecture mismatch (arm64 vs x86_64), layer download failures, and throttling. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted docker / aws ecr error output. Live-account diagnosis uses aws ecr
-  get-authorization-token, describe-repositories, describe-images, get-repository-policy, get-lifecycle-policy, describe-registry, get-replication-configuration, describe-image-scan-findings, batch-get-image,
-  batch-check-layer-availability, aws kms describe-key, aws iam simulate-principal-policy, aws cloudtrail lookup-events, and aws ecs describe-tasks / aws lambda get-function-configuration (AWS CLI v2, SSO or key credentials).
 keywords:
 - ECR
 - docker login
@@ -40,57 +26,23 @@ keywords:
 - x86_64
 - layer download
 - troubleshoot
-tags:
-- ecr
-- devtools
-- troubleshooting
-- authentication
-- lifecycle-policy
-- kms
-- replication
-- container
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
-  when_to_use: Diagnosing an ECR push or pull failure (docker login "denied: Your authorization token has expired", docker push "denied: User is not authorized", image tag overwrite rejected, image
-    vanished after a lifecycle policy run, KMS.AccessDeniedException on push, cross-region replica missing, pull-through cache miss looping, Fargate task stops with "manifest unknown", "no matching manifest for
-    platform in the manifest list", or "ImagePullBackOff"), walking a symptom to the failing layer with verify commands.
+  when_to_use: 'Diagnosing an ECR push or pull failure (docker login "denied: Your authorization token has expired", docker push "denied: User is not authorized", image tag overwrite rejected, image'
   when_not_to_use: Authoring a new lifecycle or repository policy from scratch (use ecr-repository-auditor), CI/CD pipeline construction (use the codepipeline / codebuild deployer skills), auditing image CVE
-    posture across a registry (use inspector2-finding or the ecr-repository-auditor), or debugging docker build failures unrelated to push (use docker build logs).
-  activation_triggers:
-  - ECR push denied
-  - ECR pull denied
-  - docker login ECR
-  - Your authorization token has expired
-  - denied User is not authorized to perform ecr
-  - ImagePullBackOff ECR
-  - no basic auth credentials
-  - ECR lifecycle policy deleted image
-  - tag immutability overwrite
-  - image tag cannot be overwritten
-  - KMS.AccessDeniedException ECR
-  - cross-region replication ECR
-  - pull-through cache ECR
-  - no matching manifest for platform
-  - manifest unknown ECR
-  - Fargate arm64 x86
-  - troubleshoot ECR push pull
-  invocation_schema: 'Input: either (a) a symptom description (docker / aws ecr error string, observed behaviour, "push started failing after the role change"), optionally paired with the registry / repository
-    URI and the IAM principal doing the push/pull, OR (b) a repository URI plus the failing operation (push/pull) and the caller context for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION
-    block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {AUTH_TOKEN_EXPIRED, AUTH_IAM_DENIED, POLICY_REPOSITORY, POLICY_IAM, LIFECYCLE_DELETED, IMAGE_SIZE_EXCEEDED, REPLICATION_LAG, KMS_ACCESS_DENIED,
-    REGISTRY_ALIAS_MISMATCH, SCAN_BLOCKING, TAG_IMMUTABILITY, MANIFEST_INVALID, PULL_THROUGH_CACHE, ARCHITECTURE_MISMATCH, LAYER_DOWNLOAD_FAILED, THROTTLED, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"docker push\n  111111111111.dkr.ecr.us-east-1.amazonaws.com/app:v1 returns\\n\\\"denied: Your authorization token has\
-    \ expired.\\\"\\n\"\\nRegistry: 111111111111.dkr.ecr.us-east-1.amazonaws.com\\nRepository: app\\nTag: v1\\nCaller IAM principal: arn:aws:iam::111111111111:user/ci-bot\\nPush command: docker push <uri>/app:v1\\n\
-    Last successful push: 14 hours ago"
+  activation_triggers: ''
+  invocation_schema: '''Input: either (a) a symptom description (docker / aws ecr error string, observed behaviour, "push started failing after the role change"), optionally paired with the registry / repository'
+  invocation_example: '"# Minimal valid input (offline symptom classification):\nSymptom: \"docker push\n  111111111111.dkr.ecr.us-east-1.amazonaws.com/app:v1 returns\\n\\\"denied: Your authorization token has\'
 ---
 
 # ECR Push/Pull Troubleshooter

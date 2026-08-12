@@ -1,10 +1,23 @@
 ---
 name: ecs-task-cost-optimizer
-description: 'Optimises Amazon ECS task cost across seven dimensions: launch type selection (Fargate per-second pricing vs EC2 break-even at ~30% steady utilization — EC2 wins for always-on workloads, Fargate wins for bursty or <30% utilization), Graviton2 (arm64) migration for 20% cost reduction with compatibility verification, task definition right-sizing via CloudWatch Container Insights CPU/memory utilization analysis, capacity provider strategy (spot base capacity + on-demand top for 30-70% spot savings), Savings Plan coverage mapping (compute SP applies to both Fargate and EC2-backed ECS), task placement bin-packing strategy (spread vs binpack for EC2 density), and auto-scaling target tracking tuning. Evaluates standalone task vs service scheduling, process vs daemon scheduling, EFS vs EBS persistent storage cost, and service auto-scaling vs scheduled scaling. Emits OPTIMIZED when all dimensions pass, or FURTHER_OPTIMIZATION_AVAILABLE with specific recommendation and estimated savings. Use when reviewing ECS spend, planning a Graviton migration, evaluating Fargate vs EC2, or running a FinOps container cost audit.'
+description: 'Optimises Amazon ECS task cost across seven dimensions: launch type selection (Fargate per-second pricing vs
+  EC2 break-even at ~30% steady utilization — EC2 wins for always-on workloads, Fargate wins for bursty or <30% utilization),
+  Graviton2 (arm64) migration for 20% cost reduction with compatibility verification, task definition right-sizing via CloudWatch
+  Container Insights CPU/memory utilization analysis, capacity provider strategy (spot base capacity + on-demand top for 30-70%
+  spot savings), Savings Plan coverage mapping (compute SP applies to both Fargate and EC2-backed ECS), task placement bin-packing
+  strategy (spread vs binpack for EC2 density), and auto-scaling target tracking tuning. Evaluates standalone task vs service
+  scheduling, process vs daemon scheduling, EFS vs EBS persistent storage cost, and service auto-scaling vs scheduled scaling.
+  Emits OPTIMIZED when all dimensions pass, or FURTHER_OPTIMIZATION_AVAILABLE with specific recommendation and estimated savings.
+  Use when reviewing ECS spen...'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch Container Insights metrics, task definition configs, and Cost Explorer findings. Live-account optimization uses aws ecs describe-services, aws ecs describe-tasks, aws ecs describe-task-definition, aws ecs describe-capacity-providers, aws cloudwatch get-metric-statistics (CPUUtilization, MemoryUtilization from ECS/ContainerInsights), aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification
+  works from pasted CloudWatch Container Insights metrics, task definition configs, and Cost Explorer findings. Live-account
+  optimization uses aws ecs describe-services, aws ecs describe-tasks, aws ecs describe-task-definition, aws ecs describe-capacity-providers,
+  aws cloudwatch get-metric-statistics (CPUUtilization, MemoryUtilization from ECS/ContainerInsights), aws ce get-cost-and-usage
+  (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates
+  from the reference matrix for other regions.
 keywords:
 - ECS
 - Fargate
@@ -49,8 +62,14 @@ metadata:
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising ECS task cost, evaluating Fargate vs EC2 launch type crossover, planning a Graviton2 (arm64) task migration, right-sizing task definitions from Container Insights, designing capacity provider strategy (spot + on-demand), mapping Savings Plan coverage to ECS spend, tuning task placement bin-packing for EC2 density, or tuning auto-scaling target tracking for cost.
-  when_not_to_use: EKS cost optimization (use eks-cost-optimizer), Fargate standalone cost optimization without ECS (use fargate-cost-optimizer), ECS task troubleshooting (container crashes, deployment failures, task lifecycle issues — use ecs-task-troubleshooter), or ECS task definition security auditing (use ecs-task-definition-auditor). This skill focuses on cost-driven optimization of ECS tasks, not functional debugging.
+  when_to_use: Optimising ECS task cost, evaluating Fargate vs EC2 launch type crossover, planning a Graviton2 (arm64) task
+    migration, right-sizing task definitions from Container Insights, designing capacity provider strategy (spot + on-demand),
+    mapping Savings Plan coverage to ECS spend, tuning task placement bin-packing for EC2 density, or tuning auto-scaling
+    target tracking for cost.
+  when_not_to_use: EKS cost optimization (use eks-cost-optimizer), Fargate standalone cost optimization without ECS (use fargate-cost-optimizer),
+    ECS task troubleshooting (container crashes, deployment failures, task lifecycle issues — use ecs-task-troubleshooter),
+    or ECS task definition security auditing (use ecs-task-definition-auditor). This skill focuses on cost-driven optimization
+    of ECS tasks, not functional debugging.
   activation_triggers:
   - optimise ECS cost
   - ECS Fargate vs EC2
@@ -71,8 +90,15 @@ metadata:
   - ECS FinOps
   - reduce container bill
   - ECS cost review
-  invocation_schema: 'Input: either (a) an ECS service/task identifier + live-account context, (b) a Cost Explorer ECS/Fargate charge breakdown, OR (c) CloudWatch Container Insights metrics (CPUUtilization, MemoryUtilization) with task definition details and at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per service/task, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "# Minimal valid input (offline finding classification):\nServiceName: order-api-prod\nLaunchType: FARGATE\nTaskDefinition: order-api:42\nCPU: 1024 (1 vCPU)\nMemory: 2048 MB\nRegion: us-east-1\nArchitecture: x86_64\nMetrics (last 30 days):\n  - CPUUtilization avg: 12%, p95: 25%\n  - MemoryUtilization avg: 18%, p95: 30%\n  - RunningTaskCount avg: 8\nCost (last month): $1,847.00 (Fargate compute)\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  invocation_schema: 'Input: either (a) an ECS service/task identifier + live-account context, (b) a Cost Explorer ECS/Fargate
+    charge breakdown, OR (c) CloudWatch Container Insights metrics (CPUUtilization, MemoryUtilization) with task definition
+    details and at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS
+    block per service/task, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline finding classification):\nServiceName: order-api-prod\nLaunchType: FARGATE\n\
+    TaskDefinition: order-api:42\nCPU: 1024 (1 vCPU)\nMemory: 2048 MB\nRegion: us-east-1\nArchitecture: x86_64\nMetrics (last\
+    \ 30 days):\n  - CPUUtilization avg: 12%, p95: 25%\n  - MemoryUtilization avg: 18%, p95: 30%\n  - RunningTaskCount avg:\
+    \ 8\nCost (last month): $1,847.00 (Fargate compute)\nEmit the standard optimization block (TARGET, VERDICT, REASON,\n\
+    RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
 ---
 
 # ECS Task Cost Optimizer

@@ -1,10 +1,24 @@
 ---
 name: macie-cost-optimizer
-description: 'Optimises Amazon Macie cost across seven dimensions: discovery mode selection (automated data discovery vs one-off targeted classification jobs — automated manages scope and is cheaper for recurring coverage), scan frequency tuning (daily vs weekly for large data lakes, balancing detection latency against per-GB assessment cost), bucket selection (excluding infrequently accessed, known-safe, and log/archive buckets from sensitive-data scans), S3 object sampling vs full scan (Macie samples S3 objects per bucket — understanding the sampling depth vs full classification trade-off), custom data identifier cost (regex evaluation runs per evaluated object — over-broad custom identifiers multiply assessment cost), managed data identifier scope reduction (selecting only relevant managed identifiers instead of all), finding suppression rules (suppress known-safe prefixes to prevent re-evaluation cost and reduce noise), multi-account Macie administrator delegation (single delegated Macie administrator vs per-account standalone — delegation centralises and reduces duplicated assessment), classification export to S3 for batch Athena analysis (offload recurring query cost from Macie), data discovery duration limits (long-running jobs incur monitoring overhead), and the bucket-count vs scan-depth trade-off. Uses aws macie2 get-classification-scope, get-sensitive-data-discovery-jobs, get-findings, get-bucket-statistics, aws ce get-cost-and-usage (filter Service=Macie), and AWS Organizations list-delegated-administrators to project monthly savings. Emits FURTHER_OPTIMIZATION_AVAILABLE with specific recommendation and estimated savings, OPTIMIZED, or NEED_MORE_INFO. Use when reviewing Macie spend, planning a discovery-mode migration, tuning scan frequency for a data lake, or a security FinOps review.'
+description: 'Optimises Amazon Macie cost across seven dimensions: discovery mode selection (automated data discovery vs one-off
+  targeted classification jobs — automated manages scope and is cheaper for recurring coverage), scan frequency tuning (daily
+  vs weekly for large data lakes, balancing detection latency against per-GB assessment cost), bucket selection (excluding
+  infrequently accessed, known-safe, and log/archive buckets from sensitive-data scans), S3 object sampling vs full scan (Macie
+  samples S3 objects per bucket — understanding the sampling depth vs full classification trade-off), custom data identifier
+  cost (regex evaluation runs per evaluated object — over-broad custom identifiers multiply assessment cost), managed data
+  identifier scope reduction (selecting only relevant managed identifiers instead of all), finding suppression rules (suppress
+  known-safe prefixes to prevent re-evaluation cost and reduce noise), multi-account Macie administrator delegation (single
+  delegated Macie administrator vs per-accoun...'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted Macie job configs, bucket statistics, and Cost Explorer Macie line items. Live-account optimization uses aws macie2 get-classification-scope, aws macie2 get-sensitive-data-discovery-jobs, aws macie2 describe-job-creation, aws macie2 get-findings, aws macie2 get-bac (bucket statistics), aws macie2 list-membership-accounts (Macie administrator), aws organizations list-delegated-administrators (delegation status), aws ce get-cost-and-usage (filter Service=Macie), aws s3api list-buckets (bucket inventory), and aws ce get-cost-and-usage-with-resources (resource-level Macie spend). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification
+  works from pasted Macie job configs, bucket statistics, and Cost Explorer Macie line items. Live-account optimization uses
+  aws macie2 get-classification-scope, aws macie2 get-sensitive-data-discovery-jobs, aws macie2 describe-job-creation, aws
+  macie2 get-findings, aws macie2 get-bac (bucket statistics), aws macie2 list-membership-accounts (Macie administrator),
+  aws organizations list-delegated-administrators (delegation status), aws ce get-cost-and-usage (filter Service=Macie), aws
+  s3api list-buckets (bucket inventory), and aws ce get-cost-and-usage-with-resources (resource-level Macie spend). Pricing
+  references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
 keywords:
 - Macie
 - Amazon Macie
@@ -48,8 +62,15 @@ metadata:
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising Amazon Macie cost, migrating from targeted classification jobs to automated data discovery, tuning scan frequency for a large S3 data lake, excluding known-safe or infrequently accessed buckets from Macie scans, reducing custom data identifier evaluation overhead, narrowing managed data identifier scope, configuring finding suppression rules to reduce re-evaluation, consolidating Macie onto a single delegated administrator account, or piping Macie classification exports to Athena for batch analysis.
-  when_not_to_use: GuardDuty cost (use guardduty-cost-optimizer), general S3 storage cost (use s3-lifecycle-optimizer), Security Hub finding remediation (use securityhub-finding-remediator), or Macie finding triage/identification work (use macie-finding-triage). This skill focuses on cost-driven optimization decisions for Macie assessment spend, not on classifying the contents of a specific finding.
+  when_to_use: Optimising Amazon Macie cost, migrating from targeted classification jobs to automated data discovery, tuning
+    scan frequency for a large S3 data lake, excluding known-safe or infrequently accessed buckets from Macie scans, reducing
+    custom data identifier evaluation overhead, narrowing managed data identifier scope, configuring finding suppression rules
+    to reduce re-evaluation, consolidating Macie onto a single delegated administrator account, or piping Macie classification
+    exports to Athena for batch analysis.
+  when_not_to_use: GuardDuty cost (use guardduty-cost-optimizer), general S3 storage cost (use s3-lifecycle-optimizer), Security
+    Hub finding remediation (use securityhub-finding-remediator), or Macie finding triage/identification work (use macie-finding-triage).
+    This skill focuses on cost-driven optimization decisions for Macie assessment spend, not on classifying the contents of
+    a specific finding.
   activation_triggers:
   - optimise Macie cost
   - Macie spend too high
@@ -74,8 +95,17 @@ metadata:
   - Macie FinOps
   - reduce Macie bill
   - security cost review
-  invocation_schema: 'Input: either (a) a Macie-enabled account or org context with job configurations and bucket statistics, (b) a Cost Explorer Macie cost line-item document, OR (c) Macie job configurations (jobType, scoping, managedDataIdentifierSelector, sampling) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per Macie scope, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE, NEED_MORE_INFO.'
-  invocation_example: "# Minimal valid input (offline job classification):\nMacie administrator: delegated (org-management)\nRegion: us-east-1\nClassification jobs (last 30 days):\n  - jobId: job-targeted-pci-scan\n    jobType: ONE_TIME\n    initialRun: daily schedule (recurring created as one-time)\n    buckets: [data-lake-raw, data-lake-curated, access-logs]\n    managedDataIdentifierSelector: ALL\n    sampling: s3Scope with includes '*'\n    jobsRun: 30, objectsEvaluated: 480,000,000, GBassessed: 12,400\nAutomated discovery: ENABLED but scope excludes access-logs\nCost Explorer (Service=Macie, last 30 days): $1,240\nBucket statistics: 18 buckets, 4 are log/archive, 2 are known-safe\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  invocation_schema: 'Input: either (a) a Macie-enabled account or org context with job configurations and bucket statistics,
+    (b) a Cost Explorer Macie cost line-item document, OR (c) Macie job configurations (jobType, scoping, managedDataIdentifierSelector,
+    sampling) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS
+    block per Macie scope, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE, NEED_MORE_INFO.'
+  invocation_example: "# Minimal valid input (offline job classification):\nMacie administrator: delegated (org-management)\n\
+    Region: us-east-1\nClassification jobs (last 30 days):\n  - jobId: job-targeted-pci-scan\n    jobType: ONE_TIME\n    initialRun:\
+    \ daily schedule (recurring created as one-time)\n    buckets: [data-lake-raw, data-lake-curated, access-logs]\n    managedDataIdentifierSelector:\
+    \ ALL\n    sampling: s3Scope with includes '*'\n    jobsRun: 30, objectsEvaluated: 480,000,000, GBassessed: 12,400\nAutomated\
+    \ discovery: ENABLED but scope excludes access-logs\nCost Explorer (Service=Macie, last 30 days): $1,240\nBucket statistics:\
+    \ 18 buckets, 4 are log/archive, 2 are known-safe\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION,\
+    \ ESTIMATED_SAVINGS, MIGRATION_STEPS)."
 ---
 
 # Macie Cost Optimizer

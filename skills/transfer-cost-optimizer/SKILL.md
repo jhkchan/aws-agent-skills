@@ -1,10 +1,11 @@
 ---
 name: transfer-cost-optimizer
-description: 'Optimises AWS Transfer Family cost across eight dimensions: server endpoint type (PUBLIC vs VPC vs VPC_ENDPOINT — PUBLIC is cheapest with no VPC/NAT cost; VPC_ENDPOINT for internal-only; VPC for private connectivity with NAT Gateway overhead), per-hour server cost vs usage pattern (idle servers still incur the full per-hour charge — detect and stop them), protocol selection (SFTP vs FTPS vs FTP — SFTP is the baseline; FTP adds no TLS overhead but is rare in practice), concurrency vs server count (right-size concurrency limits vs spawning multiple servers), user session duration analysis (long sessions tie up concurrency slots), data transfer cost (S3 upload/download per-GB is the baseline; Transfer Family adds a per-GB fee on top), managed workflow cost (Step Functions execution per file — scales with file count not file size, so many small files are disproportionately expensive), CloudWatch Logs volume (SFTP logging to CloudWatch can dominate cost for high-volume servers), trusted host key rotation (no direct cost but affects session retry patterns), custom identity provider Lambda cost (per-authentication Lambda invocations), and sticky session configuration. Uses aws transfer describe-server, list-users, describe-user, aws cloudwatch get-metric-statistics (Transfer Family metrics), aws ce get-cost-and-usage (filter Service=Transfer), aws stepfunctions describe-state-machine (managed workflow execution count), and aws logs describe-metric-filters (CloudWatch Logs volume) to project monthly savings. Emits FURTHER_OPTIMIZATION_AVAILABLE with specific recommendation and estimated savings, OPTIMIZED, or NEED_MORE_INFO. Use when reviewing Transfer Family spend, detecting idle servers, choosing endpoint types, evaluating managed workflow cost, or a storage FinOps review.'
+description: 'Optimises AWS Transfer Family cost across eight dimensions: server endpoint type (PUBLIC vs VPC vs VPC_ENDPOINT — PUBLIC is cheapest with no VPC/NAT cost; VPC_ENDPOINT for internal-only; VPC for private connectivity with NAT Gateway overhead), per-hour server cost vs usage pattern (idle servers still incur the full per-hour charge — detect and stop them), protocol selection (SFTP vs FTPS vs FTP — SFTP is the baseline; FTP adds no TLS overhead but is rare in practice), concurrency vs server count (right-size concurrency limits vs spawning multiple servers), user session duration analysis (long sessions tie up concurrency slots), data transfer cost (S3 upload/download per-GB is the baseline; Transfer Family adds a per-GB fee on top), managed workflow cost (Step Functions execution per file — scales with file count not file size, so many small files are disproportionately expensive), CloudWatch Logs volume (SFTP logging to CloudWatch can dominate cost for high-volume servers),
+  trusted host key rotation (no d...'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted Transfer Family server configs, CloudWatch metrics, and Cost Explorer Transfer line items. Live-account optimization uses aws transfer describe-server, aws transfer list-users, aws transfer describe-user, aws transfer describe-workflow (managed workflows), aws transfer list-accesses, aws cloudwatch get-metric-statistics (AWS/Transfer namespace: FilesIn, FilesOut, BytesIn, BytesOut, ConcurrentSessions, UserSessionsStarted), aws ce get-cost-and-usage (filter Service=Transfer), aws stepfunctions get-execution-history (workflow executions), aws logs describe-metric-filters (CloudWatch Logs volume), and aws lambda get-function-configuration (custom IdP Lambda). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted Transfer Family server configs, CloudWatch metrics, and Cost Explorer Transfer line items. Live-account optimization uses aws transfer describe-server, aws transfer list-users, aws transfer describe-user, aws transfer describe-workflow (managed workflows), aws transfer list-accesses, aws cloudwatch get-metric-statistics (AWS/Transfer namespace: FilesIn, FilesOut, BytesIn, BytesOut, ConcurrentSessions, UserSessionsStarted), aws ce get-cost-and-usage (filter Service=Transfer), aws stepfunctions get-execution-history (workflow executions), aws logs describe-metric-filters (CloudWatch Logs volume), and aws lambda get-function-configuration (custom IdP Lambda). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.'
 keywords:
 - Transfer Family
 - AWS Transfer
@@ -30,20 +31,13 @@ keywords:
 - data transfer
 - S3 upload
 - storage FinOps
-tags:
-- transfer-family
-- storage
-- cost-optimization
-- finops
-- sftp
-- file-transfer
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: optimize
   skill_class: capability
@@ -51,29 +45,9 @@ metadata:
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
   when_to_use: Optimising AWS Transfer Family cost, choosing between PUBLIC vs VPC vs VPC_ENDPOINT server types, detecting and stopping idle Transfer servers, right-sizing concurrency limits vs server count, analysing user session duration, evaluating managed workflow (Step Functions) cost, reducing CloudWatch Logs volume from SFTP logging, auditing custom identity provider Lambda cost, or reviewing SFTP/FTPS endpoint spend.
   when_not_to_use: S3 storage cost optimization (use s3-lifecycle-optimizer), DataSync cost (use datasync-cost-optimizer), general VPC/NAT Gateway cost (use vpc-cost-optimizer), or Transfer Family server troubleshooting (connection errors, authentication failures — use transfer-family-troubleshooter). This skill focuses on cost-driven optimization decisions for Transfer Family spend, not on functional debugging of broken servers.
-  activation_triggers:
-  - optimise Transfer Family cost
-  - Transfer Family spend too high
-  - SFTP server cost
-  - Transfer Family idle server
-  - Transfer Family endpoint type
-  - Transfer Family PUBLIC vs VPC
-  - Transfer Family VPC_ENDPOINT
-  - Transfer Family concurrency
-  - Transfer Family session duration
-  - Transfer Family managed workflow
-  - Transfer Family Step Functions cost
-  - Transfer Family CloudWatch Logs
-  - SFTP logging cost
-  - Transfer Family custom identity provider
-  - Transfer Family Lambda IdP cost
-  - Transfer Family sticky session
-  - Transfer Family data transfer cost
-  - SFTP FinOps
-  - reduce Transfer Family bill
-  - storage cost review
-  invocation_schema: 'Input: either (a) a Transfer Family server identifier + live-account context, (b) a Cost Explorer Transfer line-item document, OR (c) Transfer Family server configurations (endpointType, protocols, concurrency, user count) with at least 14 days of CloudWatch observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per server, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE, NEED_MORE_INFO.'
-  invocation_example: "# Minimal valid input (offline server classification):\nServerId: s-1234abcdef5678901\nEndpointType: VPC\nProtocols: [SFTP]\nRegion: us-east-1\nIdentityProviderType: API_GATEWAY (custom Lambda IdP)\nLoggingRole: arn:aws:iam::<acct>:role/TransferLogging\nConcurrency: 10 (configured), observed avg 0.5\nUsers: 25 configured, 3 active in last 30 days\nManaged workflows: 1 (post-upload Step Functions, 2,000,000 executions/month)\nMetrics (last 30 days):\n  - ConcurrentSessions: avg 0.5, p95 2, p99 3\n  - FilesIn: 2,000,000/month\n  - FilesOut: 500,000/month\n  - UserSessionsStarted: 6,000/month\nCloudWatch Logs volume: 500 GB/month from Transfer logging\nCost Explorer (Service=Transfer, last 30 days): $3,800\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  activation_triggers: ''
+  invocation_schema: '''Input: either (a) a Transfer Family server identifier + live-account context, (b) a Cost Explorer Transfer line-item document, OR (c) Transfer Family server configurations (endpointType, protocols, concurrency, user count) with at least 14 days of CloudWatch observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per server, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE, NEED_MORE_INFO.'''
+  invocation_example: '"# Minimal valid input (offline server classification):\nServerId: s-1234abcdef5678901\nEndpointType: VPC\nProtocols: [SFTP]\nRegion: us-east-1\nIdentityProviderType: API_GATEWAY (custom Lambda IdP)\nLoggingRole: arn:aws:iam::<acct>:role/TransferLogging\nConcurrency: 10 (configured), observed avg 0.5\nUsers: 25 configured, 3 active in last 30 days\nManaged workflows: 1 (post-upload Step Functions, 2,000,000 executions/month)\nMetrics (last 30 days):\n  - ConcurrentSessions: avg 0.5, p95 2, p99 3\n  - FilesIn: 2,000,000/month\n  - FilesOut: 500,000/month\n  - UserSessionsStarted: 6,000/month\nCloudWatch Logs volume: 500 GB/month from Transfer logging\nCost Explorer (Service=Transfer, last 30 days): $3,800\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."'
 ---
 
 # Transfer Family Cost Optimizer

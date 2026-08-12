@@ -1,10 +1,24 @@
 ---
 name: lambda-memory-optimizer
-description: 'Optimises AWS Lambda memory configuration across six dimensions: memory-to-CPU proportional allocation (Lambda couples vCPU to memory at 1769 MB = 1 vCPU; cost DECREASES with more memory IF CPU-bound because faster execution offsets higher per-100ms rate), AWS Lambda Power Tuning methodology (open-source Step Functions state machine that empirically finds the Pareto frontier of cost-vs-latency across memory values), cost-optimal vs latency-optimal memory setting selection (the cheapest memory may not be the fastest; surface both numbers and let the operator choose), provisioned concurrency memory reservation (PC bills per GB-second of provisioned capacity regardless of invocations — memory size scales the idle bill linearly), ARM64 Graviton2 memory-to-CPU ratio differences (ARM64 has a different memory-to-vCPU curve than x86_64; re-run Power Tuning after architecture migration), EFS memory overhead (EFS mounts add ~64 MB resident memory; factor into the headroom calculation), init phase memory / cold start allocation (SnapStart snapshots the init memory; size init allocations once, not per invocation), container image memory overhead (image-based functions have higher cold-start memory baseline; minimum 256 MB recommended), SnapStart memory snapshot (Java-only; eliminates 1-3 s init time but freezes JVM state at the snapshot), Lambda Layers memory impact (each layer is a separate zip extraction during init; over-using layers increases init memory and cold-start duration), environment variable size limit (4 KB total — oversized env vars do not affect memory but affect init parse time), /tmp storage allocation (up to 10 GB; bills separately at $0.0000000625/MB-second), CloudWatch Duration-vs-Memory correlation analysis (plot Duration as a function of Memory to find the U-curve minimum empirically). Uses aws lambda get-function-configuration, aws cloudwatch get-metric-statistics (Duration, Memory utilization via Lambda Insights), aws lambda list-provisioned-concurrency-configs, aws compute-optimizer get-lambda-function-recommendations, and invokes the AWS Lambda Power Tuning State Machine to project the Pareto frontier. Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE. Use when reviewing Lambda memory configuration, planning a Power Tuning sweep, evaluating cost-vs-latency tradeoffs, or a FinOps memory review.'
+description: 'Optimises AWS Lambda memory configuration across six dimensions: memory-to-CPU proportional allocation (Lambda
+  couples vCPU to memory at 1769 MB = 1 vCPU; cost DECREASES with more memory IF CPU-bound because faster execution offsets
+  higher per-100ms rate), AWS Lambda Power Tuning methodology (open-source Step Functions state machine that empirically finds
+  the Pareto frontier of cost-vs-latency across memory values), cost-optimal vs latency-optimal memory setting selection (the
+  cheapest memory may not be the fastest; surface both numbers and let the operator choose), provisioned concurrency memory
+  reservation (PC bills per GB-second of provisioned capacity regardless of invocations — memory size scales the idle bill
+  linearly), ARM64 Graviton2 memory-to-CPU ratio differences (ARM64 has a different memory-to-vCPU curve than x86_64; re-run
+  Power Tuning after architecture migration), EFS memory overhead (EFS mounts add ~64 MB resident memory; factor into the
+  headroom calculation), init phase memory / cold star...'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics and Power Tuning results. Live-account optimization uses aws lambda get-function-configuration, aws cloudwatch get-metric-statistics (Duration, Invocations, memory_used via LambdaInsights, InitDuration, ConcurrentExecutions), aws lambda list-provisioned-concurrency-configs, aws lambda get-event-source-mapping, aws compute-optimizer get-lambda-function-recommendations, aws ce get-cost-and-usage, and aws stepfunctions start-execution (Power Tuning State Machine) (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification
+  works from pasted CloudWatch metrics and Power Tuning results. Live-account optimization uses aws lambda get-function-configuration,
+  aws cloudwatch get-metric-statistics (Duration, Invocations, memory_used via LambdaInsights, InitDuration, ConcurrentExecutions),
+  aws lambda list-provisioned-concurrency-configs, aws lambda get-event-source-mapping, aws compute-optimizer get-lambda-function-recommendations,
+  aws ce get-cost-and-usage, and aws stepfunctions start-execution (Power Tuning State Machine) (AWS CLI v2, SSO or key-based
+  credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix
+  for other regions.
 keywords:
 - Lambda
 - memory optimization
@@ -51,8 +65,14 @@ metadata:
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising Lambda memory configuration, planning a Power Tuning sweep, selecting cost-optimal vs latency-optimal memory, sizing provisioned concurrency memory reservation, evaluating ARM64 Graviton2 memory-to-CPU ratio, accounting for EFS/container-image/Layers memory overhead, tuning SnapStart init memory, sizing /tmp storage, or running a Lambda memory FinOps review.
-  when_not_to_use: EC2 instance rightsizing (use ec2-rightsizing-optimizer), EBS volume cost (use ebs-volume-optimizer), S3 storage cost (use s3-lifecycle-optimizer), Lambda invocation/duration/cold-start troubleshooting (use lambda-invocation-troubleshooter or lambda-cold-start-optimizer), or full Lambda cost optimization across non-memory dimensions (use lambda-cost-optimizer). This skill focuses on the memory-allocation decision specifically.
+  when_to_use: Optimising Lambda memory configuration, planning a Power Tuning sweep, selecting cost-optimal vs latency-optimal
+    memory, sizing provisioned concurrency memory reservation, evaluating ARM64 Graviton2 memory-to-CPU ratio, accounting
+    for EFS/container-image/Layers memory overhead, tuning SnapStart init memory, sizing /tmp storage, or running a Lambda
+    memory FinOps review.
+  when_not_to_use: EC2 instance rightsizing (use ec2-rightsizing-optimizer), EBS volume cost (use ebs-volume-optimizer), S3
+    storage cost (use s3-lifecycle-optimizer), Lambda invocation/duration/cold-start troubleshooting (use lambda-invocation-troubleshooter
+    or lambda-cold-start-optimizer), or full Lambda cost optimization across non-memory dimensions (use lambda-cost-optimizer).
+    This skill focuses on the memory-allocation decision specifically.
   activation_triggers:
   - optimise Lambda memory
   - Lambda memory tuning
@@ -73,8 +93,18 @@ metadata:
   - Lambda /tmp storage allocation
   - Lambda memory FinOps
   - Lambda memory-to-CPU ratio
-  invocation_schema: 'Input: either (a) a function identifier + live-account context, (b) a Power Tuning result document, OR (c) CloudWatch Lambda Insights metrics (Duration, Invocations, memory_used, InitDuration) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per function, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "# Minimal valid input (offline finding classification):\nFunctionName: order-enrichment-api\nRuntime: python3.12\nMemorySize: 128 MB\nArchitecture: x86_64\nRegion: us-east-1\nPricing: on-demand (no provisioned concurrency)\nMetrics (last 30 days):\n  - Duration avg: 5000 ms, p95: 6200 ms\n  - Invocations: 47,000,000/month\n  - Errors: 45 (0.000096%)\n  - Memory utilization: avg 38 MB (30% of 128 MB)\n  - InitDuration: 1800 ms (cold start)\nLambda Insights:\n  - memory_used: avg 38 MB, peak 52 MB\n  - cpu_total_time: 4800 ms (96% of Duration)\nCompute Optimizer finding: Overprovisioned (memory)\nPower Tuning result:\n  - Tested: [128, 256, 512, 1024, 2048, 3008]\n  - Cheapest (cost-optimal): 512 MB at 950 ms\n  - Fastest: 3008 MB at 410 ms\n  - URL: https://lambda-power-tuning.show/#example\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  invocation_schema: 'Input: either (a) a function identifier + live-account context, (b) a Power Tuning result document,
+    OR (c) CloudWatch Lambda Insights metrics (Duration, Invocations, memory_used, InitDuration) with at least 14 days of
+    observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per
+    function, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline finding classification):\nFunctionName: order-enrichment-api\nRuntime:\
+    \ python3.12\nMemorySize: 128 MB\nArchitecture: x86_64\nRegion: us-east-1\nPricing: on-demand (no provisioned concurrency)\n\
+    Metrics (last 30 days):\n  - Duration avg: 5000 ms, p95: 6200 ms\n  - Invocations: 47,000,000/month\n  - Errors: 45 (0.000096%)\n\
+    \  - Memory utilization: avg 38 MB (30% of 128 MB)\n  - InitDuration: 1800 ms (cold start)\nLambda Insights:\n  - memory_used:\
+    \ avg 38 MB, peak 52 MB\n  - cpu_total_time: 4800 ms (96% of Duration)\nCompute Optimizer finding: Overprovisioned (memory)\n\
+    Power Tuning result:\n  - Tested: [128, 256, 512, 1024, 2048, 3008]\n  - Cheapest (cost-optimal): 512 MB at 950 ms\n \
+    \ - Fastest: 3008 MB at 410 ms\n  - URL: https://lambda-power-tuning.show/#example\nEmit the standard optimization block\
+    \ (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
 ---
 
 # Lambda Memory Optimizer

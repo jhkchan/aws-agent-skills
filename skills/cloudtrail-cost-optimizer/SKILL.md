@@ -1,10 +1,23 @@
 ---
 name: cloudtrail-cost-optimizer
-description: 'Optimises AWS CloudTrail cost across seven dimensions: trail consolidation (single organization trail replaces N per-region or member-account trails, eliminating duplicate log volume and per-trail KMS/SNS overhead), management-vs-data-event volume analysis (data events are ~10x costlier per event than management events — curate S3/Lambda data event sources), S3 lifecycle policy for log files (Glacier Instant/Deep Archive transition after 90 days eliminates ~80% of Standard storage cost), CloudTrail Lake event-data-store cost (per-GB ingestion at $0.75/GB-month plus retention — partition with event-category filters), CloudWatch Logs delivery cost (avoid dual-publishing CloudTrail to both S3 and CloudWatch Logs when only one consumer exists), SNS notification cost ($0.50 per million notifications — consolidate trail SNS topics), KMS key cost per trail (one CMK shared across org trail, not one per trail), Insights event cost ($0.50 per 100k management events — enable only for accounts with anomalous activity), organizational trail vs member trail (deduplication — org trail writes ALL member events once), log file integrity validation overhead (S3 PUT cost doubles for digest files — disable only when S3 Object Lock is enforced), S3 Requester Pays for cross-account log access, Athena partition projection for cost analysis (avoid full-table scans of CloudTrail logs). Uses aws cloudtrail describe-trails, get-event-selectors, get-insights-selectors, aws organizations list-accounts, aws s3api get-bucket-lifecycle-configuration, aws cloudtrail list-edges, aws kms describe-key, and aws ce get-cost-and-usage to project monthly savings. Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE. Use when reviewing CloudTrail spend, planning trail consolidation, evaluating data event volume, or a FinOps governance review.'
+description: 'Optimises AWS CloudTrail cost across seven dimensions: trail consolidation (single organization trail replaces
+  N per-region or member-account trails, eliminating duplicate log volume and per-trail KMS/SNS overhead), management-vs-data-event
+  volume analysis (data events are ~10x costlier per event than management events — curate S3/Lambda data event sources),
+  S3 lifecycle policy for log files (Glacier Instant/Deep Archive transition after 90 days eliminates ~80% of Standard storage
+  cost), CloudTrail Lake event-data-store cost (per-GB ingestion at $0.75/GB-month plus retention — partition with event-category
+  filters), CloudWatch Logs delivery cost (avoid dual-publishing CloudTrail to both S3 and CloudWatch Logs when only one consumer
+  exists), SNS notification cost ($0.50 per million notifications — consolidate trail SNS topics), KMS key cost per trail
+  (one CMK shared across org trail, not one per trail), Insights event cost ($0.50 per 100k management events — enable only
+  for accounts with anomalous activity...'
 version: 0.1.0
 author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted trail configurations and Cost Explorer exports. Live-account optimization uses aws cloudtrail describe-trails, get-event-selectors, get-insights-selectors, get-event-data-store, aws organizations describe-organization, list-accounts, aws s3api get-bucket-lifecycle-configuration, head-bucket, aws kms describe-key, get-key-rotation-status, aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification
+  works from pasted trail configurations and Cost Explorer exports. Live-account optimization uses aws cloudtrail describe-trails,
+  get-event-selectors, get-insights-selectors, get-event-data-store, aws organizations describe-organization, list-accounts,
+  aws s3api get-bucket-lifecycle-configuration, head-bucket, aws kms describe-key, get-key-rotation-status, aws ce get-cost-and-usage
+  (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates
+  from the reference matrix for other regions.
 keywords:
 - CloudTrail
 - trail consolidation
@@ -46,8 +59,13 @@ metadata:
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising CloudTrail spend, consolidating multi-region or member trails into a single org trail, curating data event sources (S3/Lambda data events), tuning S3 lifecycle for log buckets, reviewing CloudTrail Lake event data store ingestion cost, disabling dual-publishing to CloudWatch Logs, consolidating KMS keys per trail, evaluating CloudTrail Insights cost, or running a governance FinOps sweep.
-  when_not_to_use: CloudTrail functional troubleshooting (use cloudtrail-missing-events-troubleshooter or cloudtrail-gap-troubleshooter), CloudTrail Lake query authoring (use cloudtrail-lake-operator), or CloudTrail alert automation (use cloudtrail-alert-automator). This skill focuses on cost-driven optimization decisions, not on whether events are missing or alerts fire.
+  when_to_use: Optimising CloudTrail spend, consolidating multi-region or member trails into a single org trail, curating
+    data event sources (S3/Lambda data events), tuning S3 lifecycle for log buckets, reviewing CloudTrail Lake event data
+    store ingestion cost, disabling dual-publishing to CloudWatch Logs, consolidating KMS keys per trail, evaluating CloudTrail
+    Insights cost, or running a governance FinOps sweep.
+  when_not_to_use: CloudTrail functional troubleshooting (use cloudtrail-missing-events-troubleshooter or cloudtrail-gap-troubleshooter),
+    CloudTrail Lake query authoring (use cloudtrail-lake-operator), or CloudTrail alert automation (use cloudtrail-alert-automator).
+    This skill focuses on cost-driven optimization decisions, not on whether events are missing or alerts fire.
   activation_triggers:
   - optimise CloudTrail cost
   - CloudTrail trail consolidation
@@ -67,8 +85,16 @@ metadata:
   - CloudTrail monthly savings estimate
   - reduce CloudTrail bill
   - governance cost review
-  invocation_schema: 'Input: either (a) a CloudTrail trail name + live-account context, (b) an Organizations account list with per-trail configuration summary, OR (c) a Cost Explorer export of CloudTrail spend with at least 30 days of observation plus trail configurations. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per trail (or per account for consolidation cases), where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "# Minimal valid input (offline finding classification):\nTrailName: aws-organizational-trail\nIsOrganizationTrail: true\nIsMultiRegionTrail: true\nIncludeManagementEvents: true\nDataEventSources:\n  - S3 (all buckets) — 142,000,000 events/month\n  - Lambda (all functions) — 8,400,000 events/month\nInsightsEnabled: true (both ApiCallRateInsight and ApiCallErrorInsight)\nKMSKeyId: alias/cloudtrail-org-cmk\nCloudWatchLogsLogGroupArn: arn:aws:logs:us-east-1:111111111111:log-group:cloudtrail-org\nS3Bucket: org-cloudtrail-logs-us-east-1\nS3LifecyclePolicy: none\nRegion: us-east-1\nMonthlySpend: $1,847.32\nDataEventMonthlyVolume: 150.4M events\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  invocation_schema: 'Input: either (a) a CloudTrail trail name + live-account context, (b) an Organizations account list
+    with per-trail configuration summary, OR (c) a Cost Explorer export of CloudTrail spend with at least 30 days of observation
+    plus trail configurations. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS
+    block per trail (or per account for consolidation cases), where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline finding classification):\nTrailName: aws-organizational-trail\nIsOrganizationTrail:\
+    \ true\nIsMultiRegionTrail: true\nIncludeManagementEvents: true\nDataEventSources:\n  - S3 (all buckets) — 142,000,000\
+    \ events/month\n  - Lambda (all functions) — 8,400,000 events/month\nInsightsEnabled: true (both ApiCallRateInsight and\
+    \ ApiCallErrorInsight)\nKMSKeyId: alias/cloudtrail-org-cmk\nCloudWatchLogsLogGroupArn: arn:aws:logs:us-east-1:111111111111:log-group:cloudtrail-org\n\
+    S3Bucket: org-cloudtrail-logs-us-east-1\nS3LifecyclePolicy: none\nRegion: us-east-1\nMonthlySpend: $1,847.32\nDataEventMonthlyVolume:\
+    \ 150.4M events\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
 ---
 
 # CloudTrail Cost Optimizer
