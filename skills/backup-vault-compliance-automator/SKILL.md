@@ -124,14 +124,14 @@ unencrypted, or not replicated.
 |---|---|
 | Enforce vault policy (deny non-encrypted) | Step 2 |
 | Deploy Vault Lock (compliance vs governance) | Step 3 (mode matrix) |
+| Verify recovery point encryption | Step 4 |
 | Audit backup plan coverage | Step 5 |
-| Verify recovery point encryption | Step 6 |
-| Validate cross-region replication | Step 7 |
-| Check backup frequency compliance | Step 8 |
-| Deploy Config rule for backup compliance | Step 9 |
-| Automate backup compliance reports | Step 10 |
-| Roll out across Organizations | Step 11 |
-| Manage Vault Lock cool-off period | Step 12 |
+| Validate cross-region replication | Step 6 |
+| Check backup frequency compliance | Step 7 |
+| Deploy Config rule for backup compliance | Step 8 |
+| Automate backup compliance reports | Step 9 |
+| Roll out across Organizations | Step 10 |
+| Manage Vault Lock cool-off period | Step 11 |
 | Avoid common compliance pitfalls | Anti-Patterns |
 | Recent features (Backup Framework, Cross-Account) | Recent AWS features |
 
@@ -242,56 +242,25 @@ These behaviors change the compliance design if ignored:
 ### Step 1: Inventory the current backup state
 
 ```bash
-# List all backup vaults
-aws backup list-backup-vaults \
-  --output json \
-  --query 'BackupVaultList[*].[BackupVaultName,EncryptionKeyArn,LockState,NumberOfRecoveryPoints]' \
-  --region us-east-1
+# Vault inventory (name, encryption, lock state, recovery point count)
+aws backup list-backup-vaults --query 'BackupVaultList[*].[BackupVaultName,EncryptionKeyArn,LockState,NumberOfRecoveryPoints]'
 
-# Get vault policy
-aws backup get-backup-vault-policy \
-  --backup-vault-name prod-backup-vault \
-  --region us-east-1
+# Vault policy and lock state
+aws backup get-backup-vault-policy --backup-vault-name <vault>
+aws backup describe-backup-vault --backup-vault-name <vault> --query '[LockState,MinRetentionDays,VaultLockDate]'
 
-# Check vault lock state
-aws backup describe-backup-vault \
-  --backup-vault-name prod-backup-vault \
-  --query '[LockState,MinRetentionDays,VaultLockDate]' \
-  --region us-east-1
+# Recovery point encryption status
+aws backup list-recovery-points-by-backup-vault --backup-vault-name <vault> \
+  --query 'RecoveryPoints[*].[RecoveryPointArn,ResourceType,Status,EncryptionKeyArn]'
 
-# List recovery points and check encryption
-aws backup list-recovery-points-by-backup-vault \
-  --backup-vault-name prod-backup-vault \
-  --output json \
-  --query 'RecoveryPoints[*].[RecoveryPointArn,ResourceType,Status,EncryptionKeyArn]' \
-  --region us-east-1
-
-# List backup plans
-aws backup list-backup-plans \
-  --output json \
-  --query 'BackupPlansList[*].[BackupPlanId,BackupPlanName]' \
-  --region us-east-1
-
-# List backup selections (which resources are covered)
-aws backup list-backup-selections \
-  --backup-plan-id <plan-id> \
-  --region us-east-1
-
-# List copy jobs (cross-region replication)
-aws backup list-copy-jobs \
-  --by-state COMPLETED \
-  --output json \
-  --region us-east-1
+# Backup plans, selections, and copy jobs
+aws backup list-backup-plans --query 'BackupPlansList[*].[BackupPlanId,BackupPlanName]'
+aws backup list-backup-selections --backup-plan-id <plan-id>
+aws backup list-copy-jobs --by-state COMPLETED
 ```
 
-Key observations to surface in the output:
-
-- **Vaults without policies** — open access, anyone can write
-  unencrypted backups.
-- **Vaults without locks** — no immutability, recovery points can be
-  deleted by anyone with IAM permission.
-- **Recovery points without encryption** — compliance violation.
-- **Resources without backup selections** — coverage gap.
+Surface in the output: vaults without policies, vaults without locks,
+recovery points without encryption, resources without backup selections.
 
 ### Step 2: Enforce vault policy (deny non-encrypted backups)
 
@@ -372,26 +341,19 @@ Common policy errors:
 
 **THIS IS THE MOST CRITICAL DECISION IN BACKUP COMPLIANCE.**
 
-Mode comparison:
-
 | Dimension | Governance Mode | Compliance Mode |
 |---|---|---|
-| Immutability | Soft — privileged override possible | Hard — no override, not even root |
-| Lock removal | `CancelLegalHold` by privileged principal | IMPOSSIBLE after cool-off period |
-| Retention change | Can be overridden | Cannot be shortened |
+| Immutability | Soft — privileged override | Hard — no override, not even root |
+| Lock removal | `CancelLegalHold` by privileged principal | IMPOSSIBLE after cool-off |
 | Regulatory compliance | Does NOT meet SEC 17a-4, CFTC, FINRA | Meets SEC 17a-4, CFTC, FINRA |
 | Operational risk | Low — can correct mistakes | HIGH — cannot correct mistakes |
-| Use case | Internal policy enforcement | Regulatory / legal hold |
 
 Deploy governance mode:
 
 ```bash
 aws backup put-backup-vault-lock-configuration \
   --backup-vault-name prod-backup-vault \
-  --changeable-for-days 3 \
-  --min-retention-days 1 \
-  --max-retention-days 365 \
-  --region us-east-1
+  --changeable-for-days 3 --min-retention-days 1 --max-retention-days 365
 ```
 
 Deploy compliance mode:
@@ -399,32 +361,17 @@ Deploy compliance mode:
 ```bash
 aws backup put-backup-vault-lock-configuration \
   --backup-vault-name compliance-vault \
-  --changeable-for-days 3 \
-  --min-retention-days 90 \
-  --max-retention-days 2557 \
-  --mode COMPLIANCE \
-  --region us-east-1
+  --changeable-for-days 3 --min-retention-days 90 --max-retention-days 2557 --mode COMPLIANCE
 ```
 
-**Critical warning:** The `ChangeableForDays` parameter sets the
-cool-off period. During cool-off, the lock CAN be removed. After
-cool-off expires, compliance mode is PERMANENT. Before deploying
-compliance mode:
+**Critical warning:** `ChangeableForDays` sets the cool-off. During
+cool-off the lock CAN be removed. After expiry, compliance mode is
+PERMANENT. Before deploying: verify retention matches regulatory
+requirements, verify vault contains only resources needing immutable
+retention, test in non-production first, document lock date.
 
-1. Verify the retention period matches regulatory requirements.
-2. Verify the vault contains only resources that need immutable
-   retention.
-3. Test with a non-production vault first.
-4. Document the lock date and expiry for audit.
-
-Verify lock state:
-
-```bash
-aws backup describe-backup-vault \
-  --backup-vault-name compliance-vault \
-  --query '[LockState,MinRetentionDays,MaxRetentionDays,VaultLockDate]' \
-  --region us-east-1
-```
+Verify: `aws backup describe-backup-vault --backup-vault-name <vault>
+--query '[LockState,MinRetentionDays,MaxRetentionDays,VaultLockDate]'`
 
 ### Step 4: Verify recovery point encryption
 
@@ -498,36 +445,10 @@ aws backup list-backup-plans \
   --region us-east-1
 ```
 
-Coverage audit logic:
-
-```python
-# Resources that should be backed up
-required_resources = {
-    'EC2': get_all_ec2_instances(),
-    'RDS': get_all_rds_instances(),
-    'DynamoDB': get_all_dynamodb_tables(),
-    'EFS': get_all_efs_filesystems(),
-}
-
-# Resources covered by backup plans
-covered_resources = set()
-for plan in backup_plans:
-    for selection in plan['Selections']:
-        if selection.get('ListOfTags'):
-            # Tag-based selection — query resources by tag
-            for tag_filter in selection['ListOfTags']:
-                covered_resources.update(
-                    get_resources_by_tag(tag_filter['Key'], tag_filter['Value'])
-                )
-        if selection.get('Resources'):
-            covered_resources.update(selection['Resources'])
-
-# Gap analysis
-unprotected = required_resources - covered_resources
-```
-
-A coverage gap (unprotected resources) means those resources have NO
-backup. This is typically a P1 finding for production workloads.
+Coverage audit logic: enumerate all EC2/RDS/DynamoDB/EFS resources,
+cross-reference against backup plan selections (tag-based and
+explicit-ID), and compute the gap. A coverage gap means the resource
+has NO backup — typically a P1 finding for production.
 
 **Config rule for coverage detection:**
 
@@ -574,24 +495,9 @@ Verify backups run at the required frequency via `list-backup-jobs`.
 | Production critical (RPO < 4h) | Every 4 hours | 30 days |
 | Production standard (RPO < 24h) | Daily | 30-90 days |
 | Staging | Weekly | 14 days |
-| Development | On-demand | 7 days | No frequency requirement |
+| Development | On-demand | 7 days |
 
-```python
-from datetime import datetime, timedelta
-
-def check_frequency(resource_arn, expected_hours):
-    cutoff = datetime.now() - timedelta(hours=expected_hours)
-    jobs = backup.list_backup_jobs(
-        ByResourceArn=resource_arn,
-        ByCreatedAfter=cutoff,
-        ByState='COMPLETED'
-    )
-    if not jobs['BackupJobs']:
-        return f"NON_COMPLIANT: No backup in last {expected_hours}h for {resource_arn}"
-    return f"COMPLIANT: {len(jobs['BackupJobs'])} backup(s) in last {expected_hours}h"
-```
-
-### Step 9: Deploy Config rules for backup compliance
+### Step 8: Deploy Config rules for backup compliance
 
 AWS-managed Config rules for backup:
 
@@ -638,110 +544,41 @@ For the full custom Config rule Lambda implementation including tag
 extraction, backup plan lookup, and compliance evaluation, see
 **references/backup-config-rules.md**.
 
-### Step 10: Automate backup compliance reports
-
-AWS Backup Report Plan (daily compliance summary):
+### Step 9: Automate backup compliance reports
 
 ```bash
 aws backup create-report-plan \
   --report-plan-name daily-compliance-summary \
-  --report-setting '{
-    "ReportTemplates": ["BACKUP_JOB_REPORT", "BACKUP_POLICY_REPORT"],
-    "Frameworks": ["arn:aws:backup:us-east-1:111111111111:framework/compliance-framework"]
-  }' \
-  --report-delivery-config '{
-    "S3BucketName": "com-company-backup-reports",
-    "S3KeyPrefix": "reports/daily/",
-    "Formats": ["CSV", "JSON"]
-  }' \
+  --report-setting '{"ReportTemplates":["BACKUP_JOB_REPORT","BACKUP_POLICY_REPORT"]}' \
+  --report-delivery-config '{"S3BucketName":"com-company-backup-reports","Formats":["CSV","JSON"]}' \
   --region us-east-1
 ```
 
-The report is generated daily and delivered to S3. Set up an Athena
-table and QuickSight dashboard for visualization:
+Reports are generated daily and delivered to S3. Set up Athena tables
+on the S3 output for queryable compliance dashboards.
 
-```sql
-CREATE EXTERNAL TABLE IF NOT EXISTS backup_compliance_report (
-  resourceType string,
-  resourceName string,
-  backupPlanName string,
-  backupJobStatus string,
-  recoveryPointEncrypted boolean,
-  vaultLockState string,
-  complianceStatus string,
-  reportDate string
-)
-ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
-STORED AS INPUTFORMAT 'org.apache.hadoop.mapred.TextInputFormat'
-OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
-LOCATION 's3://com-company-backup-reports/reports/daily/'
-TBLPROPERTIES ('skip.header.line.count' = '1');
-```
+### Step 10: Multi-account backup compliance via Organizations
 
-### Step 11: Multi-account backup compliance via Organizations
+1. **Delegated administrator:**
+   `aws backup register-delegated-administrator --account-id 111111111111`
+2. **Org-level backup policy:** Use AWS Organizations backup policies
+   (tag-based) to enforce plans across member accounts.
+   `aws organizations create-policy --type BACKUP_POLICY --content file://policy.json`
+3. **Config aggregation:** Management account aggregates compliance:
+   `aws configservice put-configuration-aggregator --organization-aggregator-source '{"RoleArn":"...","AllAwsRegions":true}'`
 
-Architecture for Organizations-wide backup compliance:
-
-1. **Delegated administrator:** Designate one account as the AWS
-   Backup delegated administrator.
-
-```bash
-aws backup register-delegated-administrator \
-  --account-id 111111111111 \
-  --region us-east-1
-```
-
-2. **Backup policy at the org level:** Use AWS Organizations backup
-   policies (tag-based) to enforce backup plans across all member
-   accounts.
-
-```bash
-aws organizations create-policy \
-  --name org-backup-policy \
-  --type BACKUP_POLICY \
-  --content file://org-backup-policy.json \
-  --target-ids ou-xxxx-xxxxxxxx
-```
-
-3. **Cross-account backup vault:** Member accounts back up to a
-   central vault in the backup account. The vault policy allows
-   member accounts to write.
-
-4. **Config aggregation:** The management account aggregates Config
-   compliance data from all member accounts.
-
-```bash
-aws configservice put-configuration-aggregator \
-  --configuration-aggregator-name org-backup-compliance \
-  --organization-aggregator-source '{"RoleArn": "arn:aws:iam::111111111111:role/ConfigAggregatorRole", "AllAwsRegions": true}' \
-  --region us-east-1
-```
-
-### Step 12: Manage Vault Lock cool-off period
-
-The cool-off period (`ChangeableForDays`) is the window during which
-a Vault Lock can still be modified or removed. Managing this correctly
-is critical for compliance mode:
+### Step 11: Manage Vault Lock cool-off period
 
 | Phase | Duration | What happens |
 |---|---|---|
-| Pre-lock | N/A | No lock exists; vault is fully mutable |
-| Cool-off | `ChangeableForDays` (min 3) | Lock is in `LOCKED` state but CAN be removed via `delete-backup-vault-lock-configuration` |
-| Post-cool-off | Permanent | Lock is IRREVERSIBLE (compliance mode) or override-capable (governance mode) |
+| Pre-lock | N/A | Vault fully mutable |
+| Cool-off | `ChangeableForDays` (min 3) | Lock is `LOCKED` but CAN be removed |
+| Post-cool-off | Permanent | Compliance mode: IRREVERSIBLE. Governance: override-capable |
 
-Cool-off management checklist:
-
-- [ ] Set `ChangeableForDays` to the minimum (3) for rapid compliance
-- [ ] Document the exact lock date and time for audit
-- [ ] During cool-off, verify all retention settings are correct
-- [ ] After cool-off, verify `LockState` is `LOCKED` and `VaultLockDate` is set
-- [ ] For compliance mode, confirm the lock CANNOT be removed:
-  ```bash
-  # This should FAIL after cool-off in compliance mode
-  aws backup delete-backup-vault-lock-configuration \
-    --backup-vault-name compliance-vault \
-    --region us-east-1
-  ```
+Checklist: set `ChangeableForDays` to minimum (3), document lock date,
+verify retention during cool-off, confirm `LockState` post-expiry,
+verify `delete-backup-vault-lock-configuration` FAILS after cool-off
+in compliance mode.
 
 ## Output format
 

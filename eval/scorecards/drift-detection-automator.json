@@ -1,0 +1,70 @@
+{
+  "skill": "drift-detection-automator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides several non\u2011obvious details (API rate\u2011limit ~50 stacks, nested\u2011stack drift support timeline, concrete suppression rule matrix, cadence decision table, Step Functions Distributed Map usage). However, much of the content restates publicly documented behavior, so the genuine expert delta is limited."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Encodes a clear AWS\u2011specific workflow (EventBridge \u2192 detect \u2192 Lambda compare \u2192 SNS \u2192 SSM) and includes concrete CLI/SDK steps. Minor gap: error\u2011handling and rollback steps are mentioned but not fully proceduralized."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Robust NEVER list with concrete reasoning (e.g., never auto\u2011remediate prod, never assume detect\u2011stack\u2011drift runs automatically). Lacks a few cost\u2011related anti\u2011patterns (e.g., excessive scheduling frequency)."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, description explains WHAT, WHEN, and includes keywords and activation triggers. Invocation schema is described in prose but not expressed as a strict JSON schema, leaving a small ambiguity."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses sections, quick\u2011navigation table, and layered detail, but the document is dense and some deep references (e.g., external markdown files) are buried, causing occasional cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (remediation) are gated by approval for prod and rate\u2011limiting guidance is provided. Still, auto\u2011remediation for non\u2011prod is allowed without explicit safeguards for resources that may cause replacement downtime."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Navigation \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns). The pattern is not explicitly labeled as a known framework, making it slightly ad\u2011hoc."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides concrete CLI snippets, Lambda code, SSM document, decision trees, and output templates that an agent could execute. Missing explicit error handling for API throttling, pagination of list\u2011calls, and fallback for NOT_CHECKED resources reduces usability."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 40466,
+  "latency_ms": 17554,
+  "assertions_passed": false,
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
+}

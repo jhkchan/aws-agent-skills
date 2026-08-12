@@ -428,38 +428,22 @@ default immediately, then upgrade via a tag-change rule.
 ### Step 5: Manage subscription and metric filters during retention changes
 
 Changing retention does NOT affect subscription or metric filters.
-But the retention automation should inventory them for audit:
+Inventory them for audit:
 
 ```bash
-# List subscription filters on a log group
-aws logs describe-subscription-filters \
-  --log-group-name /aws/lambda/my-function \
-  --region us-east-1
-
-# List metric filters on a log group
-aws logs describe-metric-filters \
-  --log-group-name /aws/lambda/my-function \
-  --region us-east-1
+aws logs describe-subscription-filters --log-group-name <name>
+aws logs describe-metric-filters --log-group-name <name>
 ```
 
-**Subscription filter cleanup scenario:** A log group with a
-subscription filter sending to OpenSearch (formerly Elasticsearch) or a
-Lambda processor incurs downstream costs independent of retention. When
-decommissioning a log group:
+**Decommissioning a log group** (correct order): delete subscription
+filters → delete metric filters → export to S3 if compliance requires →
+set retention to 1 day (do NOT delete the group — let retention expire
+naturally) → optionally delete after all data expires.
 
-1. Delete subscription filters first (`delete-subscription-filter`).
-2. Delete metric filters (`delete-metric-filter`).
-3. Export remaining logs to S3 if compliance requires.
-4. Set retention to 1 day (do NOT delete the log group — let retention
-   expire the data naturally).
-5. Optionally delete the log group after all data has expired.
-
-**Metric filter preservation scenario:** A log group with metric
-filters powering CloudWatch alarms must NOT be deleted. Retention can
-be shortened, but the metric filter continues to evaluate incoming logs
-in real time. The alarm stays functional even if historical log data
-is expired. Document this explicitly — operators often confuse
-"retention shortened" with "metric filter destroyed."
+**Metric filter preservation:** metric filters powering CloudWatch
+alarms survive retention changes — they evaluate at ingestion time.
+Operators often confuse "retention shortened" with "metric filter
+destroyed." Document this explicitly.
 
 ### Step 6: Configure S3 archival via Kinesis Firehose
 
@@ -583,37 +567,25 @@ def sweep_handler(event, context):
 ### Step 9: Multi-account rollout via AWS Organizations
 
 For an Organizations fleet, the retention automation deploys as a
-StackSet or a delegated-administrator Lambda:
-
-**Architecture:**
-- A management-account Lambda enumerates member accounts via
-  `organizations list-accounts`.
-- For each account, it assumes a cross-account role
-  (`CloudWatchLogsRetentionRole`) with `logs:PutRetentionPolicy`,
-  `logs:DescribeLogGroups`, `logs:ListTagsLogGroup`.
-- The EventBridge `CreateLogGroup` rule is deployed per-account via
-  CloudFormation StackSet.
+CloudFormation StackSet with `SERVICE_MANAGED` permission model. The
+StackSet deploys the EventBridge rule, Lambda, IAM role, and DLQ to
+each member account. A management-account sweep Lambda provides
+centralized auditing via `organizations list-accounts` + cross-account
+role assumption.
 
 ```bash
-# Deploy the auto-retention stack to all accounts via StackSet
 aws cloudformation create-stack-set \
   --stack-set-name cw-log-retention-automation \
   --template-body file://retention-automation.yaml \
   --permission-model SERVICE_MANAGED \
   --auto-deployment 'Enabled=true,RetainStacksOnAccountRemoval=false' \
-  --capabilities CAPABILITY_IAM \
-  --region us-east-1
+  --capabilities CAPABILITY_IAM
 
 aws cloudformation create-stack-instances \
   --stack-set-name cw-log-retention-automation \
   --deployment-targets OrganizationalUnitIds='["r-xxxx"]' \
-  --regions '["us-east-1","us-west-2","eu-west-1"]' \
-  --region us-east-1
+  --regions '["us-east-1","us-west-2"]'
 ```
-
-The StackSet CloudFormation template deploys the EventBridge rule,
-Lambda function, IAM role, and DLQ to each member account. The
-management account's sweep Lambda provides centralized auditing.
 
 ### Step 10: Audit and verify
 

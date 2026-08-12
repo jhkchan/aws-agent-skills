@@ -242,56 +242,30 @@ Spot realities:
 Run before classification. Misclassifying these produces wrong plans.
 
 **Pagination:** `describe-spot-instance-requests` paginates at 1,000/page
-— drain `--next-token` to completion. `describe-spot-fleet-requests`
-follows the same pattern. For fleets with many instances, filter by
-`--state active` to narrow.
+— drain `--next-token` to completion. Filter by `--state active`.
 
 **Live-account pre-flight (skip if offline plan audit):**
 1. `aws ec2 describe-spot-instance-requests --spot-instance-request-id
-   <id>` — confirm `State: active`, capture `InstanceId`, `Type`,
-   `InstanceInterruptionBehavior` (stop, hibernate, or terminate),
-   `LaunchSpecification.InstanceType`, `LaunchSpecification.Placement.
-   AvailabilityZone`.
-2. `aws ec2 describe-instances --instance-ids <id>` — confirm
-   `State.Name: running`; capture `InstanceType`, `Placement.
-   AvailabilityZone`, `Tags`, security groups, and the
-   `SpotInstanceRequestId`.
-3. `aws ec2 describe-spot-fleet-instances --spot-fleet-request-id
-   <id>` — for Spot Fleet; capture the list of active Spot Instances,
-   their types, and AZs.
-4. `aws ec2 describe-spot-fleet-requests --spot-fleet-request-ids
-   <id>` — capture `SpotFleetRequestConfig.AllocationStrategy`,
-   `TargetCapacity`, `FulfilledCapacity`,
-   `LaunchTemplateConfigs[0].Overrides` (the instance type and AZ
-   diversification list).
-5. `aws events describe-rule --name <rule-name>` — confirm the
-   EventBridge rule is `ENABLED`, capture `EventPattern` (should match
-   `"detail-type": ["EC2 Spot Instance Interruption Warning"]`).
-6. `aws events list-targets-by-rule --rule <rule-name>` — confirm
-   the target is the SQS queue or Lambda function.
-7. `aws sqs get-queue-attributes --queue-url <url>
-   --attribute-names All` — capture
-   `ApproximateNumberOfMessagesVisible`,
-   `ApproximateAgeOfOldestMessage`, `RedrivePolicy` (dead-letter queue).
-8. `aws lambda get-function-configuration --function-name <fn>` —
-   confirm `State: Active`, `Timeout >= 60`, `Runtime` supported,
-   `ReservedConcurrentExecutions >= 1`.
-9. `aws lambda get-function-concurrency --function-name <fn>` —
-   confirm reserved concurrency is not 0.
-10. `aws elbv2 describe-target-groups --target-group-arns <arn>` —
-    capture `deregistration_delay.timeout_seconds`.
-11. `aws elbv2 describe-target-health --target-group-arn <arn>` —
-    confirm the instance is a registered target and its `TargetHealth.
-    State` is `healthy` (or `draining` if already being drained).
-12. `aws autoscaling describe-auto-scaling-groups
-    --auto-scaling-group-names <name>` — capture
-    `CapacityRebalance`, lifecycle hooks, `MixedInstancesPolicy`
-    (the instance diversification spec), `DesiredCapacity`,
-    `MinSize`, `MaxSize`.
-13. `aws autoscaling describe-lifecycle-hooks
-    --auto-scaling-group-name <name>` — confirm the
-    `InstanceTerminating` hook exists and its `HeartbeatTimeout` is
-    >= 120 seconds.
+   <id>` — confirm `State: active`; capture `InstanceId`,
+   `InstanceInterruptionBehavior`, `InstanceType`, `AvailabilityZone`.
+2. `aws ec2 describe-spot-fleet-requests --spot-fleet-request-ids <id>`
+   — capture `AllocationStrategy`, `TargetCapacity`,
+   `FulfilledCapacity`, `LaunchTemplateConfigs.Overrides`
+   (diversification list).
+3. `aws events describe-rule --name <rule-name>` — confirm `ENABLED`.
+   `aws events list-targets-by-rule` — confirm target (SQS or Lambda).
+4. `aws sqs get-queue-attributes --queue-url <url>
+   --attribute-names All` — capture queue depth,
+   `ApproximateAgeOfOldestMessage`, `RedrivePolicy`.
+5. `aws lambda get-function-configuration --function-name <fn>` —
+   confirm `State: Active`, `Timeout >= 60`. `aws lambda
+   get-function-concurrency` — confirm reserved concurrency not 0.
+6. `aws elbv2 describe-target-group-attributes --target-group-arn <arn>`
+   — capture `deregistration_delay.timeout_seconds`.
+   `aws elbv2 describe-target-health` — confirm instance is registered.
+7. `aws autoscaling describe-auto-scaling-groups
+   --auto-scaling-group-names <name>` — capture `CapacityRebalance`,
+   `MixedInstancesPolicy`, lifecycle hooks.
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: Spot/Fleet/ASG configuration
@@ -321,116 +295,63 @@ is not valid JSON or is missing required fields — cannot plan.` and
 These behaviors are easy to misjudge without operational Spot
 experience. Each changes a plan if ignored:
 
-- **The 2-minute warning is a maximum, not a guarantee.** EC2 emits
-  the EventBridge `EC2 Spot Instance Interruption Warning` event 2
-  minutes before the actual interruption. In rare cases (capacity-
-  reclaim for a higher-priority workload), the notice may be shorter.
-  Design the graceful-shutdown pipeline to complete within 90 seconds
-  to leave a safety margin. The 120-second window is the upper bound.
+- **The 2-minute warning is a maximum, not a guarantee.** Design the
+  graceful-shutdown pipeline to complete within 90 seconds. Some
+  interruption scenarios (capacity-reclaim) may provide less notice.
+  EventBridge is the ONLY notification channel — there is no SNS,
+  email, or CloudWatch Alarm for Spot interruptions.
 
-- **`InstanceInterruptionBehavior` is set at launch and cannot be
-  changed.** The three options are `terminate` (default), `stop`, and
-  `hibernate`. `stop` requires an EBS-backed instance. `hibernate`
-  requires the instance to be launched with `--hibernate-options
-  Configured=true` (which pre-allocates an EBS swap volume sized to
-  the RAM). You cannot change the interruption behavior of a running
-  Spot Instance — it is fixed for the life of the request.
+- **`InstanceInterruptionBehavior` is set at launch and immutable.**
+  Options: `terminate` (default), `stop` (EBS-backed), `hibernate`
+  (requires `--hibernate-options Configured=true`). If the Spot
+  request is cancelled, stopped/hibernated instances cannot restart
+  as Spot — they become On-Demand or remain stopped.
 
-- **`stop` and `hibernate` do not preserve the Spot request.** When
-  capacity returns, a stopped or hibernated Spot Instance can be
-  restarted — but only if the Spot request is still active. If the
-  Spot request is cancelled (manually or because the instance was
-  terminated), the stopped/hibernated instance cannot be restarted as
-  Spot. It becomes an On-Demand instance (if you restart it) or it
-  remains stopped.
+- **Capacity rebalance is proactive, not reactive.** ASG
+  `CapacityRebalance` monitors Spot placement risk and launches
+  replacements BEFORE the 2-minute warning. Enable for production
+  ASGs to reduce actual interruptions experienced.
 
-- **Capacity rebalance is proactive, not reactive.** The ASG
-  `CapacityRebalance` feature monitors Spot placement risk signals.
-  When EC2 detects that a Spot Instance is at elevated interruption
-  risk, the ASG proactively launches a replacement BEFORE the 2-minute
-  warning fires. This reduces the actual interruptions experienced by
-  the workload. Enable it for production ASGs using Spot.
+- **`capacity-optimized` over `lowest-price` for production.**
+  `lowest-price` selects the cheapest pool (highest interruption rate).
+  `capacity-optimized` selects pools with the lowest interruption rate
+  at a 5-10% cost premium for 10-100x better availability.
 
-- **`capacity-optimized` is recommended over `lowest-price` for
-  production.** The `lowest-price` strategy selects the cheapest Spot
-  pool, which often has the highest interruption rate (cheap pools are
-  cheap because they have excess capacity that can be reclaimed
-  quickly). `capacity-optimized` selects pools with the lowest
-  interruption rate, accepting a slightly higher price for much better
-  availability. The cost difference is typically 5-10%; the
-  availability difference can be 10-100x.
-
-- **Diversification math: 3 families x 3 AZs = 9 pools.** Each Spot
-  pool is a unique (instance family, AZ) combination. Interruption
+- **Diversification math: 3 families x 3 AZs = 9 pools.** Interruption
   rates are roughly independent across pools. With 9 pools, the
-  probability of all 9 being interrupted simultaneously is vanishingly
-  small — this is the mathematical basis for the 99.9% availability
-  claim. With 1 pool, the probability of interruption in any given
-  hour can be 1-5%. Use `m5`, `m6a`, `c6g` (or similar — mix Intel,
-  AMD, and Graviton) across 3+ AZs.
+  probability of all being interrupted simultaneously is negligible —
+  the basis for the 99.9% availability claim. Mix Intel, AMD, and
+  Graviton (`c5`, `m5`, `c6g`) across 3+ AZs.
 
-- **Spot placement score is a capacity forecast, not a guarantee.**
-  `get-spot-placement-scores` estimates the likelihood of fulfilling
-  a Spot request for a given capacity in a given Region or set of
-  AZs. A score of 10 means "highly recommended"; a score of 1 means
-  "very unlikely to fulfill." Use this BEFORE launching a large Spot
-  Fleet to validate that the Region has sufficient capacity. The
-  score does not guarantee future availability — it is a snapshot.
+- **Spot placement score is a forecast, not a guarantee.**
+  `get-spot-placement-scores` estimates fulfillment likelihood (10 =
+  highly recommended; 1 = unlikely). Run BEFORE launching large fleets.
+  The score is a snapshot — it does not guarantee future availability.
 
-- **Spot Block is deprecated (2024+).** Spot Block (the feature that
-  reserved Spot capacity for 1-6 hours) is no longer available for
-  new requests. Existing Spot Block requests continue to function but
-  cannot be renewed. Do NOT plan around Spot Block — use On-Demand
-  Capacity Reservations or Savings Plans for predictable capacity.
+- **Spot Block is deprecated (2024+).** No new requests accepted. Use
+  On-Demand Capacity Reservations for predictable capacity.
 
-- **EventBridge is the only notification channel for interruption
-  warnings.** EC2 does not send SNS notifications, CloudWatch Alarms,
-  or email for Spot interruptions. The ONLY way to get the 2-minute
-  warning is via EventBridge. If the EventBridge rule is disabled or
-  misconfigured, there is no warning.
+- **ELB deregistration delay must fit within 2 minutes.** The ALB
+  default of 300 seconds means the instance is terminated before
+  draining finishes. Set to 30-60 seconds for Spot targets.
 
-- **The interruption warning event contains the instance ID and the
-  action (stop, hibernate, terminate).** The event payload is:
-  `{"version":"0","id":"...","detail-type":"EC2 Spot Instance
-  Interruption Warning","source":"aws.ec2","account":"...","region":
-  "...","time":"...","resources":["arn:aws:ec2:...:instance/i-..."],
-  "detail":{"instance-id":"i-...","instance-action":"terminate"}}`.
-  The `instance-action` field is `terminate`, `stop`, or `hibernate`.
+- **ASG lifecycle hooks fire on termination, not on the warning.**
+  The `InstanceTerminating` hook places the instance in
+  `Terminating:Wait` — but the Spot interruption terminates after 2
+  minutes regardless. The lifecycle hook does NOT extend the window.
 
-- **ELB deregistration delay must fit within the 2-minute window.**
-  When the graceful-shutdown Lambda calls `deregister-targets`, the
-  target enters `draining` state and the ELB waits
-  `deregistration_delay.timeout_seconds` before fully removing it.
-  If this delay is set to the ALB default of 300 seconds, the
-  instance will be terminated (by the Spot interruption) before
-  draining completes. Set the delay to 30-60 seconds for Spot targets.
+- **Spot Fleet auto-replaces interrupted instances.** No manual
+  intervention needed for capacity restoration — but replacements
+  start from scratch (no state migration). Stateful workloads must
+  checkpoint independently.
 
-- **ASG lifecycle hooks fire on termination, not on the interruption
-  warning.** When a Spot Instance is interrupted, the ASG places it
-  in `Terminating:Wait` and fires the `InstanceTerminating` lifecycle
-  hook. The lifecycle hook timeout must be long enough for the
-  graceful-shutdown pipeline to complete — but the Spot interruption
-  will terminate the instance after 2 minutes regardless. The
-  lifecycle hook does NOT extend the 2-minute window.
+- **Graviton (arm64) Spot often has lower interruption rates.** Newer
+  pools with more spare capacity. Include in diversification for both
+  cost and resilience. Verify application supports arm64.
 
-- **Spot Fleet auto-replaces interrupted instances.** When a Spot
-  Instance in a Spot Fleet is interrupted, the Fleet automatically
-  launches a replacement (subject to the `TargetCapacity` and
-  allocation strategy). No manual intervention is needed for capacity
-  restoration — but the replacement starts from scratch (no state
-  migration). Stateful workloads must checkpoint independently.
-
-- **Graviton (arm64) Spot instances often have lower interruption
-  rates.** Graviton instance families (c6g, m6g, r6g) are newer and
-  often have more spare capacity than x86 families (c5, m5, r5).
-  Including Graviton in the diversification mix improves both cost
-  and interruption resilience. Verify the application supports arm64.
-
-- **`describe-spot-instance-requests` shows `StatusCode` for the
-  request health.** `StatusCode: marked-for-stop` or `marked-for-
-  termination` indicates the interruption is imminent. `StatusCode:
-  fulfilled` means the request is active and healthy. Monitor this
-  field for early warning beyond EventBridge.
+- **`describe-spot-instance-requests` `StatusCode` for early warning.**
+  `marked-for-stop` or `marked-for-termination` indicates imminent
+  interruption. `fulfilled` means healthy.
 
 ### Step 1: Pre-check gate — REVIEW_REQUIRED if any check needs human attention
 

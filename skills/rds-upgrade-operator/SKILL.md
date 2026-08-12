@@ -226,38 +226,26 @@ not yet ready. Driven by three RDS realities:
 Run before classification. Misclassifying these produces wrong plans.
 
 **Pagination:** `describe-db-instances` paginates at 100/page — drain
-`--marker` (or `--starting-token` in AWS CLI v2) to completion.
-`describe-db-clusters` follows the same pattern. For fleets, filter by
-`--engine <engine>` to narrow the result set.
+`--starting-token` to completion.
 
 **Live-account pre-flight (skip if offline plan audit):**
 1. `aws rds describe-db-instances --db-instance-identifier <id>` —
-   confirm instance exists; capture `DBInstanceStatus`, `Engine`,
-   `EngineVersion`, `DBInstanceClass`, `AllocatedStorage`,
-   `MultiAZ`, `ReadReplicaSourceDBInstanceIdentifier`,
-   `PendingModifiedValues`, `AutoMinorVersionUpgrade`,
-   `PreferredMaintenanceWindow`, `DBParameterGroups`,
-   `OptionGroupMemberships`, `DBSubnetGroup`, `StorageType`.
+   capture `DBInstanceStatus`, `Engine`, `EngineVersion`,
+   `DBInstanceClass`, `MultiAZ`, `PendingModifiedValues`,
+   `AutoMinorVersionUpgrade`, `DBParameterGroups`,
+   `OptionGroupMemberships`, `StorageType`.
 2. `aws rds describe-db-clusters --db-cluster-identifier <id>` — for
-   Aurora; capture `Status`, `Engine`, `EngineVersion`,
-   `DBClusterMembers`, `GlobalClusterIdentifier` (if a global cluster
-   member), `DBClusterParameterGroup`.
+   Aurora; capture `Status`, `EngineVersion`, `DBClusterMembers`,
+   `GlobalClusterIdentifier`, `DBClusterParameterGroup`.
 3. `aws rds describe-db-engine-versions --engine <engine>
-   --db-instance-class <class>` — confirm the target `EngineVersion`
-   is in the list of valid upgradable versions. Check
-   `SupportsGlobalDatabases` if the target is a global cluster member.
+   --db-instance-class <class>` — confirm the target is a valid
+   upgrade target. Check `SupportsGlobalDatabases` for global clusters.
 4. `aws rds describe-db-snapshots --db-instance-identifier <id>
-   --snapshot-type manual` — confirm a pre-upgrade snapshot exists and
-   is `available`.
-5. `aws rds describe-db-log-files --db-instance-identifier <id>` —
-   capture the last upgrade log if available (engine-specific).
-6. `aws rds describe-pending-maintenance-actions
-   --resource-identifier <arn>` — confirm no conflicting pending action.
-7. `aws ec2 describe-security-groups --group-ids <db-sg>` — verify the
-   security group still allows the application's CIDR on the DB port.
-8. `aws rds describe-global-clusters --global-cluster-identifier <id>`
-   — if the cluster is a global cluster member, capture the primary
-   and all secondary Regions for sequencing.
+   --snapshot-type manual` — confirm pre-upgrade snapshot is `available`.
+5. `aws rds describe-pending-maintenance-actions` — confirm no
+   conflicting pending action.
+6. `aws rds describe-global-clusters --global-cluster-identifier <id>`
+   — if a global cluster member, capture primary and secondaries.
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: DB/cluster configuration
@@ -285,118 +273,60 @@ is not valid JSON or is missing required fields — cannot plan.` and
 These behaviors are easy to misjudge without operational upgrade
 experience. Each changes a plan if ignored:
 
-- **Major upgrades are NEVER automatic.** `AutoMinorVersionUpgrade` only
-  schedules patches within the same major version. A major version bump
-  (e.g., PostgreSQL 13 to 14, Aurora MySQL 5.7 to 8.0) requires an
-  explicit `modify-db-instance --engine-version <target>` or
-  `modify-db-cluster --engine-version <target>`. There is no
-  "auto-major-upgrade" flag.
+- **Major upgrades are NEVER automatic.** `AutoMinorVersionUpgrade`
+  only schedules patches within the same major version. A major version
+  bump requires explicit `modify-db-instance --engine-version <target>`.
+  You cannot skip major versions (PostgreSQL 13 to 15 requires 14
+  first; Aurora MySQL 5.6 to 8.0 requires 5.7 first). Use
+  `describe-db-engine-versions` to enumerate valid upgrade targets.
 
-- **You cannot skip major versions.** PostgreSQL 13 to 15 requires going
-  through 14 first. Aurora MySQL 5.6 to 8.0 requires going through 5.7
-  first. `describe-db-engine-versions --engine <engine>` lists the
-  valid upgrade targets; use `--query
-  'DBEngineVersions[?EngineVersion==`<current>`].ValidUpgradeTarget`
-  to enumerate.
+- **Parameter group families are engine-version-specific.** Aurora
+  MySQL 5.7 uses `aurora-mysql5.7`; upgrading to 8.0 requires an
+  `aurora-mysql8.0` group. The upgrade does NOT auto-migrate parameters
+  — pre-create the target group, diff, apply custom values, attach
+  during upgrade. Same for option groups (e.g., MEMCACHED removed in
+  Aurora MySQL 8.0).
 
-- **Parameter group families are engine-version-specific.** An Aurora
-  MySQL 5.7 DB uses `aurora-mysql5.7` parameter group family. Upgrading
-  to 8.0 requires a `aurora-mysql8.0` parameter group. The upgrade
-  process does NOT auto-migrate parameters — if you leave the 5.7 group
-  attached, the upgrade fails or the instance boots with defaults. Pre-
-  create the target param group, diff parameters with the source, apply
-  custom values, then attach it during the upgrade.
+- **Blue/green deploy is the zero-downtime path.** RDS provisions a
+  staging environment (green) at the target version, syncs via logical
+  replication, and switches via DNS shift (under 60 seconds). The green
+  is retained as a rollback safety net. Use for production major
+  upgrades instead of in-place.
 
-- **Option groups are engine-version-specific.** Same pattern: an option
-  group for `mysql 5.7` is not valid for `mysql 8.0`. Pre-create the
-  target option group with the same options (or validated replacements
-  — some options changed between versions, e.g., `MEMCACHED` was
-  removed in Aurora MySQL 8.0).
+- **Multi-AZ upgrades roll through a failover.** Standby upgraded
+  first, then failover, then old primary upgraded — TWO brief
+  connection drops. Read replicas must match or trail the source
+  version; upgrade source first. Global database upgrades are Region-
+  sequential (primary first, secondaries rebuilt; secondaries
+  unavailable during rebuild).
 
-- **Blue/green deploy is the zero-downtime path.** For production major
-  upgrades, create a blue/green deployment: RDS provisions a full
-  staging environment (green) running the target engine, keeps it in
-  sync via logical replication, and switches traffic over via a DNS
-  shift. The switchover is typically under 60 seconds. The green is
-  kept for a rollback safety window before deletion. Use
-  `create-blue-green-deployment` then `switchover-blue-green-deployment`.
+- **`--apply-immediately` vs maintenance window.** Without
+  `--apply-immediately`, the upgrade is deferred to the next
+  `PreferredMaintenanceWindow`. The upgrade reboots the database — all
+  connections dropped, in-flight transactions rolled back. Pending
+  parameter/option group changes (`pending-reboot`) are applied.
 
-- **Multi-AZ upgrades roll through a failover.** The standby is
-  upgraded first, then a failover shifts the primary role to the newly
-  upgraded instance, then the old primary is upgraded. This means TWO
-  brief connection drops during the upgrade, not one. Plan application
-  retry logic accordingly.
+- **MySQL 8.0 `caching_sha2_password`.** The default auth plugin
+  changed. Applications using `mysql_native_password` need a driver
+  upgrade OR the parameter group override
+  `default_authentication_plugin = mysql_native_password`.
 
-- **Read replicas must match or trail the source version.** You cannot
-  have a replica running a higher engine version than its source. The
-  upgrade order is: source first, then each replica. For Aurora, the
-  cluster writer is upgraded first, then readers (handled automatically
-  by `modify-db-cluster`).
-
-- **Global database upgrade is Region-sequential.** For a global
-  cluster, upgrade the primary Region's cluster first. The secondary
-  Regions' clusters are rebuilt from the upgraded primary — they cannot
-  be upgraded independently. The secondary Regions are unavailable
-  during their rebuild (which can take hours depending on data size).
-  Consider a planned regional cutover if the secondary Regions serve
-  live traffic.
-
-- **`PreferredMaintenanceWindow` only applies to scheduled (deferred)
-  modifications.** When you call `modify-db-instance --engine-version
-  <target>` without `--apply-immediately`, the upgrade is deferred to
-  the next maintenance window. With `--apply-immediately`, the upgrade
-  starts now and overrides any pending maintenance-window actions.
-
-- **The upgrade reboots the database.** All connections are dropped.
-  In-flight transactions are rolled back. The reboot applies pending
-  parameter group changes (`pending-reboot`) and pending option group
-  changes. Plan for a full connection-pool drain and reconnect cycle.
+- **PostgreSQL 14+ default changes.** `default_statistics_target`
+  increased to 1000; `shared_preload_libraries` handling tightened.
+  `pg_upgrade` rebuilds planner statistics — run `ANALYZE` on all
+  tables post-upgrade to prevent query plan regressions.
 
 - **Aurora Serverless v1 does NOT support in-place major upgrades.**
-  To move Aurora Serverless v1 from MySQL 5.6 to 8.0, restore a
-  snapshot to a new Aurora Serverless v2 cluster (which supports 8.0).
-  This is a restore-and-cutover, not a modify-in-place.
+  Restore a snapshot to a Serverless v2 cluster instead.
 
-- **`pg_upgrade` is used internally for PostgreSQL major upgrades.**
-  This means query plans can change — the planner statistics are
-  rebuilt. Run `ANALYZE` on all tables after the upgrade to refresh
-  statistics. Plan for a post-upgrade performance verification window.
+- **`SupportsGlobalDatabases` flag.** Verify the target engine version
+  supports global databases before planning a global cluster upgrade.
 
-- **MySQL 8.0 introduces a new authentication plugin
-  (`caching_sha2_password`) as the default.** Applications using
-  `mysql_native_password` need either a driver upgrade or the
-  parameter group change `default_authentication_plugin =
-  mysql_native_password` to preserve connectivity. Otherwise
-  applications fail to authenticate after the upgrade.
-
-- **PostgreSQL 14+ changed some default settings.** Notably,
-  `default_statistics_target` increased from 100 to 1000, and
-  `shared_preload_libraries` handling tightened. Review the
-  release notes for each PostgreSQL major version in the upgrade
-  path and pre-configure the target parameter group accordingly.
-
-- **`describe-db-engine-versions` shows `SupportsGlobalDatabases`.**
-  Not every engine version supports global clusters. If the cluster
-  is a global cluster member, verify the target version has
-  `SupportsGlobalDatabases: true` before planning the upgrade.
-
-- **A snapshot taken DURING the upgrade may be inconsistent.** The
-  pre-upgrade snapshot must be taken when the database is `available`
-  and quiesced (no large in-flight writes). RDS takes an automatic
-  snapshot before the upgrade starts, but a manual snapshot gives you
-  a named rollback anchor that is easier to find later.
-
-- **`UpgradeInProgress` is a terminal state if it fails.** If the
-  upgrade fails midway (e.g., incompatible parameter), the instance
-  enters `upgrade-failed` state. RDS attempts to roll back to the
-  prior version, but this is not always clean. The recovery path is
-  a PITR restore to the pre-upgrade snapshot — which is why the
-  snapshot pre-check is mandatory.
-
-- **`PerformanceInsightsEnabled` should be ON before the upgrade.**
-  Performance Insights provides the before/after query-latency
-  baseline that post-upgrade verification needs. Enable it on the
-  source, capture a baseline, then compare post-upgrade.
+- **`upgrade-failed` is a terminal state if auto-rollback is unclean.**
+  Recovery is PITR restore to the pre-upgrade snapshot — which is why
+  a named manual snapshot (taken when the DB is `available` and
+  quiesced) is mandatory. Enable `PerformanceInsightsEnabled` before
+  the upgrade to capture the pre-upgrade query-latency baseline.
 
 ### Step 1: Pre-check gate — REVIEW_REQUIRED if any check needs human attention
 
