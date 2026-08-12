@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert heuristics not in generic docs: minimum 15 data points (\u22482\u2011week baseline), std\u2011dev multiplier guide with specific numeric bands, configuration dependency graph, exact cross\u2011account resource\u2011policy JSON, and tuning cycle recommendations. These details provide genuine new knowledge beyond a baseline model."
+      "justification": "Provides specific expert heuristics (15\u2011point baseline, std\u2011dev multiplier guide, configuration dependency graph, cross\u2011account resource\u2011policy JSON) that go beyond generic knowledge, but omits cost considerations, high\u2011resolution metric nuances, and some edge\u2011case limitations, so not perfect."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific workflow: verify prerequisites, metric compatibility check, create detector, wait for TRAINED, band visualization, alarm creation, cross\u2011account sharing, composite alarm integration, and tuning. Procedure order matches AWS API requirements. Minor gap: IAM permission verification is mentioned but not detailed as a step."
+      "justification": "Step\u2011by\u2011step AWS\u2011specific procedure (prerequisite verification, detector creation, band visualization, alarm setup, cross\u2011account sharing) is detailed, yet lacks guidance for updating existing detectors, handling re\u2011train delays, or cleanup of resources, preventing a full score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., creating detector without 15 data points, using eval\u2011period\u202f=\u202f1, forgetting SNS, assuming immediate std\u2011dev effect). Lacks a few additional pitfalls such as forgetting treat\u2011missing\u2011data settings or ignoring metric\u2011type exclusions, so not flawless."
+      "justification": "Contains a concrete NEVER list with reasons (insufficient data, evaluation\u2011period=1, missing SNS, std\u2011dev delay, cross\u2011account policy, composite misuse). Missing some anti\u2011patterns such as region mismatches, cost impact of high\u2011resolution metrics, and handling of API throttling."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, when_to_use, and output contract are present. Trigger criteria rely on keyword matching and a vague \"when the user wants to create...\" rather than a strict schema, which could cause ambiguous activation."
+      "justification": "Frontmatter, description, activation keywords, when_to_use, and a strict output contract are all present and well\u2011formed. However, there is no formal input schema or example invocation payload, which could affect reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Top\u2011level overview, quick navigation table, then step\u2011by\u2011step sections. Critical rules (NEVER list, output format) are highlighted early; deeper references are deferred. No overload of information at the start."
+      "justification": "Information is layered with quick navigation, mindset, detailed steps, and worked example, but the initial sections are dense and some critical rules (e.g., NEVER list) are buried, causing slight cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Constrains destructive actions by requiring prerequisite checks before any Put\u2011Metric\u2011Anomaly\u2011Detector call. Allows flexibility for tuning (std\u2011dev multiplier) while warning about re\u2011train delay. Slightly over\u2011constrains composite alarm creation (requires explicit rule) but overall well\u2011calibrated."
+      "justification": "Destructive actions are gated by prerequisite checks and a strict output format, matching task fragility. The cross\u2011account policy example is overly permissive (allows all actions), which slightly reduces calibration precision."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick navigation \u2192 Detailed steps \u2192 NEVER \u2192 Output format. The structure is consistent with other CloudOps skills, aiding comprehension."
+      "justification": "Follows a recognizable pattern (intro, mindset, stepwise process, anti\u2011patterns, output format, examples) aiding comprehension, though the ordering of some sections (e.g., cross\u2011account after step 9) feels ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI commands, verification commands, error\u2011handling guidance, and tuning plan, enabling an agent to execute end\u2011to\u2011end. Missing explicit handling of region selection and a detailed IAM\u2011policy verification step, which could cause runtime failures in some environments."
+      "justification": "Provides concrete CLI commands, checklist, verification steps, and worked examples enabling an agent to execute the deployment. Lacks detailed error\u2011handling for API failures, region mismatches, and IAM permission checks, limiting robustness in real\u2011world execution."
     }
   ],
-  "total_score": 107,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 51767,
-  "latency_ms": 7608,
+  "token_count": 51024,
+  "latency_ms": 21376,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 18,
       "max": 20,
-      "justification": "The skill compiles many known AWS WebSocket API details (limits, default expressions, connection management) but largely restates public documentation; it lacks a truly novel decision tree or threshold that a senior engineer would not already know."
+      "justification": "Provides many expert details (idle timeout 2\u202fh, 128\u202fKB limit, connection\u2011management heuristic, cross\u2011account permission syntax, auto\u2011deploy stage, recent feature list) that go beyond a baseline model, but omits newer nuances such as VPC\u2011Link private integrations and batch PostToConnection usage."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and ordered correctly (create API \u2192 routes \u2192 integrations \u2192 permissions \u2192 deployment), but the early \u201cverify prerequisites\u201d step is generic and not tied to a concrete AWS checklist."
+      "justification": "Offers AWS\u2011specific step order (create API \u2192 routes \u2192 integrations \u2192 deployment \u2192 stage) and concrete CLI commands, yet lacks explicit guidance for updating a route\u2011selection expression after creation and for establishing cross\u2011account trust relationships, which are essential procedural gaps."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "The NEVER list is thorough and explains why each pitfall matters, yet it omits warnings about unintentionally enabling auto\u2011deploy when manual control is required and about using default VPC for private integrations."
+      "justification": "Contains a thorough NEVER list (10 items) with concrete reasons (e.g., never skip connection management, never use wrong SDK for PostToConnection, never forget lambda:InvokeFunction permission), covering the most common pitfalls."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, and a precise output contract are all present and well\u2011formed, enabling reliable skill activation."
+      "justification": "Front\u2011matter is complete, description clearly states WHAT, WHEN and KEYWORDS, and the output contract is unambiguous with required literal labels."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill includes a quick\u2011navigation table and layered sections, but the initial document is dense and front\u2011loads many details (e.g., full tables of limits, recent features) which can cause cognitive overload before the agent requests deeper information."
+      "justification": "Top\u2011level sections give a concise overview; detailed procedures are hidden under headings and a quick\u2011navigation table, preventing cognitive overload while keeping depth available on demand."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (create\u2011api, create\u2011table) are given with placeholders (<api-id>) that could be mis\u2011filled; the skill does not enforce safety checks (e.g., confirm before creating resources) for fragile operations."
+      "justification": "Calibrates well for fragile provisioning commands (requires user\u2011filled placeholders, verification steps), yet leaves destructive operations (e.g., delete\u2011API) unguarded and relies on vague placeholders that could be mis\u2011used."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "The document follows a recognizable CloudOps skill pattern (metadata, mindset, steps, NEVER, output format) but mixes narrative tables and code blocks in an ad\u2011hoc way rather than a strict template."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format) that aligns with the established skill template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 10,
       "max": 15,
-      "justification": "The checklist, verification commands, and worked example enable an agent to execute the deployment, yet the examples sometimes omit optional fields (authorizer, WAF) without clear markers, and there is no guidance for handling CLI command failures."
+      "justification": "Provides actionable CLI snippets and a checklist, but the skill\u2019s own model outputs show READY_TO_DEPLOY even when required prerequisites like connection\u2011management or authorizer are missing, indicating a missing decision tree for prerequisite validation."
     }
   ],
-  "total_score": 106,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 53425,
-  "latency_ms": 15653,
+  "grade": "A",
+  "token_count": 54765,
+  "latency_ms": 14093,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2
