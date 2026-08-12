@@ -1,0 +1,70 @@
+{
+  "skill": "datazone-domain-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Introduces specific expert heuristics not found in generic docs: the cross\u2011account IAM role must trust the full execution\u2011role ARN (not just the account root), the dependency graph ordering (domain \u2192 project \u2192 data source \u2192 IAM role \u2192 assets \u2192 glossary \u2192 subscription), detailed subscription lifecycle, glossary\u2011driven policy engine, and a concrete Lambda auto\u2011classification example. These constitute genuine delta beyond baseline knowledge."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill outlines the correct AWS\u2011specific ordering (domain \u2192 project \u2192 data source \u2192 IAM role \u2192 assets) and includes verification steps, yet it intermixes generic \"verify prerequisites\" advice and lacks a detailed decision tree for handling API errors, which reduces the depth of expert procedure transfer."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never skip cross\u2011account IAM role, never assume subscriptions auto\u2011approve, never treat glossary as cosmetic). Lacks a few additional pitfalls such as least\u2011privilege IAM design and resource\u2011cleanup considerations, so a small deduction."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, includes description, version, author, license, keywords, when_to_use, and a strict output contract with required literal labels. Slight deduction for not explicitly versioning the output contract schema, but otherwise fully compliant."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses a quick\u2011navigation table and sections to layer information, keeping the top\u2011level summary concise. However, the initial narrative is dense and front\u2011loads many details, which can cause cognitive overload, leading to a modest deduction."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (domain/project creation) are guarded by a prerequisite checklist, yet there is no explicit safety mechanism such as a dry\u2011run flag or confirmation prompt, leaving the skill too permissive for irreversible operations."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick navigation \u2192 Step\u2011by\u2011step procedures \u2192 NEVER list \u2192 Output format. The structure aids comprehension, earning near\u2011max points."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides working CLI snippets, a ready\u2011to\u2011deploy checklist, and concrete examples. Missing handling for asynchronous domain creation (polling), pagination of list commands, and detailed error\u2011handling paths (e.g., IAM role creation failures), which limits full usability."
+    }
+  ],
+  "total_score": 104,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 59228,
+  "latency_ms": 5565,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
+}

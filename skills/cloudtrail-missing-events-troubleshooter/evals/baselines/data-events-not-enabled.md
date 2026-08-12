@@ -1,9 +1,11 @@
-# Baseline (without skill): data-events-not-enabled
+# Baseline (no-skill) response: data-events-not-enabled
 
-The model provides generic troubleshooting without CloudTrail-specific expertise:
+---
 
-1. Does not check trail logging status
-2. Does not verify S3 bucket policy
-3. Does not differentiate management vs data events
-4. No knowledge of org trail shadowing
-5. No diagnostic commands provided
+You're missing S3 GetObject events from CloudTrail. By default
+CloudTrail only captures management events — data events like
+GetObject are not included. You need to add a data event selector
+for S3 objects.
+
+Run `put-event-selectors` with `DataResources` configured for
+`AWS::S3::Object`.

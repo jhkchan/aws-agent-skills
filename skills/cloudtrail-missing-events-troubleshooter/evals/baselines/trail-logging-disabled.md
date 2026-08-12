@@ -1,9 +1,13 @@
-# Baseline (without skill): trail-logging-disabled
+# Baseline (no-skill) response: trail-logging-disabled
 
-The model provides generic troubleshooting without CloudTrail-specific expertise:
+---
 
-1. Does not check trail logging status
-2. Does not verify S3 bucket policy
-3. Does not differentiate management vs data events
-4. No knowledge of org trail shadowing
-5. No diagnostic commands provided
+Your CloudTrail trail shows `isLogging: false`. You need to start
+logging on it:
+
+```
+aws cloudtrail start-logging --name prod-audit-trail
+```
+
+The trail was created but never started. Make sure to call
+`start-logging` after creating a trail.

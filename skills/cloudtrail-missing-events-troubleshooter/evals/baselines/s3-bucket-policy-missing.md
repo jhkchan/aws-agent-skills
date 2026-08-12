@@ -1,9 +1,9 @@
-# Baseline (without skill): s3-bucket-policy-missing
+# Baseline (no-skill) response: s3-bucket-policy-missing
 
-The model provides generic troubleshooting without CloudTrail-specific expertise:
+---
 
-1. Does not check trail logging status
-2. Does not verify S3 bucket policy
-3. Does not differentiate management vs data events
-4. No knowledge of org trail shadowing
-5. No diagnostic commands provided
+Your CloudTrail trail says it's logging but no new files are showing
+up in S3. The bucket policy was recently updated — check that the
+new policy still allows CloudTrail to write to the bucket. You may
+need to add the `cloudtrail.amazonaws.com` service principal back
+to the bucket policy with `s3:PutObject` permission.
