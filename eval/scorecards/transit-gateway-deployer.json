@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides concrete expert details not usually memorized: exact ASN private ranges, TGW soft\u2011limit numbers, ordering of CLI commands, specific default option recommendations, and a decision\u2011tree style checklist. However much of this is restated from AWS docs, so it does not constitute completely novel knowledge."
+      "justification": "Adds concrete, up\u2011to\u2011date limits (e.g., TGWs per region\u202f=\u202f5, VPC attachments\u202f=\u202f50, route tables\u202f=\u202f50), decision\u2011tree verdict thresholds, recent 2024\u20112026 feature notes (Cloud WAN, multicast domains, Connect BGP MD5), and specific anti\u2011pattern reasons. No major missing expert insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides a clear AWS\u2011specific procedure (create TGW \u2192 route tables \u2192 attachments \u2192 association/propagation \u2192 peering \u2192 Connect \u2192 RAM \u2192 Cloud WAN). However the procedure is described in narrative form rather than a concise, step\u2011by\u2011step decision tree, leaving a small gap in procedural rigor."
+      "justification": "Encodes AWS\u2011specific procedures step\u2011by\u2011step (TGW creation, VPC attachment, route\u2011table association vs propagation, RAM share workflow, peering acceptance, Connect attachment layering). Lacks a concise checklist for TGW deletion/cleanup, but overall highly AWS\u2011specific."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasoning (association vs propagation, cross\u2011account RAM share state, multicast enable timing, AZ\u2011scope consistency, Connect not being a VPN). Lacks a few additional pitfalls such as route\u2011table loops or accidental blackhole routes, so not perfect."
+      "justification": "Contains a solid NEVER list with concrete reasons (association vs propagation, RAM share state, multicast enable timing, AZ scope, Connect misuse). Missing a few common pitfalls such as route\u2011table loops or IPv6 attachment nuances, so a small deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete and includes description, when_to_use, activation_triggers, and invocation_schema. The \"when to invoke\" section is somewhat verbose and could be more succinct; activation triggers are many and some overlap, making reliable activation slightly ambiguous."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. Slight gap: no explicit \"activation_conditions\" field and the description could be tighter for reliable trigger matching."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information well (overview \u2192 quick reference \u2192 pre\u2011flight \u2192 process \u2192 output contract). Nonetheless, the \"Quick reference\" and \"Common patterns\" sections dump a lot of details early, causing mild cognitive overload before the user reaches the core process."
+      "justification": "Information is layered (quick reference \u2192 pre\u2011flight \u2192 process \u2192 patterns \u2192 output contract). The \u201cProcess\u201d section is dense and may overload the agent with details before they are needed; a slight reduction reflects that."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by CONFIRM steps and extensive pre\u2011checks, while planning steps are more permissive. However, placeholders like <tgw-id> in the example commands leave the plan under\u2011constrained for real execution."
+      "justification": "Calibrates well: destructive actions gated by CONFIRM, strict output contract, and detailed pre\u2011flight checks. However, example blocks contain placeholder tokens (e.g., <tgw-id>) which could lead to unsafe execution if not replaced."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (description \u2192 mindset \u2192 navigation \u2192 process \u2192 contract \u2192 anti\u2011patterns). The structure is slightly ad\u2011hoc because sections such as \"Expert heuristic\" and \"Recent AWS features\" are inserted without a clear hierarchical cue."
+      "justification": "Follows a recognizable internal pattern (mindset \u2192 navigation \u2192 quick reference \u2192 pre\u2011flight \u2192 process \u2192 anti\u2011pattern \u2192 heuristic \u2192 output contract). It is not a widely\u2011adopted external pattern, so one point is deducted for being ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 5,
+      "score": 11,
       "max": 15,
-      "justification": "Model outputs violate the strict output contract: missing PRE_CHECKS block in the first example, use of placeholder tokens (<account>, <tgw-id>), omission of required CONFIRM as the first STEPS entry, and inconsistent block ordering. These gaps make the skill unusable by an agent without further correction."
+      "justification": "Provides a full CLI plan, pre\u2011checks, and verification steps, enabling an agent to execute. Yet the sample plans include unresolved placeholders, lack explicit error\u2011handling or retry logic, and do not show how to fetch IDs dynamically, which limits real\u2011world execution reliability."
     }
   ],
-  "total_score": 97,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 53864,
-  "latency_ms": 16742,
+  "token_count": 59661,
+  "latency_ms": 11871,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

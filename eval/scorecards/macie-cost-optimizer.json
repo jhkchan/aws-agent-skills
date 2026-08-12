@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 15,
+      "score": 14,
       "max": 20,
-      "justification": "Introduces concrete, senior\u2011engineer level data such as a per\u2011bucket monthly fee ($0.50), per\u2011GB assessment rate ($0.10), typical churn multiplier (5%\u202f\u2192\u202f0.05\u20130.20\u00d7), and a full decision\u2011tree for discovery\u2011mode migration. These numeric thresholds and the cost\u2011formula are not generally known to a baseline model, but the bulk of the content restates documented AWS behaviour, so full 20 is not awarded."
+      "justification": "The skill restates well\u2011known Macie concepts (automated discovery vs targeted jobs, sampling defaults, pricing formula) that a capable model already knows. It adds some concrete numbers (e.g., typical 5\u202f% churn ratio) but lacks deeper expert insights such as region\u2011specific pricing multipliers, exact per\u2011bucket fee values for all regions, or a decision\u2011tree threshold table for when to switch identifier scopes."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific workflow (pre\u2011flight data gate, step\u2011by\u2011step optimization, confirmation prompt) and orders procedures correctly. Some steps are described generically (e.g., \u201cverify compliance scope\u201d) rather than with the exact AWS\u2011specific checks, losing a few points."
+      "justification": "Provides AWS\u2011specific procedures (CLI commands, order of checks, delegation verification) but includes a few generic steps like \u201cverify compliance\u201d without concrete AWS artefacts. The mindset section is solid, yet the procedure for narrowing custom identifiers could list exact AWS CLI pagination handling."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never disable a job before automated discovery covers the same buckets). Missing a few nuanced pitfalls such as region\u2011specific delegation limits and the rare case where custom identifier regex can cause service\u2011level throttling."
+      "justification": "Contains a useful NEVER list with reasons, but only five items and some lack detailed justification (e.g., why suppressing without review is dangerous). More anti\u2011patterns (e.g., over\u2011broad regex pitfalls, region\u2011specific delegation limits) would strengthen this dimension."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter, description, keywords, activation triggers, invocation schema, and example are all present and well\u2011formed. The only shortfall is a slightly vague \"when to invoke\" paragraph that could be tighter."
+      "justification": "Frontmatter is complete and activation triggers are extensive, but the \"when_to_use\" description mixes multiple scenarios making the exact trigger ambiguous. A concise, single\u2011sentence trigger would improve reliability."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The document layers information well (quick start \u2192 mindset \u2192 detailed steps \u2192 anti\u2011patterns). However the Quick\u2011start section repeats many rules that could be deferred, causing minor cognitive overload."
+      "justification": "The skill layers information (quick start, mindset, step\u2011by\u2011step) but the Quick start section packs five headline rules and a cost formula, which can overload the initial read. Critical safety checks are buried later, causing potential cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Calibrates freedom appropriately: destructive actions (job disable, scope changes) are gated behind CONFIRM prompts, while recommendation\u2011only steps are free. One point deducted because the skill does not explicitly limit batch size for bulk updates."
+      "justification": "Destructive actions (e.g., disabling a job) are gated by confirmation prompts, but the skill does not explicitly require a dry\u2011run validation of bucket exclusions before applying them, leaving a slight risk of accidental data\u2011loss."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Process steps \u2192 Output contract \u2192 Anti\u2011patterns), making the skill easy to navigate and consistent with other CloudOps capabilities."
+      "justification": "Follows a coherent structure (What it does, Mindset, Process steps, Output contract) that is recognizable, though it does not map to a named standard pattern (e.g., \"Mindset \u2192 Navigation \u2192 Philosophy \u2192 Process \u2192 Tool\")."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 6,
+      "score": 13,
       "max": 15,
-      "justification": "Model\u2011generated example outputs contain multiple arithmetic and unit errors (e.g., 37,200\u202fGB\u202f\u00d7\u202f30\u202fruns\u202f\u00d7\u202f$0.10 = $37,200, impossible; 2\u202fTB expressed as 2,000,000,000,000\u202fGB; assessment cost off by factor 10). These errors break downstream automation and violate the strict output contract, so practical usability is severely compromised."
+      "justification": "Provides decision matrices, concrete CLI commands, and worked\u2011example blocks, enabling an agent to act. Minor issues: projected cost breakdown mixes \"automated discovery overhead\" without clear quantification, and some example numbers are loosely justified."
     }
   ],
-  "total_score": 98,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47552,
-  "latency_ms": 16925,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "token_count": 50677,
+  "latency_ms": 13009,
+  "assertions_passed": false,
+  "assertions_passed_count": 1,
+  "assertions_failed_count": 4
 }

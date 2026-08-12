@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 14,
       "max": 20,
-      "justification": "Provides several expert\u2011level heuristics not commonly known to a baseline model: encryption\u2011at\u2011creation constraint, IAM auth must be enabled at cluster creation, static parameters requiring reboot, concrete IOPS budgeting formula, instance\u2011type \u2194 graph\u2011size mapping, and cross\u2011dependency gotchas. These constitute genuine delta knowledge."
+      "justification": "Provides several nuanced points (encryption-at\u2011creation, IAM auth creation\u2011time only, static parameters needing reboot, IOPS budgeting heuristic) that a baseline model may not enumerate, but most of the content restates well\u2011known AWS best\u2011practices rather than delivering brand\u2011new expert insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Offers an AWS\u2011specific, ordered provisioning workflow (subnet group \u2192 security group \u2192 parameter group \u2192 cluster \u2192 primary instance \u2192 replicas) with exact CLI commands, reboot steps, and scaling policy syntax. Procedures are concrete and Neptune\u2011focused rather than generic."
+      "justification": "Encodes an AWS\u2011specific provisioning workflow (subnet \u2192 SG \u2192 parameter group \u2192 cluster \u2192 instances) and a decision tree for prerequisite validation. Procedures are concrete and ordered, but a few steps (e.g., error handling after each CLI call) are generic rather than fully AWS\u2011tailored."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with specific reasons (e.g., never enable encryption after creation, never assume read replicas boost writes). However, because the skill\u2019s own execution produced no output, the anti\u2011pattern guidance cannot be validated in practice, leading to a deduction."
+      "justification": "Contains a thorough NEVER list with specific rationales (e.g., encryption cannot be toggled, IAM auth must be set at creation, avoid aws rds commands). Missing are a few deeper pitfalls such as idempotent re\u2011run behavior and cost\u2011related anti\u2011patterns."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states purpose, activation keywords, and when_to_use section defines precise triggers. The output contract is explicitly defined. Minor weakness: no explicit schema validation example, but overall compliant."
+      "justification": "Frontmatter, description, keywords, triggers, and a strict output contract are all present. However, the \"when_to_use\" section repeats the description and lacks a concise, machine\u2011readable trigger list, making activation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Information is layered: quick navigation table, high\u2011level mindset, then step\u2011by\u2011step details, and finally the concise output format. Critical rules are not buried, but the skill could separate the NEVER list more cleanly."
+      "justification": "The document is well\u2011sectioned with quick\u2011navigation and layered detail, but the initial sections already contain a dense decision tree and extensive tables, which can overload the agent before it knows which parts are needed."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive provisioning actions are tightly constrained by prerequisite checks, explicit parameter values, and required reboots. Creative tasks (e.g., choosing query language) are left to the operator, matching task fragility."
+      "justification": "Destructive actions (cluster creation) are guarded by a prerequisite decision tree and explicit NEVER rules, showing good calibration. Some flexibility remains in allowing free\u2011form values (e.g., instance type) without explicit validation ranges."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick navigation \u2192 Detailed steps \u2192 NEVER \u2192 Output format \u2192 Worked example. Structure is consistent with other CloudOps skills."
+      "justification": "Follows a recognizable skill pattern (mindset, decision tree, NEVER list, output format, step\u2011by\u2011step guide). Minor deviation: the extensive narrative sections interrupt the otherwise clean pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 3,
+      "score": 12,
       "max": 15,
-      "justification": "When invoked, the model produced no output; it failed to emit the required READY_TO_DEPLOY checklist block, rendering the skill unusable in an automated pipeline."
+      "justification": "Provides working CLI examples, verification commands, and a checklist template that an agent could emit. Lacks handling of error branches (e.g., what to output if a CLI call fails) and does not cover edge cases like missing KMS key permissions or cross\u2011region subnet mismatches."
     }
   ],
-  "total_score": 94,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 37581,
-  "latency_ms": 5488,
+  "token_count": 42360,
+  "latency_ms": 7805,
   "assertions_passed": true,
   "assertions_passed_count": 0,
   "assertions_failed_count": 0

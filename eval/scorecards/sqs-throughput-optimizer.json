@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill codifies several concrete, expert\u2011level thresholds that are not universally known (e.g., empty\u2011receive ratio >50% triggers long\u2011polling, batch size limit of 10, visibility timeout \u22486\u00d7 p95 processing time, FIFO high\u2011throughput mode requiring both DeduplicationScope=MessageGroup and ThroughputLimit=PerMessageGroupId, and a detailed cost formula with per\u2011region pricing). This information would teach a senior CloudOps engineer a decision tree they would otherwise have to assemble from disparate docs. However much of the content restates standard AWS documentation, so the delta is strong but not maximal."
+      "justification": "Adds concrete expert thresholds (empty\u2011receive >50% triggers long polling, batch\u2011API >1\u202fM msgs/month, visibility timeout = 6\u00d7 p95, FIFO high\u2011throughput attribute combo). However it omits guidance on cross\u2011region messaging cost and does not address the 256\u202fKB batch payload limit or a concrete method to measure consumer p95, so the knowledge is not fully exhaustive."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "The skill embeds an AWS\u2011specific workflow: pre\u2011flight data gate, ordered steps (polling \u2192 batching \u2192 visibility \u2192 retention \u2192 DLQ \u2192 queue\u2011type), exact CLI commands for each change, and a mandatory CONFIRM gate before any state\u2011changing operation. The procedures are concrete and AWS\u2011centric, but some steps (e.g., \u201cmeasure consumer p95\u201d) are described only conceptually without a prescribed method, leaving room for generic interpretation."
+      "justification": "Provides AWS\u2011specific step\u2011by\u2011step procedures, CLI commands, pre\u2011flight data gate, and a clear decision\u2011tree mindset. Some sections are generic (e.g., \"check security\") and the ordering of steps could be tighter, preventing a full score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "A solid NEVER list is provided with specific rationales (e.g., never enable long polling without empty\u2011receive data, never migrate Standard\u2192FIFO for throughput, never use legacy per\u2011message DLQ redrive). The list, however, omits a few common pitfalls such as missing IAM permissions for SQS attribute changes, and it fails to call out the zero\u2011savings rule that the skill itself later violates in an example output."
+      "justification": "Contains a concrete NEVER list with specific reasoning (e.g., never enable long polling without empty\u2011receive ratio, never migrate Standard\u2192FIFO for throughput). Missing broader pitfalls such as cross\u2011region messaging costs and subtle SSE\u2011KMS cost interactions, so not perfect."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, description, when_to_use, activation_triggers, invocation_schema, and example are all present and well\u2011structured. The only shortfall is a slightly vague \"when_to_use\" paragraph that could better enumerate metric thresholds."
+      "justification": "Frontmatter is complete, activation triggers, invocation schema, and example are well\u2011defined. The only shortfall is the lack of an explicit versioned pricing matrix in the spec itself (it references an external file), which slightly reduces compliance."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers information (quick start, mindset, step\u2011by\u2011step, anti\u2011patterns, output contract). However, the Quick start section packs many formulas that could overload a first\u2011time reader."
+      "justification": "Uses layered sections (quick start, mindset, stepwise detail, deep references) to avoid overload. However the initial Quick navigation table and extensive tables front\u2011load a lot of detail, causing some cognitive load before the core decision tree."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (queue attribute changes) are gated by CONFIRM prompts and pre\u2011flight safety checks. Creative recommendations are left flexible. Minor issue: the skill does not explicitly limit batch\u2011size changes for extremely latency\u2011sensitive workloads."
+      "justification": "Calibrates freedom appropriately: destructive actions require explicit CONFIRM prompts and safety checks; cost\u2011optimization steps are loosely constrained to avoid over\u2011automation. Slight deduction because the skill does not explicitly limit batch\u2011size changes for extremely latency\u2011sensitive workloads."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Navigation \u2192 Mindset \u2192 Process steps \u2192 Anti\u2011patterns \u2192 Output contract). The structure is consistent with other CloudOps skills."
+      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Steps \u2192 Output format \u2192 Anti\u2011patterns \u2192 Safety). Minor ad\u2011hoc naming of sections (e.g., \"Step 0 non\u2011obvious behaviours\") prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 6,
+      "score": 9,
       "max": 15,
-      "justification": "The skill defines a clear output contract and decision matrix, but the provided model outputs contain multiple arithmetic inconsistencies (double\u2011counting empty receives, mismatched projected cost calculations, and a FURTHER_OPTIMIZATION_AVAILABLE verdict with $0.00 savings, which directly violates the hard rule). These errors would cause an agent to emit incorrect or contradictory recommendations."
+      "justification": "Provides a decision tree, CLI commands, and output template, enabling an agent to act. However the supplied example outputs contain contradictions (e.g., FURTHER_OPTIMIZATION_AVAILABLE with $0 savings) and some math inconsistencies, indicating gaps that would cause mis\u2011classifications in practice."
     }
   ],
-  "total_score": 94,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46870,
-  "latency_ms": 17041,
+  "token_count": 52361,
+  "latency_ms": 16432,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

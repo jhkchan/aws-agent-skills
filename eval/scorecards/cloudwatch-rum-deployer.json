@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 15,
       "max": 20,
-      "justification": "Provides many AWS\u2011specific details (ordering of app\u2011monitor creation, exact CLI JSON payloads, custom\u2011metric definition limits, X\u2011Ray sampling rule thresholds, recent 2024\u20112026 feature changes). However a large portion restates official documentation without novel decision trees or unique heuristics, so it falls short of a full expert delta."
+      "justification": "The skill supplies many AWS\u2011specific details (ordering of app\u2011monitor creation, domain allow\u2011list exact matching, sample\u2011rate thresholds, X\u2011Ray sampling rule impact, recent 2024\u20112026 feature changes). These go beyond a generic model\u2019s knowledge, but most points are restatements of official docs rather than novel decision trees, so full 20 is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Lists concrete AWS\u2011specific procedures: trust\u2011policy JSON for Cognito, role\u2011policy scoping to a single app\u2011monitor ARN, exact CLI sequence, SDK injection patterns for CDN vs npm. Lacks a concise, reusable checklist for troubleshooting failures, which would make the mindset more repeatable."
+      "justification": "Provides a concrete AWS\u2011centric procedure (create monitor \u2192 set allow\u2011list \u2192 create guest role \u2192 inject SDK \u2192 configure cookie domain \u2192 enable X\u2011Ray \u2192 custom events/metrics \u2192 verify). The steps are specific to CloudWatch RUM, not generic security checks, earning near\u2011max."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with clear rationales (e.g., never embed long\u2011lived keys, never use public\u2011suffix cookie domains, never omit AllowedOrigins). However, the list is limited to five items and omits other common pitfalls such as version\u2011pinning the SDK or handling ad\u2011blocker impact, so it is not exhaustive."
+      "justification": "Includes a solid NEVER list with concrete reasons (no long\u2011lived keys, never use public\u2011suffix cookie domains, never omit AllowedOrigins, never set X\u2011Ray sampling to 0%, never rename the monitor). However the list is limited to five items and lacks deeper pitfalls (e.g., ad\u2011blocker impact, IAM policy wildcards), so full credit is not given."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, triggers, and when_to_use are present. The output contract is well defined, but the skill does not enforce a strict schema for the checklist (e.g., no JSON schema or validation rules), leaving room for ambiguous activation."
+      "justification": "Frontmatter is complete, description, when_to_use, keywords, triggers, and output contract are all present. The only shortfall is that the \"when to invoke\" description is embedded in free\u2011form text rather than a crisp, machine\u2011readable trigger field, leaving a slight ambiguity for automated activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers information (quick navigation, high\u2011level contract, then deep sections). However, the main body contains very long CLI command blocks and extensive tables that could overload an agent before it reaches the concise checklist, so a modest deduction is applied."
+      "justification": "The document layers information: quick navigation, high\u2011level contract, then detailed steps, references, and anti\u2011pattern list. Critical rules are not buried, but the example blocks are long and sometimes repeat information, causing slight cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Appropriately constrains destructive actions (only creates resources, never deletes) and provides pre\u2011flight safety checks. However, the skill allows optional parameters (sample\u2011rate overrides, custom metrics) without clear limits, which could lead to over\u2011provisioning in high\u2011traffic environments."
+      "justification": "For a provisioning task the skill constrains output tightly (mandatory labels, no placeholders). It also warns about destructive mis\u2011configurations (e.g., wrong cookie domain). However the model output examples still contain placeholders and over\u2011permissive snippets, indicating the calibration is not fully enforced."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: description \u2192 navigation \u2192 contract \u2192 reasoning \u2192 prerequisites \u2192 step\u2011by\u2011step procedure \u2192 matrix \u2192 edge\u2011cases \u2192 recent features \u2192 NEVER \u2192 heuristics \u2192 safety checks. Structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern: frontmatter \u2192 strict output contract \u2192 reasoning framework \u2192 ordered deployment steps \u2192 NEVER list \u2192 references. The structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 6,
+      "score": 5,
       "max": 15,
-      "justification": "Model output examples violate the strict contract: missing space after \"Cookie domain \u2014\", inconsistent use of optional markers, extra prose before the required block, and omission of required fields in some cases. These gaps would cause an agent to produce malformed checklists, indicating the skill is not reliably usable as written."
+      "justification": "Model outputs exhibit multiple critical failures: placeholders in JS_SNIPPET, mismatched RUM_APP vs monitor name, READY_TO_DEPLOY verdict despite missing prerequisites, CLI commands embedded in JS_SNIPPET, and checklist rows not following the required \"current: \u2026 recommended: \u2026\" format. These gaps make the skill unusable in practice."
     }
   ],
   "total_score": 96,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41976,
-  "latency_ms": 6435,
+  "token_count": 50044,
+  "latency_ms": 14548,
   "assertions_passed": false,
-  "assertions_passed_count": 0,
-  "assertions_failed_count": 5
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
 }
