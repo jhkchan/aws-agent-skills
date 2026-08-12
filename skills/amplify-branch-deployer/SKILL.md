@@ -574,8 +574,8 @@ aws amplify update-app \
 
 | Mode | How it works | Amplify support |
 |---|---|---|
-| SSG (Static Site Generation) | Build-time HTML; served as static files | Default; no special config |
-| SSR (Server-Side Rendering) | Per-request HTML via Lambda serverless functions | Auto-detected for Next.js; Lambda provisioned per branch |
+| SSG (Static Site Generation) | Build-time HTML; static files | Default; no special config |
+| SSR (Server-Side Rendering) | Per-request HTML via Lambda functions | Auto-detected for Next.js; Lambda per branch |
 | ISR (Incremental Static Regeneration) | Static + on-demand regeneration | Supported via Next.js build output |
 
 **Next.js SSR:** Amplify auto-detects Next.js from the build output and
@@ -583,49 +583,17 @@ provisions Lambda serverless functions for SSR routes. No special
 `amplify.yml` config needed — the `next build` output includes SSR
 metadata that Amplify consumes.
 
-```yaml
-# amplify.yml for Next.js SSR (standard — detection is automatic)
-version: 1
-frontend:
-  phases:
-    preBuild:
-      - npm install
-    build:
-      - npm run build
-  artifacts:
-    baseDirectory: .next
-    files:
-      - '**/*'
-  cache:
-    paths:
-      - node_modules/**/*
-```
-
 **Key implication:** SSR deploys Lambda functions per branch. A repo
 with 10 active branches = 10 sets of Lambda functions. Monitor Lambda
 costs for high-traffic SSR apps.
 
 ## Step 11 — Lambda serverless functions
 
-Amplify deploys Lambda serverless functions from the build output. These
-power SSR pages, API routes, and custom compute.
+Amplify deploys Lambda serverless functions from the build output,
+powering SSR pages, API routes, and custom compute:
 
 ```yaml
-# amplify.yml — additional functions section for serverless functions
-version: 1
-frontend:
-  phases:
-    preBuild:
-      - npm install
-    build:
-      - npm run build
-  artifacts:
-    baseDirectory: .next
-    files:
-      - '**/*'
-  cache:
-    paths:
-      - node_modules/**/*
+# amplify.yml — functions section for serverless functions
 functions:
   - src: api/hello
     name: hello-function
@@ -639,31 +607,22 @@ are invoked via the branch URL under `/api/<function-name>`.
 ## Step 12 — Notifications on build result
 
 ```bash
-# Create an SNS topic for build notifications
+# SNS topic + email subscription
 aws sns create-topic --name amplify-build-notifications
-
-# Subscribe an email endpoint
 aws sns subscribe \
   --topic-arn arn:aws:sns:us-east-1:123456789012:amplify-build-notifications \
-  --protocol email \
-  --notification-endpoint team@example.com
+  --protocol email --notification-endpoint team@example.com
 
-# Wire Amplify to notify on build success/failure (via EventBridge)
-aws events put-rule \
-  --name amplify-build-result \
-  --event-pattern '{
-    "source": ["aws.amplify"],
-    "detail-type": ["Amplify Build Result"],
-    "detail": {"status": ["SUCCEED", "FAIL"]}
-  }'
+# EventBridge rule on build result
+aws events put-rule --name amplify-build-result \
+  --event-pattern '{"source":["aws.amplify"],"detail-type":["Amplify Build Result"],"detail":{"status":["SUCCEED","FAIL"]}}'
 
-aws events put-targets \
-  --rule amplify-build-result \
+aws events put-targets --rule amplify-build-result \
   --targets '[{"Id":"notify-sns","Arn":"arn:aws:sns:us-east-1:123456789012:amplify-build-notifications"}]'
 ```
 
-For Slack notifications, use an SNS → Lambda → Slack webhook pattern, or
-use AWS Chatbot to pipe SNS to Slack directly.
+For Slack, use SNS → Lambda → Slack webhook, or AWS Chatbot to pipe SNS
+to Slack directly.
 
 ## Step 13 — Recent features
 
@@ -690,13 +649,12 @@ use AWS Chatbot to pipe SNS to Slack directly.
 ## NEVER do these things
 
 1. **NEVER use `buildspec.yml` as the Amplify build spec.** Amplify uses
-   `amplify.yml`. A `buildspec.yml` in the repo is IGNORED. This is the
-   #1 cause of "my build commands don't run" tickets.
+   `amplify.yml`. A `buildspec.yml` is IGNORED. This is the #1 cause of
+   "my build commands don't run" tickets.
 
 2. **NEVER assume PR preview is a stable staging URL.** PR preview
-   environments are ephemeral — the URL rotates per build and the
-   environment is torn down on PR close. Use a dedicated `staging`
-   branch for a stable URL.
+   environments are ephemeral — URL rotates per build, torn down on PR
+   close. Use a dedicated `staging` branch for a stable URL.
 
 3. **NEVER assume monorepo detection is automatic.** Set `appRoot` on
    the app and place `amplify.yml` in the appRoot subdir. Without
@@ -704,8 +662,7 @@ use AWS Chatbot to pipe SNS to Slack directly.
 
 4. **NEVER use status 301 for SPA client-side routing.** Use `status:
    200` (rewrite) for the catch-all `/<*>` → `/index.html` rule. A 301
-   redirects to the literal path `/index.html`, breaking client-side
-   routing.
+   redirects to the literal `/index.html`, breaking client-side routing.
 
 5. **NEVER set a mis-typed branch name.** The branch name must match a
    real Git branch exactly. A typo silently never builds.
@@ -715,23 +672,22 @@ use AWS Chatbot to pipe SNS to Slack directly.
    can create the app but cannot perform OAuth.
 
 7. **NEVER forget DNS verification for custom domains.** Domain
-   association requires a CNAME record in Route 53 (or third-party
-   DNS). Without verification, SSL is not provisioned and the domain
-   stays in `CREATING` status.
+   association requires a CNAME in Route 53 (or third-party DNS).
+   Without verification, SSL is not provisioned and the domain stays in
+   `CREATING`.
 
 8. **NEVER use one PR environment per PR for high-volume repos.** Each
    PR environment consumes build minutes. Set
    `pullRequestEnvironmentName` to a fixed name to reuse one
-   environment (one PR builds at a time, lower cost).
+   environment (lower cost, one PR at a time).
 
 9. **NEVER ignore SSR Lambda costs for multi-branch repos.** SSR deploys
-   Lambda functions per branch. 10 active branches = 10 sets of Lambda
-   functions. Monitor costs for high-traffic SSR apps.
+   Lambda functions per branch. 10 branches = 10 Lambda sets. Monitor
+   costs for high-traffic SSR apps.
 
 10. **NEVER omit security headers in production.** Set HSTS,
-    X-Frame-Options, X-Content-Type-Options, and CSP via `customHeaders`
-    in `amplify.yml`. Production apps without security headers are
-    vulnerable to clickjacking and MIME-sniffing attacks.
+    X-Frame-Options, X-Content-Type-Options, and CSP via
+    `customHeaders` in `amplify.yml`.
 
 ## Output format
 
@@ -768,21 +724,16 @@ AMPLIFY: my-web-app (d2y0lrmp1qq2tu)
 VERDICT: READY_TO_DEPLOY
 CHECKLIST:
   [✓] Git provider connection: GitHub (OAuth via console)
-  [✓] Repository: https://github.com/org/my-web-app
   [✓] App created: d2y0lrmp1qq2tu (appRoot: packages/web-app — monorepo)
   [✓] Build spec: amplify.yml at packages/web-app/amplify.yml
-  [✓] Branch: main (stage: PRODUCTION, auto-build: true)
-  [✓] Build instance: medium
-  [✓] Environment variables: NEXT_PUBLIC_API_URL (app), NODE_ENV=production (branch)
+  [✓] Branch: main (stage: PRODUCTION, auto-build: true, build instance: medium)
   [✓] Redirects: SPA rewrite (/<*> → /index.html 200)
   [✓] Custom headers: HSTS, X-Frame-Options, X-Content-Type-Options
   [✓] Basic auth: disabled on main; enabled on staging
   [✓] Custom domain: example.com → main (DNS verified, SSL active)
   [✓] PR preview: enabled (environment: pr-preview, reuses single env)
-  [✓] Monorepo: appRoot=packages/web-app
   [✓] SSR/SSG: SSR (Next.js 14, Lambda functions auto-provisioned)
-  [✓] Serverless functions: 3 (per branch)
-  [✓] Notifications: SNS → Slack on build result
+  [✓] Serverless functions: 3 (per branch) | Notifications: SNS → Slack
 VERIFICATION_COMMANDS:
   aws amplify get-app --app-id d2y0lrmp1qq2tu
   aws amplify list-branches --app-id d2y0lrmp1qq2tu

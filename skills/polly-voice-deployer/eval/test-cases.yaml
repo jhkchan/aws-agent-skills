@@ -1,0 +1,155 @@
+# Eval test cases for polly-voice-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Polly TTS scenarios
+# (neural real-time synthesis with lexicon, async batch to S3,
+# SSML with standard engine full tag support, speech marks for
+# lip-sync, SSML break/emphasis on neural engine which silently
+# fails).
+skill: polly-voice-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: neural-realtime-lexicon
+    description: >-
+      Deploy a real-time Polly synthesis configuration using the neural
+      engine, voice Joanna (en-US), MP3 output at 24000 Hz, with a
+      pre-uploaded lexicon for custom company term pronunciation.
+      Expects READY_TO_DEPLOY with neural engine, voice verified on
+      engine, lexicon referenced, and per-character cost estimate.
+    input: |
+      Configure Amazon Polly to synthesize a greeting message using
+      the neural engine. Voice: Joanna (en-US, Female). Output format:
+      MP3 at 24000 Hz. Use a lexicon named company-terms (already
+      uploaded) so that "AWS" and "EC2" are pronounced correctly.
+      The text is: "Welcome to AWS. Your EC2 instance is ready."
+      This is a real-time synthesis for a web application. Region
+      us-east-1. Tags: Environment=production, UseCase=greeting.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Joanna"
+        - "neural"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "company-terms"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: async-s3-batch
+    description: >-
+      Deploy an asynchronous Polly batch synthesis configuration using
+      start-speech-synthesis-task to write long-form narration to S3.
+      Expects READY_TO_DEPLOY with async mode, S3 output bucket, task
+      lifecycle noted, and cost estimate for a long text.
+    input: |
+      Configure Amazon Polly to batch-synthesize a 50,000-character
+      article to S3 using the long-form engine. Voice: Joanna (en-US).
+      Output format: MP3 at 24000 Hz. S3 output bucket:
+      my-polly-output, key prefix: audio/articles/. Region us-east-1.
+      Tags: Environment=production, UseCase=audiobook.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "start-speech-synthesis-task"
+        - "my-polly-output"
+        - "long-form"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ssml-standard-engine
+    description: >-
+      Deploy a Polly synthesis configuration using the standard engine
+      with SSML that includes break, emphasis, prosody, and phoneme
+      tags. Expects READY_TO_DEPLOY with standard engine selected
+      (correct for full SSML support) and all tags verified compatible.
+    input: |
+      Configure Amazon Polly to synthesize speech using SSML. The SSML
+      uses <break time="500ms"/>, <emphasis level="strong">, and
+      <prosody rate="slow"> tags. Voice: Matthew (en-US). Output: MP3
+      at 24000 Hz. Text includes phoneme tags for IPA pronunciation.
+      Region us-east-1. Tags: Environment=production, UseCase=ivr.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "standard"
+        - "Matthew"
+        - "SSML"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: speech-marks-lipsync
+    description: >-
+      Deploy a Polly speech marks configuration for lip-sync animation.
+      Expects READY_TO_DEPLOY with speech marks generated as a separate
+      request (OutputFormat=json), viseme and word mark types, and the
+      two-request pattern (audio + marks) noted.
+    input: |
+      Configure Amazon Polly to generate speech marks for lip-sync
+      animation. Voice: Joanna (en-US, neural engine). Need viseme and
+      word-level marks. Output: JSON speech marks file. Also need the
+      corresponding MP3 audio file. Region us-east-1. Tags:
+      Environment=production, UseCase=avatar-lipsync.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "speech marks"
+        - "viseme"
+        - "json"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ssml-break-on-neural
+    description: >-
+      Operator requests Polly synthesis with the neural engine but the
+      SSML includes <break time="500ms"/> and <emphasis> tags, which
+      are only supported by the standard engine. Expects
+      PREREQUISITES_MISSING with the SSML-engine incompatibility cited.
+    input: |
+      Configure Amazon Polly neural voice synthesis with SSML. Use
+      voice Joanna (neural engine). The SSML includes
+      <break time="500ms"/> between sentences and
+      <emphasis level="strong"> on key terms. Output: MP3 at 24000 Hz.
+      Region us-east-1. Tags: Environment=production.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "break"
+        - "neural"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "standard"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

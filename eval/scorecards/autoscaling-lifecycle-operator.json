@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert details not usually known to a generic model: exact HeartbeatTimeout bounds (30\u20117200s), Spot\u2011specific recommended 30\u2011120s window, interaction of ELB deregistration delay with terminate\u2011hook timeout, warm\u2011pool state nuances, recent 2024\u20112026 feature changes, and a decision\u2011tree style pre\u2011check priority list. No major missing expert facts."
+      "justification": "Adds concrete expert thresholds (e.g., HeartbeatTimeout 30\u20117200, Spot ASG recommended 30\u2011120, ELB deregistration delay vs. hook timeout) and decision\u2011tree style pre\u2011check priority that a generic model would not enumerate; however, much of the basic hook concept is already known, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: ordered pre\u2011flight CLI calls, exact flag sets for put\u2011lifecycle\u2011hook, record\u2011lifecycle\u2011action\u2011heartbeat, warm\u2011pool configuration, and capacity\u2011rebalance enablement. The mindset section explains why hooks are timers, not gates. Lacks a formal rollback procedure for destructive actions (e.g., delete\u2011hook), hence a small deduction."
+      "justification": "Provides AWS\u2011specific procedures: exact CLI sequence, pagination notes, pre\u2011flight gate, CONFIRM prompt, post\u2011verification steps. The mindset section is solid, but a few steps (e.g., IAM trust\u2011policy verification) are described only at a high level, preventing a full 15."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Robust NEVER list with concrete pitfalls and reasons (e.g., never use default 3600s timeout, never omit autoscaling:CompleteLifecycleAction permission, never delete a hook while instances are in wait). Missing a few niche anti\u2011patterns such as forgetting to set the Lambda\u2019s trust policy for autoscaling.amazonaws.com, so not perfect."
+      "justification": "Contains an extensive NEVER list with concrete reasons (e.g., never use default 3600\u202fs HeartbeatTimeout, never omit autoscaling:CompleteLifecycleAction permission). One minor gap: no explicit warning about duplicate hook names causing silent failures, but overall very strong."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Complete frontmatter, clear description, extensive keywords, activation_triggers, and a well\u2011defined invocation_schema. The only shortfall is that activation triggers are a long list that could cause false positives, but overall the spec is solid."
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are present and well\u2011formed. The 'when_to_use' section is detailed, yet the skill lacks a concise 'when NOT to invoke' rule beyond a paragraph, and the activation triggers list is long but not prioritized, making reliable activation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns). However, some critical rules (e.g., the NEVER list) are buried deep, and the initial sections are dense, causing potential cognitive overload."
+      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns) so readers can skim or dive deeper. However, the quick reference table mixes verdict thresholds with pre\u2011check priority, which can overload the top layer for a first\u2011time reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations are gated by a mandatory CONFIRM prompt and extensive pre\u2011checks; creative tasks are given freedom. Missing explicit guidance on how to abort or roll back after a CONFIRM \u2018yes\u2019 if a CLI call fails, leading to a minor deduction."
+      "justification": "Destructive actions are tightly constrained by a mandatory CONFIRM gate, pre\u2011checks, and post\u2011verification. Creative tasks (e.g., diagnostic read\u2011only) are left open. Slight deduction because the skill does not explicitly limit parameter ranges for schedule cron expressions or scaling\u2011policy numeric fields."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns) that aligns with other CloudOps skills. Slight deviation in ordering of sections (quick reference before mindset) prevents a perfect score."
+      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011patterns). Consistent structure aids comprehension; a single deviation (the \u201cRecent AWS features\u201d block) prevents a perfect 10."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides concrete CLI commands, verification steps, and worked examples that an agent could execute. Lacks explicit error\u2011handling for CLI failures, pagination edge\u2011cases, and rollback steps for failed operations, which could cause execution gaps."
+      "justification": "Provides concrete CLI commands, decision trees, and worked examples that an agent could execute. Lacks explicit rollback procedures, detailed error\u2011handling for CLI failures, and handling of pagination edge cases, which limits reliability in production."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 37760,
-  "latency_ms": 30276,
+  "token_count": 37813,
+  "latency_ms": 11847,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

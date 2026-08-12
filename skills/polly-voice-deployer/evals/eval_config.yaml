@@ -1,0 +1,49 @@
+# Eval configuration for polly-voice-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: polly-voice-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: neural-realtime-lexicon
+    difficulty: hard
+    prompt_file: prompts/neural-realtime-lexicon.md
+    baseline_file: baselines/neural-realtime-lexicon.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: async-s3-batch
+    difficulty: hard
+    prompt_file: prompts/async-s3-batch.md
+    baseline_file: baselines/async-s3-batch.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: ssml-standard-engine
+    difficulty: medium
+    prompt_file: prompts/ssml-standard-engine.md
+    baseline_file: baselines/ssml-standard-engine.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: speech-marks-lipsync
+    difficulty: medium
+    prompt_file: prompts/speech-marks-lipsync.md
+    baseline_file: baselines/speech-marks-lipsync.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: ssml-break-on-neural
+    difficulty: easy
+    prompt_file: prompts/ssml-break-on-neural.md
+    baseline_file: baselines/ssml-break-on-neural.md
+    expected_verdict: PREREQUISITES_MISSING

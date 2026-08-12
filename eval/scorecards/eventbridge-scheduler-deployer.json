@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Adds concrete expert knowledge not in a baseline model: (1) Scheduler auto\u2011creates a least\u2011privilege IAM role per target and only iam:PassRole is needed; (2) Flexible time window MAXIMUM requires the window to be >= the rate interval; (3) Schedule groups are immutable after creation and enable bulk enable/disable; (4) One\u2011time schedules can auto\u2011delete after completion, leaving no API trace; (5) Decision matrix for OFF vs MAXIMUM windows and the dependency graph ordering (DLQ before schedule, group before schedule)."
+      "justification": "Provides useful heuristics (e.g., flexible\u2011window >= rate, immutable group assignment) and a decision matrix, but much of the content restates AWS documentation that a capable model could already retrieve; the novel delta is limited to a few concrete rules."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedural flow: verify prerequisites (target ARN, iam:PassRole, DLQ, group), create schedule group first, ensure DLQ exists before schedule, set flexible window >= rate, use correct CLI syntax for each target type, and update\u2011schedule requires full parameter set. Includes a step\u2011by\u2011step checklist and explicit ordering that a generic \"check security\" mindset would miss."
+      "justification": "Lists AWS\u2011specific steps (dependency graph, group creation before schedules) but also includes generic advice like \"verify prerequisites\" without a strict AWS\u2011ordered procedure, leaving some procedural detail vague."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list (10 items) with specific reasons (e.g., never pre\u2011create IAM role, never use MAXIMUM for time\u2011sensitive jobs, never forget DLQ, never assume group assignment can change, never set window smaller than rate, never omit full parameters on update\u2011schedule, etc.). The reasons are grounded in real API behavior."
+      "justification": "Contains a solid NEVER list with concrete reasons, yet omits a common pitfall: cross\u2011account Scheduler usage where the auto\u2011created role needs additional trust policy, reducing completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Full frontmatter with name, description, version, author, license, compatibility, keywords, tags, dependencies, metadata, verdict shape, and activation triggers. Clear \"when_to_use\" section, strict output contract with literal labels, and activation keywords table. All required spec elements are present and unambiguous."
+      "justification": "Frontmatter and description are thorough, but the activation condition relies on a long keyword list without a clear, singular trigger rule, which could cause ambiguous skill invocation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Uses top\u2011level summary, quick\u2011navigation table, then deep sections. Critical rules (NEVER list, output format) are early; detailed CLI examples are later. Slight overload in the long reference tables, but overall well layered."
+      "justification": "The skill presents a lot of detailed information early (full tables, heuristics) before the concise checklist, risking cognitive overload for an agent that only needs the top\u2011level contract."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (schedule creation) are constrained by prerequisite checks (DLQ existence, role permissions, window size). Creative parts (choosing OFF vs MAXIMUM) are left to the operator via a decision matrix. However, the skill sometimes over\u2011specifies mode names (MAXIMUM vs FLEXIBLE) causing slight ambiguity."
+      "justification": "Constraints for fragile operations (e.g., window >= rate, DLQ existence) are mentioned, but the output contract does not enforce them, allowing an agent to emit invalid combinations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset \u2192 Step\u2011by\u2011step Process \u2192 NEVER list \u2192 Output format \u2192 Worked examples. The structure is consistent with other CloudOps skills."
+      "justification": "Follows a recognizable structure (mindset, steps, heuristics, checklist) but lacks explicit section labels for a formal pattern (e.g., missing a distinct \"Process\" heading), making the pattern slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 13,
       "max": 15,
-      "justification": "The model output generally matches the contract and provides working CLI commands. However, the second example uses an invalid cron expression \"cron(0 9? * MON-FRI *)\" (missing space before '?') and inconsistently labels flexible\u2011window mode as \"MAXIMUM\" in the narrative but \"FLEXIBLE\" in examples, which would cause API errors. These concrete mistakes reduce practical usability."
+      "justification": "Provides working CLI examples and a ready\u2011to\u2011deploy checklist, yet does not describe how to handle API errors (e.g., IAM permission denied) or fallback actions, limiting real\u2011world execution robustness."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45669,
-  "latency_ms": 16085,
+  "token_count": 45373,
+  "latency_ms": 8396,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1
