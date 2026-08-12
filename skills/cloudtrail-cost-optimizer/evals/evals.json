@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudtrail-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudTrail Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "org-trail-consolidation",
+      "name": "Organization with 12 member trails duplicating org-trail events — consolidate to single org trail",
+      "difficulty": "hard",
+      "prompt_file": "prompts/org-trail-consolidation.md",
+      "baseline_file": "baselines/org-trail-consolidation.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "org-trail-consolidation", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "member trail"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "s3-lifecycle-glacier-transition",
+      "name": "CloudTrail log bucket 850 GB Standard no lifecycle — add Glacier IR transition",
+      "difficulty": "medium",
+      "prompt_file": "prompts/s3-lifecycle-glacier-transition.md",
+      "baseline_file": "baselines/s3-lifecycle-glacier-transition.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "s3-lifecycle-glacier-transition", "RECOMMENDATION", "ESTIMATED_SAVINGS", "Glacier"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "data-event-volume-curation",
+      "name": "Org trail capturing S3 data events on All Buckets including 83% low-value volume — curate bucket list",
+      "difficulty": "hard",
+      "prompt_file": "prompts/data-event-volume-curation.md",
+      "baseline_file": "baselines/data-event-volume-curation.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "data-event-volume-curation", "RECOMMENDATION", "ESTIMATED_SAVINGS", "event selector"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "cloudtrail-lake-scoping",
+      "name": "CloudTrail Lake EDS ingesting all event categories but only management events needed — add event-category filter",
+      "difficulty": "medium",
+      "prompt_file": "prompts/cloudtrail-lake-scoping.md",
+      "baseline_file": "baselines/cloudtrail-lake-scoping.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "cloudtrail-lake-scoping", "RECOMMENDATION", "ESTIMATED_SAVINGS", "event-category"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized-org-setup",
+      "name": "Org trail with curated data events, lifecycle, shared CMK, no Lake — all seven dimensions pass",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized-org-setup.md",
+      "baseline_file": "baselines/already-optimized-org-setup.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized-org-setup", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

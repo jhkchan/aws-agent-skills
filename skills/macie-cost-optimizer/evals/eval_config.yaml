@@ -1,0 +1,43 @@
+# Eval configuration for macie-cost-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: macie-cost-optimizer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: recurring-to-automated-discovery
+    difficulty: hard
+    prompt_file: prompts/recurring-to-automated-discovery.md
+    baseline_file: baselines/recurring-to-automated-discovery.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: scan-frequency-reduction
+    difficulty: medium
+    prompt_file: prompts/scan-frequency-reduction.md
+    baseline_file: baselines/scan-frequency-reduction.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: bucket-exclusion-and-identifier-narrowing
+    difficulty: hard
+    prompt_file: prompts/bucket-exclusion-and-identifier-narrowing.md
+    baseline_file: baselines/bucket-exclusion-and-identifier-narrowing.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: already-optimized-macie
+    difficulty: easy
+    prompt_file: prompts/already-optimized-macie.md
+    baseline_file: baselines/already-optimized-macie.md
+    expected_verdict: OPTIMIZED
+  - id: custom-identifier-and-suppression
+    difficulty: hard
+    prompt_file: prompts/custom-identifier-and-suppression.md
+    baseline_file: baselines/custom-identifier-and-suppression.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE

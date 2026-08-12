@@ -12,7 +12,7 @@ author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted STL/SYS system table query output, WLM configuration JSON,
   and CloudWatch RedshiftInsights metrics. Live-account optimization uses aws redshift describe-clusters, aws redshift describe-cluster-configuration, aws redshift describe-query, aws redshift describe-queries, aws
-  redshift modify-cluster, aws cloudwatch get-metric-statistics (CPUUtilization, QueryDuration, QueryThroughput, ConcurrencyScalingClusters, WLMQueueLength, MaintenanceMode), aws redshift-data execute-statement
+  redshift modify-cluster, aws cloudwatch get-metric-statistics (CPUUtilization, QueryDuration, QueryThroughput, ConcurrencyScalingClustersActive, WLMQueueLength, MaintenanceMode), aws redshift-data execute-statement
   (SYS_QUERY_HISTORY, STL_QUERY, STL_QUERY_METRICS, STV_WLM_QUERY_STATE), and aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state
   regional rates for other regions.
 keywords:
@@ -167,7 +167,7 @@ Four principles guide every recommendation:
 - **Concurrency scaling is the elastic safety valve.** When the queue
   length grows, Redshift transparently adds clusters that share the
   load. The added clusters bill at the same rate as the primary; the
-  cost is proportional to the workload spike, not to a reserved size.
+  cost is proportional to the workload spike, not a reserved size.
 - **SQA + query priority are the isolation levers.** SQA removes short
   queries from the queue entirely. Query priority (Highest/High/Normal/
   Low) biases resource allocation toward business-critical workloads
@@ -218,7 +218,7 @@ sequences are in `references/redshift-wlm-configuration-and-pricing.md`.
 
 | Condition | Effect on optimization |
 |---|---|
-| `describe-clusters` returns `ClusterNotFound` | Function does not exist in this region. Skip. |
+| `describe-clusters` returns `ClusterNotFound` | Cluster does not exist in this region. Skip. |
 | `SYS_QUERY_HISTORY` empty over 14 days | Cluster dormant or SYS access misconfigured. **NEED_MORE_INFO**. |
 | Observation window < 14 days | Workload may reflect atypical load. **NEED_MORE_INFO**. |
 | `ConcurrencyScalingClustersActive` metric absent | Concurrency scaling not enabled. Confirm via WLM JSON. |
@@ -276,9 +276,6 @@ choice:
 - **Single-row INSERT generates VACUUM debt.** Each single-row INSERT
   creates a micro-block that VACUUM must later consolidate. Use COPY or
   a staging-table + INSERT INTO ... SELECT pattern instead.
-- **Concurrency scaling clusters share the data.** The added cluster
-  reads from the same S3-backed storage (RA3 nodes). No data copy, no
-  sync cost.
 
 ### Step 1: WLM mode — auto WLM vs manual WLM
 
@@ -286,19 +283,16 @@ Auto WLM is the 2026 default and the right choice for 95% of clusters.
 Manual WLM remains justified only for strict workload isolation
 requirements.
 
-**Auto WLM behavior:**
-- Redshift observes the live query mix and reallocates memory across
-  queues in real time.
-- Queries are classified by Redshift into Short / Medium / Long
-  buckets; each bucket gets a dynamic concurrency level.
-- No slot count tuning required.
-- Pair with concurrency scaling for elastic throughput.
+**Auto WLM behavior:** Redshift observes the live query mix and
+reallocates memory across queues in real time. Queries are classified
+into Short / Medium / Long buckets; each bucket gets dynamic
+concurrency. No slot count tuning required. Pair with concurrency
+scaling for elastic throughput.
 
-**Manual WLM behavior:**
-- Each queue has a fixed slot count and memory %.
-- Slots map to memory and concurrency: more slots = more parallelism
-  but less memory per slot.
-- Requires periodic retuning as the workload changes.
+**Manual WLM behavior:** Each queue has a fixed slot count and memory
+%. Slots map to memory and concurrency: more slots = more parallelism
+but less memory per slot. Requires periodic retuning as workload
+changes.
 
 **Decision gate:**
 
@@ -315,10 +309,7 @@ aws redshift modify-cluster-parameter-groups \
   --parameters \
     ParameterName=auto_wlm,ParameterValue=true \
     ParameterName=wlm_json_configuration,ParameterValue='[{"auto_wlm":true}]'
-```
 
-Apply the parameter group to the cluster:
-```bash
 aws redshift modify-cluster \
   --cluster-identifier <cluster-id> \
   --cluster-parameter-group-name <param-group>
@@ -330,12 +321,9 @@ Concurrency scaling adds transient clusters that share the primary
 cluster's load when queue length grows. Each added cluster bills per
 second of active use.
 
-**Pricing:**
-```
-Concurrency scaling cluster: same $/hour as primary node type
-Billed per second of active time (60 second minimum)
-Typical workload: <5% of primary cluster monthly cost
-```
+**Pricing:** Same $/hour as primary node type; billed per second of
+active time (60 second minimum). Typical workload: <5% of primary
+cluster monthly cost.
 
 **Decision gate:**
 
@@ -379,7 +367,6 @@ within the SQA threshold bypass the queue entirely.
     "queue_name": "main",
     "auto_wlm": true,
     "concurrency_scaling": "auto",
-    "query_queue_warnings": true,
     "short_query_queue_enable": true,
     "max_execution_time": 120
   }
@@ -406,17 +393,14 @@ based on user, group, or query label.
 | Background maintenance (VACUUM, ANALYZE) | Low |
 
 **Queue assignment rule examples:**
-
 ```sql
 -- Route by user group
 CREATE GROUP dashboard_users;
--- Then in WLM JSON:
--- {"queue_name":"dashboard","user_group":["dashboard_users"],"priority":"highest"}
+-- WLM JSON: {"queue_name":"dashboard","user_group":["dashboard_users"],"priority":"highest"}
 
 -- Route by query label
 -- In SQL: SET QUERY_GROUP TO 'batch_etl';
--- In WLM JSON:
--- {"queue_name":"batch","query_group":["batch_etl"],"priority":"normal"}
+-- WLM JSON: {"queue_name":"batch","query_group":["batch_etl"],"priority":"normal"}
 ```
 
 ### Step 5: Concurrency and memory tuning (manual WLM only)
@@ -424,36 +408,16 @@ CREATE GROUP dashboard_users;
 For manual WLM clusters, slot count and memory % per queue determine
 throughput and per-query memory.
 
-**Manual WLM queue configuration:**
-
 ```json
 [
-  {
-    "queue_name": "priority-queries",
-    "max_concurrency_slots": 15,
-    "memory_percent": 40,
-    "priority": "highest",
-    "concurrency_scaling": "auto"
-  },
-  {
-    "queue_name": "etl",
-    "max_concurrency_slots": 10,
-    "memory_percent": 35,
-    "priority": "normal"
-  },
-  {
-    "queue_name": "ad-hoc",
-    "max_concurrency_slots": 5,
-    "memory_percent": 25,
-    "priority": "low"
-  }
+  {"queue_name": "priority-queries", "max_concurrency_slots": 15, "memory_percent": 40, "priority": "highest", "concurrency_scaling": "auto"},
+  {"queue_name": "etl", "max_concurrency_slots": 10, "memory_percent": 35, "priority": "normal"},
+  {"queue_name": "ad-hoc", "max_concurrency_slots": 5, "memory_percent": 25, "priority": "low"}
 ]
 ```
 
 **Memory % must sum to 100 across all queues.** Rebalance when
-adding/removing a queue.
-
-**Slot count guidance:**
+adding/removing a queue. Slot count guidance:
 
 | Workload type | Slots per queue | Rationale |
 |---|---|---|
@@ -479,33 +443,27 @@ hops, or aborts queries that breach thresholds.
 **Example QMR rule (log first, then promote to abort):**
 ```json
 {
-  "rule_name": " runaway-abort",
+  "rule_name": "runaway-abort",
   "predicate": "query_execution_time > 600000000",
   "action": "abort"
 }
 ```
 
-Threshold tuning guidance:
-- Start with `action: log` and a 10x median threshold.
-- Review STL_QUERY_METRICS_HISTORY for false positives over 7 days.
-- Promote to `action: abort` only when threshold is validated.
-- For hop action, ensure the next queue exists.
+Threshold tuning: start with `action: log` and a 10x median threshold.
+Review STL_QUERY_METRICS_HISTORY for false positives over 7 days.
+Promote to `action: abort` only when threshold is validated.
 
 ### Step 7: AQUA (Advanced Query Accelerator)
 
 AQUA accelerates specific scan patterns by pushing computation to the
 storage layer.
 
-**AQUA acceleration applies to:**
-- LIKE / ILIKE on large VARCHAR columns
-- REGEXP pattern matching
-- Hash joins on string columns
-- UDFs on scanned data
+**AQUA acceleration applies to:** LIKE / ILIKE on large VARCHAR columns,
+REGEXP pattern matching, hash joins on string columns, UDFs on scanned
+data.
 
-**AQUA does NOT accelerate:**
-- Numeric aggregation (SUM, AVG, COUNT)
-- Date/time filtering
-- Equality joins on integer keys
+**AQUA does NOT accelerate:** Numeric aggregation (SUM, AVG, COUNT),
+date/time filtering, equality joins on integer keys.
 
 **Decision gate:**
 
@@ -528,10 +486,9 @@ Materialized views pre-compute aggregates. For dashboards with repeated
 GROUP BY date patterns, a materialised view converts a multi-minute
 aggregate into a sub-second lookup.
 
-**Pattern detection:**
-- Same query shape repeated many times per day (from SYS_QUERY_HISTORY)
-- Heavy aggregate (GROUP BY date, dimension, etc.)
-- Base table changes less frequently than the query runs
+**Pattern detection:** Same query shape repeated many times per day
+(from SYS_QUERY_HISTORY); heavy aggregate (GROUP BY date, dimension);
+base table changes less frequently than the query runs.
 
 **Example materialized view with auto-refresh:**
 ```sql
@@ -562,7 +519,6 @@ the refresh; for most dashboard workloads, sub-1% of cluster compute.
 | Statistics missing on external columns | Run `ANALYZE` on the external table |
 
 **COPY command optimization:**
-
 ```sql
 -- First load on a new table
 COPY sales
@@ -594,12 +550,10 @@ Compute the throughput improvement for each recommendation:
 current_effective_concurrency = base_slots × (1 + avg_active_scaling_clusters)
 projected_effective_concurrency = projected_base_slots × (1 + projected_avg_scaling_clusters)
 throughput_improvement = (projected - current) / current
-
-# For materialized views:
-current_dashboard_query_duration_sec = (from STL_QUERY)
-projected_dashboard_query_duration_sec = (estimated sub-second for MV hit)
-duration_improvement = (current - projected) / current
 ```
+
+For materialized views, compute the dashboard duration improvement
+from STL_QUERY baseline vs. estimated sub-second MV hit.
 
 Always state assumptions: queue length baseline, concurrency scaling
 active minutes/day, query mix (% short vs long), materialized view hit
@@ -645,79 +599,34 @@ CONFIRM: Before executing any state-changing CLI, emit and await operator
   Proceed? (yes/no)"
 ```
 
-Full worked examples (auto WLM migration, SQA enablement, materialized
-views, QMR setup, already-optimal, NEED_MORE_INFO, end-to-end walkthrough)
-are in `references/worked-examples-and-edge-cases.md`.
+Full worked examples are in `references/worked-examples-and-edge-cases.md`.
 
 ## STRICT output contract
 
-The rules below are hard constraints. Violating any one produces a
+These rules are hard constraints. Violating any one produces a
 misclassification or an arithmetic contradiction that breaks downstream
-FinOps automation. Self-check EVERY emitted block against these rules
-before returning the response.
-
-### Required output structure
-
-Every response MUST be a single block using these literal labels, in this
-order. Do NOT substitute markdown headings, camelCase, or bold variants.
-
-```text
-TARGET: <cluster-identifier>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <WLM mode>, concurrency scaling <on/off>, SQA <on/off>, <queue count> queues,
-    <materialized view count> MVs, QMR <rule count> rules
-  Proposed: <WLM mode>, concurrency scaling <on/off>, SQA <on/off>, <queue count> queues,
-    <materialized view count> MVs, QMR <rule count> rules
-  Dimensions changed: <wlm_mode | concurrency_scaling | sqa | priority | memory_tuning | qmr | aqua | materialized_views | spectrum | copy>
-  Dimensions checked: <list ALL eleven, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_IMPACT:
-  Current throughput: <queries/sec, p95 wait time>
-  Projected throughput: <queries/sec, p95 wait time>
-  Throughput improvement: <percent>
-  Monthly concurrency-scaling cost delta: $<amount>
-  Net monthly cost impact: $<amount>
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: <confirmation prompt text>
-```
+FinOps automation. Self-check EVERY emitted block before returning.
 
 ### FORBIDDEN output patterns
 
-1. **NEVER emit `VERDICT: FURTHER_OPTIMIZATION_AVAILABLE` with `Throughput
-   improvement: 0%`.** If every dimension nets zero throughput delta, the
-   verdict MUST be `OPTIMIZED`. A latency-only improvement is surfaced in
-   REASON as a duration delta, NOT as a throughput improvement.
-
-2. **NEVER show savings math that does not balance.** `Current throughput
-   + projected delta MUST equal Projected throughput`, rounded to 2
-   decimals.
-
+1. **NEVER emit `VERDICT: FURTHER_OPTIMIZATION_AVAILABLE` with
+   `Throughput improvement: 0%`.** If every dimension nets zero
+   throughput delta, the verdict MUST be `OPTIMIZED`.
+2. **NEVER show savings math that does not balance.** `Current
+   throughput + projected delta MUST equal Projected throughput`.
 3. **NEVER emit scratch lines** ("WAIT — recompute", "Hmm, let me redo",
    "corrected:") in the output. Finalize the math before emitting.
-
 4. **NEVER recommend switching to auto WLM without also recommending
-   concurrency scaling.** The two are paired; auto WLM without scaling
-   still bounds throughput at base cluster capacity.
-
+   concurrency scaling.** The two are paired.
 5. **NEVER omit a dimension from the RECOMMENDATION block.** The
-   `Dimensions checked` line MUST list all eleven dimensions, each marked
-   ✓ (no finding) or → (finding).
-
-6. **NEVER present a cost-increasing change (e.g., concurrency scaling
-   for steady backlog) as "OPTIMIZED."** Surface the cost delta
-   explicitly and set verdict `FURTHER_OPTIMIZATION_AVAILABLE` if the
-   recommendation increases spend, even if throughput improves.
-
+   `Dimensions checked` line MUST list all eleven dimensions.
+6. **NEVER present a cost-increasing change as "OPTIMIZED."** Surface
+   the cost delta explicitly; set verdict `FURTHER_OPTIMIZATION_AVAILABLE`
+   if the recommendation increases spend, even if throughput improves.
 7. **NEVER round intermediate formula steps differently from the final
    figure.** Compute at full precision, round only the displayed result.
 
-### Perfect example output — FURTHER_OPTIMIZATION_AVAILABLE with verified math
-
-Every field below is internally consistent. Copy this shape exactly.
+### Perfect example output — FURTHER_OPTIMIZATION_AVAILABLE
 
 ```text
 TARGET: analytics-cluster-prod
@@ -737,9 +646,9 @@ RECOMMENDATION:
   Dimensions changed: wlm_mode + concurrency_scaling + sqa + priority +
     materialized_views + qmr
   Dimensions checked: wlm_mode → (switch to auto)  concurrency_scaling →
-    (enable)  sqa → (enable)  priority → (set dashboard=Highest) 
+    (enable)  sqa → (enable)  priority → (set dashboard=Highest)
     memory_tuning ✓ (auto WLM handles)  qmr → (add 3 rules)  aqua ✓
-    (no LIKE/REGEXP pattern)  materialized_views → (add 2 MVs) 
+    (no LIKE/REGEXP pattern)  materialized_views → (add 2 MVs)
     spectrum ✓ (no external tables)  copy ✓ (no COPY issues)
   Confidence: HIGH — WLMQueueLength p99 = 22 and STL_QUERY confirms
     mixed short/long workload; auto WLM + SQA + concurrency scaling is
@@ -760,15 +669,15 @@ MIGRATION_STEPS:
   2. Apply auto WLM + concurrency scaling + SQA via parameter group:
      aws redshift modify-cluster-parameter-groups --parameter-group-name <group> --parameters \
        ParameterName=auto_wlm,ParameterValue=true \
-       ParameterName=wlm_json_configuration,ParameterValue='[{"auto_wlm":true,"concurrency_scaling":"auto","short_query_queue_enable":true,"max_execution_time":120,"queue_name":"main"}]'
+       ParameterName=wlm_json_configuration,ParameterValue='[{"auto_wlm":true,"concurrency_scaling":"auto","short_query_queue_enable":true,"max_execution_time":120}]'
   3. Apply to cluster:
      aws redshift modify-cluster --cluster-identifier analytics-cluster-prod --cluster-parameter-group-name <group>
   4. Create dashboard materialized views (Step 8 SQL).
-  5. Add QMR log rules (Step 6 JSON); review after 7 days before promoting to abort.
+  5. Add QMR log rules (Step 6 JSON); review 7 days before promoting to abort.
   6. Monitor WLMQueueLength and ConcurrencyScalingClustersActive for 7 days.
 CONFIRM: About to modify-cluster on analytics-cluster-prod (manual WLM
-  → auto WLM + concurrency scaling + SQA). Throughput improvement ~250%
-  at peak; concurrency-scaling cost +$185/month. Proceed? (yes/no)
+  → auto WLM + concurrency scaling + SQA). Throughput ~250% at peak;
+  concurrency-scaling cost +$185/month. Proceed? (yes/no)
 ```
 
 **Self-check before emit:**
@@ -827,26 +736,22 @@ Extended anti-patterns in `references/worked-examples-and-edge-cases.md`.
 - **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
   emit and await operator approval. Do NOT execute until confirmed.
 - **Snapshot the cluster before any WLM change.** WLM parameter-group
-  changes take effect on the next query; a snapshot is the rollback
-  safety net.
+  changes take effect on the next query; a snapshot is the rollback net.
 - **WLM JSON changes apply on the next query, not instantly.** Allow
   up to 5 minutes for the configuration to propagate.
 - **Concurrency scaling adds clusters within 60 seconds.** First query
   on a scaling cluster may see a 1-2 second routing latency.
 - **QMR rule changes apply immediately.** An abort rule on a running
-  query will abort it. Confirm with the operator before promoting log
-  to abort.
+  query will abort it. Confirm before promoting log to abort.
 - **Materialized view creation locks the base table briefly.** Schedule
   during low-traffic windows for very large tables.
-- **AQUA enable requires a cluster reboot.** Schedule in the
-  maintenance window.
+- **AQUA enable requires a cluster reboot.** Schedule in maintenance.
 - **Verify Spectrum partitions are in the same region as the cluster.**
   Cross-region Spectrum reads add latency and data-transfer cost.
 - **COPY COMPUPDATE ON recomputes encodings.** Use only on first load;
   turn OFF for incremental loads to avoid wasted compute.
 - **Bulk-operation limit:** Process at most 3 clusters per batch. Sort
-  by estimated throughput improvement, verify each batch before
-  proceeding.
+  by estimated throughput improvement, verify each batch first.
 
 ## Recent AWS features (2024-2026)
 
@@ -859,15 +764,13 @@ Extended anti-patterns in `references/worked-examples-and-edge-cases.md`.
   0-300 s via parameter group.
 - **Materialized Views auto-refresh (2024-2025):** Incremental refresh
   on managed schedule; supports CREATE MATERIALIZED VIEW ... AUTO
-  REFRESH YES syntax. Refresh state visible in
-  SYS_MV_REFRESH_HISTORY.
-- **AQUA for ra3.16xlarge and ra3.4xlarge (2024):** Available on RA3
-  node types. Enabled via `aqua-configuration-status`.
+  REFRESH YES. Refresh state visible in SYS_MV_REFRESH_HISTORY.
+- **AQUA for RA3 node types (2024):** Available on ra3.16xlarge and
+  ra3.4xlarge. Enabled via `aqua-configuration-status`.
 - **Redshift Data API (2024-2026):** Direct STL/SYS query access via
   `aws redshift-data execute-statement` without a JDBC connection.
-- **Query Priority (2024):** Highest/High/Normal/Low priority in WLM
-  JSON. Priority biases slot allocation, does not preempt running
-  queries.
+- **Query Priority (2024):** Highest/High/Normal/Low in WLM JSON.
+  Priority biases slot allocation, does not preempt running queries.
 - **SYS_QUERY_HISTORY (2024-2025):** Serverless and provisioned
   unified query history view. Replaces STL_QUERY for cross-engine
   analysis.

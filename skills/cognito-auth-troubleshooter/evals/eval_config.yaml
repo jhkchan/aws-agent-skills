@@ -1,0 +1,48 @@
+# Eval configuration for cognito-auth-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cognito-auth-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: hosted-ui-callback-mismatch
+    difficulty: medium
+    prompt_file: prompts/hosted-ui-callback-mismatch.md
+    baseline_file: baselines/hosted-ui-callback-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: HOSTED_UI_REDIRECT
+  - id: app-client-secret-public-flow
+    difficulty: hard
+    prompt_file: prompts/app-client-secret-public-flow.md
+    baseline_file: baselines/app-client-secret-public-flow.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: APP_CLIENT_SECRET
+  - id: identity-pool-unauth-role-trust
+    difficulty: hard
+    prompt_file: prompts/identity-pool-unauth-role-trust.md
+    baseline_file: baselines/identity-pool-unauth-role-trust.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: IDENTITY_POOL_TRUST
+  - id: pre-token-gen-lambda-attribute-missing
+    difficulty: hard
+    prompt_file: prompts/pre-token-gen-lambda-attribute-missing.md
+    baseline_file: baselines/pre-token-gen-lambda-attribute-missing.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: PRE_TOKEN_GEN_LAMBDA
+  - id: saml-provider-cert-mismatch
+    difficulty: hard
+    prompt_file: prompts/saml-provider-cert-mismatch.md
+    baseline_file: baselines/saml-provider-cert-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: SAML_CERTIFICATE

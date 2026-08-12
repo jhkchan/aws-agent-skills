@@ -1,0 +1,270 @@
+# Eval test cases for cognito-auth-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: cognito-auth-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: hosted-ui-callback-mismatch
+    description: >-
+      Cognito hosted UI returns redirect_mismatch. Application sends
+      redirect_uri=https://app.example.com/auth/callback but the app
+      client CallbackURLs lists only https://app.example.com/callback.
+      The path difference /auth/callback vs /callback is the root cause.
+      Expected layer: HOSTED_UI_REDIRECT.
+    input: |
+      Symptom: all users see "redirect_mismatch" error after entering
+      credentials on the Cognito hosted UI. The browser address bar
+      shows redirect_uri=https://app.example.com/auth/callback but the
+      app client only lists https://app.example.com/callback.
+
+      UserPoolId: us-east-1_AbCdEf123
+      AppClientId: 1ab2cd3ef4gh5ij6lmn7opq8rs
+      ClientName: web-app-client
+      AuthFlow: code grant (hosted UI /oauth2/authorize)
+      Domain: auth.example.com (Cognito custom domain)
+
+      App Client configuration:
+        CallbackURLs: ["https://app.example.com/callback"]
+        LogoutURLs: ["https://app.example.com/logout"]
+        AllowedOAuthFlows: ["code"]
+        AllowedOAuthScopes: ["openid", "email", "profile"]
+        SupportedIdentityProviders: ["COGNITO"]
+        ClientSecret: (null — PUBLIC client)
+        ExplicitAuthFlows: ["ALLOW_USER_SRP_AUTH",
+          "ALLOW_REFRESH_TOKEN_AUTH"]
+
+      Application config (from frontend):
+        redirect_uri: https://app.example.com/auth/callback
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "hosted-ui-callback-mismatch"
+        - "HOSTED_UI_REDIRECT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: APP_CLIENT_SECRET"
+
+  - id: app-client-secret-public-flow
+    description: >-
+      SPA sends a fabricated client_secret to a PUBLIC app client
+      (ClientSecret is null). Every token exchange returns
+      NotAuthorizedException with invalid_client. The root cause is
+      sending a secret to a client that was created without one.
+      Expected layer: APP_CLIENT_SECRET.
+    input: |
+      Symptom: the React SPA calls Cognito InitiateAuth with
+      USER_PASSWORD_AUTH and includes a client_secret parameter.
+      Every token exchange returns NotAuthorizedException with
+      error: invalid_client.
+
+      UserPoolId: us-east-1_XyZwVu987
+      AppClientId: 9pq8rs7tu6vw5xy4za3b2c1def
+      ClientName: mobile-spa-client
+
+      App Client configuration:
+        ClientSecret: (null — created with GenerateClientSecret: false)
+        ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH",
+          "ALLOW_REFRESH_TOKEN_AUTH"]
+        PreventUserExistenceErrors: true
+
+      Frontend SDK call (amplify-js):
+        Auth.signIn(username, password)
+        // Internal: sends client_secret from env var
+        // COGNITO_CLIENT_SECRET (leftover from a previous
+        // CONFIDENTIAL client config)
+
+      Error response:
+        { "error": "invalid_client",
+          "error_description": "Invalid client credentials passed" }
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "app-client-secret-public-flow"
+        - "APP_CLIENT_SECRET"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: AUTH_FLOW"
+
+  - id: identity-pool-unauth-role-trust
+    description: >-
+      Identity pool unauthenticated role trust policy references
+      sts.amazonaws.com instead of cognito-identity.amazonaws.com, and
+      the aud condition references an old pool ID.
+      GetCredentialsForIdentity returns NotAuthorizedException for
+      unauthenticated access. Authenticated access works fine.
+      Expected layer: IDENTITY_POOL_TRUST.
+    input: |
+      Symptom: unauthenticated guests cannot access the app. API calls
+      return 403. GetCredentialsForIdentity returns
+      NotAuthorizedException. Authenticated users (via User Pool login)
+      work fine.
+
+      IdentityPoolId: us-east-1:123456789012:example-pool
+      IdentityPool config:
+        AllowUnauthenticatedIdentities: true
+        Roles:
+          AuthRole: arn:aws:iam::123456789012:role/CognitoAuthRole
+          UnauthRole: arn:aws:iam::123456789012:role/CognitoUnauthRole
+
+      UnauthRole trust policy (get-role output):
+        {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Service": "sts.amazonaws.com"},
+            "Action": "sts:AssumeRole",
+            "Condition": {
+              "StringEquals": {
+                "cognito-identity.amazonaws.com:aud":
+                  "us-east-1:OLD_POOL_ID_9999"
+              }
+            }
+          }]
+        }
+
+      Error:
+        { "__type": "NotAuthorizedException",
+          "message": "Invalid identity pool configuration." }
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "identity-pool-unauth-role-trust"
+        - "IDENTITY_POOL_TRUST"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: IDENTITY_POOL_ROLE"
+
+  - id: pre-token-gen-lambda-attribute-missing
+    description: >-
+      Pre-token-generation Lambda throws TypeError when the user's
+      custom:department attribute is missing. Every sign-in fails with
+      UserLambdaValidationException. CloudWatch logs show the exception
+      200 times in the last hour. Expected layer: PRE_TOKEN_GEN_LAMBDA.
+    input: |
+      Symptom: no user can sign in. All return
+      UserLambdaValidationException. The error message contains
+      "TypeError: Cannot read property 'department' of undefined".
+
+      UserPoolId: us-east-1_PrQsTu456
+      AppClientId: 2bc3de4fg5hi6jk7lmn8opq9st
+      LambdaConfig:
+        PreTokenGeneration: arn:aws:lambda:us-east-1:111111111111:
+          function:pre-token-gen-fn:live
+
+      CloudWatch logs (/aws/lambda/pre-token-gen-fn, last 30 min):
+        ERROR  TypeError: Cannot read property 'department'
+          of undefined
+          at exports.handler (/var/task/index.js:12:38)
+        (repeated 200 times in the last hour)
+
+      Lambda handler code (relevant lines):
+        const dept = event.request.userAttributes['custom:department'];
+        const claims = { 'custom:dept': dept.value };
+
+      User attributes (admin-get-user for test user):
+        custom:department: (attribute not present)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "pre-token-gen-lambda-attribute-missing"
+        - "PRE_TOKEN_GEN_LAMBDA"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: CUSTOM_ATTRIBUTE"
+
+  - id: saml-provider-cert-mismatch
+    description: >-
+      SAML provider in Cognito has stale metadata. The IdP (Okta)
+      rotated its signing certificate 2 days ago; Cognito still has
+      the old metadata. Every SAML login returns
+      SAMLResponseDoesNotMatch. Expected layer: SAML_CERTIFICATE.
+    input: |
+      Symptom: SAML login via Okta stopped working 2 days ago. Users
+      authenticate on Okta successfully but Cognito returns
+      "SAMLResponseDoesNotMatch" after the IdP redirect.
+
+      UserPoolId: us-east-1_MnOpQr789
+      ProviderName: OktaSAML
+      ProviderType: SAML
+      ProviderDetails:
+        MetadataURL: https://example.okta.com/app/abc123/sso/saml/metadata
+        (Cognito last fetched metadata 5 days ago — before Okta
+         rotated the signing certificate)
+
+      Error:
+        { "__type": "SAMLResponseDoesNotMatch",
+          "message": "SAML assertion signature does not match the
+          certificate in the provider metadata." }
+
+      Okta context:
+        - Okta rotated its SAML signing certificate 2 days ago
+        - Okta metadata at the MetadataURL now contains the NEW cert
+        - Cognito has not re-fetched the metadata since the rotation
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "saml-provider-cert-mismatch"
+        - "SAML_CERTIFICATE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SAML_PROVIDER"

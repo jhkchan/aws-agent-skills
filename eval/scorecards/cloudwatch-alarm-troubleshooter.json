@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 14,
       "max": 20,
-      "justification": "The skill compiles many known CloudWatch alarm quirks (case\u2011sensitive dimensions, period\u2011resolution rules, permission requirements) but largely restates information that a senior CloudOps engineer could already cite; it does not introduce a novel decision matrix, threshold values, or previously undocumented exception."
+      "justification": "The skill consolidates senior\u2011level CloudWatch alarm troubleshooting knowledge (nine\u2011category diagnostic tree, specific CLI probes, case\u2011sensitivity, period\u2011resolution rules) that a generic model might know in parts, but it does not introduce fundamentally new concepts or decision thresholds that a senior engineer would learn for the first time."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides a solid AWS\u2011specific diagnostic flow (pre\u2011flight gate, stepwise probes, CLI command order) yet the ordering of some probes (e.g., checking alarm\u2011history before metric\u2011data) is not optimally justified, leaving a small procedural gap."
+      "justification": "Procedures are AWS\u2011specific (exact CLI commands, pre\u2011flight gate, stepwise diagnostic tree) and reflect expert thinking, yet some steps are phrased generically (e.g., \"check the alarm configuration\") rather than prescribing the precise order of AWS calls."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER section lists many concrete pitfalls with clear reasoning, but it omits a few common anti\u2011patterns such as forgetting to disable an alarm before overwriting it, or neglecting to validate cross\u2011account role permissions."
+      "justification": "The NEVER list is extensive and gives concrete reasons, but it omits several common pitfalls such as forgetting to set ActionsEnabled, overlooking cross\u2011account SNS/Lambda permissions, and the subtle effects of Metric Streams high\u2011resolution data on period settings. These gaps prevent a fully comprehensive anti\u2011pattern guide."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter is complete, the description clearly states WHAT the skill does, WHEN to invoke it, and provides precise activation triggers and an invocation schema; the skill meets all specification requirements."
+      "justification": "Frontmatter is complete, description, activation triggers, invocation schema, and example are present. However, activation_triggers include some overlapping phrases and could be tighter to avoid false positives, and the entry_point flag is set to false without explanation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document is well\u2011structured with a quick\u2011navigation table, but critical anti\u2011pattern rules and some deep\u2011dive tables are buried in long sections, causing a slight cognitive overload before the agent reaches the most actionable guidance."
+      "justification": "The skill layers information (quick navigation \u2192 mindset \u2192 triage table \u2192 pre\u2011flight \u2192 diagnostic tree \u2192 worked examples) but the initial sections are dense; a novice agent may encounter a large amount of detail before reaching the concise quick\u2011start map, leading to cognitive overload. Better front\u2011loading of the minimal actionable steps would improve the score."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 15,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive operations are gated behind explicit CONFIRM prompts, read\u2011only probes are prioritized, and the skill calibrates freedom appropriately for fragile alarm modifications."
+      "justification": "Destructive actions are gated by a CONFIRM prompt and read\u2011only probes are emphasized, showing good calibration. Nonetheless, the skill still permits state\u2011changing CLI calls (put\u2011metric\u2011alarm, add\u2011permission) without tighter constraints such as automatic dry\u2011run or explicit risk warnings for high\u2011impact changes."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (quick navigation, mindset, triage table, pre\u2011flight, diagnostic tree, output contract, NEVER list, remediation), making it easy to follow and consistent with other CloudOps skill templates."
+      "justification": "The skill follows a recognizable structure (navigation \u2192 mindset \u2192 triage \u2192 pre\u2011flight \u2192 decision tree \u2192 output \u2192 anti\u2011patterns \u2192 remediation \u2192 references), which aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision trees, and example outputs that an agent can execute, but it lacks explicit handling for malformed inputs, cross\u2011account alarm references, and some edge\u2011case error messages, leaving a few usability gaps."
+      "justification": "Provides concrete decision trees, CLI commands, and output format, enabling an agent to act. Missing are explicit error\u2011handling branches for CLI failures, malformed input detection, and guidance for cross\u2011account alarm scenarios, which could cause execution gaps."
     }
   ],
-  "total_score": 106,
+  "total_score": 100,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46598,
-  "latency_ms": 17469,
+  "token_count": 46316,
+  "latency_ms": 11343,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

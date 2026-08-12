@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "macie-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Macie Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "recurring-to-automated-discovery",
+      "name": "Daily recurring targeted job over a 12 TB stable data lake with automated discovery underutilised — migrate to automated discovery",
+      "difficulty": "hard",
+      "prompt_file": "prompts/recurring-to-automated-discovery.md",
+      "baseline_file": "baselines/recurring-to-automated-discovery.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "recurring-to-automated-discovery", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "automated"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "scan-frequency-reduction",
+      "name": "Weekly targeted job where the compliance window is quarterly — reduce frequency to monthly",
+      "difficulty": "medium",
+      "prompt_file": "prompts/scan-frequency-reduction.md",
+      "baseline_file": "baselines/scan-frequency-reduction.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "scan-frequency-reduction", "RECOMMENDATION", "ESTIMATED_SAVINGS", "monthly"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "bucket-exclusion-and-identifier-narrowing",
+      "name": "20 buckets in scope with 6 log/archive/system buckets, ALL managed identifiers for GDPR PII-only scope — exclude buckets and narrow identifiers",
+      "difficulty": "hard",
+      "prompt_file": "prompts/bucket-exclusion-and-identifier-narrowing.md",
+      "baseline_file": "baselines/bucket-exclusion-and-identifier-narrowing.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "bucket-exclusion-and-identifier-narrowing", "RECOMMENDATION", "ESTIMATED_SAVINGS", "exclude"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized-macie",
+      "name": "Macie deployment on automated discovery, narrowed identifiers, suppression rules, delegated admin, Athena export — already optimized",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized-macie.md",
+      "baseline_file": "baselines/already-optimized-macie.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized-macie", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "custom-identifier-and-suppression",
+      "name": "12 custom identifiers with overlaps and a re-evaluated known-safe prefix with no suppression rule — consolidate identifiers and add suppression",
+      "difficulty": "hard",
+      "prompt_file": "prompts/custom-identifier-and-suppression.md",
+      "baseline_file": "baselines/custom-identifier-and-suppression.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "custom-identifier-and-suppression", "RECOMMENDATION", "ESTIMATED_SAVINGS", "suppress"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

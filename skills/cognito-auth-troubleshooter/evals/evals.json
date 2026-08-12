@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cognito-auth-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Cognito Auth Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "hosted-ui-callback-mismatch",
+      "name": "Hosted UI redirect_mismatch — app sends /auth/callback but CallbackURLs lists /callback",
+      "difficulty": "medium",
+      "prompt_file": "prompts/hosted-ui-callback-mismatch.md",
+      "baseline_file": "baselines/hosted-ui-callback-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "HOSTED_UI_REDIRECT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "hosted-ui-callback-mismatch", "HOSTED_UI_REDIRECT", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: APP_CLIENT_SECRET"]
+        }
+      ]
+    },
+    {
+      "id": "app-client-secret-public-flow",
+      "name": "SPA sends fabricated client_secret to PUBLIC client (ClientSecret is null); invalid_client on every exchange",
+      "difficulty": "hard",
+      "prompt_file": "prompts/app-client-secret-public-flow.md",
+      "baseline_file": "baselines/app-client-secret-public-flow.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "APP_CLIENT_SECRET",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "app-client-secret-public-flow", "APP_CLIENT_SECRET", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: AUTH_FLOW"]
+        }
+      ]
+    },
+    {
+      "id": "identity-pool-unauth-role-trust",
+      "name": "Identity pool unauthenticated role trust policy has wrong Principal (sts.amazonaws.com) and stale aud condition",
+      "difficulty": "hard",
+      "prompt_file": "prompts/identity-pool-unauth-role-trust.md",
+      "baseline_file": "baselines/identity-pool-unauth-role-trust.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "IDENTITY_POOL_TRUST",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "identity-pool-unauth-role-trust", "IDENTITY_POOL_TRUST", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: IDENTITY_POOL_ROLE"]
+        }
+      ]
+    },
+    {
+      "id": "pre-token-gen-lambda-attribute-missing",
+      "name": "Pre-token-generation Lambda throws TypeError when custom:department attribute is absent from user attributes",
+      "difficulty": "hard",
+      "prompt_file": "prompts/pre-token-gen-lambda-attribute-missing.md",
+      "baseline_file": "baselines/pre-token-gen-lambda-attribute-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "PRE_TOKEN_GEN_LAMBDA",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "pre-token-gen-lambda-attribute-missing", "PRE_TOKEN_GEN_LAMBDA", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CUSTOM_ATTRIBUTE"]
+        }
+      ]
+    },
+    {
+      "id": "saml-provider-cert-mismatch",
+      "name": "SAML provider metadata stale after Okta certificate rotation; SAMLResponseDoesNotMatch on every SAML login",
+      "difficulty": "hard",
+      "prompt_file": "prompts/saml-provider-cert-mismatch.md",
+      "baseline_file": "baselines/saml-provider-cert-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SAML_CERTIFICATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "saml-provider-cert-mismatch", "SAML_CERTIFICATE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: SAML_PROVIDER"]
+        }
+      ]
+    }
+  ]
+}
