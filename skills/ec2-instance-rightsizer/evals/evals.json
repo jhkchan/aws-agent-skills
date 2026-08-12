@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ec2-instance-rightsizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EC2 Instance Rightsizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "idle-downsize",
+      "name": "m5.2xlarge web server with CPU 3.2% and memory 28% (CWAgent) — downsize to m5.large",
+      "difficulty": "medium",
+      "prompt_file": "prompts/idle-downsize.md",
+      "baseline_file": "baselines/idle-downsize.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "idle-downsize", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "m5.large"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "graviton-migration",
+      "name": "m5.xlarge Python/Node.js API at CPU 35%, memory 50%, Graviton-compatible stack — migrate to m7g.xlarge",
+      "difficulty": "hard",
+      "prompt_file": "prompts/graviton-migration.md",
+      "baseline_file": "baselines/graviton-migration.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "graviton-migration", "RECOMMENDATION", "ESTIMATED_SAVINGS", "arm64"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "burstable-credit-exhaustion",
+      "name": "t3.large CI runner with CPUCreditBalance trending to 0 — migrate to m6i.large (sustained-high CPU)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/burstable-credit-exhaustion.md",
+      "baseline_file": "baselines/burstable-credit-exhaustion.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "burstable-credit-exhaustion", "RECOMMENDATION", "ESTIMATED_SAVINGS", "m6i"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized",
+      "name": "r6i.2xlarge PostgreSQL database with PostGIS x86 dep, CPU 42%, memory 68% — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized.md",
+      "baseline_file": "baselines/already-optimized.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "memory-missing-blocked",
+      "name": "m5.xlarge with CPU 8% but no CWAgent memory data — cannot recommend downsize without memory",
+      "difficulty": "medium",
+      "prompt_file": "prompts/memory-missing-blocked.md",
+      "baseline_file": "baselines/memory-missing-blocked.md",
+      "expected_verdict": "NEED_MORE_INFO",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["NEED_MORE_INFO", "memory-missing-blocked", "CWAgent"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: OPTIMIZED"]
+        }
+      ]
+    }
+  ]
+}

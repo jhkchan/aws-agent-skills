@@ -1,0 +1,232 @@
+# Eval test cases for ec2-instance-rightsizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per right-sizing pattern. Each case's
+# InstanceId embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: ec2-instance-rightsizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: idle-downsize
+    description: >-
+      m5.2xlarge web server with CPU avg 3.2%, memory avg 28% (CWAgent
+      confirmed) over 14 days. Significantly overprovisioned. Compute
+      Optimizer finding Overprovisioned. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with downsize to m5.large.
+    input: |
+      InstanceId: i-idle-downsize
+      InstanceType: m5.2xlarge
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: On-Demand (no Savings Plan coverage)
+      TerminationProtection: false
+
+      Metrics (last 14 days):
+        - CPUUtilization avg: 3.2%, p95: 7.1%
+        - MemoryUtilization avg: 28% (CWAgent mem_used_percent)
+        - NetworkIn avg: 12 MB/h
+        - NetworkOut avg: 8 MB/h
+        - DiskReadOps avg: 150/s
+        - DiskWriteOps avg: 45/s
+
+      Compute Optimizer finding: Overprovisioned
+      Recommendation options:
+        - rank: 1, instanceType: m5.large, performanceRisk: 1
+        - rank: 2, instanceType: m5.xlarge, performanceRisk: 1
+
+      Workload context: Nginx web server serving static content and
+      reverse-proxying to an API. Stateless. 2 vCPU minimum for HA.
+
+      Emit the standard right-sizing block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "idle-downsize"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "m5.large"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: graviton-migration
+    description: >-
+      m5.xlarge Python/Node.js API server with CPU 35%, memory 50%.
+      Well-sized but on x86_64. Graviton-compatible stack (Python 3.12
+      + Node.js 20, no native deps). Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with Graviton migration to m7g.xlarge.
+    input: |
+      InstanceId: i-graviton-migration
+      InstanceType: m5.xlarge
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: On-Demand
+      TerminationProtection: false
+
+      Metrics (last 30 days):
+        - CPUUtilization avg: 35%, p95: 62%
+        - MemoryUtilization avg: 50% (CWAgent mem_used_percent)
+        - NetworkIn avg: 85 MB/h
+        - NetworkOut avg: 120 MB/h
+
+      Compute Optimizer finding: Optimized (right-sized)
+
+      Workload context: Python 3.12 + Node.js 20 API server. Dependencies:
+      requests, numpy (has aarch64 wheels), psycopg2-binary (has aarch64
+      wheels). No JNI. No C extensions beyond numpy. No Docker containers
+      (bare metal Python/Node). Graviton3 (m7g) is available in this AZ.
+
+      Emit the standard right-sizing block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "graviton-migration"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "arm64"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: burstable-credit-exhaustion
+    description: >-
+      t3.large CI runner with CPUCreditBalance trending to 0 for 5+
+      days. Sustained-high CPU (not spiky). Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with migration to m6i.large
+      (cheaper than t3 + Unlimited at sustained borrow rates).
+    input: |
+      InstanceId: i-burstable-credit-exhaustion
+      InstanceType: t3.large
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: On-Demand (standard credit mode)
+      TerminationProtection: false
+
+      Metrics (last 14 days):
+        - CPUUtilization avg: 78%, p95: 95%
+        - MemoryUtilization avg: 50% (CWAgent mem_used_percent)
+        - CPUCreditBalance: trending from 144 to 12 over 14 days
+        - CPUSurplusCreditBalance: 0 (not yet in Unlimited)
+
+      Compute Optimizer finding: NotOptimized (insufficient data)
+
+      Workload context: CI/CD runner (Jenkins agent). Sustained high
+      CPU during builds (8 hours/day at 85%+ CPU). Docker-based builds
+      using x86 images.
+
+      Emit the standard right-sizing block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "burstable-credit-exhaustion"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "m6i"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimized
+    description: >-
+      r6i.2xlarge PostgreSQL database with CPU 42%, memory 68%
+      (CWAgent). Current generation, right-sized, Graviton blocked by
+      PostGIS x86 dependency. All dimensions pass. Expected verdict:
+      OPTIMIZED.
+    input: |
+      InstanceId: i-already-optimized
+      InstanceType: r6i.2xlarge
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: On-Demand
+      TerminationProtection: true
+
+      Metrics (last 30 days):
+        - CPUUtilization avg: 42%, p95: 65%
+        - MemoryUtilization avg: 68% (CWAgent mem_used_percent)
+        - NetworkIn avg: 200 MB/h
+        - DiskReadOps avg: 2000/s
+        - DiskWriteOps avg: 800/s
+
+      Compute Optimizer finding: Optimized
+
+      Workload context: PostgreSQL 16 production database. Uses PostGIS
+      extension compiled for x86_64 (no arm64 build available).
+      shared_buffers = 16 GB (25% of 64 GB RAM). Buffer cache hit
+      ratio: 99.2%.
+
+      Emit the standard right-sizing block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: memory-missing-blocked
+    description: >-
+      m5.xlarge with low CPU (8%) but no CWAgent memory metrics.
+      Cannot confidently recommend downsize without memory data.
+      Expected verdict: NEED_MORE_INFO (install CWAgent, re-evaluate).
+    input: |
+      InstanceId: i-memory-missing-blocked
+      InstanceType: m5.xlarge
+      Architecture: x86_64
+      Region: us-east-1
+      Pricing: On-Demand
+      TerminationProtection: false
+
+      Metrics (last 14 days):
+        - CPUUtilization avg: 8%, p95: 22%
+        - MemoryUtilization: NOT AVAILABLE (CWAgent not installed)
+        - NetworkIn avg: 15 MB/h
+        - DiskReadOps avg: 80/s
+
+      Compute Optimizer finding: Overprovisioned (based on CPU only)
+      Note: Compute Optimizer does not have guest memory data either.
+
+      Workload context: Unknown application (no tags, no description).
+      Recently inherited from another team.
+
+      Emit the standard right-sizing block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: NEED_MORE_INFO
+    assertions:
+      must_contain:
+        - "NEED_MORE_INFO"
+        - "memory-missing-blocked"
+        - "CWAgent"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: OPTIMIZED"

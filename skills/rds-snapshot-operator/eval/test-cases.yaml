@@ -1,0 +1,235 @@
+# Eval test cases for rds-snapshot-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: rds-snapshot-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-manual-snapshot-pre-upgrade-completed
+    description: >-
+      Operator wants to create a manual snapshot before an RDS engine
+      upgrade. All pre-checks pass: instance available, 500 GB allocated
+      storage, encrypted with enabled KMS key, no existing snapshot with
+      the target identifier. Plan should produce OPERATION_COMPLETED with
+      the create-db-snapshot CLI and a CONFIRM gate.
+    input: |
+      Operation: create-snapshot
+      Instance: prod-orders-db
+      Snapshot identifier: prod-orders-db-pre-upgrade-20260805
+      Reason: pre-upgrade safety snapshot before engine version upgrade
+
+      Instance metadata (aws rds describe-db-instances):
+        DBInstanceIdentifier: prod-orders-db
+        DBInstanceStatus: available
+        Engine: mysql
+        EngineVersion: 8.0.35
+        StorageType: gp3
+        AllocatedStorage: 500
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/orders-cmk
+        MultiAZ: true
+        BackupRetentionPeriod: 7
+        DeletionProtection: true
+        OptionGroupMemberships: [{OptionGroupName: prod-orders-options}]
+
+      KMS key (aws kms describe-key):
+        Enabled: true
+        KeyState: Enabled
+
+      Existing snapshots (aws rds describe-db-snapshots):
+        No snapshot with identifier prod-orders-db-pre-upgrade-20260805
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "prod-orders-db"
+        - "create-db-snapshot"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "prod-orders-db-pre-upgrade-20260805"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "REVIEW_REQUIRED"
+
+  - id: copy-snapshot-cross-region-dr-completed
+    description: >-
+      Operator wants to copy an encrypted manual snapshot cross-region
+      from us-east-1 to us-west-2 for DR. Target-region KMS key is
+      enabled. Plan should produce OPERATION_COMPLETED with the
+      copy-db-snapshot CLI including target-region KMS re-encryption.
+    input: |
+      Operation: copy-snapshot
+      Source snapshot: prod-orders-db-pre-upgrade-20260805
+      Source region: us-east-1
+      Target snapshot: prod-orders-db-dr-20260805
+      Target region: us-west-2
+
+      Source snapshot (aws rds describe-db-snapshots, us-east-1):
+        DBSnapshotIdentifier: prod-orders-db-pre-upgrade-20260805
+        Status: available
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/orders-cmk
+        AllocatedStorage: 500
+        Engine: mysql
+
+      Target KMS key (aws kms describe-key, us-west-2):
+        KeyId: arn:aws:kms:us-west-2:111111111111:key/dr-cmk
+        Enabled: true
+        KeyState: Enabled
+
+      Emit the standard VERDICT block.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "copy-db-snapshot"
+        - "VERDICT"
+        - "us-west-2"
+        - "dr-cmk"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "REVIEW_REQUIRED"
+
+  - id: pitr-restore-to-point-in-time-review
+    description: >-
+      Operator wants to restore an RDS instance to a specific point in
+      time using PITR. Backup retention is 7 days, target restore time
+      is within the window. Restore creates a NEW instance — the plan
+      should produce REVIEW_REQUIRED highlighting the new endpoint,
+      option group, and security group considerations.
+    input: |
+      Operation: restore-pitr
+      Source instance: prod-orders-db
+      Target instance: prod-orders-db-pitr
+      Restore time: 2026-08-05T14:35:00Z
+
+      Instance metadata (aws rds describe-db-instances):
+        DBInstanceIdentifier: prod-orders-db
+        DBInstanceStatus: available
+        Engine: mysql
+        BackupRetentionPeriod: 7
+        LatestRestorableTime: 2026-08-05T14:40:12Z
+        EarliestRestorableTime: 2026-07-29T03:00:00Z
+        OptionGroupMemberships: [{OptionGroupName: prod-orders-options}]
+        OptionGroup prod-orders-options includes: TDE (Transparent Data Encryption)
+        VpcSecurityGroups: [{VpcSecurityGroupId: sg-prod-rds}]
+        DBSubnetGroup: prod-db-subnet-group
+        DBInstanceClass: db.r6g.xlarge
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "restore-db-instance-to-point-in-time"
+        - "VERDICT"
+        - "option group"
+        - "security group"
+        - "new instance"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPERATION_COMPLETED"
+
+  - id: delete-old-snapshots-lifecycle-review
+    description: >-
+      Operator wants to run a lifecycle cleanup of manual snapshots
+      older than 30 days. Three snapshots found: two dev/staging (safe
+      to delete) and one production snapshot tagged DoNotDelete=true.
+      Plan should produce REVIEW_REQUIRED for the compliance-hold
+      snapshot and confirm the Lambda will skip it.
+    input: |
+      Operation: delete-snapshot (lifecycle cleanup)
+      Retention policy: delete manual snapshots older than 30 days
+      Lambda function: rds-snapshot-lifecycle-cleanup
+      EventBridge rule: rds-snapshot-cleanup-daily (rate(1 day))
+
+      Snapshots older than 30 days (aws rds describe-db-snapshots):
+        1. dev-test-db-snap-20260701
+           Age: 35 days
+           Tags: [{Key: Environment, Value: dev}]
+           Status: available
+        2. staging-db-snap-20260710
+           Age: 26 days
+           Tags: [{Key: Environment, Value: staging}]
+           Status: available
+        3. prod-orders-db-snap-20260705
+           Age: 31 days
+           Tags: [{Key: DoNotDelete, Value: true}, {Key: Purpose, Value: compliance}]
+           Status: available
+
+      Lambda function (aws lambda get-function-configuration):
+        FunctionName: rds-snapshot-lifecycle-cleanup
+        State: Active
+        Runtime: python3.12
+        Handler: lambda_function.lambda_handler
+        Skips snapshots with tag DoNotDelete=true
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "VERDICT"
+        - "DoNotDelete"
+        - "compliance"
+        - "delete-db-snapshot"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPERATION_COMPLETED"
+
+  - id: aurora-clone-from-snapshot-completed
+    description: >-
+      Operator wants to clone an Aurora MySQL cluster from a manual
+      cluster snapshot. All pre-checks pass: snapshot is a DBCluster
+      snapshot, engine is aurora-mysql, KMS key enabled. The clone is
+      near-instant (copy-on-write). Plan should produce
+      OPERATION_COMPLETED.
+    input: |
+      Operation: clone-from-snapshot
+      Source snapshot: prod-aurora-cluster-snap-20260805
+      Target cluster: prod-aurora-clone
+
+      Source snapshot (aws rds describe-db-cluster-snapshots):
+        DBClusterSnapshotIdentifier: prod-aurora-cluster-snap-20260805
+        Status: available
+        Engine: aurora-mysql
+        EngineVersion: 8.0.mysql_aurora.3.05.2
+        StorageType: aurora
+        Encrypted: true
+        KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/aurora-cmk
+        SnapshotType: manual
+
+      KMS key (aws kms describe-key):
+        Enabled: true
+
+      Target DB subnet group: prod-db-subnet-group
+      Target security group: sg-prod-aurora
+
+      Emit the standard VERDICT block.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "restore-db-cluster-from-snapshot"
+        - "VERDICT"
+        - "aurora-mysql"
+        - "copy-on-write"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "REVIEW_REQUIRED"

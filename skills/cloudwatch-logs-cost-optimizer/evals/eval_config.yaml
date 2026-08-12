@@ -1,0 +1,43 @@
+# Eval configuration for cloudwatch-logs-cost-optimizer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudwatch-logs-cost-optimizer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: never-expire-retention
+    difficulty: medium
+    prompt_file: prompts/never-expire-retention.md
+    baseline_file: baselines/never-expire-retention.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: insights-vs-metric-filter
+    difficulty: hard
+    prompt_file: prompts/insights-vs-metric-filter.md
+    baseline_file: baselines/insights-vs-metric-filter.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: firehose-cold-storage
+    difficulty: hard
+    prompt_file: prompts/firehose-cold-storage.md
+    baseline_file: baselines/firehose-cold-storage.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: agent-buffer-tuning
+    difficulty: medium
+    prompt_file: prompts/agent-buffer-tuning.md
+    baseline_file: baselines/agent-buffer-tuning.md
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+  - id: already-optimized
+    difficulty: easy
+    prompt_file: prompts/already-optimized.md
+    baseline_file: baselines/already-optimized.md
+    expected_verdict: OPTIMIZED

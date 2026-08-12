@@ -1,0 +1,183 @@
+{
+  "skill": "appmesh-virtual-service-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the App Mesh Virtual Service Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across App Mesh virtual service topologies (weighted canary with DNS discovery on virtual nodes, Cloud Map service discovery with virtual node-backed virtual service, virtual gateway with mTLS STRICT via ACM Private CA, Envoy auto-injection on EKS via mutating webhook, missing Cloud Map namespace prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "weighted-canary-dns-discovery",
+      "name": "Weighted canary deployment with DNS service discovery on virtual nodes",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — virtual router with weighted HTTP route (90/10 split), DNS service discovery on both virtual nodes, virtual service backed by virtual router, retry and timeout policies",
+      "prompt": "Create an App Mesh virtual service checkout.mesh.local in mesh production-mesh (us-east-1). Two virtual nodes: checkout-v1 and checkout-v2, both with DNS service discovery (checkout-v1.default.svc.cluster.local and checkout-v2.default.svc.cluster.local, port 8080 http). Virtual router checkout-router with weighted HTTP route: checkout-v1 (90%), checkout-v2 (10%) — canary. Retry policy maxRetries=3. Timeout 15s. Egress ALLOW_ALL. Author account 123456789012.",
+      "prompt_file": "prompts/weighted-canary-dns-discovery.md",
+      "baseline_file": "baselines/weighted-canary-dns-discovery.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APP_MESH: production-mesh — virtual service checkout.mesh.local (http)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Service mesh: production-mesh (egress: ALLOW_ALL)\n  [✓] Virtual node: checkout-v1 (service discovery: DNS checkout-v1.default.svc.cluster.local)\n  [✓] Virtual node: checkout-v2 (service discovery: DNS checkout-v2.default.svc.cluster.local)\n  [✓] Virtual router: checkout-router (listener: 8080/http)\n  [✓] Weighted route: checkout-canary — checkout-v1 (90%), checkout-v2 (10%)\n  [✓] Virtual service: checkout.mesh.local → backed by virtual-router checkout-router\n  [✓] Retry policy: maxRetries=3\n  [✓] Timeout: request=15s\nVERIFICATION_COMMANDS:\n  aws appmesh describe-mesh --mesh-name production-mesh --region us-east-1\n  aws appmesh describe-route --mesh-name production-mesh --virtual-router-name checkout-router --route-name checkout-canary --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "weighted",
+            "checkout-v1",
+            "checkout-v2",
+            "90",
+            "10",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cloud-map-service-discovery",
+      "name": "Cloud Map service discovery with virtual node-backed virtual service",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — virtual node with Cloud Map service discovery (namespace mesh-services, service inventory), virtual service backed by virtual node (no canary)",
+      "prompt": "Create an App Mesh virtual node inventory-v1 in mesh production-mesh using Cloud Map service discovery (namespace mesh-services, service inventory). Listener port 8080 http. Virtual service inventory.mesh.local backed by virtual node inventory-v1 (no canary needed). Region us-east-1. Account 123456789012.",
+      "prompt_file": "prompts/cloud-map-service-discovery.md",
+      "baseline_file": "baselines/cloud-map-service-discovery.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APP_MESH: production-mesh — virtual service inventory.mesh.local (http)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Service mesh: production-mesh\n  [✓] Virtual node: inventory-v1 (service discovery: Cloud Map mesh-services/inventory)\n  [✓] Virtual service: inventory.mesh.local → backed by virtual-node inventory-v1\nVERIFICATION_COMMANDS:\n  aws appmesh describe-virtual-node --mesh-name production-mesh --virtual-node-name inventory-v1 --region us-east-1\n  aws appmesh describe-virtual-service --mesh-name production-mesh --virtual-service-name inventory.mesh.local --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Cloud Map",
+            "mesh-services",
+            "inventory",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "virtual-gateway-mtls",
+      "name": "Virtual gateway with mTLS STRICT via ACM Private CA",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — virtual gateway with mTLS STRICT mode, ACM Private CA referenced, gateway route to virtual service",
+      "prompt": "Create an App Mesh virtual gateway ingress-gateway in mesh production-mesh (us-east-1). Listener port 8443 https. mTLS STRICT mode via ACM Private CA (ca-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc123). Gateway route checkout-ingress to virtual service checkout.mesh.local (prefix /checkout). Account 123456789012.",
+      "prompt_file": "prompts/virtual-gateway-mtls.md",
+      "baseline_file": "baselines/virtual-gateway-mtls.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APP_MESH: production-mesh — virtual gateway ingress-gateway (https)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Virtual gateway: ingress-gateway (listener: 8443/https)\n  [✓] mTLS: STRICT (ACM Private CA arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc123)\n  [✓] Gateway route: checkout-ingress → checkout.mesh.local (prefix /checkout)\nVERIFICATION_COMMANDS:\n  aws appmesh describe-virtual-gateway --mesh-name production-mesh --virtual-gateway-name ingress-gateway --region us-east-1\n  aws appmesh describe-gateway-route --mesh-name production-mesh --virtual-gateway-name ingress-gateway --gateway-route-name checkout-ingress --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "virtual gateway",
+            "mTLS",
+            "STRICT",
+            "ACM Private CA",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "envoy-auto-inject-webhook",
+      "name": "Envoy sidecar auto-injection via App Mesh Controller mutating webhook on EKS",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — App Mesh Controller installed via Helm, namespace labeled for injection, mutating webhook auto-injects Envoy sidecar",
+      "prompt": "Set up App Mesh on an EKS cluster for the default namespace. Mesh production-mesh. Install App Mesh Controller via Helm in appmesh-system namespace. Label namespace default for auto-injection (mesh=production-mesh, appmesh=enabled). Virtual node api-v1 with DNS discovery api.default.svc.cluster.local port 8080. Region us-east-1. Account 123456789012.",
+      "prompt_file": "prompts/envoy-auto-inject-webhook.md",
+      "baseline_file": "baselines/envoy-auto-inject-webhook.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "APP_MESH: production-mesh — virtual node api-v1 (http)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Envoy sidecar: auto-inject (EKS namespace=default, webhook=appmesh-controller)\n  [✓] App Mesh Controller: installed via Helm (namespace appmesh-system)\n  [✓] Namespace default labeled: mesh=production-mesh, appmesh=enabled\n  [✓] Virtual node: api-v1 (service discovery: DNS api.default.svc.cluster.local)\nVERIFICATION_COMMANDS:\n  kubectl get pods -n appmesh-system\n  kubectl get namespace default --show-labels\n  aws appmesh describe-virtual-node --mesh-name production-mesh --virtual-node-name api-v1 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "auto-inject",
+            "App Mesh Controller",
+            "webhook",
+            "default",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-cloudmap-namespace",
+      "name": "Cloud Map service discovery with missing namespace (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Cloud Map namespace payments-ns does not exist; virtual node cannot resolve backends",
+      "prompt": "Create an App Mesh virtual node payments-v1 in mesh production-mesh using Cloud Map service discovery (namespace payments-ns, service payments). Listener port 8080 http. The Cloud Map namespace payments-ns has NOT been created yet. Region us-east-1. Account 123456789012.",
+      "prompt_file": "prompts/missing-cloudmap-namespace.md",
+      "baseline_file": "baselines/missing-cloudmap-namespace.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "APP_MESH: production-mesh — virtual node payments-v1\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Cloud Map namespace: payments-ns MISSING — the namespace does not exist; create it with servicediscovery create-http-namespace before provisioning the virtual node",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "Cloud Map",
+            "namespace",
+            "payments-ns",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

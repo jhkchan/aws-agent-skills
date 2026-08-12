@@ -1,0 +1,190 @@
+# Eval test cases for eks-autoscaling-automator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: eks-autoscaling-automator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: karpenter-spot-full-deploy
+    description: >-
+      Production EKS cluster ready for Karpenter deployment with spot
+      diversification, disruption budgets, HPA with custom metrics, KEDA
+      for SQS-driven scaling, and overprovisioning pause-pods. The skill
+      should produce AUTOMATION_DEPLOYED with the full set of manifests
+      and Helm values.
+    input: |
+      Design reference: karpenter-spot-full-deploy
+      Account: 111111111111
+      Region: us-east-1
+
+      Cluster: my-prod-cluster, EKS 1.30, 25 nodes
+      Current autoscaler: none (greenfield Karpenter)
+      metrics-server: installed and healthy
+      Prometheus Adapter: installed, custom metrics available
+      Workloads:
+        - api-server (Deployment, 5 replicas, CPU + http_requests_per_second)
+        - sqs-consumer (Deployment, 3 replicas, scales on SQS queue depth)
+      Spot ratio target: 70% spot, 30% on-demand
+      Instance diversification: c5, m5, c6i, m6i (4 families)
+      Disruption budget: 20% max, freeze during business hours
+      Overprovisioning: 10 pause-pods x 1 CPU/1Gi headroom
+      PDB: api-server minAvailable=2
+      Descheduler: enabled (LowNodeUtilization, max 3 evictions/node)
+
+      Emit the standard AUTOSCALING block (TOOLING, PROVISIONING,
+      POD_SCALING, SPOT, SAFETY, VERDICT, TEMPLATE).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "karpenter-spot-full-deploy"
+        - "Karpenter"
+        - "VERDICT"
+        - "TEMPLATE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: missing-metrics-server
+    description: >-
+      EKS cluster without metrics-server or any autoscaling components.
+      The skill should classify REVIEW_REQUIRED and cite the missing
+      metrics-server (HPA prerequisite), missing PDBs, and lack of
+      overprovisioning headroom.
+    input: |
+      Design reference: missing-metrics-server
+      Account: 111111111111
+      Region: us-east-1
+
+      Cluster: staging-cluster, EKS 1.28, 8 nodes (managed node group, c5.large)
+      metrics-server: NOT installed
+      Prometheus: not installed
+      Current autoscaler: none
+      HPA: none configured
+      KEDA: not installed
+      PDB: none
+      Overprovisioning: none
+      Spot: 0% (on-demand only)
+
+      Emit the standard AUTOSCALING block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "missing-metrics-server"
+        - "VERDICT"
+        - "GAP"
+        - "metrics-server"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: ca-to-karpenter-migration
+    description: >-
+      EKS cluster currently running Cluster Autoscaler. The user wants
+      to migrate to Karpenter. The skill should produce
+      AUTOMATION_DEPLOYED with the migration plan (uninstall CA first,
+      then install Karpenter) and flag the conflict risk of running
+      both simultaneously.
+    input: |
+      Design reference: ca-to-karpenter-migration
+      Account: 111111111111
+      Region: us-east-1
+
+      Cluster: prod-cluster, EKS 1.30, 40 nodes
+      Current autoscaler: Cluster Autoscaler 9.34.0 (auto-discovery)
+      Desired: migrate to Karpenter 1.0.0 with consolidation
+      metrics-server: installed
+      Prometheus Adapter: installed
+      HPA: 3 deployments with HPA configured
+      Spot: 50% via ASG mixed instance policy (c5, m5)
+      Karpenter native interruption handling: desired (replace NTH)
+
+      Emit the standard AUTOSCALING block. Include the migration
+      sequence (uninstall CA first, then install Karpenter).
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "ca-to-karpenter-migration"
+        - "Karpenter"
+        - "VERDICT"
+        - "Cluster Autoscaler"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: vpa-hpa-conflict
+    description: >-
+      User wants to run HPA on CPU and VPA on CPU simultaneously. The
+      skill should classify REVIEW_REQUIRED, cite the HPA+VPA CPU
+      conflict, and recommend VPA Off mode or VPA-on-memory-only.
+    input: |
+      Design reference: vpa-hpa-conflict
+      Account: 111111111111
+      Region: us-east-1
+
+      Cluster: prod-cluster, EKS 1.30
+      Workload: data-processor (Deployment, 5 replicas)
+      Desired HPA: CPU utilization 70%, min=3, max=20
+      Desired VPA: Auto mode, controls CPU and memory
+      metrics-server: installed
+
+      Emit the standard AUTOSCALING block. Explain the conflict and
+      recommend a resolution.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "vpa-hpa-conflict"
+        - "VERDICT"
+        - "GAP"
+        - "VPA"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: AUTOMATION_DEPLOYED"
+
+  - id: keda-sqs-scale-to-zero
+    description: >-
+      Deploy KEDA with an SQS trigger for a queue consumer that should
+      scale to zero when the queue is empty. The skill should produce
+      AUTOMATION_DEPLOYED with the KEDA ScaledObject manifest including
+      minReplicaCount=0 and the SQS trigger configuration.
+    input: |
+      Design reference: keda-sqs-scale-to-zero
+      Account: 111111111111
+      Region: us-east-1
+
+      Cluster: prod-cluster, EKS 1.30
+      Workload: sqs-batch-processor (Deployment, currently 5 replicas)
+      Queue URL: https://sqs.us-east-1.amazonaws.com/111111111111/batch-jobs
+      Desired: scale to 0 when queue empty, scale up to 30 when lag > 10
+      KEDA: not yet installed (clean install needed)
+      IRSA role for KEDA: arn:aws:iam::111111111111:role/keda-sqs-role
+
+      Emit the standard AUTOSCALING block. Include the KEDA Helm
+      install and the ScaledObject manifest.
+    expected_verdict: AUTOMATION_DEPLOYED
+    assertions:
+      must_contain:
+        - "AUTOMATION_DEPLOYED"
+        - "keda-sqs-scale-to-zero"
+        - "KEDA"
+        - "VERDICT"
+        - "ScaledObject"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"

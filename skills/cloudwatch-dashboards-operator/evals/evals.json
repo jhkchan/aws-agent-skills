@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-dashboards-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Dashboards Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-rds-dashboard-completed",
+      "name": "Create RDS monitoring dashboard — all pre-checks pass (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/create-rds-dashboard-completed.md",
+      "baseline_file": "baselines/create-rds-dashboard-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "prod-rds-overview", "put-dashboard", "VERDICT", "PRE_CHECKS", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "add-anomaly-detection-band-review",
+      "name": "Add anomaly detection band — PutDashboard overwrites entire body (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/add-anomaly-detection-band-review.md",
+      "baseline_file": "baselines/add-anomaly-detection-band-review.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "VERDICT", "ANOMALY_DETECTION_BAND", "stdev", "put-dashboard", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPERATION_COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-dashboard-oam-review",
+      "name": "Create cross-account dashboard via OAM — exposes metrics from linked accounts (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-dashboard-oam-review.md",
+      "baseline_file": "baselines/cross-account-dashboard-oam-review.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "VERDICT", "cross-account", "OAM", "@Account", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPERATION_COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "metrics-insights-dashboard-completed",
+      "name": "Create top-10 EC2 dashboard with Metrics Insights query (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/metrics-insights-dashboard-completed.md",
+      "baseline_file": "baselines/metrics-insights-dashboard-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "top10-ec2-by-cpu", "put-dashboard", "VERDICT", "Metrics Insights", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "dashboard-iac-version-controlled-completed",
+      "name": "Update dashboard via version-controlled IaC — additive update verified (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/dashboard-iac-version-controlled-completed.md",
+      "baseline_file": "baselines/dashboard-iac-version-controlled-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "prod-rds-overview", "put-dashboard", "VERDICT", "Git", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

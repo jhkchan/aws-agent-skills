@@ -1,0 +1,47 @@
+# Eval configuration for cloudwatch-dashboards-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: cloudwatch-dashboards-operator
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: create-rds-dashboard-completed
+    difficulty: medium
+    prompt_file: prompts/create-rds-dashboard-completed.md
+    baseline_file: baselines/create-rds-dashboard-completed.md
+    expected_verdict: OPERATION_COMPLETED
+    expected_risk: MODERATE
+  - id: add-anomaly-detection-band-review
+    difficulty: hard
+    prompt_file: prompts/add-anomaly-detection-band-review.md
+    baseline_file: baselines/add-anomaly-detection-band-review.md
+    expected_verdict: REVIEW_REQUIRED
+    expected_risk: HIGH
+  - id: cross-account-dashboard-oam-review
+    difficulty: hard
+    prompt_file: prompts/cross-account-dashboard-oam-review.md
+    baseline_file: baselines/cross-account-dashboard-oam-review.md
+    expected_verdict: REVIEW_REQUIRED
+    expected_risk: HIGH
+  - id: metrics-insights-dashboard-completed
+    difficulty: medium
+    prompt_file: prompts/metrics-insights-dashboard-completed.md
+    baseline_file: baselines/metrics-insights-dashboard-completed.md
+    expected_verdict: OPERATION_COMPLETED
+    expected_risk: MODERATE
+  - id: dashboard-iac-version-controlled-completed
+    difficulty: medium
+    prompt_file: prompts/dashboard-iac-version-controlled-completed.md
+    baseline_file: baselines/dashboard-iac-version-controlled-completed.md
+    expected_verdict: OPERATION_COMPLETED
+    expected_risk: MODERATE

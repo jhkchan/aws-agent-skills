@@ -222,14 +222,12 @@ from the obvious choice:
   with `filter` after `stats` still scans the full log group for the
   time window. Push filters early in the query pipeline.
 - **Metric filters are free but compute at ingestion time.** A metric
-  filter extracts values as logs arrive — no scan cost. The tradeoff:
-  metric filters support a limited syntax (CWL metric filter pattern
-  language). Complex aggregations may still require Insights.
-- **Embedded Metric Format (EMF) is free for the metric extraction but
-  the log event itself still incurs ingestion + storage cost.** EMF
-  does not eliminate Logs cost — it adds structured metrics without a
-  PutMetricData call. Useful for avoiding custom-metric charges, not
-  for reducing Logs spend.
+  filter extracts values as logs arrive — no scan cost. Tradeoff: limited
+  syntax (CWL metric filter pattern language). Complex aggregations may
+  still require Insights.
+- **Embedded Metric Format (EMF) is free for metric extraction but the
+  log event itself still incurs ingestion + storage cost.** EMF does not
+  reduce Logs spend — it adds structured metrics without PutMetricData.
 - **PutLogEvents charges per request, not per event.** The CloudWatch
   agent and SDKs batch events. Default agent `batch_count` = 1000 and
   `batch_size` = 1,048,576 bytes. Increasing `batch_count` to 10000
@@ -442,14 +440,12 @@ subscription filter destination incurs its own ingestion/processing cost.
 | CW Logs → subscription filter → Firehose → S3 (central bucket) | Firehose + S3 only | Cheapest cross-account archive |
 | CW Logs → subscription filter → Lambda → another CW Logs group | Double ingestion ($1.00/GB) | Avoid for high-volume logs; use Firehose instead |
 | CW Logs → subscription filter → Kinesis Data Streams | Kinesis shard cost + ingestion | Real-time processing pipeline |
-| VPC Flow Logs → directly to S3 (no CW Logs) | S3 only ($0.023/GB-month) | Best for pure archival; no Insights queries |
+| VPC Flow Logs → directly to S3 (no CW Logs) | S3 only ($0.023/GB-month) | Best for pure archival |
 
-**Subscription filter anti-pattern — double ingestion:**
-If a subscription filter delivers to a Lambda that writes to ANOTHER
-CloudWatch Logs group, the events are ingested TWICE: once at the source
-group ($0.50/GB) and once at the destination group ($0.50/GB). For
-cross-account aggregation, use Firehose as the destination, not another
-CW Logs group.
+**Subscription filter anti-pattern — double ingestion:** If a subscription
+filter delivers to a Lambda that writes to ANOTHER CloudWatch Logs group,
+the events are ingested TWICE ($1.00/GB total). Use Firehose as the
+destination for cross-account aggregation, not another CW Logs group.
 
 ### Step 6: Vended log destinations (VPC Flow Logs, Route53 Resolver)
 
@@ -466,11 +462,8 @@ This eliminates the $0.50/GB ingestion fee.
 | Compliance archive only | S3 → Glacier | $0.012/GB-month (GIR) or $0.00099 (Deep Archive) |
 
 For VPC Flow Logs above ~10 GB/day, S3 is almost always cheaper than
-CloudWatch Logs. Use Athena for periodic investigations.
-
-**Route53 Resolver Logs to S3:**
-Route53 Resolver query logs are high-volume and rarely queried in real
-time. Default to S3 delivery; use Athena when investigation is needed.
+CloudWatch Logs. Route53 Resolver query logs are high-volume and rarely
+queried in real time — default to S3 delivery, use Athena when needed.
 
 ### Step 7: Account-level data protection policy (PII reduction)
 
@@ -478,15 +471,14 @@ Account-level data protection policies mask sensitive data (PII, credit
 card numbers, API keys) in CloudWatch Logs at ingestion time. This
 reduces stored bytes (masked fields are shorter) and reduces risk.
 
-**Important cost nuance:** Data protection policies do NOT reduce
-ingestion cost — the full event is received before masking. The saving
-is on storage (masked fields use fewer bytes) and on reducing the
-blast radius of accidental PII logging.
+**Cost nuance:** Data protection policies do NOT reduce ingestion cost
+— the full event is received before masking. The saving is on storage
+(masked fields use fewer bytes) and on reducing the blast radius of
+accidental PII logging.
 
-**When to enable data protection:**
-- Application logs with known PII fields (user emails, phone numbers)
-- Logs from services handling payment data (PCI scope reduction)
-- Audit logs that may capture sensitive headers
+**When to enable data protection:** Application logs with known PII fields
+(user emails, phone numbers), services handling payment data (PCI scope
+reduction), or audit logs that may capture sensitive headers.
 
 **CLI to create a data protection policy:**
 ```bash
@@ -638,40 +630,34 @@ Every field below is internally consistent. Copy this shape exactly.
 ```text
 TARGET: /aws/lambda/order-processor-prod
 VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
-REASON: Lambda log group with Never-expire retention accumulating 842 GB
-  at $0.03/GB-month. Combined with 450 Logs Insights queries/month
-  scanning 120 GB each ($270/month query cost that converts to free
-  metric filters). Retention to 30 days + query migration eliminates
-  94% of the log group's monthly cost.
+REASON: Lambda log group with Never-expire retention has accumulated
+  10,080 GB over 12 months at $0.03/GB-month ($302.40/month storage and
+  growing). Combined with 450 Logs Insights queries/month scanning 120 GB
+  each ($270/month that converts to free metric filters). Retention to 30
+  days caps storage at 840 GB steady-state; query migration eliminates
+  the $270/month scan charge.
 RECOMMENDATION:
-  Current: Never expire, 840 GB/month ingested, 450 Insights queries/month, N/A (serverless)
-  Proposed: 30 days, 840 GB/month ingested, 0 Insights queries (5 metric filters), N/A
+  Current: Never expire, 840 GB/month ingested, 10,080 GB stored, 450 Insights queries/month, N/A (serverless)
+  Proposed: 30 days, 840 GB/month ingested, 840 GB stored (steady), 0 Insights queries (5 metric filters), N/A
   Dimensions changed: retention (Step 1) + queries (Step 2)
   Dimensions checked: retention → (Never to 30d)  queries → (Insights to filters)
     agent ✓ (Lambda, no agent)  cold-storage ✓ (30d under S3 crossover)  subscription ✓ (none)
     destination ✓ (Lambda logs, not vended)  data-protection ✓ (no PII fields)
-  Confidence: HIGH — describe-log-groups confirms RetentionInDays absent;
-    CloudTrail StartQuery events confirm 450 queries/month scanning 120 GB each.
+  Confidence: HIGH — describe-log-groups confirms RetentionInDays absent and
+    storedBytes=10,080 GB; CloudTrail StartQuery events confirm 450 queries/month.
 ESTIMATED_SAVINGS:
-  Current monthly: $735.20
+  Current monthly: $992.40
     ingestion: 840 GB × $0.50 = $420.00
-    storage: 842 GB × $0.03 = $25.26
+    storage: 10,080 GB × $0.03 = $302.40
     requests: included in Lambda execution (no separate PutLogEvents charge)
     insights: 450 × 120 GB × $0.005 = $270.00
-    insights subtotal: $270.00
-    other: $19.94 (approx)
-  Projected monthly: $442.26
-    ingestion: 840 GB × $0.50 = $420.00 (unchanged — retention does not reduce ingestion)
-    storage: 840 GB × 30/30 × $0.03 = $25.26 (steady-state after 30-day window settles)
+  Projected monthly: $445.20
+    ingestion: 840 GB × $0.50 = $420.00 (unchanged)
+    storage: 840 GB × $0.03 = $25.20 (steady-state at 30-day retention)
     requests: included
-    insights: 0 × $0.005 = $0.00 (converted to metric filters)
-    other: $0.00
-  Hmm — recompute: storage at 30-day retention steady-state:
-    ingested daily × 30 days × $0.03/GB-month ÷ 30 days = daily_ingest_GB × $0.03
-    28 GB/day × 30 = 840 GB stored at any point; $0.03 × 840 = $25.20
-  Final projected: $420.00 (ingest) + $25.20 (storage) + $0.00 (insights) = $445.20
-  Monthly saving: $289.94 ($735.20 - $445.20)
-  Annual saving: $3,479.28
+    insights: 5 metric filters × $0.00 = $0.00 (free)
+  Monthly saving: $547.20 ($992.40 − $445.20)
+  Annual saving: $6,566.40
 MIGRATION_STEPS:
   1. Set retention to 30 days:
      aws logs put-retention-policy --log-group-name /aws/lambda/order-processor-prod --retention-in-days 30
@@ -681,7 +667,7 @@ MIGRATION_STEPS:
   4. Verify metric filters emitting data via CloudWatch metrics console.
 CONFIRM: About to put-retention-policy on /aws/lambda/order-processor-prod
   (Never → 30 days). This will delete logs older than 30 days within hours.
-  Saving $289.94/month (39.4%). Proceed? (yes/no)
+  Saving $547.20/month (55.1%). Proceed? (yes/no)
 ```
 
 **Self-check before emit:**
@@ -768,26 +754,20 @@ Extended anti-patterns in `references/cloudwatch-logs-pricing-and-retention.md`.
 ## Recent AWS features (2024-2026)
 
 - **Account-level data protection policy (2024 GA):** Masks PII at
-  ingestion across all log groups in the account. No per-group
-  configuration needed.
+  ingestion across all log groups in the account.
 - **CloudWatch Logs Insights query optimization (2024-2025):** Query
   engine improvements reduce scan volume for well-structured queries.
-  Use `filter` early and `limit` aggressively to minimize GB scanned.
-- **VPC Flow Logs to S3 via Firehose (2024):** Native support for
-  delivering VPC Flow Logs directly to S3 without a Lambda intermediary.
-  Eliminates the Lambda processing cost in the pipeline.
+- **VPC Flow Logs to S3 via Firehose (2024):** Native delivery to S3
+  without a Lambda intermediary, eliminating processing cost.
 - **CloudWatch Logs subscription filter to Firehose (enhanced 2024):**
-  Direct subscription filter to Firehose without a Lambda intermediary.
-  Simplifies cross-account aggregation architectures.
+  Direct subscription to Firehose without a Lambda intermediary.
 - **S3 Tables for log analytics (2025):** Iceberg-backed tables in S3
   for structured log data. Cheaper than Athena-on-raw-S3 for recurring
   analytical queries.
-- **CloudWatch Logs batch ingestion API improvements (2025):** Higher
-  PutLogEvents throughput per stream; reduces throttling for high-volume
-  agents.
-- **Graviton-based CloudWatch agent (2024):** The CloudWatch agent on
-  Graviton EC2 instances uses less CPU for the same log throughput,
-  indirectly reducing compute cost.
+- **CloudWatch Logs batch ingestion throughput improvements (2025):**
+  Higher PutLogEvents throughput per stream; reduces throttling.
+- **Graviton-based CloudWatch agent (2024):** Lower CPU usage on
+  Graviton instances for the same log throughput.
 
 ## References
 
@@ -808,7 +788,7 @@ AWS CloudOps / CloudWatch Logs Cost Optimization & FinOps.
 
 - **Amazon CloudWatch Logs User Guide** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 - **CloudWatch Logs pricing** — https://aws.amazon.com/cloudwatch/pricing/
-- **CloudWatch Logs retention settings** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html#SettingLogRetention
+- **CloudWatch Logs retention** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html#SettingLogRetention
 - **CloudWatch Logs Insights** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/AnalyzingLogData.html
 - **CloudWatch Logs metric filters** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/MonitoringLogData.html
 - **CloudWatch Logs subscription filters** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Subscriptions.html
@@ -816,5 +796,5 @@ AWS CloudOps / CloudWatch Logs Cost Optimization & FinOps.
 - **Kinesis Data Firehose** — https://docs.aws.amazon.com/firehose/latest/dev/what-is-this-service.html
 - **VPC Flow Logs** — https://docs.aws.amazon.com/vpc/latest/flow-logs/flow-logs-cwl.html
 - **CloudWatch Logs data protection** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/data-protection.html
-- **AWS CLI CloudWatch Logs reference** — https://docs.aws.amazon.com/cli/latest/reference/logs/
-- **AWS Well-Architected Framework — Cost Optimization** — https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
+- **AWS CLI Logs reference** — https://docs.aws.amazon.com/cli/latest/reference/logs/
+- **Well-Architected Cost Optimization** — https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html

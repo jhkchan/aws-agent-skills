@@ -1,0 +1,47 @@
+# Eval configuration for rds-snapshot-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob).
+skill_name: rds-snapshot-operator
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: create-manual-snapshot-pre-upgrade-completed
+    difficulty: medium
+    prompt_file: prompts/create-manual-snapshot-pre-upgrade-completed.md
+    baseline_file: baselines/create-manual-snapshot-pre-upgrade-completed.md
+    expected_verdict: OPERATION_COMPLETED
+    expected_risk: MODERATE
+  - id: copy-snapshot-cross-region-dr-completed
+    difficulty: hard
+    prompt_file: prompts/copy-snapshot-cross-region-dr-completed.md
+    baseline_file: baselines/copy-snapshot-cross-region-dr-completed.md
+    expected_verdict: OPERATION_COMPLETED
+    expected_risk: MODERATE
+  - id: pitr-restore-to-point-in-time-review
+    difficulty: hard
+    prompt_file: prompts/pitr-restore-to-point-in-time-review.md
+    baseline_file: baselines/pitr-restore-to-point-in-time-review.md
+    expected_verdict: REVIEW_REQUIRED
+    expected_risk: HIGH
+  - id: delete-old-snapshots-lifecycle-review
+    difficulty: hard
+    prompt_file: prompts/delete-old-snapshots-lifecycle-review.md
+    baseline_file: baselines/delete-old-snapshots-lifecycle-review.md
+    expected_verdict: REVIEW_REQUIRED
+    expected_risk: HIGH
+  - id: aurora-clone-from-snapshot-completed
+    difficulty: medium
+    prompt_file: prompts/aurora-clone-from-snapshot-completed.md
+    baseline_file: baselines/aurora-clone-from-snapshot-completed.md
+    expected_verdict: OPERATION_COMPLETED
+    expected_risk: MODERATE

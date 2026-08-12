@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "eks-autoscaling-automator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EKS Autoscaling Automator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "karpenter-spot-full-deploy",
+      "name": "Karpenter + spot diversification + HPA + KEDA + overprovisioning — full production deployment",
+      "difficulty": "hard",
+      "prompt_file": "prompts/karpenter-spot-full-deploy.md",
+      "baseline_file": "baselines/karpenter-spot-full-deploy.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "karpenter-spot-full-deploy", "Karpenter", "VERDICT", "TEMPLATE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "missing-metrics-server",
+      "name": "EKS cluster without metrics-server — REVIEW_REQUIRED, missing HPA prerequisites",
+      "difficulty": "easy",
+      "prompt_file": "prompts/missing-metrics-server.md",
+      "baseline_file": "baselines/missing-metrics-server.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "missing-metrics-server", "VERDICT", "GAP", "metrics-server"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "ca-to-karpenter-migration",
+      "name": "Cluster Autoscaler to Karpenter migration with conflict-avoidance sequence",
+      "difficulty": "hard",
+      "prompt_file": "prompts/ca-to-karpenter-migration.md",
+      "baseline_file": "baselines/ca-to-karpenter-migration.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "ca-to-karpenter-migration", "Karpenter", "VERDICT", "Cluster Autoscaler"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "vpa-hpa-conflict",
+      "name": "HPA + VPA CPU conflict — REVIEW_REQUIRED, oscillation risk",
+      "difficulty": "medium",
+      "prompt_file": "prompts/vpa-hpa-conflict.md",
+      "baseline_file": "baselines/vpa-hpa-conflict.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "vpa-hpa-conflict", "VERDICT", "GAP", "VPA"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: AUTOMATION_DEPLOYED"]
+        }
+      ]
+    },
+    {
+      "id": "keda-sqs-scale-to-zero",
+      "name": "KEDA SQS-triggered scale-to-zero for batch queue consumer",
+      "difficulty": "medium",
+      "prompt_file": "prompts/keda-sqs-scale-to-zero.md",
+      "baseline_file": "baselines/keda-sqs-scale-to-zero.md",
+      "expected_verdict": "AUTOMATION_DEPLOYED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["AUTOMATION_DEPLOYED", "keda-sqs-scale-to-zero", "KEDA", "VERDICT", "ScaledObject"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}

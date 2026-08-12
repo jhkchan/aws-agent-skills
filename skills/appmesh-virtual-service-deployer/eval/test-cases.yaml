@@ -1,0 +1,166 @@
+# Eval test cases for appmesh-virtual-service-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across App Mesh virtual
+# service topologies (weighted canary with DNS discovery, Cloud Map
+# service discovery with virtual gateway, Envoy auto-inject on EKS
+# with mTLS, virtual gateway north-south ingress, missing Cloud Map
+# namespace prerequisite failure).
+skill: appmesh-virtual-service-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: weighted-canary-dns-discovery
+    description: >-
+      Provision an App Mesh virtual service with DNS service
+      discovery on virtual nodes, a virtual router with a weighted
+      HTTP route for canary deployment (90/10 traffic split between
+      v1 and v2). Expects READY_TO_DEPLOY with weighted route noted,
+      virtual service backed by virtual router, and Envoy sidecar
+      referenced.
+    input: |
+      Create an App Mesh virtual service checkout.mesh.local in
+      mesh production-mesh (us-east-1). Two virtual nodes:
+      checkout-v1 and checkout-v2, both with DNS service discovery
+      (checkout-v1.default.svc.cluster.local and
+      checkout-v2.default.svc.cluster.local, port 8080 http).
+      Virtual router checkout-router with weighted HTTP route:
+      checkout-v1 (90%), checkout-v2 (10%) — canary. Retry policy
+      maxRetries=3. Timeout 15s. Egress ALLOW_ALL. Author account
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "weighted"
+        - "checkout-v1"
+        - "checkout-v2"
+        - "90"
+        - "10"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cloud-map-service-discovery
+    description: >-
+      Provision an App Mesh virtual node with Cloud Map service
+      discovery (namespace mesh-services, service inventory) and a
+      virtual service backed by a virtual node (no canary). Expects
+      READY_TO_DEPLOY with Cloud Map discovery noted, namespace and
+      service referenced.
+    input: |
+      Create an App Mesh virtual node inventory-v1 in mesh
+      production-mesh using Cloud Map service discovery (namespace
+      mesh-services, service inventory). Listener port 8080 http.
+      Virtual service inventory.mesh.local backed by virtual node
+      inventory-v1 (no canary needed). Region us-east-1. Account
+      123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Cloud Map"
+        - "mesh-services"
+        - "inventory"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: virtual-gateway-mtls
+    description: >-
+      Provision a virtual gateway with mTLS STRICT via ACM Private CA
+      and a gateway route to a virtual service. Expects READY_TO_DEPLOY
+      with virtual gateway noted, mTLS STRICT mode declared, and
+      ACM Private CA referenced.
+    input: |
+      Create an App Mesh virtual gateway ingress-gateway in mesh
+      production-mesh (us-east-1). Listener port 8443 https. mTLS
+      STRICT mode via ACM Private CA (ca-arn
+      arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/
+      abc123). Gateway route checkout-ingress to virtual service
+      checkout.mesh.local (prefix /checkout). Account 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "virtual gateway"
+        - "mTLS"
+        - "STRICT"
+        - "ACM Private CA"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: envoy-auto-inject-webhook
+    description: >-
+      Provision an App Mesh setup on EKS with Envoy sidecar auto-
+      injection via the App Mesh Controller mutating webhook. Expects
+      READY_TO_DEPLOY with namespace labeling noted, controller
+      installed, and webhook injection referenced.
+    input: |
+      Set up App Mesh on an EKS cluster for the default namespace.
+      Mesh production-mesh. Install App Mesh Controller via Helm in
+      appmesh-system namespace. Label namespace default for auto-
+      injection (mesh=production-mesh, appmesh=enabled). Virtual node
+      api-v1 with DNS discovery api.default.svc.cluster.local port
+      8080. Region us-east-1. Account 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "auto-inject"
+        - "App Mesh Controller"
+        - "webhook"
+        - "default"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-cloudmap-namespace
+    description: >-
+      Operator requests a virtual node with Cloud Map service
+      discovery but the Cloud Map namespace does not exist. This is
+      a prerequisite failure. Expects PREREQUISITES_MISSING with the
+      missing Cloud Map namespace cited.
+    input: |
+      Create an App Mesh virtual node payments-v1 in mesh
+      production-mesh using Cloud Map service discovery (namespace
+      payments-ns, service payments). Listener port 8080 http. The
+      Cloud Map namespace payments-ns has NOT been created yet.
+      Region us-east-1. Account 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "Cloud Map"
+        - "namespace"
+        - "payments-ns"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

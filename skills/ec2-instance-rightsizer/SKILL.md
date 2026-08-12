@@ -827,7 +827,7 @@ verdict MUST be `OPTIMIZED`, never `FURTHER_OPTIMIZATION_AVAILABLE`.
    windows capture atypical load (deploy spikes, month-end batches,
    incident response). 14 days minimum, 30 days preferred.
 
-Extended anti-patterns in `references/error-handling-and-edge-cases.md`.
+Extended anti-patterns in `references/worked-examples.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -884,11 +884,9 @@ Extended anti-patterns in `references/error-handling-and-edge-cases.md`.
 - `references/worked-examples.md` — full worked examples (downsize
   within family, generation upgrade, Graviton migration, burstable
   credit fix, idle instance stop, already-optimized, NEED_MORE_INFO,
-  end-to-end walkthrough).
-- `references/error-handling-and-edge-cases.md` — CLI/data-source
-  failure handling, operational edge cases, Spot instance edge cases,
-  container workload edge cases, extended NEVER list, right-sizing
-  decision tree, remediation guidance.
+  end-to-end walkthrough), plus error handling, edge cases (ASG,
+  Docker, databases), extended NEVER list, and the right-sizing
+  decision tree.
 
 ## Domain
 

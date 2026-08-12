@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-logs-cost-optimizer",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Logs Cost Optimizer. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py; this file is the canonical structured-eval eval surface.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "never-expire-retention",
+      "name": "Lambda log group with Never-expire retention at 10,080 GB — retention reduction to 30 days",
+      "difficulty": "medium",
+      "prompt_file": "prompts/never-expire-retention.md",
+      "baseline_file": "baselines/never-expire-retention.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "never-expire-retention", "RECOMMENDATION", "ESTIMATED_SAVINGS", "MIGRATION_STEPS", "30"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "insights-vs-metric-filter",
+      "name": "Application log group with 450 Logs Insights queries/month scanning 120 GB each — convert to metric filters",
+      "difficulty": "hard",
+      "prompt_file": "prompts/insights-vs-metric-filter.md",
+      "baseline_file": "baselines/insights-vs-metric-filter.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "insights-vs-metric-filter", "RECOMMENDATION", "ESTIMATED_SAVINGS", "metric filter"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "firehose-cold-storage",
+      "name": "SOC2 compliance log group at 2-year retention in CW Logs — migrate to Firehose S3 + Glacier",
+      "difficulty": "hard",
+      "prompt_file": "prompts/firehose-cold-storage.md",
+      "baseline_file": "baselines/firehose-cold-storage.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "firehose-cold-storage", "RECOMMENDATION", "ESTIMATED_SAVINGS", "S3"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "agent-buffer-tuning",
+      "name": "EC2 fleet with CloudWatch agent default batch_count generating excess PutLogEvents — increase batch_count",
+      "difficulty": "medium",
+      "prompt_file": "prompts/agent-buffer-tuning.md",
+      "baseline_file": "baselines/agent-buffer-tuning.md",
+      "expected_verdict": "FURTHER_OPTIMIZATION_AVAILABLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["FURTHER_OPTIMIZATION_AVAILABLE", "agent-buffer-tuning", "RECOMMENDATION", "ESTIMATED_SAVINGS", "batch"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: OPTIMIZED", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    },
+    {
+      "id": "already-optimized",
+      "name": "Well-managed log group with 14-day retention, metric filters, Firehose S3 export, agent tuned — already optimal",
+      "difficulty": "easy",
+      "prompt_file": "prompts/already-optimized.md",
+      "baseline_file": "baselines/already-optimized.md",
+      "expected_verdict": "OPTIMIZED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPTIMIZED", "already-optimized", "REASON"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE", "VERDICT: NEED_MORE_INFO"]
+        }
+      ]
+    }
+  ]
+}

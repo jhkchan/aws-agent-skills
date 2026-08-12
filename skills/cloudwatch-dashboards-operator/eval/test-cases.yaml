@@ -1,0 +1,221 @@
+# Eval test cases for cloudwatch-dashboards-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+skill: cloudwatch-dashboards-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: create-rds-dashboard-completed
+    description: >-
+      Operator wants to create an RDS monitoring dashboard with 8
+      widgets (CPU, memory, connections, storage, query throughput,
+      replica lag, alarm, error logs). All pre-checks pass: namespace
+      has published data, DBInstanceIdentifier dimension matches live
+      instances, referenced alarm exists. Plan should produce
+      OPERATION_COMPLETED with the put-dashboard CLI.
+    input: |
+      Operation: create-dashboard
+      Dashboard name: prod-rds-overview
+      Service: RDS
+      Widgets: 8 (CPU, memory, connections, storage, query throughput,
+        replica lag, alarm, error logs)
+      Metrics Insights: no
+      Cross-account: no
+
+      Namespace check (aws cloudwatch list-metrics --namespace AWS/RDS):
+        42 metrics found (CPUUtilization, DatabaseConnections,
+        FreeableMemory, FreeStorageSpace, ReadIOPS, WriteIOPS, etc.)
+
+      Dimension values:
+        DBInstanceIdentifier: prod-orders-db (exists, Status: available)
+
+      Alarm check (aws cloudwatch describe-alarms-for-metric):
+        Alarm rds-cpu-high exists (threshold 80% for 5 min)
+
+      Dashboard existence check (aws cloudwatch list-dashboards):
+        No dashboard named "prod-rds-overview"
+
+      Emit the standard VERDICT block (OPERATION, VERDICT, TARGET,
+      PRE_CHECKS, STEPS, POST_VERIFY, NOTES).
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "prod-rds-overview"
+        - "put-dashboard"
+        - "VERDICT"
+        - "PRE_CHECKS"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "REVIEW_REQUIRED"
+
+  - id: add-anomaly-detection-band-review
+    description: >-
+      Operator wants to add an anomaly detection band (stdev: 2) on the
+      Lambda Errors metric to an existing dashboard. The metric has 14
+      days of training data (optimal). Dashboard update overwrites the
+      entire body — the plan should produce REVIEW_REQUIRED noting that
+      PutDashboard overwrites all widgets and the current body must be
+      captured first.
+    input: |
+      Operation: add-anomaly-detection
+      Dashboard: prod-lambda-overview (existing, 6 widgets)
+      Metric: AWS/Lambda Errors
+      Function: prod-api-handler
+      stdev: 2
+      Training data: 14 days available
+
+      Namespace check (aws cloudwatch list-metrics --namespace AWS/Lambda):
+        128 metrics found (Invocations, Errors, Duration, Throttles, etc.)
+
+      Dashboard current body (aws cloudwatch get-dashboard):
+        DashboardName: prod-lambda-overview
+        Widget count: 6
+        DashboardBody: <escaped JSON string, 8 KB>
+
+      Anomaly detection model check:
+        Metric Errors for FunctionName=prod-api-handler:
+        14 days of data available (optimal for training)
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "VERDICT"
+        - "ANOMALY_DETECTION_BAND"
+        - "stdev"
+        - "put-dashboard"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPERATION_COMPLETED"
+
+  - id: cross-account-dashboard-oam-review
+    description: >-
+      Operator wants to create a cross-account dashboard using OAM
+      shared observability. OAM sink exists in the monitoring account,
+      two source accounts are linked. Dashboard uses @Account variable
+      for cross-account filtering. Plan should produce REVIEW_REQUIRED
+      noting that cross-account visibility exposes metrics from linked
+      accounts and stakeholders must confirm scope.
+    input: |
+      Operation: enable-cross-account
+      Dashboard: cross-account-rds-overview
+      Monitoring account: 111111111111
+      Source accounts: 222222222222, 333333333333
+
+      OAM sinks (aws oam list-sinks):
+        Sink org-monitoring-sink exists in account 111111111111
+        SinkStatus: ACTIVE
+
+      OAM links (aws oam list-links):
+        Link 1: account 222222222222, LinkStatus: LINKED, MetricLink: true
+        Link 2: account 333333333333, LinkStatus: LINKED, MetricLink: true
+
+      Dashboard plan:
+        - Widget 1: RDS CPU across all linked accounts (@Account variable)
+        - Widget 2: Metrics Insights top 10 RDS instances by CPU across
+          all accounts
+        - Widget 3: Alarm widget for cross-account RDS alarms
+
+      Emit the standard VERDICT block.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "VERDICT"
+        - "cross-account"
+        - "OAM"
+        - "@Account"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "OPERATION_COMPLETED"
+
+  - id: metrics-insights-dashboard-completed
+    description: >-
+      Operator wants to create a top-10 EC2 dashboard using Metrics
+      Insights queries. All pre-checks pass: namespace has data, query
+      syntax validated, no existing dashboard with the target name.
+      Plan should produce OPERATION_COMPLETED.
+    input: |
+      Operation: create-dashboard
+      Dashboard name: top10-ec2-by-cpu
+      Service: EC2
+      Widgets: 3 (Metrics Insights top-10, status checks, network)
+      Metrics Insights query:
+        SELECT avg(CPUUtilization) FROM AWS/EC2 WHERE
+        AutoScalingGroupName LIKE 'prod-%' GROUP BY InstanceId
+        ORDER BY avg() DESC LIMIT 10
+
+      Namespace check (aws cloudwatch list-metrics --namespace AWS/EC2):
+        256 metrics found
+
+      Dashboard existence check:
+        No dashboard named "top10-ec2-by-cpu"
+
+      Query syntax validation: PASS (valid Metrics Insights SQL)
+
+      Emit the standard VERDICT block.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "top10-ec2-by-cpu"
+        - "put-dashboard"
+        - "VERDICT"
+        - "Metrics Insights"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "REVIEW_REQUIRED"
+
+  - id: dashboard-iac-version-controlled-completed
+    description: >-
+      Operator wants to update an existing dashboard from 8 to 10
+      widgets (additive: 2 new widgets) via version-controlled JSON
+      using PutDashboard API. Current body captured for diff, proposed
+      body validated, diff shows additive update with no existing
+      widgets removed. Plan should produce OPERATION_COMPLETED.
+    input: |
+      Operation: update-dashboard
+      Dashboard: prod-rds-overview (existing)
+      Change: 8 widgets → 10 widgets (additive)
+      New widgets: replica-lag-metric-math, alarm-secondary
+      Source: dashboards/prod-rds-overview.json (Git-tracked)
+
+      Current dashboard body (aws cloudwatch get-dashboard):
+        DashboardName: prod-rds-overview
+        Widget count: 8
+        DashboardBody: <escaped JSON string, 14 KB>
+        Captured to: /tmp/prod-rds-overview-pre-1234567890.json
+
+      Proposed dashboard body:
+        Widget count: 10
+        Validated: valid JSON
+        Diff: +2 new widgets (replica-lag-metric-math, alarm-secondary)
+        No existing widgets removed
+
+      Emit the standard VERDICT block.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "prod-rds-overview"
+        - "put-dashboard"
+        - "VERDICT"
+        - "Git"
+        - "CONFIRM"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "REVIEW_REQUIRED"

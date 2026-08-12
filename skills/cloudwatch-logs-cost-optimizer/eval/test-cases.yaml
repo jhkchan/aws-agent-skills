@@ -1,0 +1,268 @@
+# Eval test cases for cloudwatch-logs-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# LogGroupName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: cloudwatch-logs-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: never-expire-retention
+    description: >-
+      Lambda log group with Never-expire retention accumulating 10,080 GB
+      over 12 months. 840 GB/month ingested. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with retention reduction to 30 days.
+    input: |
+      LogGroupName: /aws/lambda/never-expire-retention
+      RetentionInDays: 0 (Never expire)
+      Region: us-east-1
+      StoredBytes: 10,080 GB (12 months accumulated)
+
+      Metrics (last 30 days):
+        - IncomingBytes avg: 28 GB/day (840 GB/month)
+        - IncomingLogEvents avg: 12,000,000/day
+
+      Cost Explorer (last month, AmazonCloudWatch):
+        - Logs ingestion: $420.00
+        - Logs storage: $302.40
+        - Total: $722.40/month (excluding Insights)
+
+      Workload context: Lambda application logs for an order processing
+      service. Operational debugging window is 7-14 days. No compliance
+      mandate requiring long retention. Team uses Logs Insights for
+      ad-hoc investigation (less than 10 queries/month).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "never-expire-retention"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "30"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: insights-vs-metric-filter
+    description: >-
+      Application log group with 450 Logs Insights queries/month scanning
+      120 GB each ($270/month). All queries are count-by-error-pattern
+      aggregations that can be metric filters. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with query-to-filter migration.
+    input: |
+      LogGroupName: /app/insights-vs-metric-filter
+      RetentionInDays: 14
+      Region: us-east-1
+      StoredBytes: 392 GB
+
+      Metrics (last 30 days):
+        - IncomingBytes avg: 28 GB/day
+        - IncomingLogEvents avg: 8,000,000/day
+
+      Logs Insights usage (from CloudTrail StartQuery events):
+        - Queries/month: 450
+        - Average GB scanned per query: 120 GB
+        - Query patterns:
+          1. count ERROR messages per minute (200 queries/month)
+          2. count TIMEOUT messages per 5 min (100 queries/month)
+          3. count Exception by service (80 queries/month)
+          4. avg response_time by endpoint (40 queries/month)
+          5. count 5xx status codes (30 queries/month)
+
+      Cost Explorer (last month):
+        - Logs Insights charges: $270.00 (450 × 120 GB × $0.005)
+        - Logs ingestion: $420.00
+        - Logs storage: $11.76
+        - Total: $701.76/month
+
+      Workload context: microservice application logs. All 5 query
+      patterns are simple count/avg aggregations expressible as metric
+      filters. No complex multi-line queries.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "insights-vs-metric-filter"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "metric filter"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: firehose-cold-storage
+    description: >-
+      Compliance log group requiring 2-year retention, currently in
+      CloudWatch Logs at $0.03/GB-month. 500 GB/month ingested, 12,000 GB
+      stored. Should be migrated to Firehose → S3 + Glacier lifecycle.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with cold storage.
+    input: |
+      LogGroupName: /audit/firehose-cold-storage
+      RetentionInDays: 730 (2 years, compliance-mandated SOC2)
+      Region: us-east-1
+      StoredBytes: 12,000 GB
+
+      Metrics (last 30 days):
+        - IncomingBytes avg: 16.7 GB/day (500 GB/month)
+        - IncomingLogEvents avg: 3,000,000/day
+
+      Cost Explorer (last month):
+        - Logs ingestion: $250.00 (500 GB × $0.50)
+        - Logs storage: $360.00 (12,000 GB × $0.03)
+        - Total: $610.00/month
+
+      Workload context: SOC2 audit logs. Compliance mandates 2-year
+      retention. Logs are queried rarely (1-2 times/quarter) via Athena
+      on an export bucket for compliance audits. The team has already
+      confirmed S3 + Athena meets their query needs.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "firehose-cold-storage"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "S3"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: agent-buffer-tuning
+    description: >-
+      EC2 fleet running CloudWatch agent with default batch_count=1000
+      generating excessive PutLogEvents requests. 100 hosts, 12M
+      events/hour total. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE
+      with batch_count increase to 10000.
+    input: |
+      LogGroupName: /ec2/app-logs
+      RetentionInDays: 14
+      Region: us-east-1
+      StoredBytes: 196 GB
+
+      Fleet details:
+        - Hosts: 100 EC2 instances running CloudWatch agent
+        - Agent batch_count: 1000 (default)
+        - Agent batch_size: 1048576 (default, 1 MB)
+        - Agent batch_wait_time: 5 seconds (default)
+
+      Metrics (last 30 days, aggregated across fleet):
+        - IncomingBytes avg: 28 GB/day
+        - IncomingLogEvents avg: 12,000,000/hour (288M/day)
+
+      CloudWatch Logs API metrics:
+        - PutLogEvents requests: ~288,000/hour (12M events / 1000 batch / ~42 hosts active)
+        - Monthly PutLogEvents: ~208,512,000 (~209M requests/month)
+
+      Cost Explorer (last month):
+        - Logs ingestion: $420.00 (840 GB × $0.50)
+        - Logs storage: $5.88 (196 GB × $0.03)
+        - PutLogEvents requests: $83.40 (209M / 1M × $0.40)
+        - Total: $509.28/month
+
+      Workload context: microservice fleet logs. Events are non-critical
+      debug+info level. 60-second data-loss window on agent failure is
+      acceptable (events are also shipped to a downstream aggregator).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "agent-buffer-tuning"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "batch"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimized
+    description: >-
+      Application log group with 14-day retention, no Insights queries,
+      Firehose S3 export for compliance archive, metric filters in place,
+      agent batch_count=10000. All dimensions pass. Expected verdict:
+      OPTIMIZED.
+    input: |
+      LogGroupName: /app/already-optimized
+      RetentionInDays: 14
+      Region: us-east-1
+      StoredBytes: 84 GB
+
+      Metrics (last 30 days):
+        - IncomingBytes avg: 2.8 GB/day (84 GB/month)
+        - IncomingLogEvents avg: 1,200,000/day
+
+      Logs Insights usage (CloudTrail):
+        - Queries/month: 3 (ad-hoc only, no scheduled queries)
+        - Average GB scanned: 5 GB per query
+        - Monthly Insights cost: $0.08 (negligible)
+
+      Metric filters: 4 configured (ErrorCount, WarningCount, LatencyP95,
+      RequestCount). Dashboard built on these metrics — no Insights
+      queries needed for monitoring.
+
+      Firehose S3 export: configured for compliance archive. S3 bucket
+      has lifecycle policy (Standard 90 days → GIR 270 days → Glacier
+      Deep Archive for 2-year retention).
+
+      Agent configuration: batch_count=10000, batch_size=1048576,
+      batch_wait_time=30.
+
+      Data protection policy: account-level policy enabled (EmailAddress,
+      Phone, CreditCard masking).
+
+      Cost Explorer (last month):
+        - Logs ingestion: $42.00 (84 GB × $0.50)
+        - Logs storage: $2.52 (84 GB × $0.03)
+        - PutLogEvents requests: $0.34 (850K requests)
+        - Insights: $0.08
+        - Firehose: $2.43 (84 GB × $0.029)
+        - S3 storage: $1.93 (84 GB × $0.023)
+        - Total: $49.30/month
+
+      Workload context: well-managed application log group. All
+      optimization dimensions already addressed.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "rds-snapshot-operator",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the RDS Snapshot Operator. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "create-manual-snapshot-pre-upgrade-completed",
+      "name": "Create manual snapshot before RDS engine upgrade — all pre-checks pass (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/create-manual-snapshot-pre-upgrade-completed.md",
+      "baseline_file": "baselines/create-manual-snapshot-pre-upgrade-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "prod-orders-db", "create-db-snapshot", "VERDICT", "PRE_CHECKS", "prod-orders-db-pre-upgrade-20260805", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "copy-snapshot-cross-region-dr-completed",
+      "name": "Copy encrypted snapshot cross-region for DR with KMS re-encryption (OPERATION_COMPLETED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/copy-snapshot-cross-region-dr-completed.md",
+      "baseline_file": "baselines/copy-snapshot-cross-region-dr-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "copy-db-snapshot", "VERDICT", "us-west-2", "dr-cmk", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "REVIEW_REQUIRED"]
+        }
+      ]
+    },
+    {
+      "id": "pitr-restore-to-point-in-time-review",
+      "name": "PITR restore creates new instance — option group and SG review needed (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/pitr-restore-to-point-in-time-review.md",
+      "baseline_file": "baselines/pitr-restore-to-point-in-time-review.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "restore-db-instance-to-point-in-time", "VERDICT", "option group", "security group", "new instance", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPERATION_COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "delete-old-snapshots-lifecycle-review",
+      "name": "Delete old snapshots via lifecycle Lambda — compliance-hold snapshot requires review (REVIEW_REQUIRED)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/delete-old-snapshots-lifecycle-review.md",
+      "baseline_file": "baselines/delete-old-snapshots-lifecycle-review.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_risk": "HIGH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["REVIEW_REQUIRED", "VERDICT", "DoNotDelete", "compliance", "delete-db-snapshot", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "OPERATION_COMPLETED"]
+        }
+      ]
+    },
+    {
+      "id": "aurora-clone-from-snapshot-completed",
+      "name": "Aurora cluster clone from snapshot — instant copy-on-write (OPERATION_COMPLETED)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/aurora-clone-from-snapshot-completed.md",
+      "baseline_file": "baselines/aurora-clone-from-snapshot-completed.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_risk": "MODERATE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["OPERATION_COMPLETED", "restore-db-cluster-from-snapshot", "VERDICT", "aurora-mysql", "copy-on-write", "CONFIRM"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "REVIEW_REQUIRED"]
+        }
+      ]
+    }
+  ]
+}
