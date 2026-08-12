@@ -1,0 +1,70 @@
+{
+  "skill": "opensearch-alerting-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "The skill includes several expert heuristics (e.g., destination\u2011before\u2011monitor, cost scaling by query complexity, SNS notification plugin requirement, RCF cold\u2011start timing) that are not obvious from generic docs. However, a large portion restates official documentation without adding new insight, so the delta is strong but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific provisioning order (notification plugin \u2192 destination \u2192 monitor \u2192 trigger), exact CLI/API snippets, and concrete decision points for monitor\u2011type selection. Lacks a brief fallback procedure for when a destination creation fails."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a detailed \"NEVER\" list with concrete reasons (silent failures, cost blow\u2011up, missing plugin, severity misuse). One item is slightly generic (\u201cNEVER store webhook credentials in plain text\u201d) without tying it to OpenSearch keystore specifics."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, activation keywords, and when_to_use are well\u2011defined. The output format is specified, but the skill does not explicitly state required field validation (e.g., mandatory monitor\u2011name) and the activation keyword list repeats phrases, making trigger detection marginally less reliable."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections (quick navigation, mindset, step\u2011by\u2011step, anti\u2011patterns, output format) so a reader can skim or dive deep. However, the \"Recent features\" table is dense and could be moved to a reference appendix."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Calibrates constraints appropriately for fragile operations (requires notification plugin for SNS, validates destination existence). Could be tighter for custom webhook validation (e.g., network reachability checks) and for handling malformed cron expressions."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Detailed Steps \u2192 NEVER \u2192 Output) that aligns with other CloudOps skills, aiding comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Model output examples mostly obey the contract, but the per\u2011document monitor example omits required checklist items such as the Trigger line, showing that the skill does not enforce a complete checklist in all cases. Edge\u2011case handling (API error responses, IAM role validation) is not covered."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 37777,
+  "latency_ms": 10516,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

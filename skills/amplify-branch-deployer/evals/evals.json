@@ -1,0 +1,178 @@
+{
+  "skill": "amplify-branch-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Amplify Branch Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Amplify branch deployment topologies (production branch with custom domain via Route 53 and PR preview, pull-request preview with fixed environment name for cost control, monorepo subdir detection via appRoot, Next.js SSR with SPA redirects and security headers, missing Git provider connection prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "production-branch-with-custom-domain",
+      "name": "Production branch with custom domain, PR preview, and security headers",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — production branch (main) mapped to example.com via Route 53, amplify.yml build spec, SPA rewrite, security headers, PR preview with fixed environment",
+      "prompt": "Set up an AWS Amplify app named my-web-app in us-east-1 from https://github.com/org/my-web-app. Production branch \"main\" with auto-build enabled, stage PRODUCTION. Build settings via amplify.yml at repo root (Next.js build to .next/). Map custom domain example.com to main, and staging.example.com to a staging branch. Route 53 hosted zone Z1DXXXXXXXXXX. Security headers: HSTS, X-Frame-Options, X-Content-Type-Options. SPA rewrite catch-all. Enable PR preview on main with a fixed environment name \"pr-preview\". Build instance medium.",
+      "prompt_file": "prompts/production-branch-with-custom-domain.md",
+      "baseline_file": "baselines/production-branch-with-custom-domain.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "AMPLIFY: my-web-app (d2y0lrmp1qq2tu)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Git provider connection: GitHub (OAuth via console)\n  [✓] Build spec: amplify.yml at repo root (NOT buildspec.yml)\n  [✓] Branch: main (stage: PRODUCTION, auto-build: true)\n  [✓] Custom domain: example.com → main (DNS verified via Route 53)\n  [✓] PR preview: enabled (environment: pr-preview)\n  [✓] Redirects: SPA rewrite (/<*> → /index.html 200)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "amplify.yml",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "example.com",
+            "PR preview"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pr-preview-ephemeral",
+      "name": "Pull request preview with fixed environment name for cost control",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — enablePullRequestPreview with fixed pullRequestEnvironmentName (one PR builds at a time), ephemeral URL rotates per build",
+      "prompt": "Enable pull request preview on my existing Amplify app d2y0lrmp1qq2tu for branch \"main\". Use a fixed environment name \"pr-preview\" so only one PR builds at a time (cost control). Region us-east-1. The team needs to know the preview URL rotates per build.",
+      "prompt_file": "prompts/pr-preview-ephemeral.md",
+      "baseline_file": "baselines/pr-preview-ephemeral.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "AMPLIFY: <app-name> (d2y0lrmp1qq2tu)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] PR preview: enabled (environment: pr-preview — ephemeral URL rotates per build)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "enablePullRequestPreview",
+            "pr-preview",
+            "VERDICT",
+            "CHECKLIST",
+            "ephemeral"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "monorepo-subdir-detection",
+      "name": "Monorepo subdir detection via appRoot for a Turborepo workspace",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — appRoot=packages/web-app set on create-app, amplify.yml in subdir, monorepo detection surfaced",
+      "prompt": "Create an Amplify app for my monorepo at https://github.com/org/my-monorepo. The web app lives at packages/web-app and has its own amplify.yml there. Production branch \"main\", auto-build enabled. The repo root is a Turborepo workspace — do NOT build from the root. Region us-east-1.",
+      "prompt_file": "prompts/monorepo-subdir-detection.md",
+      "baseline_file": "baselines/monorepo-subdir-detection.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "AMPLIFY: <app-name> (<app-id>)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Monorepo: appRoot=packages/web-app (amplify.yml in subdir)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "appRoot",
+            "packages/web-app",
+            "VERDICT",
+            "CHECKLIST",
+            "amplify.yml"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ssr-nextjs-with-redirects",
+      "name": "Next.js SSR with SPA redirects, security headers, and Lambda serverless functions",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Next.js SSR auto-detected, SPA rewrite status 200, /api route to function, security headers, per-branch Lambda caveat (8 branches = 8 Lambda sets)",
+      "prompt": "Configure Amplify for my Next.js 14 SSR app at https://github.com/org/my-next-app. The app uses App Router with SSR pages and API routes. Production branch \"main\". Build to .next/. Redirects: catch-all SPA rewrite (status 200), /api route to the serverless function. Security headers: HSTS, CSP, and X-Frame-Options. Region us-east-1. The team has 8 active feature branches.",
+      "prompt_file": "prompts/ssr-nextjs-with-redirects.md",
+      "baseline_file": "baselines/ssr-nextjs-with-redirects.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "AMPLIFY: <app-name> (<app-id>)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] SSR/SSG: SSR (Next.js 14, Lambda functions auto-provisioned)\n  [✓] Redirects: SPA rewrite (/<*> → /index.html 200), /api → serverless function\n  [✓] Custom headers: HSTS, CSP, X-Frame-Options\n  [✓] Serverless functions: per branch (8 active branches = 8 Lambda sets — monitor cost)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SSR",
+            "status: 200",
+            "VERDICT",
+            "CHECKLIST",
+            "serverless"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-repo-connection",
+      "name": "Amplify app without Git provider connection (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Git provider (GitHub) not connected via OAuth in the console; CLI cannot complete the OAuth handshake",
+      "prompt": "Create an Amplify app named my-app from https://github.com/org/my-repo in us-east-1. I have not connected GitHub to Amplify yet — please proceed with the CLI and we'll figure out auth later. Production branch \"main\".",
+      "prompt_file": "prompts/missing-repo-connection.md",
+      "baseline_file": "baselines/missing-repo-connection.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "AMPLIFY: my-app\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Git provider connection: GitHub not connected via OAuth — the one-time OAuth handshake requires console interaction; the CLI cannot complete it",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "Git provider connection",
+            "VERDICT",
+            "CHECKLIST",
+            "OAuth"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

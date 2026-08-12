@@ -1,0 +1,49 @@
+# Eval configuration for amplify-branch-deployer.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: amplify-branch-deployer
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: production-branch-with-custom-domain
+    difficulty: hard
+    prompt_file: prompts/production-branch-with-custom-domain.md
+    baseline_file: baselines/production-branch-with-custom-domain.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: pr-preview-ephemeral
+    difficulty: medium
+    prompt_file: prompts/pr-preview-ephemeral.md
+    baseline_file: baselines/pr-preview-ephemeral.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: monorepo-subdir-detection
+    difficulty: medium
+    prompt_file: prompts/monorepo-subdir-detection.md
+    baseline_file: baselines/monorepo-subdir-detection.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: ssr-nextjs-with-redirects
+    difficulty: hard
+    prompt_file: prompts/ssr-nextjs-with-redirects.md
+    baseline_file: baselines/ssr-nextjs-with-redirects.md
+    expected_verdict: READY_TO_DEPLOY
+
+  - id: missing-repo-connection
+    difficulty: easy
+    prompt_file: prompts/missing-repo-connection.md
+    baseline_file: baselines/missing-repo-connection.md
+    expected_verdict: PREREQUISITES_MISSING
