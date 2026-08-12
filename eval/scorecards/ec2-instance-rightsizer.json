@@ -1,0 +1,70 @@
+{
+  "skill": "ec2-instance-rightsizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "The skill supplies concrete thresholds (e.g., <5% CPU for 14 days, memory <50%), detailed generation\u2011upgrade percentages, Graviton compatibility decision tree, and a cost\u2011formula with Savings\u2011Plan adjustments \u2013 information a generic model would not enumerate. However much of it restates publicly documented AWS guidance (e.g., burstable credit economics, generation\u2011upgrade savings) rather than novel expert heuristics, so full marks are not earned."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill encodes an AWS\u2011specific workflow: pre\u2011flight data gate, ordered CLI steps (stop \u2192 modify \u2192 start), termination\u2011protection check, and workload\u2011context overrides. These are concrete procedures. Some steps are generic (\"check metrics\", \"verify\"), and the procedure for bulk operations is mentioned only in a comment, not formalized, preventing a perfect score."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "A thorough NEVER list with seven detailed anti\u2011patterns and explicit rationales (e.g., never downsize on CPU alone, never migrate Graviton without AMI testing). The only shortfall is the absence of a dedicated anti\u2011pattern for inadvertent RI/Savings\u2011Plan orphaning during cross\u2011family migrations."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, includes description, keywords, activation triggers, invocation schema, and example. The only minor gap is the absence of an explicit \"verdict_shape\" field in the frontmatter (though described later), so one point is deducted."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The document layers information: quick start \u2192 mindset \u2192 decision matrix \u2192 detailed step\u2011by\u2011step logic, allowing an agent to skim or dive deeper. However, the \"Step\u202f0 non\u2011obvious behaviours\" section packs many edge cases into a dense table, which can overload the reader before the core flow is established."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (stop/terminate) are gated by termination\u2011protection checks and a mandatory CONFIRM prompt. Creative tasks (e.g., Graviton migration) are left open with explicit testing steps. The only gap is that bulk\u2011operation limits are mentioned but not enforced by the skill logic."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "The skill follows a recognizable pattern: front\u2011matter, quick navigation, mindset, stepwise process, output contract, anti\u2011patterns, safety checks. This coherent structure aids comprehension. Minor deviation: the anti\u2011pattern list appears after the process rather than as a separate, consistently\u2011named section."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 10,
+      "max": 15,
+      "justification": "The skill provides CLI commands, decision trees, and a strict output schema, enabling an agent to act. Nonetheless, the supplied example outputs contain calculation errors (e.g., mismatched current vs projected monthly costs, incorrect borrowed\u2011credit cost in the burstable example) and assume pricing data without showing how to retrieve it. Edge cases such as Spot\u2011price volatility and missing memory metrics are only partially addressed, reducing practical reliability."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 52031,
+  "latency_ms": 14336,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}

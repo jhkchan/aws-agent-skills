@@ -1,0 +1,70 @@
+{
+  "skill": "ecs-task-cost-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Provides concrete thresholds (\u224830% utilization crossover, 20% Graviton discount, 30\u201170% spot savings) and exact pricing formulas, which a generic model would not know. However, many statements restate well\u2011known AWS docs without novel decision trees or proprietary heuristics, so not a full 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Includes AWS\u2011specific step\u2011by\u2011step CLI procedures (capacity\u2011provider creation, runtime\u2011platform registration, spot strategy) and a clear decision tree. Some procedures are generic (e.g., \"verify compatibility\") and lack concrete commands for every check, costing a few points."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never use spot for stateful services, never migrate to Graviton without compatibility evidence). Missing a few common pitfalls such as forgetting Fargate minimum CPU/memory combos or ignoring Container Insights cost, so not perfect."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, invocation schema and example are all present and clear. The only minor gap is the lack of an explicit versioned schema validation rule."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Uses layered sections (quick start, mindset, step\u2011by\u2011step, references) so a reader can skim or dive deep. However, the initial Quick navigation table still presents many details, causing some cognitive overload before the reader reaches the pre\u2011flight gate."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions (capacity\u2011provider changes, task\u2011definition updates) are gated by explicit CONFIRM prompts and safety checks. Creative tasks (e.g., cost estimation) are left open. Slight deduction because spot\u2011capacity recommendation does not enforce a mandatory fault\u2011tolerance verification step."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Steps \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Safety). The structure is coherent and aids comprehension."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 11,
+      "max": 15,
+      "justification": "Provides decision matrix, CLI snippets, and a strict output contract, enabling an agent to act. However the sample outputs contain arithmetic errors (e.g., using $0.04937 per vCPU\u2011hr, mismatched savings calculations) and some blocks miss required subtotals, reducing reliability for real execution."
+    }
+  ],
+  "total_score": 103,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 51013,
+  "latency_ms": 11739,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
