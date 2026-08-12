@@ -1,0 +1,70 @@
+{
+  "skill": "cloudtrail-lake-query-deployer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds concrete expert details not usually known to a baseline model: the immutability of EDS type after creation, the two\u2011part per\u2011GB ingestion and per\u2011GB scan billing model with rough rates, the fact that data\u2011protection policies mask PII at storage level (not post\u2011query), and the exact behavior of multi\u2011account EDS ingestion. These constitute genuine delta, but much of the content restates AWS documentation, so full 20 is not awarded."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides an AWS\u2011specific procedural flow (dependency graph, exact CLI flag order, prerequisite verification) that reflects expert thinking. Missing explicit step to validate IAM permissions or region before creation, and no guidance on rollback if a later step fails, so two points are deducted."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never create EDS without deciding event type, never query without time range). One point deducted because it could list a few more pitfalls such as forgetting to set the correct AWS region or forgetting to enable the service\u2011linked role."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 14,
+      "max": 15,
+      "justification": "Frontmatter is complete, activation keywords and triggers are listed, and the output contract is precisely defined. The 'when to use' description is slightly verbose, but overall the skill gives an agent reliable activation criteria."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "The skill layers information well: quick\u2011navigation table, high\u2011level mindset, then detailed step\u2011by\u2011step sections. Slight overload in the long procedural sections prevents a perfect score."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 13,
+      "max": 15,
+      "justification": "Destructive actions (EDS creation, policy application) are gated by a prerequisite checklist, matching the fragility of the task. However, the skill does not require an explicit confirmation step before executing the CLI commands, leaving a small freedom gap."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (mindset \u2192 steps \u2192 NEVER \u2192 output format). The example blocks at the end deviate slightly from the pattern (multiple checklists separated by '---'), causing a minor inconsistency."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI snippets, a ready\u2011to\u2011deploy checklist, and verification commands, enabling an agent to execute the skill. Lacks explicit error\u2011handling for existing EDS, missing IAM permissions, and region selection; multiple example outputs could confuse automation."
+    }
+  ],
+  "total_score": 106,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 40599,
+  "latency_ms": 5952,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
+}
