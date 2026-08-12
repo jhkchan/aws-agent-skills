@@ -242,24 +242,12 @@ configuration needed beyond the one-time Git provider OAuth.
 ```text
 Amplify branch build flow:
 
-  1. Developer pushes to branch "main" on GitHub
-       │
-       ▼
-  2. Amplify receives push event via Git provider webhook (auto-wired)
-       │
-       ▼
-  3. Amplify reads amplify.yml (NOT buildspec.yml!) from repo root
-       ├── If monorepo: reads from appRoot/amplify.yml
-       └── If no amplify.yml: uses console Build settings (buildSpec on app)
-       │
-       ▼
-  4. Build runs on build instance (small/medium/large)
-       ├── install phase (npm install / pip install)
-       ├── build phase (npm run build / next build)
-       └── post-build (test, deploy backend via Amplify CLI)
-       │
-       ▼
-  5. Artifacts deployed to CDN; URL: https://<branch>.<app-id>.amplifyapp.com
+  1. Push to branch "main" → Git provider fires webhook (auto-wired)
+  2. Amplify reads amplify.yml (NOT buildspec.yml!) from repo root
+       ├── Monorepo: reads from appRoot/amplify.yml
+       └── No amplify.yml: uses console Build settings (buildSpec on app)
+  3. Build runs on instance (small/medium/large) — install, build, test
+  4. Artifacts → CDN; URL: https://<branch>.<app-id>.amplifyapp.com
        ├── Production branch → can map to custom domain
        └── PR branch → ephemeral preview URL
 ```
@@ -277,16 +265,10 @@ that rotates per build and is torn down on PR close.
 
 ```text
 PR preview lifecycle:
-
   PR #42 opened (target: main)
-       │
-       ▼
-  Amplify provisions ephemeral environment
-  URL: https://pr-42.<app-id>.amplifyapp.com  (rotates per build)
-       │
-       ├── New commit pushed to PR #42 → rebuild → new URL content
-       ├── PR #42 closed/merged → environment torn down
-       └── PR #42 reopened → new environment provisioned
+    → env at https://pr-42.<app-id>.amplifyapp.com (rotates per build)
+    → new commit → rebuild → content updates
+    → PR closed/merged → environment torn down
 ```
 
 **Key implication:** PR preview is for review, not staging. For a
@@ -407,25 +389,23 @@ frontend:
 **Critical:** this file is `amplify.yml`, NOT `buildspec.yml`. A
 `buildspec.yml` in the same directory is IGNORED. If no `amplify.yml`
 exists, Amplify uses the inline `buildSpec` on the app (settable via
-console or `create-app --build-spec`).
+`create-app --build-spec`).
 
-Environment variables can be set on the app (global) or per-branch:
+Environment variables are set on the app (global) or per-branch
+(branch-level overrides app-level):
 
 ```bash
 # App-level (all branches)
-aws amplify update-app \
-  --app-id d2y0lrmp1qq2tu \
+aws amplify update-app --app-id d2y0lrmp1qq2tu \
   --environment-variables GLOBAL_VAR=value
 
-# Branch-level (overrides app-level for that branch)
-aws amplify create-branch \
-  --app-id d2y0lrmp1qq2tu \
-  --branch-name main \
+# Branch-level (overrides app-level)
+aws amplify create-branch --app-id d2y0lrmp1qq2tu --branch-name main \
   --environment-variables API_URL=https://api.prod.example.com
 ```
 
-Build instance type: `small` (default, 4GB RAM), `medium` (8GB), `large`
-(16GB). Larger instances speed up builds at higher cost.
+Build instance type: `small` (default, 4GB), `medium` (8GB), `large`
+(16GB). Larger = faster but higher cost per build minute.
 
 ## Step 4 — Redirects (SPA vs SSR)
 
@@ -438,12 +418,12 @@ Redirects and rewrites are configured via `customRules` on the app or in
 customRules:
   - source: /<*>
     target: /index.html
-    status: 200
+    status: 200    # MUST be 200 (rewrite), NOT 301 (redirect)
 ```
 
-The `status: 200` (rewrite, not redirect) is critical: it serves
-`index.html` for all paths so client-side routing handles them. A `301`
-would redirect to the literal path `/index.html`.
+The `status: 200` (rewrite) is critical: it serves `index.html` for all
+paths so client-side routing handles them. A `301` would redirect to
+the literal path `/index.html`, breaking client-side routing.
 
 **SSR (Next.js) — function routes:**
 
@@ -454,27 +434,14 @@ customRules:
     status: 200
 ```
 
-SSR routes are handled by Lambda serverless functions; the redirect
-rules must not shadow the function routes. Amplify auto-detects Next.js
-SSR routes from the build output.
+SSR routes are handled by Lambda serverless functions; redirect rules
+must not shadow the function routes. Amplify auto-detects Next.js SSR
+routes from the build output.
 
-**Common redirect patterns:**
-
-```yaml
-customRules:
-  # Domain redirect (old → new)
-  - source: old.example.com
-    target: https://new.example.com
-    status: 301
-  # Path redirect
-  - source: /old-path
-    target: /new-path
-    status: 302
-  # SPA rewrite (catch-all)
-  - source: /<*>
-    target: /index.html
-    status: 200
-```
+**Status code semantics:** `200` = rewrite (URL stays); `301` =
+permanent redirect (URL changes); `302` = temporary redirect. See
+`references/domains-redirects-and-auth.md` for common redirect patterns
+(domain redirect, path redirect, HTTP-to-HTTPS).
 
 ## Step 5 — Custom headers
 
@@ -535,41 +502,22 @@ aws amplify create-domain-association \
     subDomainSetting=PROD,branchName=staging,prefix="staging"
 ```
 
-This maps:
-- `example.com` (apex) → `main` branch (production)
-- `staging.example.com` → `staging` branch
-
-Amplify returns DNS records (CNAME for verification + A/AAAA alias) that
+This maps `example.com` (apex) → `main` and `staging.example.com` →
+`staging`. Amplify returns DNS records (CNAME for verification) that
 must be added to Route 53 (or third-party DNS):
 
 ```bash
-# Get the DNS records Amplify needs
 aws amplify get-domain-association \
-  --app-id d2y0lrmp1qq2tu \
-  --domain-name example.com \
+  --app-id d2y0lrmp1qq2tu --domain-name example.com \
   --query 'domainAssociation.subDomains[*].dnsRecord'
 ```
 
-**Route 53 hosted zone:**
-
-```bash
-aws route53 change-resource-record-sets \
-  --hosted-zone-id Z1DXXXXXXXXXX \
-  --change-batch '{
-    "Changes": [{
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "_amplify.example.com",
-        "Type": "CNAME",
-        "TTL": 300,
-        "ResourceRecords": [{"Value": "<verification-value>.amplify.app"}]
-      }
-    }]
-  }'
-```
-
-SSL is auto-provisioned once DNS verifies. Propagation: Route 53 ~2-5
-min; third-party DNS 15-45 min.
+Add the returned CNAME to Route 53 (`route53 change-resource-record-sets
+--hosted-zone-id Z1DXXXXX`). SSL is auto-provisioned via ACM once DNS
+verifies. Propagation: Route 53 ~2-5 min; third-party DNS 15-45 min.
+Amplify does NOT support wildcard sub-domains — each must be explicit.
+See `references/domains-redirects-and-auth.md` for the full Route 53
+record example.
 
 ## Step 8 — Pull request preview
 
