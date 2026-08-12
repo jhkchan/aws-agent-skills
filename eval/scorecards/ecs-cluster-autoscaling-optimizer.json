@@ -1,0 +1,70 @@
+{
+  "skill": "ecs-cluster-autoscaling-optimizer",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 17,
+      "max": 20,
+      "justification": "Provides many concrete thresholds (empty host ratio >10%, CV >0.5, specific weight/base values, cooldown ranges) and recent AWS feature details, which a baseline model would not know. However, some guidance is generic (e.g., how to compute CV) and omits nuanced interactions such as ASG MinSize/MaxSize limits with managed scaling, multi\u2011AZ capacity\u2011provider considerations, and edge\u2011case pricing variations, leaving a small knowledge gap."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Offers a clear AWS\u2011specific step\u2011by\u2011step process, CLI command ordering, and decision gates. A minor deduction because a few procedures are phrased generically (e.g., \"check data quality\") and the optimal ordering of enabling managed scaling before creating a spot capacity provider is not explicitly enforced."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "The NEVER list contains concrete, experience\u2011driven warnings (spot not for stateful workloads, never binpack without AZ spread, never cooldown <60\u202fs, never enable managed scaling with insufficient ASG MaxSize). One minor gap: no explicit warning about using Fargate for workloads that exceed the 16\u202fvCPU / 120\u202fGB limit, so a single point is deducted."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Frontmatter is complete, description, activation triggers, invocation schema, example, metadata, keywords, and tags are all present and well\u2011structured, enabling reliable skill activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 14,
+      "max": 15,
+      "justification": "Information is layered with quick\u2011start, mindset, detailed steps, and references. The NEVER list appears near the end, requiring extra navigation for critical safety rules, which slightly hampers progressive disclosure."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions are gated by an explicit CONFIRM step, cooldowns are calibrated to workload volatility, and creative tasks retain flexibility. Calibration matches task fragility throughout."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "Follows a recognizable pattern (overview, navigation table, quick start, mindset, decision matrix, pre\u2011flight, stepwise process, output format, anti\u2011patterns, safety checks, references) that aligns with other well\u2011structured CloudOps skills."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 12,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, decision matrix, and output template, enabling an agent to act. Deductions stem from reliance on external reference files not included, an informal invocation schema lacking validation details, and absence of explicit error\u2011handling examples for API failures."
+    }
+  ],
+  "total_score": 111,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 49417,
+  "latency_ms": 14811,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
