@@ -1,0 +1,48 @@
+# Eval configuration for alb-unhealthy-target-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: alb-unhealthy-target-troubleshooter
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: health-check-path-wrong
+    difficulty: medium
+    prompt_file: prompts/health-check-path-wrong.md
+    baseline_file: baselines/health-check-path-wrong.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: HEALTH_CHECK_PATH
+  - id: sg-blocking-health-check
+    difficulty: hard
+    prompt_file: prompts/sg-blocking-health-check.md
+    baseline_file: baselines/sg-blocking-health-check.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: SG_BLOCKING_HEALTH_CHECK
+  - id: deregistration-delay-stranding
+    difficulty: medium
+    prompt_file: prompts/deregistration-delay-stranding.md
+    baseline_file: baselines/deregistration-delay-stranding.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: DEREGISTRATION_DELAY
+  - id: port-mismatch-health-check
+    difficulty: hard
+    prompt_file: prompts/port-mismatch-health-check.md
+    baseline_file: baselines/port-mismatch-health-check.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: PORT_MISMATCH
+  - id: lambda-target-timeout
+    difficulty: hard
+    prompt_file: prompts/lambda-target-timeout.md
+    baseline_file: baselines/lambda-target-timeout.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: LAMBDA_TARGET_INTEGRATION

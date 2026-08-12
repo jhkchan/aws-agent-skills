@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "alb-unhealthy-target-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ALB Unhealthy Target Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "health-check-path-wrong",
+      "name": "All 6 targets unhealthy — HealthCheckPath /health but app serves /healthz (404 vs 200)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/health-check-path-wrong.md",
+      "baseline_file": "baselines/health-check-path-wrong.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "HEALTH_CHECK_PATH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "health-check-path", "HEALTH_CHECK_PATH", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: PORT_MISMATCH"]
+        }
+      ]
+    },
+    {
+      "id": "sg-blocking-health-check",
+      "name": "All 4 targets unhealthy with ConnectionFailed — target SG allows 10.0.0.0/8 but ALB ENIs are in 172.16.x.x",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sg-blocking-health-check.md",
+      "baseline_file": "baselines/sg-blocking-health-check.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SG_BLOCKING_HEALTH_CHECK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "sg-blocking", "SG_BLOCKING_HEALTH_CHECK", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: HEALTH_CHECK_PATH"]
+        }
+      ]
+    },
+    {
+      "id": "deregistration-delay-stranding",
+      "name": "3 targets stuck in draining for 10 minutes — deregistration_delay.timeout_seconds set to 600",
+      "difficulty": "medium",
+      "prompt_file": "prompts/deregistration-delay-stranding.md",
+      "baseline_file": "baselines/deregistration-delay-stranding.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "DEREGISTRATION_DELAY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "deregistration", "DEREGISTRATION_DELAY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: HEALTH_CHECK_PATH"]
+        }
+      ]
+    },
+    {
+      "id": "port-mismatch-health-check",
+      "name": "All targets unhealthy — HealthCheckPort set to 80 but application listens on 8080",
+      "difficulty": "hard",
+      "prompt_file": "prompts/port-mismatch-health-check.md",
+      "baseline_file": "baselines/port-mismatch-health-check.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "PORT_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "port-mismatch", "PORT_MISMATCH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: SG_BLOCKING_HEALTH_CHECK"]
+        }
+      ]
+    },
+    {
+      "id": "lambda-target-timeout",
+      "name": "Lambda target group unhealthy — ALB health check invoke times out (function Timeout 3s, handler takes 5-8s)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/lambda-target-timeout.md",
+      "baseline_file": "baselines/lambda-target-timeout.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "LAMBDA_TARGET_INTEGRATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "lambda-target", "LAMBDA_TARGET_INTEGRATION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: HEALTH_CHECK_PATH"]
+        }
+      ]
+    }
+  ]
+}

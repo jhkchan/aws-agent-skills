@@ -1,0 +1,266 @@
+# Eval test cases for alb-unhealthy-target-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: alb-unhealthy-target-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: health-check-path-wrong
+    description: >-
+      ALB target group with 6 EC2 instance targets, all showing
+      unhealthy with Target.FailedHealthChecks. HealthCheckPath is
+      configured as /health but the application serves health on
+      /healthz. Direct curl to /health returns 404; /healthz returns
+      200. Expected layer: HEALTH_CHECK_PATH.
+    input: |
+      Symptom: ALB target group tg-alb-health-check-path shows all 6
+      targets as unhealthy. TargetHealthReason is
+      Target.FailedHealthChecks. The application was redeployed last
+      night and the health endpoint changed from /health to /healthz.
+      The target group configuration was not updated.
+
+      TargetGroupArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/tg-alb-health-check-path/abc123
+      TargetType: instance
+      HealthCheckPath: /health
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      Matcher: { HttpCode: "200" }
+      Target Port: 8080
+      Protocol: HTTP
+      Targets: 6 registered, 6 unhealthy (all Reason: Target.FailedHealthChecks)
+
+      Direct curl from a bastion host in the same VPC:
+        curl -s -o /dev/null -w "%{http_code}" http://10.0.1.42:8080/health
+        → 404
+        curl -s -o /dev/null -w "%{http_code}" http://10.0.1.42:8080/healthz
+        → 200
+
+      Security group sg-app allows inbound from sg-alb on port 8080.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "health-check-path"
+        - "HEALTH_CHECK_PATH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: PORT_MISMATCH"
+
+  - id: sg-blocking-health-check
+    description: >-
+      All 4 targets unhealthy with Target.ConnectionFailed. Target
+      security group sg-app-443 allows port 443 from 10.0.0.0/8 but
+      the ALB ENI IPs are in 172.16.x.x. Security group does not
+      allow the ALB security group on the health check port. Expected
+      layer: SG_BLOCKING_HEALTH_CHECK.
+    input: |
+      Symptom: ALB target group tg-alb-sg-blocking shows all 4 targets
+      as unhealthy with TargetHealthReason Target.ConnectionFailed.
+      The ALB was recently migrated to new subnets in a different CIDR
+      (172.16.0.0/16). The target security group was not updated.
+
+      TargetGroupArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/tg-alb-sg-blocking/def456
+      TargetType: ip
+      HealthCheckPath: /api/health
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTPS
+      HealthCheckPort: 443
+      Matcher: { HttpCode: "200" }
+      Target Port: 443
+      Protocol: HTTPS
+      Targets: 4 registered, 4 unhealthy (all Reason: Target.ConnectionFailed)
+
+      Target SG (sg-app-443) ingress rules:
+        - port 443, source 10.0.0.0/8
+        - port 22, source 10.0.0.0/8
+
+      ALB details:
+        - ALB security group: sg-alb
+        - ALB subnets: subnet-172a, subnet-172b (CIDR 172.16.1.0/24, 172.16.2.0/24)
+        - ALB ENI IPs: 172.16.1.15, 172.16.1.23, 172.16.2.10, 172.16.2.18
+
+      Direct curl from within the target subnet (10.0.1.0/24) to a
+      target on port 443 returns 200 (app works locally).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "sg-blocking"
+        - "SG_BLOCKING_HEALTH_CHECK"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: HEALTH_CHECK_PATH"
+
+  - id: deregistration-delay-stranding
+    description: >-
+      Targets showing state "draining" for 10 minutes after ASG
+      instance refresh. Deregistration delay is set to 600 seconds.
+      No health check failure — targets are in normal drain. Expected
+      layer: DEREGISTRATION_DELAY.
+    input: |
+      Symptom: ALB target group tg-alb-deregistration shows 3 targets
+      in state "draining". The ASG performed an instance refresh
+      10 minutes ago. The draining targets have not transitioned to
+      removed yet. Operators are concerned the targets are stuck.
+
+      TargetGroupArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/tg-alb-deregistration/ghi789
+      TargetType: instance
+      Targets:
+        - i-aaa1: state healthy
+        - i-aaa2: state healthy
+        - i-bbb1: state draining (deregistered 10 minutes ago)
+        - i-bbb2: state draining (deregistered 10 minutes ago)
+        - i-bbb3: state draining (deregistered 10 minutes ago)
+
+      Target group attributes:
+        deregistration_delay.timeout_seconds = 600
+
+      No targets show unhealthy or Target.FailedHealthChecks.
+      All draining targets were healthy before deregistration.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "deregistration"
+        - "DEREGISTRATION_DELAY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: HEALTH_CHECK_PATH"
+
+  - id: port-mismatch-health-check
+    description: >-
+      All targets unhealthy. HealthCheckPort is set to 80 but the
+      application listens on 8080. Target registration port is 8080.
+      Health check port overrides to 80, causing connection refused.
+      Expected layer: PORT_MISMATCH.
+    input: |
+      Symptom: ALB target group tg-alb-port-mismatch shows all 3
+      targets as unhealthy with TargetHealthReason
+      Target.ConnectionFailed. The targets are EC2 instances running
+      on port 8080, but the health check port was set to 80.
+
+      TargetGroupArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/tg-alb-port-mismatch/jkl012
+      TargetType: instance
+      HealthCheckPath: /healthz
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      Matcher: { HttpCode: "200" }
+      Target Port: 8080
+      Protocol: HTTP
+      Targets: 3 registered, 3 unhealthy (all Reason: Target.ConnectionFailed)
+
+      Application context:
+        - Application listens on port 8080 (confirmed via ss -tlnp)
+        - Nothing listens on port 80
+
+      Target SG allows inbound from sg-alb on BOTH port 80 and 8080.
+
+      Direct curl from bastion:
+        curl http://10.0.1.50:8080/healthz → 200 OK
+        curl http://10.0.1.50:80/healthz → connection refused
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "port-mismatch"
+        - "PORT_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SG_BLOCKING_HEALTH_CHECK"
+
+  - id: lambda-target-timeout
+    description: >-
+      Lambda target group unhealthy. ALB invokes the Lambda function
+      for health checks; function has a 3-second timeout but the
+      handler takes 5-8 seconds due to a database query. Function
+      times out on every health check invoke. Expected layer:
+      LAMBDA_TARGET_INTEGRATION.
+    input: |
+      Symptom: ALB target group tg-alb-lambda-target shows the Lambda
+      target as unhealthy with TargetHealthReason
+      Target.FailedHealthChecks. The function fn-alb-processor is
+      invoked by the ALB for health checks but times out every time.
+
+      TargetGroupArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/tg-alb-lambda-target/mno345
+      TargetType: lambda
+      HealthCheckProtocol: HTTP (path and port ignored for Lambda)
+      Target: arn:aws:lambda:us-east-1:111111111111:function:fn-alb-processor
+
+      Lambda function configuration:
+        FunctionName: fn-alb-lambda-target
+        Runtime: nodejs20.x
+        Timeout: 3
+        MemorySize: 256
+        Handler: index.handler
+
+      Recent Lambda logs:
+        START RequestId: abc-123 Version: $LATEST
+        INFO  Querying database for health status...
+        Task timed out after 3.00 seconds
+        END RequestId: abc-123 Duration: 3000.00 ms
+
+      The function's database query takes 5-8 seconds; it was
+      designed for actual request processing, not fast health checks.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "lambda-target"
+        - "LAMBDA_TARGET_INTEGRATION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: HEALTH_CHECK_PATH"

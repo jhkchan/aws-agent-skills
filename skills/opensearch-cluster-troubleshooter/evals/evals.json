@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "opensearch-cluster-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the OpenSearch Cluster Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "cluster-block-disk-watermark-flood",
+      "name": "ClusterBlockException FORBIDDEN/12 read-only — flood-stage disk watermark (97% on one node), 427 monthly log indices without ISM",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cluster-block-disk-watermark-flood.md",
+      "baseline_file": "baselines/cluster-block-disk-watermark-flood.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "DISK_WATERMARK_FLOOD",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "cluster-block-disk-watermark-flood", "DISK_WATERMARK_FLOOD", "VERDICT", "ROOT_CAUSE", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: JVM_HEAP_PRESSURE", "LAYER: SHARD_ALLOCATION"]
+        }
+      ]
+    },
+    {
+      "id": "jvm-heap-old-gen-gc-storm",
+      "name": "JVMHeapPressure 87% sustained for 15 min; old-gen GC storm; 900 GB of stale open indices pushing working set past heap",
+      "difficulty": "hard",
+      "prompt_file": "prompts/jvm-heap-old-gen-gc-storm.md",
+      "baseline_file": "baselines/jvm-heap-old-gen-gc-storm.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "JVM_HEAP_PRESSURE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "jvm-heap-old-gen-gc-storm", "JVM_HEAP_PRESSURE", "VERDICT", "ROOT_CAUSE", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: DISK_WATERMARK_FLOOD", "LAYER: THREAD_POOL_SEARCH"]
+        }
+      ]
+    },
+    {
+      "id": "search-thread-pool-rejection",
+      "name": "thread_pool [search] rejected on all data nodes; queue full at 1000; high-cardinality terms aggregation trigger",
+      "difficulty": "medium",
+      "prompt_file": "prompts/search-thread-pool-rejection.md",
+      "baseline_file": "baselines/search-thread-pool-rejection.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "THREAD_POOL_SEARCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "search-thread-pool-rejection", "THREAD_POOL_SEARCH", "VERDICT", "ROOT_CAUSE", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: JVM_HEAP_PRESSURE", "LAYER: DISK_WATERMARK_FLOOD"]
+        }
+      ]
+    },
+    {
+      "id": "shard-allocation-unassigned-red",
+      "name": "Cluster red after data-node replacement; primary unassigned; allocation_explain first decider max_shards_per_node binding",
+      "difficulty": "hard",
+      "prompt_file": "prompts/shard-allocation-unassigned-red.md",
+      "baseline_file": "baselines/shard-allocation-unassigned-red.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SHARD_ALLOCATION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "shard-allocation-unassigned-red", "SHARD_ALLOCATION", "VERDICT", "ROOT_CAUSE", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CLUSTER_YELLOW"]
+        }
+      ]
+    },
+    {
+      "id": "circuit-breaker-fielddata",
+      "name": "circuit_breaking_exception [fielddata] tripping on text field with fielddata=true; breaker at 41% over 40% limit",
+      "difficulty": "medium",
+      "prompt_file": "prompts/circuit-breaker-fielddata.md",
+      "baseline_file": "baselines/circuit-breaker-fielddata.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CIRCUIT_BREAKER_FIELDDATA",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "circuit-breaker-fielddata", "CIRCUIT_BREAKER_FIELDDATA", "VERDICT", "ROOT_CAUSE", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: CIRCUIT_BREAKER_PARENT", "LAYER: JVM_HEAP_PRESSURE"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,303 @@
+# Eval test cases for sqs-dead-letter-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: sqs-dead-letter-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: max-receive-count-too-low
+    description: >-
+      Standard SQS queue with maxReceiveCount=1. Consumer Lambda has
+      occasional transient failures (downstream API 500s). Every failed
+      attempt immediately moves the message to the DLQ because
+      maxReceiveCount=1 means no retries. Expected layer:
+      MAX_RECEIVE_COUNT_TOO_LOW.
+    input: |
+      Symptom: SQS DLQ sqs-dlq-max-receive-count has accumulated 3,200
+      messages in the last 2 hours. The source queue
+      sqs-source-max-receive-count drains normally for most messages,
+      but ~15% end up in the DLQ. The consumer Lambda has transient
+      downstream API failures (5xx responses from a payment gateway).
+
+      SourceQueueURL: https://sqs.us-east-1.amazonaws.com/111111111111/sqs-source-max-receive-count
+      DLQArn: arn:aws:sqs:us-east-1:111111111111:sqs-dlq-max-receive-count
+      RedrivePolicy:
+        deadLetterTargetArn: "arn:aws:sqs:us-east-1:111111111111:sqs-dlq-max-receive-count"
+        maxReceiveCount: "1"
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 1209600
+      FifoQueue: false
+
+      Consumer: Lambda fn-sqs-consumer-max-rc
+      Lambda Timeout: 30
+      Lambda EventSourceMapping:
+        BatchSize: 10
+        VisibilityTimeout: 60
+        FunctionResponseTypes: ["ReportBatchItemFailures"]
+
+      DLQ message inspection (5 samples):
+        All have ApproximateReceiveCount: 1
+        Bodies contain valid order data
+        Lambda logs show "Payment gateway returned 503" for same
+          MessageIds
+
+      CloudWatch metrics (last 2 hours):
+        - Lambda Throttles: 0
+        - Lambda Duration p99: 2.1s (well within VT of 60s)
+        - Lambda Errors: 480 (correlate with 503 responses)
+        - DLQ ApproximateNumberOfMessages: growing
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "max-receive-count-too-low"
+        - "MAX_RECEIVE_COUNT_TOO_LOW"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: VISIBILITY_TIMEOUT_EXCEEDED"
+
+  - id: visibility-timeout-exceeded
+    description: >-
+      SQS queue VisibilityTimeout=30s but consumer Lambda Duration p99=45s.
+      Messages become visible again during processing, causing duplicate
+      receives and accelerated receive-count increment. maxReceiveCount=3.
+      Expected layer: VISIBILITY_TIMEOUT_EXCEEDED.
+    input: |
+      Symptom: SQS DLQ sqs-dlq-vis-timeout has grown from 0 to 5,200
+      messages in the last 2 hours. The source queue
+      sqs-source-vis-timeout has a consistently high
+      ApproximateNumberOfMessagesNotVisible (30-40 messages in-flight).
+
+      SourceQueueURL: https://sqs.us-east-1.amazonaws.com/111111111111/sqs-source-vis-timeout
+      DLQArn: arn:aws:sqs:us-east-1:111111111111:sqs-dlq-vis-timeout
+      RedrivePolicy:
+        deadLetterTargetArn: "arn:aws:sqs:us-east-1:111111111111:sqs-dlq-vis-timeout"
+        maxReceiveCount: "3"
+      VisibilityTimeout: 30
+      MessageRetentionPeriod: 1209600
+      FifoQueue: false
+
+      Consumer: Lambda fn-image-processor-vis
+      Lambda Timeout: 60
+      Lambda EventSourceMapping:
+        BatchSize: 5
+        VisibilityTimeout: 30
+        FunctionResponseTypes: ["ReportBatchItemFailures"]
+
+      CloudWatch metrics (last 2 hours):
+        - Lambda Duration p99: 45s, Maximum: 58s
+        - Lambda Throttles: 0
+        - Lambda Errors: 0 (no processing errors)
+        - DLQ ApproximateNumberOfMessages: 5200 and growing
+        - Source queue ApproximateNumberOfMessagesNotVisible: 30-40
+
+      DLQ message inspection:
+        ApproximateReceiveCount: 3 on all inspected messages
+        Message bodies are valid image processing jobs
+        No consumer errors — messages simply ran out of receives
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "visibility-timeout-exceeded"
+        - "VISIBILITY_TIMEOUT_EXCEEDED"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: MAX_RECEIVE_COUNT_TOO_LOW"
+
+  - id: fifo-poison-message
+    description: >-
+      FIFO queue with a poison message in MessageGroupId "cust-9912".
+      The message contains malformed JSON that causes the consumer to
+      throw on every attempt. FIFO ordering guarantees block all messages
+      behind it in the same group. Other groups flow normally. Expected
+      layer: FIFO_POISON_MESSAGE.
+    input: |
+      Symptom: FIFO queue sqs-source-fifo-poison.fifo throughput dropped
+      to near-zero for customer "cust-9912" at 14:30 UTC. Other customer
+      groups continue processing normally. DLQ sqs-dlq-fifo-poison.fifo
+      has accumulated 23 messages in the last hour, all with
+      MessageGroupId "cust-9912".
+
+      SourceQueueURL: https://sqs.us-east-1.amazonaws.com/111111111111/sqs-source-fifo-poison.fifo
+      DLQArn: arn:aws:sqs:us-east-1:111111111111:sqs-dlq-fifo-poison.fifo
+      RedrivePolicy:
+        deadLetterTargetArn: "arn:aws:sqs:us-east-1:111111111111:sqs-dlq-fifo-poison.fifo"
+        maxReceiveCount: "5"
+      VisibilityTimeout: 120
+      MessageRetentionPeriod: 1209600
+      FifoQueue: true
+
+      Consumer: Lambda fn-sqs-fifo-consumer
+      Lambda Timeout: 60
+      Lambda EventSourceMapping:
+        BatchSize: 10
+        VisibilityTimeout: 120
+
+      DLQ message inspection (10 samples):
+        All have Attributes.MessageGroupId = "cust-9912"
+        First message (by SentTimestamp):
+          ApproximateReceiveCount: 5
+          Body: "{bad json: missing closing brace"
+        Remaining 9 messages also MessageGroupId "cust-9912"
+
+      Lambda logs:
+        Repeated "SyntaxError: Unexpected token" for MessageGroupId
+          "cust-9912" starting at 14:30 UTC
+        No errors for other MessageGroupIds
+
+      CloudWatch metrics (last hour):
+        - Lambda Throttles: 0
+        - Lambda Duration p99: 8s (well within VT of 120s)
+        - Source queue ApproximateNumberOfMessages: stable for non-cust-9912
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "fifo-poison-message"
+        - "FIFO_POISON_MESSAGE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: MAX_RECEIVE_COUNT_TOO_LOW"
+
+  - id: lambda-concurrency-throttle
+    description: >-
+      SQS queue with Lambda consumer that has reserved concurrency of 5.
+      Queue sustains 50 messages/second. Lambda is throttled; backlog
+      grows. Messages exceed VT while waiting for a Lambda slot, moving
+      to DLQ. Expected layer: LAMBDA_CONCURRENCY_THROTTLE.
+    input: |
+      Symptom: SQS DLQ sqs-dlq-lambda-throttle has grown from 0 to
+      12,000 messages in 3 hours. The source queue
+      sqs-source-lambda-throttle backlog is at 45,000 messages and
+      growing. The consumer Lambda fn-batch-processor-throttle has a
+      reserved concurrency of 5.
+
+      SourceQueueURL: https://sqs.us-east-1.amazonaws.com/111111111111/sqs-source-lambda-throttle
+      DLQArn: arn:aws:sqs:us-east-1:111111111111:sqs-dlq-lambda-throttle
+      RedrivePolicy:
+        deadLetterTargetArn: "arn:aws:sqs:us-east-1:111111111111:sqs-dlq-lambda-throttle"
+        maxReceiveCount: "5"
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 1209600
+      FifoQueue: false
+
+      Consumer: Lambda fn-batch-processor-throttle
+      Lambda Timeout: 60
+      Lambda EventSourceMapping:
+        BatchSize: 10
+        VisibilityTimeout: 300
+        FunctionResponseTypes: ["ReportBatchItemFailures"]
+
+      Lambda concurrency:
+        ReservedConcurrentExecutions: 5
+
+      CloudWatch metrics (last 3 hours):
+        - Lambda Throttles: sustained 200+ per 5-minute window
+        - Lambda ConcurrentExecutions: Maximum = 5 (at the cap)
+        - Lambda Duration p99: 12s (within VT of 300s)
+        - Lambda Errors: 0
+        - Source queue ApproximateNumberOfMessages: 45,000 and growing
+        - DLQ ApproximateNumberOfMessages: 12,000 and growing
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "lambda-concurrency-throttle"
+        - "LAMBDA_CONCURRENCY_THROTTLE"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: VISIBILITY_TIMEOUT_EXCEEDED"
+
+  - id: dlq-type-mismatch-fifo
+    description: >-
+      FIFO source queue sqs-source-dlq-mismatch.fifo has a standard (non-FIFO)
+      DLQ attached. StartMessageMoveTask fails with InvalidParameterCombination.
+      Redrive cannot proceed. Expected layer: DLQ_TYPE_MISMATCH.
+    input: |
+      Symptom: Operator attempted to redrive messages from the DLQ back
+      to the source queue using StartMessageMoveTask. The task failed
+      with: "InvalidParameterCombination: The source queue and the
+      destination queue must have the same type."
+
+      SourceQueueURL: https://sqs.us-east-1.amazonaws.com/111111111111/sqs-source-dlq-mismatch.fifo
+      DLQArn: arn:aws:sqs:us-east-1:111111111111:sqs-dlq-mismatch
+      RedrivePolicy:
+        deadLetterTargetArn: "arn:aws:sqs:us-east-1:111111111111:sqs-dlq-mismatch"
+        maxReceiveCount: "5"
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 1209600
+      FifoQueue: true
+
+      DLQ attributes:
+        FifoQueue: false (NOT a FIFO queue — standard queue)
+        QueueName: sqs-dlq-mismatch (no .fifo suffix)
+
+      StartMessageMoveTask error:
+        "InvalidParameterCombination: The source queue and the
+        destination queue must have the same type."
+
+      DLQ currently has 800 messages that need redriving.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "dlq-type-mismatch-fifo"
+        - "DLQ_TYPE_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: REDRIVE_MISCONFIGURED"

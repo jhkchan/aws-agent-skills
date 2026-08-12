@@ -1,0 +1,372 @@
+# Eval test cases for secrets-manager-rotation-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: secrets-manager-rotation-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: rotation-lambda-vpc-timeout
+    description: >-
+      Rotation Lambda for an RDS PostgreSQL secret times out at 15s
+      because the Lambda is not VPC-attached. The DB is in a private
+      subnet; the Lambda has no route to it. LastRotatedDate is stale
+      by 8 schedule intervals. Expected layer: ROTATION_LAMBDA_VPC.
+    input: |
+      Symptom: secret prod/db/rotation-lambda-vpc-timeout has not
+      rotated in 8 days. The rotation Lambda logs "Could not connect
+      to database at host prod-db.cluster-cxyz.us-east-1.rds.amazonaws.com
+      port 5432" followed by "Task timed out after 15.00 seconds"
+      on every rotation attempt.
+
+      SecretId: prod/db/rotation-lambda-vpc-timeout
+      RotationEnabled: true
+      RotationLambdaARN: arn:aws:lambda:us-east-1:111111111111:function:SecretsManagerRotation-rotation-lambda-vpc-timeout
+      RotationRules: {ScheduleExpression: 'rate(1d)'}
+      LastRotatedDate: 2026-07-28T03:17:22Z
+      KmsKeyId: alias/aws/secretsmanager
+      VersionIdsToStages: {"v1": ["AWSCURRENT"], "v2": ["AWSPENDING"]}
+
+      Rotation Lambda configuration:
+        Timeout: 15
+        MemorySize: 256
+        Runtime: python3.12
+        Handler: lambda_function.lambda_handler
+        VpcConfig: (none — VpcId is empty)
+        Role: arn:aws:iam::111111111111:role/SecretsManagerRotation-role
+        Environment.Variables:
+          SECRETS_MANAGER_SECRET_ID: prod/db/rotation-lambda-vpc-timeout
+          SECRETS_MANAGER_MASTER_ID: prod/db/rotation-lambda-vpc-timeout-master
+
+      Database context:
+        Engine: aurora-postgresql
+        Cluster endpoint: prod-db.cluster-cxyz.us-east-1.rds.amazonaws.com
+        Port: 5432
+        Subnet: subnet-private-a (10.0.10.0/24), route table local-only
+        Security Group sg-db: ingress 5432 from sg-app (no sg-lambda-rotation)
+
+      Recent rotation Lambda log pattern (last 8 attempts):
+        [INFO]  createSecret: staging new password as AWSPENDING v3
+        [INFO]  setSecret: attempting connection to host
+                prod-db.cluster-cxyz.us-east-1.rds.amazonaws.com port 5432
+        [ERROR] Could not connect to database at host
+                prod-db.cluster-cxyz.us-east-1.rds.amazonaws.com port 5432
+        Task timed out after 15.00 seconds
+
+      Rotation role simulate-principal-policy:
+        secretsmanager:GetSecretValue on the secret: ALLOWED
+        secretsmanager:PutSecretValue on the secret: ALLOWED
+        kms:Decrypt on alias/aws/secretsmanager: not required (AWS-managed)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "rotation-lambda-vpc-timeout"
+        - "ROTATION_LAMBDA_VPC"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "VERDICT: ESCALATE"
+        - "LAYER: ROTATION_LAMBDA_TIMEOUT"
+
+  - id: eventbridge-schedule-deleted
+    description: >-
+      Secret rotation never triggers because the EventBridge rule was
+      deleted during a CloudEvents cleanup. RotationEnabled is true,
+      LastRotatedDate is 14 days stale, and the rotation Lambda has
+      zero invocations in the last 14 days. Expected layer:
+      SCHEDULE_MISSING.
+    input: |
+      Symptom: secret prod/api/eventbridge-schedule-deleted has not
+      rotated in 14 days. There are no rotation Lambda log streams in
+      that window. RotationEnabled is true and RotationRules shows
+      rate(1d).
+
+      SecretId: prod/api/eventbridge-schedule-deleted
+      RotationEnabled: true
+      RotationLambdaARN: arn:aws:lambda:us-east-1:111111111111:function:SecretsManagerRotation-eventbridge-schedule-deleted
+      RotationRules: {ScheduleExpression: 'rate(1d)'}
+      LastRotatedDate: 2026-07-21T03:17:22Z
+      VersionIdsToStages: {"v7": ["AWSCURRENT"]}
+
+      Rotation Lambda configuration:
+        Timeout: 30
+        MemorySize: 256
+        Runtime: python3.12
+        VpcConfig: correctly attached to DB subnets
+        Role: arn:aws:iam::111111111111:role/SecretsManagerRotation-role
+        LastModified: 2026-06-15
+
+      EventBridge context:
+        - aws events list-rules returns NO rule matching
+          "SecretsManager" or "eventbridge-schedule-deleted"
+        - aws events list-targets-by-rule for any candidate rule
+          returns empty
+        - aws logs filter-log-events on the rotation Lambda log
+          group returns zero events in the last 14 days
+
+      Rotation role permissions (verified):
+        secretsmanager:GetSecretValue on the secret: ALLOWED
+        secretsmanager:PutSecretValue on the secret: ALLOWED
+        kms:Decrypt on the CMK: not required (AWS-managed)
+
+      Database context: connection succeeds manually from the
+      rotation Lambda's subnets; rotation role's DB user has
+      SUPERUSER.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "eventbridge-schedule-deleted"
+        - "SCHEDULE_MISSING"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SCHEDULE_DISABLED"
+
+  - id: master-secret-arn-misconfigured
+    description: >-
+      Rotation Lambda env var SECRETS_MANAGER_MASTER_ID points at a
+      Master Secret ARN that does not exist (was deleted). The Lambda
+      fails in createSecret with ResourceNotFoundException.
+      Expected layer: MASTER_SECRET_MISCONFIGURED.
+    input: |
+      Symptom: secret prod/auth/master-secret-arn-misconfigured fails
+      every rotation. The Lambda logs "ResourceNotFoundException:
+      Secrets Manager can't find the specified secret. ARN:
+      arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/auth/missing-master-6fXq2L"
+      in the createSecret step. LastRotatedDate is 5 days stale.
+
+      SecretId: prod/auth/master-secret-arn-misconfigured
+      RotationEnabled: true
+      RotationLambdaARN: arn:aws:lambda:us-east-1:111111111111:function:SecretsManagerRotation-master-secret-arn-misconfigured
+      RotationRules: {ScheduleExpression: 'rate(1d)'}
+      LastRotatedDate: 2026-07-31T03:17:22Z
+
+      Rotation Lambda environment variables:
+        SECRETS_MANAGER_SECRET_ID: prod/auth/master-secret-arn-misconfigured
+        SECRETS_MANAGER_MASTER_ID: arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/auth/missing-master-6fXq2L
+
+      secretsmanager describe-secret on the configured Master ARN:
+        ResourceNotFoundException: Secrets Manager can't find the
+        specified secret.
+
+      CloudTrail context: a DeleteSecret event for
+      prod/auth/missing-master was recorded 7 days ago by the security
+      team ( Decommissioned per compliance purge).
+
+      Recent rotation Lambda log pattern:
+        [INFO]  createSecret: loading Master Secret
+                arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/auth/missing-master-6fXq2L
+        [ERROR] ResourceNotFoundException: Secrets Manager can't find
+                the specified secret.
+
+      Rotation role permissions:
+        secretsmanager:GetSecretValue on the configured Master ARN:
+          ALLOWED in identity policy (but resource does not exist)
+        secretsmanager:PutSecretValue on the rotating secret: ALLOWED
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "master-secret-arn-misconfigured"
+        - "MASTER_SECRET_MISCONFIGURED"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: PERMISSION_ROTATION_ROLE"
+
+  - id: cross-account-secret-access-denied
+    description: >-
+      Rotation Lambda in account 222222222222 reads a secret in
+      account 111111111111. The rotation role's identity policy
+      allows GetSecretValue, but the secret's resource-based policy
+      does not list the rotation role ARN in account 222222222222.
+      Every rotation fails with AccessDenied. Expected layer:
+      PERMISSION_CROSS_ACCOUNT.
+    input: |
+      Symptom: secret prod/payments/cross-account-secret-access-denied
+      is owned by account 111111111111 but rotated by a Lambda in
+      account 222222222222 (security-tooling account). Every rotation
+      attempt fails with "AccessDeniedException: User
+      arn:aws:sts::222222222222:assumed-role/SecretsManagerRotation-role/SecretsManagerRotation-cross-account
+      is not authorized to perform: secretsmanager:GetSecretValue".
+
+      SecretId: arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/payments/cross-account-secret-access-denied-Ab12Cd
+      OwningAccount: 111111111111
+      RotationEnabled: true
+      RotationLambdaARN: arn:aws:lambda:us-east-1:222222222222:function:SecretsManagerRotation-cross-account
+      RotationRules: {ScheduleExpression: 'rate(1d)'}
+      LastRotatedDate: 2026-07-30T03:17:22Z
+
+      Rotation role (in account 222222222222) identity policy:
+        Effect: Allow
+        Action: [secretsmanager:GetSecretValue,
+                  secretsmanager:PutSecretValue,
+                  secretsmanager:DescribeSecret]
+        Resource: arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/payments/cross-account-secret-access-denied-Ab12Cd
+
+      Secret resource-based policy (account 111111111111):
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:aws:iam::111111111111:role/SecretsManagerRotation-role"},
+              "Action": ["secretsmanager:GetSecretValue",
+                          "secretsmanager:PutSecretValue"],
+              "Resource": "*"
+            }
+          ]
+        }
+        Note: Principal lists the SAME account (111111111111); does
+        not list the rotation role in account 222222222222.
+
+      KMS: secret uses alias/aws/secretsmanager (AWS-managed; no
+      cross-account KMS issue).
+
+      Recent rotation Lambda log pattern:
+        [INFO]  createSecret: reading secret value
+        [ERROR] AccessDeniedException: User
+                arn:aws:sts::222222222222:assumed-role/SecretsManagerRotation-role/...
+                is not authorized to perform: secretsmanager:GetSecretValue
+
+      CloudTrail (account 111111111111) lookup-events:
+        EventName: GetSecretValue
+        errorMessage: "User ... is not authorized to perform:
+          secretsmanager:GetSecretValue on resource:
+          arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/payments/cross-account-secret-access-denied-Ab12Cd"
+        sourceIPAddress: Lambda ENI in account 222222222222 VPC
+        userIdentity.sessionContext.sessionIssuer.arn:
+          arn:aws:iam::222222222222:role/SecretsManagerRotation-role
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "cross-account-secret-access-denied"
+        - "PERMISSION_CROSS_ACCOUNT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: PERMISSION_ROTATION_ROLE"
+
+  - id: alternating-users-strategy-conflict
+    description: >-
+      Rotation Lambda deployed with the Single User template but the
+      secret was previously rotated by an Alternating Users Lambda.
+      The Single User template authenticates as the rotating user and
+      fails with "permission denied; cannot modify own password".
+      Expected layer: STRATEGY_CONFLICT.
+    input: |
+      Symptom: secret prod/db/alternating-users-strategy-conflict
+      started failing after a rotation Lambda re-deploy last week.
+      The Lambda logs "permission denied; cannot modify own password"
+      in the setSecret step. The rotation role and DB privileges
+      worked correctly before the re-deploy.
+
+      SecretId: prod/db/alternating-users-strategy-conflict
+      RotationEnabled: true
+      RotationLambdaARN: arn:aws:lambda:us-east-1:111111111111:function:SecretsManagerRotation-alternating-users-strategy-conflict
+      RotationRules: {ScheduleExpression: 'rate(1d)'}
+      LastRotatedDate: 2026-07-29T03:17:22Z
+      VersionIdsToStages: {"v5": ["AWSCURRENT"], "v4": ["AWSPREVIOUS"],
+                            "v6": ["AWSPENDING"]}
+
+      Rotation Lambda configuration:
+        Description: "SecretsManagerRDSMySQLRotationSingleUser"
+        Handler: lambda_function.lambda_handler
+        Environment.Variables:
+          SECRETS_MANAGER_SECRET_ID: prod/db/alternating-users-strategy-conflict
+          SECRETS_MANAGER_MASTER_ID: prod/db/alternating-users-strategy-conflict-master
+          ROTATION_STRATEGY: SINGLE_USER
+        LastModified: 2026-07-28 (re-deployed 8 days ago)
+
+      Prior rotation Lambda (replaced):
+        Description: "SecretsManagerRDSMySQLRotationMultiUser"
+        ROTATION_STRATEGY: ALTERNATING_USERS
+
+      Secret value (non-sensitive fields):
+        engine: mysql
+        host: prod-db.cxyz.us-east-1.rds.amazonaws.com
+        port: 3306
+        dbname: payments
+        username: app_user
+
+      Master Secret value (non-sensitive fields):
+        engine: mysql
+        username: rotation_master
+        (verified SUPERUSER privilege)
+
+      Recent rotation Lambda log pattern:
+        [INFO]  createSecret: staging new password as AWSPENDING v6
+        [INFO]  setSecret: connecting as app_user to rotate own password
+        [ERROR] ERROR 1227 (42000): Access denied; you need (at least
+                one of) the SUPER privilege(s) for this operation.
+                Statement: ALTER USER 'app_user'@'%' IDENTIFIED BY '<new>'
+
+      Database context: app_user has only the application-level grants
+      (SELECT, INSERT, UPDATE on payments.*); no SUPER, no CREATE USER.
+
+      Rotation role permissions (all verified ALLOWED):
+        secretsmanager:GetSecretValue on rotating + Master secret
+        secretsmanager:PutSecretValue
+        kms:Decrypt on alias/aws/secretsmanager (not required)
+        VPC config correctly attached to DB subnets
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "alternating-users-strategy-conflict"
+        - "STRATEGY_CONFLICT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: SUPERUSER_INSUFFICIENT"

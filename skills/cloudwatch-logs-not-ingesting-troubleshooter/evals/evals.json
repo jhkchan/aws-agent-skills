@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "cloudwatch-logs-not-ingesting-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the CloudWatch Logs Not-Ingesting Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "iam-putlogevents-missing-lambda-role",
+      "name": "Newly-deployed Lambda runs successfully but /aws/lambda/<name> log group never created — role missing AWSLambdaBasicExecutionRole (logs:CreateLogGroup, logs:PutLogEvents)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/iam-putlogevents-missing-lambda-role.md",
+      "baseline_file": "baselines/iam-putlogevents-missing-lambda-role.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "IAM_PERMISSIONS",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "iam-putlogevents-missing-lambda-role", "IAM_PERMISSIONS", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: LOG_GROUP_NAMING"]
+        }
+      ]
+    },
+    {
+      "id": "sequence-token-collision-shared-stream",
+      "name": "Two ECS tasks share the same firelens log_stream_name; InvalidSequenceTokenException on ~50% of PutLogEvents calls — concurrent writers collide on the token",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sequence-token-collision-shared-stream.md",
+      "baseline_file": "baselines/sequence-token-collision-shared-stream.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SEQUENCE_TOKEN",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "sequence-token-collision-shared-stream", "SEQUENCE_TOKEN", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: IAM_PERMISSIONS"]
+        }
+      ]
+    },
+    {
+      "id": "agent-windows-json-misconfig",
+      "name": "CloudWatch agent on Windows EC2 not shipping — file_path uses Linux-style path; actual log is at C:\\logs\\app.log; agent never writes any events",
+      "difficulty": "medium",
+      "prompt_file": "prompts/agent-windows-json-misconfig.md",
+      "baseline_file": "baselines/agent-windows-json-misconfig.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "AGENT_MISCONFIG",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "agent-windows-json-misconfig", "AGENT_MISCONFIG", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: IAM_PERMISSIONS"]
+        }
+      ]
+    },
+    {
+      "id": "subscription-filter-lambda-concurrency-exhausted",
+      "name": "Three subscription filters fan out to one Lambda destination; destination concurrency hits the account limit and ~30% of subscription batches are silently dropped",
+      "difficulty": "hard",
+      "prompt_file": "prompts/subscription-filter-lambda-concurrency-exhausted.md",
+      "baseline_file": "baselines/subscription-filter-lambda-concurrency-exhausted.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SUBSCRIPTION_FILTER_CAPACITY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "subscription-filter-lambda-concurrency-exhausted", "SUBSCRIPTION_FILTER_CAPACITY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: IAM_PERMISSIONS"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-destination-policy-missing",
+      "name": "Cross-account log delivery fails — source IAM allows logs:PutLogEvents but destination account has no resource-based policy listing the source account",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-destination-policy-missing.md",
+      "baseline_file": "baselines/cross-account-destination-policy-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CROSS_ACCOUNT_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "cross-account-destination-policy-missing", "CROSS_ACCOUNT_POLICY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: IAM_PERMISSIONS"]
+        }
+      ]
+    }
+  ]
+}

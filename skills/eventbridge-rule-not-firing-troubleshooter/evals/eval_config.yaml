@@ -1,0 +1,48 @@
+# Eval configuration for eventbridge-rule-not-firing-troubleshooter.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: eventbridge-rule-not-firing-troubleshooter
+snapshot_date: "2026-08-07"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+evals:
+  - id: pattern-detail-type-mismatch
+    difficulty: medium
+    prompt_file: prompts/pattern-detail-type-mismatch.md
+    baseline_file: baselines/pattern-detail-type-mismatch.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: PATTERN_DETAIL_TYPE_MISMATCH
+  - id: content-filter-nested-depth
+    difficulty: hard
+    prompt_file: prompts/content-filter-nested-depth.md
+    baseline_file: baselines/content-filter-nested-depth.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: CONTENT_FILTER_NESTED_DEPTH
+  - id: schedule-cron-syntax
+    difficulty: hard
+    prompt_file: prompts/schedule-cron-syntax.md
+    baseline_file: baselines/schedule-cron-syntax.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: SCHEDULE_SYNTAX
+  - id: target-lambda-permission-missing
+    difficulty: hard
+    prompt_file: prompts/target-lambda-permission-missing.md
+    baseline_file: baselines/target-lambda-permission-missing.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: TARGET_LAMBDA_PERMISSION
+  - id: bus-mismatch-custom-default
+    difficulty: medium
+    prompt_file: prompts/bus-mismatch-custom-default.md
+    baseline_file: baselines/bus-mismatch-custom-default.md
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    expected_layer: BUS_MISMATCH

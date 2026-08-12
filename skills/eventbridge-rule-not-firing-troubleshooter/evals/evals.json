@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "eventbridge-rule-not-firing-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the EventBridge Rule Not Firing Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "pattern-detail-type-mismatch",
+      "name": "EventBridge rule detail-type 'Order Created' vs event 'OrderCreated' — case-sensitive exact match fails",
+      "difficulty": "medium",
+      "prompt_file": "prompts/pattern-detail-type-mismatch.md",
+      "baseline_file": "baselines/pattern-detail-type-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "PATTERN_DETAIL_TYPE_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "pattern-detail-type-mismatch", "PATTERN_DETAIL_TYPE_MISMATCH", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: PATTERN_SOURCE_MISMATCH"]
+        }
+      ]
+    },
+    {
+      "id": "content-filter-nested-depth",
+      "name": "Content-based filter JSON path at depth 11 exceeds EventBridge 10-level cap — silent match failure",
+      "difficulty": "hard",
+      "prompt_file": "prompts/content-filter-nested-depth.md",
+      "baseline_file": "baselines/content-filter-nested-depth.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "CONTENT_FILTER_NESTED_DEPTH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "content-filter-nested-depth", "CONTENT_FILTER_NESTED_DEPTH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: PATTERN_DETAIL_PATH_MISMATCH"]
+        }
+      ]
+    },
+    {
+      "id": "schedule-cron-syntax",
+      "name": "Schedule rule uses 5-field cron instead of 6-field — EventBridge auto-disabled the rule",
+      "difficulty": "hard",
+      "prompt_file": "prompts/schedule-cron-syntax.md",
+      "baseline_file": "baselines/schedule-cron-syntax.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SCHEDULE_SYNTAX",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "schedule-cron-syntax", "SCHEDULE_SYNTAX", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: PATTERN_SOURCE_MISMATCH"]
+        }
+      ]
+    },
+    {
+      "id": "target-lambda-permission-missing",
+      "name": "Rule fires but target Lambda resource-based policy missing events.amazonaws.com principal — invocation silently denied",
+      "difficulty": "hard",
+      "prompt_file": "prompts/target-lambda-permission-missing.md",
+      "baseline_file": "baselines/target-lambda-permission-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TARGET_LAMBDA_PERMISSION",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "target-lambda-permission-missing", "TARGET_LAMBDA_PERMISSION", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: TARGET_IAM_ROLE"]
+        }
+      ]
+    },
+    {
+      "id": "bus-mismatch-custom-default",
+      "name": "Events put on default bus, rule on custom bus — EventBusName mismatch prevents matching",
+      "difficulty": "medium",
+      "prompt_file": "prompts/bus-mismatch-custom-default.md",
+      "baseline_file": "baselines/bus-mismatch-custom-default.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "BUS_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "bus-mismatch-custom-default", "BUS_MISMATCH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: PATTERN_SOURCE_MISMATCH"]
+        }
+      ]
+    }
+  ]
+}

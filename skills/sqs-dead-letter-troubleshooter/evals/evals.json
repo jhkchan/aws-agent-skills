@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "sqs-dead-letter-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the SQS Dead-Letter Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "max-receive-count-too-low",
+      "name": "Standard SQS with maxReceiveCount=1 — transient consumer failures go straight to DLQ with no retries",
+      "difficulty": "medium",
+      "prompt_file": "prompts/max-receive-count-too-low.md",
+      "baseline_file": "baselines/max-receive-count-too-low.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "MAX_RECEIVE_COUNT_TOO_LOW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "max-receive-count-too-low", "MAX_RECEIVE_COUNT_TOO_LOW", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: VISIBILITY_TIMEOUT_EXCEEDED"]
+        }
+      ]
+    },
+    {
+      "id": "visibility-timeout-exceeded",
+      "name": "SQS VisibilityTimeout=30s but Lambda Duration p99=45s — messages become visible during processing",
+      "difficulty": "hard",
+      "prompt_file": "prompts/visibility-timeout-exceeded.md",
+      "baseline_file": "baselines/visibility-timeout-exceeded.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "VISIBILITY_TIMEOUT_EXCEEDED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "visibility-timeout-exceeded", "VISIBILITY_TIMEOUT_EXCEEDED", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: MAX_RECEIVE_COUNT_TOO_LOW"]
+        }
+      ]
+    },
+    {
+      "id": "fifo-poison-message",
+      "name": "FIFO queue poison message in MessageGroupId cust-9912 — malformed JSON blocks entire group",
+      "difficulty": "hard",
+      "prompt_file": "prompts/fifo-poison-message.md",
+      "baseline_file": "baselines/fifo-poison-message.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "FIFO_POISON_MESSAGE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "fifo-poison-message", "FIFO_POISON_MESSAGE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: MAX_RECEIVE_COUNT_TOO_LOW"]
+        }
+      ]
+    },
+    {
+      "id": "lambda-concurrency-throttle",
+      "name": "Lambda consumer reserved concurrency=5 but queue sustains 50 msg/s — throttling causes DLQ overflow",
+      "difficulty": "hard",
+      "prompt_file": "prompts/lambda-concurrency-throttle.md",
+      "baseline_file": "baselines/lambda-concurrency-throttle.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "LAMBDA_CONCURRENCY_THROTTLE",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "lambda-concurrency-throttle", "LAMBDA_CONCURRENCY_THROTTLE", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: VISIBILITY_TIMEOUT_EXCEEDED"]
+        }
+      ]
+    },
+    {
+      "id": "dlq-type-mismatch-fifo",
+      "name": "FIFO source queue with standard (non-FIFO) DLQ — StartMessageMoveTask fails with type mismatch",
+      "difficulty": "medium",
+      "prompt_file": "prompts/dlq-type-mismatch-fifo.md",
+      "baseline_file": "baselines/dlq-type-mismatch-fifo.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "DLQ_TYPE_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "dlq-type-mismatch-fifo", "DLQ_TYPE_MISMATCH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: REDRIVE_MISCONFIGURED"]
+        }
+      ]
+    }
+  ]
+}

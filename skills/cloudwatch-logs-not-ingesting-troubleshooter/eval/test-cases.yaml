@@ -1,0 +1,311 @@
+# Eval test cases for cloudwatch-logs-not-ingesting-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: cloudwatch-logs-not-ingesting-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: iam-putlogevents-missing-lambda-role
+    description: >-
+      Newly-deployed Lambda function runs successfully (returns 200)
+      but /aws/lambda/<name> log group has zero log streams. Execution
+      role has AWSLambdaVPCAccessExecutionRole but NOT
+      AWSLambdaBasicExecutionRole. Lambda silently fails to auto-create
+      the log group. Expected layer: IAM_PERMISSIONS.
+    input: |
+      Symptom: fn-iam-putlogevents-missing-lambda-role runs
+      successfully (returns 200 to API Gateway) but no logs appear in
+      CloudWatch. The /aws/lambda/fn-iam-putlogevents-missing-lambda-role
+      log group does not exist. The function was deployed 1 hour ago.
+
+      LogGroup (expected): /aws/lambda/fn-iam-putlogevents-missing-lambda-role
+      Source: Lambda (auto-publishes to /aws/lambda/<name>)
+      Execution role: arn:aws:iam::111111111111:role/fn-role
+      Attached policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - inline: { app-access: { Effect: Allow, Action: [s3:GetObject],
+            Resource: "*" } }
+
+      aws iam simulate-principal-policy for arn:aws:iam::111111111111:role/fn-role:
+        logs:CreateLogGroup on arn:aws:logs:us-east-1:111111111111:log-group:* : IMPLICIT_DENY
+        logs:CreateLogStream on same resource pattern: IMPLICIT_DENY
+        logs:PutLogEvents on same resource pattern: IMPLICIT_DENY
+
+      aws logs describe-log-groups --log-group-name-prefix /aws/lambda/fn-iam-putlogevents-missing-lambda-role:
+        logGroups: [] (empty — log group does not exist)
+
+      CloudWatch metrics (last hour):
+        - AWS/Lambda Invocations for the function: 47
+        - AWS/Lambda Errors for the function: 0
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "iam-putlogevents-missing-lambda-role"
+        - "IAM_PERMISSIONS"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: LOG_GROUP_NAMING"
+
+  - id: sequence-token-collision-shared-stream
+    description: >-
+      Two ECS tasks share the same log_stream_name in firelens
+      configuration. Each task's PutLogEvents call uses a token from
+      the previous successful call by either task, producing
+      InvalidSequenceTokenException on ~50% of calls. Expected layer:
+      SEQUENCE_TOKEN.
+    input: |
+      Symptom: the application's logger logs to CloudWatch Logs log
+      group /ecs/sequence-token-collision-shared-stream. Approximately
+      50% of PutLogEvents calls from the ECS tasks return
+      InvalidSequenceTokenException. The other 50% succeed. Events
+      are being lost on the failing calls.
+
+      LogGroup: /ecs/sequence-token-collision-shared-stream
+      Source: ECS tasks (firelensConfiguration)
+      Number of running ECS tasks: 2 (task A and task B), each writing
+        to the same log stream.
+
+      aws logs describe-log-streams --log-group-name
+      /ecs/sequence-token-collision-shared-stream:
+        single log stream named "app" exists
+        uploadSequenceToken: changes rapidly (different value on
+          each describe call)
+
+      ECS task definition firelensConfiguration:
+        log_stream_name: "app"  (hardcoded — no task_id suffix)
+
+      ECS task role IAM simulation:
+        logs:CreateLogStream on /ecs/*: ALLOWED
+        logs:PutLogEvents on /ecs/*: ALLOWED
+
+      CloudWatch metrics for the log group (last hour):
+        IncomingBytes: present but lower than expected (events lost
+          on the failing 50% of calls)
+
+      Lambda log group auto-create: N/A (ECS source)
+      Retention: Never expire
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "sequence-token-collision-shared-stream"
+        - "SEQUENCE_TOKEN"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: IAM_PERMISSIONS"
+
+  - id: agent-windows-json-misconfig
+    description: >-
+      CloudWatch agent on a Windows EC2 instance is running but no
+      logs appear. The agent config uses a Linux-style file_path
+      (/var/log/app.log) on Windows; the actual path is
+      C:\logs\app.log. JSON format mismatch: agent expects JSON but
+      the application emits text. Expected layer: AGENT_MISCONFIG.
+    input: |
+      Symptom: the CloudWatch agent on a Windows EC2 instance
+      (i-agent-windows-json-misconfig) is running
+      (status: running) but no logs appear in the expected log group.
+      The application at C:\logs\app.log is actively writing.
+
+      LogGroup (expected): /ec2/agent-windows-json-misconfig
+      Source: CloudWatch agent on Windows EC2
+      Instance: i-agent-windows-json-misconfig (Windows Server 2022)
+
+      Agent config (amazon-cloudwatch-agent.json logs section):
+        {
+          "logs": {
+            "logs_collected": {
+              "files": {
+                "collect_list": [{
+                  "file_path": "/var/log/app.log",
+                  "log_group_name": "/ec2/agent-windows-json-misconfig",
+                  "log_stream_name": "app",
+                  "timestamp_formats": ["%Y-%m-%d %H:%M:%S"]
+                }]
+              }
+            }
+          }
+        }
+        Note: file_path uses a Linux-style path; the instance is
+        Windows. The actual application log is at C:\logs\app.log.
+
+      Agent status: running (systemctl / Windows service shows OK)
+      Agent IAM role: CloudWatchAgentServerPolicy attached (IAM is OK)
+
+      Application log at C:\logs\app.log (text format):
+        2026-08-11 14:23:01 INFO  request received (id=42)
+        2026-08-11 14:23:02 INFO  processing (id=42)
+        (NOT JSON — plain text lines)
+
+      aws logs describe-log-streams --log-group-name
+      /ec2/agent-windows-json-misconfig:
+        logStreams: [] (no streams)
+
+      aws logs describe-log-groups --log-group-name-prefix
+      /ec2/agent-windows-json-misconfig:
+        logGroups: [] (log group does not exist — agent never wrote)
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "agent-windows-json-misconfig"
+        - "AGENT_MISCONFIG"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: IAM_PERMISSIONS"
+
+  - id: subscription-filter-lambda-concurrency-exhausted
+    description: >-
+      Three log groups each have a subscription filter pointing to the
+      same Lambda destination. Under load, the Lambda destination's
+      concurrency hits the account limit (1000) and subscription
+      batches are silently dropped. Subscription delivery is capped at
+      2x account concurrency. Expected layer:
+      SUBSCRIPTION_FILTER_CAPACITY.
+    input: |
+      Symptom: the Lambda destination
+      (fn-subscription-filter-lambda-concurrency-exhausted) that
+      processes log events from three source log groups is missing
+      approximately 30% of expected events under load. CloudWatch
+      shows the source log groups receiving events, but the Lambda's
+      Invocations metric is lower than IncomingLogEvents across the
+      three source groups.
+
+      Destination Lambda: fn-subscription-filter-lambda-concurrency-exhausted
+      Account concurrent-invocations quota: 1000
+      Subscription delivery cap (2x quota): 2000
+
+      aws logs describe-subscription-filters --log-group-name <each source>:
+        3 source log groups each have one subscription filter pointing
+        to arn:aws:lambda:us-east-1:111111111111:function:fn-subscription-filter-lambda-concurrency-exhausted
+
+      aws cloudwatch get-metric-statistics (AWS/Lambda,
+        ConcurrentExecutions for the destination, last hour):
+        Maximum: 1000 (sustained for 20 minutes)
+        Throttles: 124
+
+      aws lambda get-account-settings:
+        AccountLimit.ConcurrentExecutions: 1000
+
+      aws cloudwatch get-metric-statistics (AWS/Logs,
+        IncomingLogEvents across the three source groups, last hour):
+        Sum per minute: ~2500/minute
+        Lambda Invocations for the destination: ~1750/minute
+        (700 events/minute are being dropped)
+
+      Destination Lambda has NO reserved concurrency set.
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "subscription-filter-lambda-concurrency-exhausted"
+        - "SUBSCRIPTION_FILTER_CAPACITY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: IAM_PERMISSIONS"
+
+  - id: cross-account-destination-policy-missing
+    description: >-
+      Source account 222222222222 sends logs to destination account
+      111111111111. Source IAM allows logs:PutLogEvents but the
+      destination has no resource-based policy listing the source
+      account. Cross-account delivery fails silently. Expected layer:
+      CROSS_ACCOUNT_POLICY.
+    input: |
+      Symptom: account 222222222222 is configured to send application
+      logs to a log group in account 111111111111. No events appear
+      in the destination log group. The source account's emitter role
+      has logs:PutLogEvents in IAM.
+
+      Destination LogGroup: /cross-account/cross-account-destination-policy-missing
+      Destination account: 111111111111
+      Source account: 222222222222
+      Source emitter role: arn:aws:iam::222222222222:role/log-emitter
+
+      aws iam simulate-principal-policy for
+      arn:aws:iam::222222222222:role/log-emitter (source side):
+        logs:PutLogEvents on
+        arn:aws:logs:us-east-1:111111111111:log-group:/cross-account/*:
+        ALLOWED
+
+      aws logs describe-resource-policies --profile 111111-profile:
+        resourcePolicies: []
+        (empty — no resource policy on the destination account grants
+        the source account access)
+
+      aws logs describe-destinations --profile 111111-profile:
+        destinations: []
+        (no put-destination configured for cross-account delivery)
+
+      aws logs describe-log-groups --log-group-name-prefix
+      /cross-account/cross-account-destination-policy-missing
+      --profile 111111-profile:
+        logGroups: [{
+          logGroupName: /cross-account/cross-account-destination-policy-missing,
+          storedBytes: 0,
+          retentionInDays: 90
+        }]
+        (log group exists but is empty)
+
+      CloudTrail (source account 222222222222): PutLogEvents calls
+      from the emitter role return AccessDenied.
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "cross-account-destination-policy-missing"
+        - "CROSS_ACCOUNT_POLICY"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: IAM_PERMISSIONS"

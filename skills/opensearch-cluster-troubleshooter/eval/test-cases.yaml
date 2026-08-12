@@ -1,0 +1,345 @@
+# Eval test cases for opensearch-cluster-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each
+# case's TARGET embeds the test-case id so the model naturally echoes
+# it (avoids assertion-token mismatch). The diagnostic ordering in
+# SKILL.md produces exactly the expected verdicts below.
+skill: opensearch-cluster-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cluster-block-disk-watermark-flood
+    description: >-
+      OpenSearch logs cluster writes returning ClusterBlockException
+      with FORBIDDEN/12/index read-only. One data node at 97% disk;
+      others at 91% and 88%. Unbounded monthly log indices going back
+      14 months with no ISM policy. Flood-stage read-only block.
+      Expected layer: DISK_WATERMARK_FLOOD.
+    input: |
+      Symptom: writes to OpenSearch domain prod-logs-cluster return
+      `ClusterBlockException: blocked by: [FORBIDDEN/12/index
+      read-only / delete admin api]`. The cluster status is yellow
+      and writes have been failing for 12 minutes. Reads still work.
+
+      DomainName: prod-logs-cluster
+      EngineVersion: OpenSearch_2.13
+      HotDataNodes: 3 (r6g.large.search, EBS 100 GB each)
+      MasterNodes: 3
+      ClusterStatus: yellow
+
+      _cat/allocation?v output:
+        shards  disk.indices  disk.used  disk.avail  disk.total  disk.percent  host         ip           node
+        412     88.1gb        91.2gb     2.8gb       100gb       91            10.0.1.12    10.0.1.12    prod-logs-cluster-data-1
+        411     87.5gb        89.8gb     5.2gb       100gb       88            10.0.1.13    10.0.1.13    prod-logs-cluster-data-2
+        420     92.3gb        97.0gb     3.0gb       100gb       97            10.0.1.14    10.0.1.14    prod-logs-cluster-data-3
+
+      CloudWatch metrics (last 30 minutes):
+        - ClusterIndexWritesBlocked: 1 (sustained 12 min)
+        - FreeStorageSpace Minimum: 2.8 GB on data-3
+        - JVMHeapPressure Average: 41% (heap is NOT the issue)
+        - ClusterStatus.yellow: 1
+
+      _cat/indices/logs-*?v&s=index output (excerpt):
+        logs-2023-02  health=yellow  store.size=4.2gb  docs.count=12000000
+        logs-2023-03  health=yellow  store.size=4.5gb  docs.count=13100000
+        ...
+        logs-2024-11  health=yellow  store.size=4.1gb  docs.count=11800000
+        logs-2024-12  health=yellow  store.size=4.3gb  docs.count=12500000
+      Total: 427 monthly indices from 2023-02 to 2024-12; the
+      oldest 14 months have not been queried in 30 days; no ISM
+      policy is attached to any logs-* index.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, ROOT_CAUSE,
+      LAYER, EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "cluster-block-disk-watermark-flood"
+        - "DISK_WATERMARK_FLOOD"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: JVM_HEAP_PRESSURE"
+        - "LAYER: SHARD_ALLOCATION"
+
+  - id: jvm-heap-old-gen-gc-storm
+    description: >-
+      OpenSearch search cluster has JVMHeapPressure sustained at 87%
+      for 15 minutes; OldGenGCTime climbing monotonically; p99 query
+      latency degraded from 250ms to 4.2s. 14 open indices totaling
+      2.1 TB; 4 oldest indices (900 GB) unqueried for 30 days. No
+      single slow query is the trigger — working-set growth is.
+      Expected layer: JVM_HEAP_PRESSURE.
+    input: |
+      Symptom: prod-search-cluster query p99 latency rose from 250 ms
+      to 4.2 s over 30 minutes. CloudWatch JVMHeapPressure alarm
+      fired. One `circuit_breaking_exception [parent]` logged 5
+      minutes ago. No ClusterBlockException yet.
+
+      DomainName: prod-search-cluster
+      EngineVersion: OpenSearch_2.13
+      DataNodes: 7 (r6g.2xlarge.search, 32 GB heap each)
+      MasterNodes: 3
+      ClusterStatus: green
+
+      CloudWatch metrics (last 30 minutes):
+        - JVMHeapPressure: Average = 87%, Maximum = 94% (sustained 15 min)
+        - OldGenGCTime: monotonically rising (5 min cumulative → 240 min cumulative)
+        - SearchLatency p99: 250 ms → 4.2 s
+        - ClusterIndexWritesBlocked: 0 (writes still succeed)
+        - ThreadedSearchQueue Maximum: 312 (queue not yet saturated at 1000)
+        - FreeStorageSpace Minimum: 38% (disk is NOT the issue)
+
+      _cat/indices?v&s=store.size:desc (excerpt):
+        events-2024-q1  store.size=234gb  docs.count=1.2e9  search.count_last_7d=0
+        events-2024-q2  store.size=228gb  docs.count=1.1e9  search.count_last_7d=0
+        events-2024-q3  store.size=220gb  docs.count=1.1e9  search.count_last_7d=0
+        events-2024-q4  store.size=218gb  docs.count=1.1e9  search.count_last_7d=0
+        events-2025-q1  store.size=205gb  docs.count=1.0e9  search.count_last_7d=2.4e6
+        ...
+      Total: 14 open indices, 2.1 TB hot data; 4 oldest indices
+      (events-2024-q1..q4) total 900 GB and have not been queried
+      in 30 days.
+
+      Application log (last 5 min):
+        [parent] Data too large, data for [<all_shards>] would be
+          larger than limit of [33620709374/31.3gb]]
+        Old Gen used 28.4 GB of 31.0 GB
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "jvm-heap-old-gen-gc-storm"
+        - "JVM_HEAP_PRESSURE"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: DISK_WATERMARK_FLOOD"
+        - "LAYER: THREAD_POOL_SEARCH"
+
+  - id: search-thread-pool-rejection
+    description: >-
+      OpenSearch cluster returning 429 to client. _cat/thread_pool/search
+      shows rejected count growing on all 5 data nodes. ThreadedSearchQueue
+      CloudWatch metric peaked at 1000 (queue full). Disk and heap
+      are healthy. A high-cardinality terms aggregation is the trigger.
+      Expected layer: THREAD_POOL_SEARCH.
+    input: |
+      Symptom: prod-search-cluster clients receive HTTP 429
+      (`EsRejectedOperationException`). Read-heavy dashboards began
+      failing at 14:30 UTC. The cluster is green; no
+      ClusterBlockException; heap and disk are healthy.
+
+      DomainName: prod-search-cluster
+      EngineVersion: OpenSearch_2.13
+      DataNodes: 5 (r6g.xlarge.search)
+      MasterNodes: 3
+      ClusterStatus: green
+
+      _cat/thread_pool/search?v&h=node_name,name,active,queue,queue_size,rejected output:
+        node-1  search  4  1000  1000  18271
+        node-2  search  4  1000  1000  17934
+        node-3  search  4  1000  1000  18112
+        node-4  search  4  1000  1000  17893
+        node-5  search  4  1000  1000  18044
+
+      CloudWatch metrics (last 30 minutes):
+        - ThreadedSearchQueue: Maximum = 1000 (queue full on all nodes)
+        - SearchRate: 4800 searches/sec (sustained 25 min)
+        - JVMHeapPressure Average: 52% (heap healthy)
+        - FreeStorageSpace Minimum: 41% (disk healthy)
+        - CPUUtilization Average: 88%
+
+      Recent slow log entries (top 3):
+        took[8.4s], took[7.9s], took[8.1s] — all from
+        "query": { "size": 0, "aggs": {
+          "by_user": { "terms": { "field": "user_id", "size": 10000 } } } }
+        Cardinality of user_id field: 8.4M distinct values
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "search-thread-pool-rejection"
+        - "THREAD_POOL_SEARCH"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: JVM_HEAP_PRESSURE"
+        - "LAYER: DISK_WATERMARK_FLOOD"
+
+  - id: shard-allocation-unassigned-red
+    description: >-
+      OpenSearch cluster status flipped to red after a data node was
+      replaced. _cluster/allocation/explain returns
+      disk_watermark.high as the binding decider — two remaining
+      data nodes are both above 90% disk. Primary shard cannot
+      allocate. Expected layer: SHARD_ALLOCATION.
+    input: |
+      Symptom: prod-search-cluster _cluster/health flipped from
+      green to red at 09:14 UTC after data node `data-3` was
+      replaced via AWS support. Searches on events-2025-q3 return
+      `search_phase_execution_exception: all shards failed`.
+
+      DomainName: prod-search-cluster
+      EngineVersion: OpenSearch_2.13
+      DataNodes: 2 (was 3, data-3 being replaced)
+      MasterNodes: 3
+      ClusterStatus: red
+
+      _cluster/health?pretty output:
+        {
+          "cluster_name": "prod-search-cluster",
+          "status": "red",
+          "timed_out": false,
+          "number_of_nodes": 5,
+          "number_of_data_nodes": 2,
+          "active_primary_shards": 240,
+          "active_shards": 360,
+          "relocating_shards": 0,
+          "initializing_shards": 0,
+          "unassigned_shards": 24,
+          "unassigned_primary_shards": 12
+        }
+
+      _cat/allocation?v output:
+        shards  disk.indices  disk.used  disk.avail  disk.total  disk.percent  node
+        180     88.1gb        91.2gb     8.8gb       100gb       91            data-1
+        180     87.5gb        89.8gb     10.2gb      100gb       90            data-2
+        24      12.4gb                                                      UNASSIGNED
+
+      _cluster/allocation/explain (excerpt) for the unassigned primary:
+        "index": "events-2025-q3", "shard": 0, "primary": true,
+        "current_state": "unassigned",
+        "allocation_decisions": [
+          { "decider": "max_shards_per_node", "decision": "NO",
+            "explanation": "this shard allocation would put the node
+              over the cluster max_shards_per_node setting" },
+          { "decider": "disk_watermark.high", "decision": "NO",
+            "explanation": "the node has 9% free disk, above the
+              high watermark; this is informational only" }
+        ]
+      NOTE: the FIRST decider (max_shards_per_node) is the binding
+      constraint per the SKILL convention.
+
+      CloudWatch metrics (last 30 minutes):
+        - JVMHeapPressure Average: 48% (healthy)
+        - FreeStorageSpace Minimum: 8.8 GB (data-1 above low; high is 10 GB)
+        - ClusterStatus.red: 1
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "shard-allocation-unassigned-red"
+        - "SHARD_ALLOCATION"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: CLUSTER_YELLOW"
+
+  - id: circuit-breaker-fielddata
+    description: >-
+      OpenSearch cluster returns circuit_breaking_exception [fielddata]
+      on a specific aggregation against a text field. _nodes/stats/breaker
+      shows fielddata breaker tripped at 41% of heap (limit 40%).
+      Field `request_body` is mapped as text with fielddata enabled.
+      Expected layer: CIRCUIT_BREAKER_FIELDDATA.
+    input: |
+      Symptom: prod-search-cluster returns HTTP 503 with
+      `circuit_breaking_exception` for queries that aggregate on the
+      `request_body` field. Other queries succeed. Cluster is green.
+
+      DomainName: prod-search-cluster
+      EngineVersion: OpenSearch_2.13
+      DataNodes: 5 (r6g.xlarge.search)
+      ClusterNodes: 3
+      ClusterStatus: green
+
+      Application log (failing request):
+        {
+          "error": {
+            "type": "circuit_breaking_exception",
+            "reason": "[fielddata] Data too large, data for
+              [request_body] would be larger than limit of
+              [1288490188/1.2gb]",
+            "bytes_wanted": 1410000000,
+            "bytes_limit": 1288490188,
+            "durability": "TRANSIENT"
+          }
+        }
+
+      _nodes/stats/breaker?pretty (excerpt):
+        "breakers": {
+          "fielddata": {
+            "limit_size_in_bytes": 1288490188,
+            "limit_size": "1.2gb",
+            "estimated_size_in_bytes": 1310000000,
+            "tripped": 14
+          },
+          "parent": {
+            "limit_size_in_bytes": 3060164198,
+            "estimated_size_in_bytes": 1410000000,
+            "tripped": 0
+          }
+        }
+
+      events-2025-q3/_mapping (excerpt):
+        "request_body": {
+          "type": "text",
+          "fielddata": true
+        }
+
+      CloudWatch metrics (last 30 minutes):
+        - JVMHeapPressure Average: 62% (above 75% early-warning? NO)
+        - ClusterIndexWritesBlocked: 0
+        - ClusterStatus.green: 1
+
+      Emit the standard diagnostic block.
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "circuit-breaker-fielddata"
+        - "CIRCUIT_BREAKER_FIELDDATA"
+        - "VERDICT"
+        - "ROOT_CAUSE"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: CIRCUIT_BREAKER_PARENT"
+        - "LAYER: JVM_HEAP_PRESSURE"

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "redshift-query-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the Redshift Query Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "distkey-skew-ds-dist-all-inner",
+      "name": "Query joins sales (EVEN, 800M rows) to store (KEY on store_id) — EXPLAIN shows DS_DIST_ALL_INNER broadcast",
+      "difficulty": "hard",
+      "prompt_file": "prompts/distkey-skew-ds-dist-all-inner.md",
+      "baseline_file": "baselines/distkey-skew-ds-dist-all-inner.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "DIST_KEY_SKEW",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "distkey-skew", "DIST_KEY_SKEW", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: WLM_QUEUE_TIMEOUT"]
+        }
+      ]
+    },
+    {
+      "id": "wlm-queue-timeout",
+      "name": "Query cancelled at 240s in Batch queue — queue_time 240s, exec_time 0s (never started executing)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/wlm-queue-timeout.md",
+      "baseline_file": "baselines/wlm-queue-timeout.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "WLM_QUEUE_TIMEOUT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "wlm-queue", "WLM_QUEUE_TIMEOUT", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: DIST_KEY_SKEW"]
+        }
+      ]
+    },
+    {
+      "id": "copy-data-format-delimiter",
+      "name": "COPY from S3 fails — data is pipe-delimited but COPY specifies DELIMITER comma (errcode 1204)",
+      "difficulty": "medium",
+      "prompt_file": "prompts/copy-data-format-delimiter.md",
+      "baseline_file": "baselines/copy-data-format-delimiter.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "COPY_DATA_FORMAT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "copy-delimiter", "COPY_DATA_FORMAT", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: COPY_IAM_ROLE"]
+        }
+      ]
+    },
+    {
+      "id": "table-lock-copy-blocking-select",
+      "name": "COPY holding AccessExclusiveLock blocks reporting SELECT — STV_LOCKS shows granted=true/false pair",
+      "difficulty": "hard",
+      "prompt_file": "prompts/table-lock-copy-blocking-select.md",
+      "baseline_file": "baselines/table-lock-copy-blocking-select.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TABLE_LOCK",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "table-lock", "TABLE_LOCK", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: WLM_QUEUE_TIMEOUT"]
+        }
+      ]
+    },
+    {
+      "id": "sortkey-misalignment-seq-scan",
+      "name": "Query on 500M row table with no sort key — Seq Scan scans entire table instead of 1 day of data",
+      "difficulty": "hard",
+      "prompt_file": "prompts/sortkey-misalignment-seq-scan.md",
+      "baseline_file": "baselines/sortkey-misalignment-seq-scan.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "SORT_KEY_MISALIGNMENT",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "sortkey-misalignment", "SORT_KEY_MISALIGNMENT", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: DIST_KEY_SKEW"]
+        }
+      ]
+    }
+  ]
+}

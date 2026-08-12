@@ -1,0 +1,288 @@
+# Eval test cases for redshift-query-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: redshift-query-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: distkey-skew-ds-dist-all-inner
+    description: >-
+      Redshift query joining sales (DISTSTYLE EVEN, 800M rows) to store
+      (DISTSTYLE KEY on store_id). EXPLAIN shows DS_DIST_ALL_INNER —
+      the sales table is broadcast to all nodes. Query takes 45s.
+      Expected layer: DIST_KEY_SKEW.
+    input: |
+      Symptom: query on the analytics database takes 45 seconds. The
+      query joins the sales fact table (800 million rows) to the store
+      dimension table (5,000 rows). EXPLAIN output shows
+      DS_DIST_ALL_INNER on the join, indicating the sales table is
+      redistributed to every node.
+
+      Cluster: rs-redshift-distkey-skew
+      Database: analytics_db
+      Query:
+        SELECT s.store_name, sum(sa.amount)
+        FROM store s
+        JOIN sales sa ON s.store_id = sa.store_id
+        GROUP BY s.store_name;
+
+      Table definitions:
+        sales:
+          DISTSTYLE: EVEN
+          sortkey: sale_date
+          rows: 800,000,000
+        store:
+          DISTSTYLE: KEY (distkey: store_id)
+          sortkey: store_id
+          rows: 5,000
+
+      EXPLAIN excerpt:
+        XN Hash Join DS_DIST_ALL_INNER
+          -> XN Seq Scan on sales sa
+          -> XN Hash -> XN Seq Scan on store s
+
+      STL_WLM_QUERY: queue_time = 0.5s, exec_time = 44.2s
+      STV_LOCKS: empty (no locks)
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "distkey-skew"
+        - "DIST_KEY_SKEW"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: WLM_QUEUE_TIMEOUT"
+
+  - id: wlm-queue-timeout
+    description: >-
+      Redshift query cancelled after 240s in WLM Batch queue (service
+      class 8). Queue has 2 slots, 5 concurrent queries submitted.
+      queue_time = 240s, exec_time = 0s (never started executing).
+      Expected layer: WLM_QUEUE_TIMEOUT.
+    input: |
+      Symptom: Redshift query was cancelled with "Query 67890
+      cancelled due to queue timeout." The query was submitted to the
+      Batch queue (service class 8) along with 4 other queries
+      simultaneously. Only 2 queries could execute (2 slots); the
+      rest waited. The query never started executing before the
+      240-second timeout.
+
+      Cluster: rs-redshift-wlm-queue
+      Database: analytics_db
+      Query ID: 67890
+      Queue: Batch (service_class 8)
+
+      STL_WLM_QUERY for query 67890:
+        service_class: 8
+        queue_time: 240000000 (240s)
+        exec_time: 0
+        state: cancelled
+
+      STV_WLM_SERVICE_CLASS_CONFIG (service_class 8):
+        num_query_tasks: 2
+        max_execution_time: 240000000 (240s)
+
+      The query itself runs in 3 seconds when it reaches the front
+      of the queue (verified on a separate run).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "wlm-queue"
+        - "WLM_QUEUE_TIMEOUT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: DIST_KEY_SKEW"
+
+  - id: copy-data-format-delimiter
+    description: >-
+      COPY from S3 fails with "Delimiter not found" (errcode 1204).
+      Data is pipe-delimited but COPY specifies DELIMITER ','.
+      STL_LOAD_ERRORS shows raw_line with pipe separators. Expected
+      layer: COPY_DATA_FORMAT.
+    input: |
+      Symptom: COPY command from s3://etl-bucket/daily/orders.csv
+      fails. STL_LOAD_ERRORS shows errcode 1204 "Delimiter not found"
+      at line 1.
+
+      Cluster: rs-redshift-copy-delimiter
+      Database: analytics_db
+
+      Failed COPY command:
+        COPY orders
+        FROM 's3://etl-bucket/daily/orders.csv'
+        IAM_ROLE 'arn:aws:iam::111111111111:role/RedshiftETLRole'
+        DELIMITER ','
+        FORMAT CSV;
+
+      STL_LOAD_ERRORS (latest entry):
+        starttime: 2026-08-11 14:23:15
+        errcode: 1204
+        errmsg: "Delimiter not found"
+        filename: orders.csv
+        line_number: 1
+        colname: order_id
+        coltype: integer
+        raw_line: "1001|2024-01-15|450.00|shipped"
+        raw_field_value: "1001|2024-01-15|450.00|shipped"
+
+      File header (verified from S3):
+        order_id|order_date|amount|status
+
+      IAM role has s3:GetObject on the bucket (verified).
+      File exists and is readable.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "copy-delimiter"
+        - "COPY_DATA_FORMAT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: COPY_IAM_ROLE"
+
+  - id: table-lock-copy-blocking-select
+    description: >-
+      Long-running COPY blocks a SELECT query on the same table.
+      STV_LOCKS shows the COPY holding an exclusive lock with
+      granted=true; the SELECT waiting with granted=false. Expected
+      layer: TABLE_LOCK.
+    input: |
+      Symptom: a reporting SELECT query on the orders table has been
+      hanging for 10 minutes. The query started at 14:10 UTC; at
+      14:05 UTC a large COPY began loading data into the same table.
+
+      Cluster: rs-redshift-table-lock
+      Database: analytics_db
+
+      STV_LOCKS output:
+        relation  | relname  | pid  | granted | lock_mode         | lock_owner_pid
+        167854    | orders    | 8421 | true    | AccessExclusiveLock | (self)
+        167854    | orders    | 8432 | false   | AccessShareLock     | 8421
+
+      STV_INFLIGHT output:
+        pid  | query                                                    | starttime          | elapsed
+        8421 | COPY orders FROM 's3://etl-bucket/huge_batch.csv' ...   | 2026-08-11 14:05:00 | 620s
+        8432 | SELECT count(*) FROM orders WHERE order_date = '...'     | 2026-08-11 14:10:00 | 320s
+
+      The COPY (pid 8421) holds an AccessExclusiveLock on orders.
+      The SELECT (pid 8432) is waiting for an AccessShareLock,
+      blocked by pid 8421.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "table-lock"
+        - "TABLE_LOCK"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: WLM_QUEUE_TIMEOUT"
+
+  - id: sortkey-misalignment-seq-scan
+    description: >-
+      Query on a 500M row events table takes 60s. Table has no sort
+      key. EXPLAIN shows Seq Scan. Query filters on event_type and
+      created_at. Adding a sort key on created_at would enable zone
+      map elimination. Expected layer: SORT_KEY_MISALIGNMENT.
+    input: |
+      Symptom: query on the events table takes 60 seconds. The table
+      has 500 million rows and NO sort key. The query filters on
+      created_at and event_type but EXPLAIN shows a full Seq Scan
+      (no zone map elimination possible).
+
+      Cluster: rs-redshift-sortkey-misalignment
+      Database: analytics_db
+      Query:
+        SELECT event_type, count(*)
+        FROM events
+        WHERE created_at >= '2026-08-01'
+          AND created_at < '2026-08-02'
+          AND event_type = 'purchase'
+        GROUP BY event_type;
+
+      Table definition:
+        events:
+          DISTSTYLE: KEY (distkey: user_id)
+          sortkey: (none)
+          rows: 500,000,000
+
+      EXPLAIN excerpt:
+        XN Seq Scan on events
+          Filter: ((created_at >= '2026-08-01') AND
+                   (created_at < '2026-08-02') AND
+                   (event_type = 'purchase'))
+
+      SVV_TABLE_INFO:
+        tablename: events
+        sortkey1: (empty)
+        unsorted: N/A (no sort key)
+        size: 125 GB
+
+      The query should only scan ~1 day of data (~1.4M rows) but
+      instead scans the entire 500M row table.
+
+      STL_WLM_QUERY: queue_time = 0.3s, exec_time = 59.5s
+      STV_LOCKS: empty
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "sortkey-misalignment"
+        - "SORT_KEY_MISALIGNMENT"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: DIST_KEY_SKEW"

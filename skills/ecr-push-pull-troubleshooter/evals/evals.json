@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jhkchan/aws-agent-skills/main/schema/SKILL.schema.json",
+  "skill": "ecr-push-pull-troubleshooter",
+  "version": "1.0.0",
+  "description": "Structured eval definitions for the ECR Push/Pull Troubleshooter. Each eval case is a self-contained {id, name, difficulty, prompt, expected_output, files[], assertions[]} record. The prompt and baseline live in external files (see eval_config.yaml) so the same case can run with-skill vs without-skill (baseline) for delta comparison. The legacy eval/test-cases.yaml remains the CI assertion-layer surface discovered by eval/run_eval.py.",
+  "baseline_model": "amazon.nova-pro-v1:0",
+  "eval_cases": [
+    {
+      "id": "auth-token-expired-ci-cache",
+      "name": "docker push 'Your authorization token has expired' — CI caches ~/.docker/config.json across jobs; 12-hour ECR token elapsed",
+      "difficulty": "medium",
+      "prompt_file": "prompts/auth-token-expired-ci-cache.md",
+      "baseline_file": "baselines/auth-token-expired-ci-cache.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "AUTH_TOKEN_EXPIRED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "auth-token-expired-ci-cache", "AUTH_TOKEN_EXPIRED", "VERDICT", "REASON", "EVIDENCE", "REMEDIATION"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: AUTH_IAM_DENIED", "LAYER: POLICY_IAM"]
+        }
+      ]
+    },
+    {
+      "id": "lifecycle-policy-first-match-delete",
+      "name": "Lifecycle policy rule 'expire count=3' in first-match position deleted the 4th-newest image (a production release)",
+      "difficulty": "hard",
+      "prompt_file": "prompts/lifecycle-policy-first-match-delete.md",
+      "baseline_file": "baselines/lifecycle-policy-first-match-delete.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "LIFECYCLE_DELETED",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "lifecycle-policy-first-match-delete", "LIFECYCLE_DELETED", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: POLICY_REPOSITORY"]
+        }
+      ]
+    },
+    {
+      "id": "cross-account-repo-policy-missing",
+      "name": "Cross-account ECS pull denied — caller IAM allows ecr:BatchGetImage but ECR repository policy does not list the caller's account",
+      "difficulty": "hard",
+      "prompt_file": "prompts/cross-account-repo-policy-missing.md",
+      "baseline_file": "baselines/cross-account-repo-policy-missing.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "POLICY_REPOSITORY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "cross-account-repo-policy-missing", "POLICY_REPOSITORY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: POLICY_IAM"]
+        }
+      ]
+    },
+    {
+      "id": "tag-immutability-overwrite-blocked",
+      "name": "CI overwrite of 'latest' tag fails — repository imageTagMutability is IMMUTABLE; first-push succeeded, subsequent pushes denied",
+      "difficulty": "medium",
+      "prompt_file": "prompts/tag-immutability-overwrite-blocked.md",
+      "baseline_file": "baselines/tag-immutability-overwrite-blocked.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "TAG_IMMUTABILITY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "tag-immutability-overwrite-blocked", "TAG_IMMUTABILITY", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: POLICY_IAM", "LAYER: AUTH_TOKEN_EXPIRED"]
+        }
+      ]
+    },
+    {
+      "id": "fargate-arm64-arch-mismatch",
+      "name": "Fargate x86_64 task pulls a single-arch arm64 image — 'no matching manifest for platform linux/amd64' — manifest is not a multi-arch list",
+      "difficulty": "hard",
+      "prompt_file": "prompts/fargate-arm64-arch-mismatch.md",
+      "baseline_file": "baselines/fargate-arm64-arch-mismatch.md",
+      "expected_verdict": "ROOT_CAUSE_IDENTIFIED",
+      "expected_layer": "ARCHITECTURE_MISMATCH",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": ["ROOT_CAUSE_IDENTIFIED", "fargate-arm64-arch-mismatch", "ARCHITECTURE_MISMATCH", "VERDICT", "REASON", "EVIDENCE"]
+        },
+        {
+          "type": "must_not_contain",
+          "values": ["Error:", "I cannot", "I'm unable", "VERDICT: INSUFFICIENT_DATA", "LAYER: MANIFEST_INVALID", "LAYER: POLICY_REPOSITORY"]
+        }
+      ]
+    }
+  ]
+}

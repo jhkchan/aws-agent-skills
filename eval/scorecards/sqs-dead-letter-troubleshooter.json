@@ -1,0 +1,70 @@
+{
+  "skill": "sqs-dead-letter-troubleshooter",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 15,
+      "max": 20,
+      "justification": "The skill compiles extensive AWS\u2011specific diagnostics (e.g., FIFO poison\u2011message behavior, visibility\u2011timeout reset semantics, StartMessageMoveTask v2 details) into a decision tree, which is useful but largely restates documented best\u2011practice knowledge. No truly novel thresholds or proprietary heuristics are introduced, so the delta is solid but not maximal."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 13,
+      "max": 15,
+      "justification": "Procedures are AWS\u2011specific (CLI commands, ordering of queue\u2011attribute checks, Lambda event\u2011source\u2011mapping overrides). However, some steps are generic (e.g., \u201ccheck visibility timeout\u201d) and the exact ordering for Lambda vs queue visibility timeout could be clearer, leading to a small deduction."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 14,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never emit ROOT_CAUSE_IDENTIFIED without a failing probe, never attach a standard DLQ to a FIFO source). Missing a few edge anti\u2011patterns such as IAM permission pitfalls keeps it from full marks."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 15,
+      "max": 15,
+      "justification": "Front\u2011matter is complete, description clearly states WHAT it does, WHEN to invoke, and includes rich keywords and activation triggers. The invocation schema and example are well\u2011formed, enabling reliable activation."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "The skill layers information (quick start \u2192 mindset \u2192 philosophy \u2192 detailed tree \u2192 anti\u2011patterns \u2192 remediation). The symptom\u2011triage table and large pre\u2011flight command block front\u2011load a lot of detail, which could overwhelm a first\u2011time user, so two points are deducted."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 15,
+      "max": 15,
+      "justification": "Destructive actions (set\u2011queue\u2011attributes, delete\u2011message, start\u2011message\u2011move\u2011task, concurrency changes) are gated behind explicit CONFIRM prompts. Non\u2011destructive probes are read\u2011only. Calibration matches task fragility perfectly."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 10,
+      "max": 10,
+      "justification": "The skill follows a coherent, recognizable pattern (quick start, mindset, philosophy, diagnostic tree, anti\u2011patterns, safety checks, remediation, deep reference) that aligns with the CloudOps skill framework."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides concrete CLI commands, output format, and worked examples that an agent can execute. Minor gaps: no guidance on handling paginated results, missing error\u2011handling for failed CLI calls, and no explicit method to retrieve the Lambda event\u2011source\u2011mapping UUID, which could impede execution in some scenarios."
+    }
+  ],
+  "total_score": 108,
+  "max_score": 120,
+  "grade": "A",
+  "token_count": 62996,
+  "latency_ms": 17368,
+  "assertions_passed": false,
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
+}

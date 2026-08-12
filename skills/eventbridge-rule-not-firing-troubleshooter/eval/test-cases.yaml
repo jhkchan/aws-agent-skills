@@ -1,0 +1,277 @@
+# Eval test cases for eventbridge-rule-not-firing-troubleshooter
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per root-cause layer family. Each case's
+# TARGET embeds the test-case id so the model naturally echoes it (avoids
+# assertion-token mismatch). The diagnostic ordering in SKILL.md produces
+# exactly the expected verdicts below.
+skill: eventbridge-rule-not-firing-troubleshooter
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: pattern-detail-type-mismatch
+    description: >-
+      EventBridge rule filters on detail-type "Order Created" but the
+      event has detail-type "OrderCreated" (no space). test-event-pattern
+      returns false. Target Lambda never invoked. Expected layer:
+      PATTERN_DETAIL_TYPE_MISMATCH.
+    input: |
+      Symptom: PutEvents returns 200 with FailedEntryCount: 0 for events
+      on custom.orders-bus, but the target Lambda fn-ev-pattern-detail-type
+      is never invoked. The rule State is ENABLED.
+
+      EventBusName: custom.orders-bus
+      RuleName: ev-pattern-detail-type-mismatch
+      EventPattern:
+        source: ["myapp.orders"]
+        detail-type: ["Order Created"]
+        detail:
+          status: ["confirmed"]
+      State: ENABLED
+
+      SampleEvent:
+        version: "0"
+        id: "abc-123"
+        detail-type: "OrderCreated"
+        source: "myapp.orders"
+        account: "111111111111"
+        region: "us-east-1"
+        detail:
+          status: "confirmed"
+          orderId: "ord-9912"
+
+      Target Lambda: fn-ev-pattern-detail-type (same account)
+      Target Lambda resource-based policy: includes events.amazonaws.com
+        principal with SourceArn matching the rule ARN.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "pattern-detail-type-mismatch"
+        - "PATTERN_DETAIL_TYPE_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+        - "REMEDIATION"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: PATTERN_SOURCE_MISMATCH"
+
+  - id: content-filter-nested-depth
+    description: >-
+      EventBridge rule uses a content-based filter on detail path at
+      depth 11 (exceeds the 10-level cap). Events whose matching value
+      lives at depth 11 silently fail to match. Expected layer:
+      CONTENT_FILTER_NESTED_DEPTH.
+    input: |
+      Symptom: PutEvents returns 200 but the rule never fires. The
+      pattern looks correct — the source, detail-type, and nested path
+      all correspond to the event. But test-event-pattern returns false.
+
+      EventBusName: custom.events-bus
+      RuleName: ev-content-filter-nested-depth
+      EventPattern:
+        source: ["myapp.events"]
+        detail-type: ["Deep Event"]
+        detail:
+          l1:
+            l2:
+              l3:
+                l4:
+                  l5:
+                    l6:
+                      l7:
+                        l8:
+                          l9:
+                            l10:
+                              l11: ["target-value"]
+      State: ENABLED
+
+      SampleEvent:
+        version: "0"
+        detail-type: "Deep Event"
+        source: "myapp.events"
+        detail:
+          l1:
+            l2:
+              l3:
+                l4:
+                  l5:
+                    l6:
+                      l7:
+                        l8:
+                          l9:
+                            l10:
+                              l11: "target-value"
+
+      aws events test-event-pattern returns {"Result": false}.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "content-filter-nested-depth"
+        - "CONTENT_FILTER_NESTED_DEPTH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: PATTERN_DETAIL_PATH_MISMATCH"
+
+  - id: schedule-cron-syntax
+    description: >-
+      Schedule-based rule uses a 5-field cron expression "cron(0 9 * * *)"
+      instead of the required 6-field format. EventBridge auto-disabled
+      the rule. Expected layer: SCHEDULE_SYNTAX.
+    input: |
+      Symptom: schedule-based rule ev-schedule-cron-syntax never fires
+      at the expected time (09:00 UTC daily). describe-rule shows
+      State: DISABLED.
+
+      EventBusName: default
+      RuleName: ev-schedule-cron-syntax
+      ScheduleExpression: "cron(0 9 * * *)"
+      EventPattern: (none — schedule-based rule)
+      State: DISABLED
+
+      Target Lambda: fn-ev-schedule-cron (same account, has
+        events.amazonaws.com principal).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "schedule-cron-syntax"
+        - "SCHEDULE_SYNTAX"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: PATTERN_SOURCE_MISMATCH"
+
+  - id: target-lambda-permission-missing
+    description: >-
+      Rule fires (test-event-pattern: true, CloudTrail shows invocation
+      attempt) but target Lambda is never invoked. Lambda resource-based
+      policy has no events.amazonaws.com statement. Expected layer:
+      TARGET_LAMBDA_PERMISSION.
+    input: |
+      Symptom: PutEvents returns 200; test-event-pattern returns
+      {"Result": true}; CloudTrail shows EventBridge attempting to
+      invoke the Lambda. But the Lambda's CloudWatch logs show zero
+      invocations.
+
+      EventBusName: custom.orders-bus
+      RuleName: ev-target-lambda-permission-missing
+      EventPattern:
+        source: ["myapp.orders"]
+        detail-type: ["OrderCreated"]
+      State: ENABLED
+
+      Target Lambda: fn-ev-target-permission (same account)
+
+      aws lambda get-policy on fn-ev-target-permission returns:
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "APIGatewayInvoke",
+            "Effect": "Allow",
+            "Principal": {"Service": "apigateway.amazonaws.com"},
+            "Action": "lambda:InvokeFunction"
+          }
+        ]
+      }
+      Note: No statement for events.amazonaws.com.
+
+      CloudTrail shows EventBridge invocation returning AccessDenied.
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "target-lambda-permission-missing"
+        - "TARGET_LAMBDA_PERMISSION"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: TARGET_IAM_ROLE"
+
+  - id: bus-mismatch-custom-default
+    description: >-
+      Events are put on the default bus but the rule is on a custom bus.
+      PutEvents returns 200 but no rule fires. Expected layer:
+      BUS_MISMATCH.
+    input: |
+      Symptom: PutEvents returns 200 with FailedEntryCount: 0. The
+      target Lambda is never invoked. The rule State is ENABLED and the
+      pattern matches the event (test-event-pattern returns true when
+      tested manually).
+
+      EventBusName (rule): custom.events-bus
+      RuleName: ev-bus-mismatch-custom-default
+      EventPattern:
+        source: ["myapp.events"]
+        detail-type: ["EventPublished"]
+      State: ENABLED
+
+      PutEvents call (from CloudTrail):
+        requestParameters.entries[0].eventBusName: "default"
+        (operator omitted EventBusName in PutEvents, defaulting to
+        the default bus)
+
+      SampleEvent:
+        source: "myapp.events"
+        detail-type: "EventPublished"
+        detail: {"status": "ok"}
+
+      Target Lambda: fn-ev-bus-mismatch (has
+        events.amazonaws.com principal, SourceArn scoped to
+        custom.events-bus rule ARN).
+
+      Emit the standard diagnostic block (TARGET, VERDICT, REASON, LAYER,
+      EVIDENCE, REMEDIATION).
+    expected_verdict: ROOT_CAUSE_IDENTIFIED
+    assertions:
+      must_contain:
+        - "ROOT_CAUSE_IDENTIFIED"
+        - "bus-mismatch-custom-default"
+        - "BUS_MISMATCH"
+        - "VERDICT"
+        - "REASON"
+        - "EVIDENCE"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: INSUFFICIENT_DATA"
+        - "LAYER: PATTERN_SOURCE_MISMATCH"
